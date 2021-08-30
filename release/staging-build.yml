@@ -1,0 +1,29 @@
+version: 0.2
+
+run-as: imagebuilder
+
+env:
+  secrets-manager:
+    GOVC_DATACENTER: "vsphere_ci_beta_connection:vsphere_datacenter"
+    GOVC_URL: "vsphere_ci_beta_connection:vsphere_url"
+    GOVC_USERNAME: "vsphere_ci_beta_connection:vsphere_username"
+    GOVC_PASSWORD: "vsphere_ci_beta_connection:vsphere_password"
+    VSPHERE_CONNECTION_DATA: "vsphere_ci_beta_connection:vsphere_connection_data"
+
+phases:
+  pre_build:
+    run-as: root
+    commands:
+    - ./build/lib/setup.sh
+    - /docker.sh
+
+  build:
+    run-as: root
+    commands:
+    - make release-binaries-images
+  
+  post_build:
+    commands:
+    - export HOME="/home/imagebuilder"
+    - make release-ovas
+    

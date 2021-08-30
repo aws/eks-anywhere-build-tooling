@@ -1,0 +1,73 @@
+#!/bin/bash
+set -eux -o pipefail
+export PATH="${PATH}:/opt/bin"
+
+
+############################
+# Modify files created by cloud-init script until we change capi to generate them the way we need for BR
+
+# kube-vip needs the admin.conf to use the api server for leader election. we already symlink /etc/kubernetes to /var/lib/kubeadm so that it is persisted
+yq -i e '.spec.volumes |= [{"hostPath":{"path":"/var/lib/kubeadm/admin.conf", "type": "File"}, "name":"kubeconfig"}]' /etc/kubernetes/manifests/kube-vip.yaml 
+
+yq -i e 'select(.kind == "ClusterConfiguration").certificatesDir |= "/var/lib/kubeadm/pki"' /tmp/kubeadm-join-config.yaml
+
+yq -i e 'select(.kind == "ClusterConfiguration").controllerManager.extraVolumes |= [{"name": "kubeconfig", "hostPath": "/var/lib/kubeadm/controller-manager.conf", "mountPath": "/etc/kubernetes/controller-manager.conf", "readOnly": true, "pathType": "File"}]' /tmp/kubeadm-join-config.yaml
+yq -i e 'select(.kind == "ClusterConfiguration").scheduler.extraVolumes |= [{"name": "kubeconfig", "hostPath": "/var/lib/kubeadm/scheduler.conf", "mountPath": "/etc/kubernetes/scheduler.conf", "readOnly": true, "pathType": "File"}]' /tmp/kubeadm-join-config.yaml
+
+###########################
+
+kubeadm -v9 --config /tmp/kubeadm-join-config.yaml join phase control-plane-prepare all
+
+# Get kubeadm to write out keys, certificates, manifests, and the kubelet config.
+# timeout 10 because kubeadm will wait for kubelet to start which will never succeed since
+# we need to set the api settings down below
+# TODO: instead of a dumb timeout, we migth be able to be a bit smarter and make sure
+# /var/lib/kubelet/config.yaml + certs are all written out
+timeout 10 kubeadm -v9 --config /tmp/kubeadm-join-config.yaml join phase kubelet-start ||:
+
+# Compute and apply all required settings.
+API="$(awk '/apiServerEndpoint:/{ print "https://"$2 }' /tmp/kubeadm-join-config.yaml)"
+CA="$(base64 -w 0 /etc/kubernetes/pki/ca.crt)"
+TOKEN="$(awk '/token:/{ print $2 }' /tmp/kubeadm-join-config.yaml)"
+DNS="$(awk '/clusterDNS:/ { getline; print $2 }' /var/lib/kubelet/config.yaml)"
+
+apiclient set \
+  kubernetes.api-server="${API}" \
+  kubernetes.cluster-certificate="${CA}" \
+  kubernetes.cluster-dns-ip="${DNS}" \
+  kubernetes.bootstrap-token="${TOKEN}" \
+  kubernetes.authentication-mode="tls" \
+  kubernetes.standalone-mode="false"
+
+# Give the kubelet time to join the cluster.
+sleep 30
+
+# Migrate all static pods from this host-container to the bottleroot host using the apiclient
+for file in /etc/kubernetes/manifests/*.yaml; do
+  filename=$(basename $file)
+  pod="${filename%.*}" 
+  cat $file
+  apiclient set \
+    "kubernetes.static-pods.${pod}.manifest"="$(base64 -w 0 $file)" \
+    "kubernetes.static-pods.${pod}.enabled"=true
+done
+
+# Get kubeadm to write out the manifest for etcd.
+# It will wait for etcd to start, which won't succeed because we need to set the static-pods in the BR api.
+timeout 10 kubeadm -v9 --config /tmp/kubeadm-join-config.yaml join phase control-plane-join etcd ||:
+
+# Bring up our etcd pod.
+apiclient set \
+  "kubernetes.static-pods.etcd.manifest"="$(base64 -w 0 /etc/kubernetes/manifests/etcd.yaml)" \
+  "kubernetes.static-pods.etcd.enabled"=true
+
+# Wait for the local Kubernetes API server to come up.
+#https://github.com/kubernetes/kubeadm/blob/05f9b96cf83d73ed2177815487eba90517b66708/kinder/pkg/cluster/manager/actions/kubeadm-init.go#L167
+while [ "$(curl -k https://localhost:6443/healthz -s -o /dev/null -w '%{http_code}')" != "200" ] ; do
+  sleep 1
+done
+
+# Let kubeadm finish.
+kubeadm -v9 --config /tmp/kubeadm-join-config.yaml \
+  join \
+  --skip-phases preflight,control-plane-prepare,kubelet-start,control-plane-join/etcd

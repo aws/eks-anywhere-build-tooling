@@ -1,0 +1,40 @@
+#!/bin/bash
+set -eux -o pipefail
+
+MARKER="/.bottlerocket/host-containers/kubeadm-the-hard-way/.ran"
+if [ -f "${MARKER}" ] ; then
+  echo "Found a previous execution; shutting down" 2>&1
+  apiclient set host-containers.kubeadm-the-hard-way.enabled=false
+  sleep 100000
+fi
+
+touch "${MARKER}"
+
+# Ensure that kubeadm created files are visible/saved on the host.
+# The "cloud-init" script is going to write out all the certs to the pki folder
+mkdir -p /.bottlerocket/rootfs/var/lib/kubeadm/pki
+ln -sfn /.bottlerocket/rootfs/var/lib/kubeadm /var/lib
+ln -sfn /.bottlerocket/rootfs/var/lib/kubeadm /etc/kubernetes
+
+# CAPA gives us cloud-init user-data with commands to read the actual user-data from
+# AWS Secrets Manager. This will write out the keys and kubeadm config file we need.
+# CAPV does not use this approach so we can skip the cloud-init call and go straight
+# to calling cloud-init with our user-data file supplied from capi
+# cloud-init init
+cloud-init --force --file /.bottlerocket/host-containers/current/user-data single --name write_files --frequency always
+
+# CAPA includes this parameter by default, but cloud-init isn't replacing the value.
+HOSTNAME=$(cat /proc/sys/kernel/hostname)
+sed -i "s,{{ ds.meta_data.hostname }},${HOSTNAME}," /tmp/kubeadm*.yaml
+
+# Figure out which path to take based on the files that were written.
+if [ -s "/tmp/kubeadm.yaml" ] && [ -s "/etc/kubernetes/pki/ca.key" ] ; then
+  kubeadm-controlplane-init
+elif [ -s "/tmp/kubeadm-join-config.yaml" ] && [ -s "/etc/kubernetes/pki/ca.key" ] ; then
+  kubeadm-controlplane-join
+else
+  kubeadm-worker-join
+fi
+
+# All done!
+apiclient set host-containers.kubeadm-the-hard-way.enabled=false

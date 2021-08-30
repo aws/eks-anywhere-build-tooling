@@ -1,0 +1,27 @@
+From bde62f69ebe450e7a9cafb9a0c06fc53fc43de64 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Mon, 28 Jun 2021 14:59:01 -0700
+Subject: [PATCH] Requeue vsphereMachine if cluster infrastructure is not ready
+
+---
+ controllers/vspheremachine_controller.go | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/controllers/vspheremachine_controller.go b/controllers/vspheremachine_controller.go
+index 2c6d6168..9c4de04d 100644
+--- a/controllers/vspheremachine_controller.go
++++ b/controllers/vspheremachine_controller.go
+@@ -317,9 +317,9 @@ func (r machineReconciler) reconcileNormal(ctx *context.MachineContext) (reconci
+ 	ctrlutil.AddFinalizer(ctx.VSphereMachine, infrav1.MachineFinalizer)
+
+ 	if !ctx.Cluster.Status.InfrastructureReady {
+-		ctx.Logger.Info("Cluster infrastructure is not ready yet")
++		ctx.Logger.Info("Cluster infrastructure is not ready yet, requeuing")
+ 		conditions.MarkFalse(ctx.VSphereMachine, infrav1.VMProvisionedCondition, infrav1.WaitingForClusterInfrastructureReason, clusterv1.ConditionSeverityInfo, "")
+-		return reconcile.Result{}, nil
++		return reconcile.Result{RequeueAfter: 30*time.Second}, nil
+ 	}
+
+ 	// Make sure bootstrap data is available and populated.
+--
+2.30.1

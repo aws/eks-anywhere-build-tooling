@@ -1,0 +1,50 @@
+package etcdadm
+
+import (
+	"fmt"
+
+	"github.com/-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
+	"github.com/pkg/errors"
+)
+
+var joinPreKubeletPhases = []string{
+	"stop",
+	"certificates",
+	"membership",
+	"install",
+	"configure",
+	"start",
+}
+
+var joinPostKubeletPhases = []string{"health"}
+
+type joinCommand struct {
+	repository, version string
+	endpoint            string
+}
+
+func (j *joinCommand) run() error {
+	flags := buildFlags(j.repository, j.version)
+	fmt.Println("Running etcdadm join phases")
+	if err := runPhases("join", joinPreKubeletPhases, flags, j.endpoint); err != nil {
+		return err
+	}
+
+	fmt.Println("Starting etcd static pods")
+	podDefinitions, err := utils.EnableStaticPods(podSpecDir)
+	if err != nil {
+		return errors.Wrap(err, "error enabling etcd static pods")
+	}
+
+	fmt.Println("Waiting for etcd static pods")
+	err = utils.WaitForPods(podDefinitions)
+	if err != nil {
+		return errors.Wrapf(err, "error waiting for etcd static pods to be up")
+	}
+
+	if err := runPhases("join", joinPostKubeletPhases, flags, j.endpoint); err != nil {
+		return err
+	}
+
+	return nil
+}
