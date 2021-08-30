@@ -1,0 +1,114 @@
+From 9c747cafd4ad96ac74c0f7b3a82ff8fb33f041b0 Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Wed, 31 Mar 2021 11:03:35 -0500
+Subject: [PATCH] install containerd from apt
+
+Signed-off-by: Jackson West <jgw@amazon.com>
+---
+ .../ansible/roles/containerd/tasks/main.yml   | 41 +++++++++++--------
+ .../ansible/roles/kubernetes/tasks/url.yml    | 24 +++++------
+ 2 files changed, 35 insertions(+), 30 deletions(-)
+
+diff --git a/images/capi/ansible/roles/containerd/tasks/main.yml b/images/capi/ansible/roles/containerd/tasks/main.yml
+index 1080d384..34f00677 100644
+--- a/images/capi/ansible/roles/containerd/tasks/main.yml
++++ b/images/capi/ansible/roles/containerd/tasks/main.yml
+@@ -28,12 +28,16 @@
+ 
+ # TODO(vincepri): Use deb/rpm packages once available.
+ # See https://github.com/containerd/containerd/issues/1508 for context.
+-- name: download containerd
+-  get_url:
+-    url: "{{ containerd_url }}"
+-    checksum: "sha256:{{ containerd_sha256 }}"
+-    dest: /tmp/containerd.tar.gz
+-    mode: 0600
++# - name: download containerd
++#   get_url:
++#     url: "{{ containerd_url }}"
++#     checksum: "sha256:{{ containerd_sha256 }}"
++#     dest: /tmp/containerd.tar.gz
++#     mode: 0600
++
++- name: Install containerd package
++  apt:
++    name: containerd
+ 
+ - name: Create a directory if it does not exist
+   file:
+@@ -41,16 +45,17 @@
+     state: directory
+     mode: 0755
+ 
++
+ # TODO(vincepri): This unpacks the entire tar in the root directory
+ # we should find a better way to check what's being unpacked and where.
+-- name: unpack containerd
+-  unarchive:
+-    remote_src: True
+-    src: /tmp/containerd.tar.gz
+-    dest: /
+-    extra_opts:
+-      - --no-overwrite-dir
+-  when: ansible_os_family != "Flatcar"
++# - name: unpack containerd
++#   unarchive:
++#     remote_src: True
++#     src: /tmp/containerd.tar.gz
++#     dest: /
++#     extra_opts:
++#       - --no-overwrite-dir
++#   when: ansible_os_family != "Flatcar"
+ 
+ - name: unpack containerd for Flatcar
+   unarchive:
+@@ -145,7 +150,7 @@
+     enabled: True
+     state: restarted
+ 
+-- name: delete tarball
+-  file:
+-    path: /tmp/containerd.tar.gz
+-    state: absent
++# - name: delete tarball
++#   file:
++#     path: /tmp/containerd.tar.gz
++#     state: absent
+diff --git a/images/capi/ansible/roles/kubernetes/tasks/url.yml b/images/capi/ansible/roles/kubernetes/tasks/url.yml
+index 79a3974b..6686c8d6 100644
+--- a/images/capi/ansible/roles/kubernetes/tasks/url.yml
++++ b/images/capi/ansible/roles/kubernetes/tasks/url.yml
+@@ -12,18 +12,18 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ ---
+-- name: Symlink cri-tools
+-  file:
+-    src:   "/usr/local/bin/{{ item }}"
+-    dest:  "/usr/bin/{{ item }}"
+-    mode: 0777
+-    state: link
+-    force: yes
+-  loop:
+-  - ctr
+-  - crictl
+-  - critest
+-  when: ansible_os_family != "Flatcar"
++# - name: Symlink cri-tools
++#   file:
++#     src:   "/usr/local/bin/{{ item }}"
++#     dest:  "/usr/bin/{{ item }}"
++#     mode: 0777
++#     state: link
++#     force: yes
++#   loop:
++#   - ctr
++#   - crictl
++#   - critest
++#   when: ansible_os_family != "Flatcar"
+ 
+ - name: Create CNI directory
+   file:
+-- 
+2.29.2
+

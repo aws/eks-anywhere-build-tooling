@@ -1,0 +1,113 @@
+From bbf210311611f2b3da5ed53c307682b3f0083252 Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Thu, 22 Jul 2021 12:59:46 -0500
+Subject: [PATCH] Switch to AL2 base image for node image
+
+Signed-off-by: Jackson West <jgw@amazon.com>
+---
+ images/base/Dockerfile                        | 43 +++++--------------
+ images/base/files/usr/local/bin/clean-install |  7 +--
+ 2 files changed, 14 insertions(+), 36 deletions(-)
+
+diff --git a/images/base/Dockerfile b/images/base/Dockerfile
+index ec8fcd7c..1150a5e1 100644
+--- a/images/base/Dockerfile
++++ b/images/base/Dockerfile
+@@ -99,10 +99,11 @@ COPY --chmod=0644 files/etc/systemd/system/kubelet.service.d/* /etc/systemd/syst
+ RUN echo "Installing Packages ..." \
+     && DEBIAN_FRONTEND=noninteractive clean-install \
+       systemd \
+-      conntrack iptables iproute2 ethtool socat util-linux mount ebtables udev kmod \
+-      libseccomp2 pigz \
++      conntrack iptables iproute ethtool socat util-linux ebtables udev kmod \
++      seccomp2 pigz \
+       bash ca-certificates curl rsync \
+-      nfs-common \
++      nfs-utils \
++      containerd which tar procps hostname \
+     && find /lib/systemd/system/sysinit.target.wants/ -name "systemd-tmpfiles-setup.service" -delete \
+     && rm -f /lib/systemd/system/multi-user.target.wants/* \
+     && rm -f /etc/systemd/system/*.wants/* \
+@@ -111,44 +112,22 @@ RUN echo "Installing Packages ..." \
+     && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
+     && rm -f /lib/systemd/system/basic.target.wants/* \
+     && echo "ReadKMsg=no" >> /etc/systemd/journald.conf \
+-    && ln -s "$(which systemd)" /sbin/init \
+  && echo "Enabling kubelet ... " \
+     && systemctl enable kubelet.service \
+- && echo "Installing containerd ..." \
+-    && curl -sSL --retry 5 --output /tmp/containerd.${TARGETARCH}.tgz "${CONTAINERD_URL}" \
+-    && echo "${CONTAINERD_AMD64_SHA256SUM}  /tmp/containerd.amd64.tgz" | tee /tmp/containerd.sha256 \
+-    && echo "${CONTAINERD_ARM64_SHA256SUM}  /tmp/containerd.arm64.tgz" | tee -a /tmp/containerd.sha256 \
+-    && echo "${CONTAINERD_PPC64LE_SHA256SUM}  /tmp/containerd.ppc64le.tgz" | tee -a /tmp/containerd.sha256 \
+-    && sha256sum --ignore-missing -c /tmp/containerd.sha256 \
+-    && rm -f /tmp/containerd.sha256 \
+-    && tar -C /usr/local -xzvf /tmp/containerd.${TARGETARCH}.tgz \
+-    && rm -rf /tmp/containerd.${TARGETARCH}.tgz \
+-    && rm -f /usr/local/bin/containerd-stress /usr/local/bin/containerd-shim-runc-v1 \
+-    && curl -sSL --retry 5 --output /tmp/runc.${TARGETARCH} "${RUNC_URL}" \
+-    && echo "${RUNC_AMD64_SHA256SUM}  /tmp/runc.amd64" | tee /tmp/runc.sha256 \
+-    && echo "${RUNC_ARM64_SHA256SUM}  /tmp/runc.arm64" | tee -a /tmp/runc.sha256 \
+-    && echo "${RUNC_PPC64LE_SHA256SUM}  /tmp/runc.ppc64le" | tee -a /tmp/runc.sha256 \
+-    && sha256sum --ignore-missing -c /tmp/runc.sha256 \
+-    && mv /tmp/runc.${TARGETARCH} /usr/local/sbin/runc \
+-    && chmod 755 /usr/local/sbin/runc \
+-    && containerd --version \
+-    && runc --version \
+-    && systemctl enable containerd \
++ && echo "Enable Containerd" \
++    && systemctl enable containerd.service \
++    && cp /usr/lib/systemd/system/containerd.service /etc/systemd/system/containerd.service \
+  && echo "Installing crictl ..." \
+     && curl -sSL --retry 5 --output /tmp/crictl.${TARGETARCH}.tgz "${CRICTL_URL}" \
+     && echo "${CRICTL_AMD64_SHA256SUM}  /tmp/crictl.amd64.tgz" | tee /tmp/crictl.sha256 \
+-    && echo "${CRICTL_ARM64_SHA256SUM}  /tmp/crictl.arm64.tgz" | tee -a /tmp/crictl.sha256 \
+-    && echo "${CRICTL_PPC64LE_SHA256SUM}  /tmp/crictl.ppc64le.tgz" | tee -a /tmp/crictl.sha256 \
+-    && sha256sum --ignore-missing -c /tmp/crictl.sha256 \
++    && sha256sum -c /tmp/crictl.sha256 \
+     && rm -f /tmp/crictl.sha256 \
+     && tar -C /usr/local/bin -xzvf /tmp/crictl.${TARGETARCH}.tgz \
+     && rm -rf /tmp/crictl.${TARGETARCH}.tgz \
+  && echo "Installing CNI plugin binaries ..." \
+     && curl -sSL --retry 5 --output /tmp/cni.${TARGETARCH}.tgz "${CNI_PLUGINS_URL}" \
+     && echo "${CNI_PLUGINS_AMD64_SHA256SUM}  /tmp/cni.amd64.tgz" | tee /tmp/cni.sha256 \
+-    && echo "${CNI_PLUGINS_ARM64_SHA256SUM}  /tmp/cni.arm64.tgz" | tee -a /tmp/cni.sha256 \
+-    && echo "${CNI_PLUGINS_PPC64LE_SHA256SUM}  /tmp/cni.ppc64le.tgz" | tee -a /tmp/cni.sha256 \
+-    && sha256sum --ignore-missing -c /tmp/cni.sha256 \
++    && sha256sum -c /tmp/cni.sha256 \
+     && rm -f /tmp/cni.sha256 \
+     && mkdir -p /opt/cni/bin \
+     && tar -C /opt/cni/bin -xzvf /tmp/cni.${TARGETARCH}.tgz \
+@@ -163,9 +142,7 @@ RUN echo "Installing Packages ..." \
+  && echo "Ensuring /etc/kubernetes/manifests" \
+     && mkdir -p /etc/kubernetes/manifests \
+  && echo "Adjusting systemd-tmpfiles timer" \
+-    && sed -i /usr/lib/systemd/system/systemd-tmpfiles-clean.timer -e 's#OnBootSec=.*#OnBootSec=1min#' \
+- && echo "Disabling udev" \
+-    && systemctl disable udev.service
++    && sed -i /usr/lib/systemd/system/systemd-tmpfiles-clean.timer -e 's#OnBootSec=.*#OnBootSec=1min#'
+ 
+ # tell systemd that it is in docker (it will check for the container env)
+ # https://systemd.io/CONTAINER_INTERFACE/
+diff --git a/images/base/files/usr/local/bin/clean-install b/images/base/files/usr/local/bin/clean-install
+index 33b3238b..d8c9db56 100755
+--- a/images/base/files/usr/local/bin/clean-install
++++ b/images/base/files/usr/local/bin/clean-install
+@@ -25,10 +25,11 @@ if [ $# = 0 ]; then
+   exit 1
+ fi
+ 
+-apt-get update
+-apt-get install -y --no-install-recommends "$@"
+-apt-get clean -y
++amazon-linux-extras enable docker
++yum install -y "$@"
++yum clean all
+ rm -rf \
++   /var/cache/yum/* \
+    /var/cache/debconf/* \
+    /var/lib/apt/lists/* \
+    /var/log/* \
+-- 
+2.31.1
+

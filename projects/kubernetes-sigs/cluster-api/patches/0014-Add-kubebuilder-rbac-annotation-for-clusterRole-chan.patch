@@ -1,0 +1,92 @@
+From d832a507efff089c40ecea099d9e8b15cd290661 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Wed, 28 Jul 2021 13:30:36 -0700
+Subject: [PATCH] Add kubebuilder rbac annotation for clusterRole change
+
+The ClusterRole for cluster controller and KCP controller has permissions
+on the etcdadm resources. These were added without using the kubebuilder
+annotation, causing them to get removed on running `make generate-manifests`
+This commit adds the kubebuilder rbac annotation for the required changes
+so as to retain them after running the manifests target
+
+cr: https://code.amazon.com/reviews/CR-54484976
+---
+ config/rbac/role.yaml                          |  2 +-
+ controllers/cluster_controller.go              |  2 +-
+ controlplane/kubeadm/config/rbac/role.yaml     | 16 ++++++++--------
+ controlplane/kubeadm/controllers/controller.go |  1 +
+ 4 files changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
+index 4775bfafb..df4643c18 100644
+--- a/config/rbac/role.yaml
++++ b/config/rbac/role.yaml
+@@ -37,8 +37,8 @@ rules:
+ - apiGroups:
+   - bootstrap.cluster.x-k8s.io
+   - controlplane.cluster.x-k8s.io
+-  - infrastructure.cluster.x-k8s.io
+   - etcdcluster.cluster.x-k8s.io
++  - infrastructure.cluster.x-k8s.io
+   resources:
+   - '*'
+   verbs:
+diff --git a/controllers/cluster_controller.go b/controllers/cluster_controller.go
+index 4b55fed1c..f4b0b4a5a 100644
+--- a/controllers/cluster_controller.go
++++ b/controllers/cluster_controller.go
+@@ -58,7 +58,7 @@ const (
+ // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
+ // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;patch
+ // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
+-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io;bootstrap.cluster.x-k8s.io;controlplane.cluster.x-k8s.io,resources=*,verbs=get;list;watch;create;update;patch;delete
++// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io;bootstrap.cluster.x-k8s.io;controlplane.cluster.x-k8s.io;etcdcluster.cluster.x-k8s.io,resources=*,verbs=get;list;watch;create;update;patch;delete
+ // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch;create;update;patch;delete
+ // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
+ 
+diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
+index 19f8ac04c..9215b99a3 100644
+--- a/controlplane/kubeadm/config/rbac/role.yaml
++++ b/controlplane/kubeadm/config/rbac/role.yaml
+@@ -20,14 +20,6 @@ rules:
+   - patch
+   - update
+   - watch
+-- apiGroups:
+-  - etcdcluster.cluster.x-k8s.io
+-  resources:
+-    - '*'
+-  verbs:
+-    - get
+-    - list
+-    - watch
+ - apiGroups:
+   - cluster.x-k8s.io
+   resources:
+@@ -71,3 +63,11 @@ rules:
+   - patch
+   - update
+   - watch
++- apiGroups:
++  - etcdcluster.cluster.x-k8s.io
++  resources:
++  - '*'
++  verbs:
++  - get
++  - list
++  - watch
+diff --git a/controlplane/kubeadm/controllers/controller.go b/controlplane/kubeadm/controllers/controller.go
+index 0ad11fe70..c648dcfb6 100644
+--- a/controlplane/kubeadm/controllers/controller.go
++++ b/controlplane/kubeadm/controllers/controller.go
+@@ -61,6 +61,7 @@ import (
+ // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io;bootstrap.cluster.x-k8s.io;controlplane.cluster.x-k8s.io,resources=*,verbs=get;list;watch;create;update;patch;delete
+ // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
+ // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch;create;update;patch;delete
++// +kubebuilder:rbac:groups=etcdcluster.cluster.x-k8s.io,resources=*,verbs=get;list;watch
+ 
+ // KubeadmControlPlaneReconciler reconciles a KubeadmControlPlane object
+ type KubeadmControlPlaneReconciler struct {
+-- 
+2.30.1
+

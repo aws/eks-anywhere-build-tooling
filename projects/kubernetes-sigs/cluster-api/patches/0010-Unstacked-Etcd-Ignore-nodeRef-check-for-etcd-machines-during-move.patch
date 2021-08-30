@@ -1,0 +1,31 @@
+From ba54587a0e97a10ab1c49908e4c724862b967c41 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Mon, 28 Jun 2021 13:47:21 -0700
+Subject: [PATCH 6/6] Unstacked etcd: Ignore nodeRef check for etcd machines
+ during clusterctl move
+
+Clusterctl before beginning the move checks if all CAPI objects are
+ready and provisioned. One of these checks is for Machine.Status.NodeRef field.
+This check needs to be skipped for etcd machines since they are not registered
+as Kubernetes nodes so they don't have a corresponding Node.
+---
+ cmd/clusterctl/client/cluster/mover.go | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
+index 0929f3a4c..f7d715acc 100644
+--- a/cmd/clusterctl/client/cluster/mover.go
++++ b/cmd/clusterctl/client/cluster/mover.go
+@@ -161,7 +161,8 @@ func (o *objectMover) checkProvisioningCompleted(graph *objectGraph) error {
+ 			return err
+ 		}
+ 
+-		if machineObj.Status.NodeRef == nil {
++		_, isEtcdMachine := machineObj.Labels[clusterv1.MachineEtcdClusterLabelName]
++		if machineObj.Status.NodeRef == nil && !isEtcdMachine {
+ 			errList = append(errList, errors.Errorf("cannot start the move operation while %q %s/%s is still provisioning the node", machineObj.GroupVersionKind(), machineObj.GetNamespace(), machineObj.GetName()))
+ 		}
+ 	}
+-- 
+2.30.1
+

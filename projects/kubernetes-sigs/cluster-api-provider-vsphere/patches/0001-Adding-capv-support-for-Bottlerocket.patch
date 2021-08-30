@@ -1,0 +1,142 @@
+From 3d7c8034283ffa59e3a30a613547317e17cfba0d Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Fri, 11 Jun 2021 10:59:56 -0700
+Subject: [PATCH] Adding capv support for Bottlerocket
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+---
+ pkg/services/govmomi/vcenter/clone.go | 28 ++++++++++++++++++++++-----
+ templates/cluster-template.yaml       |  4 +++-
+ 2 files changed, 26 insertions(+), 6 deletions(-)
+
+diff --git a/pkg/services/govmomi/vcenter/clone.go b/pkg/services/govmomi/vcenter/clone.go
+index 300f24e9..0e62865b 100644
+--- a/pkg/services/govmomi/vcenter/clone.go
++++ b/pkg/services/govmomi/vcenter/clone.go
+@@ -54,6 +54,8 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
+ 	var extraConfig extra.Config
+ 	if len(bootstrapData) > 0 {
+ 		ctx.Logger.Info("applied bootstrap data to VM clone spec")
++		ctx.Logger.Info("bootstrapData")
++		ctx.Logger.Info(string(bootstrapData))
+ 		if err := extraConfig.SetCloudInitUserData(bootstrapData); err != nil {
+ 			return err
+ 		}
+@@ -84,8 +86,11 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
+ 				return errors.Wrapf(err, "error getting snapshot information for template %s", ctx.VSphereVM.Spec.Template)
+ 			}
+ 			if vm.Snapshot != nil {
++				ctx.Logger.Info("Snapshot found")
+ 				snapshotRef = vm.Snapshot.CurrentSnapshot
+ 			}
++			ctx.Logger.Info("Snapshot not found under template properties")
++			ctx.Logger.Info(fmt.Sprintf("%s", vm.Snapshot))
+ 		} else {
+ 			ctx.Logger.Info("searching for snapshot by name", "snapshotName", snapshotName)
+ 			var err error
+@@ -100,26 +105,32 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
+ 	// from which to do a linked clone.
+ 	diskMoveType := fullCloneDiskMoveType
+ 	ctx.VSphereVM.Status.CloneMode = infrav1.FullClone
++	ctx.Logger.Info("Full clone mode")
+ 	if snapshotRef != nil {
+ 		// Record the actual type of clone mode used as well as the name of
+ 		// the snapshot (if not the current snapshot).
++		ctx.Logger.Info("Linked clone mode --override")
+ 		ctx.VSphereVM.Status.CloneMode = infrav1.LinkedClone
+ 		ctx.VSphereVM.Status.Snapshot = snapshotRef.Value
+ 		diskMoveType = linkCloneDiskMoveType
+ 	}
+-
++	ctx.Logger.Info("Pre folder")
+ 	folder, err := ctx.Session.Finder.FolderOrDefault(ctx, ctx.VSphereVM.Spec.Folder)
+ 	if err != nil {
+ 		return errors.Wrapf(err, "unable to get folder for %q", ctx)
+ 	}
++	ctx.Logger.Info(fmt.Sprintf("%+v", folder))
+ 
+ 	pool, err := ctx.Session.Finder.ResourcePoolOrDefault(ctx, ctx.VSphereVM.Spec.ResourcePool)
+ 	if err != nil {
+ 		return errors.Wrapf(err, "unable to get resource pool for %q", ctx)
+ 	}
++	ctx.Logger.Info("Resource pool")
++	ctx.Logger.Info(fmt.Sprintf("%+v", pool))
+ 
+ 	devices, err := tpl.Device(ctx)
+ 	if err != nil {
++		ctx.Logger.Info("error getting devices")
+ 		return errors.Wrapf(err, "error getting devices for %q", ctx)
+ 	}
+ 
+@@ -130,11 +141,13 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
+ 	if snapshotRef == nil {
+ 		diskSpec, err := getDiskSpec(ctx, devices)
+ 		if err != nil {
++			ctx.Logger.Info("error getting disk spec")
++			ctx.Logger.Info(fmt.Sprintf("%+v", err))
+ 			return errors.Wrapf(err, "error getting disk spec for %q", ctx)
+ 		}
+ 		deviceSpecs = append(deviceSpecs, diskSpec)
+ 	}
+-
++	ctx.Logger.Info("pre-network")
+ 	networkSpecs, err := getNetworkSpecs(ctx, devices)
+ 	if err != nil {
+ 		return errors.Wrapf(err, "error getting network specs for %q", ctx)
+@@ -179,6 +192,8 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
+ 		PowerOn:  false,
+ 		Snapshot: snapshotRef,
+ 	}
++	ctx.Logger.Info("Spec for vm before turning on")
++	ctx.Logger.Info(fmt.Sprintf("%+v", spec))
+ 
+ 	var datastoreRef *types.ManagedObjectReference
+ 	if ctx.VSphereVM.Spec.Datastore != "" {
+@@ -291,9 +306,12 @@ func getDiskSpec(
+ 	devices object.VirtualDeviceList) (types.BaseVirtualDeviceConfigSpec, error) {
+ 
+ 	disks := devices.SelectByType((*types.VirtualDisk)(nil))
+-	if len(disks) != 1 {
+-		return nil, errors.Errorf("invalid disk count: %d", len(disks))
+-	}
++	// Bottlerocket has 2 disks. TODO: Follow up and check out why there is a 1 disk restriction
++	// Testing bottlerocket with 2 disks just works fine, as the userdata is injected in the correct first disk
++	// if len(disks) != 1 {
++	// 	ctx.Logger.Info(fmt.Sprintf("error invalid disk count:%d", len(disks)))
++	// 	return nil, errors.Errorf("invalid disk count: %d", len(disks))
++	// }
+ 
+ 	disk := disks[0].(*types.VirtualDisk)
+ 	cloneCapacityKB := int64(ctx.VSphereVM.Spec.DiskGiB) * 1024 * 1024
+diff --git a/templates/cluster-template.yaml b/templates/cluster-template.yaml
+index 6f223391..f3ede2a1 100644
+--- a/templates/cluster-template.yaml
++++ b/templates/cluster-template.yaml
+@@ -145,6 +145,7 @@ spec:
+     - echo "127.0.0.1   {{ ds.meta_data.hostname }}" >>/etc/hosts
+     - echo "{{ ds.meta_data.hostname }}" >/etc/hostname
+     useExperimentalRetryJoin: true
++    format: '${VSPHERE_TEMPLATE_BOOTSTRAP_FORMAT}'
+     users:
+     - name: capv
+       sshAuthorizedKeys:
+@@ -166,7 +167,7 @@ spec:
+           criSocket: /var/run/containerd/containerd.sock
+           kubeletExtraArgs:
+             cloud-provider: external
+-          name: '{{ ds.meta_data.hostname}}'
++          name: '{{ ds.meta_data.hostname }}'
+       preKubeadmCommands:
+       - hostname "{{ ds.meta_data.hostname }}"
+       - echo "::1         ipv6-localhost ipv6-loopback" >/etc/hosts
+@@ -178,6 +179,7 @@ spec:
+         sshAuthorizedKeys:
+         - '${VSPHERE_SSH_AUTHORIZED_KEY}'
+         sudo: ALL=(ALL) NOPASSWD:ALL
++      format: '${VSPHERE_TEMPLATE_BOOTSTRAP_FORMAT}'
+ ---
+ apiVersion: cluster.x-k8s.io/v1alpha3
+ kind: MachineDeployment
+-- 
+2.24.3 (Apple Git-128)
+
