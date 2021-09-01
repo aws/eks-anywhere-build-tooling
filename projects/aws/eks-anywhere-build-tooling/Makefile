@@ -1,6 +1,7 @@
-REPO_ROOT="$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")/../../../" && pwd -P)"
-LATEST_RELEASE_BRANCH=$(shell yq e ".latest" $(REPO_ROOT)/EKSD_LATEST_RELEASES)
-LATEST_RELEASE=$(shell yq e ".$(LATEST_RELEASE_BRANCH).number" $(REPO_ROOT)/EKSD_LATEST_RELEASES)
+BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
+LATEST_RELEASE_BRANCH=$(shell yq e ".latest" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
+LATEST_RELEASE=$(shell yq e ".$(LATEST_RELEASE_BRANCH).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 GIT_TAG=v$(LATEST_RELEASE_BRANCH)-$(LATEST_RELEASE)
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
@@ -29,7 +30,7 @@ fetch-binaries:
 
 .PHONY: local-images
 local-images: fetch-binaries
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -40,7 +41,7 @@ local-images: fetch-binaries
 
 .PHONY: images
 images: fetch-binaries
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \

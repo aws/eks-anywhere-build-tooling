@@ -1,4 +1,5 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACT_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.15"
@@ -59,7 +60,7 @@ tarballs:  binaries
 
 .PHONY: local-images
 local-images: binaries
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -68,7 +69,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/cert-manager-acmesolver \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_ACMESOLVER_IMAGE),$(SECONDARY_CERT_MANAGER_ACMESOLVER_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_ACMESOLVER_IMAGE)\",dest=/tmp/cert-manager-acmesolver.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -77,7 +78,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/cert-manager-cainjector \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_CAINJECTOR_IMAGE),$(SECONDARY_CERT_MANAGER_CAINJECTOR_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_CAINJECTOR_IMAGE)\",dest=/tmp/cert-manager-cainjector.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -86,7 +87,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/cert-manager-controller \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_CONTROLLER_IMAGE),$(SECONDARY_CERT_MANAGER_CONTROLLER_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_CONTROLLER_IMAGE)\",dest=/tmp/cert-manager-controller.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -97,7 +98,7 @@ local-images: binaries
 
 .PHONY: images
 images: binaries
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -106,7 +107,7 @@ images: binaries
 		--local dockerfile=./docker/linux/cert-manager-acmesolver \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_ACMESOLVER_IMAGE),$(SECONDARY_CERT_MANAGER_ACMESOLVER_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_ACMESOLVER_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -115,7 +116,7 @@ images: binaries
 		--local dockerfile=./docker/linux/cert-manager-cainjector \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_CAINJECTOR_IMAGE),$(SECONDARY_CERT_MANAGER_CAINJECTOR_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_CAINJECTOR_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -124,7 +125,7 @@ images: binaries
 		--local dockerfile=./docker/linux/cert-manager-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_CONTROLLER_IMAGE),$(SECONDARY_CERT_MANAGER_CONTROLLER_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_CONTROLLER_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \

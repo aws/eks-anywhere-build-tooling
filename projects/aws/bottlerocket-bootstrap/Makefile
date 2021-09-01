@@ -1,5 +1,5 @@
-REPO_ROOT="$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")/../../../" && pwd -P)"
-
+BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
 
@@ -20,7 +20,7 @@ SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 SECONDARY_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME)
 SECONDARY_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME)
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(REPO_ROOT)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
+SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
 BUILD_TARGETS=$(addprefix local-images-, $(SUPPORTED_K8S_VERSIONS))
 RELEASE_TARGETS=$(addprefix images-, $(SUPPORTED_K8S_VERSIONS))
 
@@ -40,11 +40,11 @@ fetch-binaries-%:
 	build/fetch_binaries.sh $*
 
 .PHONY: local-images-%
-local-images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(REPO_ROOT)/EKSD_LATEST_RELEASES)
+local-images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 local-images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 local-images-%: RELEASE_LATEST=$(GIT_TAG)-latest
 local-images-%: fetch-binaries-% bootstrap-binary
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -55,11 +55,11 @@ local-images-%: fetch-binaries-% bootstrap-binary
 		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(SECONDARY_IMAGE):$(IMAGE_TAG),$(SECONDARY_LATEST_IMAGE):$(RELEASE_LATEST)\",dest=/tmp/bottlerocket-bootstrap.tar
 
 .PHONY: images-%
-images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(REPO_ROOT)/EKSD_LATEST_RELEASES)
+images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 images-%: RELEASE_LATEST=$(GIT_TAG)-latest
 images-%: fetch-binaries-% bootstrap-binary
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \

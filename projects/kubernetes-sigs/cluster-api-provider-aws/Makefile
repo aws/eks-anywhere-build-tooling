@@ -1,4 +1,5 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.13"
@@ -61,7 +62,7 @@ tarballs:  binaries
 
 .PHONY: local-images
 local-images: binaries
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -69,7 +70,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/cluster-api-aws-controller \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CAPA_CONTROLLER_IMAGE),$(SECONDARY_CAPA_CONTROLLER_IMAGE),$(SECONDARY_CAPA_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capa-controller.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -77,7 +78,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/eks-bootstrap-controller \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capa-eks-bootstrap-controller.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -88,7 +89,7 @@ local-images: binaries
 
 .PHONY: images
 images: binaries
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -96,7 +97,7 @@ images: binaries
 		--local dockerfile=./docker/linux/cluster-api-aws-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CAPA_CONTROLLER_IMAGE),$(SECONDARY_CAPA_CONTROLLER_IMAGE),$(SECONDARY_CAPA_CONTROLLER_LATEST_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -104,7 +105,7 @@ images: binaries
 		--local dockerfile=./docker/linux/eks-bootstrap-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \

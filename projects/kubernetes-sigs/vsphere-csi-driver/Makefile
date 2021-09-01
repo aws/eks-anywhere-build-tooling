@@ -1,4 +1,5 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.15"
@@ -58,7 +59,7 @@ tarballs:  binaries
 
 .PHONY: local-images
 local-images: binaries
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -66,7 +67,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/csi-driver \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CSI_DRIVER_IMAGE),$(SECONDARY_DRIVER_IMAGE),$(SECONDARY_LATEST_DRIVER_IMAGE)\",dest=/tmp/csi-driver.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -77,7 +78,7 @@ local-images: binaries
 
 .PHONY: images
 images: binaries
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -85,7 +86,7 @@ images: binaries
 		--local dockerfile=./docker/linux/csi-driver \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CSI_DRIVER_IMAGE),$(SECONDARY_DRIVER_IMAGE),$(SECONDARY_LATEST_DRIVER_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \

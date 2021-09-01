@@ -1,4 +1,5 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.13"
@@ -72,7 +73,7 @@ tarballs:  binaries
 
 .PHONY: local-images
 local-images: binaries
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -80,7 +81,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/cluster-api-controller \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_CONTROLLER_IMAGE),$(SECONDARY_CAPI_CONTROLLER_IMAGE),$(SECONDARY_CAPI_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-controller.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -88,7 +89,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/kubeadm-bootstrap-controller \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-kubeadm-bootstrap-controller.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -96,7 +97,7 @@ local-images: binaries
 		--local dockerfile=./docker/linux/kubeadm-control-plane-controller \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-kubeadm-control-plane-controller.tar
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -107,7 +108,7 @@ local-images: binaries
 
 .PHONY: images
 images: binaries
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -115,7 +116,7 @@ images: binaries
 		--local dockerfile=./docker/linux/cluster-api-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CAPI_CONTROLLER_IMAGE),$(SECONDARY_CAPI_CONTROLLER_IMAGE),$(SECONDARY_CAPI_CONTROLLER_LATEST_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -123,7 +124,7 @@ images: binaries
 		--local dockerfile=./docker/linux/kubeadm-bootstrap-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -131,7 +132,7 @@ images: binaries
 		--local dockerfile=./docker/linux/kubeadm-control-plane-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",push=true
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
