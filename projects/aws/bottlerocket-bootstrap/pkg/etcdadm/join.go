@@ -3,7 +3,7 @@ package etcdadm
 import (
 	"fmt"
 
-	"github.com/-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
 )
 
