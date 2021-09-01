@@ -64,6 +64,7 @@ export IMAGE_REPO=$(build::eksd_releases::get_eksd_image_repo $RELEASE_BRANCH)
 export KUBERNETES_ASSET_BASE_URL=$(build::eksd_releases::get_eksd_kubernetes_asset_base_url $RELEASE_BRANCH)
 export KUBERNETES_VERSION=$(build::eksd_releases::get_eksd_component_version "kubernetes" $RELEASE_BRANCH)
 export KUBERNETES_SERIES="v${RELEASE_BRANCH/-/.}"
+export EKSD_NAME=$(build::eksd_releases::get_eksd_release_name $RELEASE_BRANCH)
 EKSD_RELEASE=$(build::eksd_releases::get_eksd_release_number $RELEASE_BRANCH)
 export KUBERNETES_FULL_VERSION="$KUBERNETES_VERSION-eks-$RELEASE_BRANCH-$EKSD_RELEASE"
 export ETCD_HTTP_SOURCE=$(build::eksd_releases::get_eksd_component_url "etcd" $RELEASE_BRANCH)
@@ -93,3 +94,7 @@ echo "$EKSD_MANIFEST_URL" > "$OVA_PATH"/EKSD_MANIFEST_URL
 envsubst '$CNI_VERSION:$KUBERNETES_FULL_VERSION:$ETCD_VERSION:$ETCD_SHA256:$ETCDADM_VERSION:$PAUSE_IMAGE:$CNI_HOST_DEVICE_SHA256' \
     < "$MAKE_ROOT/packer/config/validate_goss_inline_vars.json.tmpl" \
     > "$OUTPUT_CONFIGS/validate_goss_inline_vars.json"
+
+envsubst '$EKSD_NAME' \
+    < "$MAKE_ROOT/packer/config/ovf_custom_properties.json.tmpl" \
+    > "$OUTPUT_CONFIGS/ovf_custom_properties.json"

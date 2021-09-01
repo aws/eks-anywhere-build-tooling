@@ -61,6 +61,19 @@ function build::eksd_releases::get_eksd_release_number() {
     set -$oldopt
 }
 
+function build::eksd_releases::get_eksd_release_name() {
+    local -r release_branch=$1
+    
+    oldopt=$-
+    set +x
+    
+    local -r yaml=$(build::eksd_releases::load_release_yaml $release_branch)
+
+    echo "$yaml" |  yq e ".metadata.name" -
+    
+    set -$oldopt
+}
+
 function build::eksd_releases::get_eksd_component_version() {
     local -r component=$1
     local -r release_branch=$2
