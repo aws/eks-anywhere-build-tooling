@@ -1,6 +1,6 @@
-REPO_ROOT="$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")/../../../" && pwd -P)"
-
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
+
 ARTIFACTS_BUCKET?=my-s3-bucket
 
 REPO=cloud-provider-vsphere
@@ -35,7 +35,7 @@ IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
 SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 SECONDARY_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME)
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(REPO_ROOT)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
+SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
 BINARY_TARGETS=$(addprefix binaries-, $(SUPPORTED_K8S_VERSIONS))
 BUILD_TARGETS=$(addprefix local-images-, $(SUPPORTED_K8S_VERSIONS)) $(addprefix tarballs-, $(SUPPORTED_K8S_VERSIONS))
 RELEASE_TARGETS=$(addprefix images-, $(SUPPORTED_K8S_VERSIONS)) $(addprefix tarballs-, $(SUPPORTED_K8S_VERSIONS))
@@ -79,7 +79,7 @@ local-images-%: GIT_TAG=$(shell cat ./$*/GIT_TAG)
 local-images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 local-images-%: RELEASE_LATEST=$(GIT_TAG)-latest
 local-images-%: binaries-%
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -94,7 +94,7 @@ images-%: GIT_TAG=$(shell cat ./$*/GIT_TAG)
 images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 images-%: RELEASE_LATEST=$(GIT_TAG)-latest
 images-%: binaries-%
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \

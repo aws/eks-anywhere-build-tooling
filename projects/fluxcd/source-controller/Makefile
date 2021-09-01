@@ -1,4 +1,5 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACT_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.16"
@@ -48,7 +49,7 @@ tarballs:  binaries
 
 .PHONY: local-images
 local-images: binaries
-	buildctl \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
@@ -60,7 +61,7 @@ local-images: binaries
 
 .PHONY: images
 images: binaries
-	/buildkit.sh \
+	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \

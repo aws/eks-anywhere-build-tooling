@@ -1,4 +1,5 @@
-REPO_ROOT="$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")/../../../" && pwd -P)"
+BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)

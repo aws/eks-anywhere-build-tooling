@@ -1,4 +1,5 @@
-REPO_ROOT="$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")/../../../" && pwd -P)"
+BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 ARTIFACTS_BUCKET?=my-s3-bucket
@@ -46,7 +47,7 @@ SECONDARY_KIND_KINDNETD_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/$(KIND_KINDNETD_IMA
 
 PUSH=false
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(REPO_ROOT)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
+SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
 BUILD_TARGETS=$(addprefix build-kind-node-, $(SUPPORTED_K8S_VERSIONS))
 
 ## --------------------------------------
