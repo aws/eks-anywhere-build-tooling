@@ -14,6 +14,9 @@ else
 	CLONE_URL?=https://github.com/$(COMPONENT).git
 endif
 
+GOPROXY_DNS?=https://proxy.golang.org
+export GOPROXY=$(GOPROXY_DNS)
+
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
 
