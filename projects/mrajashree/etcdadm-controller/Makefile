@@ -2,7 +2,7 @@ BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.13"
+GOLANG_VERSION?="1.16"
 
 REPO=etcdadm-controller
 COMPONENT=mrajashree/$(REPO)

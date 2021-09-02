@@ -1,0 +1,192 @@
+From 1ae1d4879368adab3c4932bdcd51472b6daa590e Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Thu, 2 Sep 2021 08:39:54 -0700
+Subject: [PATCH] Fix etcdMachine to cluster reconciler so it listens on
+ Machine events
+
+cr: https://code.amazon.com/reviews/CR-56463335
+---
+ controllers/cluster_controller.go      |  11 ++-
+ controllers/cluster_controller_test.go | 130 +++++++++++++++++++++++++
+ 2 files changed, 137 insertions(+), 4 deletions(-)
+
+diff --git a/controllers/cluster_controller.go b/controllers/cluster_controller.go
+index f4b0b4a5a..5ab84c907 100644
+--- a/controllers/cluster_controller.go
++++ b/controllers/cluster_controller.go
+@@ -89,10 +89,8 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager, options controlle
+ 	}
+ 
+ 	err = controller.Watch(
+-		&source.Kind{Type: &clusterv1.Cluster{}},
+-		&handler.EnqueueRequestsFromMapFunc{
+-			ToRequests: handler.ToRequestsFunc(r.etcdMachineToCluster),
+-		})
++		&source.Kind{Type: &clusterv1.Machine{}},
++		&handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(r.etcdMachineToCluster)})
+ 
+ 	if err != nil {
+ 		return errors.Wrap(err, "failed adding Watch for Clusters on etcd machines to controller manager")
+@@ -598,6 +596,10 @@ func (r *ClusterReconciler) etcdMachineToCluster(o handler.MapObject) []ctrl.Req
+ 	if !util.IsEtcdMachine(m) {
+ 		return nil
+ 	}
++	// address has not been set, so ManagedExternalEtcdInitialized would not be true
++	if len(m.Status.Addresses) == 0 {
++		return nil
++	}
+ 
+ 	cluster, err := util.GetClusterByName(context.TODO(), r.Client, m.Namespace, m.Spec.ClusterName)
+ 	if err != nil {
+@@ -606,6 +608,7 @@ func (r *ClusterReconciler) etcdMachineToCluster(o handler.MapObject) []ctrl.Req
+ 	}
+ 
+ 	if cluster.Status.ManagedExternalEtcdInitialized {
++		// no need to enqueue cluster for reconcile based on machine changes
+ 		return nil
+ 	}
+ 
+diff --git a/controllers/cluster_controller_test.go b/controllers/cluster_controller_test.go
+index 27d34d15e..1867d5219 100644
+--- a/controllers/cluster_controller_test.go
++++ b/controllers/cluster_controller_test.go
+@@ -479,6 +479,136 @@ func TestClusterReconciler(t *testing.T) {
+ 	})
+ }
+ 
++func TestClusterReconcilerEtcdMachineToCluster(t *testing.T) {
++	t.Run("machine to cluster", func(t *testing.T) {
++		clusterEtcdNotInitialized := &clusterv1.Cluster{
++			TypeMeta: metav1.TypeMeta{
++				Kind: "Cluster",
++			},
++			ObjectMeta: metav1.ObjectMeta{
++				Name:      "test-cluster",
++				Namespace: "test",
++			},
++			Spec:   clusterv1.ClusterSpec{},
++			Status: clusterv1.ClusterStatus{},
++		}
++		clusterEtcdInitialized := &clusterv1.Cluster{
++			TypeMeta: metav1.TypeMeta{
++				Kind: "Cluster",
++			},
++			ObjectMeta: metav1.ObjectMeta{
++				Name:      "test-cluster-etcd-init",
++				Namespace: "test",
++			},
++			Spec:   clusterv1.ClusterSpec{},
++			Status: clusterv1.ClusterStatus{ManagedExternalEtcdInitialized: true},
++		}
++		etcdMachineWithAddress := &clusterv1.Machine{
++			TypeMeta: metav1.TypeMeta{
++				Kind: "Machine",
++			},
++			ObjectMeta: metav1.ObjectMeta{
++				Name:      "etcdWithAddress",
++				Namespace: "test",
++				Labels: map[string]string{
++					clusterv1.ClusterLabelName:            clusterEtcdNotInitialized.Name,
++					clusterv1.MachineEtcdClusterLabelName: "",
++				},
++			},
++			Spec: clusterv1.MachineSpec{
++				ClusterName: "test-cluster",
++			},
++			Status: clusterv1.MachineStatus{
++				Addresses: clusterv1.MachineAddresses{clusterv1.MachineAddress{Type: clusterv1.MachineExternalIP, Address: "test"}},
++			},
++		}
++		etcdMachineNoAddress := &clusterv1.Machine{
++			TypeMeta: metav1.TypeMeta{
++				Kind: "Machine",
++			},
++			ObjectMeta: metav1.ObjectMeta{
++				Name:      "etcdNoAddress",
++				Namespace: "test",
++				Labels: map[string]string{
++					clusterv1.ClusterLabelName:            clusterEtcdNotInitialized.Name,
++					clusterv1.MachineEtcdClusterLabelName: "",
++				},
++			},
++			Spec: clusterv1.MachineSpec{
++				ClusterName: "test-cluster",
++			},
++			Status: clusterv1.MachineStatus{},
++		}
++		etcdMachineNoAddressForInitializedCluster := &clusterv1.Machine{
++			TypeMeta: metav1.TypeMeta{
++				Kind: "Machine",
++			},
++			ObjectMeta: metav1.ObjectMeta{
++				Name:      "etcdNoAddressClusterEtcdInitialized",
++				Namespace: "test",
++				Labels: map[string]string{
++					clusterv1.ClusterLabelName:            clusterEtcdInitialized.Name,
++					clusterv1.MachineEtcdClusterLabelName: "",
++				},
++			},
++			Spec: clusterv1.MachineSpec{
++				ClusterName: "test-cluster-etcd-init",
++			},
++			Status: clusterv1.MachineStatus{},
++		}
++
++		tests := []struct {
++			name string
++			o    handler.MapObject
++			want []ctrl.Request
++		}{
++			{
++				name: "etcd machine, address is set, should return cluster",
++				o: handler.MapObject{
++					Meta:   etcdMachineWithAddress.GetObjectMeta(),
++					Object: etcdMachineWithAddress,
++				},
++				want: []ctrl.Request{
++					{
++						NamespacedName: util.ObjectKey(clusterEtcdNotInitialized),
++					},
++				},
++			},
++			{
++				name: "etcd machine, address is not set, should not return cluster",
++				o: handler.MapObject{
++					Meta:   etcdMachineNoAddress.GetObjectMeta(),
++					Object: etcdMachineNoAddress,
++				},
++				want: nil,
++			},
++			{
++				name: "etcd machine, address is not set, but etcd is initialized, should not return cluster",
++				o: handler.MapObject{
++					Meta:   etcdMachineNoAddressForInitializedCluster.GetObjectMeta(),
++					Object: etcdMachineNoAddressForInitializedCluster,
++				},
++				want: nil,
++			},
++		}
++		for _, tt := range tests {
++			t.Run(tt.name, func(t *testing.T) {
++				g := NewWithT(t)
++
++				g.Expect(clusterv1.AddToScheme(scheme.Scheme)).To(Succeed())
++
++				r := &ClusterReconciler{
++					Client: fake.NewFakeClientWithScheme(scheme.Scheme, clusterEtcdNotInitialized, clusterEtcdInitialized, etcdMachineNoAddress, etcdMachineWithAddress, etcdMachineNoAddressForInitializedCluster),
++					Log:    log.Log,
++				}
++				requests := r.etcdMachineToCluster(tt.o)
++				g.Expect(requests).To(Equal(tt.want))
++			})
++		}
++	})
++
++}
++
+ type machineDeploymentBuilder struct {
+ 	md clusterv1.MachineDeployment
+ }
+-- 
+2.30.1
+
