@@ -27,6 +27,7 @@ HELM_BIN="${MAKE_ROOT}/_output/helm-bin"
 function build::install::helm(){
   mkdir -p $HELM_BIN
   export PATH=$HELM_BIN:$PATH
+  # TODO: install on builder base to avoid limitting this to linux machines for building
   yum install -y openssl
   curl -s https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | HELM_INSTALL_DIR=$HELM_BIN bash
 }
