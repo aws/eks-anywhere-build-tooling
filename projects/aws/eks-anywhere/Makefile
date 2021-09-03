@@ -78,7 +78,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/eksa-diagnostic-collector \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(COLLECTOR_SECONDARY_IMAGE),$(COLLECTOR_SECONDARY_LATEST_IMAGE)\",dest=/tmp/eksa-diagnostic-collector.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_LATEST_IMAGE)\",dest=/tmp/eksa-diagnostic-collector.tar
 
 .PHONY: images
 images: binaries
@@ -97,7 +97,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/eksa-diagnostic-collector \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(COLLECTOR_SECONDARY_IMAGE),$(COLLECTOR_SECONDARY_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_LATEST_IMAGE)\",push=true
 
 .PHONY: build
 build: local-images tarballs
