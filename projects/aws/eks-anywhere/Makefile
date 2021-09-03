@@ -32,11 +32,23 @@ IMAGE_NAME=eks-anywhere-cluster-controller
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
 
+COLLECTOR_BASE_IMAGE_NAME?=eks-distro-base
+COLLECTOR_BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
+COLLECTOR_BASE_IMAGE=$(BASE_REPO)/$(COLLECTOR_BASE_IMAGE_NAME):$(COLLECTOR_BASE_TAG)
+
+COLLECTOR_IMAGE_NAME=eks-anywhere-diagnostic-collector
+COLLECTOR_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(IMAGE_TAG)
+
+
 # These will go away after the full release stuff merges
 # This is to not block anyone using the images
 SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 SECONDARY_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
 SECONDARY_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME):latest
+
+SECONDARY_COLLECTOR_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+SECONDARY_COLLECTOR_IMAGE=$(SECONDARY_COLLECTOR_IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(IMAGE_TAG)
+SECONDARY_COLLECTOR_LATEST_IMAGE=$(SECONDARY_COLLECTOR_IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):latest
 
 .PHONY: upload-artifacts
 upload-artifacts:
@@ -61,9 +73,17 @@ local-images: binaries
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux \
+		--local dockerfile=./docker/linux/eks-anywhere-cluster-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE),$(SECONDARY_IMAGE),$(SECONDARY_LATEST_IMAGE)\",dest=/tmp/local-path-provisioner.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE),$(SECONDARY_IMAGE),$(SECONDARY_LATEST_IMAGE)\",dest=/tmp/eks-anywhere-cluster-controller.tar
+	$(BUILD_LIB)/buildkit.sh \
+		build \
+		--frontend dockerfile.v0 \
+		--opt platform=linux/amd64 \
+		--opt build-arg:BASE_IMAGE=$(COLLECTOR_BASE_IMAGE) \
+		--local dockerfile=./docker/linux/eksa-diagnostic-collector \
+		--local context=. \
+		--output type=oci,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_LATEST_IMAGE)\",dest=/tmp/eksa-diagnostic-collector.tar
 
 .PHONY: images
 images: binaries
@@ -72,9 +92,17 @@ images: binaries
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux \
+		--local dockerfile=./docker/linux/eks-anywhere-cluster-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(IMAGE),$(SECONDARY_IMAGE),$(SECONDARY_LATEST_IMAGE)\",push=true
+	$(BUILD_LIB)/buildkit.sh \
+		build \
+		--frontend dockerfile.v0 \
+		--opt platform=linux/amd64 \
+		--opt build-arg:BASE_IMAGE=$(COLLECTOR_BASE_IMAGE) \
+		--local dockerfile=./docker/linux/eksa-diagnostic-collector \
+		--local context=. \
+		--output type=image,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_LATEST_IMAGE)\",push=true
 
 .PHONY: build
 build: local-images tarballs
