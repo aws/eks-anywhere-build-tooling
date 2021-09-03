@@ -29,10 +29,11 @@ BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 
 IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_NAME=eks-anywhere-cluster-controller
-COLLECTOR_IMAGE_NAME=eks-anywhere-diagnostic-collector
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
-COLLECTOR_IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
+
+COLLECTOR_IMAGE_NAME=eks-anywhere-diagnostic-collector
+COLLECTOR_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(IMAGE_TAG)
 
 # These will go away after the full release stuff merges
 # This is to not block anyone using the images
