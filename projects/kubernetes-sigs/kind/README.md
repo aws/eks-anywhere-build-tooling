@@ -21,4 +21,4 @@ Kind also implements its own standard CNI/cluster networking configuration in th
 
 You can find the latest versions of these images on ECR Public Gallery.
 
-[Node](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/kind/node) | [HA Proxy](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/kind/haproxy) | [Kindnetd](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/kind/kindnetd)
+[Node](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/kind/node) | [HA Proxy](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/kind/haproxy) | [Kindnetd](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/kind/kindnetd)

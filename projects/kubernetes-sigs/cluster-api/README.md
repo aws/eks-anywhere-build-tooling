@@ -8,6 +8,6 @@ The `eks-a` CLI uses Cluster API to generate configurations for various infrasur
 
 You can find the latest versions of these images on ECR Public Gallery.
 
-[Cluster API Controller](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/cluster-api/cluster-api-controller) | 
-[Cluster API Kubeadm Bootstrap Controller](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller) | 
-[Cluster API Kubeadm Controlplane Controller](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/cluster-api/kubeadm-control-plane-controller)
+[Cluster API Controller](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/cluster-api/cluster-api-controller) | 
+[Cluster API Kubeadm Bootstrap Controller](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller) | 
+[Cluster API Kubeadm Controlplane Controller](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/cluster-api/kubeadm-control-plane-controller)

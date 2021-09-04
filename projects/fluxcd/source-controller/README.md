@@ -16,4 +16,4 @@ Some of the features of the Source controller are:
 * Notifies interested third-parties of source changes and availability (status conditions, events, hooks)
 * Reacts to Git push and Helm chart upload events
 
-You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/l0g8r8j6/fluxcd/source-controller).
+You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/fluxcd/source-controller).
