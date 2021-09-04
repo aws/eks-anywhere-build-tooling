@@ -27,24 +27,16 @@ BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_TAG_FILE)
 BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 BUILDER_IMAGE=$(BASE_REPO)/eks-distro-base:$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
 
-IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 CERT_MANAGER_ACMESOLVER_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-acmesolver:$(IMAGE_TAG)
+CERT_MANAGER_ACMESOLVER_LATEST_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-acmesolver:latest
 CERT_MANAGER_CAINJECTOR_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-cainjector:$(IMAGE_TAG)
+CERT_MANAGER_CAINJECTOR_LATEST_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-cainjector:latest
 CERT_MANAGER_CONTROLLER_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-controller:$(IMAGE_TAG)
+CERT_MANAGER_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-controller:latest
 CERT_MANAGER_WEBHOOK_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-webhook:$(IMAGE_TAG)
-
-# These will go away after the full release stuff merges
-# This is to not block anyone using the images
-SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-SECONDARY_CERT_MANAGER_ACMESOLVER_IMAGE=$(SECONDARY_IMAGE_REPO)/jetstack/cert-manager-acmesolver:$(IMAGE_TAG)
-SECONDARY_CERT_MANAGER_CAINJECTOR_IMAGE=$(SECONDARY_IMAGE_REPO)/jetstack/cert-manager-cainjector:$(IMAGE_TAG)
-SECONDARY_CERT_MANAGER_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/jetstack/cert-manager-controller:$(IMAGE_TAG)
-SECONDARY_CERT_MANAGER_WEBHOOK_IMAGE=$(SECONDARY_IMAGE_REPO)/jetstack/cert-manager-webhook:$(IMAGE_TAG)
-SECONDARY_LATEST_CERT_MANAGER_ACMESOLVER_IMAGE=$(SECONDARY_IMAGE_REPO)/jetstack/cert-manager-acmesolver:latest
-SECONDARY_LATEST_CERT_MANAGER_CAINJECTOR_IMAGE=$(SECONDARY_IMAGE_REPO)/jetstack/cert-manager-cainjector:latest
-SECONDARY_LATEST_CERT_MANAGER_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/jetstack/cert-manager-controller:latest
-SECONDARY_LATEST_CERT_MANAGER_WEBHOOK_IMAGE=$(SECONDARY_IMAGE_REPO)/jetstack/cert-manager-webhook:latest
+CERT_MANAGER_WEBHOOK_LATEST_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-webhook:latest
 
 .PHONY: binaries
 binaries:
@@ -68,7 +60,7 @@ local-images: binaries
 		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
 		--local dockerfile=./docker/linux/cert-manager-acmesolver \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_ACMESOLVER_IMAGE),$(SECONDARY_CERT_MANAGER_ACMESOLVER_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_ACMESOLVER_IMAGE)\",dest=/tmp/cert-manager-acmesolver.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_ACMESOLVER_IMAGE),$(CERT_MANAGER_ACMESOLVER_LATEST_IMAGE)\",dest=/tmp/cert-manager-acmesolver.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -77,7 +69,7 @@ local-images: binaries
 		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
 		--local dockerfile=./docker/linux/cert-manager-cainjector \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_CAINJECTOR_IMAGE),$(SECONDARY_CERT_MANAGER_CAINJECTOR_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_CAINJECTOR_IMAGE)\",dest=/tmp/cert-manager-cainjector.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_CAINJECTOR_IMAGE),$(CERT_MANAGER_CAINJECTOR_LATEST_IMAGE)\",dest=/tmp/cert-manager-cainjector.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -86,7 +78,7 @@ local-images: binaries
 		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
 		--local dockerfile=./docker/linux/cert-manager-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_CONTROLLER_IMAGE),$(SECONDARY_CERT_MANAGER_CONTROLLER_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_CONTROLLER_IMAGE)\",dest=/tmp/cert-manager-controller.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_CONTROLLER_IMAGE),$(CERT_MANAGER_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/cert-manager-controller.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -94,7 +86,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/cert-manager-webhook \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_WEBHOOK_IMAGE),$(SECONDARY_CERT_MANAGER_WEBHOOK_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_WEBHOOK_IMAGE)\",dest=/tmp/cert-manager-webhook.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_WEBHOOK_IMAGE),$(CERT_MANAGER_WEBHOOK_LATEST_IMAGE)\",dest=/tmp/cert-manager-webhook.tar
 
 .PHONY: images
 images: binaries
@@ -106,7 +98,7 @@ images: binaries
 		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
 		--local dockerfile=./docker/linux/cert-manager-acmesolver \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_ACMESOLVER_IMAGE),$(SECONDARY_CERT_MANAGER_ACMESOLVER_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_ACMESOLVER_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_ACMESOLVER_IMAGE),$(CERT_MANAGER_ACMESOLVER_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -115,7 +107,7 @@ images: binaries
 		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
 		--local dockerfile=./docker/linux/cert-manager-cainjector \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_CAINJECTOR_IMAGE),$(SECONDARY_CERT_MANAGER_CAINJECTOR_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_CAINJECTOR_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_CAINJECTOR_IMAGE),$(CERT_MANAGER_CAINJECTOR_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -124,7 +116,7 @@ images: binaries
 		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
 		--local dockerfile=./docker/linux/cert-manager-controller \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_CONTROLLER_IMAGE),$(SECONDARY_CERT_MANAGER_CONTROLLER_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_CONTROLLER_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_CONTROLLER_IMAGE),$(CERT_MANAGER_CONTROLLER_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -132,7 +124,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/cert-manager-webhook \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_WEBHOOK_IMAGE),$(SECONDARY_CERT_MANAGER_WEBHOOK_IMAGE),$(SECONDARY_LATEST_CERT_MANAGER_WEBHOOK_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_WEBHOOK_IMAGE),$(CERT_MANAGER_WEBHOOK_LATEST_IMAGE)\",push=true
 	
 .PHONY: build
 build: local-images tarballs

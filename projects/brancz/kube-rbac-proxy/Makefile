@@ -23,16 +23,11 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base-nonroot
 BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_NONROOT_TAG_FILE)
 BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 
-IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_NAME=$(COMPONENT)
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
-
-# These will go away after the full release stuff merges
-# This is to not block anyone using the images
-SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-SECONDARY_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
-SECONDARY_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME):latest
+LATEST_IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):latest
 
 .PHONY: upload-artifacts
 upload-artifacts:
@@ -59,7 +54,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/ \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE),$(SECONDARY_IMAGE),$(SECONDARY_LATEST_IMAGE)\",dest=/tmp/kube-rbac-proxy.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",dest=/tmp/kube-rbac-proxy.tar
 
 .PHONY: images
 images: binaries
@@ -70,7 +65,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/ \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(IMAGE),$(SECONDARY_IMAGE),$(SECONDARY_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",push=true
 
 .PHONY: build
 build: local-images tarballs

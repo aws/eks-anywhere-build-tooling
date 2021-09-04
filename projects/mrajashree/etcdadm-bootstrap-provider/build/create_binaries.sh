@@ -49,12 +49,7 @@ function build::etcdadm-bootstrap-provider::create_binaries(){
 
 function build::etcdadm-bootstrap-provider::manifests(){
   MANIFEST_IMAGE_OVERRIDE="${IMAGE_REPO}/mrajashree/etcdadm-bootstrap-provider:${IMAGE_TAG}"
-  if [[ -v CODEBUILD_CI ]]; then
-    KUBE_RBAC_PROXY_LATEST_TAG=$(aws ecr-public describe-images --region us-east-1 --output text --repository-name brancz/kube-rbac-proxy --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]')
-  else
-    KUBE_RBAC_PROXY_LATEST_TAG=latest
-  fi
-  KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:${KUBE_RBAC_PROXY_LATEST_TAG}
+  KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
 
   sed -i "s,\${ETCDADM_BOOTSTRAP_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ./config/manager/manager.yaml
   sed -i 's,image: .*,image: '"${KUBE_RBAC_PROXY_IMAGE_OVERRIDE}"',' ./config/default/manager_auth_proxy_patch.yaml

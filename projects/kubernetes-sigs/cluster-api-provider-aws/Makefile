@@ -26,23 +26,14 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base
 BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_TAG_FILE)
 BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 
-IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 CAPA_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller:$(IMAGE_TAG)
+CAPA_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller:latest
 CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/eks-bootstrap-controller:$(IMAGE_TAG)
+CAPA_EKS_BOOTSTRAP_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/eks-bootstrap-controller:latest
 CAPA_EKS_CONTROL_PLANE_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/eks-control-plane-controller:$(IMAGE_TAG)
-
-# These will go away after the full release stuff merges
-# This is to not block anyone using the images
-SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-SECONDARY_CAPA_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller:$(IMAGE_TAG)
-SECONDARY_CAPA_CONTROLLER_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller:latest
-
-SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/eks-bootstrap-controller:$(IMAGE_TAG)
-SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/eks-bootstrap-controller:latest
-
-SECONDARY_CAPA_EKS_CONTROL_PLANE_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/eks-control-plane-controller:$(IMAGE_TAG)
-SECONDARY_CAPA_EKS_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/eks-control-plane-controller:latest
+CAPA_EKS_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-aws/eks-control-plane-controller:latest
 
 .PHONY: upload-artifacts
 upload-artifacts:
@@ -69,7 +60,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/cluster-api-aws-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPA_CONTROLLER_IMAGE),$(SECONDARY_CAPA_CONTROLLER_IMAGE),$(SECONDARY_CAPA_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capa-controller.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CAPA_CONTROLLER_IMAGE),$(CAPA_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capa-controller.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -77,7 +68,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/eks-bootstrap-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capa-eks-bootstrap-controller.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(CAPA_EKS_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capa-eks-bootstrap-controller.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -85,7 +76,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/eks-control-plane-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPA_EKS_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capa-eks-control-plane-controller.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CAPA_EKS_CONTROL_PLANE_CONTROLLER_IMAGE),$(CAPA_EKS_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capa-eks-control-plane-controller.tar
 
 .PHONY: images
 images: binaries
@@ -96,7 +87,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/cluster-api-aws-controller \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPA_CONTROLLER_IMAGE),$(SECONDARY_CAPA_CONTROLLER_IMAGE),$(SECONDARY_CAPA_CONTROLLER_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CAPA_CONTROLLER_IMAGE),$(CAPA_CONTROLLER_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -104,7 +95,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/eks-bootstrap-controller \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CAPA_EKS_BOOTSTRAP_CONTROLLER_IMAGE),$(CAPA_EKS_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -112,7 +103,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/eks-control-plane-controller \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPA_EKS_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_CAPA_EKS_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CAPA_EKS_CONTROL_PLANE_CONTROLLER_IMAGE),$(CAPA_EKS_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",push=true
 
 .PHONY: build
 build: local-images tarballs
