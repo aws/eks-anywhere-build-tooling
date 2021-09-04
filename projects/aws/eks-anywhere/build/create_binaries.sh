@@ -50,18 +50,17 @@ function build::eks-anywhere-cluster-controller::create_binaries(){
 }
 
 function build::eks-anywhere-cluster-controller::manifests(){
-  MANIFEST_IMAGE="public.ecr.aws/l0g8r8j6/eks-anywhere-cluster-controller:.*"
-  MANIFEST_IMAGE_OVERRIDE="${IMAGE_REPO}/eks-anywhere-cluster-controller:${IMAGE_TAG}"
+  MANIFEST_IMAGE_TAG=$(yq e '.images[] | select(.name == "controller") | .newTag' ./config/prod/kustomization.yaml)
+  KUBE_RBAC_PROXY_MANIFEST_IMAGE_TAG=$(yq e '.images[] | select(.name == "*kube-rbac-proxy") | .newTag' ./config/prod/kustomization.yaml)
 
   if [[ -v CODEBUILD_CI ]]; then
-    KUBE_RBAC_PROXY_LATEST_TAG=$(aws ecr-public describe-images --region us-east-1 --output text --repository-name brancz/kube-rbac-proxy --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]')
+    KUBE_RBAC_PROXY_IMAGE_TAG_OVERRIDE=$(aws ecr-public describe-images --region us-east-1 --output text --repository-name brancz/kube-rbac-proxy --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]')
   else
-    KUBE_RBAC_PROXY_LATEST_TAG=latest
+    KUBE_RBAC_PROXY_IMAGE_TAG_OVERRIDE=latest
   fi
-  KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:${KUBE_RBAC_PROXY_LATEST_TAG}
 
-  sed -i 's,image: .*,image: '"${MANIFEST_IMAGE_OVERRIDE}"',' ./config/manager/manager_image_patch.yaml
-  sed -i 's,image: .*,image: '"${KUBE_RBAC_PROXY_IMAGE_OVERRIDE}"',' ./config/default/manager_auth_proxy_patch.yaml
+  sed -i "s,${MANIFEST_IMAGE_TAG},${IMAGE_TAG}," ./config/prod/kustomization.yaml
+  sed -i "s,${KUBE_RBAC_PROXY_MANIFEST_IMAGE_TAG},${KUBE_RBAC_PROXY_IMAGE_TAG_OVERRIDE}," ./config/prod/kustomization.yaml
 
   mkdir -p ../_output/manifests/cluster-controller
   make release-manifests RELEASE_DIR=.
