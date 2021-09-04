@@ -5,10 +5,10 @@ GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.16"
 
 REPO=kube-vip
-COMPONENT=plunder-app/$(REPO)
+COMPONENT=kube-vip/$(REPO)
 ifdef CODEBUILD_SRC_DIR
 	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/plunder-app.kube-vip
+	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kube-vip.kube-vip
 else
 	TAR_PATH?="_output/tar"
 	CLONE_URL?=https://github.com/$(COMPONENT).git
