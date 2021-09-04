@@ -1,8 +1,6 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-LATEST_RELEASE_BRANCH=$(shell yq e ".latest" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
-LATEST_RELEASE=$(shell yq e ".$(LATEST_RELEASE_BRANCH).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
-GIT_TAG=v$(LATEST_RELEASE_BRANCH)-$(LATEST_RELEASE)
+GIT_TAG?=$(shell cat GIT_TAG)
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
@@ -15,7 +13,7 @@ BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 
 IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_NAME=eks-anywhere-cli-tools
-IMAGE_TAG?=$(shell git rev-parse HEAD)
+IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
 
 # These will go away after the full release stuff merges
