@@ -10,4 +10,4 @@ In Kubernetes, CNS provides a volume driver that has two sub-components – the 
 
 You can find the latest versions of these images on ECR Public Gallery.
 
-[CSI driver](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/vsphere-csi-driver/csi/driver) | [CSI syncer](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/vsphere-csi-driver/csi/syncer)
+[CSI driver](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/vsphere-csi-driver/csi/driver) | [CSI syncer](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/vsphere-csi-driver/csi/syncer)

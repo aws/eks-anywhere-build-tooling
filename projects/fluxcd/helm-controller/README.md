@@ -16,4 +16,4 @@ Some of the features of the Helm controller are:
 * Reports Helm release statuses
 * Built-in Kustomize compatible Helm post renderer, providing support for strategic merge, JSON 6902 and images patches
 
-You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/l0g8r8j6/fluxcd/helm-controller).
+You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/fluxcd/helm-controller).

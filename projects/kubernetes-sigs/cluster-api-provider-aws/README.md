@@ -16,7 +16,7 @@ Cluster API Provider AWS controller images are used in the Provider confgiration
 
 You can find the latest versions of these images on ECR Public Gallery.
 
-[Cluster API AWS Controller](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller) | 
-[Cluster API EKS Bootstrap Controller](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/cluster-api-provider-aws/eks-bootstrap-controller) | 
-[Cluster API EKS Controlplane Controller](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/cluster-api-provider-aws/eks-control-plane-controller)
+[Cluster API AWS Controller](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller) | 
+[Cluster API EKS Bootstrap Controller](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/cluster-api-provider-aws/eks-bootstrap-controller) | 
+[Cluster API EKS Controlplane Controller](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/cluster-api-provider-aws/eks-control-plane-controller)
 

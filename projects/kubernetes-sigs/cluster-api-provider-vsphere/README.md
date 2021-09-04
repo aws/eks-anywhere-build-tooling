@@ -12,4 +12,4 @@ Some of the features of Cluster API Provider vSphere include:
 
 The Cluster API Provider vSphere controller image is used in the Provider confgiration to bootstrap the vSphere Infrastructure Provider in the EKS-A CLI.
 
-You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/l0g8r8j6/kubernetes-sigs/cluster-api-provider-vsphere/release/manager).
+You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/cluster-api-provider-vsphere/release/manager).

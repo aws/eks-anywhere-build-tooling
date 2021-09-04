@@ -4,4 +4,4 @@
 
 The EKS-A CLI tools image is packaged with the executables that are invoked by the `eks-a` command-line tool, such as `clusterctl`, `kubectl`, `kind`, `flux`, `govc`, etc. This image serves as the runtime environment when using the CLI, but customers can choose to use their own local binaries by setting the flag `MR_TOOLS_DISABLED` to `true`.
 
-You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/l0g8r8j6/eks-anywhere-cli-tools).
+You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/cli-tools).

@@ -4,4 +4,4 @@
 
 The [notification-controller](https://github.com/fluxcd/notification-controller) is a Kubernetes operator specialized in handling inbound and outbound events. The controller exposes an HTTP endpoint for receiving events from other controllers. It can be configured with Kubernetes custom resources such as `Alert`, `Event`,`Provider` and `Receiver` to define how events are processed and where to dispatch them.
 
-You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/l0g8r8j6/fluxcd/notification-controller).
+You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/fluxcd/notification-controller).

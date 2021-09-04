@@ -13,7 +13,7 @@ In addition, cert-manager supports requesting certificates from ACME servers, in
 
 You can find the latest versions of these images on ECR Public Gallery.
 
-[ACME Solver](https://gallery.ecr.aws/l0g8r8j6/jetstack/cert-manager-acmesolver) | 
-[cert-manager Controller](https://gallery.ecr.aws/l0g8r8j6/jetstack/cert-manager-controller) | 
-[CA injector](https://gallery.ecr.aws/l0g8r8j6/jetstack/cert-manager-cainjector) | 
-[cert-manager Webhook Server](https://gallery.ecr.aws/l0g8r8j6/jetstack/cert-manager-webhook)
+[ACME Solver](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-acmesolver) | 
+[cert-manager Controller](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-controller) | 
+[CA injector](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-cainjector) | 
+[cert-manager Webhook Server](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-webhook)

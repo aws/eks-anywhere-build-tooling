@@ -19,4 +19,4 @@ Some of the features of the Kustomize controller are:
 * Runs `Kustomizations` in a specific order, taking into account the depends-on relationship 
 * Notifies whenever a `Kustomization` status changes
 
-You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/l0g8r8j6/fluxcd/kustomize-controller).
+You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/fluxcd/kustomize-controller).

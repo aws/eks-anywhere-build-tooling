@@ -6,4 +6,4 @@ The [kube-rbac-proxy](https://github.com/brancz/kube-rbac-proxy) is an HTTP prox
 
 A `kube-rbac-proxy` sidecar container is injected by Cluster API Kubeadm manager when provisioning the Kubernetes controlplane.
 
-You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/l0g8r8j6/brancz/kube-rbac-proxy).
+You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/brancz/kube-rbac-proxy).
