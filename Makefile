@@ -3,7 +3,7 @@ AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output tex
 AWS_REGION?=us-west-2
 IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
-PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller
+PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere kube-vip_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller
 BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 
 EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi
@@ -45,7 +45,7 @@ clean:
 	make -C projects/kubernetes-sigs/cri-tools clean
 	make -C projects/kubernetes-sigs/kind clean
 	make -C projects/kubernetes/cloud-provider-vsphere clean
-	make -C projects/plunder-app/kube-vip clean
+	make -C projects/kube-vip/kube-vip clean
 	make -C projects/kubernetes-sigs/etcdadm clean
 	make -C projects/fluxcd/flux2 clean
 
@@ -72,7 +72,7 @@ attribution-files:
 	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/etcdadm
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-bootstrap-provider
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-controller
-	build/update-attribution-files/make_attribution.sh projects/plunder-app/kube-vip
+	build/update-attribution-files/make_attribution.sh projects/kube-vip/kube-vip
 
 	cat _output/total_summary.txt
 
