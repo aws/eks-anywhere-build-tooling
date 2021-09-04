@@ -50,17 +50,20 @@ function build::eks-anywhere-cluster-controller::create_binaries(){
 }
 
 function build::eks-anywhere-cluster-controller::manifests(){
-  MANIFEST_IMAGE_TAG=$(yq e '.images[] | select(.name == "controller") | .newTag' ./config/prod/kustomization.yaml)
-  KUBE_RBAC_PROXY_MANIFEST_IMAGE_TAG=$(yq e '.images[] | select(.name == "*kube-rbac-proxy") | .newTag' ./config/prod/kustomization.yaml)
+  MANIFEST_IMAGE_NAME="$(yq e '.images[] | select(.name == "controller") | .newName' ./config/prod/kustomization.yaml)"
+  MANIFEST_IMAGE_TAG="$(yq e '.images[] | select(.name == "controller") | .newTag' ./config/prod/kustomization.yaml)"
+  MANIFEST_IMAGE_NAME_OVERRIDE="${IMAGE_REPO}/eks-anywhere-cluster-controller"
+  MANIFEST_IMAGE_TAG_OVERRIDE=${IMAGE_TAG}
 
-  if [[ -v CODEBUILD_CI ]]; then
-    KUBE_RBAC_PROXY_IMAGE_TAG_OVERRIDE=$(aws ecr-public describe-images --region us-east-1 --output text --repository-name brancz/kube-rbac-proxy --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]')
-  else
-    KUBE_RBAC_PROXY_IMAGE_TAG_OVERRIDE=latest
-  fi
+  KUBE_RBAC_PROXY_IMAGE_NAME="$(yq e '.images[] | select(.name == "*kube-rbac-proxy") | .newName' ./config/prod/kustomization.yaml)"
+  KUBE_RBAC_PROXY_IMAGE_TAG="$(yq e '.images[] | select(.name == "*kube-rbac-proxy") | .newTag' ./config/prod/kustomization.yaml)"
+  KUBE_RBAC_PROXY_IMAGE_NAME_OVERRIDE="${IMAGE_REPO}/brancz/kube-rbac-proxy"
+  KUBE_RBAC_PROXY_IMAGE_TAG_OVERRIDE="latest"
 
-  sed -i "s,${MANIFEST_IMAGE_TAG},${IMAGE_TAG}," ./config/prod/kustomization.yaml
-  sed -i "s,${KUBE_RBAC_PROXY_MANIFEST_IMAGE_TAG},${KUBE_RBAC_PROXY_IMAGE_TAG_OVERRIDE}," ./config/prod/kustomization.yaml
+  sed -i "s,${MANIFEST_IMAGE_NAME},${MANIFEST_IMAGE_NAME_OVERRIDE}," ./config/prod/kustomization.yaml
+  sed -i "s,${MANIFEST_IMAGE_TAG},${MANIFEST_IMAGE_TAG_OVERRIDE}," ./config/prod/kustomization.yaml
+  sed -i "s,${KUBE_RBAC_PROXY_IMAGE_NAME},${KUBE_RBAC_PROXY_IMAGE_NAME_OVERRIDE}," ./config/prod/kustomization.yaml
+  sed -i "s,${KUBE_RBAC_PROXY_IMAGE_TAG},${KUBE_RBAC_PROXY_IMAGE_TAG_OVERRIDE}," ./config/prod/kustomization.yaml
 
   mkdir -p ../_output/manifests/cluster-controller
   make release-manifests RELEASE_DIR=.

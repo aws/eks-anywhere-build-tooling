@@ -26,27 +26,16 @@ CAPD_BASE_IMAGE_NAME?=eks-distro-minimal-base-docker-client
 CAPD_BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_DOCKER_CLIENT_TAG_FILE)
 CAPD_BASE_IMAGE?=$(BASE_REPO)/$(CAPD_BASE_IMAGE_NAME):$(CAPD_BASE_TAG)
 
-IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 CAPI_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/cluster-api-controller:$(IMAGE_TAG)
+CAPI_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/cluster-api-controller:latest
 CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller:$(IMAGE_TAG)
+CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller:latest
 CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-control-plane-controller:$(IMAGE_TAG)
+CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-control-plane-controller:latest
 CAPD_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/capd-manager:$(IMAGE_TAG)
-
-# These will go away after the full release stuff merges
-# This is to not block anyone using the images
-SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-SECONDARY_CAPI_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api/cluster-api-controller:$(IMAGE_TAG)
-SECONDARY_CAPI_CONTROLLER_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api/cluster-api-controller:latest
-
-SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller:$(IMAGE_TAG)
-SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller:latest
-
-SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-control-plane-controller:$(IMAGE_TAG)
-SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-control-plane-controller:latest
-
-SECONDARY_CAPD_CONTROLLER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api/capd-manager:$(IMAGE_TAG)
-SECONDARY_CAPD_CONTROLLER_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/cluster-api/capd-manager:latest
+CAPD_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/capd-manager:latest
 
 .PHONY: upload-artifacts
 upload-artifacts:
@@ -80,7 +69,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/cluster-api-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_CONTROLLER_IMAGE),$(SECONDARY_CAPI_CONTROLLER_IMAGE),$(SECONDARY_CAPI_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-controller.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_CONTROLLER_IMAGE),$(CAPI_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-controller.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -88,7 +77,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/kubeadm-bootstrap-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-kubeadm-bootstrap-controller.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-kubeadm-bootstrap-controller.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -96,7 +85,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/kubeadm-control-plane-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-kubeadm-control-plane-controller.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-kubeadm-control-plane-controller.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -104,7 +93,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(CAPD_BASE_IMAGE) \
 		--local dockerfile=./docker/linux/cluster-api-docker-controller \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPD_CONTROLLER_IMAGE),$(SECONDARY_CAPD_CONTROLLER_IMAGE),$(SECONDARY_CAPD_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capd-controller.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CAPD_CONTROLLER_IMAGE),$(CAPD_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capd-controller.tar
 
 .PHONY: images
 images: binaries
@@ -115,7 +104,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/cluster-api-controller \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPI_CONTROLLER_IMAGE),$(SECONDARY_CAPI_CONTROLLER_IMAGE),$(SECONDARY_CAPI_CONTROLLER_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CAPI_CONTROLLER_IMAGE),$(CAPI_CONTROLLER_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -123,7 +112,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/kubeadm-bootstrap-controller \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -131,7 +120,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/kubeadm-control-plane-controller \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(SECONDARY_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -139,7 +128,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(CAPD_BASE_IMAGE) \
 		--local dockerfile=./docker/linux/cluster-api-docker-controller \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPD_CONTROLLER_IMAGE),$(SECONDARY_CAPD_CONTROLLER_IMAGE),$(SECONDARY_CAPD_CONTROLLER_LATEST_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CAPD_CONTROLLER_IMAGE),$(CAPD_CONTROLLER_LATEST_IMAGE)\",push=true
 
 .PHONY: build
 build: local-images tarballs

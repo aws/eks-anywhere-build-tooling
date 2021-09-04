@@ -19,10 +19,9 @@ set -o nounset
 set -o pipefail
 
 BASE_IMAGE="${1?Specify first argument - base image}"
-KIND_KINDNETD_IMAGE="${2?Specify second argument - primary kindnetd image}"
-SECONDARY_KIND_KINDNETD_IMAGE="${3?Specify third argument - secondary kindnetd image}"
-SECONDARY_KIND_KINDNETD_LATEST_IMAGE="${4?Specify fourth argument - secondary kindnetd latest image}"
-PUSH="${5?Specify fifth argument - push}"
+KIND_KINDNETD_IMAGE="${2?Specify second argument - kindnetd image}"
+KIND_KINDNETD_LATEST_IMAGE="${3?Specify third argument - kindnetd latest image}"
+PUSH="${4?Specify fourth argument - push}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BUILD_LIB="${MAKE_ROOT}/../../../build/lib"
@@ -43,7 +42,7 @@ function build::kindnetd::image(){
         --local context=$MAKE_ROOT \
         --opt filename=Dockerfile \
         --progress plain \
-        --output $TYPE,oci-mediatypes=true,\"name=${KIND_KINDNETD_IMAGE},${SECONDARY_KIND_KINDNETD_IMAGE},${SECONDARY_KIND_KINDNETD_LATEST_IMAGE}\",$OUTPUT
+        --output $TYPE,oci-mediatypes=true,\"name=${KIND_KINDNETD_IMAGE},${KIND_KINDNETD_LATEST_IMAGE}\",$OUTPUT
 }
 
 build::kindnetd::image

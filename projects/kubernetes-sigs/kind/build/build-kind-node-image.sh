@@ -19,24 +19,18 @@ set -o pipefail
 EKSD_RELEASE_BRANCH="${1?Specify first argument - release branch}"
 KIND_BASE_IMAGE_NAME="${2?Specify second argument - kind base tag}"
 KIND_NODE_IMAGE_NAME="${3?Specify third argument - kind node image name}"
-SECONDARY_KIND_NODE_IMAGE="${4?Specify the fourth argument - secondary node image name}"
-KIND_KINDNETD_IMAGE_OVERRIDE="${5?Specify the fifth argument - kindnetd image}"
-IMAGE_REPO="${6?Specify sixth argument - image repo}"
-IMAGE_TAG="${7?Specify seventh argument - image tag}"
-ARTIFACTS_BUCKET="${8?Specify argument argument - artifact bucket}"
-PUSH="${9?Specify ninth argument - push}"
+KIND_KINDNETD_IMAGE_OVERRIDE="${4?Specify the fourth argument - kindnetd image}"
+IMAGE_REPO="${5?Specify fifth argument - image repo}"
+IMAGE_TAG="${6?Specify sixth argument - image tag}"
+ARTIFACTS_BUCKET="${7?Specify seventh argument - artifact bucket}"
+PUSH="${8?Specify eighth argument - push}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 # This is used by the local-path-provisioner within the kind node
 AL2_HELPER_IMAGE="public.ecr.aws/amazonlinux/amazonlinux:2"
-if [ "$PULL_PULL_SHA" = "" ]; then
-    LOCAL_PATH_PROVISIONER_LATEST_TAG=$(aws ecr-public describe-images --region us-east-1 --output text --repository-name rancher/local-path-provisioner --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]')
-else
-    LOCAL_PATH_PROVISIONER_LATEST_TAG="v0.0.14"
-fi
-LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE="$IMAGE_REPO/rancher/local-path-provisioner:$LOCAL_PATH_PROVISIONER_LATEST_TAG"
+LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE="$IMAGE_REPO/rancher/local-path-provisioner:latest"
 LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE="public.ecr.aws/eks-anywhere/rancher/local-path-provisioner:$(cat $MAKE_ROOT/../../rancher/local-path-provisioner/GIT_TAG)"
 KIND_KINDNETD_RELEASE_OVERRIDE="public.ecr.aws/eks-anywhere/kubernetes-sigs/kind/kindnetd:$(cat $MAKE_ROOT/GIT_TAG)"
 
@@ -247,10 +241,8 @@ function build::kind::build_final_node_image(){
 
     if [ "$PUSH" == "true" ] ; then
         docker push $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG
-        docker tag $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG $SECONDARY_KIND_NODE_IMAGE:$EKSD_KUBE_VERSION-$IMAGE_TAG
-        docker tag $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG $SECONDARY_KIND_NODE_IMAGE:$EKSD_KUBE_VERSION-latest
-        docker push $SECONDARY_KIND_NODE_IMAGE:$EKSD_KUBE_VERSION-$IMAGE_TAG
-        docker push $SECONDARY_KIND_NODE_IMAGE:$EKSD_KUBE_VERSION-latest
+        docker tag $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG $KIND_NODE_IMAGE:$EKSD_KUBE_VERSION-latest
+        docker push $KIND_NODE_IMAGE:$EKSD_KUBE_VERSION-latest
     fi
 }
 
