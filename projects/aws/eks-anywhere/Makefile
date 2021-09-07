@@ -2,6 +2,7 @@ BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG=$(shell cat GIT_TAG)
+GIT_COMMIT=$(shell cat GIT_COMMIT)
 GOLANG_VERSION?="1.16"
 
 REPO=eks-anywhere
@@ -56,7 +57,7 @@ upload-artifacts:
 
 .PHONY: binaries
 binaries:
-	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION) $(BINARY_NAME) $(IMAGE_REPO) $(IMAGE_TAG)
+	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_COMMIT) $(GOLANG_VERSION) $(BINARY_NAME) $(IMAGE_REPO) $(IMAGE_TAG)
 
 .PHONY: generate-attribution
 generate-attribution:
