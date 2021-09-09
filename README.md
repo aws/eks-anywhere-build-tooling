@@ -4,6 +4,12 @@ The EKS Anywhere Build Tooling repository contains the code to build artifacts c
 
 ## Base Image Tracker
 
+This table tracks the base images used to build the container images for the upstream dependencies of EKS Anywhere.
+
+<details>
+<summary>Click to view/hide table</summary>
+
+
 | Dockerfile | Image Repo | Base image |
 | --- | --- | --- |
 | [EKS-A tools](https://github.com/aws/eks-anywhere-build-tooling/blob/main/projects/aws/eks-anywhere-build-tooling/docker/linux/Dockerfile) | [EKS-A tools image](https://gallery.ecr.aws/eks-anywhere/cli-tools) | [EKS Distro Minimal Base Docker Client Image](https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-docker-client) |
@@ -35,6 +41,8 @@ The EKS Anywhere Build Tooling repository contains the code to build artifacts c
 | [Etcdadm controller](https://github.com/aws/eks-anywhere-build-tooling/blob/main/projects/mrajashree/etcdadm-controller/docker/linux/Dockerfile) | [Etcdadm controller image](https://gallery.ecr.aws/eks-anywhere/mrajashree/etcdadm-controller) | [EKS Distro Minimal Base Image](https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base) |
 | [Kube VIP](https://github.com/aws/eks-anywhere-build-tooling/blob/main/projects/plunder-app/kube-vip/docker/linux/Dockerfile) | [Kube VIP image](https://gallery.ecr.aws/eks-anywhere/plunder-app/kube-vip) | [EKS Distro Minimal Base Image](https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base) |
 | [Local path provisioner](https://github.com/aws/eks-anywhere-build-tooling/blob/main/projects/rancher/local-path-provisioner/docker/linux/Dockerfile) | [Local path provisioner image](https://gallery.ecr.aws/eks-anywhere/rancher/local-path-provisioner) | [EKS Distro Minimal Base Image](https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base) |
+
+</details>
 
 ## Contribution
 
