@@ -28,18 +28,12 @@ BASE_CSI_IMAGE_NAME?=eks-distro-minimal-base-csi
 BASE_CSI_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_CSI_TAG_FILE)
 BASE_CSI_IMAGE?=$(BASE_REPO)/$(BASE_CSI_IMAGE_NAME):$(BASE_CSI_TAG)
 
-IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 CSI_DRIVER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/driver:$(IMAGE_TAG)
+CSI_DRIVER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/driver:latest
 CSI_SYNCER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/syncer:$(IMAGE_TAG)
-
-# These will go away after the full release stuff merges
-# This is to not block anyone using the images
-SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-SECONDARY_DRIVER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/driver:$(IMAGE_TAG)
-SECONDARY_LATEST_DRIVER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/driver:latest
-SECONDARY_SYNCER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/syncer:$(IMAGE_TAG)
-SECONDARY_LATEST_SYNCER_IMAGE=$(SECONDARY_IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/syncer:latest
+CSI_SYNCER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/syncer:latest
 
 .PHONY: upload-artifacts
 upload-artifacts:
@@ -66,7 +60,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_CSI_IMAGE) \
 		--local dockerfile=./docker/linux/csi-driver \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CSI_DRIVER_IMAGE),$(SECONDARY_DRIVER_IMAGE),$(SECONDARY_LATEST_DRIVER_IMAGE)\",dest=/tmp/csi-driver.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CSI_DRIVER_IMAGE),$(CSI_DRIVER_LATEST_IMAGE)\",dest=/tmp/csi-driver.tar
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -74,7 +68,7 @@ local-images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/csi-syncer \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CSI_SYNCER_IMAGE),$(SECONDARY_SYNCER_IMAGE),$(SECONDARY_LATEST_SYNCER_IMAGE)\",dest=/tmp/csi-syncer.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(CSI_SYNCER_IMAGE),$(CSI_SYNCER_LATEST_IMAGE)\",dest=/tmp/csi-syncer.tar
 
 .PHONY: images
 images: binaries
@@ -85,7 +79,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_CSI_IMAGE) \
 		--local dockerfile=./docker/linux/csi-driver \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CSI_DRIVER_IMAGE),$(SECONDARY_DRIVER_IMAGE),$(SECONDARY_LATEST_DRIVER_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CSI_DRIVER_IMAGE),$(CSI_DRIVER_LATEST_IMAGE)\",push=true
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -93,7 +87,7 @@ images: binaries
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--local dockerfile=./docker/linux/csi-syncer \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CSI_SYNCER_IMAGE),$(SECONDARY_SYNCER_IMAGE),$(SECONDARY_LATEST_SYNCER_IMAGE)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(CSI_SYNCER_IMAGE),$(CSI_SYNCER_LATEST_IMAGE)\",push=true
 
 .PHONY: build
 build: local-images tarballs

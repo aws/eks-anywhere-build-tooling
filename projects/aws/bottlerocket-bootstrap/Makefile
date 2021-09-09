@@ -9,16 +9,9 @@ BASE_IMAGE_NAME?=eks-distro-base
 BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
 BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 
-IMAGE_REPO?=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_NAME=bottlerocket-bootstrap
-
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
-
-# These will go away after the full release stuff merges
-# This is to not block anyone using the images
-SECONDARY_IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-SECONDARY_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME)
-SECONDARY_LATEST_IMAGE=$(SECONDARY_IMAGE_REPO)/$(IMAGE_NAME)
 
 SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
 BUILD_TARGETS=$(addprefix local-images-, $(SUPPORTED_K8S_VERSIONS))
@@ -52,7 +45,7 @@ local-images-%: fetch-binaries-% bootstrap-binary
 		--opt build-arg:RELEASE_BRANCH=$(*) \
 		--local dockerfile=./docker/linux/ \
 		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(SECONDARY_IMAGE):$(IMAGE_TAG),$(SECONDARY_LATEST_IMAGE):$(RELEASE_LATEST)\",dest=/tmp/bottlerocket-bootstrap.tar
+		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(IMAGE):$(RELEASE_LATEST)\",dest=/tmp/bottlerocket-bootstrap.tar
 
 .PHONY: images-%
 images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
@@ -67,7 +60,7 @@ images-%: fetch-binaries-% bootstrap-binary
 		--opt build-arg:RELEASE_BRANCH=$(*) \
 		--local dockerfile=./docker/linux/ \
 		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(SECONDARY_IMAGE):$(IMAGE_TAG),$(SECONDARY_LATEST_IMAGE):$(RELEASE_LATEST)\",push=true
+		--output type=image,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(IMAGE):$(RELEASE_LATEST)\",push=true
 
 .PHONY: build
 build: ## Build images for all Kubernetes versions to ECR

@@ -43,16 +43,14 @@ function build::cluster-api-provider-aws::create_binaries(){
 }
 
 function build::cluster-api-provider-aws::manifests(){
-  if [[ -v CODEBUILD_CI ]]; then
-    KUBE_RBAC_PROXY_LATEST_TAG=$(aws ecr-public describe-images --region us-east-1 --output text --repository-name brancz/kube-rbac-proxy --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]')
-  else
-    KUBE_RBAC_PROXY_LATEST_TAG=latest
-  fi
-  KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:${KUBE_RBAC_PROXY_LATEST_TAG}
+  MANIFEST_IMAGE="public.ecr.aws/l0g8r8j6/kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller:v0.6.4"
+  MANIFEST_IMAGE_OVERRIDE="${IMAGE_REPO}/kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller:${IMAGE_TAG}"
+  KUBE_RBAC_PROXY_MANIFEST_IMAGE="gcr.io/kubebuilder/kube-rbac-proxy:v0.4.1"
+  KUBE_RBAC_PROXY_MANIFEST_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
 
   mkdir -p ../_output/manifests/infrastructure-aws/$TAG
-  sed -i "s,$TAG,$IMAGE_TAG," ../manifests/infrastructure-components.yaml
-  sed -i 's,image: .*,image: '"${KUBE_RBAC_PROXY_IMAGE_OVERRIDE}"',' ../manifests/infrastructure-components.yaml
+  sed -i "s,${MANIFEST_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ../manifests/infrastructure-components.yaml
+  sed -i "s,${KUBE_RBAC_PROXY_MANIFEST_IMAGE},${KUBE_RBAC_PROXY_MANIFEST_IMAGE_OVERRIDE}," ../manifests/infrastructure-components.yaml
   cp ../manifests/infrastructure-components.yaml "../_output/manifests/infrastructure-aws/$TAG"
   cp templates/cluster-template.yaml "../_output/manifests/infrastructure-aws/$TAG"
   cp metadata.yaml "../_output/manifests/infrastructure-aws/$TAG"

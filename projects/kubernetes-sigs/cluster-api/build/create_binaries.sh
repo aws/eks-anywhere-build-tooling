@@ -58,23 +58,19 @@ function build::cluster-api::build_binaries(){
 }
 
 function build::cluster-api::manifests(){
-  PROD_REGISTRY="${IMAGE_REPO}/kubernetes-sigs/cluster-api"
-  if [[ -v CODEBUILD_CI ]]; then
-    KUBE_RBAC_PROXY_LATEST_TAG=$(aws ecr-public describe-images --region us-east-1 --output text --repository-name brancz/kube-rbac-proxy --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]')
-  else
-    KUBE_RBAC_PROXY_LATEST_TAG=latest
-  fi
+  CAPI_REGISTRY_PREFIX="${IMAGE_REPO}/kubernetes-sigs/cluster-api"
+  KUBE_RBAC_PROXY_LATEST_TAG=latest
 
   make set-manifest-image \
-    MANIFEST_IMG=$PROD_REGISTRY/cluster-api-controller MANIFEST_TAG=$IMAGE_TAG \
+    MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/cluster-api-controller MANIFEST_TAG=$IMAGE_TAG \
     TARGET_RESOURCE="./config/manager/manager_image_patch.yaml"
   # Set the kubeadm bootstrap image to the production bucket.
   make set-manifest-image \
-    MANIFEST_IMG=$PROD_REGISTRY/kubeadm-bootstrap-controller MANIFEST_TAG=$IMAGE_TAG \
+    MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/kubeadm-bootstrap-controller MANIFEST_TAG=$IMAGE_TAG \
     TARGET_RESOURCE="./bootstrap/kubeadm/config/manager/manager_image_patch.yaml"
   # Set the kubeadm control plane image to the production bucket.
   make set-manifest-image \
-    MANIFEST_IMG=$PROD_REGISTRY/kubeadm-control-plane-controller MANIFEST_TAG=$IMAGE_TAG  \
+    MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/kubeadm-control-plane-controller MANIFEST_TAG=$IMAGE_TAG  \
     TARGET_RESOURCE="./controlplane/kubeadm/config/manager/manager_image_patch.yaml"
   make set-manifest-image \
     MANIFEST_IMG=${IMAGE_REPO}/brancz/kube-rbac-proxy MANIFEST_TAG=$KUBE_RBAC_PROXY_LATEST_TAG \
@@ -93,7 +89,7 @@ function build::cluster-api::manifests(){
   make release-manifests
   ## Build the development manifests
   make -C test/infrastructure/docker set-manifest-image \
-    MANIFEST_IMG=$PROD_REGISTRY/capd-manager MANIFEST_TAG=$IMAGE_TAG
+    MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/capd-manager MANIFEST_TAG=$IMAGE_TAG
   sed -i 's,image: .*,image: '"${IMAGE_REPO}/brancz/kube-rbac-proxy:${KUBE_RBAC_PROXY_LATEST_TAG}"',' ./test/infrastructure/docker/config/manager/manager_auth_proxy_patch.yaml
   make -C test/infrastructure/docker set-manifest-pull-policy PULL_POLICY=IfNotPresent
   PATH="$(pwd)/hack/tools/bin:$PATH" make -C test/infrastructure/docker release-manifests 
