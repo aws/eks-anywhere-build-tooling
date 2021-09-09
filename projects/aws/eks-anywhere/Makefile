@@ -81,7 +81,7 @@ images: binaries
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
+		--opt build-arg:BASE_IMAGE=$(CLUSTER_CONTROLLER_BASE_IMAGE) \
 		--local dockerfile=./docker/linux/eks-anywhere-cluster-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(CLUSTER_CONTROLLER_IMAGE),$(CLUSTER_CONTROLLER_LATEST_IMAGE)\",push=true
