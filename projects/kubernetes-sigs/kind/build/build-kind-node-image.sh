@@ -241,8 +241,8 @@ function build::kind::build_final_node_image(){
 
     if [ "$PUSH" == "true" ] ; then
         docker push $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG
-        docker tag $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG $KIND_NODE_IMAGE:$EKSD_KUBE_VERSION-latest
-        docker push $KIND_NODE_IMAGE:$EKSD_KUBE_VERSION-latest
+        docker tag $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-latest
+        docker push $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-latest
     fi
 }
 
