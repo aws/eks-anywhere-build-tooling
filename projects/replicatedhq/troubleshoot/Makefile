@@ -23,12 +23,8 @@ upload-artifacts:
 create-binaries:
 	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION)
 
-.PHONY: fetch-binaries
-fetch-binaries:
-	build/fetch_binaries.sh
-
 .PHONY: binaries
-binaries: create-binaries fetch-binaries
+binaries: create-binaries
 
 .PHONY: generate-attribution
 generate-attribution:
