@@ -31,6 +31,7 @@ declare -A repos=(["fluxcd/flux2"]="true"
                   ["kubernetes-sigs/cluster-api-provider-aws"]="true"
                   ["kubernetes-sigs/kind"]="true"
                   ["kubernetes"]="false"
+                  ["replicatedhq/troubleshoot"]="true"
                   ["vmware/govmomi"]="true")
 
 declare -A project_bin_licenses=(["flux2"]="flux FLUX2"
