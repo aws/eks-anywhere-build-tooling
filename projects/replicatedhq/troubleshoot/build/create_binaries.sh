@@ -47,9 +47,13 @@ function build::troubleshoot::binaries(){
   go mod tidy
   go mod vendor
   build::troubleshoot::build_binaries "linux/amd64"
-  build::gather_licenses $MAKE_ROOT/_output "./cmd/troubleshoot"
+  build::troubleshoot::gather_licenses $MAKE_ROOT/_output "./cmd/troubleshoot"
   cd ..
   rm -rf $REPO
+}
+
+function build::troubleshoot::gather_licenses(){
+  (cd ./cmd/troubleshoot && go mod vendor && build::gather_licenses $MAKE_ROOT/_output "./cmd/troubleshoot")
 }
 
 build::troubleshoot::binaries
