@@ -1,7 +1,7 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.12"
+GOLANG_VERSION?="1.14"
 
 REPO=troubleshoot
 COMPONENT=replicatedhq/$(REPO)
