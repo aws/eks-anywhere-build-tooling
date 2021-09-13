@@ -45,6 +45,7 @@ function build::troubleshoot::binaries(){
   git checkout $TAG
   build::common::use_go_version $GOLANG_VERSION
   go mod vendor
+  go get sigs.k8s.io/controller-runtime
   go mod tidy
   build::troubleshoot::build_binaries "linux/amd64"
   build::gather_licenses $MAKE_ROOT/_output "./cmd/troubleshoot"
