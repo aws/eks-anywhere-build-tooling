@@ -38,6 +38,20 @@ function build::troubleshoot::build_binaries(){
   mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
 }
 
+function build::troubleshoot::fix_licenses(){
+  # The tj dependency github repos all have licenses however they all do not have go.mod files
+  # checked in to the repo. Hence we need to manually download licenses from Github for each of them
+  # and place them in the respective folders under vendor directory so that they is available for
+  # go-licenses to pick up
+  packages=(
+    "go-spin"
+  )
+  for package in "${packages[@]}"; do
+    wget https://raw.githubusercontent.com/tj/${package}/master/LICENSE
+    mv LICENSE ./vendor/github.com/tj/${package}/LICENSE.txt
+  done
+}
+
 function build::troubleshoot::binaries(){
   mkdir -p $BIN_PATH
   git clone $CLONE_URL $REPO
@@ -53,7 +67,7 @@ function build::troubleshoot::binaries(){
 }
 
 function build::troubleshoot::gather_licenses(){
-  (cd ./cmd/troubleshoot && go mod vendor && build::gather_licenses $MAKE_ROOT/_output "./")
+  (cd ./cmd/troubleshoot && go mod vendor && build::troubleshoot::fix_licenses && build::gather_licenses $MAKE_ROOT/_output "./")
 }
 
 build::troubleshoot::binaries
