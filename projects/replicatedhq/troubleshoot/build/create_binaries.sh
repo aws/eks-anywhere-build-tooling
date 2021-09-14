@@ -39,17 +39,12 @@ function build::troubleshoot::build_binaries(){
 }
 
 function build::troubleshoot::fix_licenses(){
-  # The tj dependency github repos all have licenses however they all do not have go.mod files
-  # checked in to the repo. Hence we need to manually download licenses from Github for each of them
-  # and place them in the respective folders under vendor directory so that they is available for
-  # go-licenses to pick up
-  packages=(
-    "go-spin"
-  )
-  for package in "${packages[@]}"; do
-    wget https://raw.githubusercontent.com/tj/${package}/master/LICENSE
-    mv LICENSE ./vendor/github.com/tj/${package}/LICENSE
-  done
+  # The tj/go-spin dependency github repo has a license file however it does not have a go.mod file
+  # checked in to the repo. Hence we need to manually download the licenses from Github and place
+  # it in the respective folder under vendor directory so that they is available for go-licenses
+  # to pick up
+  wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE
+  mv LICENSE ./vendor/github.com/tj/go-spin/LICENSE
 }
 
 function build::troubleshoot::binaries(){
@@ -57,6 +52,7 @@ function build::troubleshoot::binaries(){
   git clone $CLONE_URL $REPO
   cd $REPO
   git checkout $TAG
+  git apply --verbose $MAKE_ROOT/patches/*
   build::common::use_go_version $GOLANG_VERSION
   go mod tidy
   go mod vendor
@@ -67,7 +63,7 @@ function build::troubleshoot::binaries(){
 }
 
 function build::troubleshoot::gather_licenses(){
-  (go mod vendor && build::troubleshoot::fix_licenses && cd ./cmd/troubleshoot && build::gather_licenses $MAKE_ROOT/_output "./")
+  (build::troubleshoot::fix_licenses && build::gather_licenses $MAKE_ROOT/_output "./cmd/troubleshoot")
 }
 
 build::troubleshoot::binaries
