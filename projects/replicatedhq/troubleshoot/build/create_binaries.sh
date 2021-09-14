@@ -67,7 +67,7 @@ function build::troubleshoot::binaries(){
 }
 
 function build::troubleshoot::gather_licenses(){
-  (cd ./cmd/troubleshoot && go mod vendor && build::troubleshoot::fix_licenses && build::gather_licenses $MAKE_ROOT/_output "./")
+  (go mod vendor && build::troubleshoot::fix_licenses && cd ./cmd/troubleshoot && build::gather_licenses $MAKE_ROOT/_output "./")
 }
 
 build::troubleshoot::binaries
