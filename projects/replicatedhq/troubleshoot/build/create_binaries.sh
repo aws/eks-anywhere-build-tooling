@@ -33,6 +33,7 @@ function build::troubleshoot::build_binaries(){
   platform=${1}
   OS="$(cut -d '/' -f1 <<< ${platform})"
   ARCH="$(cut -d '/' -f2 <<< ${platform})"
+  go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0
   make support-bundle
   mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
   mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
