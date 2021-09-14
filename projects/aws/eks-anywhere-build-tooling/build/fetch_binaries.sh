@@ -31,6 +31,7 @@ declare -A repos=(["fluxcd/flux2"]="true"
                   ["kubernetes-sigs/cluster-api-provider-aws"]="true"
                   ["kubernetes-sigs/kind"]="true"
                   ["kubernetes"]="false"
+                  ["replicatedhq/troubleshoot"]="true"
                   ["vmware/govmomi"]="true")
 
 declare -A project_bin_licenses=(["flux2"]="flux FLUX2"
@@ -38,6 +39,7 @@ declare -A project_bin_licenses=(["flux2"]="flux FLUX2"
                                  ["cluster-api-provider-aws"]="clusterawsadm CAPA"
                                  ["kind"]="kind KIND"
                                  ["kubernetes/kubernetes"]="client/bin/kubectl KUBERNETES"
+                                 ["troubleshoot"]="support-bundle TROUBLESHOOT"
                                  ["govmomi"]="govc GOVMOMI")
 
 function unpack::tarballs(){
