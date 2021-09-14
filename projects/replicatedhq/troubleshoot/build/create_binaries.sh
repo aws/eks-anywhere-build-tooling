@@ -40,7 +40,7 @@ function build::troubleshoot::build_binaries(){
 
 function build::troubleshoot::fix_licenses(){
   # The tj/go-spin dependency github repo has a license file however it does not have a go.mod file
-  # checked in to the repo. Hence we need to manually download the licenses from Github and place
+  # checked in to the repo. Hence we need to manually download the license from Github and place
   # it in the respective folder under vendor directory so that they is available for go-licenses
   # to pick up
   wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE
