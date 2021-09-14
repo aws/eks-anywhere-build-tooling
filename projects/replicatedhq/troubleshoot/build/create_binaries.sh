@@ -33,6 +33,9 @@ function build::troubleshoot::build_binaries(){
   platform=${1}
   OS="$(cut -d '/' -f1 <<< ${platform})"
   ARCH="$(cut -d '/' -f2 <<< ${platform})"
+  export PATH=$PATH:$(go env GOPATH)/bin
+  go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0
+  go get k8s.io/code-generator/cmd/client-gen@kubernetes-1.18.0
   make support-bundle
   mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
   mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
