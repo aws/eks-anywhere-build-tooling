@@ -43,8 +43,7 @@ function build::troubleshoot::fix_licenses(){
   # checked in to the repo. Hence we need to manually download the license from Github and place
   # it in the respective folder under vendor directory so that they is available for go-licenses
   # to pick up
-  wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE
-  mv LICENSE ./vendor/github.com/tj/go-spin/LICENSE
+  wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE -O vendor/github.com/tj/go-spin/LICENSE
 }
 
 function build::troubleshoot::binaries(){
@@ -63,7 +62,7 @@ function build::troubleshoot::binaries(){
 }
 
 function build::troubleshoot::gather_licenses(){
-  (build::troubleshoot::fix_licenses && build::gather_licenses $MAKE_ROOT/_output "./cmd/troubleshoot")
+  (go mod vendor && build::troubleshoot::fix_licenses && build::gather_licenses $MAKE_ROOT/_output "./cmd/troubleshoot")
 }
 
 build::troubleshoot::binaries

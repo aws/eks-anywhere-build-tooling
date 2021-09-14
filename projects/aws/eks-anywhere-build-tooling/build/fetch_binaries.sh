@@ -39,6 +39,7 @@ declare -A project_bin_licenses=(["flux2"]="flux FLUX2"
                                  ["cluster-api-provider-aws"]="clusterawsadm CAPA"
                                  ["kind"]="kind KIND"
                                  ["kubernetes/kubernetes"]="client/bin/kubectl KUBERNETES"
+                                 ["troubleshoot"]="support-bundle TROUBLESHOOT"
                                  ["govmomi"]="govc GOVMOMI")
 
 function unpack::tarballs(){
