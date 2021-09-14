@@ -48,7 +48,7 @@ function build::troubleshoot::fix_licenses(){
   )
   for package in "${packages[@]}"; do
     wget https://raw.githubusercontent.com/tj/${package}/master/LICENSE
-    mv LICENSE ./vendor/github.com/tj/${package}/LICENSE.txt
+    mv LICENSE ./vendor/github.com/tj/${package}/LICENSE
   done
 }
 
