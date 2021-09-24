@@ -52,7 +52,7 @@ func WriteUserDataFiles(userData *UserData) error {
 		if file.Permissions == "" {
 			file.Permissions = "0640"
 		}
-		perm, err := strconv.Atoi(file.Permissions)
+		perm, err := strconv.ParseInt(file.Permissions, 8, 64)
 		if err != nil {
 			return errors.Wrap(err, "Error converting string to int for permissions")
 		}
