@@ -1,5 +1,6 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
+<<<<<<< HEAD
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG=$(shell cat GIT_TAG)
 GIT_COMMIT=$(shell cat GIT_COMMIT)
@@ -18,12 +19,16 @@ endif
 
 GOPROXY_DNS?=https://proxy.golang.org
 export GOPROXY=$(GOPROXY_DNS)
+=======
+GIT_TAG=$(shell cat GIT_TAG)
+>>>>>>> Keep collector build in projects/aws/eks-anywhere + remove unnecessary code
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
 
 MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
 BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
+<<<<<<< HEAD
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_TAG_FILE)
 BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
@@ -33,10 +38,13 @@ IMAGE_NAME=eks-anywhere-cluster-controller
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
 
+=======
+>>>>>>> Keep collector build in projects/aws/eks-anywhere + remove unnecessary code
 COLLECTOR_BASE_IMAGE_NAME?=eks-distro-base
 COLLECTOR_BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
 COLLECTOR_BASE_IMAGE=$(BASE_REPO)/$(COLLECTOR_BASE_IMAGE_NAME):$(COLLECTOR_BASE_TAG)
 
+<<<<<<< HEAD
 COLLECTOR_IMAGE_NAME=eks-anywhere-diagnostic-collector
 COLLECTOR_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(IMAGE_TAG)
 
@@ -77,11 +85,22 @@ local-images: binaries
 		--local dockerfile=./docker/linux/eks-anywhere-cluster-controller \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE),$(SECONDARY_IMAGE),$(SECONDARY_LATEST_IMAGE)\",dest=/tmp/eks-anywhere-cluster-controller.tar
+=======
+IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
+COLLECTOR_IMAGE_NAME=eks-anywhere-diagnostic-collector
+COLLECTOR_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(IMAGE_TAG)
+COLLECTOR_LATEST_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):latest
+
+.PHONY: local-images
+local-images:
+>>>>>>> Keep collector build in projects/aws/eks-anywhere + remove unnecessary code
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
 		--opt build-arg:BASE_IMAGE=$(COLLECTOR_BASE_IMAGE) \
+<<<<<<< HEAD
 		--local dockerfile=./docker/linux/eksa-diagnostic-collector \
 		--local context=. \
 		--output type=oci,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_LATEST_IMAGE)\",dest=/tmp/eksa-diagnostic-collector.tar
@@ -96,11 +115,20 @@ images: binaries
 		--local dockerfile=./docker/linux/eks-anywhere-cluster-controller \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(IMAGE),$(SECONDARY_IMAGE),$(SECONDARY_LATEST_IMAGE)\",push=true
+=======
+		--local dockerfile=./docker/linux \
+		--local context=. \
+		--output type=oci,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(COLLECTOR_LATEST_IMAGE)\",dest=/tmp/eksa-diagnostic-collector.tar
+
+.PHONY: images
+images:
+>>>>>>> Keep collector build in projects/aws/eks-anywhere + remove unnecessary code
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
 		--opt platform=linux/amd64 \
 		--opt build-arg:BASE_IMAGE=$(COLLECTOR_BASE_IMAGE) \
+<<<<<<< HEAD
 		--local dockerfile=./docker/linux/eksa-diagnostic-collector \
 		--local context=. \
 		--output type=image,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_IMAGE),$(SECONDARY_COLLECTOR_LATEST_IMAGE)\",push=true
@@ -116,11 +144,31 @@ release: images tarballs
 .PHONY: release-upload
 release-upload: release upload-artifacts
 	echo "Done upload $(COMPONENT)"
+=======
+		--local dockerfile=./docker/linux \
+		--local context=. \
+		--output type=image,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(COLLECTOR_LATEST_IMAGE)\",push=true
+
+.PHONY: build
+build: local-images
+	echo "Done"
+
+.PHONY: release
+release: images
+	echo "Done"
+
+.PHONY: release-upload
+release-upload: release
+	echo "Done upload"
+>>>>>>> Keep collector build in projects/aws/eks-anywhere + remove unnecessary code
 
 .PHONY: all
 all: release
 
 .PHONY: clean
 clean:
+<<<<<<< HEAD
 	rm -rf $(REPO)
+=======
+>>>>>>> Keep collector build in projects/aws/eks-anywhere + remove unnecessary code
 	rm -rf "_output"
