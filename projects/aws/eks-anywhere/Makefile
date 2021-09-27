@@ -2,16 +2,13 @@ BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 GIT_TAG=$(shell cat GIT_TAG)
 
-GOPROXY_DNS?=https://proxy.golang.org
-export GOPROXY=$(GOPROXY_DNS)
-
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
 
 MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
 BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
 COLLECTOR_BASE_IMAGE_NAME?=eks-distro-base
-COLLECTOR_BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../../EKS_DISTRO_BASE_TAG_FILE)
+COLLECTOR_BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
 COLLECTOR_BASE_IMAGE=$(BASE_REPO)/$(COLLECTOR_BASE_IMAGE_NAME):$(COLLECTOR_BASE_TAG)
 
 IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
