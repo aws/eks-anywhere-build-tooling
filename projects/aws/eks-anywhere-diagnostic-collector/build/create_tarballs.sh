@@ -24,12 +24,11 @@ TAG="${2?Specify second argument - git version tag}"
 TAR_PATH="${3?Specify third argument - tarball output path}"
 BIN_ROOT="_output/bin"
 LICENSES_PATH="_output/LICENSES"
-MANIFESTS_PATH="_output/manifests"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
-function build::eks-anywhere-cluster-controller::create_tarball() {
+function build::eks-anywhere-diagnostic-collector::create_tarball() {
   platform=${1}
   OS="$(cut -d '/' -f1 <<< ${platform})"
   ARCH="$(cut -d '/' -f2 <<< ${platform})"
@@ -38,17 +37,16 @@ function build::eks-anywhere-cluster-controller::create_tarball() {
   cp -rf $LICENSES_PATH $BIN_ROOT/$BINARY_NAME/${OS}-${ARCH}/
   cp ATTRIBUTION.txt $BIN_ROOT/$BINARY_NAME/${OS}-${ARCH}/
   build::common::create_tarball ${TAR_PATH}/${TAR_FILE} $BIN_ROOT/$BINARY_NAME/${OS}-${ARCH} .
-  cp -rf $MANIFESTS_PATH/ ${TAR_PATH}
 }
 
-function build::eks-anywhere-cluster-controller::tarball() {
+function build::eks-anywhere-diagnostic-collector::tarball() {
   build::common::ensure_tar
   mkdir -p "$TAR_PATH"
-  build::eks-anywhere-cluster-controller::create_tarball "linux/amd64"
+  build::eks-anywhere-diagnostic-collector::create_tarball "linux/amd64"
   rm -rf $BIN_ROOT
   rm -rf $LICENSES_PATH
 }
 
-build::eks-anywhere-cluster-controller::tarball
+build::eks-anywhere-diagnostic-collector::tarball
 
 build::common::generate_shasum "${TAR_PATH}"
