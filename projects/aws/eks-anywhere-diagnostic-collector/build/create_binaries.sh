@@ -33,7 +33,7 @@ function build::eks-anywhere-diagnostic-collector::create_binaries(){
   platform=${1}
   OS="$(cut -d '/' -f1 <<< ${platform})"
   ARCH="$(cut -d '/' -f2 <<< ${platform})"
-  CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH make build
+  CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH make build-cluster-controller-binaries
   mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
   mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
 }
