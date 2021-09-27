@@ -12,8 +12,6 @@ else
 	TAR_PATH?="_output/tar"
 	CLONE_URL?=https://github.com/$(COMPONENT).git
 endif
-GOPROXY_DNS?=https://proxy.golang.org
-export GOPROXY=$(GOPROXY_DNS)
 
 .PHONY: upload-artifacts
 upload-artifacts:
