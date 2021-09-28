@@ -13,8 +13,6 @@ else
 	TAR_PATH?="_output/tar"
 	CLONE_URL?=https://github.com/$(COMPONENT).git
 endif
-GOPROXY_DNS?=direct
-export GOPROXY=$(GOPROXY_DNS)
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
