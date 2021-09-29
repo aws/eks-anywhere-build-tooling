@@ -12,3 +12,5 @@ ARG EKS_A_DIAGNOSTIC_COLLECTOR_TOOL_LICENSE_DIR=/eks-a-diagnostic-collector-tool
 
 COPY ./_output/eks-a-diagnostic-collector-tools/binary $EKS_A_DIAGNOSTIC_COLLECTOR_BINARY_DIR
 COPY ./_output/eks-a-diagnostic-collector-tools/licenses $EKS_A_DIAGNOSTIC_COLLECTOR_TOOL_LICENSE_DIR
+
+ENV PATH="${EKS_A_DIAGNOSTIC_COLLECTOR_BINARY_DIR}:${PATH}"
