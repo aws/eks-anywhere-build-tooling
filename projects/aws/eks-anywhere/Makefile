@@ -19,7 +19,7 @@ COLLECTOR_LATEST_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):latest
 
 .PHONY: fetch-binaries
 fetch-binaries:
-    build/fetch_binaries.sh $(RELEASE_BRANCH) $(RELEASE) $(EKS_DISTRO_RELEASE_VERSION)
+	build/fetch_binaries.sh
 
 .PHONY: local-images
 local-images: fetch-binaries
