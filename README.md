@@ -48,6 +48,9 @@ This table tracks the base images used to build the container images for the ups
 
 We appreciate your interest in contributing. Please refer to the [Amazon EKS Anywhere Contribution Guide](https://github.com/aws/eks-anywhere/blob/main/CONTRIBUTING.md) before submitting any issues or pull requests.
 
+- Dealing with [attribution](./docs/development/attribution-files.md) files
+- [Cherry picking](./docs/development/cherry-picks.md) to release branches
+
 ## Security
 
 If you discover a potential security issue in this project, or think you may
