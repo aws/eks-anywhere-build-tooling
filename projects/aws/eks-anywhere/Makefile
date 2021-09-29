@@ -17,8 +17,12 @@ COLLECTOR_IMAGE_NAME=eks-anywhere-diagnostic-collector
 COLLECTOR_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(IMAGE_TAG)
 COLLECTOR_LATEST_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):latest
 
+.PHONY: fetch-binaries
+fetch-binaries:
+    build/fetch_binaries.sh $(RELEASE_BRANCH) $(RELEASE) $(EKS_DISTRO_RELEASE_VERSION)
+
 .PHONY: local-images
-local-images:
+local-images: fetch-binaries
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
@@ -29,7 +33,7 @@ local-images:
 		--output type=oci,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(COLLECTOR_LATEST_IMAGE)\",dest=/tmp/eksa-diagnostic-collector.tar
 
 .PHONY: images
-images:
+images: fetch-binaries
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
