@@ -24,6 +24,7 @@ TAG="${2?Specify second argument - git version tag}"
 TAR_PATH="${3?Specify third argument - tarball output path}"
 BIN_ROOT="_output/bin"
 LICENSES_PATH="_output/LICENSES"
+MANIFESTS_PATH="_output/manifests"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
@@ -37,6 +38,7 @@ function build::flux::create_tarball() {
   cp -rf $LICENSES_PATH $BIN_ROOT/$REPO/${OS}-${ARCH}/
   cp ATTRIBUTION.txt $BIN_ROOT/$REPO/${OS}-${ARCH}/
   build::common::create_tarball ${TAR_PATH}/${TAR_FILE} $BIN_ROOT/$REPO/${OS}-${ARCH} .
+  cp -rf $MANIFESTS_PATH/ ${TAR_PATH}/
 }
 
 function build::flux::tarball() {
