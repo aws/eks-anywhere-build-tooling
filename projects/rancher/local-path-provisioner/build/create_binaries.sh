@@ -33,7 +33,7 @@ function build::local-path-provisioner::create_binaries(){
   platform=${1}
   OS="$(cut -d '/' -f1 <<< ${platform})"
   ARCH="$(cut -d '/' -f2 <<< ${platform})"
-  CGO_ENABLED=0 GO111MODULE=auto GOOS=$OS GOARCH=$ARCH go build -ldflags "-s -w -buildid='' -extldflags -static" -o bin/local-path-provisioner-linux-amd64
+  CGO_ENABLED=0 GO111MODULE=auto GOOS=$OS GOARCH=$ARCH go build -trimpath -ldflags "-s -w -buildid='' -extldflags -static" -o bin/local-path-provisioner-linux-amd64
   mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
   mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
 }
@@ -45,6 +45,7 @@ function build::local-path-provisioner::binaries(){
   build::common::wait_for_tag $TAG
   git checkout $TAG
   build::common::use_go_version $GOLANG_VERSION
+  build::common::set_go_cache "local-path-provisioner" $TAG
   go mod vendor
   build::local-path-provisioner::create_binaries "linux/amd64"
   build::gather_licenses $MAKE_ROOT/_output "."
