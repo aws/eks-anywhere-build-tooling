@@ -19,7 +19,7 @@ set -o pipefail
 
 PROJECT_ROOT="$1"
 OUTPUT_BIN_DIR="$2"
-RELEASE_BRANCH="$3"
+RELEASE_BRANCH="${3:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 

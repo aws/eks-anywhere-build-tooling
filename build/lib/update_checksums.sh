@@ -19,7 +19,7 @@ set -o pipefail
 
 PROJECT_ROOT="$1"
 OUTPUT_BIN_DIR="$2"
-RELEASE_BRANCH="$3"
+RELEASE_BRANCH="${3:-}"
 
 if [ ! -d ${OUTPUT_BIN_DIR} ] ;  then
     echo "${OUTPUT_BIN_DIR} not present! Run 'make binaries'"

@@ -3,12 +3,18 @@ MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
 .SHELLFLAGS:=-eu -o pipefail -c
 .SUFFIXES:
 
-RELEASE_BRANCH?=$(shell cat $(BASE_DIRECTORY)/release/DEFAULT_RELEASE_BRANCH)
+RELEASE_BRANCH?=
 RELEASE_ENVIRONMENT?=development
-RELEASE?=$(shell cat $(BASE_DIRECTORY)/release/$(RELEASE_BRANCH)/$(RELEASE_ENVIRONMENT)/RELEASE)
 ARTIFACT_BUCKET?=my-s3-bucket
 
-CLONE_URL=https://github.com/$(COMPONENT).git
+COMPONENT=$(REPO_OWNER)/$(REPO)
+ifdef CODEBUILD_SRC_DIR
+	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
+	CLONE_URL=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
+else
+	ARTIFACTS_PATH?=$(MAKE_ROOT)/_output/tar
+	CLONE_URL?=https://github.com/$(COMPONENT).git	
+endif
 
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
@@ -25,7 +31,8 @@ IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazo
 
 BASE_IMAGE_REPO?=public.ecr.aws/eks-distro-build-tooling
 BASE_IMAGE_NAME?=eks-distro-base
-BASE_IMAGE_TAG?=$(shell cat $(BASE_DIRECTORY)/EKS_DISTRO_BASE_TAG_FILE)
+BASE_IMAGE_TAG_FILE?=$(BASE_DIRECTORY)/$(shell echo $(BASE_IMAGE_NAME) | tr '[:lower:]' '[:upper:]' | tr '-' '_')_TAG_FILE
+BASE_IMAGE_TAG?=$(shell cat $(BASE_IMAGE_TAG_FILE))
 BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=BASE_IMAGE
 
@@ -34,9 +41,10 @@ IMAGE_OUTPUT_DIR?=/tmp
 IMAGE_CONTEXT_DIR?=.
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
 IMAGE=$($(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE)
+LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=latest)
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
-IMAGE_TAG?=${GIT_TAG}-eks-${RELEASE_BRANCH}-${RELEASE}
+IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 DOCKERFILE_FOLDER?=./docker/linux
 
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
@@ -48,7 +56,7 @@ REPO_SUBPATH?=
 IMAGE_BUILD_ARGS?=
 TAR_FILE_PREFIX?=$(REPO)
 
-GIT_CHECKOUT_TARGET=$(REPO)/eks-distro-checkout-$(GIT_TAG)
+GIT_CHECKOUT_TARGET=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
 FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 
@@ -64,7 +72,7 @@ define BUILDCTL
 		--progress plain \
 		--local dockerfile=$(DOCKERFILE_FOLDER) \
 		--local context=$(IMAGE_CONTEXT_DIR) \
-		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE)\",$(IMAGE_OUTPUT)
+		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
 endef
 
 define WRITE_LOCAL_IMAGE_TAG
@@ -89,7 +97,8 @@ help: ## Display this help
 $(REPO):
 	git clone $(CLONE_URL) $(REPO)
 
-$(GIT_CHECKOUT_TARGET): $(REPO)
+$(GIT_CHECKOUT_TARGET): | $(REPO)
+	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
 	git -C $(REPO) checkout -f $(GIT_TAG)
 	touch $@
 
@@ -139,6 +148,10 @@ ifeq ($(SIMPLE_CREATE_TARBALLS),true)
 else
 	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(RELEASE_BRANCH)
 endif
+
+.PHONY: upload-artifacts
+upload-artifacts: s3-artifacts
+	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION)
 
 
 ##@ Checksum Targets
@@ -201,6 +214,9 @@ build: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) local-image
 .PHONY: release
 release: ## Called via prow postsubmit + release jobs, calls `binaries gather-licenses clean-repo images` by default
 release: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) images
+
+.PHONY: release-upload
+release-upload: release upload-artifacts
 
 
 ##@ Clean Targets
