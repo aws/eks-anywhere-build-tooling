@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,20 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -o errexit
+set -o nounset
+set -o pipefail
 
-function buildkit_ready() {
-  for i in {1..24}
-  do
-    if [ ! -S "/run/buildkit/buildkitd.sock" ]
-    then
-      echo "Buildkit daemon is not running. Retrying."
-      sleep 5s
-    else
-      exit 0
-    fi
-  done
-  echo "Buildkit daemon is not available"
-  exit 1
-}
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
 
-buildkit_ready
+PROJECT_ROOT="$1"
+GOLANG_VERSION="$2"
+OUTPUT_DIR="$3"
+RELEASE_BRANCH="${4:-}"
+
+if [ -d "$PROJECT_ROOT/$RELEASE_BRANCH" ]; then
+	PROJECT_ROOT=$PROJECT_ROOT/$RELEASE_BRANCH
+fi
+
+build::generate_attribution $PROJECT_ROOT $GOLANG_VERSION $OUTPUT_DIR
