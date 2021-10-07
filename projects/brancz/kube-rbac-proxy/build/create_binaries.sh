@@ -33,7 +33,7 @@ function build::kube-rbac-proxy::create_binaries(){
   platform=${1}
   OS="$(cut -d '/' -f1 <<< ${platform})"
   ARCH="$(cut -d '/' -f2 <<< ${platform})"
-  CGO_ENABLED=0 GO111MODULE=auto GOOS=$OS GOARCH=$ARCH go build -v -o bin/kube-rbac-proxy-linux-amd64 -ldflags "-s -w -buildid=''" $(pwd)
+  CGO_ENABLED=0 GO111MODULE=auto GOOS=$OS GOARCH=$ARCH go build -trimpath -v -o bin/kube-rbac-proxy-linux-amd64 -ldflags "-s -w -buildid=''" $(pwd)
   mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
   mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
 }
@@ -45,6 +45,7 @@ function build::kube-rbac-proxy::binaries(){
   build::common::wait_for_tag $TAG
   git checkout $TAG
   build::common::use_go_version $GOLANG_VERSION
+  build::common::set_go_cache kube-rbac-proxy $TAG
   go mod vendor
   build::kube-rbac-proxy::create_binaries "linux/amd64"
   build::gather_licenses $MAKE_ROOT/_output "."

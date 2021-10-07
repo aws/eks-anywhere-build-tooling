@@ -43,10 +43,8 @@ function build::kube-rbac-proxy::tarball() {
   build::common::ensure_tar
   mkdir -p "$TAR_PATH"
   build::kube-rbac-proxy::create_tarball "linux/amd64"
-  rm -rf $BIN_ROOT
-  rm -rf $LICENSES_PATH
 }
 
 build::kube-rbac-proxy::tarball
 
-build::common::generate_shasum "${TAR_PATH}"
+"${MAKE_ROOT}/../../../build/lib/create_release_checksums.sh" $MAKE_ROOT/$TAR_PATH

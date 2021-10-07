@@ -68,16 +68,28 @@ images: binaries
 		--output type=image,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",push=true
 
 .PHONY: build
-build: local-images tarballs
+build: local-images tarballs validate-checksums validate-artifacts
 	echo "Done $(COMPONENT)"
 
 .PHONY: release
-release: images tarballs
+release: images tarballs validate-checksums validate-artifacts
 	echo "Done $(COMPONENT)"
 
 .PHONY: release-upload
 release-upload: release upload-artifacts
 	echo "Done upload $(COMPONENT)"
+
+.PHONY: checksums
+checksums:
+	$(BUILD_LIB)/update_checksums.sh $(MAKE_ROOT) $(MAKE_ROOT)/_output/bin $(MAKE_ROOT)/CHECKSUMS
+
+.PHONY: validate-checksums
+validate-checksums:
+	sha256sum -c $(MAKE_ROOT)/CHECKSUMS
+
+.PHONY: validate-artifacts
+validate-artifacts:
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(MAKE_ROOT)/_output/tar $(GIT_TAG)
 
 .PHONY: all
 all: release
