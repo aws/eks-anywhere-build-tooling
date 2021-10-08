@@ -1,10 +1,12 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-PROJECT_DIRECTORY=$(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder
+PROJECT_PATH?=projects/kubernetes-sigs/image-builder
+PROJECT_DIRECTORY=$(BASE_DIRECTORY)/$(PROJECT_PATH)
 OUTPUT_DIRECTORY=$(PROJECT_DIRECTORY)/_output
+BOTTLEROCKET_DOWNLOAD_PATH?=$(PROJECT_DIRECTORY)/bottlerocket/downloads
+CARGO_HOME=$(OUTPUT_DIRECTORY)/cargo
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 
@@ -44,8 +46,9 @@ PACKER_OVA_CONF_FILE=$(PROJECT_DIRECTORY)/packer/ova/vsphere.json
 PACKER_OVA_VAR_FILES=$(PACKER_OVA_CONF_FILE)
 PACKER_OVA_VAR_FILES+=$(PROJECT_DIRECTORY)/packer/ova/vsphere-library.json
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(MAKE_ROOT)/BOTTLEROCKET_OVA_RELEASES)
+SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(PROJECT_DIRECTORY)/BOTTLEROCKET_OVA_RELEASES)
 BUILD_TARGETS=$(addprefix build-ami-ubuntu-2004-, $(SUPPORTED_K8S_VERSIONS))
+BUILD_TARGETS+=$(addprefix release-ova-bottlerocket-, $(SUPPORTED_K8S_VERSIONS))
 RELEASE_TARGETS=$(addprefix release-ami-ubuntu-2004-, $(SUPPORTED_K8S_VERSIONS))
 RELEASE_TARGETS+=$(addprefix release-ova-ubuntu-2004-, $(SUPPORTED_K8S_VERSIONS))
 RELEASE_TARGETS+=$(addprefix release-ova-bottlerocket-, $(SUPPORTED_K8S_VERSIONS))
@@ -69,6 +72,10 @@ setup-image-builder:
 .PHONY: setup-vsphere
 setup-vsphere:
 	echo $(VSPHERE_CONNECTION_DATA) > $(PACKER_OVA_CONF_FILE)
+
+.PHONY: setup-bottlerocket
+setup-bottlerocket:
+	build/setup_bottlerocket.sh $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME)
 
 .PHONY: deps-ami
 deps-ami: setup-image-builder
@@ -121,9 +128,9 @@ release-upload-ova-ubuntu-2004-%:
 	$(MAKE) upload-artifacts-$*
 
 .PHONY: release-ova-bottlerocket-%
-release-ova-bottlerocket-%: BOTTLEROCKET_DOWNLOAD_PATH=$(MAKE_ROOT)/bottlerocket-ova/$*/downloads
 release-ova-bottlerocket-%:
-	build/upload_bottlerocket_artifacts.sh $* bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(PROJECT_PATH)/$*
+release-ova-bottlerocket-%: setup-bottlerocket
+	build/upload_bottlerocket_artifacts.sh $* bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$*
 
 .PHONY: release
 release: ## Build and share amis and push ovas to s3 for all kubernetes versions
