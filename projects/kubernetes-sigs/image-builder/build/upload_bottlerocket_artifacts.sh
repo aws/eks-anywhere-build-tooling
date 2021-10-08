@@ -42,13 +42,15 @@ $CARGO_HOME/bin/tuftool download $BOTTLEROCKET_DOWNLOAD_PATH \
     --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
     --targets-url "${BOTTLEROCKET_TARGETS_URL}"
 
+# We do this to get the artifact name to upload to S3
+mv ${BOTTLEROCKET_DOWNLOAD_PATH}/${OVA} ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova
+sha256sum ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova > ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova.sha256
+sha512sum ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova > ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova.sha512
+
 # If not running the script on Codebuild, i.e., running on a 
 # Prow presubmit or locally, exit gracefully
 if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
-
-sha256sum ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova > ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova.sha256
-sha512sum ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova > ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova.sha512
 
 aws s3 sync ${BOTTLEROCKET_DOWNLOAD_PATH} ${ARTIFACTS_BUCKET}/${PROJECT_PATH}/latest --acl public-read
