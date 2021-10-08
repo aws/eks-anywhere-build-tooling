@@ -25,6 +25,7 @@ CARGO_HOME="${2?Specify second argument - Root directory for Cargo installation}
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 RUSTUP_HOME=$MAKE_ROOT/_output/rustup
 BOTTLEROCKET_ROOT_JSON_URL="https://cache.bottlerocket.aws/root.json"
+CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
 mkdir -p $BOTTLEROCKET_DOWNLOAD_PATH
 mkdir -p $CARGO_HOME
@@ -40,10 +41,10 @@ envsubst '$BOTTLEROCKET_ROOT_JSON_PATH' \
 curl $BOTTLEROCKET_ROOT_JSON_URL -o $BOTTLEROCKET_ROOT_JSON_PATH
 sha512sum -c $BOTTLEROCKET_DOWNLOAD_PATH/bottlerocket-root-json-checksum
 
-# On AL2, the Cargo build system requires the openssl-devel package
+# On Linux, the Cargo build system requires the openssl-devel package
 # for installing OpenSSL libraries and the pkgconfig utility to 
 # locate these headers/libs
-if [ "$(uname)" = "Linux" ]; then
+if [ "$CODEBUILD_CI" = "false" ] && [ "$(uname)" = "Linux" ]; then
     yum install -y openssl-devel pkgconfig
 fi
 
