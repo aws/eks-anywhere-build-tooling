@@ -13,19 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 set -x
 set -o errexit
 set -o nounset
 set -o pipefail
 
-SRC_TAR_PATH="${1?Specify first argument - source tar path}"
-ARTIFACTS_BUCKET="${2?Specify second argument - artifacts buckets}"
-PROJECT_PATH="${3? Specify third argument - project path}"
-BUILD_IDENTIFIER="${4? Specify fourth argument - build identifier}"
-GIT_HASH="${5?Specify fifth argument - git hash of the tar builds}"
-
-
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
-build::common::upload_artifacts $SRC_TAR_PATH $ARTIFACTS_BUCKET $PROJECT_PATH $BUILD_IDENTIFIER $GIT_HASH
+mkdir -p kubernetes
+TARBALL="kubernetes-client-linux-amd64.tar.gz"
+URL=$(build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL)
+curl -sSL $URL -o ${TARBALL}
+tar xzf $TARBALL -C kubernetes

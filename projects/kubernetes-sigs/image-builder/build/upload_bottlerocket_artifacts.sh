@@ -21,17 +21,36 @@ set -o pipefail
 
 RELEASE_CHANNEL="${1?Specify first argument - EKS-D release channel}"
 OS="${2?Specify second argument - base os of ova built}"
-BOTTLEROCKET_DOWNLOAD_PATH="${3?Specify third argument - Download path for ova}"
-PROJECT_PATH="${4?Specify fourth argument - Project path}"
+BOTTLEROCKET_DOWNLOAD_PATH="${3?Specify third argument - Download path for Bottlerocket-related files}"
+CARGO_HOME="${4?Specify fourth argument - Root directory for Cargo installation}"
+PROJECT_PATH="${5?Specify fifth argument - Project path}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-BOTTLEROCKET_OVA_URI=$(yq e ".${RELEASE_CHANNEL}.uri" $MAKE_ROOT/BOTTLEROCKET_OVA_RELEASES)
+CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
-mkdir -p $BOTTLEROCKET_DOWNLOAD_PATH
+# Setting version and URL parameters for downloading the OVA
+KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
+BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.releaseVersion" $MAKE_ROOT/BOTTLEROCKET_OVA_RELEASES)
+OVA="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
+BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/vmware-k8s-${KUBEVERSION}/x86_64/"
+BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
 
-wget $BOTTLEROCKET_OVA_URI -O ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova
+# Downloading the OVA from the Bottlerocket target location using Tuftool
+$CARGO_HOME/bin/tuftool download $BOTTLEROCKET_DOWNLOAD_PATH \
+    --target-name "${OVA}" \
+    --root "${BOTTLEROCKET_DOWNLOAD_PATH}/root.json" \
+    --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
+    --targets-url "${BOTTLEROCKET_TARGETS_URL}"
 
+# We do this to get the artifact name to upload to S3
+mv ${BOTTLEROCKET_DOWNLOAD_PATH}/${OVA} ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova
 sha256sum ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova > ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova.sha256
 sha512sum ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova > ${BOTTLEROCKET_DOWNLOAD_PATH}/${OS}.ova.sha512
+
+# If not running the script on Codebuild, i.e., running on a 
+# Prow presubmit or locally, exit gracefully
+if [ "$CODEBUILD_CI" = "false" ]; then
+    exit 0
+fi
 
 aws s3 sync ${BOTTLEROCKET_DOWNLOAD_PATH} ${ARTIFACTS_BUCKET}/${PROJECT_PATH}/latest --acl public-read
