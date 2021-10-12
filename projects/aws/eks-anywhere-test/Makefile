@@ -1,7 +1,7 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 GIT_TAG?=$(shell cat GIT_TAG)
-COMPONENT=test-eks-anywhere
+COMPONENT=eks-anywhere-test
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2

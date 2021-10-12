@@ -22,7 +22,7 @@ Thank you for using
 ██║  ██║██║ ╚████║   ██║   ╚███╔███╔╝██║  ██║███████╗██║  ██║███████╗
 ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝    ╚══╝╚══╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝
 
-You have successfully deployed the test-eks-anywhere pod $POD_NAME
+You have successfully deployed the eks-anywhere-test pod $POD_NAME
 
 For more information check out
 https://anywhere.eks.amazonaws.com
