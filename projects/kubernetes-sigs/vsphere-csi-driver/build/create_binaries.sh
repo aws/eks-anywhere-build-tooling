@@ -45,6 +45,7 @@ function build::vsphere-csi-driver::binaries(){
   mkdir -p $BIN_FILES
   git clone $CLONE_URL $REPO
   cd $REPO
+  build::common::wait_for_tag $TAG
   git checkout $TAG
   cp pkg/apis/cnsoperator/config/cnsregistervolume_crd.yaml pkg/apis/cnsoperator/config/cnsfileaccessconfig_crd.yaml pkg/internal/cnsoperator/config/cnsfilevolumeclient_crd.yaml ../$BIN_FILES/
   build::common::use_go_version $GOLANG_VERSION

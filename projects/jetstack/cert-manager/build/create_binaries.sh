@@ -58,6 +58,7 @@ function build::cert-manager::binaries(){
   mkdir -p $BIN_PATH
   git clone $CLONE_URL $REPO
   cd $REPO
+  build::common::wait_for_tag $TAG
   git checkout $TAG
   build::cert-manager::cherry_pick
   build::common::use_go_version $GOLANG_VERSION

@@ -44,6 +44,7 @@ function build::cri-tools::binaries(){
   git clone $CLONE_URL $REPO
   cd $REPO
   COMMIT=$(git rev-parse HEAD 2>/dev/null)
+  build::common::wait_for_tag $TAG
   git checkout $TAG
   build::common::use_go_version $GOLANG_VERSION
   build::cri-tools::build_binaries "linux/amd64"

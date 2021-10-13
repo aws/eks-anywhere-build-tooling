@@ -60,6 +60,7 @@ function build::cluster-api-provider-vsphere::binaries(){
   cd $REPO
   source ./hack/version.sh;
   LDFLAGS=$(version::ldflags)
+  build::common::wait_for_tag $TAG
   git checkout $TAG
   git apply --verbose $MAKE_ROOT/patches/*
   build::common::use_go_version $GOLANG_VERSION

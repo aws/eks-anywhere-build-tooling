@@ -53,6 +53,7 @@ function build::notification-controller::binaries(){
   mkdir -p $BIN_PATH
   git clone $CLONE_URL $REPO
   cd $REPO
+  build::common::wait_for_tag $TAG
   git checkout $TAG
   build::common::use_go_version $GOLANG_VERSION
   go mod vendor

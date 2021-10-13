@@ -55,6 +55,7 @@ function build::kustomize-controller::binaries(){
   mkdir -p $BIN_FILES
   git clone $CLONE_URL $REPO
   cd $REPO
+  build::common::wait_for_tag $TAG
   git checkout $TAG
   cp config/kubeconfig ../$BIN_FILES/
   build::common::use_go_version $GOLANG_VERSION
