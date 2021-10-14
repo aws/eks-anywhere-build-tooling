@@ -62,6 +62,7 @@ function build::cluster-api-provider-aws::binaries(){
   cd $REPO
   source ./hack/version.sh;
   LDFLAGS=$(version::ldflags)
+  build::common::wait_for_tag $TAG
   git checkout $TAG
   build::common::use_go_version $GOLANG_VERSION
   go mod vendor

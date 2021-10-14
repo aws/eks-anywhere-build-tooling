@@ -70,6 +70,7 @@ function build::flux::binaries(){
   mkdir $KUSTOMIZE_BIN
   git clone $CLONE_URL $REPO
   cd $REPO
+  build::common::wait_for_tag $TAG
   git checkout $TAG
   git apply --verbose $MAKE_ROOT/patches/*
   build::install::kustomize

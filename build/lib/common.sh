@@ -257,3 +257,19 @@ function build::common::get_latest_eksa_asset_url() {
   echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-amd64-${git_tag}.tar.gz"
 
 }
+
+function build::common::wait_for_tag() {
+  local -r tag=$1
+  sleep_interval=20
+  for i in {1..60}; do
+    echo "Checking for tag ${tag}..."
+    git fetch --tags > /dev/null 2>&1
+    git rev-parse --verify --quiet "${tag}" && echo "Tag ${tag} exists!" && break
+    echo "Tag ${tag} does not exist!"
+    echo "Waiting for tag ${tag}..."
+    sleep $sleep_interval
+    if [ "$i" = "60" ]; then
+      exit 1
+    fi
+  done
+}
