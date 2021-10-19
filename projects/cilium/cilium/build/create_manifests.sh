@@ -35,7 +35,7 @@ function build::install::helm(){
 function build::cilium::manifests(){
   mkdir -p _output/manifests/cilium/$TAG
   helm repo add cilium https://helm.cilium.io
-  helm template cilium cilium/cilium --version $HELM_REPO_VERSION --namespace kube-system --set prometheus.enabled=true -f manifests/cilium-eksa.yaml > _output/manifests/cilium/${TAG}/cilium.yaml
+  helm template cilium cilium/cilium --version $HELM_REPO_VERSION --namespace kube-system -f manifests/cilium-eksa.yaml > _output/manifests/cilium/${TAG}/cilium.yaml
 }
 
 build::install::helm
