@@ -76,8 +76,6 @@ function build::common::upload_artifacts() {
   local -r buildidentifier=$4
   local -r githash=$5
 
-  echo "$githash" >> "$artifactspath"/githash
-
   # Upload artifacts to s3 
   # 1. To proper path on s3 with buildId-githash
   # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path

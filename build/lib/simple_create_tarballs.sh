@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -22,6 +23,7 @@ OUTPUT_BIN_DIR="$2"
 TAG="$3"
 BINARY_PLATFORMS="$4"
 TAR_PATH="$5"
+GIT_HASH="$6"
 
 LICENSES_PATH="_output/LICENSES"
 ATTRIBUTION_PATH="_output/ATTRIBUTION.txt"
@@ -43,6 +45,7 @@ function build::simple::tarball() {
     cp $ATTRIBUTION_PATH ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/ 
     build::common::create_tarball ${TAR_PATH}/${TAR_FILE} ${OUTPUT_BIN_DIR}/${OS}-${ARCH} .
   done
+  echo $GIT_HASH > $TAR_PATH/githash
 }
 
 build::simple::tarball
