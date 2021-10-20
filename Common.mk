@@ -36,11 +36,13 @@ BASE_IMAGE_TAG?=$(shell cat $(BASE_IMAGE_TAG_FILE))
 BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=BASE_IMAGE
 
-IMAGE_NAME?=$(COMPONENT)
+IMAGE_COMPONENT?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
 IMAGE_CONTEXT_DIR?=.
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
-IMAGE=$($(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE)
+# For projects with multiple containers this is defined to override the default
+IMAGE_COMPONENT_VARIABLE=$(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE_COMPONENT
+IMAGE=$(IMAGE_REPO)/$(if $(value $(IMAGE_COMPONENT_VARIABLE)),$(value $(IMAGE_COMPONENT_VARIABLE)),$(IMAGE_COMPONENT)):$(IMAGE_TAG)
 LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=latest)
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
