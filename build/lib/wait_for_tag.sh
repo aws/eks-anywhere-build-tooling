@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "${MAKE_ROOT}/../../../build/lib/common.sh"
+TAG="$1"
 
-GOLANG_VERSION="$1"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
 
-build::generate_attribution $MAKE_ROOT $GOLANG_VERSION
+build::common::wait_for_tag $TAG

@@ -13,19 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
 
-SRC_TAR_PATH="${1?Specify first argument - source tar path}"
-ARTIFACTS_BUCKET="${2?Specify second argument - artifacts buckets}"
-PROJECT_PATH="${3? Specify third argument - project path}"
-BUILD_IDENTIFIER="${4? Specify fourth argument - build identifier}"
-GIT_HASH="${5?Specify fifth argument - git hash of the tar builds}"
+PROJECT_ROOT="$1"
+OUTPUT_BIN_DIR="$2"
+RELEASE_BRANCH="${3:-}"
 
+if [ ! -d ${OUTPUT_BIN_DIR} ] ;  then
+    echo "${OUTPUT_BIN_DIR} not present! Run 'make binaries'"
+    exit 1
+fi
 
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "${MAKE_ROOT}/../../../build/lib/common.sh"
+CHECKSUMS_FILE=$PROJECT_ROOT/CHECKSUMS
 
-build::common::upload_artifacts $SRC_TAR_PATH $ARTIFACTS_BUCKET $PROJECT_PATH $BUILD_IDENTIFIER $GIT_HASH
+if [ -d $PROJECT_ROOT/$RELEASE_BRANCH ]; then
+	CHECKSUMS_FILE=$PROJECT_ROOT/$RELEASE_BRANCH/CHECKSUMS
+fi
+
+rm -f $CHECKSUMS_FILE
+for file in $(find ${OUTPUT_BIN_DIR} -type f | sort); do
+    filepath=$(realpath --relative-base=$PROJECT_ROOT $file)
+    sha256sum $filepath >> $CHECKSUMS_FILE
+done
+
+echo "*************** CHECKSUMS ***************"
+cat $CHECKSUMS_FILE
+echo "*****************************************"

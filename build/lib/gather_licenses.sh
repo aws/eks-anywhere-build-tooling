@@ -17,9 +17,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "${MAKE_ROOT}/../../../build/lib/common.sh"
+REPO="$1"
+OUTPUT_DIR="$2"
+PACKAGE_FILTER="$3"
+REPO_SUBPATH="${4:-}"
 
-GOLANG_VERSION="$1"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
 
-build::generate_attribution $MAKE_ROOT $GOLANG_VERSION
+cd $REPO/$REPO_SUBPATH
+build::gather_licenses $OUTPUT_DIR "$PACKAGE_FILTER"

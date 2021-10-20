@@ -13,16 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
 
-TAG="$1"
-BIN_PATH="$2"
-OS="$3"
-ARCH="$4"
+PROJECT_ROOT="$1"
+OUTPUT_BIN_DIR="$2"
+RELEASE_BRANCH="${3:-}"
 
-CGO_ENABLED=0 GO111MODULE=auto GOOS=$OS GOARCH=$ARCH \
-	go build -trimpath -ldflags "-s -w -buildid='' -extldflags -static" -o $BIN_PATH/local-path-provisioner
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
+cd $PROJECT_ROOT
+
+CHECKSUMS_FILE=$PROJECT_ROOT/CHECKSUMS
+
+if [ -d $PROJECT_ROOT/$RELEASE_BRANCH ]; then
+	CHECKSUMS_FILE=$PROJECT_ROOT/$RELEASE_BRANCH/CHECKSUMS
+fi
+
+if ! sha256sum -c $CHECKSUMS_FILE; then
+	echo "Checksums do not match!"
+	echo "The correct checksums are printed below"
+	echo "Please only update if changing GIT_TAG or build flags."
+	$SCRIPT_ROOT/update_checksums.sh $PROJECT_ROOT $OUTPUT_BIN_DIR $RELEASE_BRANCH
+	exit 1
+fi
