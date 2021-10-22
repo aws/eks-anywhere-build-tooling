@@ -9,6 +9,8 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 
 include $(BASE_DIRECTORY)/Common.mk
 
+# overriding targets called by build + release to be no-ops 
+# these do not apply here since there is no binary/checksums/attribution/licenses
 $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) $(ATTRIBUTION_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
 
 .PHONY: local-images
