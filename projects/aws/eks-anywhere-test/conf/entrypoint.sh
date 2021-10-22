@@ -39,3 +39,5 @@ echo '{"podname":"${POD_NAME}","nodename":"$NODE_NAME","foo":"$foo","bar":"$bar"
 ln -s /usr/share/nginx/txt/index.json /usr/share/nginx/html/index.json
 
 export -n foo bar
+
+exec "$@"
