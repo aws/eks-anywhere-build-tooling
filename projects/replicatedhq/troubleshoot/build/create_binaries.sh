@@ -25,10 +25,11 @@ OS="$3"
 ARCH="$4"
 
 
+# Tags and LDFLAGS copied from troubleshoot/Makefile
 VERSION_PACKAGE="github.com/replicatedhq/troubleshoot/pkg/version"
-LDFLAGS="-s -w -buildid=''	-X $VERSION_PACKAGE.version=$TAG \
+LDFLAGS="-s -w -buildid='' -X $VERSION_PACKAGE.version=$TAG \
 	-X $VERSION_PACKAGE.gitSHA=$(git rev-list -n 1 $TAG)"
 BUILDTAGS="netgo containers_image_ostree_stub exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp"
 
-GOOS=$OS GOARCH=$ARCH go build -trimpath -tags "$BUILDTAGS" -installsuffix netgo -ldflags "$LDFLAGS" -o $BIN_PATH/support-bundle \
+CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH go build -trimpath -tags "$BUILDTAGS" -installsuffix netgo -ldflags "$LDFLAGS" -o $BIN_PATH/support-bundle \
   github.com/replicatedhq/troubleshoot/cmd/troubleshoot
