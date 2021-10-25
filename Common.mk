@@ -62,6 +62,7 @@ TAR_FILE_PREFIX?=$(REPO)
 GIT_CHECKOUT_TARGET=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
 FAKE_ARM_IMAGES_FOR_VALIDATION?=false
+KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 
 define BUILDCTL
 	$(BUILD_LIB)/buildkit.sh \
@@ -114,6 +115,11 @@ endif
 
 binaries: ## Build binaries by calling build/lib/simple_create_binaries.sh unless SIMPLE_CREATE_BINARIES=false, then calls build/create_binaries.sh from the project root.
 binaries: $(BINARY_TARGET) validate-checksums
+
+$(KUSTOMIZE_TARGET):
+	@mkdir -p $(OUTPUT_DIR)
+	curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- $(OUTPUT_DIR)
+
 
 ## File/Folder Targets
 
