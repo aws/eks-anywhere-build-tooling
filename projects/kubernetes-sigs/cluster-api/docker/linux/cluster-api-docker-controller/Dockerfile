@@ -1,9 +1,12 @@
 ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-docker-client
 FROM $BASE_IMAGE
 
+ARG TARGETARCH
+ARG TARGETOS
+
 WORKDIR /
 
-COPY _output/bin/cluster-api/linux-amd64/cluster-api-provider-docker-manager /manager
+COPY _output/bin/cluster-api/$TARGETOS-$TARGETARCH/cluster-api-provider-docker-manager /manager
 COPY _output/capd/LICENSES /CAPD_LICENSES
 COPY CAPD_ATTRIBUTION.txt /CAPD_ATTRIBUTION.txt
 
