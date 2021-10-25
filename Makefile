@@ -12,6 +12,7 @@ EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQ
 SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
 OVA_TARGETS=$(addprefix release-upload-ova-ubuntu-2004-, $(SUPPORTED_K8S_VERSIONS))
 OVA_TARGETS+=$(addprefix release-ova-bottlerocket-, $(SUPPORTED_K8S_VERSIONS))
+RELEASE_BRANCH?=
 
 .PHONY: build-all-projects
 build-all-projects: $(BUILD_TARGETS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling
@@ -48,7 +49,17 @@ clean:
 	make -C projects/plunder-app/kube-vip clean
 	make -C projects/kubernetes-sigs/etcdadm clean
 	make -C projects/fluxcd/flux2 clean
-
+	make -C projects/kubernetes/cloud-provider-vsphere clean
+	make -C projects/kubernetes-sigs/vsphere-csi-driver clean
+	make -C projects/rancher/local-path-provisioner clean
+	make -C projects/vmware/govmomi clean
+	make -C projects/jetstack/cert-manager clean
+	make -C projects/fluxcd/helm-controller clean
+	make -C projects/fluxcd/kustomize-controller clean
+	make -C projects/fluxcd/notification-controller clean
+	make -C projects/fluxcd/source-controller clean
+	make -C projects/mrajashree/etcdadm-bootstrap-provider clean
+	make -C projects/mrajashree/etcdadm-controller clean
 	rm -rf _output
 
 .PHONY: attribution-files
@@ -59,23 +70,46 @@ attribution-files:
 	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/cluster-api-provider-vsphere
 	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/cri-tools
 	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/kind
+	build/update-attribution-files/make_attribution.sh projects/plunder-app/kube-vip
+	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/etcdadm
+	build/update-attribution-files/make_attribution.sh projects/fluxcd/flux2
 	build/update-attribution-files/make_attribution.sh projects/kubernetes/cloud-provider-vsphere
 	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/vsphere-csi-driver
 	build/update-attribution-files/make_attribution.sh projects/rancher/local-path-provisioner
 	build/update-attribution-files/make_attribution.sh projects/vmware/govmomi
 	build/update-attribution-files/make_attribution.sh projects/jetstack/cert-manager
-	build/update-attribution-files/make_attribution.sh projects/fluxcd/flux2
 	build/update-attribution-files/make_attribution.sh projects/fluxcd/helm-controller
 	build/update-attribution-files/make_attribution.sh projects/fluxcd/kustomize-controller
 	build/update-attribution-files/make_attribution.sh projects/fluxcd/notification-controller
 	build/update-attribution-files/make_attribution.sh projects/fluxcd/source-controller
-	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/etcdadm
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-bootstrap-provider
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-controller
-	build/update-attribution-files/make_attribution.sh projects/plunder-app/kube-vip
+
 
 	cat _output/total_summary.txt
 
 .PHONY: update-attribution-files
 update-attribution-files: attribution-files
 	build/update-attribution-files/create_pr.sh
+
+.PHONY: run-target-in-docker
+run-target-in-docker:
+	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH)
+
+.PHONY: update-attribution-checksums-docker
+update-attribution-checksums-docker:
+	build/lib/update_checksum_docker.sh $(PROJECT) $(RELEASE_BRANCH)
+
+.PHONY: stop-docker-builder
+stop-docker-builder:
+	docker rm -f -v eks-d-builder
+
+.PHONY: run-buildkit-and-registry
+run-buildkit-and-registry:
+	docker run -d --name buildkitd --net host --privileged moby/buildkit:v0.9.0-rootless
+	docker run -d --name registry  --net host registry:2
+
+.PHONY: stop-buildkit-and-registry
+stop-buildkit-and-registry:
+	docker rm -v --force buildkitd
+	docker rm -v --force registry
