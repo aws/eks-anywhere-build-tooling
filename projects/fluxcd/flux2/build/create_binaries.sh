@@ -23,7 +23,6 @@ REPO="${1?Specify first argument - repository name}"
 CLONE_URL="${2?Specify second argument - git clone endpoint}"
 TAG="${3?Specify third argument - git version tag}"
 GOLANG_VERSION="${4?Specify fourth argument - golang version}"
-IMAGE_REPO="${5?Specify fifth argument - ecr image repo}"
 BIN_ROOT="_output/bin"
 BIN_PATH=$BIN_ROOT/$REPO
 
@@ -48,23 +47,6 @@ function build::flux::create_binaries(){
   mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
 }
 
-function build::flux::create_manifests(){
-  mkdir -p ../_output/manifests/gotk/$TAG
-  FLUX_PATH="$MAKE_ROOT/$BIN_PATH/linux-amd64/flux"
-  $FLUX_PATH install --export > gotk-components.yaml
-  images=(
-    helm-controller
-    kustomize-controller
-    notification-controller
-    source-controller
-  )
-  for image in "${images[@]}"; do
-    sed -i "s,ghcr.io/fluxcd/$image:.*,$IMAGE_REPO/fluxcd/$image:latest," gotk-components.yaml
-  done
-
-  cp gotk-components.yaml "../_output/manifests/gotk/$TAG"
-}
-
 function build::flux::binaries(){
   mkdir -p $BIN_PATH
   mkdir $KUSTOMIZE_BIN
@@ -77,7 +59,6 @@ function build::flux::binaries(){
   build::common::use_go_version $GOLANG_VERSION
   go mod vendor
   build::flux::create_binaries "linux/amd64"
-  build::flux::create_manifests
   build::gather_licenses $MAKE_ROOT/_output "./cmd/flux"
   cd ..
   rm -rf $REPO
