@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "test-eks-add-ons.name" -}}
+{{- define "eks-anywhere-test.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "test-eks-add-ons.fullname" -}}
+{{- define "eks-anywhere-test.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "test-eks-add-ons.chart" -}}
+{{- define "eks-anywhere-test.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "test-eks-add-ons.labels" -}}
-helm.sh/chart: {{ include "test-eks-add-ons.chart" . }}
-{{ include "test-eks-add-ons.selectorLabels" . }}
+{{- define "eks-anywhere-test.labels" -}}
+helm.sh/chart: {{ include "eks-anywhere-test.chart" . }}
+{{ include "eks-anywhere-test.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "test-eks-add-ons.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "test-eks-add-ons.name" . }}
+{{- define "eks-anywhere-test.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "eks-anywhere-test.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "test-eks-add-ons.serviceAccountName" -}}
+{{- define "eks-anywhere-test.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "test-eks-add-ons.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "eks-anywhere-test.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
