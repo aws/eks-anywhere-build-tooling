@@ -19,46 +19,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REPO="${1?Specify first argument - repository name}"
-CLONE_URL="${2?Specify second argument - git clone endpoint}"
-TAG="${3?Specify third argument - git version tag}"
-GOLANG_VERSION="${4?Specify fourth argument - golang version}"
-BIN_ROOT="_output/bin"
-BIN_PATH=$BIN_ROOT/$REPO
+TAG="$1"
+BIN_PATH="$2"
+OS="$3"
+ARCH="$4"
 
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "${MAKE_ROOT}/../../../build/lib/common.sh"
-
-function build::kube-vip::fix_licenses(){
-  # The kube-vip project uses an older version of kamhlos/upnp module which does not have
-  # a LICENSE file committed to the repo. Hence we need to go get explicitly to make sure
-  # the latest version from Github with the license so that it is available in the vendor
-  # directory for go-licenses to pick up
-  go get github.com/kamhlos/upnp
-}
-
-function build::kube-vip::create_binaries(){
-  platform=${1}
-  OS="$(cut -d '/' -f1 <<< ${platform})"
-  ARCH="$(cut -d '/' -f2 <<< ${platform})"
-  CGO_ENABLED=0 GO111MODULE=auto GOOS=$OS GOARCH=$ARCH go build -ldflags "-s -w -extldflags -static" -v -o bin/kube-vip .
-  mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
-  mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
-}
-
-function build::kube-vip::binaries(){
-  mkdir -p $BIN_PATH
-  git clone $CLONE_URL $REPO
-  cd $REPO
-  build::common::wait_for_tag $TAG
-  git checkout $TAG
-  build::common::use_go_version $GOLANG_VERSION
-  build::kube-vip::fix_licenses
-  go mod vendor
-  build::kube-vip::create_binaries "linux/amd64"
-  build::gather_licenses $MAKE_ROOT/_output "."
-  cd ..
-  rm -rf $REPO
-}
-
-build::kube-vip::binaries
+CGO_ENABLED=0 GO111MODULE=auto GOOS=$OS GOARCH=$ARCH \
+  go build -trimpath -ldflags "-s -w -buildid='' -extldflags -static" -o $BIN_PATH/kube-vip .
