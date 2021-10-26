@@ -12,11 +12,12 @@ BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/clusterctl
 GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-nonroot
+DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
-CAPI_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/cluster-api-controller
-CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller
-CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/kubeadm-control-plane-controller
-CAPD_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/capd-manager
+CLUSTER_API_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/cluster-api-controller
+KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller
+KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/kubeadm-control-plane-controller
+CLUSTER_API_DOCKER_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/capd-manager
 
 CAPD_GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/capd/attribution/go-license.csv
 CAPD_ATTRIBUTION_TARGET=CAPD_ATTRIBUTION.txt
@@ -26,6 +27,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 build: $(CAPD_ATTRIBUTION_TARGET) s3-artifacts
 release: upload-artifacts
+
 clean: clean-binary-deps
 attribution: $(CAPD_ATTRIBUTION_TARGET)
 
@@ -43,20 +45,13 @@ $(CAPD_ATTRIBUTION_TARGET): $(CAPD_GATHER_LICENSES_TARGET)
 	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(OUTPUT_DIR)/capd CAPD_ATTRIBUTION.txt
 
 .PHONY: local-images
-local-images: capi-controller/images/amd64 capi-kubeadm-bootstrap-controller/images/amd64 capi-kubeadm-control-plane-controller/images/amd64 capd-controller/images/amd64 
+local-images: cluster-api-controller/images/amd64 kubeadm-bootstrap-controller/images/amd64 kubeadm-control-plane-controller/images/amd64 cluster-api-docker-controller/images/amd64 
 
 .PHONY: images
-images: capi-controller/images/push capi-kubeadm-bootstrap-controller/images/push capi-kubeadm-control-plane-controller/images/push capd-controller/images/push 
+images: cluster-api-controller/images/push kubeadm-bootstrap-controller/images/push kubeadm-control-plane-controller/images/push cluster-api-docker-controller/images/push 
 
-capd-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
-capd-controller/images/%: DOCKERFILE_FOLDER=./docker/linux/cluster-api-docker-controller
-$(call IMAGE_TARGETS_FOR_NAME, capd-controller): fetch-binaries $(CAPD_GATHER_LICENSES_TARGET)
-
-capi-controller/images/%: DOCKERFILE_FOLDER=./docker/linux/cluster-api-controller
-
-capi-kubeadm-bootstrap-controller/images/%: DOCKERFILE_FOLDER=./docker/linux/kubeadm-bootstrap-controller
-
-capi-kubeadm-control-plane-controller/images/%: DOCKERFILE_FOLDER=./docker/linux/kubeadm-control-plane-controller
+cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
+$(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): fetch-binaries $(CAPD_GATHER_LICENSES_TARGET)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs create-manifests
