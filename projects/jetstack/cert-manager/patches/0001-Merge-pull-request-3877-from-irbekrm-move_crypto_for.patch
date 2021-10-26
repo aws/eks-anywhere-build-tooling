@@ -1,0 +1,648 @@
+From ce733a0a9f75719da6816915fca065a7f812ebdb Mon Sep 17 00:00:00 2001
+From: jetstack-bot <32282838+jetstack-bot@users.noreply.github.com>
+Date: Tue, 13 Apr 2021 13:28:15 +0100
+Subject: [PATCH] Merge pull request #3877 from irbekrm/move_crypto_fork
+
+The v1.1.0 cert-manager project repo references a 3rd-party fork of a fork of golang/crypto (https://github.com/meyskens/crypto).
+In a later commit (https://github.com/jetstack/cert-manager/commit/b5be5a8730a7307072c1d5d5fc6f3eb57b6018f4), this crypto fork
+was moved into the cert-manager repo and consumed from there. We are cherry-picking this commit so that we can use the changes
+introduced by it.
+
+Use upstream golang/crypto for ACME EAB + move crypto fork to cert-manager org
+
+Signed-off-by: Jackson West <jgw@amazon.com>
+---
+ LICENSES                                      | 35 ++++++++
+ deploy/crds/crd-clusterissuers.yaml           | 12 +--
+ deploy/crds/crd-issuers.yaml                  | 12 +--
+ go.mod                                        |  6 +-
+ go.sum                                        | 12 ++-
+ hack/build/repos.bzl                          | 23 ++++--
+ pkg/apis/acme/v1/types_issuer.go              |  8 +-
+ pkg/apis/acme/v1alpha2/types_issuer.go        |  8 +-
+ pkg/apis/acme/v1alpha3/types_issuer.go        |  8 +-
+ pkg/apis/acme/v1beta1/types_issuer.go         |  8 +-
+ pkg/internal/apis/acme/types_issuer.go        |  6 +-
+ .../apis/certmanager/validation/issuer.go     |  6 +-
+ .../certmanager/validation/issuer_test.go     | 40 +++++++++-
+ pkg/issuer/acme/setup.go                      |  5 +-
+ .../conformance/certificates/acme/acme.go     |  3 +-
+ test/e2e/suite/issuers/acme/BUILD.bazel       |  3 +
+ test/e2e/suite/issuers/acme/issuer.go         | 79 ++++++++++++++++++-
+ 17 files changed, 217 insertions(+), 57 deletions(-)
+
+diff --git a/LICENSES b/LICENSES
+index 3c97ed4ec..6a4d66e3b 100644
+--- a/LICENSES
++++ b/LICENSES
+@@ -14166,6 +14166,41 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ ================================================================================
+ 
+ 
++================================================================================
++= vendor/golang.org/x/term licensed under: =
++
++Copyright (c) 2009 The Go Authors. All rights reserved.
++
++Redistribution and use in source and binary forms, with or without
++modification, are permitted provided that the following conditions are
++met:
++
++   * Redistributions of source code must retain the above copyright
++notice, this list of conditions and the following disclaimer.
++   * Redistributions in binary form must reproduce the above
++copyright notice, this list of conditions and the following disclaimer
++in the documentation and/or other materials provided with the
++distribution.
++   * Neither the name of Google Inc. nor the names of its
++contributors may be used to endorse or promote products derived from
++this software without specific prior written permission.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++= vendor/golang.org/x/term/LICENSE 5d4950ecb7b26d2c5e4e7b4e0dd74707
++================================================================================
++
++
+ ================================================================================
+ = vendor/golang.org/x/text licensed under: =
+ 
+diff --git a/deploy/crds/crd-clusterissuers.yaml b/deploy/crds/crd-clusterissuers.yaml
+index 464aced0d..ad492d1e7 100644
+--- a/deploy/crds/crd-clusterissuers.yaml
++++ b/deploy/crds/crd-clusterissuers.yaml
+@@ -82,12 +82,11 @@ spec:
+                       description: ExternalAccountBinding is a reference to a CA external account of the ACME server. If set, upon registration cert-manager will attempt to associate the given external account credentials with the registered ACME account.
+                       type: object
+                       required:
+-                        - keyAlgorithm
+                         - keyID
+                         - keySecretRef
+                       properties:
+                         keyAlgorithm:
+-                          description: keyAlgorithm is the MAC key algorithm that the key is used for. Valid values are "HS256", "HS384" and "HS512".
++                          description: 'Deprecated: keyAlgorithm field exists for historical compatibility reasons and should not be used. The algorithm is now hardcoded to HS256 in golang/x/crypto/acme.'
+                           type: string
+                           enum:
+                             - HS256
+@@ -1111,12 +1110,11 @@ spec:
+                       description: ExternalAccountBinding is a reference to a CA external account of the ACME server. If set, upon registration cert-manager will attempt to associate the given external account credentials with the registered ACME account.
+                       type: object
+                       required:
+-                        - keyAlgorithm
+                         - keyID
+                         - keySecretRef
+                       properties:
+                         keyAlgorithm:
+-                          description: keyAlgorithm is the MAC key algorithm that the key is used for. Valid values are "HS256", "HS384" and "HS512".
++                          description: 'Deprecated: keyAlgorithm field exists for historical compatibility reasons and should not be used. The algorithm is now hardcoded to HS256 in golang/x/crypto/acme.'
+                           type: string
+                           enum:
+                             - HS256
+@@ -2142,12 +2140,11 @@ spec:
+                       description: ExternalAccountBinding is a reference to a CA external account of the ACME server. If set, upon registration cert-manager will attempt to associate the given external account credentials with the registered ACME account.
+                       type: object
+                       required:
+-                        - keyAlgorithm
+                         - keyID
+                         - keySecretRef
+                       properties:
+                         keyAlgorithm:
+-                          description: keyAlgorithm is the MAC key algorithm that the key is used for. Valid values are "HS256", "HS384" and "HS512".
++                          description: 'Deprecated: keyAlgorithm field exists for historical compatibility reasons and should not be used. The algorithm is now hardcoded to HS256 in golang/x/crypto/acme.'
+                           type: string
+                           enum:
+                             - HS256
+@@ -3173,12 +3170,11 @@ spec:
+                       description: ExternalAccountBinding is a reference to a CA external account of the ACME server. If set, upon registration cert-manager will attempt to associate the given external account credentials with the registered ACME account.
+                       type: object
+                       required:
+-                        - keyAlgorithm
+                         - keyID
+                         - keySecretRef
+                       properties:
+                         keyAlgorithm:
+-                          description: keyAlgorithm is the MAC key algorithm that the key is used for. Valid values are "HS256", "HS384" and "HS512".
++                          description: 'Deprecated: keyAlgorithm field exists for historical compatibility reasons and should not be used. The algorithm is now hardcoded to HS256 in golang/x/crypto/acme.'
+                           type: string
+                           enum:
+                             - HS256
+diff --git a/deploy/crds/crd-issuers.yaml b/deploy/crds/crd-issuers.yaml
+index 0b91dbe04..e9bae1d0b 100644
+--- a/deploy/crds/crd-issuers.yaml
++++ b/deploy/crds/crd-issuers.yaml
+@@ -82,12 +82,11 @@ spec:
+                       description: ExternalAccountBinding is a reference to a CA external account of the ACME server. If set, upon registration cert-manager will attempt to associate the given external account credentials with the registered ACME account.
+                       type: object
+                       required:
+-                        - keyAlgorithm
+                         - keyID
+                         - keySecretRef
+                       properties:
+                         keyAlgorithm:
+-                          description: keyAlgorithm is the MAC key algorithm that the key is used for. Valid values are "HS256", "HS384" and "HS512".
++                          description: 'Deprecated: keyAlgorithm field exists for historical compatibility reasons and should not be used. The algorithm is now hardcoded to HS256 in golang/x/crypto/acme.'
+                           type: string
+                           enum:
+                             - HS256
+@@ -1111,12 +1110,11 @@ spec:
+                       description: ExternalAccountBinding is a reference to a CA external account of the ACME server. If set, upon registration cert-manager will attempt to associate the given external account credentials with the registered ACME account.
+                       type: object
+                       required:
+-                        - keyAlgorithm
+                         - keyID
+                         - keySecretRef
+                       properties:
+                         keyAlgorithm:
+-                          description: keyAlgorithm is the MAC key algorithm that the key is used for. Valid values are "HS256", "HS384" and "HS512".
++                          description: 'Deprecated: keyAlgorithm field exists for historical compatibility reasons and should not be used. The algorithm is now hardcoded to HS256 in golang/x/crypto/acme.'
+                           type: string
+                           enum:
+                             - HS256
+@@ -2142,12 +2140,11 @@ spec:
+                       description: ExternalAccountBinding is a reference to a CA external account of the ACME server. If set, upon registration cert-manager will attempt to associate the given external account credentials with the registered ACME account.
+                       type: object
+                       required:
+-                        - keyAlgorithm
+                         - keyID
+                         - keySecretRef
+                       properties:
+                         keyAlgorithm:
+-                          description: keyAlgorithm is the MAC key algorithm that the key is used for. Valid values are "HS256", "HS384" and "HS512".
++                          description: 'Deprecated: keyAlgorithm field exists for historical compatibility reasons and should not be used. The algorithm is now hardcoded to HS256 in golang/x/crypto/acme.'
+                           type: string
+                           enum:
+                             - HS256
+@@ -3173,12 +3170,11 @@ spec:
+                       description: ExternalAccountBinding is a reference to a CA external account of the ACME server. If set, upon registration cert-manager will attempt to associate the given external account credentials with the registered ACME account.
+                       type: object
+                       required:
+-                        - keyAlgorithm
+                         - keyID
+                         - keySecretRef
+                       properties:
+                         keyAlgorithm:
+-                          description: keyAlgorithm is the MAC key algorithm that the key is used for. Valid values are "HS256", "HS384" and "HS512".
++                          description: 'Deprecated: keyAlgorithm field exists for historical compatibility reasons and should not be used. The algorithm is now hardcoded to HS256 in golang/x/crypto/acme.'
+                           type: string
+                           enum:
+                             - HS256
+diff --git a/go.mod b/go.mod
+index cf420551b..548e00bbc 100644
+--- a/go.mod
++++ b/go.mod
+@@ -3,8 +3,8 @@ module github.com/jetstack/cert-manager
+ go 1.15
+ 
+ // this if a fork to add EAB and alternative chains in ACME
+-// to be replaced after https://github.com/golang/crypto/pull/109 merges
+-replace golang.org/x/crypto => github.com/meyskens/crypto v0.0.0-20200821143559-6ca9aec645f0
++// to be replaced after https://go-review.googlesource.com/c/crypto/+/277294/ merges
++replace golang.org/x/crypto => github.com/cert-manager/crypto v0.0.0-20210409161129-d4c19753215a
+ 
+ require (
+ 	github.com/Azure/azure-sdk-for-go v46.3.0+incompatible
+@@ -40,7 +40,7 @@ require (
+ 	github.com/spf13/pflag v1.0.5
+ 	github.com/stretchr/testify v1.6.1
+ 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+-	golang.org/x/net v0.0.0-20200822124328-c89045814202
++	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+ 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+ 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+ 	google.golang.org/api v0.15.0
+diff --git a/go.sum b/go.sum
+index 6e2c4c72e..aa5b57a11 100644
+--- a/go.sum
++++ b/go.sum
+@@ -99,6 +99,8 @@ github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c/go.mod h1:MKsuJm
+ github.com/blang/semver v3.5.0+incompatible h1:CGxCgetQ64DKk7rdZ++Vfnb1+ogGNnB17OJKJXD2Cfs=
+ github.com/blang/semver v3.5.0+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
+ github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
++github.com/cert-manager/crypto v0.0.0-20210409161129-d4c19753215a h1:HXp46OGPFPV7He+NPxUbCgEDCBL56R7BkQRGWEkznVQ=
++github.com/cert-manager/crypto v0.0.0-20210409161129-d4c19753215a/go.mod h1:T9bdIzuCu7OtxOm1hfPfRQxPLYneinmdGuTeoZ9dtd4=
+ github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
+ github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
+ github.com/cespare/xxhash/v2 v2.1.1 h1:6MnRN8NT7+YBpUIWxHtefFZOKTAPgGjpQSxqLNn0+qY=
+@@ -460,8 +462,6 @@ github.com/mattn/go-runewidth v0.0.7/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m
+ github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
+ github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 h1:I0XW9+e1XWDxdcEniV4rQAIOPUGDq67JSCiRCgGCZLI=
+ github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
+-github.com/meyskens/crypto v0.0.0-20200821143559-6ca9aec645f0 h1:09XQpCKCNW3zrjz4zvD/cYU3hqUEWW+bZrBwK8NwFW0=
+-github.com/meyskens/crypto v0.0.0-20200821143559-6ca9aec645f0/go.mod h1:ihkquczjM7M0cZsn7H1TJ3ACXW1rCuAMKX9lZEWNU3U=
+ github.com/miekg/dns v1.0.14/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
+ github.com/miekg/dns v1.1.31 h1:sJFOl9BgwbYAWOGEwr61FU28pqsBNdpRBnhGXtO06Oo=
+ github.com/miekg/dns v1.1.31/go.mod h1:KNUDUusw/aVsxyTYZM1oqvCicbwhgbNgztCETuNZ7xM=
+@@ -704,8 +704,9 @@ golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e/go.mod h1:qpuaurCH72eLCgpAm/
+ golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7/go.mod h1:qpuaurCH72eLCgpAm/N6yyVIVM9cpaDIP3A8BGJEC5A=
+ golang.org/x/net v0.0.0-20200707034311-ab3426394381 h1:VXak5I6aEWmAXeQjA+QSZzlgNrpq9mjcfDemuexIKsU=
+ golang.org/x/net v0.0.0-20200707034311-ab3426394381/go.mod h1:/O7V0waA8r7cgGh81Ro3o1hOxt32SMVPicZroKQ2sZA=
+-golang.org/x/net v0.0.0-20200822124328-c89045814202 h1:VvcQYSHwXgi7W+TpUR6A9g6Up98WAHf3f/ulnJ62IyA=
+ golang.org/x/net v0.0.0-20200822124328-c89045814202/go.mod h1:/O7V0waA8r7cgGh81Ro3o1hOxt32SMVPicZroKQ2sZA=
++golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 h1:qWPm9rbaAMKs8Bq/9LRpbMqxWRVUAQwMI9fVrssnTfw=
++golang.org/x/net v0.0.0-20210226172049-e18ecbb05110/go.mod h1:m0MpNAwzfU5UDzcl9v0D8zg8gWTRqZa9RBIspLL5mdg=
+ golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
+ golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
+ golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
+@@ -757,8 +758,11 @@ golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5/go.mod h1:h1NjWce9XRLGQEsW7w
+ golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+ golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+ golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+-golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4 h1:5/PjkGUjvEU5Gl6BxmvKRPpqo2uNMv4rcHBMwzk/st8=
+ golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
++golang.org/x/sys v0.0.0-20201119102817-f84b799fce68 h1:nxC68pudNYkKU6jWhgrqdreuFiOQWj1Fs7T3VrH4Pjw=
++golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
++golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 h1:v+OssWQX+hTHEmOBgwxdZxK4zHq3yOs8F9J7mk0PY8E=
++golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
+ golang.org/x/text v0.0.0-20160726164857-2910a502d2bf/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+ golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+ golang.org/x/text v0.3.1-0.20171227012246-e19ae1496984/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+diff --git a/hack/build/repos.bzl b/hack/build/repos.bzl
+index 7cfbf8ee2..36629837c 100644
+--- a/hack/build/repos.bzl
++++ b/hack/build/repos.bzl
+@@ -1966,9 +1966,9 @@ def go_repositories():
+         build_file_generation = "on",
+         build_file_proto_mode = "disable",
+         importpath = "golang.org/x/crypto",
+-        replace = "github.com/meyskens/crypto",
+-        sum = "h1:09XQpCKCNW3zrjz4zvD/cYU3hqUEWW+bZrBwK8NwFW0=",
+-        version = "v0.0.0-20200821143559-6ca9aec645f0",
++        replace = "github.com/cert-manager/crypto",
++        sum = "h1:HXp46OGPFPV7He+NPxUbCgEDCBL56R7BkQRGWEkznVQ=",
++        version = "v0.0.0-20210409161129-d4c19753215a",
+     )
+     go_repository(
+         name = "org_golang_x_exp",
+@@ -2007,8 +2007,8 @@ def go_repositories():
+         build_file_generation = "on",
+         build_file_proto_mode = "disable",
+         importpath = "golang.org/x/net",
+-        sum = "h1:VvcQYSHwXgi7W+TpUR6A9g6Up98WAHf3f/ulnJ62IyA=",
+-        version = "v0.0.0-20200822124328-c89045814202",
++        sum = "h1:qWPm9rbaAMKs8Bq/9LRpbMqxWRVUAQwMI9fVrssnTfw=",
++        version = "v0.0.0-20210226172049-e18ecbb05110",
+     )
+     go_repository(
+         name = "org_golang_x_oauth2",
+@@ -2031,9 +2031,18 @@ def go_repositories():
+         build_file_generation = "on",
+         build_file_proto_mode = "disable",
+         importpath = "golang.org/x/sys",
+-        sum = "h1:5/PjkGUjvEU5Gl6BxmvKRPpqo2uNMv4rcHBMwzk/st8=",
+-        version = "v0.0.0-20200622214017-ed371f2e16b4",
++        sum = "h1:nxC68pudNYkKU6jWhgrqdreuFiOQWj1Fs7T3VrH4Pjw=",
++        version = "v0.0.0-20201119102817-f84b799fce68",
+     )
++    go_repository(
++        name = "org_golang_x_term",
++        build_file_generation = "on",
++        build_file_proto_mode = "disable",
++        importpath = "golang.org/x/term",
++        sum = "h1:v+OssWQX+hTHEmOBgwxdZxK4zHq3yOs8F9J7mk0PY8E=",
++        version = "v0.0.0-20201126162022-7de9c90e9dd1",
++    )
++
+     go_repository(
+         name = "org_golang_x_text",
+         build_file_generation = "on",
+diff --git a/pkg/apis/acme/v1/types_issuer.go b/pkg/apis/acme/v1/types_issuer.go
+index d2b0e7bd4..018f8d6cf 100644
+--- a/pkg/apis/acme/v1/types_issuer.go
++++ b/pkg/apis/acme/v1/types_issuer.go
+@@ -118,9 +118,11 @@ type ACMEExternalAccountBinding struct {
+ 	// encoded data.
+ 	Key cmmeta.SecretKeySelector `json:"keySecretRef"`
+ 
+-	// keyAlgorithm is the MAC key algorithm that the key is used for.
+-	// Valid values are "HS256", "HS384" and "HS512".
+-	KeyAlgorithm HMACKeyAlgorithm `json:"keyAlgorithm"`
++	// Deprecated: keyAlgorithm field exists for historical compatibility
++	// reasons and should not be used. The algorithm is now hardcoded to HS256
++	// in golang/x/crypto/acme.
++	// +optional
++	KeyAlgorithm HMACKeyAlgorithm `json:"keyAlgorithm,omitempty"`
+ }
+ 
+ // HMACKeyAlgorithm is the name of a key algorithm used for HMAC encryption
+diff --git a/pkg/apis/acme/v1alpha2/types_issuer.go b/pkg/apis/acme/v1alpha2/types_issuer.go
+index af685a8e6..67c506f40 100644
+--- a/pkg/apis/acme/v1alpha2/types_issuer.go
++++ b/pkg/apis/acme/v1alpha2/types_issuer.go
+@@ -118,9 +118,11 @@ type ACMEExternalAccountBinding struct {
+ 	// encoded data.
+ 	Key cmmeta.SecretKeySelector `json:"keySecretRef"`
+ 
+-	// keyAlgorithm is the MAC key algorithm that the key is used for.
+-	// Valid values are "HS256", "HS384" and "HS512".
+-	KeyAlgorithm HMACKeyAlgorithm `json:"keyAlgorithm"`
++	// Deprecated: keyAlgorithm field exists for historical compatibility
++	// reasons and should not be used. The algorithm is now hardcoded to HS256
++	// in golang/x/crypto/acme.
++	// +optional
++	KeyAlgorithm HMACKeyAlgorithm `json:"keyAlgorithm,omitempty"`
+ }
+ 
+ // HMACKeyAlgorithm is the name of a key algorithm used for HMAC encryption
+diff --git a/pkg/apis/acme/v1alpha3/types_issuer.go b/pkg/apis/acme/v1alpha3/types_issuer.go
+index 1850cd8e2..988b57ae1 100644
+--- a/pkg/apis/acme/v1alpha3/types_issuer.go
++++ b/pkg/apis/acme/v1alpha3/types_issuer.go
+@@ -118,9 +118,11 @@ type ACMEExternalAccountBinding struct {
+ 	// encoded data.
+ 	Key cmmeta.SecretKeySelector `json:"keySecretRef"`
+ 
+-	// keyAlgorithm is the MAC key algorithm that the key is used for.
+-	// Valid values are "HS256", "HS384" and "HS512".
+-	KeyAlgorithm HMACKeyAlgorithm `json:"keyAlgorithm"`
++	// Deprecated: keyAlgorithm field exists for historical compatibility
++	// reasons and should not be used. The algorithm is now hardcoded to HS256
++	// in golang/x/crypto/acme.
++	// +optional
++	KeyAlgorithm HMACKeyAlgorithm `json:"keyAlgorithm,omitempty"`
+ }
+ 
+ // HMACKeyAlgorithm is the name of a key algorithm used for HMAC encryption
+diff --git a/pkg/apis/acme/v1beta1/types_issuer.go b/pkg/apis/acme/v1beta1/types_issuer.go
+index 766a0dca4..b5a16d457 100644
+--- a/pkg/apis/acme/v1beta1/types_issuer.go
++++ b/pkg/apis/acme/v1beta1/types_issuer.go
+@@ -118,9 +118,11 @@ type ACMEExternalAccountBinding struct {
+ 	// encoded data.
+ 	Key cmmeta.SecretKeySelector `json:"keySecretRef"`
+ 
+-	// keyAlgorithm is the MAC key algorithm that the key is used for.
+-	// Valid values are "HS256", "HS384" and "HS512".
+-	KeyAlgorithm HMACKeyAlgorithm `json:"keyAlgorithm"`
++	// Deprecated: keyAlgorithm field exists for historical compatibility
++	// reasons and should not be used. The algorithm is now hardcoded to HS256
++	// in golang/x/crypto/acme.
++	// +optional
++	KeyAlgorithm HMACKeyAlgorithm `json:"keyAlgorithm,omitempty"`
+ }
+ 
+ // HMACKeyAlgorithm is the name of a key algorithm used for HMAC encryption
+diff --git a/pkg/internal/apis/acme/types_issuer.go b/pkg/internal/apis/acme/types_issuer.go
+index ad412b14b..397f75fa6 100644
+--- a/pkg/internal/apis/acme/types_issuer.go
++++ b/pkg/internal/apis/acme/types_issuer.go
+@@ -108,8 +108,10 @@ type ACMEExternalAccountBinding struct {
+ 	// encoded data.
+ 	Key cmmeta.SecretKeySelector
+ 
+-	// keyAlgorithm is the MAC key algorithm that the key is used for.
+-	// Valid values are "HS256", "HS384" and "HS512".
++	// Deprecated: keyAlgorithm exists for historical compatibility reasons and
++	// should not be used. golang/x/crypto/acme hardcodes the algorithm to HS256
++	// so setting this field will have no effect.
++	// See https://github.com/jetstack/cert-manager/issues/3220#issuecomment-809438314
+ 	KeyAlgorithm HMACKeyAlgorithm
+ }
+ 
+diff --git a/pkg/internal/apis/certmanager/validation/issuer.go b/pkg/internal/apis/certmanager/validation/issuer.go
+index ef817e300..2a2f1995c 100644
+--- a/pkg/internal/apis/certmanager/validation/issuer.go
++++ b/pkg/internal/apis/certmanager/validation/issuer.go
+@@ -31,7 +31,7 @@ import (
+ 	cmmeta "github.com/jetstack/cert-manager/pkg/internal/apis/meta"
+ )
+ 
+-// Validation functions for cert-manager v1alpha2 Issuer types
++// Validation functions for cert-manager Issuer types.
+ 
+ func ValidateIssuer(obj runtime.Object) field.ErrorList {
+ 	iss := obj.(*certmanager.Issuer)
+@@ -115,10 +115,6 @@ func ValidateACMEIssuerConfig(iss *cmacme.ACMEIssuer, fldPath *field.Path) field
+ 		}
+ 
+ 		el = append(el, ValidateSecretKeySelector(&eab.Key, eabFldPath.Child("keySecretRef"))...)
+-
+-		if len(eab.KeyAlgorithm) == 0 {
+-			el = append(el, field.Required(eabFldPath.Child("keyAlgorithm"), "the keyAlgorithm field is required when using externalAccountBinding"))
+-		}
+ 	}
+ 
+ 	for i, sol := range iss.Solvers {
+diff --git a/pkg/internal/apis/certmanager/validation/issuer_test.go b/pkg/internal/apis/certmanager/validation/issuer_test.go
+index 8d0b9c828..ccd6d43e3 100644
+--- a/pkg/internal/apis/certmanager/validation/issuer_test.go
++++ b/pkg/internal/apis/certmanager/validation/issuer_test.go
+@@ -144,7 +144,7 @@ func TestValidateACMEIssuerConfig(t *testing.T) {
+ 				},
+ 			},
+ 		},
+-		"acme solver with empty external account binding fields": {
++		"acme solver with external account binding missing required fields": {
+ 			spec: &cmacme.ACMEIssuer{
+ 				Email:                  "valid-email",
+ 				Server:                 "valid-server",
+@@ -162,7 +162,43 @@ func TestValidateACMEIssuerConfig(t *testing.T) {
+ 				field.Required(fldPath.Child("externalAccountBinding.keyID"), "the keyID field is required when using externalAccountBinding"),
+ 				field.Required(fldPath.Child("externalAccountBinding.keySecretRef.name"), "secret name is required"),
+ 				field.Required(fldPath.Child("externalAccountBinding.keySecretRef.key"), "secret key is required"),
+-				field.Required(fldPath.Child("externalAccountBinding.keyAlgorithm"), "the keyAlgorithm field is required when using externalAccountBinding"),
++			},
++		},
++		"acme solver with a valid external account binding and keyAlgorithm not set": {
++			spec: &cmacme.ACMEIssuer{
++				Email:      "valid-email",
++				Server:     "valid-server",
++				PrivateKey: validSecretKeyRef,
++				ExternalAccountBinding: &cmacme.ACMEExternalAccountBinding{
++					KeyID: "test",
++					Key:   validSecretKeyRef,
++				},
++				Solvers: []cmacme.ACMEChallengeSolver{
++					{
++						DNS01: &cmacme.ACMEChallengeSolverDNS01{
++							CloudDNS: &validCloudDNSProvider,
++						},
++					},
++				},
++			},
++		},
++		"acme solver with a valid external account binding and keyAlgorithm set": {
++			spec: &cmacme.ACMEIssuer{
++				Email:      "valid-email",
++				Server:     "valid-server",
++				PrivateKey: validSecretKeyRef,
++				ExternalAccountBinding: &cmacme.ACMEExternalAccountBinding{
++					KeyID:        "test",
++					Key:          validSecretKeyRef,
++					KeyAlgorithm: cmacme.HS384,
++				},
++				Solvers: []cmacme.ACMEChallengeSolver{
++					{
++						DNS01: &cmacme.ACMEChallengeSolverDNS01{
++							CloudDNS: &validCloudDNSProvider,
++						},
++					},
++				},
+ 			},
+ 		},
+ 		"acme solver with missing http01 config type": {
+diff --git a/pkg/issuer/acme/setup.go b/pkg/issuer/acme/setup.go
+index ff50cd9b5..2847288f3 100644
+--- a/pkg/issuer/acme/setup.go
++++ b/pkg/issuer/acme/setup.go
+@@ -204,9 +204,8 @@ func (a *Acme) Setup(ctx context.Context) error {
+ 
+ 		// set the external account binding
+ 		eabAccount = &acmeapi.ExternalAccountBinding{
+-			KID:          eabObj.KeyID,
+-			Key:          eabKey,
+-			KeyAlgorithm: string(eabObj.KeyAlgorithm),
++			KID: eabObj.KeyID,
++			Key: eabKey,
+ 		}
+ 	}
+ 
+diff --git a/test/e2e/suite/conformance/certificates/acme/acme.go b/test/e2e/suite/conformance/certificates/acme/acme.go
+index 988660a1d..4082ce548 100644
+--- a/test/e2e/suite/conformance/certificates/acme/acme.go
++++ b/test/e2e/suite/conformance/certificates/acme/acme.go
+@@ -39,8 +39,7 @@ var _ = framework.ConformanceDescribe("Certificates", func() {
+ })
+ var _ = framework.ConformanceDescribe("Certificates with External Account Binding", func() {
+ 	runACMEIssuerTests(&cmacme.ACMEExternalAccountBinding{
+-		KeyID:        "kid-1",
+-		KeyAlgorithm: "HS256",
++		KeyID: "kid-1",
+ 	})
+ })
+ 
+diff --git a/test/e2e/suite/issuers/acme/BUILD.bazel b/test/e2e/suite/issuers/acme/BUILD.bazel
+index 6e62257c7..2f5038a39 100644
+--- a/test/e2e/suite/issuers/acme/BUILD.bazel
++++ b/test/e2e/suite/issuers/acme/BUILD.bazel
+@@ -10,6 +10,8 @@ go_library(
+     tags = ["manual"],
+     visibility = ["//visibility:public"],
+     deps = [
++        "//pkg/api/util:go_default_library",
++        "//pkg/apis/acme/v1:go_default_library",
+         "//pkg/apis/certmanager/v1:go_default_library",
+         "//pkg/apis/meta/v1:go_default_library",
+         "//test/e2e/framework:go_default_library",
+@@ -19,6 +21,7 @@ go_library(
+         "@com_github_onsi_ginkgo//:go_default_library",
+         "@com_github_onsi_gomega//:go_default_library",
+         "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
++        "@io_k8s_apimachinery//pkg/util/wait:go_default_library",
+     ],
+ )
+ 
+diff --git a/test/e2e/suite/issuers/acme/issuer.go b/test/e2e/suite/issuers/acme/issuer.go
+index 14c4ee3ab..e1e7834c6 100644
+--- a/test/e2e/suite/issuers/acme/issuer.go
++++ b/test/e2e/suite/issuers/acme/issuer.go
+@@ -18,13 +18,19 @@ package acme
+ 
+ import (
+ 	"context"
++	"encoding/base64"
++	"errors"
+ 	"fmt"
++	"time"
+ 
+ 	. "github.com/onsi/ginkgo"
+ 	. "github.com/onsi/gomega"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/util/wait"
+ 
+-	"github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
++	apiutil "github.com/jetstack/cert-manager/pkg/api/util"
++	cmacme "github.com/jetstack/cert-manager/pkg/apis/acme/v1"
++	v1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
+ 	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
+ 	"github.com/jetstack/cert-manager/test/e2e/framework"
+ 	"github.com/jetstack/cert-manager/test/e2e/util"
+@@ -243,4 +249,75 @@ var _ = framework.CertManagerDescribe("ACME Issuer", func() {
+ 			})
+ 		Expect(err).NotTo(HaveOccurred())
+ 	})
++	It("ACME account with External Account Binding", func() {
++
++		By("providing the legacy keyAlgorithm value")
++
++		var (
++			secretName = "test-secret"
++			keyID      = "kid-1"
++			key        = "kid-secret-1"
++		)
++
++		keyBytes := []byte(base64.RawURLEncoding.EncodeToString([]byte(key)))
++		s := gen.Secret(secretName,
++			gen.SetSecretNamespace(f.Namespace.Name),
++			gen.SetSecretData(map[string][]byte{
++				"key": keyBytes,
++			}))
++		_, err := f.KubeClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), s, metav1.CreateOptions{})
++		Expect(err).NotTo(HaveOccurred())
++
++		acmeIssuer := gen.Issuer(issuerName,
++			gen.SetIssuerNamespace(f.Namespace.Name),
++			gen.SetIssuerACMEEmail(testingACMEEmail),
++			gen.SetIssuerACMEURL(f.Config.Addons.ACMEServer.URL),
++			gen.SetIssuerACMESkipTLSVerify(true),
++			gen.SetIssuerACMEPrivKeyRef(testingACMEPrivateKey),
++			gen.SetIssuerACMEEABWithKeyAlgorithm(keyID, secretName, cmacme.HS256))
++
++		acmeIssuer, err = f.CertManagerClientSet.CertmanagerV1().Issuers(f.Namespace.Name).Create(
++			context.TODO(), acmeIssuer, metav1.CreateOptions{})
++		Expect(err).NotTo(HaveOccurred())
++
++		err = util.WaitForIssuerCondition(f.CertManagerClientSet.CertmanagerV1().Issuers(f.Namespace.Name),
++			acmeIssuer.Name,
++			v1.IssuerCondition{
++				Type:   v1.IssuerConditionReady,
++				Status: cmmeta.ConditionTrue,
++			})
++		Expect(err).NotTo(HaveOccurred())
++
++		By("removing the legacy keyAlgorithm value")
++
++		acmeIssuer, err = f.CertManagerClientSet.CertmanagerV1().Issuers(f.Namespace.Name).Get(context.TODO(), acmeIssuer.Name, metav1.GetOptions{})
++		Expect(err).NotTo(HaveOccurred())
++
++		acmeIssuer = gen.IssuerFrom(acmeIssuer,
++			gen.SetIssuerACMEEAB(keyID, secretName))
++
++		_, err = f.CertManagerClientSet.CertmanagerV1().Issuers(f.Namespace.Name).Update(context.TODO(), acmeIssuer, metav1.UpdateOptions{})
++		Expect(err).NotTo(HaveOccurred())
++
++		// TODO: we should use observedGeneration here, but currently it won't
++		// be incremented correctly in this scenario.
++		// Verify that Issuer's Ready condition remains True for 5 seconds.
++		err = wait.Poll(time.Millisecond*200, time.Second*5, func() (bool, error) {
++			iss, err := f.CertManagerClientSet.CertmanagerV1().Issuers(f.Namespace.Name).Get(
++				context.TODO(), issuerName, metav1.GetOptions{})
++			if err != nil {
++				return false, err
++			}
++			if !apiutil.IssuerHasCondition(iss, v1.IssuerCondition{
++				Type:   v1.IssuerConditionReady,
++				Status: cmmeta.ConditionTrue,
++			}) {
++				return false, errors.New("expected Ready condition to be true, got false")
++			}
++			// keep polling
++			return false, nil
++		})
++		Expect(err).To(HaveOccurred())
++		Expect(err).To(MatchError(wait.ErrWaitTimeout))
++	})
+ })
+-- 
+2.33.1
+

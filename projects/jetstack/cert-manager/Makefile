@@ -1,145 +1,41 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-ARTIFACT_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.15"
 
 REPO=cert-manager
-COMPONENT=jetstack/$(REPO)
-ifdef CODEBUILD_SRC_DIR
-	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/jetstack.cert-manager
-else
-	TAR_PATH?="_output/tar"
-	CLONE_URL?=https://github.com/$(COMPONENT).git
-endif
+REPO_OWNER=jetstack
 
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
+LICENSE_PACKAGE_FILTER?=./cmd/acmesolver ./cmd/cainjector ./cmd/controller ./cmd/webhook
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
 BASE_IMAGE_NAME?=eks-distro-minimal-base
-BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_TAG_FILE)
-BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
-BUILDER_IMAGE=$(BASE_REPO)/eks-distro-base:$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
+DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-CERT_MANAGER_ACMESOLVER_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-acmesolver:$(IMAGE_TAG)
-CERT_MANAGER_ACMESOLVER_LATEST_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-acmesolver:latest
-CERT_MANAGER_CAINJECTOR_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-cainjector:$(IMAGE_TAG)
-CERT_MANAGER_CAINJECTOR_LATEST_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-cainjector:latest
-CERT_MANAGER_CONTROLLER_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-controller:$(IMAGE_TAG)
-CERT_MANAGER_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-controller:latest
-CERT_MANAGER_WEBHOOK_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-webhook:$(IMAGE_TAG)
-CERT_MANAGER_WEBHOOK_LATEST_IMAGE=$(IMAGE_REPO)/jetstack/cert-manager-webhook:latest
+CERT_MANAGER_ACMESOLVER_IMAGE_COMPONENT=jetstack/cert-manager-acmesolver
+CERT_MANAGER_CAINJECTOR_IMAGE_COMPONENT=jetstack/cert-manager-cainjector
+CERT_MANAGER_CONTROLLER_IMAGE_COMPONENT=jetstack/cert-manager-controller
+CERT_MANAGER_WEBHOOK_IMAGE_COMPONENT=jetstack/cert-manager-webhook
 
-.PHONY: binaries
-binaries:
-	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION)
+BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/cert-manager-controller
+GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
-.PHONY: generate-attribution
-generate-attribution:
-	build/create_attribution.sh $(GOLANG_VERSION)
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: tarballs
-tarballs:  binaries
-	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(TAR_PATH)
+build: s3-artifacts
+release: upload-artifacts
+
+$(BINARY_TARGET): $(GIT_PATCH_TARGET)
+
+$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
+	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
+	@touch $@ 
 
 .PHONY: local-images
-local-images: binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/cert-manager-acmesolver \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_ACMESOLVER_IMAGE),$(CERT_MANAGER_ACMESOLVER_LATEST_IMAGE)\",dest=/tmp/cert-manager-acmesolver.tar
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/cert-manager-cainjector \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_CAINJECTOR_IMAGE),$(CERT_MANAGER_CAINJECTOR_LATEST_IMAGE)\",dest=/tmp/cert-manager-cainjector.tar
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/cert-manager-controller \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_CONTROLLER_IMAGE),$(CERT_MANAGER_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/cert-manager-controller.tar
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/cert-manager-webhook \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CERT_MANAGER_WEBHOOK_IMAGE),$(CERT_MANAGER_WEBHOOK_LATEST_IMAGE)\",dest=/tmp/cert-manager-webhook.tar
+local-images: cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64
 
 .PHONY: images
-images: binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/cert-manager-acmesolver \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_ACMESOLVER_IMAGE),$(CERT_MANAGER_ACMESOLVER_LATEST_IMAGE)\",push=true
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/cert-manager-cainjector \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_CAINJECTOR_IMAGE),$(CERT_MANAGER_CAINJECTOR_LATEST_IMAGE)\",push=true
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/cert-manager-controller \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_CONTROLLER_IMAGE),$(CERT_MANAGER_CONTROLLER_LATEST_IMAGE)\",push=true
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/cert-manager-webhook \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CERT_MANAGER_WEBHOOK_IMAGE),$(CERT_MANAGER_WEBHOOK_LATEST_IMAGE)\",push=true
-	
-.PHONY: build
-build: local-images tarballs
-	echo "Done $(COMPONENT)"
+images: cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push
 
-.PHONY: release
-release: images tarballs
-	echo "Done $(COMPONENT)"
-
-.PHONY: all
-all: release
-
-.PHONY: release-upload
-release-upload: release
-	echo "Done upload $(COMPONENT)"
-
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf _output
-	
+.PHONY: s3-artifacts
+s3-artifacts: tarballs
+	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)

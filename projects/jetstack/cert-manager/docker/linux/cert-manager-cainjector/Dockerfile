@@ -12,9 +12,12 @@ RUN yum install -y shadow-utils && \
 
 FROM $BASE_IMAGE
 
+ARG TARGETARCH
+ARG TARGETOS
+
 COPY --from=builder /etc/group /etc/group
 COPY --from=builder /etc/passwd /etc/passwd
-COPY _output/bin/cert-manager/linux-amd64/cert-manager-cainjector /usr/bin/cainjector
+COPY _output/bin/cert-manager/$TARGETOS-$TARGETARCH/cert-manager-cainjector /usr/bin/cainjector
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
