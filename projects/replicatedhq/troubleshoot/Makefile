@@ -1,53 +1,45 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.14"
 
 REPO=troubleshoot
-COMPONENT=replicatedhq/$(REPO)
-ifdef CODEBUILD_SRC_DIR
-	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/replicatedhq.troubleshoot
-else
-	TAR_PATH?="_output/tar"
-	CLONE_URL?=https://github.com/$(COMPONENT).git
-endif
+REPO_OWNER=replicatedhq
 
-.PHONY: upload-artifacts
-upload-artifacts:
-	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION)
+LICENSE_PACKAGE_FILTER?=./cmd/troubleshoot
 
-.PHONY: create-binaries
-create-binaries:
-	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION)
+BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/support-bundle
+GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
+FIX_LICENSES_TARGET=$(REPO)/vendor/github.com/tj/go-spin/LICENSE
 
-.PHONY: binaries
-binaries: create-binaries
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: generate-attribution
-generate-attribution:
-	build/create_attribution.sh $(GOLANG_VERSION)
 
-.PHONY: tarballs
-tarballs:  binaries
-	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(TAR_PATH)
+build: s3-artifacts
+release: upload-artifacts
 
-.PHONY: build
-build: tarballs
-	echo "Done $(COMPONENT)"
+# Patch source before building
+$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
 
-.PHONY: release
-release: build
-	echo "Done $(COMPONENT)"
+$(GATHER_LICENSES_TARGET): $(FIX_LICENSES_TARGET)
 
-.PHONY: release-upload
-release-upload: release upload-artifacts
-	echo "Done upload $(COMPONENT)"
+$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
+	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
+	@touch $@ 
 
-.PHONY: all
-all: release
+.PHONY: s3-artifacts
+s3-artifacts: tarballs
+	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
+$(FIX_LICENSES_TARGET):
+# The tj/go-spin dependency github repo has a license file however it does not have a go.mod file
+# checked in to the repo. Hence we need to manually download the license from Github and place
+# it in the respective folder under vendor directory so that they is available for go-licenses
+# to pick up
+	wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE -O $@
+
+.PHONY: local-images
+local-images: #noop
+
+.PHONY: images
+images: #noop

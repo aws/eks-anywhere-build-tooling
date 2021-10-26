@@ -19,54 +19,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REPO="${1?Specify first argument - repository name}"
-CLONE_URL="${2?Specify second argument - git clone endpoint}"
-TAG="${3?Specify third argument - git version tag}"
-GOLANG_VERSION="${4?Specify fourth argument - golang version}"
-BIN_ROOT="_output/bin"
-BIN_PATH=$BIN_ROOT/$REPO
+TAG="$1"
+BIN_PATH="$2"
+OS="$3"
+ARCH="$4"
 
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
-function build::troubleshoot::build_binaries(){
-  platform=${1}
-  OS="$(cut -d '/' -f1 <<< ${platform})"
-  ARCH="$(cut -d '/' -f2 <<< ${platform})"
-  export PATH=$PATH:$(go env GOPATH)/bin
-  go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0
-  go get k8s.io/code-generator/cmd/client-gen@kubernetes-1.18.0
-  make support-bundle
-  mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
-  mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
-}
+# Tags and LDFLAGS copied from troubleshoot/Makefile
+VERSION_PACKAGE="github.com/replicatedhq/troubleshoot/pkg/version"
+LDFLAGS="-s -w -buildid='' -X $VERSION_PACKAGE.version=$TAG \
+	-X $VERSION_PACKAGE.gitSHA=$(git rev-list -n 1 $TAG)"
+BUILDTAGS="netgo containers_image_ostree_stub exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp"
 
-function build::troubleshoot::fix_licenses(){
-  # The tj/go-spin dependency github repo has a license file however it does not have a go.mod file
-  # checked in to the repo. Hence we need to manually download the license from Github and place
-  # it in the respective folder under vendor directory so that they is available for go-licenses
-  # to pick up
-  wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE -O vendor/github.com/tj/go-spin/LICENSE
-}
-
-function build::troubleshoot::binaries(){
-  mkdir -p $BIN_PATH
-  git clone $CLONE_URL $REPO
-  cd $REPO
-  build::common::wait_for_tag $TAG
-  git checkout $TAG
-  git apply --verbose $MAKE_ROOT/patches/*
-  build::common::use_go_version $GOLANG_VERSION
-  go mod tidy
-  go mod vendor
-  build::troubleshoot::build_binaries "linux/amd64"
-  build::troubleshoot::gather_licenses
-  cd ..
-  rm -rf $REPO
-}
-
-function build::troubleshoot::gather_licenses(){
-  (go mod vendor && build::troubleshoot::fix_licenses && build::gather_licenses $MAKE_ROOT/_output "./cmd/troubleshoot")
-}
-
-build::troubleshoot::binaries
+CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH go build -trimpath -tags "$BUILDTAGS" -installsuffix netgo -ldflags "$LDFLAGS" -o $BIN_PATH/support-bundle \
+  github.com/replicatedhq/troubleshoot/cmd/troubleshoot
