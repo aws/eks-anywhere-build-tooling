@@ -24,13 +24,13 @@ OS="$3"
 ARCH="$4"
 
 CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
-  go build -trimpath -ldflags "-s -w -extldflags -static" -o $BIN_PATH/cert-manager-acmesolver ./cmd/acmesolver
+  go build -trimpath -ldflags "-s -w -buildid= -extldflags -static" -o $BIN_PATH/cert-manager-acmesolver ./cmd/acmesolver
 
 CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
-  go build -trimpath -ldflags "-s -w -extldflags -static" -o $BIN_PATH/cert-manager-cainjector ./cmd/cainjector
+  go build -trimpath -ldflags "-s -w -buildid= -extldflags -static" -o $BIN_PATH/cert-manager-cainjector ./cmd/cainjector
 
 CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
-  go build -trimpath -ldflags "-s -w -extldflags -static" -o $BIN_PATH/cert-manager-controller ./cmd/controller
+  go build -trimpath -ldflags "-s -w -buildid= -extldflags -static" -o $BIN_PATH/cert-manager-controller ./cmd/controller
 
 CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
-  go build -trimpath -ldflags "-s -w -extldflags -static" -o $BIN_PATH/cert-manager-webhook ./cmd/webhook
+  go build -trimpath -ldflags "-s -w -buildid= -extldflags -static" -o $BIN_PATH/cert-manager-webhook ./cmd/webhook
