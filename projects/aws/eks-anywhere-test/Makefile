@@ -4,6 +4,7 @@ GIT_TAG?=$(shell cat GIT_TAG)
 REPO=eks-anywhere-test
 REPO_OWNER=aws
 IMAGE_COMPONENT=eks-anywhere-test
+IMAGE_DESCRIPTION="EKS Anywhere Add-ons Test Application"
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 
@@ -17,4 +18,4 @@ $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) $(ATTRIBUTION_TARG
 local-images: eks-anywhere-test/images/amd64
 	
 .PHONY: images
-images: eks-anywhere-test/images/push
+images: eks-anywhere-test/images/push eks-anywhere-test/helm/push
