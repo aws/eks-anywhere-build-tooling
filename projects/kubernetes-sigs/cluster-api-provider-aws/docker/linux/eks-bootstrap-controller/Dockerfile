@@ -1,9 +1,12 @@
 ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base
 FROM $BASE_IMAGE
 
+ARG TARGETARCH
+ARG TARGETOS
+
 WORKDIR /
 
-COPY _output/bin/cluster-api-provider-aws/linux-amd64/eks-bootstrap-manager /eks-bootstrap-manager
+COPY _output/bin/cluster-api-provider-aws/$TARGETOS-$TARGETARCH/eks-bootstrap-manager /eks-bootstrap-manager
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
