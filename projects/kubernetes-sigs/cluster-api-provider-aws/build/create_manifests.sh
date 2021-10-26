@@ -40,3 +40,5 @@ sed -i "s,${KUBE_RBAC_PROXY_MANIFEST_IMAGE},${KUBE_RBAC_PROXY_MANIFEST_IMAGE_OVE
 cp ../manifests/infrastructure-components.yaml "$OUTPUT_DIR/manifests/infrastructure-aws/$TAG"
 cp templates/cluster-template.yaml "$OUTPUT_DIR/manifests/infrastructure-aws/$TAG"
 cp metadata.yaml "$OUTPUT_DIR/manifests/infrastructure-aws/$TAG"
+
+cp -rf $OUTPUT_DIR/manifests $ARTIFACTS_PATH
