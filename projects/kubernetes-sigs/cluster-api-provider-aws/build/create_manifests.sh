@@ -35,9 +35,12 @@ KUBE_RBAC_PROXY_MANIFEST_IMAGE="gcr.io/kubebuilder/kube-rbac-proxy:v0.4.1"
 KUBE_RBAC_PROXY_MANIFEST_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
 
 mkdir -p $OUTPUT_DIR/manifests/infrastructure-aws/$TAG
-sed -i "s,${MANIFEST_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ../manifests/infrastructure-components.yaml
-sed -i "s,${KUBE_RBAC_PROXY_MANIFEST_IMAGE},${KUBE_RBAC_PROXY_MANIFEST_IMAGE_OVERRIDE}," ../manifests/infrastructure-components.yaml
+# we have this checked in because generation was failing in our builder images
+# TODO: fix this if we ever add offical aws support
 cp ../manifests/infrastructure-components.yaml "$OUTPUT_DIR/manifests/infrastructure-aws/$TAG"
+sed -i "s,${MANIFEST_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," "$OUTPUT_DIR/manifests/infrastructure-aws/$TAG/infrastructure-components.yaml"
+sed -i "s,${KUBE_RBAC_PROXY_MANIFEST_IMAGE},${KUBE_RBAC_PROXY_MANIFEST_IMAGE_OVERRIDE}," "$OUTPUT_DIR/manifests/infrastructure-aws/$TAG/infrastructure-components.yaml"
+
 cp templates/cluster-template.yaml "$OUTPUT_DIR/manifests/infrastructure-aws/$TAG"
 cp metadata.yaml "$OUTPUT_DIR/manifests/infrastructure-aws/$TAG"
 
