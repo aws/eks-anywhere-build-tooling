@@ -19,38 +19,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REPO="${1?Specify first argument - repository name}"
-CLONE_URL="${2?Specify second argument - git clone endpoint}"
-TAG="${3?Specify third argument - git version tag}"
-GOLANG_VERSION="${4?Specify fourth argument - golang version}"
-BIN_ROOT="_output/bin"
-BIN_PATH=$BIN_ROOT/$REPO
+TAG="$1"
+BIN_PATH="$2"
+OS="$3"
+ARCH="$4"
 
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "${MAKE_ROOT}/../../../build/lib/common.sh"
+LDFLAGS="-X github.com/kubernetes-sigs/cri-tools/pkg/version.Version=${TAG:1}"
 
-function build::cri-tools::build_binaries(){
-  platform=$1
-  OS="$(cut -d '/' -f1 <<< ${platform})"
-  ARCH="$(cut -d '/' -f2 <<< ${platform})"
-  make binaries
-  mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
-  mv _output/* ../${BIN_PATH}/${OS}-${ARCH}/
-  make clean
-}
+CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
+  go build -trimpath -a -ldflags "$LDFLAGS -s -w -buildid=" -tags 'selinux' -o $BIN_PATH/crictl ./cmd/crictl
 
-function build::cri-tools::binaries(){
-  mkdir -p $BIN_PATH
-  git clone $CLONE_URL $REPO
-  cd $REPO
-  COMMIT=$(git rev-parse HEAD 2>/dev/null)
-  build::common::wait_for_tag $TAG
-  git checkout $TAG
-  build::common::use_go_version $GOLANG_VERSION
-  build::cri-tools::build_binaries "linux/amd64"
-  build::gather_licenses $MAKE_ROOT/_output "./cmd/critest ./cmd/crictl"
-  cd ..
-  rm -rf $REPO
-}
-
-build::cri-tools::binaries
+CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
+  go test -trimpath -c -a -ldflags "$LDFLAGS -s -w -buildid=" -tags 'selinux' -o $BIN_PATH/critest ./cmd/critest
