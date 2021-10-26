@@ -20,7 +20,7 @@ build: s3-artifacts
 release: upload-artifacts
 
 # Patch source before building
-$(BINARY_TARGET): $(KUSTOMIZE_TARGET) $(FLUX_MANIFESTS_TARGET) | $(GIT_PATCH_TARGET)
+$(BINARY_TARGET): $(FLUX_MANIFESTS_TARGET) | $(GIT_PATCH_TARGET)
 
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
