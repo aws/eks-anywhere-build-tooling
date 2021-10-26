@@ -12,9 +12,6 @@ BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/clusterawsadm
 BASE_IMAGE_NAME=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
-
 CLUSTER_API_AWS_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-aws/cluster-api-aws-controller
 EKS_BOOTSTRAP_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-aws/eks-bootstrap-controller
 EKS_CONTROL_PLANE_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-aws/eks-control-plane-controller
