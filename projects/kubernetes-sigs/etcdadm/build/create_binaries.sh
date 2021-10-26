@@ -24,4 +24,4 @@ OS="$3"
 ARCH="$4"
 
 CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
-  go build -a -ldflags "-s -w -buildid= -extldflags '-static'" -o $BIN_PATH/etcdadm .
+  go build -trimpath -a -ldflags "-s -w -buildid= -extldflags '-static'" -o $BIN_PATH/etcdadm .
