@@ -18,4 +18,4 @@ $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) $(ATTRIBUTION_TARG
 local-images: eks-anywhere-test/images/amd64
 	
 .PHONY: images
-images: eks-anywhere-test/images/push eks-anywhere-test/helm/push
+images: eks-anywhere-test/images/push helm/push

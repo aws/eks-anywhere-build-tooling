@@ -38,6 +38,7 @@ BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
 
 IMAGE_COMPONENT?=$(COMPONENT)
+IMAGE_DESCRIPTION?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
 IMAGE_CONTEXT_DIR?=.
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
@@ -79,17 +80,13 @@ define BUILDCTL
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
 endef
 
-define HELM_BUILD
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION)
-endef
-
 define WRITE_LOCAL_IMAGE_TAG
 	echo $(IMAGE_TAG) > $(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).docker_tag
 	echo $(IMAGE) > $(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).docker_image_name	
 endef
 
 define IMAGE_TARGETS_FOR_NAME
-	$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64, $(1)) $(addsuffix /images/arm64, $(1)) $(addsuffix /helm/push, $(1))
+	$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64, $(1)) $(addsuffix /images/arm64, $(1))
 endef
 
 ## --------------------------------------
@@ -188,8 +185,8 @@ validate-checksums: $(BINARY_TARGET)
 #	IMAGE_BUILD_ARGS:  additional build-args passed to buildctl, set to name of variable defined in makefile \
 #	IMAGE_CONTEXT_DIR: context directory for buildctl, default: .
 
-.PHONY: %/images/push %/images/amd64 %/images/arm64 %/helm/push
-%/images/push %/images/amd64 %/images/arm64 %/helm/push: IMAGE_NAME=$*
+.PHONY: %/images/push %/images/amd64 %/images/arm64
+%/images/push %/images/amd64 %/images/arm64: IMAGE_NAME=$*
 
 %/images/push: ## Build image using buildkit for all platforms, by default pushes to registry defined in IMAGE_REPO.
 %/images/push: IMAGE_PLATFORMS?=linux/amd64,linux/arm64
@@ -198,9 +195,9 @@ validate-checksums: $(BINARY_TARGET)
 %/images/push: $(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt
 	$(BUILDCTL)
 
-%/helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
-%/helm/push:
-	$(HELM_BUILD)
+.PHONY: helm/push
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
+	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION)
 
 %/images/amd64: ## Build image using buildkit only builds linux/amd64 and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64
