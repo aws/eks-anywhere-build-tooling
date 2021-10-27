@@ -18,10 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-IMAGE_REGISTRY="${1?First argument is image registry}"
-IMAGE_REPOSITORY="${2?Second argument is image repository}"
-IMAGE_TAG="${3?Third argument is image tag}"
-IMAGE_DESCRIPTION="${4?Fourth argument is image description}"
+IMAGE_REPOSITORY="${1?First argument is image repository}"
+IMAGE_TAG="${2?Second argument is image tag}"
+IMAGE_DESCRIPTION="${3?Third argument is image description}"
+IMAGE_REGISTRY="${4:-}"
 
 cd helm
 cat >${IMAGE_REPOSITORY}/Chart.yaml <<!
@@ -35,6 +35,10 @@ appVersion: "${IMAGE_TAG}-helm"
 trap "rm -f ${IMAGE_REPOSITORY}-${IMAGE_TAG}-helm.tgz ${IMAGE_REPOSITORY}/Chart.yaml" err exit
 helm package ${IMAGE_REPOSITORY}
 
-export HELM_EXPERIMENTAL_OCI=1
-aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}
-helm push ${IMAGE_REPOSITORY}-${IMAGE_TAG}-helm.tgz oci://${IMAGE_REGISTRY}
+if [ -n "${IMAGE_REGISTRY}" ]
+then
+  export HELM_EXPERIMENTAL_OCI=1
+  helm push ${IMAGE_REPOSITORY}-${IMAGE_TAG}-helm.tgz oci://${IMAGE_REGISTRY} ||
+   (echo "If authentication failed: aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}" &&
+   false)
+fi

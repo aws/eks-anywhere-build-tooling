@@ -195,9 +195,13 @@ validate-checksums: $(BINARY_TARGET)
 %/images/push: $(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt
 	$(BUILDCTL)
 
+.PHONY: helm/build
+helm/build: ## Build helm chart
+	$(BUILD_LIB)/helm_build.sh $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION)
+
 .PHONY: helm/push
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION)
+	$(BUILD_LIB)/helm_build.sh $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION) $(IMAGE_REPO)
 
 %/images/amd64: ## Build image using buildkit only builds linux/amd64 and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64
