@@ -15,7 +15,7 @@ include $(BASE_DIRECTORY)/Common.mk
 $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) $(ATTRIBUTION_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
 
 .PHONY: local-images
-local-images: eks-anywhere-test/images/amd64
+local-images: eks-anywhere-test/images/amd64 helm/build
 	
 .PHONY: images
 images: eks-anywhere-test/images/push helm/push
