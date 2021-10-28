@@ -1,87 +1,43 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-ARTIFACT_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.15"
 
 REPO=notification-controller
-COMPONENT=fluxcd/$(REPO)
-ifdef CODEBUILD_SRC_DIR
-	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.notification-controller
-else
-	TAR_PATH?="_output/tar"
-	CLONE_URL?=https://github.com/$(COMPONENT).git
-endif
+REPO_OWNER=fluxcd
 
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
+LICENSE_PACKAGE_FILTER?=.
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
-BASE_IMAGE_NAME?=eks-distro-minimal-base
-BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_TAG_FILE)
-BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
-BUILDER_IMAGE=$(BASE_REPO)/eks-distro-base:$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
+BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/notification-controller
+FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/notification-controller/api/LICENSE
+FIX_LICENSES_K0KUBUN_TARGET=$(REPO)/vendor/github.com/k0kubun/pp/LICENSE.txt
 
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_NAME=$(COMPONENT)
-IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
-LATEST_IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):latest
+BASE_IMAGE_NAME=eks-distro-minimal-base
 
-.PHONY: binaries
-binaries:
-	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION)
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: generate-attribution
-generate-attribution:
-	build/create_attribution.sh $(GOLANG_VERSION)
 
-.PHONY: tarballs
-tarballs:  binaries
-	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(TAR_PATH)
+build: s3-artifacts
+release: upload-artifacts
+
+$(GATHER_LICENSES_TARGET): $(FIX_LICENSES_K0KUBUN_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
 .PHONY: local-images
-local-images: binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",dest=/tmp/notification-controller.tar
+local-images: notification-controller/images/amd64
 
 .PHONY: images
-images: binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",push=true
+images: notification-controller/images/push
 
-.PHONY: build
-build: local-images tarballs
-	echo "Done $(COMPONENT)"
+.PHONY: s3-artifacts
+s3-artifacts: tarballs
+	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
-.PHONY: release
-release: images tarballs
-	echo "Done $(COMPONENT)"
+$(FIX_LICENSES_API_LICENSE_TARGET): | $(GIT_CHECKOUT_TARGET)
+# Internal go.mod under /api directory
+	cp $(REPO)/LICENSE $@
 
-.PHONY: release-upload
-release-upload: release
-	echo "Done upload $(COMPONENT)"
-
-.PHONY: all
-all: release
-
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
+$(FIX_LICENSES_K0KUBUN_TARGET): | $(GIT_CHECKOUT_TARGET)
+# The notification-controller project consumes an older version (v2.3.0) of the k0kubun/pp module 
+# which does not have a LICENSE file committed to the repo. Hence we are fetching the license file 
+# from the master branch so that it is available in the vendor directory for go-licenses to pick up
+	wget -q -O $@  https://raw.githubusercontent.com/k0kubun/pp/master/LICENSE.txt

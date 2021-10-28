@@ -13,10 +13,13 @@ RUN yum install -y shadow-utils && \
 
 FROM $BASE_IMAGE
 
+ARG TARGETARCH
+ARG TARGETOS
+
 COPY --from=builder /etc/group /etc/group
 COPY --from=builder /etc/passwd /etc/passwd
 
-COPY _output/bin/helm-controller/linux-amd64/helm-controller /usr/local/bin/helm-controller
+COPY _output/bin/helm-controller/$TARGETOS-$TARGETARCH/helm-controller /usr/local/bin/helm-controller
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 

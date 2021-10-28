@@ -144,9 +144,9 @@ $(ATTRIBUTION_TARGET): $(GATHER_LICENSES_TARGET)
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGET) which gathers all licenses
 gather-licenses: $(GATHER_LICENSES_TARGET)
 
-.PHONY: attribution
-attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
-attribution: $(ATTRIBUTION_TARGET)
+.PHONY: generate-attribution
+generate-attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
+generate-attribution: $(ATTRIBUTION_TARGET)
 
 ##@ Tarball Targets
 
@@ -225,7 +225,7 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 ##@ Build Targets
 
 .PHONY: build
-build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images attribution checksums` by default
+build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images generate-attribution checksums` by default
 build: FAKE_ARM_IMAGES_FOR_VALIDATION=true
 build: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) local-images $(ATTRIBUTION_TARGET)
 

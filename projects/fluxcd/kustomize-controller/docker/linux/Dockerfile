@@ -14,18 +14,21 @@ RUN yum install -y shadow-utils && \
 
 FROM $BASE_IMAGE
 
+ARG TARGETARCH
+ARG TARGETOS
+
 COPY --from=builder /etc/group /etc/group
 COPY --from=builder /etc/passwd /etc/passwd
 
 COPY _output/files/kubeconfig /home/controller/.kube/config
 
-COPY _output/bin/kustomize-controller/linux-amd64/kustomize-controller /usr/local/bin/kustomize-controller
+COPY _output/bin/kustomize-controller/$TARGETOS-$TARGETARCH/kustomize-controller /usr/local/bin/kustomize-controller
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
-COPY kubernetes/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
-COPY kubernetes/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
-COPY kubernetes/kubernetes/LICENSES /KUBERNETES_LICENSES
+COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/client/bin/kubectl /kubectl
+COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
+COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/LICENSES /KUBERNETES_LICENSES
 
 USER controller
 ENV GNUPGHOME=/tmp

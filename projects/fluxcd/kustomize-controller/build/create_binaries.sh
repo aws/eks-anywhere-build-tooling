@@ -19,52 +19,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REPO="${1?Specify first argument - repository name}"
-CLONE_URL="${2?Specify second argument - git clone endpoint}"
-TAG="${3?Specify third argument - git version tag}"
-GOLANG_VERSION="${4?Specify fourth argument - golang version}"
-BIN_ROOT="_output/bin"
-BIN_PATH=$BIN_ROOT/$REPO
-BIN_FILES="_output/files"
+TAG="$1"
+BIN_PATH="$2"
+OS="$3"
+ARCH="$4"
 
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "${MAKE_ROOT}/../../../build/lib/common.sh"
-
-function build::kustomize-controller::fix_licenses(){
-  # The mozilla-services/gopgagent does not have a license file checked into the repo, but there is a currently open PR
-  # https://github.com/mozilla-services/gopgagent/pull/4 which adds it. Until this is merged, we need to fetch the license
-  # file from the commit and not from main/master.
-  wget https://raw.githubusercontent.com/mozilla-services/gopgagent/39936d55b621318e919509000af38573d91c42ad/LICENSE.txt
-  mv LICENSE.txt ./vendor/go.mozilla.org/gopgagent/LICENSE.txt
-  
-  # Internal go.mod under /api directory
-  cp LICENSE ./vendor/github.com/fluxcd/kustomize-controller/api/LICENSE
-}
-
-function build::kustomize-controller::create_binaries(){
-  platform=${1}
-  OS="$(cut -d '/' -f1 <<< ${platform})"
-  ARCH="$(cut -d '/' -f2 <<< ${platform})"
-  CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH go build -a -ldflags "-s -w -buildid= -extldflags '-static'" -o bin/kustomize-controller .
-  mkdir -p ../${BIN_PATH}/${OS}-${ARCH}/
-  mv bin/* ../${BIN_PATH}/${OS}-${ARCH}/
-}
-
-function build::kustomize-controller::binaries(){
-  mkdir -p $BIN_PATH
-  mkdir -p $BIN_FILES
-  git clone $CLONE_URL $REPO
-  cd $REPO
-  build::common::wait_for_tag $TAG
-  git checkout $TAG
-  cp config/kubeconfig ../$BIN_FILES/
-  build::common::use_go_version $GOLANG_VERSION
-  go mod vendor
-  build::kustomize-controller::create_binaries "linux/amd64"
-  build::kustomize-controller::fix_licenses
-  build::gather_licenses $MAKE_ROOT/_output "."
-  cd ..
-  rm -rf $REPO
-}
-
-build::kustomize-controller::binaries
+CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
+  go build -trimpath -a -ldflags "-s -w -buildid= -extldflags '-static'" -o $BIN_PATH/kustomize-controller .

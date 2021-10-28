@@ -5,6 +5,7 @@ REPO=eks-anywhere-test
 REPO_OWNER=aws
 IMAGE_COMPONENT=eks-anywhere-test
 IMAGE_DESCRIPTION="EKS Anywhere Add-ons Test Application"
+IMAGE_PLATFORMS?=linux/amd64
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 
