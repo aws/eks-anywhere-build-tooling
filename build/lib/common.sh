@@ -155,6 +155,7 @@ function build::gather_licenses() {
 function build::non-golang::gather_licenses(){
   local -r project="$1"
   local -r git_tag="$2"
+  local -r output_dir="$3"
   project_org="$(cut -d '/' -f1 <<< ${project})"
   project_name="$(cut -d '/' -f2 <<< ${project})"
   git clone https://github.com/${project_org}/${project_name}
@@ -162,10 +163,12 @@ function build::non-golang::gather_licenses(){
   git checkout $git_tag
   license_files=($(find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)))
   for file in "${license_files[@]}"; do
-    license_dest=$MAKE_ROOT/_output/LICENSES/github.com/${project_org}/${project_name}/$(dirname $file)
+    license_dest=$output_dir/LICENSES/github.com/${project_org}/${project_name}/$(dirname $file)
     mkdir -p $license_dest
     cp $file $license_dest/$(basename $file)
   done
+  cd ..
+  rm -rf $project_name
 }
 
 function build::generate_attribution(){

@@ -29,7 +29,7 @@ MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
 OUTPUT_DIR?=_output
 OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 
-BUILD_LIB=${MAKE_ROOT}/../../../build/lib
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 
 ATTRIBUTION_TARGET=$(wildcard ATTRIBUTION.txt) $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt)
 
@@ -45,7 +45,6 @@ BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
 IMAGE_COMPONENT?=$(COMPONENT)
 IMAGE_DESCRIPTION?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
-IMAGE_CONTEXT_DIR?=.
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
 # For projects with multiple containers this is defined to override the default
 IMAGE_COMPONENT_VARIABLE=$(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE_COMPONENT
@@ -54,7 +53,8 @@ LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-DOCKERFILE_FOLDER?=./docker/linux
+CGO_SOURCE=$(OUTPUT_DIR)/source
+CGO_PLATFORMS?=linux/amd64
 
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
 SIMPLE_CREATE_BINARIES?=true
@@ -62,8 +62,8 @@ SIMPLE_CREATE_TARBALLS?=true
 
 LICENSE_PACKAGE_FILTER?=
 REPO_SUBPATH?=
-IMAGE_BUILD_ARGS?=
 TAR_FILE_PREFIX?=$(REPO)
+IMAGE_TARGET?=
 
 GIT_CHECKOUT_TARGET=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
@@ -82,6 +82,7 @@ define BUILDCTL
 		--progress plain \
 		--local dockerfile=$(DOCKERFILE_FOLDER) \
 		--local context=$(IMAGE_CONTEXT_DIR) \
+		--opt target=$(IMAGE_TARGET) \
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
 endef
 
@@ -93,6 +94,19 @@ endef
 define IMAGE_TARGETS_FOR_NAME
 	$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64, $(1)) $(addsuffix /images/arm64, $(1))
 endef
+
+define SET_UP_CGO_SOURCE
+	@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/
+	@rsync -rm  --exclude='.git/logs/***' \
+		--exclude='projects/$(COMPONENT)/_output/***' --exclude='projects/$(COMPONENT)/$(REPO)/***' \
+		--include='projects/$(COMPONENT)/***' --include='*/' --exclude='projects/***'  \
+		$(BASE_DIRECTORY)/ $(CGO_SOURCE)/eks-anywhere-build-tooling/
+endef
+
+define RUN_SIMPLE_CREATE_BINARIES
+	$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(REPO) $(GOLANG_VERSION) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(REPO_SUBPATH)
+endef
+
 
 ## --------------------------------------
 ## Help
@@ -113,10 +127,10 @@ $(GIT_CHECKOUT_TARGET): | $(REPO)
 	touch $@
 
 $(BINARY_TARGET): | $(GIT_CHECKOUT_TARGET)
+
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
-	$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(REPO) $(GOLANG_VERSION) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(REPO_SUBPATH)
-else
-	build/create_binaries.sh $(REPO) $(GOLANG_VERSION) $(GIT_TAG) $(RELEASE_BRANCH)
+$(BINARY_TARGET):
+	$(call RUN_SIMPLE_CREATE_BINARIES)
 endif
 
 binaries: ## Build binaries by calling build/lib/simple_create_binaries.sh unless SIMPLE_CREATE_BINARIES=false, then calls build/create_binaries.sh from the project root.
@@ -129,6 +143,9 @@ $(KUSTOMIZE_TARGET):
 	@mkdir -p $(OUTPUT_DIR)
 	curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- $(OUTPUT_DIR)
 
+.PHONY: simple-create-binaries
+simple-create-binaries: $(GIT_CHECKOUT_TARGET)
+	$(call RUN_SIMPLE_CREATE_BINARIES)
 
 ## File/Folder Targets
 
@@ -195,6 +212,9 @@ validate-checksums: $(BINARY_TARGET)
 
 .PHONY: %/images/push %/images/amd64 %/images/arm64
 %/images/push %/images/amd64 %/images/arm64: IMAGE_NAME=$*
+%/images/push %/images/amd64 %/images/arm64: DOCKERFILE_FOLDER?=./docker/linux
+%/images/push %/images/amd64 %/images/arm64: IMAGE_CONTEXT_DIR?=.
+%/images/push %/images/amd64 %/images/arm64: IMAGE_BUILD_ARGS?=
 
 %/images/push: ## Build image using buildkit for all platforms, by default pushes to registry defined in IMAGE_REPO.
 %/images/push: IMAGE_PLATFORMS?=linux/amd64,linux/arm64
@@ -229,6 +249,27 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
+
+.PHONY: %/cgo/amd64 %/cgo/arm64
+%/cgo/amd64 %/cgo/arm64: IMAGE_OUTPUT_TYPE?=local
+%/cgo/amd64 %/cgo/arm64: DOCKERFILE_FOLDER?=./docker/build
+%/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
+%/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
+%/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
+
+%/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
+%/cgo/amd64:
+	$(call SET_UP_CGO_SOURCE)
+	$(BUILDCTL)
+	$(BUILD_LIB)/buildkit.sh prune --all
+	sleep 60
+
+%/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
+%/cgo/arm64:
+	$(call SET_UP_CGO_SOURCE)
+	$(BUILDCTL)
+	$(BUILD_LIB)/buildkit.sh prune --all
+	sleep 60
 
 ##@ Build Targets
 

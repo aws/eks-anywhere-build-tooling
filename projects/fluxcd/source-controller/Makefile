@@ -1,6 +1,4 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-ARTIFACT_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.16"
 BRANCH_NAME?=main
@@ -13,80 +11,68 @@ AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output tex
 AWS_REGION?=us-west-2
 
 REPO=source-controller
-COMPONENT=fluxcd/$(REPO)
-ifdef CODEBUILD_SRC_DIR
-	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/fluxcd.source-controller
-else
-	TAR_PATH?="_output/tar"
-	CLONE_URL?=https://github.com/$(COMPONENT).git
-endif
+REPO_OWNER=fluxcd
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
+LICENSE_PACKAGE_FILTER?=.
+
+BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/source-controller
+FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
+FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/source-controller/api/LICENSE
+LIBGIT2_LICENSES_TARGET=$(OUTPUT_DIR)/LICENSES/github.com/libgit2/libgit2/COPYING
 BASE_IMAGE_NAME?=eks-distro-minimal-base-git
-BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_GIT_TAG_FILE)
-BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
-BUILDER_IMAGE=$(BASE_REPO)/eks-distro-base:$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
+BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/builder-base:latest
 
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_NAME=$(COMPONENT)
-IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
-LATEST_IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(LATEST_TAG)
+SIMPLE_CREATE_BINARIES=false
+IMAGE_PLATFORMS=$(CGO_PLATFORMS)
 
-.PHONY: binaries
-binaries:
-	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION) $(BASE_IMAGE)
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: generate-attribution
-generate-attribution:
-	build/create_attribution.sh $(GOLANG_VERSION)
 
-.PHONY: tarballs
-tarballs:  binaries
-	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(TAR_PATH)
+build: s3-artifacts
+release: upload-artifacts
+
+# source-controller depends on building with cgo to include git2go
+# to avoid dealing with cross compling issues using a buildctl
+# multi-stage build to build the binaries for both amd64 and arm64
+# licenses and attribution are also run from the builder image since
+# the deps are all needed
+# runs from the root repo since the common scripts are neded
+$(BINARY_TARGET):
+	for platform in $(CGO_PLATFORMS); do \
+		$(MAKE) source-controller-deps/cgo/$${platform#linux/} IMAGE_TARGET=deps IMAGE_OUTPUT=dest=$(CGO_SOURCE); \
+		$(MAKE) source-controller/cgo/$${platform#linux/} IMAGE_OUTPUT=dest=$(OUTPUT_DIR); \
+	done;
+	@cp $(OUTPUT_DIR)/attribution/ATTRIBUTION.txt ./
+
+$(GATHER_LICENSES_TARGET): | $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET) $(LIBGIT2_LICENSES_TARGET)
 
 .PHONY: local-images
-local-images: binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",dest=/tmp/source-controller.tar
+local-images: source-controller/images/amd64
 
 .PHONY: images
-images: binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",push=true
+images: source-controller/images/push
 
-.PHONY: build
-build: local-images tarballs
-	echo "Done $(COMPONENT)"
+.PHONY: s3-artifacts
+s3-artifacts: tarballs
+	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
-.PHONY: release
-release: images tarballs
-	echo "Done $(COMPONENT)"
+$(FIX_LICENSES_XEIPUUV_TARGET): | $(GIT_CHECKOUT_TARGET)
+# The xeipuuv dependency github repos all have licenses however they all do not have go.mod files
+# checked in to the repo. Hence we need to manually download licenses from Github for each of them 
+# and place them in the respective folders under vendor directory so that they is available for 
+# go-licenses to pick up	
+	for package in gojsonpointer gojsonreference gojsonschema ; do \
+		dest=$(REPO)/vendor/github.com/xeipuuv/$$package/LICENSE.txt; \
+		mkdir -p $$(dirname $$dest); \
+		wget -q https://raw.githubusercontent.com/xeipuuv/$$package/master/LICENSE-APACHE-2.0.txt -O \
+			$$dest; \
+	done;
 
-.PHONY: release-upload
-release-upload: release
-	echo "Done upload $(COMPONENT)"
+$(FIX_LICENSES_API_LICENSE_TARGET): | $(GIT_CHECKOUT_TARGET)
+# Internal go.mod under /api directory
+	@mkdir -p $(@D)
+	cp $(REPO)/LICENSE $@
 
-.PHONY: all
-all: release
-
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
+$(LIBGIT2_LICENSES_TARGET):
+	$(BASE_DIRECTORY)/build/lib/gather_non_golang_licenses.sh libgit2/libgit2 v1.1.0 $(MAKE_ROOT)/$(OUTPUT_DIR)
