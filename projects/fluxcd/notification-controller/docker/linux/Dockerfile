@@ -13,10 +13,13 @@ RUN yum install -y shadow-utils && \
 
 FROM $BASE_IMAGE
 
+ARG TARGETARCH
+ARG TARGETOS
+
 COPY --from=builder /etc/group /etc/group
 COPY --from=builder /etc/passwd /etc/passwd
 
-COPY _output/bin/notification-controller/linux-amd64/notification-controller /usr/local/bin/notification-controller
+COPY _output/bin/notification-controller/$TARGETOS-$TARGETARCH/notification-controller /usr/local/bin/notification-controller
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
