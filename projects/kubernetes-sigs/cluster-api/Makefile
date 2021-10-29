@@ -1,153 +1,74 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.13"
 
 REPO=cluster-api
-COMPONENT=kubernetes-sigs/$(REPO)
-ifdef CODEBUILD_SRC_DIR
-	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.cluster-api
-else
-	TAR_PATH?="_output/tar"
-	CLONE_URL?=https://github.com/$(COMPONENT).git
-endif
+REPO_OWNER=kubernetes-sigs
 
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
+LICENSE_PACKAGE_FILTER?=./cmd/clusterctl ./bootstrap/kubeadm ./controlplane/kubeadm ./
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
-BASE_IMAGE_NAME?=eks-distro-minimal-base-nonroot
-BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_NONROOT_TAG_FILE)
-BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
-CAPD_BASE_IMAGE_NAME?=eks-distro-minimal-base-docker-client
-CAPD_BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_DOCKER_CLIENT_TAG_FILE)
-CAPD_BASE_IMAGE?=$(BASE_REPO)/$(CAPD_BASE_IMAGE_NAME):$(CAPD_BASE_TAG)
+BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/clusterctl
 
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-CAPI_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/cluster-api-controller:$(IMAGE_TAG)
-CAPI_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/cluster-api-controller:latest
-CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller:$(IMAGE_TAG)
-CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller:latest
-CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-control-plane-controller:$(IMAGE_TAG)
-CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/kubeadm-control-plane-controller:latest
-CAPD_CONTROLLER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/capd-manager:$(IMAGE_TAG)
-CAPD_CONTROLLER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api/capd-manager:latest
+GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
-.PHONY: upload-artifacts
-upload-artifacts:
-	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION)
+BASE_IMAGE_NAME=eks-distro-minimal-base-nonroot
+DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
-.PHONY: create-binaries
-create-binaries:
-	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION) $(IMAGE_REPO) $(IMAGE_TAG)
+CLUSTER_API_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/cluster-api-controller
+KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/kubeadm-bootstrap-controller
+KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/kubeadm-control-plane-controller
+CLUSTER_API_DOCKER_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/capd-manager
 
-.PHONY: fetch-binaries
-fetch-binaries:
-	build/fetch_binaries.sh
+CAPD_GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/capd/attribution/go-license.csv
+CAPD_ATTRIBUTION_TARGET=CAPD_ATTRIBUTION.txt
 
-.PHONY: binaries
-binaries: create-binaries fetch-binaries
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: generate-attribution
-generate-attribution:
-	build/create_attribution.sh $(GOLANG_VERSION)
 
-.PHONY: tarballs
-tarballs:  binaries
-	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(TAR_PATH)
+build: $(CAPD_ATTRIBUTION_TARGET) s3-artifacts
+release: upload-artifacts
+
+clean: clean-binary-deps
+attribution: $(CAPD_ATTRIBUTION_TARGET)
+
+# Patch source before building
+$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
+
+$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
+	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
+	@touch $@ 
+
+$(CAPD_GATHER_LICENSES_TARGET): $(BINARY_TARGET)
+	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/capd . test/infrastructure/docker
+
+$(CAPD_ATTRIBUTION_TARGET): $(CAPD_GATHER_LICENSES_TARGET)
+	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(OUTPUT_DIR)/capd CAPD_ATTRIBUTION.txt
 
 .PHONY: local-images
-local-images: binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/cluster-api-controller \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_CONTROLLER_IMAGE),$(CAPI_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-controller.tar
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/kubeadm-bootstrap-controller \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-kubeadm-bootstrap-controller.tar
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/kubeadm-control-plane-controller \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capi-kubeadm-control-plane-controller.tar
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(CAPD_BASE_IMAGE) \
-		--local dockerfile=./docker/linux/cluster-api-docker-controller \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(CAPD_CONTROLLER_IMAGE),$(CAPD_CONTROLLER_LATEST_IMAGE)\",dest=/tmp/capd-controller.tar
+local-images: cluster-api-controller/images/amd64 kubeadm-bootstrap-controller/images/amd64 kubeadm-control-plane-controller/images/amd64 cluster-api-docker-controller/images/amd64 
 
 .PHONY: images
-images: binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/cluster-api-controller \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPI_CONTROLLER_IMAGE),$(CAPI_CONTROLLER_LATEST_IMAGE)\",push=true
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/kubeadm-bootstrap-controller \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE),$(CAPI_KUBEADM_BOOTSTRAP_CONTROLLER_LATEST_IMAGE)\",push=true
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/kubeadm-control-plane-controller \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE),$(CAPI_KUBEADM_CONTROL_PLANE_CONTROLLER_LATEST_IMAGE)\",push=true
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(CAPD_BASE_IMAGE) \
-		--local dockerfile=./docker/linux/cluster-api-docker-controller \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(CAPD_CONTROLLER_IMAGE),$(CAPD_CONTROLLER_LATEST_IMAGE)\",push=true
+images: cluster-api-controller/images/push kubeadm-bootstrap-controller/images/push kubeadm-control-plane-controller/images/push cluster-api-docker-controller/images/push 
 
-.PHONY: build
-build: local-images tarballs
-	echo "Done $(COMPONENT)"
+cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
+$(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): fetch-binaries $(CAPD_GATHER_LICENSES_TARGET)
 
-.PHONY: release
-release: images tarballs
-	echo "Done $(COMPONENT)"
+.PHONY: s3-artifacts
+s3-artifacts: tarballs create-manifests
+	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
-.PHONY: all
-all: release
+.PHONY: create-manifests
+create-manifests:
+	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
 
-.PHONY: release-upload
-release-upload: release upload-artifacts
-	echo "Done upload $(COMPONENT)"
+kubernetes:
+	build/fetch_binaries.sh
 
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf _output
-	rm -rf kubernetes
-	rm -f kubernetes-client-linux-amd64.tar.gz
+.PHONY: fetch-binaries
+fetch-binaries: kubernetes
+
+.PHONY: clean-binary-deps
+clean-binary-deps:
+	@rm -rf kubernetes
+	@rm -f kubernetes-client-linux-amd64.tar.gz

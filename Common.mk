@@ -137,7 +137,7 @@ $(GATHER_LICENSES_TARGET): $(BINARY_TARGET)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR) "$(LICENSE_PACKAGE_FILTER)" $(REPO_SUBPATH)
 
 $(ATTRIBUTION_TARGET): $(GATHER_LICENSES_TARGET)
-	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(OUTPUT_DIR) $(RELEASE_BRANCH)
+	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(OUTPUT_DIR) ATTRIBUTION.txt $(RELEASE_BRANCH)
 
 .PHONY: gather-licenses
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGET) which gathers all licenses
