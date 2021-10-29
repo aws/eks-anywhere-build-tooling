@@ -26,7 +26,7 @@ COPY _output/bin/kustomize-controller/$TARGETOS-$TARGETARCH/kustomize-controller
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
-COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/client/bin/kubectl /kubectl
+COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
 COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
 COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/LICENSES /KUBERNETES_LICENSES
 
