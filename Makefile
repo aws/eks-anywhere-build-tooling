@@ -102,7 +102,7 @@ update-attribution-checksums-docker:
 
 .PHONY: stop-docker-builder
 stop-docker-builder:
-	docker rm -f -v eks-d-builder
+	docker rm -f -v eks-a-builder
 
 .PHONY: run-buildkit-and-registry
 run-buildkit-and-registry:
