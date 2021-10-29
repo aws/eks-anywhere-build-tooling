@@ -113,3 +113,7 @@ run-buildkit-and-registry:
 stop-buildkit-and-registry:
 	docker rm -v --force buildkitd
 	docker rm -v --force registry
+
+.PHONY: generate
+generate:
+	build/lib/generate_projects_list.sh $(BASE_DIRECTORY)
