@@ -182,6 +182,10 @@ endif
 upload-artifacts: s3-artifacts
 	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH) $(LATEST_TAG)
 
+.PHONY: s3-artifacts
+s3-artifacts: tarballs
+	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
 ##@ Checksum Targets
 	

@@ -10,18 +10,12 @@ LICENSE_PACKAGE_FILTER?=./cmd/troubleshoot
 BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/support-bundle
 FIX_LICENSES_TARGET=$(REPO)/vendor/github.com/tj/go-spin/LICENSE
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
-build: s3-artifacts
-release: upload-artifacts
-
 $(GATHER_LICENSES_TARGET): $(FIX_LICENSES_TARGET)
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
 $(FIX_LICENSES_TARGET):
 # The tj/go-spin dependency github repo has a license file however it does not have a go.mod file

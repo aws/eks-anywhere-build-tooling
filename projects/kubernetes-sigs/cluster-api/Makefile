@@ -22,11 +22,13 @@ CLUSTER_API_DOCKER_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/capd-m
 CAPD_GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/capd/attribution/go-license.csv
 CAPD_ATTRIBUTION_TARGET=CAPD_ATTRIBUTION.txt
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
-build: $(CAPD_ATTRIBUTION_TARGET) s3-artifacts
-release: upload-artifacts
+build: $(CAPD_ATTRIBUTION_TARGET)
+s3-artifacts: create-manifests
 
 clean: clean-binary-deps
 attribution: $(CAPD_ATTRIBUTION_TARGET)
@@ -46,13 +48,8 @@ images: cluster-api-controller/images/push kubeadm-bootstrap-controller/images/p
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
 $(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): fetch-binaries $(CAPD_GATHER_LICENSES_TARGET)
 
-.PHONY: s3-artifacts
-s3-artifacts: tarballs create-manifests
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
-
 .PHONY: create-manifests
-create-manifests:
+create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
 
 kubernetes:

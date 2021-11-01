@@ -12,11 +12,10 @@ FLUX_MANIFESTS_TARGET=$(REPO)/cmd/flux/manifests
 
 BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
-
-build: s3-artifacts
-release: upload-artifacts
 
 # Patch source before building
 $(BINARY_TARGET): $(FLUX_MANIFESTS_TARGET)
@@ -24,11 +23,6 @@ $(BINARY_TARGET): $(FLUX_MANIFESTS_TARGET)
 $(FLUX_MANIFESTS_TARGET): export PATH:=$(MAKE_ROOT)/$(OUTPUT_DIR):$(PATH)
 $(FLUX_MANIFESTS_TARGET): $(KUSTOMIZE_TARGET)
 	make -C $(REPO) cmd/flux/manifests
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
 .PHONY: local-images
 local-images: #noop
