@@ -31,13 +31,6 @@ release: upload-artifacts
 clean: clean-binary-deps
 attribution: $(CAPD_ATTRIBUTION_TARGET)
 
-# Patch source before building
-$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
-
-$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
-	@touch $@ 
-
 $(CAPD_GATHER_LICENSES_TARGET): $(BINARY_TARGET)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/capd . test/infrastructure/docker
 

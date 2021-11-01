@@ -8,7 +8,6 @@ REPO_OWNER=replicatedhq
 LICENSE_PACKAGE_FILTER?=./cmd/troubleshoot
 
 BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/support-bundle
-GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 FIX_LICENSES_TARGET=$(REPO)/vendor/github.com/tj/go-spin/LICENSE
 
 include $(BASE_DIRECTORY)/Common.mk
@@ -17,14 +16,7 @@ include $(BASE_DIRECTORY)/Common.mk
 build: s3-artifacts
 release: upload-artifacts
 
-# Patch source before building
-$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
-
 $(GATHER_LICENSES_TARGET): $(FIX_LICENSES_TARGET)
-
-$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
-	@touch $@ 
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
