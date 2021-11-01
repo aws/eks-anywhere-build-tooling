@@ -42,7 +42,7 @@ function build::simple::binaries(){
     OS="$(cut -d '/' -f1 <<< ${platform})"
     ARCH="$(cut -d '/' -f2 <<< ${platform})"
 	mkdir -p ${OUTPUT_BIN_DIR}/${OS}-${ARCH}
-	$PROJECT_ROOT/build/create_binaries.sh $TAG ${OUTPUT_BIN_DIR}/${OS}-${ARCH} $OS $ARCH
+	$PROJECT_ROOT/build/create_binaries.sh $TAG ${OUTPUT_BIN_DIR}/${OS}-${ARCH} $OS $ARCH $SCRIPT_ROOT
   done
 }
 

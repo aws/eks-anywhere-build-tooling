@@ -60,9 +60,14 @@ IMAGE_BUILD_ARGS?=
 TAR_FILE_PREFIX?=$(REPO)
 
 GIT_CHECKOUT_TARGET=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
+GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
 FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
+
+# TODO: currently all projects push artifact tars to s3, change this to only those that are actually consumed
+# etcdadm,kind,cri-tools
+HAS_S3_ARTIFACTS?=false
 
 define BUILDCTL
 	$(BUILD_LIB)/buildkit.sh \
@@ -106,7 +111,13 @@ $(GIT_CHECKOUT_TARGET): | $(REPO)
 	git -C $(REPO) checkout -f $(GIT_TAG)
 	touch $@
 
-$(BINARY_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
+	git -C $(REPO) config user.email prow@amazonaws.com
+	git -C $(REPO) config user.name "Prow Bot"
+	git -C $(REPO) am $(MAKE_ROOT)/patches/*
+	@touch $@
+
+$(BINARY_TARGET): | $(if $(wildcard patches),$(GIT_PATCH_TARGET),) $(GIT_CHECKOUT_TARGET)
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
 	$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(REPO) $(GOLANG_VERSION) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(REPO_SUBPATH)
 else
@@ -221,11 +232,11 @@ validate-checksums: $(BINARY_TARGET)
 .PHONY: build
 build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images generate-attribution checksums` by default
 build: FAKE_ARM_IMAGES_FOR_VALIDATION=true
-build: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) local-images $(ATTRIBUTION_TARGET)
+build: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) local-images $(ATTRIBUTION_TARGET) $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
 
 .PHONY: release
 release: ## Called via prow postsubmit + release jobs, calls `binaries gather-licenses clean-repo images` by default
-release: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) images
+release: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) images $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 
 .PHONY: release-upload
 release-upload: release upload-artifacts

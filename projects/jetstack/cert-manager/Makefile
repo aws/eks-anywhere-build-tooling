@@ -16,18 +16,11 @@ CERT_MANAGER_CONTROLLER_IMAGE_COMPONENT=jetstack/cert-manager-controller
 CERT_MANAGER_WEBHOOK_IMAGE_COMPONENT=jetstack/cert-manager-webhook
 
 BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/cert-manager-controller
-GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
 include $(BASE_DIRECTORY)/Common.mk
 
 build: s3-artifacts
 release: upload-artifacts
-
-$(BINARY_TARGET): $(GIT_PATCH_TARGET)
-
-$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
-	@touch $@ 
 
 .PHONY: local-images
 local-images: cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64

@@ -168,7 +168,8 @@ $(FIX_LICENSES_TARGET):
 
 ### patching
 
-There are several projects in EKS Anywhere that require patching, such as Kind, Cluster API, Flux, etc. To support these, the following target is added to Makefiles of projects that require patching.
+There are several projects in EKS Anywhere that require patching, such as Kind, Cluster API, Flux, etc. To support these, the Common.mk will automatically add the following
+if a `patches` directory exists.
 
 ```
 GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
@@ -176,7 +177,7 @@ GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 $(BINARY_TARGET): | $(GIT_PATCH_TARGET)
 
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
+	git -C $(REPO) am $(MAKE_ROOT)/patches/*
 	@touch $@ 
 
 ```
