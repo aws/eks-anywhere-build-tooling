@@ -9,16 +9,9 @@ LICENSE_PACKAGE_FILTER?=./govc
 
 BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/govc
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
-
-
-build: s3-artifacts
-release: upload-artifacts
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
 
 .PHONY: local-images

@@ -125,25 +125,8 @@ Please refer to [building-locally](building-locally.md) for resources for genera
 ### s3-artifacts/tarballs 
 
 Some projects deliver tarballs to s3 and to support this there are additional targets necessary. [cluster-api](../../projects/kubernetes-sigs/cluster-api/Makefile)
-is a good example for reference of this. Typically,two new targets are added `s3-artifacts` and `upload-artifacts` which generally follow this pattern:
-
-```
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BASE_DIRECTORY)/build/lib/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BASE_DIRECTORY)/build/lib/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
-	
-.PHONY: upload-artifacts
-upload-artifacts: s3-artifacts	
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH)
-```
-
-In additional to the new targets, `build` and `release` have additional pre-reqs added:
-
-```
-build: s3-artifacts
-release: upload-artifacts
-```
+is a good example for reference of this. Setting `HAS_S3_ARTIFACTS` to true in the project's Makefile
+will automatically add the necessary pre-reqs to the `build` and `release` targets.
 
 Projects with this requirement need to supply the `expected_artifacts_<repo>` file in their root.
 

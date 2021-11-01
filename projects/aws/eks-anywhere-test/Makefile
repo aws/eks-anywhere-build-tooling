@@ -7,6 +7,8 @@ IMAGE_COMPONENT=eks-anywhere-test
 IMAGE_PLATFORMS?=linux/amd64
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
+HAS_S3_ARTIFACTS=false
+
 
 include $(BASE_DIRECTORY)/Common.mk
 
