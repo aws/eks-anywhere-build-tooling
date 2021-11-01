@@ -8,17 +8,17 @@ RELEASE_ENVIRONMENT?=development
 ARTIFACT_BUCKET?=my-s3-bucket
 GIT_HASH=$(shell git rev-parse HEAD)
 
+AWS_REGION?=us-west-2
+AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
+
 COMPONENT=$(REPO_OWNER)/$(REPO)
 ifdef CODEBUILD_SRC_DIR
 	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
+	CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
 else
 	ARTIFACTS_PATH?=$(MAKE_ROOT)/_output/tar
 	CLONE_URL?=https://github.com/$(COMPONENT).git	
 endif
-
-AWS_REGION?=us-west-2
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
 OUTPUT_DIR?=_output
