@@ -7,7 +7,9 @@ REPO_OWNER=kubernetes-sigs
 
 LICENSE_PACKAGE_FILTER?=./cmd/clusterctl ./bootstrap/kubeadm ./controlplane/kubeadm ./
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/clusterctl
+BINARY_TARGET_FILES=clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager
+SOURCE_PATTERNS=sigs.k8s.io/cluster-api/cmd/clusterctl sigs.k8s.io/cluster-api sigs.k8s.io/cluster-api/bootstrap/kubeadm sigs.k8s.io/cluster-api/controlplane/kubeadm sigs.k8s.io/cluster-api/test/infrastructure/docker
+EXTRA_GO_LDFLAGS=-extldflags -static $(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/cmd/version)
 
 GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
@@ -26,14 +28,15 @@ HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
-build: $(CAPD_ATTRIBUTION_TARGET)
+$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: REPO_SUBPATH=test/infrastructure/docker
+$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=-extldflags -static
+	
 s3-artifacts: create-manifests
 
 clean: clean-binary-deps
-attribution: $(CAPD_ATTRIBUTION_TARGET)
+generate-attribution: $(CAPD_ATTRIBUTION_TARGET)
 
-$(CAPD_GATHER_LICENSES_TARGET): $(BINARY_TARGET)
+$(CAPD_GATHER_LICENSES_TARGET): $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/capd . test/infrastructure/docker
 
 $(CAPD_ATTRIBUTION_TARGET): $(CAPD_GATHER_LICENSES_TARGET)

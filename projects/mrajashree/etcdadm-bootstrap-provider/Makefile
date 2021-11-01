@@ -7,7 +7,7 @@ REPO_OWNER=mrajashree
 
 LICENSE_PACKAGE_FILTER?=.
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/manager
+BINARY_TARGET_FILES=manager
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 

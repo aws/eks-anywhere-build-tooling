@@ -7,7 +7,9 @@ REPO_OWNER=fluxcd
 
 LICENSE_PACKAGE_FILTER?=.
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/helm-controller
+BINARY_TARGET_FILES=helm-controller
+EXTRA_GO_LDFLAGS=-extldflags -static
+
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/helm-controller/api/LICENSE
 

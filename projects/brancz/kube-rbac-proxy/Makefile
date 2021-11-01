@@ -9,7 +9,7 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base-nonroot
 
 LICENSE_PACKAGE_FILTER?=.
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/kube-rbac-proxy
+BINARY_TARGET_FILES=kube-rbac-proxy
 
 HAS_S3_ARTIFACTS=true
 

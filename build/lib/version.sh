@@ -10,14 +10,14 @@
 # Adapted upsteam code from kubernetes/kubernetes and CAPI to support the CAPI use case, but also be generic for other
 # projects built in this repo
 
-
 set -o errexit
 set -o nounset
 set -o pipefail
 
 version::get_version_vars() {
-    GIT_RELEASE_TAG=$(git describe --abbrev=0 --tags)
-    GIT_RELEASE_COMMIT=$(git rev-list -n 1  "${GIT_RELEASE_TAG}")
+    local -r repo=$1
+    GIT_RELEASE_TAG=$(git -C $repo describe --abbrev=0 --tags)
+    GIT_RELEASE_COMMIT=$(git -C $repo rev-list -n 1  "${GIT_RELEASE_TAG}")
 
     GIT_COMMIT=$GIT_RELEASE_COMMIT
 
@@ -45,8 +45,9 @@ version::get_version_vars() {
 
 # Prints the value that needs to be passed to the -ldflags parameter of go build
 version::ldflags() {
-    local -r package_prefix=$1
-    version::get_version_vars
+    local -r repo=$1
+    local -r package_prefix=$2
+    version::get_version_vars $repo
 
     # from k8s.io/hack/lib/version.sh
     local -a ldflags
@@ -66,7 +67,7 @@ version::ldflags() {
     
     # buildDate is not actual buildDate to avoid it breaking reproducible checksums
     # instead it is the date of the last commit, either the upstream TAG commit or the latest patch applied
-    SOURCE_DATE_EPOCH=$(git log -1 --format=%at)
+    SOURCE_DATE_EPOCH=$(git -C $repo log -1 --format=%at)
     add_ldflag "buildDate" "$(${DATE} --date=@${SOURCE_DATE_EPOCH} -u +'%Y-%m-%dT%H:%M:%SZ')"
     add_ldflag "gitCommit" "${GIT_COMMIT}"
     add_ldflag "gitTreeState" "clean"
@@ -79,4 +80,4 @@ version::ldflags() {
     echo "${ldflags[*]-}"
 }
 
-version::ldflags $1
+version::ldflags $1 $2

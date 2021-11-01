@@ -7,7 +7,9 @@ REPO_OWNER=fluxcd
 
 LICENSE_PACKAGE_FILTER?=.
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/notification-controller
+BINARY_TARGET_FILES=notification-controller
+EXTRA_GO_LDFLAGS=-extldflags -static
+
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/notification-controller/api/LICENSE
 FIX_LICENSES_K0KUBUN_TARGET=$(REPO)/vendor/github.com/k0kubun/pp/LICENSE.txt
 

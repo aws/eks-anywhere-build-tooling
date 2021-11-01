@@ -7,7 +7,8 @@ REPO_OWNER=kubernetes-sigs
 
 LICENSE_PACKAGE_FILTER?=./cmd/clusterawsadm sigs.k8s.io/cluster-api-provider-aws/bootstrap/eks sigs.k8s.io/cluster-api-provider-aws/controlplane/eks ./
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/clusterawsadm
+BINARY_TARGET_FILES=manager eks-bootstrap-manager eks-controlplane-manager clusterawsadm
+SOURCE_PATTERNS=. sigs.k8s.io/cluster-api-provider-aws/bootstrap/eks sigs.k8s.io/cluster-api-provider-aws/controlplane/eks ./cmd/clusterawsadm
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
@@ -20,6 +21,7 @@ HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+$(OUTPUT_BIN_DIR)/linux-%/manager: EXTRA_GO_LDFLAGS=-extldflags -static
 
 s3-artifacts: create-manifests
 

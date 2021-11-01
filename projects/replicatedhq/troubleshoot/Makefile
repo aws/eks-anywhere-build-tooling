@@ -7,7 +7,11 @@ REPO_OWNER=replicatedhq
 
 LICENSE_PACKAGE_FILTER?=./cmd/troubleshoot
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/support-bundle
+BINARY_TARGET_FILES=support-bundle
+SOURCE_PATTERNS=github.com/replicatedhq/troubleshoot/cmd/troubleshoot
+EXTRA_GO_LDFLAGS=-X github.com/replicatedhq/troubleshoot/pkg/version.version=$(GIT_TAG)	\
+	-X github.com/replicatedhq/troubleshoot/pkg/version.gitSHA=$(shell git -C $(REPO) rev-list -n 1 $(GIT_TAG))
+EXTRA_GOBUILD_FLAGS=-installsuffix netgo -tags netgo,containers_image_ostree_stub,exclude_graphdriver_devicemapper,exclude_graphdriver_btrfs,containers_image_openpgp
 FIX_LICENSES_TARGET=$(REPO)/vendor/github.com/tj/go-spin/LICENSE
 
 HAS_S3_ARTIFACTS=true
