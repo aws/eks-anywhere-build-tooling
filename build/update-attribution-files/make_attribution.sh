@@ -23,21 +23,12 @@ PROJECT="$1"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 PROJECT_ROOT=$MAKE_ROOT/$PROJECT
-FETCH_PROJECTS=(
-    "fluxcd/flux2"
-    "fluxcd/kustomize-controller"
-    "kubernetes-sigs/cluster-api"
-)
 
 mkdir -p _output
 touch _output/total_summary.txt
 
 function build::attribution::generate(){
-    if [ $(printf "%s\n" "${FETCH_PROJECTS[@]}" | grep -c "^$(cut -d / -f2- <<< $PROJECT)$" || true) -ne 0 ]; then
-        make -C $PROJECT_ROOT create-binaries
-    else
-        make -C $PROJECT_ROOT binaries
-    fi
+    make -C $PROJECT_ROOT binaries
     make -C $PROJECT_ROOT generate-attribution
     for summary in $PROJECT_ROOT/_output/**/summary.txt; do
         sed -i "s/+.*=/ =/g" $summary
