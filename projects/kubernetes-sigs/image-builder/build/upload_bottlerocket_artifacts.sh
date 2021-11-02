@@ -24,6 +24,7 @@ OS="${2?Specify second argument - base os of ova built}"
 BOTTLEROCKET_DOWNLOAD_PATH="${3?Specify third argument - Download path for Bottlerocket-related files}"
 CARGO_HOME="${4?Specify fourth argument - Root directory for Cargo installation}"
 PROJECT_PATH="${5?Specify fifth argument - Project path}"
+LATEST_TAG="${6?Specify sixth argument - S3 destination folder for latest artifact upload}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
@@ -54,4 +55,4 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-aws s3 sync ${OVA_DOWNLOAD_PATH} ${ARTIFACTS_BUCKET}/${PROJECT_PATH}/latest --acl public-read
+aws s3 sync ${OVA_DOWNLOAD_PATH} ${ARTIFACTS_BUCKET}/${PROJECT_PATH}/${LATEST_TAG} --acl public-read

@@ -24,6 +24,7 @@ IMAGE_REPO="${5?Specify fifth argument - image repo}"
 IMAGE_TAG="${6?Specify sixth argument - image tag}"
 ARTIFACTS_BUCKET="${7?Specify seventh argument - artifact bucket}"
 PUSH="${8?Specify eighth argument - push}"
+LATEST_TAG="${9?Specify ninth argument - Tag denoting build source}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
@@ -241,8 +242,8 @@ function build::kind::build_final_node_image(){
 
     if [ "$PUSH" == "true" ] ; then
         docker push $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG
-        docker tag $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-latest
-        docker push $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-latest
+        docker tag $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$LATEST_TAG
+        docker push $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$LATEST_TAG
     fi
 }
 

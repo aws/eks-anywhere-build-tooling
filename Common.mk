@@ -10,6 +10,11 @@ GIT_HASH=$(shell git rev-parse HEAD)
 
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
+BRANCH_NAME?=main
+LATEST_TAG?=latest
+ifneq ("$(BRANCH_NAME)","main")
+	LATEST_TAG=$(BRANCH_NAME)
+endif
 
 COMPONENT=$(REPO_OWNER)/$(REPO)
 ifdef CODEBUILD_SRC_DIR
@@ -45,7 +50,7 @@ IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
 # For projects with multiple containers this is defined to override the default
 IMAGE_COMPONENT_VARIABLE=$(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE_COMPONENT
 IMAGE=$(IMAGE_REPO)/$(if $(value $(IMAGE_COMPONENT_VARIABLE)),$(value $(IMAGE_COMPONENT_VARIABLE)),$(IMAGE_COMPONENT)):$(IMAGE_TAG)
-LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=latest)
+LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
@@ -164,7 +169,7 @@ endif
 
 .PHONY: upload-artifacts
 upload-artifacts: s3-artifacts
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH)
+	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH) $(LATEST_TAG)
 
 
 ##@ Checksum Targets

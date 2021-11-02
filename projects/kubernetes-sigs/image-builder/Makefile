@@ -9,6 +9,11 @@ BOTTLEROCKET_DOWNLOAD_PATH?=$(PROJECT_DIRECTORY)/bottlerocket/downloads
 CARGO_HOME=$(OUTPUT_DIRECTORY)/cargo
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
+BRANCH_NAME?=main
+LATEST_TAG?=latest
+ifneq ("$(BRANCH_NAME)","main")
+	LATEST_TAG=$(BRANCH_NAME)
+endif
 
 REPO=image-builder
 COMPONENT=kubernetes-sigs/$(REPO)
@@ -95,7 +100,7 @@ help: ## Display this help
 
 .PHONY: upload-artifacts-%
 upload-artifacts-%:
-	build/upload_artifacts.sh $(OVA_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH)/$* $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION)
+	build/upload_artifacts.sh $(OVA_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH)/$* $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
 
 .PHONY: setup-packer-configs-%
 setup-packer-configs-%:
@@ -130,7 +135,7 @@ release-upload-ova-ubuntu-2004-%:
 .PHONY: release-ova-bottlerocket-%
 release-ova-bottlerocket-%:
 release-ova-bottlerocket-%: setup-bottlerocket
-	build/upload_bottlerocket_artifacts.sh $* bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$*
+	build/upload_bottlerocket_artifacts.sh $* bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$* $(LATEST_TAG)
 
 .PHONY: release
 release: ## Build and share amis and push ovas to s3 for all kubernetes versions

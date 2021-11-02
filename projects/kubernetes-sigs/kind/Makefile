@@ -5,6 +5,11 @@ BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.16"
+BRANCH_NAME?=main
+LATEST_TAG?=latest
+ifneq ("$(BRANCH_NAME)","main")
+	LATEST_TAG=$(BRANCH_NAME)
+endif
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2
@@ -37,7 +42,7 @@ KIND_KINDNETD_IMAGE_NAME=kubernetes-sigs/kind/kindnetd
 KIND_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_NAME)
 KIND_NODE_IMAGE=$(IMAGE_REPO)/${KIND_NODE_IMAGE_NAME}
 KIND_KINDNETD_IMAGE=$(IMAGE_REPO)/$(KIND_KINDNETD_IMAGE_NAME):$(IMAGE_TAG)
-KIND_KINDNETD_LATEST_IMAGE=$(IMAGE_REPO)/$(KIND_KINDNETD_IMAGE_NAME):latest
+KIND_KINDNETD_LATEST_IMAGE=$(IMAGE_REPO)/$(KIND_KINDNETD_IMAGE_NAME):$(LATEST_TAG)
 
 PUSH=false
 
@@ -54,7 +59,7 @@ help: ## Display this help
 
 .PHONY: upload-artifacts
 upload-artifacts:
-	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION)
+	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
 
 .PHONY: binaries
 binaries:
@@ -72,7 +77,7 @@ tarballs:  binaries
 build-kind-node-%:
 	# base image is still tied to a specific eks version because the cni_plugins are included
 	build/build-kind-base-image.sh $* $(KIND_BASE_IMAGE) $(ARTIFACTS_BUCKET) $(EKS_DISTRO_BASE_IMAGE) 
-	build/build-kind-node-image.sh $* $(KIND_BASE_IMAGE) $(KIND_NODE_IMAGE) $(KIND_KINDNETD_LATEST_IMAGE) $(IMAGE_REPO) $(IMAGE_TAG) $(ARTIFACTS_BUCKET) $(PUSH)
+	build/build-kind-node-image.sh $* $(KIND_BASE_IMAGE) $(KIND_NODE_IMAGE) $(KIND_KINDNETD_LATEST_IMAGE) $(IMAGE_REPO) $(IMAGE_TAG) $(ARTIFACTS_BUCKET) $(PUSH) $(LATEST_TAG)
 
 .PHONY: build-kindnetd-image
 build-kindnetd-image:

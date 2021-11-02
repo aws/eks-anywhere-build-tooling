@@ -3,6 +3,11 @@ BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.15"
+BRANCH_NAME?=main
+LATEST_TAG?=latest
+ifneq ("$(BRANCH_NAME)","main")
+	LATEST_TAG=$(BRANCH_NAME)
+endif
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2
@@ -26,7 +31,7 @@ BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-vsphere/release/manager:$(IMAGE_TAG)
-LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-vsphere/release/manager:latest
+LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/cluster-api-provider-vsphere/release/manager:$(LATEST_TAG)
 
 .PHONY: upload-artifacts
 upload-artifacts:

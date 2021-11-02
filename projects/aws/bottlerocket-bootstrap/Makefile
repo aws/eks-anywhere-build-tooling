@@ -1,5 +1,11 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
+BRANCH_NAME?=main
+LATEST_TAG?=latest
+ifneq ("$(BRANCH_NAME)","main")
+	LATEST_TAG=$(BRANCH_NAME)
+endif
+
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
 
@@ -35,7 +41,7 @@ fetch-binaries-%:
 .PHONY: local-images-%
 local-images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 local-images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-local-images-%: RELEASE_LATEST=$(GIT_TAG)-latest
+local-images-%: RELEASE_LATEST=$(GIT_TAG)-$(LATEST_TAG)
 local-images-%: fetch-binaries-% bootstrap-binary
 	$(BUILD_LIB)/buildkit.sh \
 		build \
@@ -50,7 +56,7 @@ local-images-%: fetch-binaries-% bootstrap-binary
 .PHONY: images-%
 images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-images-%: RELEASE_LATEST=$(GIT_TAG)-latest
+images-%: RELEASE_LATEST=$(GIT_TAG)-$(LATEST_TAG)
 images-%: fetch-binaries-% bootstrap-binary
 	$(BUILD_LIB)/buildkit.sh \
 		build \

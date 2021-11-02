@@ -1,7 +1,11 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-
 ARTIFACTS_BUCKET?=my-s3-bucket
+BRANCH_NAME?=main
+LATEST_TAG?=latest
+ifneq ("$(BRANCH_NAME)","main")
+	LATEST_TAG=$(BRANCH_NAME)
+endif
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2
@@ -69,7 +73,7 @@ tarballs-%: binaries-%
 .PHONY: local-images-%
 local-images-%: GIT_TAG=$(shell cat ./$*/GIT_TAG)
 local-images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-local-images-%: RELEASE_LATEST=$(GIT_TAG)-latest
+local-images-%: RELEASE_LATEST=$(GIT_TAG)-$(LATEST_TAG)
 local-images-%: binaries-%
 	$(BUILD_LIB)/buildkit.sh \
 		build \
@@ -84,7 +88,7 @@ local-images-%: binaries-%
 .PHONY: images-%
 images-%: GIT_TAG=$(shell cat ./$*/GIT_TAG)
 images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-images-%: RELEASE_LATEST=$(GIT_TAG)-latest
+images-%: RELEASE_LATEST=$(GIT_TAG)-$(LATEST_TAG)
 images-%: binaries-%
 	$(BUILD_LIB)/buildkit.sh \
 		build \

@@ -3,6 +3,11 @@ BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.15"
+BRANCH_NAME?=main
+LATEST_TAG?=latest
+ifneq ("$(BRANCH_NAME)","main")
+	LATEST_TAG=$(BRANCH_NAME)
+endif
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2
@@ -29,13 +34,13 @@ BASE_CSI_IMAGE?=$(BASE_REPO)/$(BASE_CSI_IMAGE_NAME):$(BASE_CSI_TAG)
 IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 CSI_DRIVER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/driver:$(IMAGE_TAG)
-CSI_DRIVER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/driver:latest
+CSI_DRIVER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/driver:$(LATEST_TAG)
 CSI_SYNCER_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/syncer:$(IMAGE_TAG)
-CSI_SYNCER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/syncer:latest
+CSI_SYNCER_LATEST_IMAGE=$(IMAGE_REPO)/kubernetes-sigs/vsphere-csi-driver/csi/syncer:$(LATEST_TAG)
 
 .PHONY: upload-artifacts
 upload-artifacts:
-	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION)
+	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
 
 .PHONY: binaries
 binaries:
