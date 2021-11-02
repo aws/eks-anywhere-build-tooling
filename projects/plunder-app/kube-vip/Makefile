@@ -10,7 +10,6 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base
 LICENSE_PACKAGE_FILTER?=.
 
 BINARY_TARGET_FILES=kube-vip
-EXTRA_GO_LDFLAGS=-extldflags -static
 
 HAS_S3_ARTIFACTS=true
 

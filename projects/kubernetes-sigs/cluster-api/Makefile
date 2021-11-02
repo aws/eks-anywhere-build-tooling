@@ -9,7 +9,7 @@ LICENSE_PACKAGE_FILTER?=./cmd/clusterctl ./bootstrap/kubeadm ./controlplane/kube
 
 BINARY_TARGET_FILES=clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager
 SOURCE_PATTERNS=sigs.k8s.io/cluster-api/cmd/clusterctl sigs.k8s.io/cluster-api sigs.k8s.io/cluster-api/bootstrap/kubeadm sigs.k8s.io/cluster-api/controlplane/kubeadm sigs.k8s.io/cluster-api/test/infrastructure/docker
-EXTRA_GO_LDFLAGS=-extldflags -static $(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/cmd/version)
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/cmd/version)
 
 GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
@@ -29,7 +29,7 @@ HAS_S3_ARTIFACTS=true
 include $(BASE_DIRECTORY)/Common.mk
 
 $(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: REPO_SUBPATH=test/infrastructure/docker
-$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=-extldflags -static
+$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=
 	
 s3-artifacts: create-manifests
 

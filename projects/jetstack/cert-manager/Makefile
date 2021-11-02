@@ -17,7 +17,6 @@ CERT_MANAGER_WEBHOOK_IMAGE_COMPONENT=jetstack/cert-manager-webhook
 
 BINARY_TARGET_FILES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook
 SOURCE_PATTERNS=./cmd/acmesolver ./cmd/cainjector ./cmd/controller ./cmd/webhook
-EXTRA_GO_LDFLAGS=-extldflags -static
 
 HAS_S3_ARTIFACTS=true
 

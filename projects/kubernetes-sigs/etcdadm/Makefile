@@ -8,7 +8,6 @@ REPO_OWNER=kubernetes-sigs
 LICENSE_PACKAGE_FILTER?=.
 
 BINARY_TARGET_FILES=etcdadm
-EXTRA_GO_LDFLAGS=-extldflags -static
 
 HAS_S3_ARTIFACTS=true
 

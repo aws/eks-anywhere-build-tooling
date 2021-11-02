@@ -8,7 +8,6 @@ REPO_OWNER=fluxcd
 LICENSE_PACKAGE_FILTER?=.
 
 BINARY_TARGET_FILES=kustomize-controller
-EXTRA_GO_LDFLAGS=-extldflags -static
 
 DEFAULT_KUBECONFIG_TARGET=$(OUTPUT_DIR)/files/kubeconfig
 FIX_LICENSES_MOZILLA_TARGET=$(REPO)/vendor/go.mozilla.org/gopgagent/LICENSE.txt

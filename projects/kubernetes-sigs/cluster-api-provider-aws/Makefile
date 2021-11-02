@@ -21,7 +21,6 @@ HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-$(OUTPUT_BIN_DIR)/linux-%/manager: EXTRA_GO_LDFLAGS=-extldflags -static
 
 s3-artifacts: create-manifests
 
