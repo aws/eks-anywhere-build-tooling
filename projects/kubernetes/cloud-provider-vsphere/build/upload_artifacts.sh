@@ -23,7 +23,7 @@ ARTIFACTS_BUCKET="${2?Specify second argument - artifacts buckets}"
 PROJECT_PATH="${3? Specify third argument - project path}"
 BUILD_IDENTIFIER="${4? Specify fourth argument - build identifier}"
 GIT_HASH="${5?Specify fifth argument - git hash of the tar builds}"
-LATEST_TAG="${6?Specify sixth argument - folder name corresponding to latest build"
+LATEST_TAG="${6?Specify sixth argument - folder name corresponding to latest build}"
 
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
