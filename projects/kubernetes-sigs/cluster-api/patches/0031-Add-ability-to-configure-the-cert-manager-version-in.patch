@@ -1,0 +1,387 @@
+From eb8fd897a47a93d37831215ef7068510ff2bdeb1 Mon Sep 17 00:00:00 2001
+From: Guillermo Gaston <gaslor@amazon.com>
+Date: Tue, 2 Nov 2021 18:23:37 +0000
+Subject: [PATCH] Add ability to configure the cert-manager version in
+ clusterctl
+
+Signed-off-by: Guillermo Gaston <gaslor@amazon.com>
+---
+ cmd/clusterctl/client/cluster/cert_manager.go |  54 ++++--
+ .../client/cluster/cert_manager_test.go       | 155 ++++++++++++++++--
+ 2 files changed, 182 insertions(+), 27 deletions(-)
+
+diff --git a/cmd/clusterctl/client/cluster/cert_manager.go b/cmd/clusterctl/client/cluster/cert_manager.go
+index 365559bf2..7bdc76b49 100644
+--- a/cmd/clusterctl/client/cluster/cert_manager.go
++++ b/cmd/clusterctl/client/cluster/cert_manager.go
+@@ -45,6 +45,7 @@ const (
+ 
+ 	certManagerImageComponent = "cert-manager"
+ 	timeoutConfigKey          = "cert-manager-timeout"
++	versionConfigKey          = "cert-manager-version"
+ 
+ 	certmanagerVersionAnnotation = "certmanager.clusterctl.cluster.x-k8s.io/version"
+ 	certmanagerHashAnnotation    = "certmanager.clusterctl.cluster.x-k8s.io/hash"
+@@ -134,7 +135,7 @@ func (cm *certManagerClient) EnsureInstalled() error {
+ 		return nil
+ 	}
+ 
+-	log.Info("Installing cert-manager", "Version", embeddedCertManagerManifestVersion)
++	log.Info("Installing cert-manager", "Version", cm.getCertManagerConfigVersion())
+ 	return cm.install()
+ }
+ 
+@@ -178,14 +179,14 @@ func (cm *certManagerClient) PlanUpgrade() (CertManagerUpgradePlan, error) {
+ 		return CertManagerUpgradePlan{}, errors.Wrap(err, "failed get cert manager components")
+ 	}
+ 
+-	currentVersion, shouldUpgrade, err := shouldUpgrade(objs)
++	currentVersion, shouldUpgrade, err := cm.shouldUpgrade(objs)
+ 	if err != nil {
+ 		return CertManagerUpgradePlan{}, err
+ 	}
+ 
+ 	return CertManagerUpgradePlan{
+ 		From:          currentVersion,
+-		To:            embeddedCertManagerManifestVersion,
++		To:            cm.getCertManagerConfigVersion(),
+ 		ShouldUpgrade: shouldUpgrade,
+ 	}, nil
+ }
+@@ -201,7 +202,7 @@ func (cm *certManagerClient) EnsureLatestVersion() error {
+ 		return errors.Wrap(err, "failed get cert manager components")
+ 	}
+ 
+-	currentVersion, shouldUpgrade, err := shouldUpgrade(objs)
++	currentVersion, shouldUpgrade, err := cm.shouldUpgrade(objs)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -220,7 +221,7 @@ func (cm *certManagerClient) EnsureLatestVersion() error {
+ 	}
+ 
+ 	// install the cert-manager version embedded in clusterctl
+-	log.Info("Installing cert-manager", "Version", embeddedCertManagerManifestVersion)
++	log.Info("Installing cert-manager", "Version", cm.getCertManagerConfigVersion())
+ 	return cm.install()
+ }
+ 
+@@ -254,7 +255,8 @@ func (cm *certManagerClient) deleteObjs(objs []unstructured.Unstructured) error
+ 	return nil
+ }
+ 
+-func shouldUpgrade(objs []unstructured.Unstructured) (string, bool, error) {
++func (cm *certManagerClient) shouldUpgrade(objs []unstructured.Unstructured) (string, bool, error) {
++	newVersion := cm.getCertManagerConfigVersion()
+ 	needUpgrade := false
+ 	currentVersion := ""
+ 	for i := range objs {
+@@ -279,7 +281,7 @@ func shouldUpgrade(objs []unstructured.Unstructured) (string, bool, error) {
+ 			return "", false, errors.Wrapf(err, "failed to parse version for cert-manager component %s/%s", obj.GetKind(), obj.GetName())
+ 		}
+ 
+-		c, err := objSemVersion.Compare(embeddedCertManagerManifestVersion)
++		c, err := objSemVersion.Compare(newVersion)
+ 		if err != nil {
+ 			return "", false, errors.Wrapf(err, "failed to compare version for cert-manager component %s/%s", obj.GetKind(), obj.GetName())
+ 		}
+@@ -290,9 +292,26 @@ func shouldUpgrade(objs []unstructured.Unstructured) (string, bool, error) {
+ 			currentVersion = objVersion
+ 			needUpgrade = true
+ 		case c == 0:
+-			// if version == current, check the manifest hash; if it does not exists or if it is different, then upgrade
+-			objHash, ok := obj.GetAnnotations()[certmanagerHashAnnotation]
+-			if !ok || objHash != embeddedCertManagerManifestHash {
++			// semvers could have build metadata
++			// if same version but different build metadata, upgrade
++			newSemVersion, err := version.ParseSemantic(newVersion)
++			if err != nil {
++				return "", false, errors.Wrapf(err, "failed parsing new version [%s] for cert manager", newVersion)
++			}
++
++			var objHash, newVersionHash string
++			var hashPresent bool
++
++			if newSemVersion.BuildMetadata() != "" || objSemVersion.BuildMetadata() != "" {
++				objHash, newVersionHash = objSemVersion.BuildMetadata(), newSemVersion.BuildMetadata()
++				hashPresent = true
++			} else {
++				// if version == current, check the manifest hash; if it does not exists or if it is different, then upgrade
++				objHash, hashPresent = obj.GetAnnotations()[certmanagerHashAnnotation]
++				newVersionHash = embeddedCertManagerManifestHash
++			}
++
++			if !hashPresent || objHash != newVersionHash {
+ 				currentVersion = fmt.Sprintf("%s (%s)", objVersion, objHash)
+ 				needUpgrade = true
+ 				break
+@@ -382,7 +401,7 @@ func (cm *certManagerClient) createObj(obj unstructured.Unstructured) error {
+ 	}
+ 	// persist the version number of stored resources to make a
+ 	// future enhancement to add upgrade support possible.
+-	annotations[certmanagerVersionAnnotation] = embeddedCertManagerManifestVersion
++	annotations[certmanagerVersionAnnotation] = cm.getCertManagerConfigVersion()
+ 	annotations[certmanagerHashAnnotation] = embeddedCertManagerManifestHash
+ 	obj.SetAnnotations(annotations)
+ 
+@@ -495,3 +514,16 @@ func (cm *certManagerClient) waitForAPIReady(ctx context.Context, retry bool) er
+ 
+ 	return nil
+ }
++
++func (cm *certManagerClient) getCertManagerConfigVersion() string {
++	ver, err := cm.configClient.Variables().Get(versionConfigKey)
++	if err != nil {
++		return embeddedCertManagerManifestVersion
++	}
++
++	if _, err := version.ParseSemantic(ver); err != nil {
++		return embeddedCertManagerManifestVersion
++	}
++
++	return ver
++}
+diff --git a/cmd/clusterctl/client/cluster/cert_manager_test.go b/cmd/clusterctl/client/cluster/cert_manager_test.go
+index 2d00778bc..7b237ad57 100644
+--- a/cmd/clusterctl/client/cluster/cert_manager_test.go
++++ b/cmd/clusterctl/client/cluster/cert_manager_test.go
+@@ -165,7 +165,7 @@ func Test_certManagerClient_getManifestObjects(t *testing.T) {
+ 			pollImmediateWaiter := func(interval, timeout time.Duration, condition wait.ConditionFunc) error {
+ 				return nil
+ 			}
+-			fakeConfigClient := newFakeConfig("")
++			fakeConfigClient := newFakeConfig("", "")
+ 
+ 			cm := newCertMangerClient(fakeConfigClient, nil, pollImmediateWaiter)
+ 			objs, err := cm.getManifestObjs()
+@@ -178,7 +178,6 @@ func Test_certManagerClient_getManifestObjects(t *testing.T) {
+ 			tt.assert(t, objs)
+ 		})
+ 	}
+-
+ }
+ 
+ func Test_GetTimeout(t *testing.T) {
+@@ -211,7 +210,7 @@ func Test_GetTimeout(t *testing.T) {
+ 		t.Run(tt.name, func(t *testing.T) {
+ 			g := NewWithT(t)
+ 
+-			fakeConfigClient := newFakeConfig(tt.timeout)
++			fakeConfigClient := newFakeConfig(tt.timeout, "")
+ 
+ 			cm := newCertMangerClient(fakeConfigClient, nil, pollImmediateWaiter)
+ 			tm := cm.getWaitTimeout()
+@@ -219,7 +218,6 @@ func Test_GetTimeout(t *testing.T) {
+ 			g.Expect(tm).To(Equal(tt.want))
+ 		})
+ 	}
+-
+ }
+ 
+ func Test_shouldUpgrade(t *testing.T) {
+@@ -227,11 +225,12 @@ func Test_shouldUpgrade(t *testing.T) {
+ 		objs []unstructured.Unstructured
+ 	}
+ 	tests := []struct {
+-		name        string
+-		args        args
+-		wantVersion string
+-		want        bool
+-		wantErr     bool
++		name          string
++		args          args
++		configVersion string
++		wantVersion   string
++		want          bool
++		wantErr       bool
+ 	}{
+ 		{
+ 			name: "Version is not defined (e.g. cluster created with clusterctl < v0.3.9), should upgrade",
+@@ -364,12 +363,136 @@ func Test_shouldUpgrade(t *testing.T) {
+ 			want:        false,
+ 			wantErr:     false,
+ 		},
++		{
++			name: "Version in config is older, should upgrade",
++			args: args{
++				objs: []unstructured.Unstructured{
++					{
++						Object: map[string]interface{}{
++							"metadata": map[string]interface{}{
++								"annotations": map[string]interface{}{
++									certmanagerVersionAnnotation: "v0.9.1",
++								},
++							},
++						},
++					},
++				},
++			},
++			configVersion: "v0.9.5",
++			wantVersion:   "v0.9.1",
++			want:          true,
++			wantErr:       false,
++		},
++		{
++			name: "Version in config is the same with different build metadata, should upgrade",
++			args: args{
++				objs: []unstructured.Unstructured{
++					{
++						Object: map[string]interface{}{
++							"metadata": map[string]interface{}{
++								"annotations": map[string]interface{}{
++									certmanagerVersionAnnotation: "v1.1.0+7878a",
++								},
++							},
++						},
++					},
++				},
++			},
++			configVersion: "v1.1.0+86759",
++			wantVersion:   "v1.1.0+7878a (7878a)",
++			want:          true,
++			wantErr:       false,
++		},
++		{
++			name: "Version in config is the same with no build metadata in current object, should upgrade",
++			args: args{
++				objs: []unstructured.Unstructured{
++					{
++						Object: map[string]interface{}{
++							"metadata": map[string]interface{}{
++								"annotations": map[string]interface{}{
++									certmanagerVersionAnnotation: "v1.1.0",
++								},
++							},
++						},
++					},
++				},
++			},
++			configVersion: "v1.1.0+86759",
++			wantVersion:   "v1.1.0 ()",
++			want:          true,
++			wantErr:       false,
++		},
++		{
++			name: "Version in config is older with build metadata, should not upgrade",
++			args: args{
++				objs: []unstructured.Unstructured{
++					{
++						Object: map[string]interface{}{
++							"metadata": map[string]interface{}{
++								"annotations": map[string]interface{}{
++									certmanagerVersionAnnotation: "v1.10.0+8768",
++								},
++							},
++						},
++					},
++				},
++			},
++			configVersion: "v1.1.0+86759",
++			wantVersion:   "v1.10.0+8768",
++			want:          false,
++			wantErr:       false,
++		},
++		{
++			name: "Version in config is the same with same build metadata, should not upgrade",
++			args: args{
++				objs: []unstructured.Unstructured{
++					{
++						Object: map[string]interface{}{
++							"metadata": map[string]interface{}{
++								"annotations": map[string]interface{}{
++									certmanagerVersionAnnotation: "v1.1.0+86759",
++								},
++							},
++						},
++					},
++				},
++			},
++			configVersion: "v1.1.0+86759",
++			wantVersion:   "v1.1.0+86759",
++			want:          false,
++			wantErr:       false,
++		},
++		{
++			name: "Version in config is newer with same build metadata, should upgrade",
++			args: args{
++				objs: []unstructured.Unstructured{
++					{
++						Object: map[string]interface{}{
++							"metadata": map[string]interface{}{
++								"annotations": map[string]interface{}{
++									certmanagerVersionAnnotation: "v1.1.0+86759",
++								},
++							},
++						},
++					},
++				},
++			},
++			configVersion: "v1.2.0+86759",
++			wantVersion:   "v1.1.0+86759",
++			want:          true,
++			wantErr:       false,
++		},
+ 	}
+ 	for _, tt := range tests {
+ 		t.Run(tt.name, func(t *testing.T) {
+ 			g := NewWithT(t)
+ 
+-			gotVersion, got, err := shouldUpgrade(tt.args.objs)
++			cm := &certManagerClient{
++				configClient: newFakeConfig("", tt.configVersion),
++			}
++
++			gotVersion, got, err := cm.shouldUpgrade(tt.args.objs)
+ 			if tt.wantErr {
+ 				g.Expect(err).To(HaveOccurred())
+ 				return
+@@ -548,7 +671,6 @@ func Test_certManagerClient_deleteObjs(t *testing.T) {
+ }
+ 
+ func Test_certManagerClient_PlanUpgrade(t *testing.T) {
+-
+ 	tests := []struct {
+ 		name         string
+ 		objs         []runtime.Object
+@@ -673,7 +795,8 @@ func Test_certManagerClient_PlanUpgrade(t *testing.T) {
+ 			g := NewWithT(t)
+ 
+ 			cm := &certManagerClient{
+-				proxy: test.NewFakeProxy().WithObjs(tt.objs...),
++				proxy:        test.NewFakeProxy().WithObjs(tt.objs...),
++				configClient: newFakeConfig("", ""),
+ 			}
+ 			actualPlan, err := cm.PlanUpgrade()
+ 			if tt.expectErr {
+@@ -685,7 +808,6 @@ func Test_certManagerClient_PlanUpgrade(t *testing.T) {
+ 			g.Expect(actualPlan).To(Equal(tt.expectedPlan))
+ 		})
+ 	}
+-
+ }
+ 
+ func Test_certManagerClient_EnsureLatestVersion(t *testing.T) {
+@@ -716,7 +838,8 @@ func Test_certManagerClient_EnsureLatestVersion(t *testing.T) {
+ 			g := NewWithT(t)
+ 
+ 			cm := &certManagerClient{
+-				proxy: tt.fields.proxy,
++				proxy:        tt.fields.proxy,
++				configClient: newFakeConfig("", ""),
+ 			}
+ 
+ 			err := cm.EnsureLatestVersion()
+@@ -729,8 +852,8 @@ func Test_certManagerClient_EnsureLatestVersion(t *testing.T) {
+ 	}
+ }
+ 
+-func newFakeConfig(timeout string) fakeConfigClient {
+-	fakeReader := test.NewFakeReader().WithVar("cert-manager-timeout", timeout)
++func newFakeConfig(timeout, version string) fakeConfigClient {
++	fakeReader := test.NewFakeReader().WithVar("cert-manager-timeout", timeout).WithVar("cert-manager-version", version)
+ 
+ 	client, _ := config.New("fake-config", config.InjectReader(fakeReader))
+ 	return fakeConfigClient{
+-- 
+2.25.1
+
