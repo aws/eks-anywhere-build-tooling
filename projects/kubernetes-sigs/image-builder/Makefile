@@ -15,7 +15,7 @@ COMPONENT=kubernetes-sigs/$(REPO)
 ifdef CODEBUILD_SRC_DIR
 	PROJECT_PATH=projects/kubernetes-sigs/image-builder
 	OVA_PATH=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/image-builder/images/capi/output
-	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.image-builder
+	CLONE_URL?=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/kubernetes-sigs.image-builder
 else
 	OVA_PATH=image-builder/images/capi/output
 	CLONE_URL?=https://github.com/$(COMPONENT).git

@@ -3,20 +3,19 @@ BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 
 ARTIFACTS_BUCKET?=my-s3-bucket
 
+AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
+AWS_REGION?=us-west-2
+
 REPO=cloud-provider-vsphere
 COMPONENT=kubernetes/$(REPO)
 CLONE_URL?=https://github.com/$(COMPONENT).git
 ifdef CODEBUILD_SRC_DIR
 	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes.cloud-provider-vsphere
+	CLONE_URL?=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/kubernetes.cloud-provider-vsphere
 else
 	TAR_PATH?="_output/tar"
 	CLONE_URL?=https://github.com/$(COMPONENT).git
 endif
-
-
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
 
 MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
 BASE_REPO?=public.ecr.aws/eks-distro-build-tooling

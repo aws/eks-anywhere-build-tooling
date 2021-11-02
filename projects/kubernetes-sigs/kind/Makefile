@@ -7,13 +7,13 @@ GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.16"
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
+AWS_REGION?=us-west-2
 
 REPO=kind
 COMPONENT=kubernetes-sigs/$(REPO)
 ifdef CODEBUILD_SRC_DIR
 	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.kind
+	CLONE_URL?=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/kubernetes-sigs.kind
 else
 	TAR_PATH?="_output/tar"
 	CLONE_URL?=https://github.com/$(COMPONENT).git
