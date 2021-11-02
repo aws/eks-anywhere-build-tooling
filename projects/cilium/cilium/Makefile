@@ -1,41 +1,22 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 HELM_REPO_VERSION?=$(shell cat HELM_REPO_VERSION)
-BRANCH_NAME?=main
-LATEST_TAG?=latest
-ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
-endif
 
-ifdef CODEBUILD_SRC_DIR
-	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-else
-	ARTIFACTS_PATH?="_output/artifacts"
-endif
+REPO=cilium
+REPO_OWNER=cilium
 
-.PHONY: upload-artifacts
-upload-artifacts:
-	mkdir -p $(ARTIFACTS_PATH)
-	cp -rf _output/manifests/ $(ARTIFACTS_PATH)
-	build/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
+HAS_S3_ARTIFACTS=true
+BUILD_TARGETS=s3-artifacts
+RELEASE_TARGETS=
 
-.PHONY: manifests
-manifests:
-	build/create_manifests.sh $(GIT_TAG) $(HELM_REPO_VERSION)
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: build
-build: manifests
-	echo "Done $(COMPONENT)"
+# overriding targets called by build + release to be no-ops 
+# these do not apply here since there is no binary/checksums/attribution/licenses
+tarballs $(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
 
-.PHONY: release
-release: build
-	echo "Done $(COMPONENT)"
+s3-artifacts: create-manifests
 
-.PHONY: all
-all: release
-
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
+.PHONY: create-manifests
+create-manifests:
+	build/create_manifests.sh $(GIT_TAG) $(HELM_REPO_VERSION) $(ARTIFACTS_PATH)

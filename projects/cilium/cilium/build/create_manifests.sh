@@ -20,9 +20,12 @@ set -o pipefail
 
 TAG="${1?Specify first argument - git version tag}"
 HELM_REPO_VERSION="${2?Specify second argument - helm repo version}"
+ARTIFACTS_PATH="${3?Specify third argument - artifacts path}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 HELM_BIN="${MAKE_ROOT}/_output/helm-bin"
+
+mkdir -p $ARTIFACTS_PATH
 
 function build::install::helm(){
   mkdir -p $HELM_BIN
@@ -38,3 +41,5 @@ function build::cilium::manifests(){
 
 build::install::helm
 build::cilium::manifests
+
+cp -rf _output/manifests/cilium $ARTIFACTS_PATH
