@@ -1,6 +1,11 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 GIT_TAG=$(shell cat GIT_TAG)
+BRANCH_NAME?=main
+LATEST_TAG?=latest
+ifneq ("$(BRANCH_NAME)","main")
+	LATEST_TAG=$(BRANCH_NAME)
+endif
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
@@ -15,7 +20,7 @@ IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 COLLECTOR_IMAGE_NAME=eks-anywhere-diagnostic-collector
 COLLECTOR_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(IMAGE_TAG)
-COLLECTOR_LATEST_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):latest
+COLLECTOR_LATEST_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(LATEST_TAG)
 
 .PHONY: fetch-binaries
 fetch-binaries:
