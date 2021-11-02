@@ -4,7 +4,7 @@ BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 ARTIFACTS_BUCKET?=my-s3-bucket
 
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
+AWS_REGION?=us-west-2
 
 REPO=cloud-provider-vsphere
 COMPONENT=kubernetes/$(REPO)
