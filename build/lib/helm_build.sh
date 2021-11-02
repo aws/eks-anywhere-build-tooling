@@ -38,6 +38,8 @@ helm package ${IMAGE_REPOSITORY}
 if [ -n "${IMAGE_REGISTRY}" ]
 then
   export HELM_EXPERIMENTAL_OCI=1
+  export DOCKER_CONFIG=~/.docker
+  export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
   helm push ${IMAGE_REPOSITORY}-${IMAGE_TAG}-helm.tgz oci://${IMAGE_REGISTRY} ||
    (echo "If authentication failed: aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}" &&
    false)
