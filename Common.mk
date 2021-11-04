@@ -4,7 +4,8 @@ MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
 .SUFFIXES:
 
 RELEASE_ENVIRONMENT?=development
-GIT_HASH?=$(shell git rev-parse HEAD)
+ARTIFACTS_BUCKET?=my-s3-bucket
+GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
 COMPONENT=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
