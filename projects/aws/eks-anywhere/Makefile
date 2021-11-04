@@ -1,68 +1,34 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-GIT_TAG=$(shell cat GIT_TAG)
-BRANCH_NAME?=main
-LATEST_TAG?=latest
-ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
-endif
+GIT_TAG?=$(shell cat GIT_TAG)
 
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
+REPO=eks-anywhere
+REPO_OWNER=aws
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
-COLLECTOR_BASE_IMAGE_NAME?=eks-distro-base
-COLLECTOR_BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
-COLLECTOR_BASE_IMAGE=$(BASE_REPO)/$(COLLECTOR_BASE_IMAGE_NAME):$(COLLECTOR_BASE_TAG)
+BASE_IMAGE_NAME?=eks-distro-base
 
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-COLLECTOR_IMAGE_NAME=eks-anywhere-diagnostic-collector
-COLLECTOR_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(IMAGE_TAG)
-COLLECTOR_LATEST_IMAGE=$(IMAGE_REPO)/$(COLLECTOR_IMAGE_NAME):$(LATEST_TAG)
+HAS_S3_ARTIFACTS=false
+SIMPLE_CREATE_BINARIES=false
 
-.PHONY: fetch-binaries
-fetch-binaries:
-	build/fetch_binaries.sh
+BUILD_TARGETS=local-images
+RELEASE_TARGETS=images
+
+include $(BASE_DIRECTORY)/Common.mk
+
+
+# overriding targets called by build + release to be no-ops 
+# these do not apply here since there is no binary/checksums/attribution/licenses
+$(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
+
+$(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-diagnostic-collector): fetch-binaries
 
 .PHONY: local-images
-local-images: fetch-binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(COLLECTOR_BASE_IMAGE) \
-		--local dockerfile=./docker/linux \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(COLLECTOR_LATEST_IMAGE)\",dest=/tmp/eksa-diagnostic-collector.tar
-
+local-images: eks-anywhere-diagnostic-collector/images/amd64
+	
 .PHONY: images
-images: fetch-binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(COLLECTOR_BASE_IMAGE) \
-		--local dockerfile=./docker/linux \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(COLLECTOR_IMAGE),$(COLLECTOR_LATEST_IMAGE)\",push=true
+images: eks-anywhere-diagnostic-collector/images/push
 
-.PHONY: build
-build: local-images
-	echo "Done"
+.PHONY: fetch-binaries
+fetch-binaries: kubernetes
 
-.PHONY: release
-release: images
-	echo "Done"
-
-.PHONY: release-upload
-release-upload: release
-	echo "Done upload"
-
-.PHONY: all
-all: release
-
-.PHONY: clean
-clean:
-	rm -rf "_output"
+kubernetes:
+	build/fetch_binaries.sh
