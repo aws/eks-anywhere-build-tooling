@@ -29,10 +29,6 @@ fi
 
 CHECKSUMS_FILE=$PROJECT_ROOT/CHECKSUMS
 
-if [ -d $PROJECT_ROOT/$RELEASE_BRANCH ]; then
-	CHECKSUMS_FILE=$PROJECT_ROOT/$RELEASE_BRANCH/CHECKSUMS
-fi
-
 rm -f $CHECKSUMS_FILE
 for file in $(find ${OUTPUT_BIN_DIR} -type f | sort); do
     filepath=$(realpath --relative-base=$MAKE_ROOT $file)

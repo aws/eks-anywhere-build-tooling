@@ -1,100 +1,72 @@
-BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-BRANCH_NAME?=main
-LATEST_TAG?=latest
-ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
-endif
+# avoid finding the local fake git repo by looking one level up when looking for base_directory
+BASE_DIRECTORY=$(shell git -C .. rev-parse --show-toplevel)
+GOLANG_VERSION?=1.16
 
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
+REPO=bottlerocket-bootstrap
+REPO_OWNER=aws
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
 BASE_IMAGE_NAME?=eks-distro-base
-BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
-BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_NAME=bottlerocket-bootstrap
-IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
+LICENSE_PACKAGE_FILTER?=.
+BINARY_TARGET_FILES=bottlerocket-bootstrap
+SOURCE_PATTERNS=github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
-BUILD_TARGETS=$(addprefix local-images-, $(SUPPORTED_K8S_VERSIONS))
-RELEASE_TARGETS=$(addprefix images-, $(SUPPORTED_K8S_VERSIONS))
+GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".$(RELEASE_BRANCH).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 
-## --------------------------------------
-## Help
-## --------------------------------------
-##@ Helpers
-help: ## Display this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-35s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+HAS_RELEASE_BRANCHES=true
 
-.PHONY: bootstrap-binary
-bootstrap-binary:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bottlerocket-bootstrap github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap
+# This project is a bit of odd ball when it comes to using the standard makefile targets
+# - the image builds are release branch aware but the binary is the same across all versions
+# - there is no clone of source since the source for the bootstrap exist in this repo already
+# - go-licenses supports only HTTPS URLs so a temporary git repo is created in this project root
+#   to add the https origin
+# - REPO target is overridden to create empty folder
 
-.PHONY: fetch-binaries-%
-fetch-binaries-%:
-	build/fetch_binaries.sh $*
+# force binarys to go to non-release branch bin folder
+OUTPUT_DIR=_output
 
-.PHONY: local-images-%
-local-images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
-local-images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-local-images-%: RELEASE_LATEST=$(GIT_TAG)-$(LATEST_TAG)
-local-images-%: fetch-binaries-% bootstrap-binary
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:RELEASE_BRANCH=$(*) \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(IMAGE):$(RELEASE_LATEST)\",dest=/tmp/bottlerocket-bootstrap.tar
+# do not look for checksums in release branch folder, instead use project root
+PROJECT_ROOT=$(MAKE_ROOT)
 
-.PHONY: images-%
-images-%: GIT_TAG=v$(*)-$(shell yq e ".$(*).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
-images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-images-%: RELEASE_LATEST=$(GIT_TAG)-$(LATEST_TAG)
-images-%: fetch-binaries-% bootstrap-binary
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:RELEASE_BRANCH=$(*) \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(IMAGE):$(RELEASE_LATEST)\",push=true
+# fake git checkout
+GIT_CHECKOUT_TARGET=main.go
+FAKE_GIT_REPO_TARGET=.git
 
-.PHONY: build
-build: ## Build images for all Kubernetes versions to ECR
-build: $(BUILD_TARGETS)
-	echo "Done $(COMPONENT)"
+FETCH_BINARIES_TARGET=$(OUTPUT_DIR)/linux-amd64/kubernetes/$(RELEASE_BRANCH)
 
-.PHONY: release
-release: ## Build and push images for all Kubernetes versions to ECR
-release: $(RELEASE_TARGETS)
-	echo "Done $(COMPONENT)"
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: all
-all: release
+$(REPO):
+	@mkdir $@
 
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
+.PHONY: local-images
+local-images: bottlerocket-bootstrap/images/amd64
 
-## --------------------------------------
-## Document dynamic build targets
-## --------------------------------------
-##@ Builds
-local-images-1-18: ## Build image with Kubernetes 1-18
-local-images-1-19: ## Build image with Kubernetes 1-19
-local-images-1-20: ## Build image with Kubernetes 1-20
+.PHONY: images
+images: bottlerocket-bootstrap/images/push
 
-##@ Releases
-images-1-18: ## Build and push image with Kubernetes 1-18
-images-1-19: ## Build and push image with Kubernetes 1-19
-images-1-20: ## Build and push image with Kubernetes 1-20
+$(call IMAGE_TARGETS_FOR_NAME, bottlerocket-bootstrap): fetch-binaries
+
+$(GATHER_LICENSES_TARGET): REPO_SUBPATH=..
+$(GATHER_LICENSES_TARGET): | $(FAKE_GIT_REPO_TARGET)
+
+$(ATTRIBUTION_TARGET): GIT_TAG
+
+$(FAKE_GIT_REPO_TARGET):
+	@git init
+	@git remote add origin https://github.com/aws/eks-anywhere-build-tooling.git 
+
+GIT_TAG:
+	echo 0.0.0 > $@
+
+$(FETCH_BINARIES_TARGET):
+	build/fetch_binaries.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET)
+
+.PHONY: fetch-binaries
+fetch-binaries: $(FETCH_BINARIES_TARGET)
+
+.PHONY: clean-extra
+clean-extra:
+	@rm -rf vendor .git GIT_TAG
+
+clean: clean-extra
