@@ -44,6 +44,7 @@ WORKDIR /
 ADD conf/index.template /usr/share/nginx/index.template
 ADD conf/default.conf /etc/nginx/conf.d/
 ADD conf/entrypoint.sh /entrypoint.sh
+ADD GIT_TAG /GIT_TAG
 
 STOPSIGNAL SIGQUIT
 ENTRYPOINT ["/entrypoint.sh"]
