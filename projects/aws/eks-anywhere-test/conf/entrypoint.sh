@@ -2,7 +2,7 @@
 
 export foo="$(cat /config/foo | tr -d '\n')"
 export bar="$(cat /secrets/bar | tr -d '\n')"
-export version="$(cat /GIT_TAG | tr -d '\n')"
+export version="$(cat /IMAGE_TAG | tr -d '\n')"
 
 mkdir -p /usr/share/nginx/txt/
 echo "⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢
@@ -30,7 +30,7 @@ https://anywhere.eks.amazonaws.com
 
 config value foo: ${foo}
 secret value bar: ${bar}
-image version value: ${version}
+version: ${version}
 
 ⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢" \
 	| tee /usr/share/nginx/txt/index.html

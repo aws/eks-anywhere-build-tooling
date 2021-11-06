@@ -36,6 +36,7 @@ RUN set -x && \
 
 
 FROM $BASE_IMAGE
+ARG IMAGE_TAG=not-set
 
 COPY --from=nginx-builder /newroot /
 
@@ -44,7 +45,7 @@ WORKDIR /
 ADD conf/index.template /usr/share/nginx/index.template
 ADD conf/default.conf /etc/nginx/conf.d/
 ADD conf/entrypoint.sh /entrypoint.sh
-ADD GIT_TAG /GIT_TAG
+RUN echo $IMAGE_TAG >/IMAGE_TAG
 
 STOPSIGNAL SIGQUIT
 ENTRYPOINT ["/entrypoint.sh"]
