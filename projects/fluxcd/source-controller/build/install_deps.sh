@@ -36,5 +36,3 @@ $BUILD_LIB/buildkit.sh build \
   --local context=. \
   --progress plain \
   --output type=local,dest=/
-
-yum install pkgconfig -y

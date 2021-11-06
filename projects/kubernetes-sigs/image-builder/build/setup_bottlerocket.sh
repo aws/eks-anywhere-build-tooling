@@ -42,10 +42,9 @@ curl $BOTTLEROCKET_ROOT_JSON_URL -o $BOTTLEROCKET_ROOT_JSON_PATH
 sha512sum -c $BOTTLEROCKET_DOWNLOAD_PATH/bottlerocket-root-json-checksum
 
 # On Linux, the Cargo build system requires the openssl-devel package
-# for installing OpenSSL libraries and the pkgconfig utility to 
-# locate these headers/libs
+# for installing OpenSSL libraries
 if [ "$CODEBUILD_CI" = "false" ] && [ "$(uname)" = "Linux" ]; then
-    yum install -y openssl-devel pkgconfig
+    yum install -y openssl-devel
 fi
 
 # This code installs the Rust toolchain manager called rustup along
