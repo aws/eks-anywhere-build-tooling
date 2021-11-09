@@ -161,10 +161,6 @@ endif
 binaries: ## Build binaries by calling build/lib/simple_create_binaries.sh unless SIMPLE_CREATE_BINARIES=false, then calls build/create_binaries.sh from the project root.
 binaries: $(BINARY_TARGETS)
 
-binaries-no-validation: ## Build binaries by calling build/lib/simple_create_binaries.sh unless SIMPLE_CREATE_BINARIES=false, then calls build/create_binaries.sh from the project root.
-binaries-no-validation: $(BINARY_TARGET)
-	
-
 $(KUSTOMIZE_TARGET):
 	@mkdir -p $(OUTPUT_DIR)
 	curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- $(OUTPUT_DIR)
@@ -182,7 +178,7 @@ $(OUTPUT_DIR)/ATTRIBUTION.txt:
 ##@ License Targets
 
 ## Gather licenses for project based on dependencies in REPO.
-$(GATHER_LICENSES_TARGET): binaries
+$(GATHER_LICENSES_TARGET): $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR) "$(LICENSE_PACKAGE_FILTER)" $(REPO_SUBPATH)
 
 $(ATTRIBUTION_TARGET): $(GATHER_LICENSES_TARGET)
@@ -220,12 +216,12 @@ s3-artifacts: tarballs
 	
 .PHONY: checksums
 checksums: ## Update checksums file based on currently built binaries.
-checksums: binaries
+checksums: $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(RELEASE_BRANCH)
 
 .PHONY: validate-checksums
 validate-checksums: ## Validate checksums of currently built binaries against checksums file.
-validate-checksums: binaries
+validate-checksums: $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(RELEASE_BRANCH)
 
 ## Image Targets

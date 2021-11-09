@@ -53,8 +53,9 @@ The key pieces to setup in the Makefile  are:
 * LICENSE_PACKAGE_FILTER - This should be the pattern used to gather dependencies for this
 	specific project.  Typically this will be `.` or `./cmd/<project-name>`. For more
 	refer to [attribution-files](attribution-files.md).
-* BINARY_TARGET - The path where the built binary will be placed, should generally start with
-	$(OUTPUT_BIN_DIR)
+* BINARY_TARGET_FILES - The binary file names to be built, automatically appended with $(OUTPUT_BIN_DIR) and generated for each
+	$(BINARY_PLATFORMS).  Passed to `go build -o`.
+* SOURCE_PATTERNS - The patterns to pass to `go build`.  Must follow the same ordering as $(BINARY_TARGET_FILES)
 * <IMAGE_NAME>_IMAGE_COMPONENT (optional) - Common Makefile will use this if set to override the default 
 	component in the `IMAGE` variable.  By default `IMAGE` will be set to `$(IMAGE_REPO)/$(COMPONENT):$(IMAGE_TAG)`
 
@@ -157,7 +158,7 @@ if a `patches` directory exists.
 ```
 GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
-$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
+$(BINARY_TARGETS): | $(GIT_PATCH_TARGET)
 
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) am $(MAKE_ROOT)/patches/*
