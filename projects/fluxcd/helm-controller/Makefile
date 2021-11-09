@@ -7,17 +7,17 @@ REPO_OWNER=fluxcd
 
 LICENSE_PACKAGE_FILTER?=.
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/helm-controller
+BINARY_TARGET_FILES=helm-controller
+
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/helm-controller/api/LICENSE
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
-
-build: s3-artifacts
-release: upload-artifacts
 
 $(GATHER_LICENSES_TARGET): $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
@@ -26,11 +26,6 @@ local-images: helm-controller/images/amd64
 
 .PHONY: images
 images: helm-controller/images/push
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
 $(FIX_LICENSES_XEIPUUV_TARGET): | $(GIT_CHECKOUT_TARGET)
 # The xeipuuv dependency github repos all have licenses however they all do not have go.mod files

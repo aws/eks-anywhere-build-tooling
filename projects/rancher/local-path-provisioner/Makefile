@@ -9,21 +9,15 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base
 
 LICENSE_PACKAGE_FILTER?=.
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/local-path-provisioner
+BINARY_TARGET_FILES=local-path-provisioner
+
+HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
-build: s3-artifacts
-release: upload-artifacts
 
 .PHONY: local-images
 local-images: local-path-provisioner/images/amd64
 
 .PHONY: images
 images: local-path-provisioner/images/push
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)

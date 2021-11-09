@@ -7,18 +7,18 @@ REPO_OWNER=fluxcd
 
 LICENSE_PACKAGE_FILTER?=.
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/kustomize-controller
+BINARY_TARGET_FILES=kustomize-controller
+
 DEFAULT_KUBECONFIG_TARGET=$(OUTPUT_DIR)/files/kubeconfig
 FIX_LICENSES_MOZILLA_TARGET=$(REPO)/vendor/go.mozilla.org/gopgagent/LICENSE.txt
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/kustomize-controller/api/LICENSE
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-git
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
-
-build: s3-artifacts
-release: upload-artifacts
 
 $(GATHER_LICENSES_TARGET): $(FIX_LICENSES_MOZILLA_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
@@ -29,11 +29,6 @@ local-images: kustomize-controller/images/amd64
 
 .PHONY: images
 images: kustomize-controller/images/push
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
 kubernetes:
 	build/fetch_binaries.sh

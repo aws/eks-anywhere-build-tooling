@@ -9,12 +9,14 @@ IMAGE_PLATFORMS?=linux/amd64
 IMAGE_BUILD_ARGS?=IMAGE_TAG
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
+HAS_S3_ARTIFACTS=false
+SIMPLE_CREATE_BINARIES=false
 
 include $(BASE_DIRECTORY)/Common.mk
 
 # overriding targets called by build + release to be no-ops 
 # these do not apply here since there is no binary/checksums/attribution/licenses
-$(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) $(ATTRIBUTION_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
+validate-checksums $(GATHER_LICENSES_TARGET) generate-attribution $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
 
 .PHONY: local-images
 local-images: eks-anywhere-test/images/amd64 helm/build

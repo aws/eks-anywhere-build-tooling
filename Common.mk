@@ -66,9 +66,27 @@ IMAGE_BUILD_ARGS?=
 TAR_FILE_PREFIX?=$(REPO)
 
 GIT_CHECKOUT_TARGET=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
+GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
 FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
+
+BINARY_TARGETS?=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS, $(BINARY_TARGET_FILES), $(BINARY_PLATFORMS))
+SOURCE_PATTERNS?=.
+EXTRA_GO_LDFLAGS?=
+GO_LDFLAGS=-s -w -buildid= -extldflags -static $(EXTRA_GO_LDFLAGS)
+GOBUILD_COMMAND?=build
+EXTRA_GOBUILD_FLAGS?=
+
+# https://riptutorial.com/makefile/example/23643/zipping-lists
+list-rem = $(wordlist 2,$(words $1),$1)
+pairmap = $(and $(strip $2),$(strip $3),$(call \
+    $1,$(firstword $2),$(firstword $3)) $(call \
+    pairmap,$1,$(call list-rem,$2),$(call list-rem,$3)))
+
+# TODO: currently all projects push artifact tars to s3, change this to only those that are actually consumed
+# etcdadm,kind,cri-tools
+HAS_S3_ARTIFACTS?=false
 
 define BUILDCTL
 	$(BUILD_LIB)/buildkit.sh \
@@ -94,6 +112,22 @@ define IMAGE_TARGETS_FOR_NAME
 	$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64, $(1)) $(addsuffix /images/arm64, $(1))
 endef
 
+define BINARY_TARGETS_FROM_FILES_PLATFORMS
+	$(foreach platform, $(2), $(foreach target, $(1), $(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/$(target)))
+endef
+
+define BINARY_TARGET_BODY_ALL_PLATFORMS
+	$(eval $(foreach platform, $(BINARY_PLATFORMS), $(call BINARY_TARGET_BODY,$(platform),$(1),$(2))))
+endef
+
+define BINARY_TARGET_BODY
+	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): | $(if $(wildcard patches),$(GIT_PATCH_TARGET),) $(GIT_CHECKOUT_TARGET)
+		$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $$(MAKE_ROOT) \
+			$$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2) $$(REPO) $$(GOLANG_VERSION) $$(GIT_TAG) $(1) $(3) \
+			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" $$(REPO_SUBPATH)
+
+endef
+
 ## --------------------------------------
 ## Help
 ## --------------------------------------
@@ -112,18 +146,20 @@ $(GIT_CHECKOUT_TARGET): | $(REPO)
 	git -C $(REPO) checkout -f $(GIT_TAG)
 	touch $@
 
-$(BINARY_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
+	git -C $(REPO) config user.email prow@amazonaws.com
+	git -C $(REPO) config user.name "Prow Bot"
+	git -C $(REPO) am $(MAKE_ROOT)/patches/*
+	@touch $@
+
+
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
-	$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(REPO) $(GOLANG_VERSION) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(REPO_SUBPATH)
-else
-	build/create_binaries.sh $(REPO) $(GOLANG_VERSION) $(GIT_TAG) $(RELEASE_BRANCH)
+$(call pairmap,BINARY_TARGET_BODY_ALL_PLATFORMS,$(BINARY_TARGET_FILES),$(SOURCE_PATTERNS))
 endif
 
+.PHONY: binaries
 binaries: ## Build binaries by calling build/lib/simple_create_binaries.sh unless SIMPLE_CREATE_BINARIES=false, then calls build/create_binaries.sh from the project root.
-binaries: $(BINARY_TARGET) validate-checksums
-
-binaries-no-validation: ## Build binaries by calling build/lib/simple_create_binaries.sh unless SIMPLE_CREATE_BINARIES=false, then calls build/create_binaries.sh from the project root.
-binaries-no-validation: $(BINARY_TARGET)
+binaries: $(BINARY_TARGETS)
 
 $(KUSTOMIZE_TARGET):
 	@mkdir -p $(OUTPUT_DIR)
@@ -142,7 +178,7 @@ $(OUTPUT_DIR)/ATTRIBUTION.txt:
 ##@ License Targets
 
 ## Gather licenses for project based on dependencies in REPO.
-$(GATHER_LICENSES_TARGET): $(BINARY_TARGET)
+$(GATHER_LICENSES_TARGET): $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR) "$(LICENSE_PACKAGE_FILTER)" $(REPO_SUBPATH)
 
 $(ATTRIBUTION_TARGET): $(GATHER_LICENSES_TARGET)
@@ -171,17 +207,21 @@ endif
 upload-artifacts: s3-artifacts
 	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH) $(LATEST_TAG)
 
+.PHONY: s3-artifacts
+s3-artifacts: tarballs
+	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
 ##@ Checksum Targets
 	
 .PHONY: checksums
 checksums: ## Update checksums file based on currently built binaries.
-checksums: $(BINARY_TARGET)
+checksums: $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(RELEASE_BRANCH)
 
 .PHONY: validate-checksums
 validate-checksums: ## Validate checksums of currently built binaries against checksums file.
-validate-checksums: $(BINARY_TARGET)
+validate-checksums: $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(RELEASE_BRANCH)
 
 ## Image Targets
@@ -235,11 +275,11 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: build
 build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images generate-attribution checksums` by default
 build: FAKE_ARM_IMAGES_FOR_VALIDATION=true
-build: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) local-images $(ATTRIBUTION_TARGET)
+build: validate-checksums local-images generate-attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
 
 .PHONY: release
 release: ## Called via prow postsubmit + release jobs, calls `binaries gather-licenses clean-repo images` by default
-release: $(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) images
+release: validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 
 .PHONY: release-upload
 release-upload: release upload-artifacts

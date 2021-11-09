@@ -7,7 +7,9 @@ REPO_OWNER=kubernetes-sigs
 
 LICENSE_PACKAGE_FILTER?=./cmd/clusterctl ./bootstrap/kubeadm ./controlplane/kubeadm ./
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/clusterctl
+BINARY_TARGET_FILES=clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager
+SOURCE_PATTERNS=sigs.k8s.io/cluster-api/cmd/clusterctl sigs.k8s.io/cluster-api sigs.k8s.io/cluster-api/bootstrap/kubeadm sigs.k8s.io/cluster-api/controlplane/kubeadm sigs.k8s.io/cluster-api/test/infrastructure/docker
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/cmd/version)
 
 GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
@@ -22,23 +24,19 @@ CLUSTER_API_DOCKER_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/capd-m
 CAPD_GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/capd/attribution/go-license.csv
 CAPD_ATTRIBUTION_TARGET=CAPD_ATTRIBUTION.txt
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
-
-build: $(CAPD_ATTRIBUTION_TARGET) s3-artifacts
-release: upload-artifacts
+$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: REPO_SUBPATH=test/infrastructure/docker
+$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=
+	
+s3-artifacts: create-manifests
 
 clean: clean-binary-deps
-attribution: $(CAPD_ATTRIBUTION_TARGET)
+generate-attribution: $(CAPD_ATTRIBUTION_TARGET)
 
-# Patch source before building
-$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
-
-$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
-	@touch $@ 
-
-$(CAPD_GATHER_LICENSES_TARGET): $(BINARY_TARGET)
+$(CAPD_GATHER_LICENSES_TARGET): $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/capd . test/infrastructure/docker
 
 $(CAPD_ATTRIBUTION_TARGET): $(CAPD_GATHER_LICENSES_TARGET)
@@ -53,13 +51,8 @@ images: cluster-api-controller/images/push kubeadm-bootstrap-controller/images/p
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
 $(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): fetch-binaries $(CAPD_GATHER_LICENSES_TARGET)
 
-.PHONY: s3-artifacts
-s3-artifacts: tarballs create-manifests
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
-
 .PHONY: create-manifests
-create-manifests:
+create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
 
 kubernetes:

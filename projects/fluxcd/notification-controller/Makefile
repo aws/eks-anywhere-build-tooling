@@ -7,17 +7,17 @@ REPO_OWNER=fluxcd
 
 LICENSE_PACKAGE_FILTER?=.
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/notification-controller
+BINARY_TARGET_FILES=notification-controller
+
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/notification-controller/api/LICENSE
 FIX_LICENSES_K0KUBUN_TARGET=$(REPO)/vendor/github.com/k0kubun/pp/LICENSE.txt
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
-
-build: s3-artifacts
-release: upload-artifacts
 
 $(GATHER_LICENSES_TARGET): $(FIX_LICENSES_K0KUBUN_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
@@ -26,11 +26,6 @@ local-images: notification-controller/images/amd64
 
 .PHONY: images
 images: notification-controller/images/push
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
 
 $(FIX_LICENSES_API_LICENSE_TARGET): | $(GIT_CHECKOUT_TARGET)
 # Internal go.mod under /api directory

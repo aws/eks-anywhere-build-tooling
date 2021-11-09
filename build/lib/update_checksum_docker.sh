@@ -22,7 +22,7 @@ RELEASE_BRANCH="${2:-}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
-$MAKE_ROOT/build/lib/run_target_docker.sh $PROJECT "clean binaries-no-validation attribution checksums" $RELEASE_BRANCH
+$MAKE_ROOT/build/lib/run_target_docker.sh $PROJECT "clean binaries generate-attribution checksums" $RELEASE_BRANCH
 
 PROJECT_CHECKSUM=$PROJECT/CHECKSUMS
 PROJECT_ATTRIBUTION=$PROJECT/ATTRIBUTION.txt

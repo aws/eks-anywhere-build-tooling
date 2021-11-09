@@ -19,19 +19,23 @@ set -o nounset
 set -o pipefail
 
 PROJECT_ROOT="$1"
-OUTPUT_BIN_DIR="$2"
+TARGET_FILE="$2"
 REPO="$3"
 GOLANG_VERSION="$4"
 TAG="$5"
 BINARY_PLATFORMS="$6"
-REPO_SUBPATH="${7:-}"
+SOURCE_PATTERN="$7"
+GOBUILD_COMMAND="$8" 
+EXTRA_GOBUILD_FLAGS="$9"
+GO_LDFLAGS="${10}"
+REPO_SUBPATH="${11:-}"
 
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
 function build::simple::binaries(){
-  mkdir -p $OUTPUT_BIN_DIR
+  mkdir -p $(dirname $TARGET_FILE)
   cd "$PROJECT_ROOT/$REPO/$REPO_SUBPATH"
   local -r cache_key=$(echo $PROJECT_ROOT | sed 's/\(.*\)\//\1-/' | xargs basename)
   build::common::use_go_version $GOLANG_VERSION
@@ -41,8 +45,8 @@ function build::simple::binaries(){
   for platform in "${SUPPORTED_PLATFORMS[@]}"; do
     OS="$(cut -d '/' -f1 <<< ${platform})"
     ARCH="$(cut -d '/' -f2 <<< ${platform})"
-	mkdir -p ${OUTPUT_BIN_DIR}/${OS}-${ARCH}
-	$PROJECT_ROOT/build/create_binaries.sh $TAG ${OUTPUT_BIN_DIR}/${OS}-${ARCH} $OS $ARCH
+    CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
+      go $GOBUILD_COMMAND -trimpath -a -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -o $TARGET_FILE $SOURCE_PATTERN
   done
 }
 
