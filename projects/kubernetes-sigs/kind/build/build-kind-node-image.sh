@@ -17,63 +17,31 @@ set -o errexit
 set -o pipefail
 
 EKSD_RELEASE_BRANCH="${1?Specify first argument - release branch}"
-KIND_BASE_IMAGE_NAME="${2?Specify second argument - kind base tag}"
-KIND_NODE_IMAGE_NAME="${3?Specify third argument - kind node image name}"
-KIND_KINDNETD_IMAGE_OVERRIDE="${4?Specify the fourth argument - kindnetd image}"
-IMAGE_REPO="${5?Specify fifth argument - image repo}"
-IMAGE_TAG="${6?Specify sixth argument - image tag}"
-ARTIFACTS_BUCKET="${7?Specify seventh argument - artifact bucket}"
-PUSH="${8?Specify eighth argument - push}"
-LATEST_TAG="${9?Specify ninth argument - Tag denoting build source}"
+INTERMEDIATE_BASE_IMAGE="${2?Specify second argument - kind base tag}"
+INTERMEDIATE_NODE_IMAGE="${3?Specify third argument - kind node image name}"
+ARTIFACTS_BUCKET="${4?Specify fourth argument - artifact bucket}"
+ARCH="${5?Specify fifth argument - Targetarch}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
-# This is used by the local-path-provisioner within the kind node
-AL2_HELPER_IMAGE="public.ecr.aws/amazonlinux/amazonlinux:2"
-LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE="$IMAGE_REPO/rancher/local-path-provisioner:latest"
-LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE="public.ecr.aws/eks-anywhere/rancher/local-path-provisioner:$(cat $MAKE_ROOT/../../rancher/local-path-provisioner/GIT_TAG)"
-KIND_KINDNETD_RELEASE_OVERRIDE="public.ecr.aws/eks-anywhere/kubernetes-sigs/kind/kindnetd:$(cat $MAKE_ROOT/GIT_TAG)"
-
-# Preload release yaml
-build::eksd_releases::load_release_yaml $EKSD_RELEASE_BRANCH
-
-KUBE_VERSION=$(build::eksd_releases::get_eksd_component_version "kubernetes" $EKSD_RELEASE_BRANCH)
-EKSD_RELEASE=$(build::eksd_releases::get_eksd_release_number $EKSD_RELEASE_BRANCH)
-EKSD_KUBE_VERSION="$KUBE_VERSION-eks-$EKSD_RELEASE_BRANCH-$EKSD_RELEASE"
-PAUSE_IMAGE_TAG_OVERRIDE=$(build::eksd_releases::get_eksd_kubernetes_image_url "pause-image" $EKSD_RELEASE_BRANCH)
-EKSD_IMAGE_REPO=$(build::eksd_releases::get_eksd_image_repo $EKSD_RELEASE_BRANCH)
-EKSD_ASSET_URL=$(build::eksd_releases::get_eksd_kubernetes_asset_base_url $EKSD_RELEASE_BRANCH)/$KUBE_VERSION
-
-# Expected versions provided by kind which are replaced in the docker build with our versions
-# when updating kind check the following, they may need to be updated
-# https://github.com/kubernetes-sigs/kind/blob/main/pkg/build/nodeimage/const_cni.go#L23
-KINDNETD_IMAGE_TAG="docker.io/kindest/kindnetd:v20210326-1e038dc5"
-# https://github.com/kubernetes-sigs/kind/blob/main/pkg/build/nodeimage/const_storage.go#L28
-DEBIAN_BASE_IMAGE_TAG="k8s.gcr.io/build-image/debian-base:v2.1.0"
-# https://github.com/kubernetes-sigs/kind/blob/main/pkg/build/nodeimage/const_storage.go#L28
-LOCAL_PATH_PROVISONER_IMAGE_TAG="docker.io/rancher/local-path-provisioner:v0.0.14"
-# https://github.com/kubernetes-sigs/kind/blob/main/images/base/files/etc/containerd/config.toml#L22
-PAUSE_IMAGE_TAG="k8s.gcr.io/pause:3.5"
+# Include common constants and other vars needed when building image
+source "${MAKE_ROOT}/_output/$EKSD_RELEASE_BRANCH/kind-node-image-build-args"
 
 # Uses kind cli to build node-image, usually the fake kubernetes src
 # to download the eks-d release artifacts instead of building from src
-# ouput image: $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-kind
+# ouput image: $INTERMEDIATE_NODE_IMAGE
 function build::kind::build_node_image(){
     export KUBE_VERSION=$KUBE_VERSION
     export EKSD_RELEASE_BRANCH=$EKSD_RELEASE_BRANCH
     export EKSD_RELEASE=$EKSD_RELEASE
     export EKSD_IMAGE_REPO=$EKSD_IMAGE_REPO
     export EKSD_ASSET_URL=$EKSD_ASSET_URL
+    export KUBE_ARCH=$ARCH
 
-    # base image was created using buildctl and stored as tar
-    BASE_IMAGE_ID=$(docker load -i $MAKE_ROOT/_output/images/$EKSD_RELEASE_BRANCH/base.tar | sed -E 's/.*sha256:(.*)$/\1/')
-    docker tag $BASE_IMAGE_ID $KIND_BASE_IMAGE_NAME:$EKSD_KUBE_VERSION
-
-    KIND_PATH="$MAKE_ROOT/_output/bin/kind/$(uname | tr '[:upper:]' '[:lower:]')-amd64/kind"
-    $KIND_PATH build node-image \
-        --base-image $KIND_BASE_IMAGE_NAME:$EKSD_KUBE_VERSION  --image $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-kind \
-        --kube-root $MAKE_ROOT/images/k8s.io/kubernetes
+    KIND_PATH="$MAKE_ROOT/_output/bin/kind/$(uname | tr '[:upper:]' '[:lower:]')-$(go env GOHOSTARCH)/kind"
+    $KIND_PATH build node-image $MAKE_ROOT/images/k8s.io/kubernetes \
+        --base-image $INTERMEDIATE_BASE_IMAGE --image $INTERMEDIATE_NODE_IMAGE --arch $ARCH      
 }
 
 function build::kind::validate_versions(){
@@ -115,9 +83,9 @@ function build::kind::validate_versions(){
 # and commit it back is a recreation of what the kind build node-image does
 # the reason being is this is the easiest way to convert a docker/oci image
 # into an on disk containerd format
-# output image: $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION
+# output image: $INTERMEDIATE_NODE_IMAGE
 function build::kind::load_images(){
-    CONTAINER_ID=$(docker run --entrypoint sleep -d -i $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-kind infinity)
+    CONTAINER_ID=$(docker run --platform linux/$ARCH --entrypoint sleep -d -i $INTERMEDIATE_NODE_IMAGE infinity)
 
     build::kind::validate_versions $CONTAINER_ID
 
@@ -151,18 +119,19 @@ function build::kind::load_images(){
 
     for image in "${IMAGES[@]}"; do
         if ! docker image inspect $image > /dev/null 2>&1; then
-            docker pull $image
+            docker pull --platform linux/$ARCH $image
         fi
-        if [[ $image =~ local-path-provisioner ]] || [[ $image =~ kindnetd ]]; then
-            image_id=$(docker images $image --format "{{.ID}}")
-            docker tag $image_id ${release_image_overrides[$image]}
-            docker save ${release_image_overrides[$image]} -o $MAKE_ROOT/_output/dependencies/image.tar
-        else
-            docker save $image -o $MAKE_ROOT/_output/dependencies/image.tar
+        image_id=$(docker images $image --format "{{.ID}}")
+        if [ ! -f $MAKE_ROOT/_output/dependencies/$image_id.tar ]; then
+            if [[ $image =~ local-path-provisioner ]] || [[ $image =~ kindnetd ]]; then
+                docker tag $image_id ${release_image_overrides[$image]}
+                docker save ${release_image_overrides[$image]} -o $MAKE_ROOT/_output/dependencies/$image_id.tar
+            else
+                docker save $image -o $MAKE_ROOT/_output/dependencies/$image_id.tar
+            fi
         fi
         docker exec --privileged -i $CONTAINER_ID \
-            ctr --namespace=k8s.io images import --all-platforms --no-unpack - < $MAKE_ROOT/_output/dependencies/image.tar
-        rm $MAKE_ROOT/_output/dependencies/image.tar
+            ctr --namespace=k8s.io images import --all-platforms --no-unpack - < $MAKE_ROOT/_output/dependencies/$image_id.tar
     done
 
     docker exec --privileged -i $CONTAINER_ID crictl images
@@ -181,7 +150,8 @@ function build::kind::load_images(){
     docker exec --privileged -i $CONTAINER_ID pkill containerd
 
     NEW_IMAGE_ID=$(docker commit --change 'ENTRYPOINT [ "/usr/local/bin/entrypoint", "/sbin/init" ]' $CONTAINER_ID | sed -E 's/.*sha256:(.*)$/\1/')
-    docker tag $NEW_IMAGE_ID $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION
+    docker tag $NEW_IMAGE_ID $INTERMEDIATE_NODE_IMAGE
+    docker push $INTERMEDIATE_NODE_IMAGE
 
     docker kill $CONTAINER_ID
     rm -rf $MAKE_ROOT/_output/dependencies
@@ -191,10 +161,10 @@ function build::kind::load_images(){
 function build::kind::download_additional_components() {
     OUTPUT_FOLDER="$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies"
 
-    declare -A URLS=([$(build::eksd_releases::get_eksd_kubernetes_asset_url kubernetes-client-linux-amd64.tar.gz)]="kubernetes"
-                  [$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm')]="etcdadm"
-                  [$(build::eksd_releases::get_eksd_component_url "cni-plugins" $EKSD_RELEASE_BRANCH)]="cni-plugins"
-                  [$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools')]="cri-tools")
+    declare -A URLS=([$(build::eksd_releases::get_eksd_kubernetes_asset_url kubernetes-client-linux-$ARCH.tar.gz $EKSD_RELEASE_BRANCH $ARCH)]="kubernetes"
+                  [$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm' $ARCH)]="etcdadm"
+                  [$(build::eksd_releases::get_eksd_component_url "cni-plugins" $EKSD_RELEASE_BRANCH $ARCH)]="cni-plugins"
+                  [$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' $ARCH)]="cri-tools")
 
     
     mkdir -p $OUTPUT_FOLDER/LICENSES
@@ -220,36 +190,11 @@ function build::kind::download_additional_components() {
     ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_RELEASE_BRANCH)
     FOLDER="$OUTPUT_FOLDER/cache/etcdadm/etcd/$ETCD_VERSION"
     mkdir -p $FOLDER
-    curl -sSL $ETCD_HTTP_SOURCE -o $FOLDER/etcd-$ETCD_VERSION-linux-amd64.tar.gz
-}
-
-function build::kind::build_final_node_image(){
-    # squash image since we removed images
-    docker build \
-        -f $MAKE_ROOT/images/node/Dockerfile.squash \
-        -t $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG \
-        --build-arg BASE_IMAGE=$KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION \
-        --build-arg IMAGE_REPO=$IMAGE_REPO \
-        --build-arg AL2_HELPER_IMAGE=$AL2_HELPER_IMAGE \
-        --build-arg DEBIAN_BASE_IMAGE_TAG=$DEBIAN_BASE_IMAGE_TAG \
-        --build-arg LOCAL_PATH_PROVISONER_IMAGE_TAG=$LOCAL_PATH_PROVISONER_IMAGE_TAG \
-        --build-arg LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE=$LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE \
-        --build-arg PAUSE_IMAGE_TAG_OVERRIDE=$PAUSE_IMAGE_TAG_OVERRIDE \
-        --build-arg PAUSE_IMAGE_TAG=$PAUSE_IMAGE_TAG \
-        --build-arg KIND_KINDNETD_IMAGE_OVERRIDE=$KIND_KINDNETD_RELEASE_OVERRIDE \
-        --build-arg KINDNETD_IMAGE_TAG=$KINDNETD_IMAGE_TAG \
-        $MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies
-
-    if [ "$PUSH" == "true" ] ; then
-        docker push $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG
-        docker tag $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$IMAGE_TAG $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$LATEST_TAG
-        docker push $KIND_NODE_IMAGE_NAME:$EKSD_KUBE_VERSION-$LATEST_TAG
-    fi
+    curl -sSL $ETCD_HTTP_SOURCE -o $FOLDER/etcd-$ETCD_VERSION-linux-$ARCH.tar.gz
 }
 
 if command -v docker &> /dev/null && docker info > /dev/null 2>&1 ; then
     build::kind::build_node_image
     build::kind::load_images
     build::kind::download_additional_components
-    build::kind::build_final_node_image
 fi

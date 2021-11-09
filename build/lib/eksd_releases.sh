@@ -19,23 +19,24 @@ declare -A RELEASE_YAML=()
 
 function build::eksd_releases::load_release_yaml() {
     local -r release_branch=$1
-
+    local -r echo=${2-true}
     oldopt=$-
     set +o nounset
 
     # if key exists, 1 is returned which would resolve to true
     if [ ! ${RELEASE_YAML[$release_branch]+1} ]; then
         local -r yaml_url=$(build::eksd_releases::get_release_yaml_url ${release_branch})
-        RELEASE_YAML[$release_branch]=$(curl --retry 5 $yaml_url)
+        RELEASE_YAML[$release_branch]=$(curl -s --retry 5 $yaml_url)
     fi
-    echo "${RELEASE_YAML[$release_branch]}"
-    
+    if $echo; then
+        echo "${RELEASE_YAML[$release_branch]}"
+    fi
     set -$oldopt
 }
 
 function build::eksd_releases::get_release_yaml_url() {
     local -r release_branch=$1
-
+    
     local -r release_number=$(yq e ".${release_branch}.number" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
     local -r yaml_url="https://distro.eks.amazonaws.com/kubernetes-${release_branch}/kubernetes-${release_branch}-eks-${release_number}.yaml"
     echo "$yaml_url"

@@ -1,5 +1,12 @@
+# The base image is the unversioned base built and pushed to the local repo
+# This base image was based off eks-distro-base
 ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-base
-FROM $BASE_IMAGE AS builder
+ARG BUILDER_IMAGE
+FROM $BUILDER_IMAGE-amd64 AS builder-amd64
+FROM $BUILDER_IMAGE-arm64 AS builder-arm64
+
+ARG TARGETARCH
+FROM builder-${TARGETARCH} AS builder
 
 ARG IMAGE_REPO
 ARG AL2_HELPER_IMAGE
@@ -41,7 +48,8 @@ RUN update-alternatives \
 RUN rm -rf /tmp && \
     mkdir -m 1777 /tmp
 
-FROM scratch
+
+FROM ${BASE_IMAGE}
 
 COPY --from=builder / /
 

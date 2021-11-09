@@ -1,114 +1,136 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-
-BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.16"
-BRANCH_NAME?=main
-LATEST_TAG?=latest
-ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
-endif
-
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION?=us-west-2
 
 REPO=kind
-COMPONENT=kubernetes-sigs/$(REPO)
-ifdef CODEBUILD_SRC_DIR
-	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/kubernetes-sigs.kind
-else
-	TAR_PATH?="_output/tar"
-	CLONE_URL?=https://github.com/$(COMPONENT).git
+REPO_OWNER=kubernetes-sigs
+
+LICENSE_PACKAGE_FILTER?=./cmd/kind
+
+BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
+BINARY_TARGETS=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS,kind,$(BINARY_PLATFORMS))
+
+BINARY_PLATFORMS_KINDNETD=linux/amd64 linux/arm64
+BINARY_TARGETS+=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS,kindnetd,$(BINARY_PLATFORMS_KINDNETD))
+
+# force binarys to go to non-release branch bin folder
+OUTPUT_DIR=_output
+
+# do not look for checksums in release branch folder, instead use project root
+PROJECT_ROOT=$(MAKE_ROOT)
+
+BASE_IMAGE_NAME?=eks-distro-base
+MINIMAL_IPTABLES_BASE_IMAGE_NAME?=eks-distro-minimal-base-iptables
+
+KINDNETD_GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv
+KINDNETD_ATTRIBUTION_TARGET=KINDNETD_ATTRIBUTION.txt
+
+KIND_BASE_IMAGE_COMPONENT=kindest/base
+KIND_BASE_VERSIONED_IMAGE_COMPONENT=kindest/base
+KIND_NODE_IMAGE_COMPONENT=kubernetes-sigs/kind/node
+KINDNETD_IMAGE_COMPONENT=kubernetes-sigs/kind/kindnetd
+
+KIND_BASE_IMAGE_BUILD_ARGS=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/kind-base-image-build-args
+KIND_BASE_KUBEADM_OVERRIDE=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base/files/usr/local/bin/kubeadm
+KIND_NODE_IMAGE_BUILD_ARGS=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/kind-node-image-build-args
+
+LOCAL_REGISTRY=localhost:5000
+INTERMEDIATE_BASE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)
+INTERMEDIATE_NODE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_NODE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)
+
+HAS_S3_ARTIFACTS=true
+HAS_RELEASE_BRANCHES=true
+
+# Binary targets are added manually in this makefile instead of relying on simple_create logic
+SIMPLE_CREATE_BINARIES=false
+
+ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS))),)
+-include $(KIND_BASE_IMAGE_BUILD_ARGS)
+-include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
-BASE_IMAGE_NAME?=eks-distro-base
-BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_BASE_TAG_FILE)
-EKS_DISTRO_BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
-MINIMAL_IPTABLES_BASE_IMAGE_NAME?=eks-distro-minimal-base-iptables
-MINIMAL_IPTABLES_BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_IPTABLES_TAG_FILE)
-EKS_DISTRO_MINIMAL_BASE_IPTABLES_IMAGE?=$(BASE_REPO)/$(MINIMAL_IPTABLES_BASE_IMAGE_NAME):$(MINIMAL_IPTABLES_BASE_TAG)
-
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-KIND_BASE_IMAGE_NAME=kindest/base
-KIND_NODE_IMAGE_NAME=kubernetes-sigs/kind/node
-KIND_KINDNETD_IMAGE_NAME=kubernetes-sigs/kind/kindnetd
-
-KIND_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_NAME)
-KIND_NODE_IMAGE=$(IMAGE_REPO)/${KIND_NODE_IMAGE_NAME}
-KIND_KINDNETD_IMAGE=$(IMAGE_REPO)/$(KIND_KINDNETD_IMAGE_NAME):$(IMAGE_TAG)
-KIND_KINDNETD_LATEST_IMAGE=$(IMAGE_REPO)/$(KIND_KINDNETD_IMAGE_NAME):$(LATEST_TAG)
-
-PUSH=false
-
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
-BUILD_TARGETS=$(addprefix build-kind-node-, $(SUPPORTED_K8S_VERSIONS))
-
-## --------------------------------------
-## Help
-## --------------------------------------
-##@ Helpers
-help: ## Display this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-35s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+include $(BASE_DIRECTORY)/Common.mk
 
 
-.PHONY: upload-artifacts
-upload-artifacts:
-	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
+$(OUTPUT_BIN_DIR)/%/kindnetd: REPO_SUBPATH=images/kindnetd
 
-.PHONY: binaries
-binaries:
-	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION)
+$(OUTPUT_BIN_DIR)/%/kind: EXTRA_GO_LDFLAGS=-X=sigs.k8s.io/kind/pkg/cmd/kind/version.GitCommit=$(shell git -C $(REPO) rev-list -n 1  "${GIT_TAG}")
 
-.PHONY: generate-attribution
-generate-attribution:
-	build/create_attribution.sh $(GOLANG_VERSION)
+# Since there are different platforms for the different binaries, calling helper from common.mk directly
+# instead of relying on it automatically
+$(eval $(foreach platform, $(BINARY_PLATFORMS), $(call BINARY_TARGET_BODY,$(platform),kind,.)))
+$(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BODY,$(platform),kindnetd,./cmd/kindnetd)))
 
-.PHONY: tarballs
-tarballs:  binaries
-	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(TAR_PATH)
+# Kindnetd
+kindnetd/images/%: DOCKERFILE_FOLDER=./images/kindnetd
+kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_IPTABLES_BASE_IMAGE_NAME)
+$(call IMAGE_TARGETS_FOR_NAME, kindnetd): $(KINDNETD_GATHER_LICENSES_TARGET)
+
+# Kind-base
+kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/images/base
+kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=eks-distro-base
+kind-base/images/% kind-base-versioned/images/%: IMAGE_BUILD_ARGS=CNI_PLUGINS_AMD64_URL CNI_PLUGINS_ARM64_URL CNI_PLUGINS_AMD64_SHA256SUM \
+	CNI_PLUGINS_ARM64_SHA256SUM CRICTL_AMD64_SHA256SUM CRICTL_ARM64_SHA256SUM CRICTL_AMD64_URL CRICTL_ARM64_URL
+
+kind-base/images/%: IMAGE_TARGET=base
+kind-base/images/%: IMAGE_TAG=latest
+kind-base/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/base
+$(call IMAGE_TARGETS_FOR_NAME, kind-base): $(KIND_BASE_IMAGE_BUILD_ARGS)
+
+kind-base-versioned/images/%: IMAGE_TARGET=base-versioned
+kind-base-versioned/images/%: IMAGE_TAG=$(EKSD_KUBE_VERSION)
+kind-base-versioned/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base
+kind-base-versioned/images/%: BUILDER_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):latest
+$(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_KUBEADM_OVERRIDE)
+
+# Avoid pushing to remote repo, this image is used by the `kind build node-image`
+kind-base-versioned/images/push: IMAGE_REPO=$(LOCAL_REGISTRY)
+
+# Kind-node
+kind-node/images/%: DOCKERFILE_FOLDER=./images/node
+kind-node/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/dependencies
+kind-node/images/%: BUILDER_IMAGE=$(INTERMEDIATE_NODE_IMAGE)
+kind-node/images/%: BASE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):latest
+kind-node/images/%: IMAGE_TAG=$(EKSD_KUBE_VERSION)
+kind-node/images/%: IMAGE_BUILD_ARGS=IMAGE_REPO AL2_HELPER_IMAGE DEBIAN_BASE_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE \
+	PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG KIND_KINDNETD_IMAGE_OVERRIDE KINDNETD_IMAGE_TAG
+$(call IMAGE_TARGETS_FOR_NAME, kind-node): $(KIND_NODE_IMAGE_BUILD_ARGS)
+
+generate-attribution: $(KINDNETD_ATTRIBUTION_TARGET)
+
+$(KINDNETD_GATHER_LICENSES_TARGET): $(BINARY_TARGETS)
+	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/kindnetd ./cmd/kindnetd images/kindnetd 
+
+$(KINDNETD_ATTRIBUTION_TARGET): $(KINDNETD_GATHER_LICENSES_TARGET)
+	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(OUTPUT_DIR)/kindnetd $@
+
+.PHONY: local-images
+local-images: kindnetd/images/amd64 kind-base/images/amd64
+
+.PHONY: images
+images: kindnetd/images/push kind-base/images/push kind-base-versioned/images/push build-kind-node-amd64 build-kind-node-arm64 kind-node/images/push
+
+$(KIND_BASE_IMAGE_BUILD_ARGS):
+	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@
+
+$(KIND_NODE_IMAGE_BUILD_ARGS):
+	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) $(ARTIFACTS_BUCKET) $(LATEST_TAG) $@
+
+# Tweak the kind/base image to have a hardcode kubeadm config
+# so that during the image pull phase it pulls eks-d images
+# vs upstream images
+# kubeadm-override and config are copied into kind/images/base/files/etc
+# so they are automatically added into the image by the dockerfile
+$(KIND_BASE_KUBEADM_OVERRIDE): KUBEADM_CONFIG_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base/files/etc
+$(KIND_BASE_KUBEADM_OVERRIDE):
+	@mkdir -p $(@D)
+	@mkdir -p $(KUBEADM_CONFIG_DIR)
+	set -a && source $(KIND_BASE_IMAGE_BUILD_ARGS) && envsubst '$$COREDNS_VERSION:$$ETCD_VERSION:$$EKSD_KUBE_VERSION' \
+		< ./images/base/kubeadm.config.tmpl \
+		> $(KUBEADM_CONFIG_DIR)/kubeadm.config
+	cp ./images/base/kubeadm-override.sh $@
 
 .PHONY: build-kind-node-%
-build-kind-node-%:
-	# base image is still tied to a specific eks version because the cni_plugins are included
-	build/build-kind-base-image.sh $* $(KIND_BASE_IMAGE) $(ARTIFACTS_BUCKET) $(EKS_DISTRO_BASE_IMAGE) 
-	build/build-kind-node-image.sh $* $(KIND_BASE_IMAGE) $(KIND_NODE_IMAGE) $(KIND_KINDNETD_LATEST_IMAGE) $(IMAGE_REPO) $(IMAGE_TAG) $(ARTIFACTS_BUCKET) $(PUSH) $(LATEST_TAG)
-
-.PHONY: build-kindnetd-image
-build-kindnetd-image:
-	build/build-kindnetd-image.sh $(EKS_DISTRO_MINIMAL_BASE_IPTABLES_IMAGE) $(KIND_KINDNETD_IMAGE) $(KIND_KINDNETD_LATEST_IMAGE) $(PUSH)
-
-
-##@ Builds
-
-.PHONY: build
-build: ## Build binaries + kindnetd + node images for every kubernetes version
-build: tarballs build-kindnetd-image $(BUILD_TARGETS)
-	echo "Done $(COMPONENT)"
-
-.PHONY: release
-release: ## Build binaries + kindnetd + node images for every kubernetes version and push to ecr
-release: PUSH=true
-release: build
-	echo "Done $(COMPONENT)"
-
-.PHONY: release-upload
-release-upload: release upload-artifacts
-
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
-
-## --------------------------------------
-## Document dynamic build targets
-## --------------------------------------
-build-kind-node-1-18: ## Build kind node image for kubernetes 1.18
-build-kind-node-1-19: ## Build kind node image for kubernetes 1.19
-build-kind-node-1-20: ## Build kind node image for kubernetes 1.20
-build-kind-node-1-21: ## Build kind node image for kubernetes 1.21
+build-kind-node-%: $(KIND_NODE_IMAGE_BUILD_ARGS)
+	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(INTERMEDIATE_BASE_IMAGE) \
+		$(INTERMEDIATE_NODE_IMAGE)-$* $(ARTIFACTS_BUCKET) $*
