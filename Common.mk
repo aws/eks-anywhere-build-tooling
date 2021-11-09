@@ -91,6 +91,7 @@ IMAGE_CONTEXT_DIR?=.
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
 IMAGE_BUILD_ARGS?=
 DOCKERFILE_FOLDER?=./docker/linux
+IMAGE_TARGET?=
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
 IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
@@ -169,6 +170,7 @@ define BUILDCTL
 		--progress plain \
 		--local dockerfile=$(DOCKERFILE_FOLDER) \
 		--local context=$(IMAGE_CONTEXT_DIR) \
+		--opt target=$(IMAGE_TARGET) \
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
 endef 
 

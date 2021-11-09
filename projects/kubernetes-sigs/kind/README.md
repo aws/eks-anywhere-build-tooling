@@ -22,3 +22,20 @@ Kind also implements its own standard CNI/cluster networking configuration in th
 You can find the latest versions of these images on ECR Public Gallery.
 
 [Node](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/kind/node) | [HA Proxy](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/kind/haproxy) | [Kindnetd](https://gallery.ecr.aws/eks-anywhere/kubernetes-sigs/kind/kindnetd)
+
+## Building
+This project depends on other artifacts from this repo.  To build image locally, `ARTIFACTS_BUCKET` must be supplied. For ex
+the following is the presubmit bucket:
+
+`ARTIFACTS_BUCKET=s3://projectbuildpipeline-857-pipelineoutputartifactsb-10ajmk30khe3f make build`
+
+To avoid pushing intermediate images to a remote repo, a local registry is required
+to build images.  Refer to [building locally](../../../docs/development/building-locally.md) for more instructions.
+
+`local-path-provisioner` is required to exist in the local registry to build images
+
+`cd projects/rancher/local-path/provisioner && IMAGE_REPO=localhost:5000 make images`
+
+To build all images for all supported EKS-D versions and amd64 + arm64, run
+
+`ARTIFACTS_BUCKET=<> IMAGE_REPO=localhost:5000 make release`

@@ -94,7 +94,7 @@ update-attribution-files: attribution-files
 
 .PHONY: run-target-in-docker
 run-target-in-docker:
-	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH)
+	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET)
 
 .PHONY: update-attribution-checksums-docker
 update-attribution-checksums-docker:
