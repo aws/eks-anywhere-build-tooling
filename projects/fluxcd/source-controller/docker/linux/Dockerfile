@@ -14,10 +14,13 @@ RUN yum install -y shadow-utils && \
 
 FROM $BASE_IMAGE
 
+ARG TARGETARCH
+ARG TARGETOS
+
 COPY --from=builder /etc/group /etc/group
 COPY --from=builder /etc/passwd /etc/passwd
 
-COPY _output/bin/source-controller/linux-amd64/source-controller /usr/local/bin/source-controller
+COPY _output/bin/source-controller/$TARGETOS-$TARGETARCH/source-controller /usr/local/bin/source-controller
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
