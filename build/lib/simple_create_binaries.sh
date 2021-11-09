@@ -28,7 +28,9 @@ SOURCE_PATTERN="$7"
 GOBUILD_COMMAND="$8" 
 EXTRA_GOBUILD_FLAGS="$9"
 GO_LDFLAGS="${10}"
-REPO_SUBPATH="${11:-}"
+CGO_ENABLED="${11}"
+CGO_LDFLAGS="${12}"
+REPO_SUBPATH="${13:-}"
 
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -45,7 +47,13 @@ function build::simple::binaries(){
   for platform in "${SUPPORTED_PLATFORMS[@]}"; do
     OS="$(cut -d '/' -f1 <<< ${platform})"
     ARCH="$(cut -d '/' -f2 <<< ${platform})"
-    CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
+    if [ $CGO_ENABLED = 1 ]; then
+      export CGO_LDFLAGS="$CGO_LDFLAGS,-L$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64"
+      export CGO_CFLAGS="-I$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/include"
+      export LD_LIBRARY_PATH=$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64:${LD_LIBRARY_PATH-}
+      export PKG_CONFIG_PATH=$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64/pkgconfig:${PKG_CONFIG_PATH-}
+    fi
+    CGO_ENABLED=$CGO_ENABLED GOOS=$OS GOARCH=$ARCH \
       go $GOBUILD_COMMAND -trimpath -a -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -o $TARGET_FILE $SOURCE_PATTERN
   done
 }
