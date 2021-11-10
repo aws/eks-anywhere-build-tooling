@@ -17,13 +17,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-PROJECT_ROOT="$1"
-OUTPUT_BIN_DIR="$2"
-RELEASE_BRANCH="${3:-}"
+MAKE_ROOT="$1"
+PROJECT_ROOT="$2"
+OUTPUT_BIN_DIR="$3"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-cd $PROJECT_ROOT
+cd $MAKE_ROOT
 
 CHECKSUMS_FILE=$PROJECT_ROOT/CHECKSUMS
 
@@ -35,6 +35,6 @@ if ! sha256sum -c $CHECKSUMS_FILE; then
 	echo "Checksums do not match!"
 	echo "The correct checksums are printed below"
 	echo "Please only update if changing GIT_TAG or build flags."
-	$SCRIPT_ROOT/update_checksums.sh $PROJECT_ROOT $OUTPUT_BIN_DIR $RELEASE_BRANCH
+	$SCRIPT_ROOT/update_checksums.sh $MAKE_ROOT $PROJECT_ROOT $OUTPUT_BIN_DIR
 	exit 1
 fi

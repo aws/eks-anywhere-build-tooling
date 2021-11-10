@@ -3,90 +3,155 @@ MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
 .SHELLFLAGS:=-eu -o pipefail -c
 .SUFFIXES:
 
-RELEASE_BRANCH?=
 RELEASE_ENVIRONMENT?=development
-ARTIFACT_BUCKET?=my-s3-bucket
-GIT_HASH=$(shell git rev-parse HEAD)
+GIT_HASH?=$(shell git rev-parse HEAD)
 
+COMPONENT=$(REPO_OWNER)/$(REPO)
+MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
+BUILD_LIB=${BASE_DIRECTORY}/build/lib
+OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
+
+#################### AWS ###########################
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
+ARTIFACT_BUCKET?=my-s3-bucket
+IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
+####################################################
+
+#################### LATEST TAG ####################
 BRANCH_NAME?=main
 LATEST_TAG?=latest
 ifneq ("$(BRANCH_NAME)","main")
 	LATEST_TAG=$(BRANCH_NAME)
 endif
+####################################################
 
-COMPONENT=$(REPO_OWNER)/$(REPO)
+#################### CODEBUILD #####################
 ifdef CODEBUILD_SRC_DIR
 	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
 	CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
 else
 	ARTIFACTS_PATH?=$(MAKE_ROOT)/_output/tar
-	CLONE_URL?=https://github.com/$(COMPONENT).git	
+	CLONE_URL=https://github.com/$(COMPONENT).git	
+endif
+####################################################
+
+#################### GIT ###########################
+GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
+GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
+####################################################
+
+#################### RELEASE BRANCHES ##############
+HAS_RELEASE_BRANCHES?=false
+RELEASE_BRANCH?=
+SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
+ifneq ($(RELEASE_BRANCH),)
+	RELEASE_BRANCH_SUFFIX=/$(RELEASE_BRANCH)
+
+	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)/$(RELEASE_BRANCH_SUFFIX)
+	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)
+	OUTPUT_DIR?=_output$(RELEASE_BRANCH_SUFFIX)
+else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
+	$(filter-out build release release-upload clean,$(MAKECMDGOALS))),)
+	# if project has release branches and not calling one of the above targets
+$(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
+else ifeq ($(HAS_RELEASE_BRANCHES),true)
+	# project has release branches and one was not specified, trigger target for all
+	BUILD_TARGETS=build/release-branches/all
+	RELEASE_TARGETS=release/release-branches/all
+	RELEASE_UPLOAD_TARGETS=release-upload/release-branches/all
+
+	# avoid warnings when trying to read GIT_TAG file which wont exist when no release_branch is given
+	GIT_TAG=non-existent
+else
+	PROJECT_ROOT?=$(MAKE_ROOT)
+	OUTPUT_DIR?=_output
 endif
 
-MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
-OUTPUT_DIR?=_output
-OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
+####################################################
 
-BUILD_LIB=${MAKE_ROOT}/../../../build/lib
-
-ATTRIBUTION_TARGET=$(wildcard ATTRIBUTION.txt) $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt)
-
-IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
-
+#################### BASE IMAGES ###################
 BASE_IMAGE_REPO?=public.ecr.aws/eks-distro-build-tooling
 BASE_IMAGE_NAME?=eks-distro-base
 BASE_IMAGE_TAG_FILE?=$(BASE_DIRECTORY)/$(shell echo $(BASE_IMAGE_NAME) | tr '[:lower:]' '[:upper:]' | tr '-' '_')_TAG_FILE
 BASE_IMAGE_TAG?=$(shell cat $(BASE_IMAGE_TAG_FILE))
 BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
+####################################################
 
+#################### IMAGES ########################
 IMAGE_COMPONENT?=$(COMPONENT)
 IMAGE_DESCRIPTION?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
 IMAGE_CONTEXT_DIR?=.
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
+IMAGE_BUILD_ARGS?=
+DOCKERFILE_FOLDER?=./docker/linux
+
 # For projects with multiple containers this is defined to override the default
+# ex: CLUSTER_API_CONTROLLER_IMAGE_COMPONENT
 IMAGE_COMPONENT_VARIABLE=$(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE_COMPONENT
 IMAGE=$(IMAGE_REPO)/$(if $(value $(IMAGE_COMPONENT_VARIABLE)),$(value $(IMAGE_COMPONENT_VARIABLE)),$(IMAGE_COMPONENT)):$(IMAGE_TAG)
 LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
-IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-DOCKERFILE_FOLDER?=./docker/linux
+IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
+####################################################
 
+#################### BINARIES ######################
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
 SIMPLE_CREATE_BINARIES?=true
-SIMPLE_CREATE_TARBALLS?=true
-
-LICENSE_PACKAGE_FILTER?=
-REPO_SUBPATH?=
-IMAGE_BUILD_ARGS?=
-TAR_FILE_PREFIX?=$(REPO)
-
-GIT_CHECKOUT_TARGET=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
-GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
-GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
-FAKE_ARM_IMAGES_FOR_VALIDATION?=false
-KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 
 BINARY_TARGETS?=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS, $(BINARY_TARGET_FILES), $(BINARY_PLATFORMS))
+BINARY_TARGET_FILES?=
 SOURCE_PATTERNS?=.
+
+#### BUILD FLAGS ####
 EXTRA_GO_LDFLAGS?=
 GO_LDFLAGS=-s -w -buildid= -extldflags -static $(EXTRA_GO_LDFLAGS)
 GOBUILD_COMMAND?=build
 EXTRA_GOBUILD_FLAGS?=
+######################
 
+#### HELPERS ########
 # https://riptutorial.com/makefile/example/23643/zipping-lists
+# Used to generate binary targets based on BINARY_TARGET_FILES
 list-rem = $(wordlist 2,$(words $1),$1)
 pairmap = $(and $(strip $2),$(strip $3),$(call \
     $1,$(firstword $2),$(firstword $3)) $(call \
     pairmap,$1,$(call list-rem,$2),$(call list-rem,$3)))
+######################
+
+####################################################
+
+#################### LICENSES ######################
+LICENSE_PACKAGE_FILTER?=
+REPO_SUBPATH?=
+
+ATTRIBUTION_TARGET=$(wildcard ATTRIBUTION.txt) $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt)
+GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
+####################################################
+
+#################### TARBALLS ######################
 
 # TODO: currently all projects push artifact tars to s3, change this to only those that are actually consumed
 # etcdadm,kind,cri-tools
 HAS_S3_ARTIFACTS?=false
+
+SIMPLE_CREATE_TARBALLS?=true
+TAR_FILE_PREFIX?=$(REPO)
+FAKE_ARM_IMAGES_FOR_VALIDATION?=false
+####################################################
+
+#################### OTHER #########################
+KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
+####################################################
+
+#################### TARGETS FOR OVERRIDING ########
+BUILD_TARGETS?=validate-checksums local-images generate-attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
+RELEASE_TARGETS?=validate-checksums images
+RELEASE_UPLOAD_TARGETS?=release $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+####################################################
 
 define BUILDCTL
 	$(BUILD_LIB)/buildkit.sh \
@@ -101,7 +166,7 @@ define BUILDCTL
 		--local dockerfile=$(DOCKERFILE_FOLDER) \
 		--local context=$(IMAGE_CONTEXT_DIR) \
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
-endef
+endef 
 
 define WRITE_LOCAL_IMAGE_TAG
 	echo $(IMAGE_TAG) > $(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).docker_tag
@@ -198,7 +263,7 @@ generate-attribution: $(ATTRIBUTION_TARGET)
 tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then calls build/create_tarballs.sh from project directory
 tarballs: $(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt
 ifeq ($(SIMPLE_CREATE_TARBALLS),true)
-	$(BASE_DIRECTORY)/build/lib/simple_create_tarballs.sh $(TAR_FILE_PREFIX) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(ARTIFACTS_PATH) $(GIT_HASH)
+	$(BASE_DIRECTORY)/build/lib/simple_create_tarballs.sh $(TAR_FILE_PREFIX) $(MAKE_ROOT)/$(OUTPUT_DIR) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(ARTIFACTS_PATH) $(GIT_HASH)
 else
 	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(RELEASE_BRANCH)
 endif
@@ -217,12 +282,12 @@ s3-artifacts: tarballs
 .PHONY: checksums
 checksums: ## Update checksums file based on currently built binaries.
 checksums: $(BINARY_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(RELEASE_BRANCH)
+	$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
 
 .PHONY: validate-checksums
 validate-checksums: ## Validate checksums of currently built binaries against checksums file.
 validate-checksums: $(BINARY_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(RELEASE_BRANCH)
+	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
 
 ## Image Targets
 
@@ -275,15 +340,20 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: build
 build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images generate-attribution checksums` by default
 build: FAKE_ARM_IMAGES_FOR_VALIDATION=true
-build: validate-checksums local-images generate-attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
+build: $(BUILD_TARGETS)
 
 .PHONY: release
 release: ## Called via prow postsubmit + release jobs, calls `binaries gather-licenses clean-repo images` by default
-release: validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+release: $(RELEASE_TARGETS)
 
 .PHONY: release-upload
-release-upload: release upload-artifacts
+release-upload: $(RELEASE_UPLOAD_TARGETS)
 
+.PHONY: %/release-branches/all
+%/release-branches/all:
+	@for version in $(SUPPORTED_K8S_VERSIONS) ; do \
+		$(MAKE) $* RELEASE_BRANCH=$$version; \
+	done;
 
 ##@ Clean Targets
 
