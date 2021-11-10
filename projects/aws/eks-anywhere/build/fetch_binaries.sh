@@ -22,8 +22,11 @@ set -o pipefail
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
-mkdir -p kubernetes
-TARBALL="kubernetes-client-linux-amd64.tar.gz"
-URL=$(build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL)
-curl -sSL $URL -o ${TARBALL}
-tar xzf $TARBALL -C kubernetes
+
+for arch in amd64 arm64; do
+    mkdir -p kubernetes/linux-$arch
+    TARBALL="kubernetes-client-linux-$arch.tar.gz"
+    URL=$(build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL $(build::eksd_releases::get_release_branch) $arch)
+    curl -sSL $URL -o ${TARBALL}
+    tar xzf $TARBALL -C kubernetes/linux-$arch
+done
