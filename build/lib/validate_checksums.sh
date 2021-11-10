@@ -27,10 +27,6 @@ cd $MAKE_ROOT
 
 CHECKSUMS_FILE=$PROJECT_ROOT/CHECKSUMS
 
-if [[ -n "$RELEASE_BRANCH" ]] && [ -d $PROJECT_ROOT/$RELEASE_BRANCH ]; then
-	CHECKSUMS_FILE=$PROJECT_ROOT/$RELEASE_BRANCH/CHECKSUMS
-fi
-
 if ! sha256sum -c $CHECKSUMS_FILE; then
 	echo "Checksums do not match!"
 	echo "The correct checksums are printed below"
