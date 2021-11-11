@@ -3,7 +3,7 @@
 export foo="$(cat /config/foo | tr -d '\n')"
 export bar="$(cat /secrets/bar | tr -d '\n')"
 export version="$(cat /IMAGE_TAG | tr -d '\n')"
-export pvcsize="$(df --output=size /pvc | tail -1)"
+export pvcsize="$(df --human-readable  --output=size /pvc | tail -1)"
 date=$(date +"%Y%m%d%H%M%S")
 date_value=$(date +"%Y-%m-%d %H:%M:%S")
 echo "${date_value}" >/pvc/$date
