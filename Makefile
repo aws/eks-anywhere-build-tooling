@@ -98,7 +98,7 @@ run-target-in-docker:
 
 .PHONY: update-attribution-checksums-docker
 update-attribution-checksums-docker:
-	build/lib/update_checksum_docker.sh $(PROJECT) $(RELEASE_BRANCH)
+	build/lib/update_checksum_docker.sh $(PROJECT) $(IMAGE_REPO) $(RELEASE_BRANCH)
 
 .PHONY: stop-docker-builder
 stop-docker-builder:

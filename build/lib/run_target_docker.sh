@@ -36,6 +36,8 @@ if ! docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
 		public.ecr.aws/eks-distro-build-tooling/builder-base:latest  infinity 
 fi
 
-rsync -e 'docker exec -i' -a --exclude '*_output*' ./ eks-a-builder:/eks-anywhere-build-tooling
+rsync -e 'docker exec -i' -rm --exclude='.git/logs/***' \
+	--exclude="projects/$PROJECT/_output/***" --exclude="projects/$PROJECT/$(basename $PROJECT)/***" \
+	--include="projects/$PROJECT/***" --include='*/' --exclude='projects/***' ./ eks-a-builder:/eks-anywhere-build-tooling
 
 docker exec -it eks-a-builder make $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT RELEASE_BRANCH=$RELEASE_BRANCH IMAGE_REPO=$IMAGE_REPO
