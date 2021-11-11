@@ -36,7 +36,7 @@ https://anywhere.eks.amazonaws.com
 config value foo: ${foo}
 secret value bar: ${bar}
 version: ${version}
-pvc size 1K blocks: ${pvcsize}
+pvc size: ${pvcsize}
 history: ${history}
 
 ⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢⬡⬢" \
