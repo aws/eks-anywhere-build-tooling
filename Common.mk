@@ -55,7 +55,7 @@ ifneq ($(RELEASE_BRANCH),)
 	# include release branch info in latest tag
 	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
-	$(filter-out build release release-upload clean,$(MAKECMDGOALS))),)
+	$(filter-out build release upload-artifacts release-upload clean,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
 $(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
 else ifeq ($(HAS_RELEASE_BRANCHES),true)
