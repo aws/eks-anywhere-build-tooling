@@ -51,6 +51,9 @@ ifneq ($(RELEASE_BRANCH),)
 	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)/$(RELEASE_BRANCH_SUFFIX)
 	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)
 	OUTPUT_DIR?=_output$(RELEASE_BRANCH_SUFFIX)
+
+	# include release branch info in latest tag
+	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
 	$(filter-out build release release-upload clean,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
@@ -88,14 +91,14 @@ IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
 IMAGE_BUILD_ARGS?=
 DOCKERFILE_FOLDER?=./docker/linux
 
+# This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
+IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
+
 # For projects with multiple containers this is defined to override the default
 # ex: CLUSTER_API_CONTROLLER_IMAGE_COMPONENT
 IMAGE_COMPONENT_VARIABLE=$(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE_COMPONENT
 IMAGE=$(IMAGE_REPO)/$(if $(value $(IMAGE_COMPONENT_VARIABLE)),$(value $(IMAGE_COMPONENT_VARIABLE)),$(IMAGE_COMPONENT)):$(IMAGE_TAG)
 LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))
-
-# This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
-IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
 ####################################################
 
 #################### BINARIES ######################
