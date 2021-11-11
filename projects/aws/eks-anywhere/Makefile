@@ -8,6 +8,7 @@ BASE_IMAGE_NAME?=eks-distro-base
 
 HAS_S3_ARTIFACTS=false
 SIMPLE_CREATE_BINARIES=false
+IMAGE_COMPONENT=eks-anywhere-diagnostic-collector
 
 
 include $(BASE_DIRECTORY)/Common.mk
