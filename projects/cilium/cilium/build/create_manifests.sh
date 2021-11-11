@@ -42,4 +42,4 @@ function build::cilium::manifests(){
 build::install::helm
 build::cilium::manifests
 
-cp -rf _output/manifests/cilium $ARTIFACTS_PATH
+cp -rf _output/manifests $ARTIFACTS_PATH
