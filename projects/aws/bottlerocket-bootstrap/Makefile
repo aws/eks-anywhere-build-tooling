@@ -6,6 +6,7 @@ REPO=bottlerocket-bootstrap
 REPO_OWNER=aws
 
 BASE_IMAGE_NAME?=eks-distro-base
+IMAGE_COMPONENT=bottlerocket-bootstrap
 
 LICENSE_PACKAGE_FILTER?=.
 BINARY_TARGET_FILES=bottlerocket-bootstrap
