@@ -20,21 +20,27 @@ set -o pipefail
 PROJECT_ROOT="$1"
 ARTIFACTS_FOLDER="$2"
 GIT_TAG="$3"
+FAKE_ARM_ARTIFACTS_FOR_VALIDATION="$4"
 
 PROJECT_NAME=$(basename $PROJECT_ROOT)
-rm -f /tmp/actual-$PROJECT_NAME-files
+ACTUAL_FILES=$(mktemp)
+
 for file in $(find ${ARTIFACTS_FOLDER} -type f | sort); do
     filepath=$(realpath --relative-base=$ARTIFACTS_FOLDER $file)
-	echo $filepath >> /tmp/actual-$PROJECT_NAME-files
+	echo $filepath >> $ACTUAL_FILES
 done
 
+EXPECTED_FILES=$(mktemp)
 export GIT_TAG=$GIT_TAG
 envsubst '$GIT_TAG' \
 	< $PROJECT_ROOT/expected_artifacts \
-	> /tmp/expected-$PROJECT_NAME-files
+	> $EXPECTED_FILES
 
+if $FAKE_ARM_ARTIFACTS_FOR_VALIDATION; then
+	sed -i '/arm64/d' $EXPECTED_FILES
+fi
 
-if ! diff /tmp/expected-$PROJECT_NAME-files /tmp/actual-$PROJECT_NAME-files; then
+if ! diff $EXPECTED_FILES $ACTUAL_FILES; then
 	echo "Artifacts directory does not matched expected!"
 	echo "******************* Actual ******************"
 	cat /tmp/actual-$PROJECT_NAME-files

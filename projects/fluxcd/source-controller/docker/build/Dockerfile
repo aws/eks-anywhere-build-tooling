@@ -28,8 +28,8 @@ ENV GOPROXY=$GOPROXY
 RUN --mount=type=bind,source=/,target=/files set -x && \
     cp -rf /files/eks-anywhere-build-tooling / && \
     cd /eks-anywhere-build-tooling && \
-    make -C projects/fluxcd/source-controller binaries BINARY_PLATFORMS=$TARGETOS/$TARGETARCH 
-    # if [ $TARGETARCH = "amd64" ] ; then make -C projects/fluxcd/source-controller generate-attribution ; fi
+    make -C projects/fluxcd/source-controller binaries BINARY_PLATFORMS=$TARGETOS/$TARGETARCH && \
+    if [ $TARGETARCH = "amd64" ] ; then make -C projects/fluxcd/source-controller generate-attribution BINARY_PLATFORMS=linux/amd64 ; fi
 
 FROM scratch
 

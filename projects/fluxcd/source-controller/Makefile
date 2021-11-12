@@ -31,14 +31,6 @@ $(OUTPUT_BIN_DIR)/linux-arm64/source-controller: | $(CGO_SOURCE)/linux-arm64/usr
 $(CGO_SOURCE)/linux-%/usr/lib64/libgit2.so:
 	$(MAKE) binary-builder-deps/cgo/$* IMAGE_TARGET=deps IMAGE_OUTPUT=dest=$(CGO_SOURCE)/linux-$*
 
-
-# $(BINARY_TARGET):
-# 	for platform in $(CGO_PLATFORMS); do \
-# 		$(MAKE) source-controller-deps/cgo/$${platform#linux/} IMAGE_TARGET=deps IMAGE_OUTPUT=dest=$(CGO_SOURCE); \
-# 		$(MAKE) source-controller/cgo/$${platform#linux/} IMAGE_OUTPUT=dest=$(OUTPUT_DIR); \
-# 	done;
-# 	@cp $(OUTPUT_DIR)/attribution/ATTRIBUTION.txt ./
-
 $(GATHER_LICENSES_TARGET): | $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET) $(LIBGIT2_LICENSES_TARGET)
 
 .PHONY: local-images

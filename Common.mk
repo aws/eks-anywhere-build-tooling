@@ -159,7 +159,7 @@ HAS_S3_ARTIFACTS?=false
 
 SIMPLE_CREATE_TARBALLS?=true
 TAR_FILE_PREFIX?=$(REPO)
-FAKE_ARM_IMAGES_FOR_VALIDATION?=false
+FAKE_ARM_ARTIFACTS_FOR_VALIDATION?=false
 ####################################################
 
 #################### OTHER #########################
@@ -309,7 +309,7 @@ upload-artifacts:
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_ARTIFACTS_FOR_VALIDATION)
 
 ##@ Checksum Targets
 	
@@ -321,7 +321,7 @@ checksums: $(BINARY_TARGETS)
 .PHONY: validate-checksums
 validate-checksums: ## Validate checksums of currently built binaries against checksums file.
 validate-checksums: $(BINARY_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
+	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_ARTIFACTS_FOR_VALIDATION)
 
 ## Image Targets
 
@@ -393,7 +393,6 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 .PHONY: build
 build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images generate-attribution checksums` by default
-build: FAKE_ARM_IMAGES_FOR_VALIDATION=true
 build: $(BUILD_TARGETS)
 
 .PHONY: release
