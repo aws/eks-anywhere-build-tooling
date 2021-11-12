@@ -60,6 +60,7 @@ clean:
 	make -C projects/fluxcd/source-controller clean
 	make -C projects/mrajashree/etcdadm-bootstrap-provider clean
 	make -C projects/mrajashree/etcdadm-controller clean
+	make -C projects/aws/bottlerocket-bootstrap clean
 	rm -rf _output
 
 .PHONY: attribution-files
@@ -84,7 +85,7 @@ attribution-files:
 	build/update-attribution-files/make_attribution.sh projects/fluxcd/source-controller
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-bootstrap-provider
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-controller
-
+	build/update-attribution-files/make_attribution.sh projects/aws/bottlerocket-bootstrap
 
 	cat _output/total_summary.txt
 
