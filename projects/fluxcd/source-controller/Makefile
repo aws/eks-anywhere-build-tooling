@@ -35,6 +35,10 @@ IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
 LATEST_IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(LATEST_TAG)
 
+.PHONY: upload-artifacts
+upload-artifacts:
+	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
+
 .PHONY: binaries
 binaries:
 	build/create_binaries.sh $(REPO) $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION) $(BASE_IMAGE)
