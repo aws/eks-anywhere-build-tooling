@@ -14,7 +14,6 @@ FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICE
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/source-controller/api/LICENSE
 LIBGIT2_LICENSES_TARGET=$(OUTPUT_DIR)/LICENSES/github.com/libgit2/libgit2/COPYING
 BASE_IMAGE_NAME?=eks-distro-minimal-base-git
-BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/builder-base:latest
 
 CGO_DEPS_TARGET=$(CGO_SOURCE)/linux-%/lib64/libgit2.so
 CGO_CREATE_BINARIES=true
@@ -27,6 +26,7 @@ include $(BASE_DIRECTORY)/Common.mk
 # source-controller depends on building with cgo to include git2go
 $(OUTPUT_BIN_DIR)/linux-amd64/source-controller: | $(CGO_SOURCE)/linux-amd64/usr/lib64/libgit2.so
 $(OUTPUT_BIN_DIR)/linux-arm64/source-controller: | $(CGO_SOURCE)/linux-arm64/usr/lib64/libgit2.so
+%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(BASE_IMAGE_REPO)/builder-base:latest
 
 $(CGO_SOURCE)/linux-%/usr/lib64/libgit2.so:
 	$(MAKE) binary-builder-deps/cgo/$* IMAGE_TARGET=deps IMAGE_OUTPUT=dest=$(CGO_SOURCE)/linux-$*
