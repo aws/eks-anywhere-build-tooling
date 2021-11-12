@@ -152,7 +152,7 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 
 #################### TARGETS FOR OVERRIDING ########
 BUILD_TARGETS?=validate-checksums local-images generate-attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
-RELEASE_TARGETS?=validate-checksums images
+RELEASE_TARGETS?=validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
 RELEASE_UPLOAD_TARGETS?=release $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
@@ -272,7 +272,7 @@ else
 endif
 
 .PHONY: upload-artifacts
-upload-artifacts: s3-artifacts
+upload-artifacts:
 	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH) $(LATEST_TAG)
 
 .PHONY: s3-artifacts
