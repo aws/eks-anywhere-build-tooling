@@ -13,26 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
 
-BASE_IMAGE="${1?Specify first argument - base image}"
+PROJECT="$1"
+GIT_TAG="$2"
+OUTPUT_DIR="$3"
 
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-BUILD_LIB="${MAKE_ROOT}/../../../build/lib"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
 
-# to build git2go we need the headers and pc files for libgit which
-# are included in the base image
-# run buildctl to extract the files we needed into the host
-$BUILD_LIB/buildkit.sh build \
-  --frontend dockerfile.v0 \
-  --opt platform=linux/amd64 \
-  --opt build-arg:BASE_IMAGE=${BASE_IMAGE} \
-  --local dockerfile=${MAKE_ROOT}/build \
-  --opt filename=./Dockerfile.deps \
-  --local context=. \
-  --progress plain \
-  --output type=local,dest=/
+build::non-golang::gather_licenses $PROJECT $GIT_TAG $OUTPUT_DIR

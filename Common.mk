@@ -87,10 +87,8 @@ BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
 IMAGE_COMPONENT?=$(COMPONENT)
 IMAGE_DESCRIPTION?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
-IMAGE_CONTEXT_DIR?=.
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
-IMAGE_BUILD_ARGS?=
-DOCKERFILE_FOLDER?=./docker/linux
+IMAGE_TARGET?=
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
 IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
@@ -110,17 +108,35 @@ BINARY_TARGETS?=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS, $(BINARY_TARGET_FILE
 BINARY_TARGET_FILES?=
 SOURCE_PATTERNS?=.
 
+#### CGO ############
+CGO_CREATE_BINARIES?=false
+CGO_SOURCE=$(OUTPUT_DIR)/source
+IS_ON_BUILDER_BASE=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
+BUILDER_PLATFORM=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
+needs-cgo-builder=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter-out $(1),$(BUILDER_PLATFORM)),true,))
+######################
+
 #### BUILD FLAGS ####
+ifeq ($(CGO_CREATE_BINARIES),true)
+	CGO_ENABLED=1
+	GO_LDFLAGS?=-s -w -buildid= $(EXTRA_GO_LDFLAGS)
+	CGO_LDFLAGS?=-Wl,--build-id=none
+	EXTRA_GOBUILD_FLAGS?=-gcflags=-trimpath=$(MAKE_ROOT) -asmflags=-trimpath=$(MAKE_ROOT)
+else
+	CGO_ENABLED=0
+	GO_LDFLAGS?=-s -w -buildid= -extldflags -static $(EXTRA_GO_LDFLAGS)
+	CGO_LDFLAGS?=
+	EXTRA_GOBUILD_FLAGS?=
+endif
 EXTRA_GO_LDFLAGS?=
-GO_LDFLAGS=-s -w -buildid= -extldflags -static $(EXTRA_GO_LDFLAGS)
 GOBUILD_COMMAND?=build
-EXTRA_GOBUILD_FLAGS?=
 ######################
 
 #### HELPERS ########
 # https://riptutorial.com/makefile/example/23643/zipping-lists
 # Used to generate binary targets based on BINARY_TARGET_FILES
 list-rem = $(wordlist 2,$(words $1),$1)
+
 pairmap = $(and $(strip $2),$(strip $3),$(call \
     $1,$(firstword $2),$(firstword $3)) $(call \
     pairmap,$1,$(call list-rem,$2),$(call list-rem,$3)))
@@ -137,14 +153,13 @@ GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
 ####################################################
 
 #################### TARBALLS ######################
-
 # TODO: currently all projects push artifact tars to s3, change this to only those that are actually consumed
 # etcdadm,kind,cri-tools
 HAS_S3_ARTIFACTS?=false
 
 SIMPLE_CREATE_TARBALLS?=true
 TAR_FILE_PREFIX?=$(REPO)
-FAKE_ARM_IMAGES_FOR_VALIDATION?=false
+FAKE_ARM_ARTIFACTS_FOR_VALIDATION?=false
 ####################################################
 
 #################### OTHER #########################
@@ -169,6 +184,7 @@ define BUILDCTL
 		--progress plain \
 		--local dockerfile=$(DOCKERFILE_FOLDER) \
 		--local context=$(IMAGE_CONTEXT_DIR) \
+		--opt target=$(IMAGE_TARGET) \
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
 endef 
 
@@ -186,14 +202,29 @@ define BINARY_TARGETS_FROM_FILES_PLATFORMS
 endef
 
 define BINARY_TARGET_BODY_ALL_PLATFORMS
-	$(eval $(foreach platform, $(BINARY_PLATFORMS), $(call BINARY_TARGET_BODY,$(platform),$(1),$(2))))
+	$(eval $(foreach platform, $(BINARY_PLATFORMS), $(call $(if $(call needs-cgo-builder,$(platform)),CGO_BINARY_TARGET_BODY,BINARY_TARGET_BODY),$(platform),$(1),$(2))))
 endef
 
 define BINARY_TARGET_BODY
 	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): | $(if $(wildcard patches),$(GIT_PATCH_TARGET),) $(GIT_CHECKOUT_TARGET)
 		$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $$(MAKE_ROOT) \
 			$$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2) $$(REPO) $$(GOLANG_VERSION) $$(GIT_TAG) $(1) $(3) \
-			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" $$(REPO_SUBPATH)
+			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" $$(CGO_ENABLED) "$$(CGO_LDFLAGS)" $$(REPO_SUBPATH)
+
+endef
+
+# to avoid dealing with cross compling issues using a buildctl
+# multi-stage build to build the binaries for both amd64 and arm64
+# licenses and attribution are also run from the builder image since
+# the deps are all needed
+define CGO_BINARY_TARGET_BODY
+	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): | $(if $(wildcard patches),$(GIT_PATCH_TARGET),) $(GIT_CHECKOUT_TARGET)
+		@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/
+		rsync -rm  --exclude='.git/logs/***' \
+			--exclude='projects/$(COMPONENT)/_output/bin/***' --exclude='projects/$(COMPONENT)/$(REPO)/***' \
+			--include='projects/$(COMPONENT)/***' --include='*/' --exclude='projects/***'  \
+			$(BASE_DIRECTORY)/ $(CGO_SOURCE)/eks-anywhere-build-tooling/
+		$(MAKE) binary-builder/cgo/$(1:linux/%=%) IMAGE_OUTPUT=dest=$(OUTPUT_DIR)
 
 endef
 
@@ -279,7 +310,7 @@ upload-artifacts:
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_ARTIFACTS_FOR_VALIDATION)
 
 ##@ Checksum Targets
 	
@@ -291,7 +322,7 @@ checksums: $(BINARY_TARGETS)
 .PHONY: validate-checksums
 validate-checksums: ## Validate checksums of currently built binaries against checksums file.
 validate-checksums: $(BINARY_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
+	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_ARTIFACTS_FOR_VALIDATION)
 
 ## Image Targets
 
@@ -304,6 +335,9 @@ validate-checksums: $(BINARY_TARGETS)
 
 .PHONY: %/images/push %/images/amd64 %/images/arm64
 %/images/push %/images/amd64 %/images/arm64: IMAGE_NAME=$*
+%/images/push %/images/amd64 %/images/arm64: DOCKERFILE_FOLDER?=./docker/linux
+%/images/push %/images/amd64 %/images/arm64: IMAGE_CONTEXT_DIR?=.
+%/images/push %/images/amd64 %/images/arm64: IMAGE_BUILD_ARGS?=
 
 %/images/push: ## Build image using buildkit for all platforms, by default pushes to registry defined in IMAGE_REPO.
 %/images/push: IMAGE_PLATFORMS?=linux/amd64,linux/arm64
@@ -339,11 +373,27 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
 
+.PHONY: %/cgo/amd64 %/cgo/arm64
+%/cgo/amd64 %/cgo/arm64: IMAGE_OUTPUT_TYPE?=local
+%/cgo/amd64 %/cgo/arm64: DOCKERFILE_FOLDER?=./docker/build
+%/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
+%/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
+%/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
+
+%/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
+%/cgo/amd64:
+	@mkdir -p $(CGO_SOURCE)
+	$(BUILDCTL)
+
+%/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
+%/cgo/arm64:
+	@mkdir -p $(CGO_SOURCE)
+	$(BUILDCTL)
+
 ##@ Build Targets
 
 .PHONY: build
 build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images generate-attribution checksums` by default
-build: FAKE_ARM_IMAGES_FOR_VALIDATION=true
 build: $(BUILD_TARGETS)
 
 .PHONY: release
