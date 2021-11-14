@@ -121,7 +121,7 @@ ifeq ($(CGO_CREATE_BINARIES),true)
 	CGO_ENABLED=1
 	GO_LDFLAGS?=-s -w -buildid= $(EXTRA_GO_LDFLAGS)
 	CGO_LDFLAGS?=-Wl,--build-id=none
-	EXTRA_GOBUILD_FLAGS?=-gcflags=-trimpath=$$GOPATH -asmflags=-trimpath=$$GOPATH
+	EXTRA_GOBUILD_FLAGS?=-gcflags=-trimpath=$(MAKE_ROOT) -asmflags=-trimpath=$(MAKE_ROOT)
 else
 	CGO_ENABLED=0
 	GO_LDFLAGS?=-s -w -buildid= -extldflags -static $(EXTRA_GO_LDFLAGS)
