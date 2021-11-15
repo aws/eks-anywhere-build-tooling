@@ -1,5 +1,5 @@
 ## **Kustomize Controller**
-![Version](https://img.shields.io/badge/version-v0.11.1-blue)
+![Version](https://img.shields.io/badge/version-v0.18.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoibldOWFUyd2ZXOXR1WkNhSVZDZkprbEowWi9nNEZrN2RMcCtRK3EvQW9qbWUzQjcxVEZvTEZ6VUw3M004WHNKQ0M1MGJ4SlU0RUJvVE1YQ0hFT0hzZ21nPSIsIml2UGFyYW1ldGVyU3BlYyI6Ing4cTAwdG9pc1I0Qk81MlQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [kustomize-controller](https://github.com/fluxcd/kustomize-controller) is a Kubernetes operator, specialized in running continuous delivery pipelines for infrastructure and workloads defined with Kubernetes manifests and assembled with Kustomize.
@@ -37,3 +37,5 @@ a [dockerfile](https://github.com/fluxcd/kustomize-controller/blob/main/Dockerfi
 1. Verify no changes have been made to the [dockerfile](https://github.com/fluxcd/kustomize-controller/blob/main/Dockerfile) looking specifically for
 added runtime deps.
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=fluxcd/kustomize-controller` from the root of the repo.
+1. Update the version at the top of this Readme.
+1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.

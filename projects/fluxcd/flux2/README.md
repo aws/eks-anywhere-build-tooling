@@ -1,5 +1,5 @@
 ## **Flux**
-![Version](https://img.shields.io/badge/version-v0.13.1-blue)
+![Version](https://img.shields.io/badge/version-v0.23.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiYzRDM0E2d3BGeHZNenB4aVdRY0RqMkhoMUZBdjVHdjZsTSsrVEdhVEw1Sy9DREIwRUlwSEx4MFpoUVBiK2grUnhyT2JodmNVWUVaemFGR2JTOWhkWC9VPSIsIml2UGFyYW1ldGVyU3BlYyI6Im1VckJkV25QbHdyc0hRbmgiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Flux](https://github.com/fluxcd/flux2) is a tool for keeping Kubernetes clusters in sync with sources of configuration (like Git repositories), and automating updates to configuration when new code is deployed.
@@ -24,4 +24,6 @@ from our Makefile.
 a github release [action](https://github.com/fluxcd/flux2/blob/main/.github/workflows/release.yaml#L18) where the golang version
 is defined.
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=fluxcd/flux2` from the root of the repo.
+1. Update the version at the top of this Readme.
+1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
 1. Updating flux2 usually comes with updates to the source/helm/notification/kustomize-controller, make sure and update as well.

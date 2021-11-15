@@ -1,5 +1,5 @@
 ## **Notification Controller**
-![Version](https://img.shields.io/badge/version-v0.13.0-blue)
+![Version](https://img.shields.io/badge/version-v0.18.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiVDhSNCt1djNtRytnWTgvQ01BMW13b2Y1YmZPakRrSGlRWitKZ0ZLZUdaS2xxclpLOFNidnBHNjBFWjRueHpOaGRrMzV5OUhLLzhRWHgyaC85R2tET2JZPSIsIml2UGFyYW1ldGVyU3BlYyI6IlZpNGwrazFrZndNMWE4cTciLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [notification-controller](https://github.com/fluxcd/notification-controller) is a Kubernetes operator specialized in handling inbound and outbound events. The controller exposes an HTTP endpoint for receiving events from other controllers. It can be configured with Kubernetes custom resources such as `Alert`, `Event`,`Provider` and `Receiver` to define how events are processed and where to dispatch them.
@@ -22,3 +22,5 @@ a [dockerfile](https://github.com/fluxcd/notification-controller/blob/main/Docke
 1. Verify no changes have been made to the [dockerfile](https://github.com/fluxcd/notification-controller/blob/main/Dockerfile) looking specifically for
 added runtime deps.
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=fluxcd/notification-controller` from the root of the repo.
+1. Update the version at the top of this Readme.
+1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
