@@ -168,4 +168,4 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 
 ## Upstream projects tracker
 
-This repository has a [script](../../build/lib/generate_projects_list.sh) that generates a [list](../../UPSTREAM_PROJECTS.yaml) of the Github projects that are being built from this repository. When adding a new project, the `generate` target is to be used to re-generate this list and check in the updated file. This file must only be generated through the script and not edited by hand.
+This repository has a [script](../../build/lib/generate_projects_list.sh) that generates a [list](../../UPSTREAM_PROJECTS.yaml) of the Github projects that are being built from this repository, along with the tag or commit built. When adding a new project or bumping up the tag for a project, the `generate` target is to be used to re-generate this list and check in the updated file. This file must only be modified through the script and not edited by hand.
