@@ -9,6 +9,7 @@ LICENSE_PACKAGE_FILTER?=./cmd/flux
 
 BINARY_TARGET_FILES=flux
 SOURCE_PATTERNS=./cmd/flux
+EXTRA_GO_LDFLAGS=-X main.VERSION=$(GIT_TAG:v%=%)
 
 FLUX_MANIFESTS_TARGET=$(REPO)/cmd/flux/manifests
 
@@ -23,7 +24,8 @@ $(OUTPUT_BIN_DIR)/linux-amd64/flux $(OUTPUT_BIN_DIR)/linux-arm64/flux: $(FLUX_MA
 
 $(FLUX_MANIFESTS_TARGET): export PATH:=$(MAKE_ROOT)/$(OUTPUT_DIR):$(PATH)
 $(FLUX_MANIFESTS_TARGET): $(KUSTOMIZE_TARGET)
-	make -C $(REPO) cmd/flux/manifests
+	# EMBEDDED_MANIFESTS_TARGET from https://github.com/fluxcd/flux2/blob/main/Makefile#L2
+	make -C $(REPO) cmd/flux/.manifests.done
 
 .PHONY: local-images
 local-images: #noop
