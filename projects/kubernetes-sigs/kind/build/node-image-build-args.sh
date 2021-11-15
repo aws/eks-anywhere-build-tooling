@@ -46,13 +46,13 @@ EKSD_ASSET_URL=$(build::eksd_releases::get_eksd_kubernetes_asset_base_url $EKSD_
 
 # Expected versions provided by kind which are replaced in the docker build with our versions
 # when updating kind check the following, they may need to be updated
-# https://github.com/kubernetes-sigs/kind/blob/main/pkg/build/nodeimage/const_cni.go#L23
+# https://github.com/kubernetes-sigs/kind/blob/v0.11.1/pkg/build/nodeimage/const_cni.go#L23
 KINDNETD_IMAGE_TAG="docker.io/kindest/kindnetd:v20210326-1e038dc5"
-# https://github.com/kubernetes-sigs/kind/blob/main/pkg/build/nodeimage/const_storage.go#L28
+# https://github.com/kubernetes-sigs/kind/blob/v0.11.1/pkg/build/nodeimage/const_storage.go#L28
 DEBIAN_BASE_IMAGE_TAG="k8s.gcr.io/build-image/debian-base:v2.1.0"
-# https://github.com/kubernetes-sigs/kind/blob/main/pkg/build/nodeimage/const_storage.go#L28
+# https://github.com/kubernetes-sigs/kind/blob/v0.11.1/pkg/build/nodeimage/const_storage.go#L28
 LOCAL_PATH_PROVISONER_IMAGE_TAG="docker.io/rancher/local-path-provisioner:v0.0.14"
-# https://github.com/kubernetes-sigs/kind/blob/main/images/base/files/etc/containerd/config.toml#L22
+# https://github.com/kubernetes-sigs/kind/blob/v0.11.1/images/base/files/etc/containerd/config.toml#L22
 PAUSE_IMAGE_TAG="k8s.gcr.io/pause:3.5"
 
 mkdir -p $(dirname $OUTPUT_FILE)
@@ -73,4 +73,3 @@ DEBIAN_BASE_IMAGE_TAG=$DEBIAN_BASE_IMAGE_TAG
 LOCAL_PATH_PROVISONER_IMAGE_TAG=$LOCAL_PATH_PROVISONER_IMAGE_TAG
 PAUSE_IMAGE_TAG=$PAUSE_IMAGE_TAG
 EOF
- 

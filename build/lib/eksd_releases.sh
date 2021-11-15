@@ -36,7 +36,6 @@ function build::eksd_releases::load_release_yaml() {
 
 function build::eksd_releases::get_release_yaml_url() {
     local -r release_branch=$1
-    
     local -r release_number=$(yq e ".${release_branch}.number" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
     local -r yaml_url="https://distro.eks.amazonaws.com/kubernetes-${release_branch}/kubernetes-${release_branch}-eks-${release_number}.yaml"
     echo "$yaml_url"
