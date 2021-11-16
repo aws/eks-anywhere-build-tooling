@@ -21,10 +21,11 @@ IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazo
 
 #################### LATEST TAG ####################
 BRANCH_NAME?=main
-LATEST_TAG?=latest
+LATEST=latest
 ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
+	LATEST=$(BRANCH_NAME)
 endif
+LATEST_TAG?=$(LATEST)
 ####################################################
 
 #################### CODEBUILD #####################
@@ -46,12 +47,13 @@ GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
 HAS_RELEASE_BRANCHES?=false
 RELEASE_BRANCH?=
 SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
+BINARIES_ARE_RELEASE_BRANCHED?=true
 ifneq ($(RELEASE_BRANCH),)
 	RELEASE_BRANCH_SUFFIX=/$(RELEASE_BRANCH)
 
-	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)/$(RELEASE_BRANCH_SUFFIX)
-	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)
-	OUTPUT_DIR?=_output$(RELEASE_BRANCH_SUFFIX)
+	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)
+	OUTPUT_DIR?=_output$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)
+	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)	
 
 	# include release branch info in latest tag
 	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)

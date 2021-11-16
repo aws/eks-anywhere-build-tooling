@@ -24,7 +24,7 @@ HAS_RELEASE_BRANCHES=true
 # - REPO target is overridden to create empty folder
 
 # force binarys to go to non-release branch bin folder
-OUTPUT_DIR=_output
+BINARIES_ARE_RELEASE_BRANCHED=false
 
 # do not look for checksums in release branch folder, instead use project root
 PROJECT_ROOT=$(MAKE_ROOT)
