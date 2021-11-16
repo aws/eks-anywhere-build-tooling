@@ -122,7 +122,7 @@ release-ami-ubuntu-2004-%: setup-ami-share deps-ami setup-packer-configs-%
 
 .PHONY: release-ova-ubuntu-2004-%
 release-ova-ubuntu-2004-%: deps-ova setup-vsphere setup-packer-configs-%
-	PACKER_LOG=1 PACKER_LOG_PATH=$(OVA_PATH)/packer.log PACKER_VAR_FILES="$(OUTPUT_DIRECTORY)/$*/config/kubernetes.json $(PACKER_OVA_VAR_FILES) $(OUTPUT_DIRECTORY)/$*/config/common.json $(OUTPUT_DIRECTORY)/$*/config/cni.json $(OUTPUT_DIRECTORY)/$*/config/additional_components.json" \
+	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(OVA_PATH)/packer.log PACKER_VAR_FILES="$(OUTPUT_DIRECTORY)/$*/config/kubernetes.json $(PACKER_OVA_VAR_FILES) $(OUTPUT_DIRECTORY)/$*/config/common.json $(OUTPUT_DIRECTORY)/$*/config/cni.json $(OUTPUT_DIRECTORY)/$*/config/additional_components.json" \
 		OVF_CUSTOM_PROPERTIES="$(OUTPUT_DIRECTORY)/$*/config/ovf_custom_properties.json" \
 		make -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
 	build/get_artifacts.sh $(IMAGE_BUILDER_DIR) ubuntu
