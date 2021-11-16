@@ -41,6 +41,7 @@ endif
 #################### GIT ###########################
 GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
+GO_MOD_DOWNLOAD_TARGETS?=$(REPO)/eks-anywhere-go-mod-download
 ####################################################
 
 #################### RELEASE BRANCHES ##############
@@ -58,7 +59,7 @@ ifneq ($(RELEASE_BRANCH),)
 	# include release branch info in latest tag
 	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
-	$(filter-out build release upload-artifacts release-upload clean,$(MAKECMDGOALS))),)
+	$(filter-out build release upload-artifacts release-upload attribution clean,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
 $(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
 else ifeq ($(HAS_RELEASE_BRANCHES),true)
@@ -66,7 +67,8 @@ else ifeq ($(HAS_RELEASE_BRANCHES),true)
 	BUILD_TARGETS=build/release-branches/all
 	RELEASE_TARGETS=release/release-branches/all
 	RELEASE_UPLOAD_TARGETS=release-upload/release-branches/all
-
+	ATTRIBUTION_TARGETS=attribution/release-branches/all
+	
 	# avoid warnings when trying to read GIT_TAG file which wont exist when no release_branch is given
 	GIT_TAG=non-existent
 else
@@ -149,9 +151,11 @@ pairmap = $(and $(strip $2),$(strip $3),$(call \
 #################### LICENSES ######################
 LICENSE_PACKAGE_FILTER?=
 REPO_SUBPATH?=
-
-ATTRIBUTION_TARGET=$(wildcard ATTRIBUTION.txt) $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt)
-GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/attribution/go-license.csv
+HAS_LICENSES?=true
+ATTRIBUTION_TARGETS?=$(if $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt),$(RELEASE_BRANCH)/ATTRIBUTION.txt,ATTRIBUTION.txt)
+GATHER_LICENSES_TARGETS?=$(OUTPUT_DIR)/attribution/go-license.csv
+LICENSES_OUTPUT_DIR?=$(OUTPUT_DIR)
+LICENSES_TARGETS_FOR_PREREQ=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSES_TARGETS) $(OUTPUT_DIR)/ATTRIBUTION.txt,)
 ####################################################
 
 #################### TARBALLS ######################
@@ -169,7 +173,7 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums local-images generate-attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
+BUILD_TARGETS?=validate-checksums local-images attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
 RELEASE_TARGETS?=validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
 RELEASE_UPLOAD_TARGETS?=release $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
@@ -208,9 +212,9 @@ define BINARY_TARGET_BODY_ALL_PLATFORMS
 endef
 
 define BINARY_TARGET_BODY
-	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): | $(if $(wildcard patches),$(GIT_PATCH_TARGET),) $(GIT_CHECKOUT_TARGET)
+	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): $(GO_MOD_DOWNLOAD_TARGETS)
 		$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $$(MAKE_ROOT) \
-			$$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2) $$(REPO) $$(GOLANG_VERSION) $$(GIT_TAG) $(1) $(3) \
+			$$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2) $$(REPO) $$(GOLANG_VERSION) $(1) $(3) \
 			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" $$(CGO_ENABLED) "$$(CGO_LDFLAGS)" $$(REPO_SUBPATH)
 
 endef
@@ -220,13 +224,14 @@ endef
 # licenses and attribution are also run from the builder image since
 # the deps are all needed
 define CGO_BINARY_TARGET_BODY
-	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): | $(if $(wildcard patches),$(GIT_PATCH_TARGET),) $(GIT_CHECKOUT_TARGET)
+	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): $(GO_MOD_DOWNLOAD_TARGETS)
 		@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/
 		rsync -rm  --exclude='.git/logs/***' \
 			--exclude='projects/$(COMPONENT)/_output/bin/***' --exclude='projects/$(COMPONENT)/$(REPO)/***' \
 			--include='projects/$(COMPONENT)/***' --include='*/' --exclude='projects/***'  \
 			$(BASE_DIRECTORY)/ $(CGO_SOURCE)/eks-anywhere-build-tooling/
-		$(MAKE) binary-builder/cgo/$(1:linux/%=%) IMAGE_OUTPUT=dest=$(OUTPUT_DIR)
+		@mkdir -p $(OUTPUT_BIN_DIR)/$(subst /,-,$(1))
+		$(MAKE) binary-builder/cgo/$(1:linux/%=%) IMAGE_OUTPUT=dest=$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))
 
 endef
 
@@ -254,6 +259,9 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) am $(MAKE_ROOT)/patches/*
 	@touch $@
 
+%eks-anywhere-go-mod-download: $(if $(wildcard patches),$(GIT_PATCH_TARGET),) $(GIT_CHECKOUT_TARGET)
+	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(REPO_SUBPATH)
+	@touch $@
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
 $(call pairmap,BINARY_TARGET_BODY_ALL_PLATFORMS,$(BINARY_TARGET_FILES),$(SOURCE_PATTERNS))
@@ -274,35 +282,34 @@ $(OUTPUT_DIR)/images/%:
 	@mkdir -p $(@D)
 
 $(OUTPUT_DIR)/ATTRIBUTION.txt:
-	@cp $(ATTRIBUTION_TARGET) $(OUTPUT_DIR)
+	@cp $(ATTRIBUTION_TARGETS) $(OUTPUT_DIR)
 
 
 ##@ License Targets
 
 ## Gather licenses for project based on dependencies in REPO.
-$(GATHER_LICENSES_TARGET): $(BINARY_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR) "$(LICENSE_PACKAGE_FILTER)" $(REPO_SUBPATH)
+%/attribution/go-license.csv: $(GO_MOD_DOWNLOAD_TARGETS)
+	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) "$(LICENSE_PACKAGE_FILTER)" $(REPO_SUBPATH)
 
-$(ATTRIBUTION_TARGET): $(GATHER_LICENSES_TARGET)
-	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(OUTPUT_DIR) ATTRIBUTION.txt $(RELEASE_BRANCH)
+%ATTRIBUTION.txt: $(GATHER_LICENSES_TARGETS)
+	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) $(@F) $(RELEASE_BRANCH)
 
 .PHONY: gather-licenses
-gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGET) which gathers all licenses
-gather-licenses: $(GATHER_LICENSES_TARGET)
+gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
+gather-licenses: $(GATHER_LICENSES_TARGETS)
 
-.PHONY: generate-attribution
-generate-attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
-generate-attribution: $(ATTRIBUTION_TARGET)
+.PHONY: attribution
+attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
+attribution: $(ATTRIBUTION_TARGETS)
+
 
 ##@ Tarball Targets
 
 .PHONY: tarballs
 tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then calls build/create_tarballs.sh from project directory
-tarballs: $(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt
+tarballs: $(LICENSES_TARGETS_FOR_PREREQ)
 ifeq ($(SIMPLE_CREATE_TARBALLS),true)
 	$(BASE_DIRECTORY)/build/lib/simple_create_tarballs.sh $(TAR_FILE_PREFIX) $(MAKE_ROOT)/$(OUTPUT_DIR) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(ARTIFACTS_PATH) $(GIT_HASH)
-else
-	build/create_tarballs.sh $(REPO) $(GIT_TAG) $(RELEASE_BRANCH)
 endif
 
 .PHONY: upload-artifacts
@@ -345,7 +352,7 @@ validate-checksums: $(BINARY_TARGETS)
 %/images/push: IMAGE_PLATFORMS?=linux/amd64,linux/arm64
 %/images/push: IMAGE_OUTPUT_TYPE?=image
 %/images/push: IMAGE_OUTPUT?=push=true
-%/images/push: $(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt
+%/images/push: $(LICENSES_TARGETS_FOR_PREREQ)
 	$(BUILDCTL)
 
 .PHONY: helm/build
@@ -365,12 +372,12 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE?=oci
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).tar
 
-%/images/amd64: $(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt
+%/images/amd64: $(LICENSES_TARGETS_FOR_PREREQ)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
 
-%/images/arm64: $(GATHER_LICENSES_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt
+%/images/arm64: $(LICENSES_TARGETS_FOR_PREREQ)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
@@ -395,7 +402,7 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 ##@ Build Targets
 
 .PHONY: build
-build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images generate-attribution checksums` by default
+build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images attribution checksums` by default
 build: $(BUILD_TARGETS)
 
 .PHONY: release

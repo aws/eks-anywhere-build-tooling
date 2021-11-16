@@ -151,6 +151,10 @@ check-env-validation:
 		$(error Environment var TEMPLATE not set. Example: TEMPLATE=<ubuntu.livecd> make ...)
 	endif
 
+.PHONY: clean
+clean:
+	@rm -rf _output
+
 ## --------------------------------------
 ## Document dynamic build targets
 ## --------------------------------------

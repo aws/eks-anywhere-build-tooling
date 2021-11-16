@@ -31,7 +31,7 @@ $(OUTPUT_BIN_DIR)/linux-arm64/source-controller: | $(CGO_SOURCE)/linux-arm64/usr
 $(CGO_SOURCE)/linux-%/usr/lib64/libgit2.so:
 	$(MAKE) binary-builder-deps/cgo/$* IMAGE_TARGET=deps IMAGE_OUTPUT=dest=$(CGO_SOURCE)/linux-$*
 
-$(GATHER_LICENSES_TARGET): | $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET) $(LIBGIT2_LICENSES_TARGET)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET) $(LIBGIT2_LICENSES_TARGET)
 
 .PHONY: local-images
 local-images: source-controller/images/amd64
@@ -39,7 +39,7 @@ local-images: source-controller/images/amd64
 .PHONY: images
 images: source-controller/images/push
 
-$(FIX_LICENSES_XEIPUUV_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The xeipuuv dependency github repos all have licenses however they all do not have go.mod files
 # checked in to the repo. Hence we need to manually download licenses from Github for each of them 
 # and place them in the respective folders under vendor directory so that they is available for 
@@ -51,7 +51,7 @@ $(FIX_LICENSES_XEIPUUV_TARGET): | $(GIT_CHECKOUT_TARGET)
 			$$dest; \
 	done;
 
-$(FIX_LICENSES_API_LICENSE_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # Internal go.mod under /api directory
 	@mkdir -p $(@D)
 	cp $(REPO)/LICENSE $@

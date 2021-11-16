@@ -19,7 +19,7 @@ HAS_S3_ARTIFACTS=true
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(GATHER_LICENSES_TARGET): $(FIX_LICENSES_MOZILLA_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
+$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_MOZILLA_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
 .PHONY: local-images
 local-images: kustomize-controller/images/amd64
@@ -27,13 +27,13 @@ local-images: kustomize-controller/images/amd64
 .PHONY: images
 images: kustomize-controller/images/push
 
-$(FIX_LICENSES_MOZILLA_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_MOZILLA_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The mozilla-services/gopgagent does not have a license file checked into the repo, but there is a currently open PR
 # https://github.com/mozilla-services/gopgagent/pull/4 which adds it. Until this is merged, we need to fetch the license
 # file from the commit and not from main/master.
 	wget -q -O $@ \
 		https://raw.githubusercontent.com/mozilla-services/gopgagent/39936d55b621318e919509000af38573d91c42ad/LICENSE.txt
 
-$(FIX_LICENSES_API_LICENSE_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # Internal go.mod under /api directory
 	cp $(REPO)/LICENSE $@
