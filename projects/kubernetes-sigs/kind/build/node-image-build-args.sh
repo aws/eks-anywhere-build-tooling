@@ -20,8 +20,10 @@ EKSD_RELEASE_BRANCH="$1"
 KINDNETD_IMAGE_COMPONENT="$2"
 IMAGE_REPO="$3"
 ARTIFACTS_BUCKET="$4"
-LATEST_TAG="$5"
-OUTPUT_FILE="$6"
+IMAGE_TAG="$5"
+LATEST_TAG="$6"
+LATEST="$7"
+OUTPUT_FILE="$8"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BUILD_LIB="${MAKE_ROOT}/../../../build/lib"
@@ -29,10 +31,10 @@ source "${BUILD_LIB}/common.sh"
 
 # This is used by the local-path-provisioner within the kind node
 AL2_HELPER_IMAGE="public.ecr.aws/amazonlinux/amazonlinux:2"
-LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE="$IMAGE_REPO/rancher/local-path-provisioner:latest"
+LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE="$IMAGE_REPO/rancher/local-path-provisioner:$LATEST"
 LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE="public.ecr.aws/eks-anywhere/rancher/local-path-provisioner:$(cat $MAKE_ROOT/../../rancher/local-path-provisioner/GIT_TAG)"
 KIND_KINDNETD_RELEASE_OVERRIDE="public.ecr.aws/eks-anywhere/kubernetes-sigs/kind/kindnetd:$(cat $MAKE_ROOT/GIT_TAG)"
-KIND_KINDNETD_IMAGE_OVERRIDE="$IMAGE_REPO/$KINDNETD_IMAGE_COMPONENT:latest"
+KIND_KINDNETD_IMAGE_OVERRIDE="$IMAGE_REPO/$KINDNETD_IMAGE_COMPONENT:$LATEST"
 
 # Preload release yaml
 build::eksd_releases::load_release_yaml $EKSD_RELEASE_BRANCH
@@ -72,4 +74,5 @@ KINDNETD_IMAGE_TAG=$KINDNETD_IMAGE_TAG
 DEBIAN_BASE_IMAGE_TAG=$DEBIAN_BASE_IMAGE_TAG
 LOCAL_PATH_PROVISONER_IMAGE_TAG=$LOCAL_PATH_PROVISONER_IMAGE_TAG
 PAUSE_IMAGE_TAG=$PAUSE_IMAGE_TAG
+IMAGE_TAG=$EKSD_KUBE_VERSION-$IMAGE_TAG
 EOF

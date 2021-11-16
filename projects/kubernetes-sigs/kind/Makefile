@@ -14,7 +14,7 @@ BINARY_PLATFORMS_KINDNETD=linux/amd64 linux/arm64
 BINARY_TARGETS+=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS,kindnetd,$(BINARY_PLATFORMS_KINDNETD))
 
 # force binarys to go to non-release branch bin folder
-OUTPUT_DIR=_output
+BINARIES_ARE_RELEASE_BRANCHED=false
 
 # do not look for checksums in release branch folder, instead use project root
 PROJECT_ROOT=$(MAKE_ROOT)
@@ -44,13 +44,13 @@ HAS_RELEASE_BRANCHES=true
 # Binary targets are added manually in this makefile instead of relying on simple_create logic
 SIMPLE_CREATE_BINARIES=false
 
+include $(BASE_DIRECTORY)/Common.mk
+
+
 ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS))),)
 -include $(KIND_BASE_IMAGE_BUILD_ARGS)
 -include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
-
-include $(BASE_DIRECTORY)/Common.mk
-
 
 $(OUTPUT_BIN_DIR)/%/kindnetd: REPO_SUBPATH=images/kindnetd
 
@@ -64,7 +64,7 @@ $(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BO
 # Kindnetd
 kindnetd/images/%: DOCKERFILE_FOLDER=./images/kindnetd
 kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_IPTABLES_BASE_IMAGE_NAME)
-kindnetd/images/%: LATEST_TAG=latest
+kindnetd/images/%: LATEST_TAG=$(LATEST)
 $(call IMAGE_TARGETS_FOR_NAME, kindnetd): $(KINDNETD_GATHER_LICENSES_TARGET)
 
 # Kind-base
@@ -92,7 +92,7 @@ kind-node/images/%: DOCKERFILE_FOLDER=./images/node
 kind-node/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/dependencies
 kind-node/images/%: BUILDER_IMAGE=$(INTERMEDIATE_NODE_IMAGE)
 kind-node/images/%: BASE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):latest
-kind-node/images/%: IMAGE_TAG=$(EKSD_KUBE_VERSION)
+kind-node/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
 kind-node/images/%: IMAGE_BUILD_ARGS=IMAGE_REPO AL2_HELPER_IMAGE DEBIAN_BASE_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE \
 	PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG KIND_KINDNETD_IMAGE_OVERRIDE KINDNETD_IMAGE_TAG
 $(call IMAGE_TARGETS_FOR_NAME, kind-node): $(KIND_NODE_IMAGE_BUILD_ARGS)
@@ -115,7 +115,7 @@ $(KIND_BASE_IMAGE_BUILD_ARGS):
 	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@
 
 $(KIND_NODE_IMAGE_BUILD_ARGS):
-	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) $(ARTIFACTS_BUCKET) $(LATEST_TAG) $@
+	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) $(ARTIFACTS_BUCKET) $(IMAGE_TAG) $(LATEST_TAG) $(LATEST) $@
 
 # Tweak the kind/base image to have a hardcode kubeadm config
 # so that during the image pull phase it pulls eks-d images
