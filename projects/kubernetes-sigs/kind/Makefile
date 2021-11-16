@@ -64,6 +64,7 @@ $(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BO
 # Kindnetd
 kindnetd/images/%: DOCKERFILE_FOLDER=./images/kindnetd
 kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_IPTABLES_BASE_IMAGE_NAME)
+kindnetd/images/%: LATEST_TAG=latest
 $(call IMAGE_TARGETS_FOR_NAME, kindnetd): $(KINDNETD_GATHER_LICENSES_TARGET)
 
 # Kind-base
