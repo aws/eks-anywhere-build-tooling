@@ -44,13 +44,13 @@ HAS_RELEASE_BRANCHES=true
 # Binary targets are added manually in this makefile instead of relying on simple_create logic
 SIMPLE_CREATE_BINARIES=false
 
+include $(BASE_DIRECTORY)/Common.mk
+
+
 ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS))),)
 -include $(KIND_BASE_IMAGE_BUILD_ARGS)
 -include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
-
-include $(BASE_DIRECTORY)/Common.mk
-
 
 $(OUTPUT_BIN_DIR)/%/kindnetd: REPO_SUBPATH=images/kindnetd
 
@@ -92,7 +92,6 @@ kind-node/images/%: DOCKERFILE_FOLDER=./images/node
 kind-node/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/dependencies
 kind-node/images/%: BUILDER_IMAGE=$(INTERMEDIATE_NODE_IMAGE)
 kind-node/images/%: BASE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):latest
-kind-node/images/%: IMAGE_TAG:=$(EKSD_KUBE_VERSION)-$(IMAGE_TAG)
 kind-node/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
 kind-node/images/%: IMAGE_BUILD_ARGS=IMAGE_REPO AL2_HELPER_IMAGE DEBIAN_BASE_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE \
 	PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG KIND_KINDNETD_IMAGE_OVERRIDE KINDNETD_IMAGE_TAG
@@ -116,7 +115,7 @@ $(KIND_BASE_IMAGE_BUILD_ARGS):
 	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@
 
 $(KIND_NODE_IMAGE_BUILD_ARGS):
-	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) $(ARTIFACTS_BUCKET) $(LATEST_TAG) $(LATEST) $@
+	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) $(ARTIFACTS_BUCKET) $(IMAGE_TAG) $(LATEST_TAG) $(LATEST) $@
 
 # Tweak the kind/base image to have a hardcode kubeadm config
 # so that during the image pull phase it pulls eks-d images
