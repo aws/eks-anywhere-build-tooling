@@ -61,10 +61,10 @@ RELEASE_TARGETS+=$(addprefix release-ova-bottlerocket-, $(SUPPORTED_K8S_VERSIONS
 # Kubeadm hardcodes the version of the pause image it pulls, even tho containerd config
 # overrides which image is actually used
 # Setting up this mapping so we can build the additional image into the image
-ADDITIONAL_PAUSE_1-18_FROM=1-18
-ADDITIONAL_PAUSE_1-19_FROM=1-18
-ADDITIONAL_PAUSE_1-20_FROM=1-19
-ADDITIONAL_PAUSE_1-21_FROM=1-20
+ADDITIONAL_PAUSE_1-18=3.2
+ADDITIONAL_PAUSE_1-19=3.2
+ADDITIONAL_PAUSE_1-20=3.2
+ADDITIONAL_PAUSE_1-21=3.4.1
 
 .PHONY: setup-ami-share
 setup-ami-share:
@@ -104,7 +104,7 @@ upload-artifacts-%:
 
 .PHONY: setup-packer-configs-%
 setup-packer-configs-%:
-	build/setup_packer_configs.sh $* $(ARTIFACTS_BUCKET) $(OVA_PATH) $(ADDITIONAL_PAUSE_$*_FROM)
+	build/setup_packer_configs.sh $* $(ARTIFACTS_BUCKET) $(OVA_PATH) $(ADDITIONAL_PAUSE_$*)
 
 .PHONY: build-ami-ubuntu-2004-%
 build-ami-ubuntu-2004-%: setup-ami-share deps-ami setup-packer-configs-%
