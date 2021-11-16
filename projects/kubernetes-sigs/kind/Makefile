@@ -84,7 +84,7 @@ kind-base-versioned/images/%: BUILDER_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_
 $(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_KUBEADM_OVERRIDE)
 
 # Avoid pushing to remote repo, this image is used by the `kind build node-image`
-kind-base-versioned/images/push: IMAGE_REPO=$(LOCAL_REGISTRY)
+kind-base/images/push kind-base-versioned/images/push: IMAGE_REPO=$(LOCAL_REGISTRY)
 
 # Kind-node
 kind-node/images/%: DOCKERFILE_FOLDER=./images/node
