@@ -15,8 +15,6 @@ SOURCE_PATTERNS=./cmd/vsphere-cloud-controller-manager
 
 IMAGE_COMPONENT=kubernetes/cloud-provider-vsphere/cpi/manager
 
-HAS_S3_ARTIFACTS=false
-
 HAS_RELEASE_BRANCHES=true
 
 include $(BASE_DIRECTORY)/Common.mk

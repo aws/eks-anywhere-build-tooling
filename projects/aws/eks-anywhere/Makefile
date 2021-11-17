@@ -6,7 +6,6 @@ REPO_OWNER=aws
 
 BASE_IMAGE_NAME?=eks-distro-base
 
-HAS_S3_ARTIFACTS=false
 SIMPLE_CREATE_BINARIES=false
 HAS_LICENSES=false
 

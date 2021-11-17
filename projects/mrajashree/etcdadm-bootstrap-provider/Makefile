@@ -11,8 +11,6 @@ BINARY_TARGET_FILES=manager
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
-HAS_S3_ARTIFACTS=false
-
 include $(BASE_DIRECTORY)/Common.mk
 
 

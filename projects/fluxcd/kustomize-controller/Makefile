@@ -14,8 +14,6 @@ FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/kustomize-contr
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-git
 
-HAS_S3_ARTIFACTS=false
-
 include $(BASE_DIRECTORY)/Common.mk
 
 
