@@ -75,7 +75,7 @@ kindnetd/images/%: LATEST_TAG=latest
 kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/images/base
 kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=eks-distro-base
 kind-base/images/% kind-base-versioned/images/%: IMAGE_BUILD_ARGS=CNI_PLUGINS_AMD64_URL CNI_PLUGINS_ARM64_URL CNI_PLUGINS_AMD64_SHA256SUM \
-	CNI_PLUGINS_ARM64_SHA256SUM CRICTL_AMD64_SHA256SUM CRICTL_ARM64_SHA256SUM CRICTL_AMD64_URL CRICTL_ARM64_URL
+	CNI_PLUGINS_ARM64_SHA256SUM CRICTL_AMD64_SHA256SUM_URL CRICTL_ARM64_SHA256SUM_URL CRICTL_AMD64_URL CRICTL_ARM64_URL
 
 kind-base/images/%: IMAGE_TARGET=base
 kind-base/images/%: IMAGE_TAG=latest
