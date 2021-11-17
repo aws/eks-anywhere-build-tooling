@@ -14,7 +14,7 @@ FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/helm-controller
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
 
-HAS_S3_ARTIFACTS=true
+HAS_S3_ARTIFACTS=false
 
 include $(BASE_DIRECTORY)/Common.mk
 

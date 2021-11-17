@@ -11,7 +11,7 @@ LICENSE_PACKAGE_FILTER?=.
 
 BINARY_TARGET_FILES=kube-rbac-proxy
 
-HAS_S3_ARTIFACTS=true
+HAS_S3_ARTIFACTS=false
 
 include $(BASE_DIRECTORY)/Common.mk
 

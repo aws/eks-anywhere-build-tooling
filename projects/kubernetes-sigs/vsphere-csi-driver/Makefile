@@ -17,7 +17,7 @@ CSI_SYNCER_IMAGE_COMPONENT=kubernetes-sigs/vsphere-csi-driver/csi/syncer
 
 OUTPUT_FILES_TARGET=$(OUTPUT_DIR)/files
 
-HAS_S3_ARTIFACTS=true
+HAS_S3_ARTIFACTS=false
 
 include $(BASE_DIRECTORY)/Common.mk
 
