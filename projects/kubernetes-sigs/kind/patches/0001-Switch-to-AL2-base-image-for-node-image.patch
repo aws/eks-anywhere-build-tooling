@@ -1,4 +1,4 @@
-From 1dbbbf4976adcc7ceb93b0a9f46e625c3f92c765 Mon Sep 17 00:00:00 2001
+From 0d2af05bf029506e0e563d9e6cb515963d1333e9 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 22 Jul 2021 12:59:46 -0500
 Subject: [PATCH] Switch to AL2 base image for node image
@@ -10,7 +10,7 @@ Signed-off-by: Jackson West <jgw@amazon.com>
  2 files changed, 70 insertions(+), 78 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index ec8fcd7c..a7c861de 100644
+index ec8fcd7c..436f9854 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -20,40 +20,24 @@
@@ -22,9 +22,9 @@ index ec8fcd7c..a7c861de 100644
 +FROM $BASE_IMAGE as base-amd64
 +
 +ARG CRICTL_AMD64_URL
-+ARG CRICTL_AMD64_SHA256SUM
++ARG CRICTL_AMD64_SHA256SUM_URL
 +ARG CRICTL_URL=${CRICTL_AMD64_URL}
-+ARG CRICTL_SHA256SUM=${CRICTL_AMD64_SHA256SUM}
++ARG CRICTL_SHA256SUM_URL=${CRICTL_AMD64_SHA256SUM_URL}
  
 -# `docker buildx` automatically sets this arg value, but we add the arg for
 -# regular `docker bulid` invocations to force a selection
@@ -61,9 +61,9 @@ index ec8fcd7c..a7c861de 100644
 +FROM $BASE_IMAGE as base-arm64
 +
 +ARG CRICTL_ARM64_URL
-+ARG CRICTL_ARM64_SHA256SUM
++ARG CRICTL_ARM64_SHA256SUM_URL
 +ARG CRICTL_URL=${CRICTL_ARM64_URL}
-+ARG CRICTL_SHA256SUM=${CRICTL_ARM64_SHA256SUM}
++ARG CRICTL_SHA256SUM_URL=${CRICTL_ARM64_SHA256SUM_URL}
 +
 +ARG TARGETARCH
 +FROM base-$TARGETARCH as base
@@ -119,7 +119,7 @@ index ec8fcd7c..a7c861de 100644
 -    && echo "${CRICTL_ARM64_SHA256SUM}  /tmp/crictl.arm64.tgz" | tee -a /tmp/crictl.sha256 \
 -    && echo "${CRICTL_PPC64LE_SHA256SUM}  /tmp/crictl.ppc64le.tgz" | tee -a /tmp/crictl.sha256 \
 -    && sha256sum --ignore-missing -c /tmp/crictl.sha256 \
-+    && echo "${CRICTL_SHA256SUM}  /tmp/crictl.${TARGETARCH}.tgz" | tee /tmp/crictl.sha256 \
++    && echo "$(curl $CRICTL_SHA256SUM_URL | cut -d ' ' -f1)  /tmp/crictl.${TARGETARCH}.tgz" | tee /tmp/crictl.sha256 \
 +    && sha256sum -c /tmp/crictl.sha256 \
      && rm -f /tmp/crictl.sha256 \
      && tar -C /usr/local/bin -xzvf /tmp/crictl.${TARGETARCH}.tgz \
