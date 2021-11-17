@@ -4,6 +4,8 @@ GIT_TAG?=$(shell cat GIT_TAG)
 REPO=eks-anwyhere-build-tooling
 REPO_OWNER=aws
 
+IMAGE_COMPONENT=eks-anywhere-cli-tools
+
 BASE_IMAGE_NAME?=eks-distro-minimal-base-docker-client
 
 SIMPLE_CREATE_BINARIES=false
