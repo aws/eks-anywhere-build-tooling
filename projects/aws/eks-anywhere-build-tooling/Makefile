@@ -1,8 +1,8 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
 
-REPO=aws
-REPO_OWNER=eks-anwyhere-build-tooling
+REPO=eks-anwyhere-build-tooling
+REPO_OWNER=aws
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-docker-client
 
