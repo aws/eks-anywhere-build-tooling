@@ -118,10 +118,11 @@ function build::kind::load_images(){
     release_image_overrides["$KIND_KINDNETD_IMAGE_OVERRIDE"]=$KIND_KINDNETD_RELEASE_OVERRIDE
 
     for image in "${IMAGES[@]}"; do
-        if ! docker image inspect $image > /dev/null 2>&1; then
-            docker pull --platform linux/$ARCH $image
-        fi
+        # docker pull when passing a platform will pull the image for the given platform
+        # and that new image id will "take over" the tag which we can use to trigger the save
+        docker pull --platform linux/$ARCH $image
         image_id=$(docker images $image --format "{{.ID}}")
+
         if [ ! -f $MAKE_ROOT/_output/dependencies/$image_id.tar ]; then
             if [[ $image =~ local-path-provisioner ]] || [[ $image =~ kindnetd ]]; then
                 docker tag $image_id ${release_image_overrides[$image]}
@@ -132,6 +133,12 @@ function build::kind::load_images(){
         fi
         docker exec --privileged -i $CONTAINER_ID \
             ctr --namespace=k8s.io images import --all-platforms --no-unpack - < $MAKE_ROOT/_output/dependencies/$image_id.tar
+
+        if [[ $ARCH != $(docker exec --privileged -i $CONTAINER_ID \
+            crictl inspecti -o go-template --template={{.info.imageSpec.architecture}} $image_id) ]]; then
+            echo "saved image: $image is not the correct arch: $ARCH!"
+            exit 1
+        fi
     done
 
     docker exec --privileged -i $CONTAINER_ID crictl images
