@@ -15,7 +15,6 @@ EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api
 
 IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-vsphere/release/manager
 
-HAS_S3_ARTIFACTS=false
 
 include $(BASE_DIRECTORY)/Common.mk
 
