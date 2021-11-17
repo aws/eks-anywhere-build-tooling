@@ -12,21 +12,21 @@ ARG IMAGE_REPO
 ARG AL2_HELPER_IMAGE
 ARG LOCAL_PATH_PROVISONER_IMAGE_TAG
 ARG DEBIAN_BASE_IMAGE_TAG
-ARG LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE
+ARG LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE
 ARG PAUSE_IMAGE_TAG_OVERRIDE
 ARG PAUSE_IMAGE_TAG
 ARG KINDNETD_IMAGE_TAG
-ARG KIND_KINDNETD_IMAGE_OVERRIDE
+ARG KIND_KINDNETD_RELEASE_OVERRIDE
 
 
 # remove kubeadm override script and containerd/runc
 RUN rm /usr/local/bin/kubeadm && \
  rm /etc/kubeadm.config
 
-RUN sed -i "s,image: $LOCAL_PATH_PROVISONER_IMAGE_TAG,image: $LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE," /kind/manifests/default-storage.yaml 
+RUN sed -i "s,image: $LOCAL_PATH_PROVISONER_IMAGE_TAG,image: $LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE," /kind/manifests/default-storage.yaml 
 RUN sed -i "s,$DEBIAN_BASE_IMAGE_TAG,$AL2_HELPER_IMAGE," /kind/manifests/default-storage.yaml 
 RUN sed -i "s,$PAUSE_IMAGE_TAG,$PAUSE_IMAGE_TAG_OVERRIDE," /etc/containerd/config.toml
-RUN sed -i "s,image: $KINDNETD_IMAGE_TAG,image: $KIND_KINDNETD_IMAGE_OVERRIDE," /kind/manifests/default-cni.yaml
+RUN sed -i "s,image: $KINDNETD_IMAGE_TAG,image: $KIND_KINDNETD_RELEASE_OVERRIDE," /kind/manifests/default-cni.yaml
 
 # Add licenses/attribution + etcdadm + etcd tarball
 COPY LICENSES /LICENSES
