@@ -159,7 +159,7 @@ function build::kind::load_images(){
 
 
 function build::kind::download_additional_components() {
-    OUTPUT_FOLDER="$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies"
+    OUTPUT_FOLDER="$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH"
 
     declare -A URLS=([$(build::eksd_releases::get_eksd_kubernetes_asset_url kubernetes-client-linux-$ARCH.tar.gz $EKSD_RELEASE_BRANCH $ARCH)]="kubernetes"
                   [$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm' $ARCH)]="etcdadm"
@@ -186,8 +186,8 @@ function build::kind::download_additional_components() {
     done
     
     # Download etcd tarball to be placed in etcdadm cache directory to avoid downloading at runtime
-    ETCD_HTTP_SOURCE=$(build::eksd_releases::get_eksd_component_url "etcd" $EKSD_RELEASE_BRANCH)
-    ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_RELEASE_BRANCH)
+    ETCD_HTTP_SOURCE=$(build::eksd_releases::get_eksd_component_url "etcd" $EKSD_RELEASE_BRANCH $ARCH)
+    ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_RELEASE_BRANCH $ARCH)
     FOLDER="$OUTPUT_FOLDER/cache/etcdadm/etcd/$ETCD_VERSION"
     mkdir -p $FOLDER
     curl -sSL $ETCD_HTTP_SOURCE -o $FOLDER/etcd-$ETCD_VERSION-linux-$ARCH.tar.gz

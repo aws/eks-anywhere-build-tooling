@@ -8,6 +8,9 @@ FROM $BUILDER_IMAGE-arm64 AS builder-arm64
 ARG TARGETARCH
 FROM builder-${TARGETARCH} AS builder
 
+ARG TARGETOS
+ARG TARGETARCH
+
 ARG IMAGE_REPO
 ARG AL2_HELPER_IMAGE
 ARG LOCAL_PATH_PROVISONER_IMAGE_TAG
@@ -29,10 +32,9 @@ RUN sed -i "s,$PAUSE_IMAGE_TAG,$PAUSE_IMAGE_TAG_OVERRIDE," /etc/containerd/confi
 RUN sed -i "s,image: $KINDNETD_IMAGE_TAG,image: $KIND_KINDNETD_RELEASE_OVERRIDE," /kind/manifests/default-cni.yaml
 
 # Add licenses/attribution + etcdadm + etcd tarball
-COPY LICENSES /LICENSES
-COPY etcdadm/etcdadm \
-     /usr/bin/
-COPY cache/etcdadm /var/cache/etcdadm
+COPY $TARGETOS-$TARGETARCH/LICENSES /LICENSES
+COPY $TARGETOS-$TARGETARCH/etcdadm/etcdadm /usr/bin/
+COPY $TARGETOS-$TARGETARCH/cache/etcdadm /var/cache/etcdadm
 
 # AL2 doesn't setup the ip6tables alternative the same as ubuntu
 # since kind's entrypoint assumes this adding the alternative
