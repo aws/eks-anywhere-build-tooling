@@ -288,10 +288,10 @@ $(OUTPUT_DIR)/ATTRIBUTION.txt:
 ##@ License Targets
 
 ## Gather licenses for project based on dependencies in REPO.
-%/attribution/go-license.csv: $(GO_MOD_DOWNLOAD_TARGETS)
+$(GATHER_LICENSES_TARGETS): $(GO_MOD_DOWNLOAD_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) "$(LICENSE_PACKAGE_FILTER)" $(REPO_SUBPATH)
 
-%ATTRIBUTION.txt: $(GATHER_LICENSES_TARGETS)
+$(ATTRIBUTION_TARGETS): $(GATHER_LICENSES_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) $(@F) $(RELEASE_BRANCH)
 
 .PHONY: gather-licenses
