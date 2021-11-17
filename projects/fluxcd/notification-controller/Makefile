@@ -19,7 +19,7 @@ HAS_S3_ARTIFACTS=true
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(GATHER_LICENSES_TARGET): $(FIX_LICENSES_K0KUBUN_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
+$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_K0KUBUN_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
 .PHONY: local-images
 local-images: notification-controller/images/amd64
@@ -27,11 +27,11 @@ local-images: notification-controller/images/amd64
 .PHONY: images
 images: notification-controller/images/push
 
-$(FIX_LICENSES_API_LICENSE_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # Internal go.mod under /api directory
 	cp $(REPO)/LICENSE $@
 
-$(FIX_LICENSES_K0KUBUN_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_K0KUBUN_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The notification-controller project consumes an older version (v2.3.0) of the k0kubun/pp module 
 # which does not have a LICENSE file committed to the repo. Hence we are fetching the license file 
 # from the master branch so that it is available in the vendor directory for go-licenses to pick up

@@ -8,15 +8,15 @@ BASE_IMAGE_NAME?=eks-distro-base
 
 HAS_S3_ARTIFACTS=false
 SIMPLE_CREATE_BINARIES=false
+HAS_LICENSES=false
+
 IMAGE_COMPONENT=eks-anywhere-diagnostic-collector
 
+BUILD_TARGETS=local-images
+RELEASE_TARGETS=images
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
-# overriding targets called by build + release to be no-ops 
-# these do not apply here since there is no binary/checksums/attribution/licenses
-validate-checksums $(GATHER_LICENSES_TARGET) generate-attribution $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
 
 $(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-diagnostic-collector): fetch-binaries
 

@@ -6,12 +6,15 @@ REPO=cilium
 REPO_OWNER=cilium
 
 HAS_S3_ARTIFACTS=true
+SIMPLE_CREATE_BINARIES=false
+SIMPLE_CREATE_TARBALLS=false
+HAS_LICENSES=false
+
+BUILD_TARGETS=s3-artifacts
+RELEASE_TARGETS=s3-artifacts
 
 include $(BASE_DIRECTORY)/Common.mk
 
-# overriding targets called by build + release to be no-ops 
-# these do not apply here since there is no binary/checksums/attribution/licenses
-local-images images tarballs validate-checksums $(GATHER_LICENSES_TARGET) generate-attribution $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
 
 s3-artifacts: create-manifests
 

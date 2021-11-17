@@ -19,7 +19,7 @@ HAS_S3_ARTIFACTS=true
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(GATHER_LICENSES_TARGET): $(FIX_LICENSES_TARGET)
+$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_TARGET)
 
 $(FIX_LICENSES_TARGET):
 # The tj/go-spin dependency github repo has a license file however it does not have a go.mod file
