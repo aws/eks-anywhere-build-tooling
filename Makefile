@@ -61,6 +61,13 @@ clean:
 	make -C projects/mrajashree/etcdadm-bootstrap-provider clean
 	make -C projects/mrajashree/etcdadm-controller clean
 	make -C projects/aws/bottlerocket-bootstrap clean
+	make -C projects/replicatedhq/troubleshoot clean
+
+	make -C projects/kubernetes-sigs/image-builder clean
+	make -C projects/aws/eks-anywhere-test clean
+	make -C projects/aws/eks-anywhere-build-tooling clean
+	make -C projects/cilium/cilium clean
+
 	rm -rf _output
 
 .PHONY: attribution-files
@@ -86,6 +93,7 @@ attribution-files:
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-bootstrap-provider
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-controller
 	build/update-attribution-files/make_attribution.sh projects/aws/bottlerocket-bootstrap
+	build/update-attribution-files/make_attribution.sh projects/replicatedhq/troubleshoot
 
 	cat _output/total_summary.txt
 

@@ -19,7 +19,7 @@ HAS_S3_ARTIFACTS=true
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(GATHER_LICENSES_TARGET): $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
+$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
 .PHONY: local-images
 local-images: helm-controller/images/amd64
@@ -27,7 +27,7 @@ local-images: helm-controller/images/amd64
 .PHONY: images
 images: helm-controller/images/push
 
-$(FIX_LICENSES_XEIPUUV_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The xeipuuv dependency github repos all have licenses however they all do not have go.mod files
 # checked in to the repo. Hence we need to manually download licenses from Github for each of them 
 # and place them in the respective folders under vendor directory so that they is available for 
@@ -37,6 +37,6 @@ $(FIX_LICENSES_XEIPUUV_TARGET): | $(GIT_CHECKOUT_TARGET)
 			$(REPO)/vendor/github.com/xeipuuv/$$package/LICENSE.txt; \
 	done;
 
-$(FIX_LICENSES_API_LICENSE_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # Internal go.mod under /api directory
 	cp $(REPO)/LICENSE $@

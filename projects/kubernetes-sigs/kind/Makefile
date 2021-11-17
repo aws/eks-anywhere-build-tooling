@@ -22,8 +22,9 @@ PROJECT_ROOT=$(MAKE_ROOT)
 BASE_IMAGE_NAME?=eks-distro-base
 MINIMAL_IPTABLES_BASE_IMAGE_NAME?=eks-distro-minimal-base-iptables
 
-KINDNETD_GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv
-KINDNETD_ATTRIBUTION_TARGET=KINDNETD_ATTRIBUTION.txt
+GO_MOD_DOWNLOAD_TARGETS=$(REPO)/eks-anywhere-go-mod-download $(REPO)/images/kindnetd/eks-anywhere-go-mod-download
+GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/attribution/go-license.csv $(OUTPUT_DIR)/kindnetd/attribution/go-license.csv
+ATTRIBUTION_TARGETS=ATTRIBUTION.txt KINDNETD_ATTRIBUTION.txt
 
 KIND_BASE_IMAGE_COMPONENT=kindest/base
 KIND_BASE_VERSIONED_IMAGE_COMPONENT=kindest/base
@@ -52,9 +53,13 @@ ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS))),)
 -include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
 
-$(OUTPUT_BIN_DIR)/%/kindnetd: REPO_SUBPATH=images/kindnetd
+$(OUTPUT_BIN_DIR)/%/kindnetd $(REPO)/images/kindnetd/eks-anywhere-go-mod-download \
+	$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv: REPO_SUBPATH=images/kindnetd
 
 $(OUTPUT_BIN_DIR)/%/kind: EXTRA_GO_LDFLAGS=-X=sigs.k8s.io/kind/pkg/cmd/kind/version.GitCommit=$(shell git -C $(REPO) rev-list -n 1  "${GIT_TAG}")
+
+$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv KINDNETD_ATTRIBUTION.txt: LICENSE_PACKAGE_FILTER=./cmd/kindnetd
+$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv KINDNETD_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/kindnetd
 
 # Since there are different platforms for the different binaries, calling helper from common.mk directly
 # instead of relying on it automatically
@@ -64,8 +69,7 @@ $(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BO
 # Kindnetd
 kindnetd/images/%: DOCKERFILE_FOLDER=./images/kindnetd
 kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_IPTABLES_BASE_IMAGE_NAME)
-kindnetd/images/%: LATEST_TAG=$(LATEST)
-$(call IMAGE_TARGETS_FOR_NAME, kindnetd): $(KINDNETD_GATHER_LICENSES_TARGET)
+kindnetd/images/%: LATEST_TAG=latest
 
 # Kind-base
 kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/images/base
@@ -96,14 +100,6 @@ kind-node/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
 kind-node/images/%: IMAGE_BUILD_ARGS=IMAGE_REPO AL2_HELPER_IMAGE DEBIAN_BASE_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE \
 	PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG KIND_KINDNETD_IMAGE_OVERRIDE KINDNETD_IMAGE_TAG
 $(call IMAGE_TARGETS_FOR_NAME, kind-node): $(KIND_NODE_IMAGE_BUILD_ARGS)
-
-generate-attribution: $(KINDNETD_ATTRIBUTION_TARGET)
-
-$(KINDNETD_GATHER_LICENSES_TARGET): $(BINARY_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/kindnetd ./cmd/kindnetd images/kindnetd 
-
-$(KINDNETD_ATTRIBUTION_TARGET): $(KINDNETD_GATHER_LICENSES_TARGET)
-	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(OUTPUT_DIR)/kindnetd $@
 
 .PHONY: local-images
 local-images: kindnetd/images/amd64 kind-base/images/amd64
