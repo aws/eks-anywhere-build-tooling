@@ -9,7 +9,6 @@ IMAGE_COMPONENT=eks-anywhere-cli-tools
 BASE_IMAGE_NAME?=eks-distro-minimal-base-docker-client
 
 SIMPLE_CREATE_BINARIES=false
-HAS_S3_ARTIFACTS=false
 HAS_LICENSES=false
 
 BUILD_TARGETS=local-images

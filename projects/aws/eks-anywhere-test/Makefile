@@ -9,7 +9,6 @@ IMAGE_PLATFORMS?=linux/amd64
 IMAGE_BUILD_ARGS?=IMAGE_TAG
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
-HAS_S3_ARTIFACTS=false
 SIMPLE_CREATE_BINARIES=false
 HAS_LICENSES=false
 

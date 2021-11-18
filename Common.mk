@@ -159,8 +159,6 @@ LICENSES_TARGETS_FOR_PREREQ=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSE
 ####################################################
 
 #################### TARBALLS ######################
-# TODO: currently all projects push artifact tars to s3, change this to only those that are actually consumed
-# etcdadm,kind,cri-tools
 HAS_S3_ARTIFACTS?=false
 
 SIMPLE_CREATE_TARBALLS?=true
