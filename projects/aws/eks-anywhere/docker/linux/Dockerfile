@@ -8,6 +8,6 @@ RUN yum install tar -y && \
     yum clean all && \
     rm -rf /var/cache/yum
 
-COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
-COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
-COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/LICENSES /KUBERNETES_LICENSES
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/LICENSES /KUBERNETES_LICENSES

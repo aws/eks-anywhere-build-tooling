@@ -33,7 +33,7 @@ RUN sed -i "s,image: $KINDNETD_IMAGE_TAG,image: $KIND_KINDNETD_RELEASE_OVERRIDE,
 
 # Add licenses/attribution + etcdadm + etcd tarball
 COPY $TARGETOS-$TARGETARCH/LICENSES /LICENSES
-COPY $TARGETOS-$TARGETARCH/etcdadm/etcdadm /usr/bin/
+COPY $TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/etcdadm/etcdadm /usr/bin/
 COPY $TARGETOS-$TARGETARCH/cache/etcdadm /var/cache/etcdadm
 
 # AL2 doesn't setup the ip6tables alternative the same as ubuntu

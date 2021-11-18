@@ -53,6 +53,8 @@ ifneq ($(RELEASE_BRANCH),)
 	RELEASE_BRANCH_SUFFIX=/$(RELEASE_BRANCH)
 
 	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)
+	# Deps are always released branched
+	BINARY_DEPS_DIR=$(OUTPUT_DIR)$(if $(filter-out true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)/dependencies
 	OUTPUT_DIR?=_output$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)
 	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)
 
@@ -148,6 +150,11 @@ pairmap = $(and $(strip $2),$(strip $3),$(call \
 
 ####################################################
 
+############### BINARIES DEPS ######################
+BINARY_DEPS_DIR?=$(OUTPUT_DIR)/dependencies
+FETCH_BINARIES_TARGETS?=
+####################################################
+
 #################### LICENSES ######################
 LICENSE_PACKAGE_FILTER?=
 REPO_SUBPATH?=
@@ -201,6 +208,10 @@ define IMAGE_TARGETS_FOR_NAME
 	$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64, $(1)) $(addsuffix /images/arm64, $(1))
 endef
 
+define FULL_FETCH_BINARIES_TARGETS
+	$(addprefix $(BINARY_DEPS_DIR)/linux-amd64/, $(1)) $(addprefix $(BINARY_DEPS_DIR)/linux-arm64/, $(1))
+endef
+
 define BINARY_TARGETS_FROM_FILES_PLATFORMS
 	$(foreach platform, $(2), $(foreach target, $(1), $(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/$(target)))
 endef
@@ -247,6 +258,7 @@ $(REPO):
 	git clone $(CLONE_URL) $(REPO)
 
 $(GIT_CHECKOUT_TARGET): | $(REPO)
+	rm -f $(REPO)/eks-anywhere-*
 	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
 	git -C $(REPO) checkout -f $(GIT_TAG)
 	touch $@
@@ -257,7 +269,7 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) am $(MAKE_ROOT)/patches/*
 	@touch $@
 
-%eks-anywhere-go-mod-download: $(if $(wildcard patches),$(GIT_PATCH_TARGET),) $(GIT_CHECKOUT_TARGET)
+%eks-anywhere-go-mod-download: $(if $(wildcard patches),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(REPO_SUBPATH)
 	@touch $@
 
@@ -350,7 +362,7 @@ validate-checksums: $(BINARY_TARGETS)
 %/images/push: IMAGE_PLATFORMS?=linux/amd64,linux/arm64
 %/images/push: IMAGE_OUTPUT_TYPE?=image
 %/images/push: IMAGE_OUTPUT?=push=true
-%/images/push: $(LICENSES_TARGETS_FOR_PREREQ)
+%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ)
 	$(BUILDCTL)
 
 .PHONY: helm/build
@@ -370,12 +382,12 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE?=oci
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).tar
 
-%/images/amd64: $(LICENSES_TARGETS_FOR_PREREQ)
+%/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
 
-%/images/arm64: $(LICENSES_TARGETS_FOR_PREREQ)
+%/images/arm64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
@@ -396,6 +408,15 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/cgo/arm64:
 	@mkdir -p $(CGO_SOURCE)
 	$(BUILDCTL)
+
+##@ Fetch Binary Targets
+$(BINARY_DEPS_DIR)/linux-%:
+	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(RELEASE_BRANCH)
+
+# Do not binary deps as intermediate files
+ifneq ($(FETCH_BINARIES_TARGETS),)
+.SECONDARY: $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+endif
 
 ##@ Build Targets
 

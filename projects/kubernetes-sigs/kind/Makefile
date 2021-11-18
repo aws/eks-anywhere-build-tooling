@@ -42,6 +42,8 @@ INTERMEDIATE_NODE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_NODE_IMAGE_COMPONENT):$(EKSD_KU
 HAS_S3_ARTIFACTS=true
 HAS_RELEASE_BRANCHES=true
 
+FETCH_BINARIES_TARGETS=eksd/kubernetes/client eksa/kubernetes-sigs/etcdadm eksd/cni-plugins eksa/kubernetes-sigs/cri-tools eksd/etcd/etcd.tar.gz
+
 # Binary targets are added manually in this makefile instead of relying on simple_create logic
 SIMPLE_CREATE_BINARIES=false
 
@@ -128,6 +130,9 @@ $(KIND_BASE_KUBEADM_OVERRIDE):
 	cp ./images/base/kubeadm-override.sh $@
 
 .PHONY: build-kind-node-%
-build-kind-node-%: $(KIND_NODE_IMAGE_BUILD_ARGS)
+build-kind-node-%: $(KIND_NODE_IMAGE_BUILD_ARGS) $(BINARY_DEPS_DIR)/dependencies/linux-%/LICENSES
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(INTERMEDIATE_BASE_IMAGE) \
-		$(INTERMEDIATE_NODE_IMAGE)-$* $(ARTIFACTS_BUCKET) $*
+		$(INTERMEDIATE_NODE_IMAGE)-$* $*
+
+$(BINARY_DEPS_DIR)/dependencies/linux-%/LICENSES: $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+	build/organize_binaries.sh $(RELEASE_BRANCH) $*
