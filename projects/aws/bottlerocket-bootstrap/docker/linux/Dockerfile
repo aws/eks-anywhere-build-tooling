@@ -5,14 +5,14 @@ ARG RELEASE_BRANCH
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/$TARGETOS-$TARGETARCH/kubernetes/$RELEASE_BRANCH/kubernetes/client/bin/kubectl \
-     _output/$TARGETOS-$TARGETARCH/kubernetes/$RELEASE_BRANCH/kubernetes/server/bin/kubeadm \
-     _output/$TARGETOS-$TARGETARCH/etcdadm \
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/client/bin/kubectl \
+     _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/server/bin/kubeadm \
+     _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/etcdadm/etcdadm \
      /opt/bin/
-COPY _output/$TARGETOS-$TARGETARCH/kubernetes/$RELEASE_BRANCH/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
-COPY _output/$TARGETOS-$TARGETARCH/kubernetes/$RELEASE_BRANCH/kubernetes/LICENSES /KUBERNETES_LICENSES
-COPY _output/$TARGETOS-$TARGETARCH/etcdadm/ATTRIBUTION.txt /ETCDADM_ATTRIBUTION.txt
-COPY _output/$TARGETOS-$TARGETARCH/etcdadm/LICENSES /ETCDADM_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/LICENSES /KUBERNETES_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/etcdadm/ATTRIBUTION.txt /ETCDADM_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/etcdadm/LICENSES /ETCDADM_LICENSES
 
 RUN ulimit -n 1024 && \
     mkdir -p /opt/bin && \

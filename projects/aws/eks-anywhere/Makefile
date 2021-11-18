@@ -14,19 +14,15 @@ IMAGE_COMPONENT=eks-anywhere-diagnostic-collector
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
+FETCH_BINARIES_TARGETS=eksd/kubernetes/client
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-diagnostic-collector): fetch-binaries
+$(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-diagnostic-collector): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 .PHONY: local-images
 local-images: eks-anywhere-diagnostic-collector/images/amd64
 	
 .PHONY: images
 images: eks-anywhere-diagnostic-collector/images/push
-
-.PHONY: fetch-binaries
-fetch-binaries: kubernetes
-
-kubernetes:
-	build/fetch_binaries.sh

@@ -33,7 +33,7 @@ PROJECT_ROOT=$(MAKE_ROOT)
 GIT_CHECKOUT_TARGET=main.go
 FAKE_GIT_REPO_TARGET=.git
 
-FETCH_BINARIES_TARGET=$(OUTPUT_DIR)/linux-amd64/kubernetes/$(RELEASE_BRANCH)
+FETCH_BINARIES_TARGETS=eksd/kubernetes/client eksd/kubernetes/server eksa/kubernetes-sigs/etcdadm
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -46,7 +46,7 @@ local-images: bottlerocket-bootstrap/images/amd64
 .PHONY: images
 images: bottlerocket-bootstrap/images/push
 
-$(call IMAGE_TARGETS_FOR_NAME, bottlerocket-bootstrap): fetch-binaries
+$(call IMAGE_TARGETS_FOR_NAME, bottlerocket-bootstrap): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 $(GATHER_LICENSES_TARGETS): REPO_SUBPATH=..
 $(GATHER_LICENSES_TARGETS): | $(FAKE_GIT_REPO_TARGET)
@@ -59,12 +59,6 @@ $(FAKE_GIT_REPO_TARGET):
 
 GIT_TAG:
 	echo 0.0.0 > $@
-
-$(FETCH_BINARIES_TARGET):
-	build/fetch_binaries.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET)
-
-.PHONY: fetch-binaries
-fetch-binaries: $(FETCH_BINARIES_TARGET)
 
 .PHONY: clean-extra
 clean-extra:

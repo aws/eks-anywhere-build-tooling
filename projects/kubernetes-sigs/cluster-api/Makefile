@@ -23,6 +23,8 @@ GO_MOD_DOWNLOAD_TARGETS=$(REPO)/eks-anywhere-go-mod-download $(REPO)/test/infras
 GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/attribution/go-license.csv $(OUTPUT_DIR)/capd/attribution/go-license.csv
 ATTRIBUTION_TARGETS=ATTRIBUTION.txt CAPD_ATTRIBUTION.txt
 
+FETCH_BINARIES_TARGETS=eksd/kubernetes/client
+
 HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
@@ -39,8 +41,6 @@ $(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSES_OUT
 
 s3-artifacts: create-manifests
 
-clean: clean-binary-deps
-
 .PHONY: local-images
 local-images: cluster-api-controller/images/amd64 kubeadm-bootstrap-controller/images/amd64 kubeadm-control-plane-controller/images/amd64 cluster-api-docker-controller/images/amd64 
 
@@ -48,19 +48,8 @@ local-images: cluster-api-controller/images/amd64 kubeadm-bootstrap-controller/i
 images: cluster-api-controller/images/push kubeadm-bootstrap-controller/images/push kubeadm-control-plane-controller/images/push cluster-api-docker-controller/images/push 
 
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
-$(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): fetch-binaries
+$(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 .PHONY: create-manifests
 create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
-
-kubernetes:
-	build/fetch_binaries.sh
-
-.PHONY: fetch-binaries
-fetch-binaries: kubernetes
-
-.PHONY: clean-binary-deps
-clean-binary-deps:
-	@rm -rf kubernetes
-	@rm -f kubernetes-client-linux-amd64.tar.gz
