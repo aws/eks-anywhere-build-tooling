@@ -18,8 +18,6 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base-git
 CGO_DEPS_TARGET=$(CGO_SOURCE)/linux-%/lib64/libgit2.so
 CGO_CREATE_BINARIES=true
 
-HAS_S3_ARTIFACTS=true
-
 include $(BASE_DIRECTORY)/Common.mk
 
 

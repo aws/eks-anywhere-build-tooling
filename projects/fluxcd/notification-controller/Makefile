@@ -14,8 +14,6 @@ FIX_LICENSES_K0KUBUN_TARGET=$(REPO)/vendor/github.com/k0kubun/pp/LICENSE.txt
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
 
-HAS_S3_ARTIFACTS=true
-
 include $(BASE_DIRECTORY)/Common.mk
 
 

@@ -11,8 +11,6 @@ LICENSE_PACKAGE_FILTER?=.
 
 BINARY_TARGET_FILES=local-path-provisioner
 
-HAS_S3_ARTIFACTS=true
-
 include $(BASE_DIRECTORY)/Common.mk
 
 
