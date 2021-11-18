@@ -43,6 +43,7 @@ HAS_S3_ARTIFACTS=true
 HAS_RELEASE_BRANCHES=true
 
 FETCH_BINARIES_TARGETS=eksd/kubernetes/client eksa/kubernetes-sigs/etcdadm eksd/cni-plugins eksa/kubernetes-sigs/cri-tools eksd/etcd/etcd.tar.gz
+ORGANIZE_BINARIES_TARGETS=$(addsuffix /LICENSES,$(addprefix $(BINARY_DEPS_DIR)/linux-,amd64 arm64))
 
 # Binary targets are added manually in this makefile instead of relying on simple_create logic
 SIMPLE_CREATE_BINARIES=false
@@ -95,13 +96,13 @@ kind-base/images/push kind-base-versioned/images/push: IMAGE_REPO=$(LOCAL_REGIST
 
 # Kind-node
 kind-node/images/%: DOCKERFILE_FOLDER=./images/node
-kind-node/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/dependencies
+kind-node/images/%: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
 kind-node/images/%: BUILDER_IMAGE=$(INTERMEDIATE_NODE_IMAGE)
 kind-node/images/%: BASE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):latest
 kind-node/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
 kind-node/images/%: IMAGE_BUILD_ARGS=IMAGE_REPO AL2_HELPER_IMAGE DEBIAN_BASE_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE \
 	PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG KIND_KINDNETD_RELEASE_OVERRIDE KINDNETD_IMAGE_TAG
-$(call IMAGE_TARGETS_FOR_NAME, kind-node): $(KIND_NODE_IMAGE_BUILD_ARGS)
+$(call IMAGE_TARGETS_FOR_NAME, kind-node): $(KIND_NODE_IMAGE_BUILD_ARGS) $(BINARY_DEPS_DIR)/files
 
 .PHONY: local-images
 local-images: kindnetd/images/amd64 kind-base/images/amd64
@@ -130,9 +131,12 @@ $(KIND_BASE_KUBEADM_OVERRIDE):
 	cp ./images/base/kubeadm-override.sh $@
 
 .PHONY: build-kind-node-%
-build-kind-node-%: $(KIND_NODE_IMAGE_BUILD_ARGS) $(BINARY_DEPS_DIR)/dependencies/linux-%/LICENSES
+build-kind-node-%: $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_TARGETS)
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(INTERMEDIATE_BASE_IMAGE) \
 		$(INTERMEDIATE_NODE_IMAGE)-$* $*
 
-$(BINARY_DEPS_DIR)/dependencies/linux-%/LICENSES: $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
-	build/organize_binaries.sh $(RELEASE_BRANCH) $*
+$(ORGANIZE_BINARIES_TARGETS): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+	build/organize_binaries.sh $(RELEASE_BRANCH) $(lastword $(subst -, ,$(@D)))
+
+$(BINARY_DEPS_DIR)/files:
+	@cp -rf images/node/files $(BINARY_DEPS_DIR)

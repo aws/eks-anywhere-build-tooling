@@ -56,7 +56,7 @@ FROM $BASE_IMAGE AS base-arm64
 # in the case of unstacked etcd on docker we use this image and etcd is run
 # as a systemd unit, adding env var to allow it run on arm
 ENV ETCD_UNSUPPORTED_ARCH=arm64
-
+COPY files /
 
 FROM base-${TARGETARCH}
 
