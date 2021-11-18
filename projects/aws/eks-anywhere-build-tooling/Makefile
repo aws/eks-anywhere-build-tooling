@@ -14,12 +14,15 @@ HAS_LICENSES=false
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
-FETCH_BINARIES_TARGET=$(OUTPUT_DIR)/linux-amd64/eks-a-tools
+FETCH_BINARIES_TARGETS=eksa/fluxcd/flux2 eksa/kubernetes-sigs/cluster-api eksa/kubernetes-sigs/cluster-api-provider-aws \
+	eksa/kubernetes-sigs/kind eksa/replicatedhq/troubleshoot eksa/vmware/govmomi eksd/kubernetes/client
+
+ORGANIZE_BINARIES_TARGETS=$(addsuffix /eks-a-tools,$(addprefix $(BINARY_DEPS_DIR)/linux-,amd64 arm64))
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-cli-tools): fetch-binaries
+$(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-cli-tools): $(ORGANIZE_BINARIES_TARGETS)
 
 .PHONY: local-images
 local-images: eks-anywhere-cli-tools/images/amd64
@@ -32,3 +35,6 @@ fetch-binaries: $(FETCH_BINARIES_TARGET)
 
 $(FETCH_BINARIES_TARGET):
 	build/fetch_binaries.sh $(ARTIFACTS_BUCKET)
+
+$(ORGANIZE_BINARIES_TARGETS): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+	build/organize_binaries.sh $(lastword $(subst -, ,$(@D)))

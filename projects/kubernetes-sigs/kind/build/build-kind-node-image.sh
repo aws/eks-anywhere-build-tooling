@@ -19,8 +19,7 @@ set -o pipefail
 EKSD_RELEASE_BRANCH="${1?Specify first argument - release branch}"
 INTERMEDIATE_BASE_IMAGE="${2?Specify second argument - kind base tag}"
 INTERMEDIATE_NODE_IMAGE="${3?Specify third argument - kind node image name}"
-ARTIFACTS_BUCKET="${4?Specify fourth argument - artifact bucket}"
-ARCH="${5?Specify fifth argument - Targetarch}"
+ARCH="${4?Specify fifth argument - Targetarch}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
@@ -164,44 +163,7 @@ function build::kind::load_images(){
     rm -rf $MAKE_ROOT/_output/dependencies
 }
 
-
-function build::kind::download_additional_components() {
-    OUTPUT_FOLDER="$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH"
-
-    declare -A URLS=([$(build::eksd_releases::get_eksd_kubernetes_asset_url kubernetes-client-linux-$ARCH.tar.gz $EKSD_RELEASE_BRANCH $ARCH)]="kubernetes"
-                  [$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm' $ARCH)]="etcdadm"
-                  [$(build::eksd_releases::get_eksd_component_url "cni-plugins" $EKSD_RELEASE_BRANCH $ARCH)]="cni-plugins"
-                  [$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' $ARCH)]="cri-tools")
-
-    
-    mkdir -p $OUTPUT_FOLDER/LICENSES
-    for URL in "${!URLS[@]}"
-    do
-        FOLDER=(${URLS[$URL]})
-
-        mkdir -p $OUTPUT_FOLDER/$FOLDER
-        TARBALL="$OUTPUT_FOLDER/tmp.tar.gz"
-        curl -sSL $URL -o ${TARBALL}
-        tar xzf ${TARBALL} -C $OUTPUT_FOLDER/$FOLDER
-
-        FOLDER_PATH=$FOLDER
-        if [ $FOLDER == 'kubernetes' ]; then
-            FOLDER_PATH="kubernetes/kubernetes"
-        fi
-        cp -rf $OUTPUT_FOLDER/$FOLDER_PATH/LICENSES "$OUTPUT_FOLDER/LICENSES/$(echo $FOLDER | tr a-z A-Z  | tr -d '-'  )_LICENSES"
-        cp $OUTPUT_FOLDER/$FOLDER_PATH/ATTRIBUTION.txt "$OUTPUT_FOLDER/LICENSES/$(echo $FOLDER | tr a-z A-Z  | tr -d '-'  )_ATTRIBUTION.txt"
-    done
-    
-    # Download etcd tarball to be placed in etcdadm cache directory to avoid downloading at runtime
-    ETCD_HTTP_SOURCE=$(build::eksd_releases::get_eksd_component_url "etcd" $EKSD_RELEASE_BRANCH $ARCH)
-    ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_RELEASE_BRANCH $ARCH)
-    FOLDER="$OUTPUT_FOLDER/cache/etcdadm/etcd/$ETCD_VERSION"
-    mkdir -p $FOLDER
-    curl -sSL $ETCD_HTTP_SOURCE -o $FOLDER/etcd-$ETCD_VERSION-linux-$ARCH.tar.gz
-}
-
 if command -v docker &> /dev/null && docker info > /dev/null 2>&1 ; then
     build::kind::build_node_image
     build::kind::load_images
-    build::kind::download_additional_components
 fi

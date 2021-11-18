@@ -10,9 +10,9 @@ COPY _output/bin/cluster-api/$TARGETOS-$TARGETARCH/cluster-api-provider-docker-m
 COPY _output/capd/LICENSES /CAPD_LICENSES
 COPY CAPD_ATTRIBUTION.txt /CAPD_ATTRIBUTION.txt
 
-COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/client/bin/kubectl /kubectl
-COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
-COPY kubernetes/$TARGETOS-$TARGETARCH/kubernetes/LICENSES /KUBERNETES_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /kubectl
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/LICENSES /KUBERNETES_LICENSES
 
 # NOTE: CAPD can't use non-root because docker requires access to the docker socket
 USER root
