@@ -196,7 +196,9 @@ define BUILDCTL
 		--local dockerfile=$(DOCKERFILE_FOLDER) \
 		--local context=$(IMAGE_CONTEXT_DIR) \
 		--opt target=$(IMAGE_TARGET) \
-		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
+		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT) \
+		--export-cache type=inline \
+  		--import-cache type=registry,ref=$(LATEST_IMAGE)
 endef 
 
 define WRITE_LOCAL_IMAGE_TAG
