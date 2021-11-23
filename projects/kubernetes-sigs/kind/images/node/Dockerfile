@@ -58,8 +58,12 @@ FROM $BASE_IMAGE AS base-arm64
 ENV ETCD_UNSUPPORTED_ARCH=arm64
 COPY files /
 
-FROM base-${TARGETARCH}
+FROM base-${TARGETARCH} as node
 
 COPY --from=builder / /
 
 ENTRYPOINT [ "/usr/local/bin/entrypoint", "/sbin/init" ]
+
+FROM scratch as export
+
+COPY --from=node /kind/manifests/default-cni.yaml ./manifests/kindnetd.yaml
