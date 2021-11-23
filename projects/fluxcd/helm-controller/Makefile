@@ -13,11 +13,14 @@ FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICE
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/helm-controller/api/LICENSE
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
+IMAGE_USERADD_USER_NAME=controller
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
+
+$(call IMAGE_TARGETS_FOR_NAME, helm-controller): helm-controller-useradd/images/export
 
 .PHONY: local-images
 local-images: helm-controller/images/amd64

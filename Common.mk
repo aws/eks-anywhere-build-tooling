@@ -98,12 +98,19 @@ IMAGE_TARGET?=
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
 IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
-
 # For projects with multiple containers this is defined to override the default
 # ex: CLUSTER_API_CONTROLLER_IMAGE_COMPONENT
 IMAGE_COMPONENT_VARIABLE=$(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE_COMPONENT
 IMAGE=$(IMAGE_REPO)/$(if $(value $(IMAGE_COMPONENT_VARIABLE)),$(value $(IMAGE_COMPONENT_VARIABLE)),$(IMAGE_COMPONENT)):$(IMAGE_TAG)
 LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))
+
+IMAGE_USERADD_USER_ID?=1000
+IMAGE_USERADD_USER_NAME?=
+
+# Branch builds should look at the current branch latest image for cache as well as main branch latest for cache to cover the cases
+# where its the first build from a new release branch
+IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST))
+
 ####################################################
 
 #################### BINARIES ######################
@@ -197,8 +204,9 @@ define BUILDCTL
 		--local context=$(IMAGE_CONTEXT_DIR) \
 		--opt target=$(IMAGE_TARGET) \
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT) \
-		--export-cache type=inline \
-  		--import-cache type=registry,ref=$(LATEST_IMAGE)
+		$(if $(IMAGE_IMPORT_CACHE),--export-cache type=inline,) \
+		$(foreach IMPORT_CACHE,$(IMAGE_IMPORT_CACHE),--import-cache $(IMPORT_CACHE))
+
 endef 
 
 define WRITE_LOCAL_IMAGE_TAG
@@ -401,6 +409,7 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
+%/cgo/amd64 %/cgo/arm64: IMAGE_IMPORT_CACHE=
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/amd64:
@@ -410,6 +419,15 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
 %/cgo/arm64:
 	@mkdir -p $(CGO_SOURCE)
+	$(BUILDCTL)
+
+%-useradd/images/export: IMAGE_OUTPUT_TYPE=local
+%-useradd/images/export: IMAGE_OUTPUT=dest=$(OUTPUT_DIR)/files/$*
+%-useradd/images/export: IMAGE_BUILD_ARGS=IMAGE_USERADD_USER_ID IMAGE_USERADD_USER_NAME
+%-useradd/images/export: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/useradd
+%-useradd/images/export: IMAGE_PLATFORMS=linux/amd64
+%-useradd/images/export: IMAGE_IMPORT_CACHE=
+%-useradd/images/export:
 	$(BUILDCTL)
 
 ##@ Fetch Binary Targets

@@ -14,13 +14,14 @@ FIX_LICENSES_MOZILLA_TARGET=$(REPO)/vendor/go.mozilla.org/gopgagent/LICENSE.txt
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/kustomize-controller/api/LICENSE
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-git
+IMAGE_USERADD_USER_NAME=controller
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_MOZILLA_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
-$(call IMAGE_TARGETS_FOR_NAME, kustomize-controller): fetch-binaries $(DEFAULT_KUBECONFIG_TARGET)
+$(call IMAGE_TARGETS_FOR_NAME, kustomize-controller): fetch-binaries $(DEFAULT_KUBECONFIG_TARGET) kustomize-controller-useradd/images/export
 
 .PHONY: local-images
 local-images: kustomize-controller/images/amd64
