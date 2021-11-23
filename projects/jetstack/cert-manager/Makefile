@@ -20,6 +20,13 @@ SOURCE_PATTERNS=./cmd/acmesolver ./cmd/cainjector ./cmd/controller ./cmd/webhook
 
 include $(BASE_DIRECTORY)/Common.mk
 
+$(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver-useradd/images/export
+$(call IMAGE_TARGETS_FOR_NAME, cert-manager-cainjector): cert-manager-cainjector-useradd/images/export
+$(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-controller-useradd/images/export
+
+cert-manager-acmesolver-useradd/images/export: IMAGE_USERADD_USER_NAME=acmesolver
+cert-manager-cainjector-useradd/images/export: IMAGE_USERADD_USER_NAME=cainjector
+cert-manager-controller-useradd/images/export: IMAGE_USERADD_USER_NAME=cert-manager
 
 .PHONY: local-images
 local-images: cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64
