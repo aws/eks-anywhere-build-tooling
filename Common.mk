@@ -204,7 +204,7 @@ define BUILDCTL
 		--local context=$(IMAGE_CONTEXT_DIR) \
 		--opt target=$(IMAGE_TARGET) \
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT) \
-		$(if $(IMAGE_IMPORT_CACHE),--export-cache type=inline,) \
+		$(if $(filter push=true,$(IMAGE_OUTPUT)),--export-cache type=inline,) \
 		$(foreach IMPORT_CACHE,$(IMAGE_IMPORT_CACHE),--import-cache $(IMPORT_CACHE))
 
 endef 
@@ -409,7 +409,6 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
-%/cgo/amd64 %/cgo/arm64: IMAGE_IMPORT_CACHE=
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/amd64:
@@ -426,7 +425,6 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %-useradd/images/export: IMAGE_BUILD_ARGS=IMAGE_USERADD_USER_ID IMAGE_USERADD_USER_NAME
 %-useradd/images/export: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/useradd
 %-useradd/images/export: IMAGE_PLATFORMS=linux/amd64
-%-useradd/images/export: IMAGE_IMPORT_CACHE=
 %-useradd/images/export:
 	$(BUILDCTL)
 
