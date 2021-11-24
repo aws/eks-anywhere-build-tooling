@@ -154,8 +154,8 @@ extract-kindnetd-manifest: kind-node-extract-kindnetd/images/amd64
 
 # During build the node image is never built so we can extract this file
 # instead fake it to keep s3-artifacts happy
-s3-artifacts: $(ARTIFACTS_PATH)/manifests/kindnetd
+s3-artifacts: $(ARTIFACTS_PATH)/manifests/kindnetd.yaml
 
-$(ARTIFACTS_PATH)/manifests/kindnetd:
+$(ARTIFACTS_PATH)/manifests/kindnetd.yaml:
 	@mkdir -p $(@D)
 	@touch $@
