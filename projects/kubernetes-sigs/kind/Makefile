@@ -109,7 +109,6 @@ $(call IMAGE_TARGETS_FOR_NAME, kind-node): $(KIND_NODE_IMAGE_BUILD_ARGS) $(BINAR
 kind-node-extract-kindnetd/images/amd64: IMAGE_TARGET=export
 kind-node-extract-kindnetd/images/amd64: IMAGE_OUTPUT_TYPE=local
 kind-node-extract-kindnetd/images/amd64: IMAGE_OUTPUT=dest=$(ARTIFACTS_PATH)
-kind-node-extract-kindnetd/images/amd64: IMAGE_IMPORT_CACHE=
 
 .PHONY: local-images
 local-images: kindnetd/images/amd64 kind-base/images/amd64
