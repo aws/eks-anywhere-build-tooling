@@ -43,7 +43,7 @@ fi
 if ! diff $EXPECTED_FILES $ACTUAL_FILES; then
 	echo "Artifacts directory does not matched expected!"
 	echo "******************* Actual ******************"
-	cat /tmp/actual-$PROJECT_NAME-files
+	cat $ACTUAL_FILES
 	echo "*********************************************"
 	exit 1
 fi
