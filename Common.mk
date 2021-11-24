@@ -61,7 +61,7 @@ ifneq ($(RELEASE_BRANCH),)
 	# include release branch info in latest tag
 	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
-	$(filter-out build release upload-artifacts release-upload attribution clean,$(MAKECMDGOALS))),)
+	$(filter-out build release upload-artifacts release-upload clean,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
 $(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
 else ifeq ($(HAS_RELEASE_BRANCHES),true)
@@ -69,7 +69,6 @@ else ifeq ($(HAS_RELEASE_BRANCHES),true)
 	BUILD_TARGETS=build/release-branches/all
 	RELEASE_TARGETS=release/release-branches/all
 	RELEASE_UPLOAD_TARGETS=release-upload/release-branches/all
-	ATTRIBUTION_TARGETS=attribution/release-branches/all
 	
 	# avoid warnings when trying to read GIT_TAG file which wont exist when no release_branch is given
 	GIT_TAG=non-existent
@@ -185,7 +184,7 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums local-images attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
+BUILD_TARGETS?=validate-checksums local-images attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
 RELEASE_TARGETS?=validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
 RELEASE_UPLOAD_TARGETS?=release $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
@@ -323,6 +322,10 @@ gather-licenses: $(GATHER_LICENSES_TARGETS)
 attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
 attribution: $(ATTRIBUTION_TARGETS)
 
+.PHONY: attribution-pr
+attribution-pr: ## Generates PR to update attribution files for projects
+attribution-pr:
+	$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
 
 ##@ Tarball Targets
 
