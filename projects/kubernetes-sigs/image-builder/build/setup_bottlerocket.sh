@@ -41,15 +41,9 @@ envsubst '$BOTTLEROCKET_ROOT_JSON_PATH' \
 curl $BOTTLEROCKET_ROOT_JSON_URL -o $BOTTLEROCKET_ROOT_JSON_PATH
 sha512sum -c $BOTTLEROCKET_DOWNLOAD_PATH/bottlerocket-root-json-checksum
 
-# On Linux, the Cargo build system requires the openssl-devel package
-# for installing OpenSSL libraries
-if [ "$CODEBUILD_CI" = "false" ] && [ "$(uname)" = "Linux" ]; then
-    yum install -y openssl-devel
-fi
-
 # This code installs the Rust toolchain manager called rustup along
 # with other Rust binaries such as rustc, rustfmt. It also installs Cargo,
 # the Rust package manager which is then used to install Tuftool.
 curl https://sh.rustup.rs -sSf | CARGO_HOME=$CARGO_HOME RUSTUP_HOME=$RUSTUP_HOME sh -s -- -y
 $CARGO_HOME/bin/rustup default stable
-CARGO_NET_GIT_FETCH_WITH_CLI=true $CARGO_HOME/bin/cargo install --force --root $CARGO_HOME tuftool
+CARGO_NET_GIT_FETCH_WITH_CLI=true $CARGO_HOME/bin/cargo install --root $CARGO_HOME tuftool
