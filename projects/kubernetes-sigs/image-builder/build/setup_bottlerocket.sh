@@ -46,4 +46,4 @@ sha512sum -c $BOTTLEROCKET_DOWNLOAD_PATH/bottlerocket-root-json-checksum
 # the Rust package manager which is then used to install Tuftool.
 curl https://sh.rustup.rs -sSf | CARGO_HOME=$CARGO_HOME RUSTUP_HOME=$RUSTUP_HOME sh -s -- -y
 $CARGO_HOME/bin/rustup default stable
-CARGO_NET_GIT_FETCH_WITH_CLI=true $CARGO_HOME/bin/cargo install --root $CARGO_HOME tuftool
+CARGO_NET_GIT_FETCH_WITH_CLI=true $CARGO_HOME/bin/cargo install --force --root $CARGO_HOME tuftool

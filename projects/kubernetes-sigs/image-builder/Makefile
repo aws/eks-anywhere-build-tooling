@@ -11,10 +11,11 @@ ifdef CODEBUILD_SRC_DIR
 	OVA_PATH=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/image-builder/images/capi/output
 endif
 
-BOTTLEROCKET_DOWNLOAD_PATH?=$(OUTPUT_DIR)/bottlerocket/downloads
-
+FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)
 # Force non release-branched
-CARGO_HOME=_output/cargo
+CARGO_HOME=$(MAKE_ROOT)/_output/cargo
+
+BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 
 VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
@@ -29,7 +30,7 @@ PACKER_OVA_VAR_FILES=$(PACKER_OVA_CONF_FILE)
 PACKER_OVA_VAR_FILES+=$(MAKE_ROOT)/packer/ova/vsphere-library.json
 
 PACKER_TYPE_VAR_FILES?=
-PACKER_VAR_FILES=$(MAKE_ROOT)/$(OUTPUT_DIR)/config/kubernetes.json $(PACKER_TYPE_VAR_FILES) $(MAKE_ROOT)/$(OUTPUT_DIR)/config/common.json $(MAKE_ROOT)/$(OUTPUT_DIR)/config/cni.json $(MAKE_ROOT)/$(OUTPUT_DIR)/config/additional_components.json
+PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(PACKER_TYPE_VAR_FILES) $(FULL_OUTPUT_DIR)/config/common.json $(FULL_OUTPUT_DIR)/config/cni.json $(FULL_OUTPUT_DIR)/config/additional_components.json
 
 BUILD_TARGETS=build-ami-ubuntu-2004 release-ova-bottlerocket
 RELEASE_TARGETS= release-ami-ubuntu-2004 release-ova-ubuntu-2004 upload-artifacts release-ova-bottlerocket
@@ -44,8 +45,10 @@ ADDITIONAL_PAUSE_1-21_FROM=1-20
 
 HAS_RELEASE_BRANCHES=true
 
+
 include $(BASE_DIRECTORY)/Common.mk
 
+export PATH:=$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
 
 .PHONY: setup-ami-share
 setup-ami-share:
@@ -55,8 +58,7 @@ setup-ami-share:
 setup-vsphere:
 	echo $(VSPHERE_CONNECTION_DATA) > $(PACKER_OVA_CONF_FILE)
 
-.PHONY: setup-bottlerocket
-setup-bottlerocket:
+$(CARGO_HOME)/bin/tuftool:
 	build/setup_bottlerocket.sh $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME)
 
 .PHONY: deps-ami
@@ -85,17 +87,17 @@ release-ami-ubuntu-2004-%: setup-ami-share deps-ami setup-packer-configs
 build-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
 release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(OVA_PATH)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
-		OVF_CUSTOM_PROPERTIES="$(MAKE_ROOT)/$(OUTPUT_DIR)/config/ovf_custom_properties.json" \
+		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		make -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
 	build/get_artifacts.sh $(IMAGE_BUILDER_DIR) ubuntu
 
 .PHONY: release-ova-bottlerocket
-release-ova-bottlerocket: setup-bottlerocket
+release-ova-bottlerocket: $(CARGO_HOME)/bin/tuftool
 	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs
-	sh validate/validate.sh $(MAKE_ROOT)/$(OUTPUT_DIR)/config/validate_goss_inline_vars.json
+	sh validate/validate.sh $(FULL_OUTPUT_DIR)/config/validate_goss_inline_vars.json
 
 .PHONY: check-env-validation
 check-env-validation:

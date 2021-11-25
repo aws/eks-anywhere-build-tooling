@@ -37,6 +37,7 @@ OVA="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSIO
 BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/vmware-k8s-${KUBEVERSION}/x86_64/"
 BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
 
+rm -rf $OVA_DOWNLOAD_PATH
 # Downloading the OVA from the Bottlerocket target location using Tuftool
 $CARGO_HOME/bin/tuftool download "${OVA_DOWNLOAD_PATH}" \
     --target-name "${OVA}" \
