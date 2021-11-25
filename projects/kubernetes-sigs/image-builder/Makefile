@@ -12,7 +12,9 @@ ifdef CODEBUILD_SRC_DIR
 endif
 
 BOTTLEROCKET_DOWNLOAD_PATH?=$(OUTPUT_DIR)/bottlerocket/downloads
-CARGO_HOME=$(OUTPUT_DIR)/cargo
+
+# Force non release-branched
+CARGO_HOME=_output/cargo
 
 VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
