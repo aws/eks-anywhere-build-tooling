@@ -6,6 +6,7 @@ REPO_OWNER=kubernetes-sigs
 
 IMAGE_BUILDER_DIR=$(REPO)/images/capi
 
+PROJECT_PATH?=projects/$(REPO_OWNER)/$(REPO)
 OVA_PATH=$(IMAGE_BUILDER_DIR)/output
 ifdef CODEBUILD_SRC_DIR
 	OVA_PATH=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/image-builder/images/capi/output
@@ -14,7 +15,7 @@ endif
 FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)
 # Force non release-branched
 CARGO_HOME=$(MAKE_ROOT)/_output/cargo
-
+RUSTUP_HOME=$(MAKE_ROOT)/_output/rustup
 BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 
 VSPHERE_CONNECTION_DATA?={}
@@ -45,10 +46,12 @@ ADDITIONAL_PAUSE_1-21_FROM=1-20
 
 HAS_RELEASE_BRANCHES=true
 
+TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
+BOOTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
 include $(BASE_DIRECTORY)/Common.mk
 
-export PATH:=$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
+export PATH:=$(CARGO_HOME)/bin:$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
 
 .PHONY: setup-ami-share
 setup-ami-share:
@@ -58,8 +61,26 @@ setup-ami-share:
 setup-vsphere:
 	echo $(VSPHERE_CONNECTION_DATA) > $(PACKER_OVA_CONF_FILE)
 
-$(CARGO_HOME)/bin/tuftool:
-	build/setup_bottlerocket.sh $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME)
+$(TUFTOOL_TARGET):
+	# This code installs the Rust toolchain manager called rustup along
+	# with other Rust binaries such as rustc, rustfmt. It also installs Cargo,
+	# the Rust package manager which is then used to install Tuftool.
+	@mkdir -p $(CARGO_HOME)
+	@mkdir -p $(RUSTUP_HOME)
+	curl https://sh.rustup.rs -sSf | CARGO_HOME=$(CARGO_HOME) RUSTUP_HOME=$(RUSTUP_HOME) sh -s -- -y
+	$(CARGO_HOME)/bin/rustup default stable
+	CARGO_NET_GIT_FETCH_WITH_CLI=true $(CARGO_HOME)/bin/cargo install --force --root $(CARGO_HOME) tuftool
+
+$(BOOTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
+$(BOOTLEROCKET_SETUP_TARGET):
+	@mkdir -p $(BOTTLEROCKET_DOWNLOAD_PATH)
+	# This configuration supports local installations and checksum validations
+	# of root.json file
+	envsubst '$$BOTTLEROCKET_ROOT_JSON_PATH' \
+		< $(MAKE_ROOT)/bottlerocket-root-json-checksum \
+		> $(BOOTLEROCKET_SETUP_TARGET)
+	curl https://cache.bottlerocket.aws/root.json -o $$BOTTLEROCKET_ROOT_JSON_PATH
+	sha512sum -c $(BOOTLEROCKET_SETUP_TARGET)
 
 .PHONY: deps-ami
 deps-ami: $(GIT_PATCH_TARGET)
@@ -92,7 +113,7 @@ release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs
 	build/get_artifacts.sh $(IMAGE_BUILDER_DIR) ubuntu
 
 .PHONY: release-ova-bottlerocket
-release-ova-bottlerocket: $(CARGO_HOME)/bin/tuftool
+release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOOTLEROCKET_SETUP_TARGET)
 	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
 .PHONY: validate-ubuntu-2004
