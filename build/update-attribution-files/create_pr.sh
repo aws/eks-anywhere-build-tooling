@@ -17,7 +17,7 @@ set -e
 set -o pipefail
 set -x
 
-if [[ -z "$JOB_TYPE" ]]
+if [[ -z "$JOB_TYPE" ]]; then
     return 0
 fi
 
