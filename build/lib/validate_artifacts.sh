@@ -22,7 +22,7 @@ ARTIFACTS_FOLDER="$2"
 GIT_TAG="$3"
 FAKE_ARM_ARTIFACTS_FOR_VALIDATION="$4"
 
-PROJECT_NAME=$(basename $PROJECT_ROOT)
+
 ACTUAL_FILES=$(mktemp)
 
 for file in $(find ${ARTIFACTS_FOLDER} -type f | sort); do

@@ -137,6 +137,15 @@ For projects which build multiple containers, DOCKERFILE_FOLDER generally needs 
 in the Makefile, one per container image to be built. Refer to [cert-manager](../../projects/jetstack/cert-manager/Makefile) as
 an example of this.
 
+### additional pre-reqs for image builds
+
+Sometimes projects need to run additional targets before building images. [release](../../projects/kubernetes/release/Makefile) is a good example to refer
+to for this situation. To add additional pre-reqs to the image builds:
+
+```
+$(call IMAGE_TARGETS_FOR_NAME, kube-proxy-base): <new_pre_preq>
+```
+
 ### fixing licenses
 
 As documented in [attribution-files](attribution-files.md) there are situations where licenses need to be fixed before running attribution generation.
