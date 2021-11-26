@@ -4,7 +4,7 @@ MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
 .SUFFIXES:
 
 RELEASE_ENVIRONMENT?=development
-ARTIFACTS_BUCKET?=my-s3-bucket
+
 GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
 COMPONENT=$(REPO_OWNER)/$(REPO)
@@ -15,7 +15,7 @@ OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 #################### AWS ###########################
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-ARTIFACT_BUCKET?=my-s3-bucket
+ARTIFACTS_BUCKET?=my-s3-bucket
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 ####################################################
 
@@ -267,7 +267,7 @@ $(REPO):
 	git clone $(CLONE_URL) $(REPO)
 
 $(GIT_CHECKOUT_TARGET): | $(REPO)
-	rm -f $(REPO)/eks-anywhere-*
+	@rm -f $(REPO)/eks-anywhere-*
 	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
 	git -C $(REPO) checkout -f $(GIT_TAG)
 	touch $@
