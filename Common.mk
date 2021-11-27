@@ -7,7 +7,7 @@ RELEASE_ENVIRONMENT?=development
 
 GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
-COMPONENT=$(REPO_OWNER)/$(REPO)
+COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
 PROJECT_PATH?=$(subst $(BASE_DIRECTORY)/,,$(MAKE_ROOT))
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
@@ -53,6 +53,7 @@ endif
 GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
 GO_MOD_DOWNLOAD_TARGETS?=$(REPO)/eks-anywhere-go-mod-download
+REPO_NO_CLONE?=false
 ####################################################
 
 #################### RELEASE BRANCHES ##############
@@ -60,26 +61,27 @@ HAS_RELEASE_BRANCHES?=false
 RELEASE_BRANCH?=
 SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
 BINARIES_ARE_RELEASE_BRANCHED?=true
-ifneq ($(RELEASE_BRANCH),)
-	RELEASE_BRANCH_SUFFIX=/$(RELEASE_BRANCH)
+ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)),$(RELEASE_BRANCH)),)
+	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
 
-	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)
-	# Deps are always released branched
-	BINARY_DEPS_DIR=$(OUTPUT_DIR)$(if $(filter-out true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)/dependencies
-	OUTPUT_DIR?=_output$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)
+	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)$(RELEASE_BRANCH_SUFFIX)
+	OUTPUT_DIR?=_output$(RELEASE_BRANCH_SUFFIX)
 	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)
+
+	# Deps are always released branched
+	BINARY_DEPS_DIR?=_output/$(RELEASE_BRANCH)/dependencies
 
 	# include release branch info in latest tag
 	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
-	$(filter-out build release upload-artifacts clean,$(MAKECMDGOALS))),)
+	$(filter-out build release clean,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
 $(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
 else ifeq ($(HAS_RELEASE_BRANCHES),true)
 	# project has release branches and one was not specified, trigger target for all
 	BUILD_TARGETS=build/release-branches/all
 	RELEASE_TARGETS=release/release-branches/all
-	
+
 	# avoid warnings when trying to read GIT_TAG file which wont exist when no release_branch is given
 	GIT_TAG=non-existent
 else
@@ -104,6 +106,8 @@ IMAGE_OUTPUT_DIR?=/tmp
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
 IMAGE_TARGET?=
 
+IMAGE_NAMES?=$(REPO)
+
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
 IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
 # For projects with multiple containers this is defined to override the default
@@ -119,6 +123,8 @@ IMAGE_USERADD_USER_NAME?=
 # where its the first build from a new release branch
 IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST))
 
+BUILD_OCI_TARS?=false
+HAS_HELM_CHART?=false
 ####################################################
 
 #################### BINARIES ######################
@@ -171,7 +177,7 @@ FETCH_BINARIES_TARGETS?=
 ####################################################
 
 #################### LICENSES ######################
-LICENSE_PACKAGE_FILTER?=
+LICENSE_PACKAGE_FILTER?=$(SOURCE_PATTERNS)
 REPO_SUBPATH?=
 HAS_LICENSES?=true
 ATTRIBUTION_TARGETS?=$(if $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt),$(RELEASE_BRANCH)/ATTRIBUTION.txt,ATTRIBUTION.txt)
@@ -185,7 +191,8 @@ HAS_S3_ARTIFACTS?=false
 
 SIMPLE_CREATE_TARBALLS?=true
 TAR_FILE_PREFIX?=$(REPO)
-FAKE_ARM_ARTIFACTS_FOR_VALIDATION?=false
+FAKE_ARM_BINARIES_FOR_VALIDATION?=$(if $(filter linux/arm64,$(BINARY_PLATFORMS)),false,true)
+FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 ####################################################
 
 #################### OTHER #########################
@@ -193,8 +200,8 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums local-images attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
-RELEASE_TARGETS?=validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),local-images,) attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
 define BUILDCTL
@@ -230,11 +237,13 @@ define FULL_FETCH_BINARIES_TARGETS
 endef
 
 define BINARY_TARGETS_FROM_FILES_PLATFORMS
-	$(foreach platform, $(2), $(foreach target, $(1), $(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/$(target)))
+	$(foreach platform, $(2), $(foreach target, $(1), \
+		$(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/$(if $(findstring windows,$(platform)),$(target).exe,$(target))))
 endef
 
 define BINARY_TARGET_BODY_ALL_PLATFORMS
-	$(eval $(foreach platform, $(BINARY_PLATFORMS), $(call $(if $(call needs-cgo-builder,$(platform)),CGO_BINARY_TARGET_BODY,BINARY_TARGET_BODY),$(platform),$(1),$(2))))
+	$(eval $(foreach platform, $(BINARY_PLATFORMS), \
+		$(call $(if $(call needs-cgo-builder,$(platform)),CGO_BINARY_TARGET_BODY,BINARY_TARGET_BODY),$(platform),$(if $(findstring windows,$(platform)),$(1).exe,$(1)),$(2))))
 endef
 
 define BINARY_TARGET_BODY
@@ -270,9 +279,10 @@ help: ## Display this help
 
 
 ##@ Source repo + binary Targets
-
+ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
 	git clone $(CLONE_URL) $(REPO)
+endif
 
 $(GIT_CHECKOUT_TARGET): | $(REPO)
 	@rm -f $(REPO)/eks-anywhere-*
@@ -283,11 +293,11 @@ $(GIT_CHECKOUT_TARGET): | $(REPO)
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) config user.email prow@amazonaws.com
 	git -C $(REPO) config user.name "Prow Bot"
-	git -C $(REPO) am $(MAKE_ROOT)/patches/*
+	git -C $(REPO) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches))/*
 	@touch $@
 
-%eks-anywhere-go-mod-download: $(if $(wildcard patches),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
-	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(REPO_SUBPATH)
+%eks-anywhere-go-mod-download: $(if $(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches)),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
+	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
 	@touch $@
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
@@ -351,7 +361,7 @@ upload-artifacts: s3-artifacts
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_ARTIFACTS_FOR_VALIDATION)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
 
 ##@ Checksum Targets
 	
@@ -363,7 +373,7 @@ checksums: $(BINARY_TARGETS)
 .PHONY: validate-checksums
 validate-checksums: ## Validate checksums of currently built binaries against checksums file.
 validate-checksums: $(BINARY_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_ARTIFACTS_FOR_VALIDATION)
+	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
 
 ## Image Targets
 
@@ -421,6 +431,7 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
+%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/builder-base:latest
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/amd64:
@@ -439,6 +450,11 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %-useradd/images/export: IMAGE_PLATFORMS=linux/amd64
 %-useradd/images/export:
 	$(BUILDCTL)
+
+ifneq ($(IMAGE_NAMES),)
+local-images: $(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
+images: $(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
+endif
 
 ##@ Fetch Binary Targets
 $(BINARY_DEPS_DIR)/linux-%:

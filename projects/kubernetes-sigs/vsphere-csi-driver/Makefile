@@ -5,7 +5,6 @@ GOLANG_VERSION?="1.15"
 REPO=vsphere-csi-driver
 REPO_OWNER=kubernetes-sigs
 
-LICENSE_PACKAGE_FILTER?=./cmd/vsphere-csi ./cmd/syncer
 BINARY_TARGET_FILES=vsphere-csi-driver vsphere-csi-syncer
 SOURCE_PATTERNS=./cmd/vsphere-csi ./cmd/syncer
 
@@ -15,6 +14,8 @@ DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 CSI_DRIVER_IMAGE_COMPONENT=kubernetes-sigs/vsphere-csi-driver/csi/driver
 CSI_SYNCER_IMAGE_COMPONENT=kubernetes-sigs/vsphere-csi-driver/csi/syncer
 
+IMAGE_NAMES=csi-driver csi-syncer
+
 OUTPUT_FILES_TARGET=$(OUTPUT_DIR)/files
 
 include $(BASE_DIRECTORY)/Common.mk
@@ -22,12 +23,6 @@ include $(BASE_DIRECTORY)/Common.mk
 csi-driver/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-csi
 
 $(call IMAGE_TARGETS_FOR_NAME, csi-syncer): $(OUTPUT_FILES_TARGET)
-
-.PHONY: local-images
-local-images: csi-driver/images/amd64 csi-syncer/images/amd64
-
-.PHONY: images
-images: csi-driver/images/push csi-syncer/images/push
 
 $(OUTPUT_FILES_TARGET):
 	@mkdir -p $@

@@ -5,17 +5,10 @@ GOLANG_VERSION?="1.16"
 REPO=etcdadm
 REPO_OWNER=kubernetes-sigs
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=etcdadm
 
 HAS_S3_ARTIFACTS=true
 
+IMAGE_NAMES=
+
 include $(BASE_DIRECTORY)/Common.mk
-
-
-.PHONY: local-images
-local-images: #noop
-
-.PHONY: images
-images: #noop

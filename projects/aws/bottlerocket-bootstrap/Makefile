@@ -8,9 +8,9 @@ REPO_OWNER=aws
 BASE_IMAGE_NAME?=eks-distro-base
 IMAGE_COMPONENT=bottlerocket-bootstrap
 
-LICENSE_PACKAGE_FILTER?=.
 BINARY_TARGET_FILES=bottlerocket-bootstrap
-SOURCE_PATTERNS=github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap
+SOURCE_PATTERNS=.
+REPO_SUBPATH=..
 
 GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".$(RELEASE_BRANCH).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 
@@ -30,6 +30,7 @@ BINARIES_ARE_RELEASE_BRANCHED=false
 PROJECT_ROOT=$(MAKE_ROOT)
 
 # fake git checkout
+REPO_NO_CLONE=true
 GIT_CHECKOUT_TARGET=main.go
 FAKE_GIT_REPO_TARGET=.git
 
@@ -40,15 +41,8 @@ include $(BASE_DIRECTORY)/Common.mk
 $(REPO):
 	@mkdir $@
 
-.PHONY: local-images
-local-images: bottlerocket-bootstrap/images/amd64
-
-.PHONY: images
-images: bottlerocket-bootstrap/images/push
-
 $(call IMAGE_TARGETS_FOR_NAME, bottlerocket-bootstrap): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
-$(GATHER_LICENSES_TARGETS): REPO_SUBPATH=..
 $(GATHER_LICENSES_TARGETS): | $(FAKE_GIT_REPO_TARGET)
 
 $(ATTRIBUTION_TARGETS): GIT_TAG

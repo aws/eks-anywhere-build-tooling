@@ -20,7 +20,8 @@ set -o pipefail
 PROJECT_ROOT="$1"
 REPO="$2"
 TAG="$3"
-REPO_SUBPATH="${4:-}"
+GOLANG_VERSION="$4"
+REPO_SUBPATH="${5:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
@@ -28,5 +29,6 @@ source "${SCRIPT_ROOT}/common.sh"
 cd $REPO/$REPO_SUBPATH
 
 CACHE_KEY=$(echo $PROJECT_ROOT | sed 's/\(.*\)\//\1-/' | xargs basename)
+build::common::use_go_version $GOLANG_VERSION
 build::common::set_go_cache $CACHE_KEY $TAG
 go mod vendor

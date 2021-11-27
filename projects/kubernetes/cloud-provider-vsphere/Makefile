@@ -7,7 +7,6 @@ REPO_OWNER=kubernetes
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
-LICENSE_PACKAGE_FILTER?=./cmd/vsphere-cloud-controller-manager
 FIX_LICENSES_VSPHERE_AUTOMATION_TARGET=$(REPO)/vendor/github.com/vmware/vsphere-automation-sdk-go/lib/LICENSE.txt
 
 BINARY_TARGET_FILES=vsphere-cloud-controller-manager
@@ -21,13 +20,6 @@ include $(BASE_DIRECTORY)/Common.mk
 
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_VSPHERE_AUTOMATION_TARGET)
-
-.PHONY: local-images
-local-images: cloud-provider-vsphere/images/amd64
-
-.PHONY: images
-images: cloud-provider-vsphere/images/push
-
 
 $(FIX_LICENSES_VSPHERE_AUTOMATION_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
   # The vsphere-automation-sdk-go dependency github repo has a license however
