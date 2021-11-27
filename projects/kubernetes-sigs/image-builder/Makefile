@@ -78,9 +78,9 @@ $(BOTTLEROCKET_SETUP_TARGET):
 	# of root.json file
 	envsubst '$$BOTTLEROCKET_ROOT_JSON_PATH' \
 		< $(MAKE_ROOT)/bottlerocket-root-json-checksum \
-		> $(BOOTLEROCKET_SETUP_TARGET)
+		> $(BOTTLEROCKET_SETUP_TARGET)
 	curl https://cache.bottlerocket.aws/root.json -o $$BOTTLEROCKET_ROOT_JSON_PATH
-	sha512sum -c $(BOOTLEROCKET_SETUP_TARGET)
+	sha512sum -c $(BOTTLEROCKET_SETUP_TARGET)
 
 .PHONY: deps-ami
 deps-ami: $(GIT_PATCH_TARGET)
