@@ -47,7 +47,7 @@ ADDITIONAL_PAUSE_1-21_FROM=1-20
 HAS_RELEASE_BRANCHES=true
 
 TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
-BOOTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
+BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -71,8 +71,8 @@ $(TUFTOOL_TARGET):
 	$(CARGO_HOME)/bin/rustup default stable
 	CARGO_NET_GIT_FETCH_WITH_CLI=true $(CARGO_HOME)/bin/cargo install --force --root $(CARGO_HOME) tuftool
 
-$(BOOTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
-$(BOOTLEROCKET_SETUP_TARGET):
+$(BOTTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
+$(BOTTLEROCKET_SETUP_TARGET):
 	@mkdir -p $(BOTTLEROCKET_DOWNLOAD_PATH)
 	# This configuration supports local installations and checksum validations
 	# of root.json file
@@ -113,7 +113,7 @@ release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs
 	build/get_artifacts.sh $(IMAGE_BUILDER_DIR) ubuntu
 
 .PHONY: release-ova-bottlerocket
-release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOOTLEROCKET_SETUP_TARGET)
+release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
 	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
 .PHONY: validate-ubuntu-2004
