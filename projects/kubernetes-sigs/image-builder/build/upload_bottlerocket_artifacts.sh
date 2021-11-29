@@ -30,13 +30,14 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
 # Setting version and URL parameters for downloading the OVA
-OVA_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/${RELEASE_CHANNEL}
+OVA_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/ova
 KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
 BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.releaseVersion" $MAKE_ROOT/BOTTLEROCKET_OVA_RELEASES)
 OVA="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
 BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/vmware-k8s-${KUBEVERSION}/x86_64/"
 BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
 
+rm -rf $OVA_DOWNLOAD_PATH
 # Downloading the OVA from the Bottlerocket target location using Tuftool
 $CARGO_HOME/bin/tuftool download "${OVA_DOWNLOAD_PATH}" \
     --target-name "${OVA}" \

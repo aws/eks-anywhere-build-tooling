@@ -9,9 +9,6 @@ BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi
 EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQS))
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
-OVA_TARGETS=$(addprefix release-upload-ova-ubuntu-2004-, $(SUPPORTED_K8S_VERSIONS))
-OVA_TARGETS+=$(addprefix release-ova-bottlerocket-, $(SUPPORTED_K8S_VERSIONS))
 RELEASE_BRANCH?=
 
 .PHONY: build-all-projects
@@ -35,7 +32,7 @@ release-binaries-images: build-all-projects
 
 .PHONY: release-ovas
 release-ovas:
-	$(MAKE) $(OVA_TARGETS) -C projects/kubernetes-sigs/image-builder
+	$(MAKE) release -C projects/kubernetes-sigs/image-builder
 
 .PHONY: clean
 clean:
