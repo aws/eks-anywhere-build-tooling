@@ -34,7 +34,7 @@ PACKER_TYPE_VAR_FILES?=
 PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(PACKER_TYPE_VAR_FILES) $(FULL_OUTPUT_DIR)/config/common.json $(FULL_OUTPUT_DIR)/config/cni.json $(FULL_OUTPUT_DIR)/config/additional_components.json
 
 BUILD_TARGETS=build-ami-ubuntu-2004 release-ova-bottlerocket
-RELEASE_TARGETS= release-ami-ubuntu-2004 release-ova-ubuntu-2004 upload-artifacts release-ova-bottlerocket
+RELEASE_TARGETS=release-ova-ubuntu-2004 upload-artifacts release-ova-bottlerocket
 
 # Kubeadm hardcodes the version of the pause image it pulls, even tho containerd config
 # overrides which image is actually used
