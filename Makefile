@@ -28,7 +28,7 @@ aws_eks-anywhere-build-tooling: $(EKSA_TOOLS_PREREQS_BUILD_TARGETS)
 .PHONY: build-project-%
 build-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
-	$(MAKE) release-upload -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
+	$(MAKE) release -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
 
 .PHONY: release-binaries-images
 release-binaries-images: build-all-projects

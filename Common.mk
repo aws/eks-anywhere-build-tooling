@@ -61,14 +61,13 @@ ifneq ($(RELEASE_BRANCH),)
 	# include release branch info in latest tag
 	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
-	$(filter-out build release upload-artifacts release-upload clean,$(MAKECMDGOALS))),)
+	$(filter-out build release upload-artifacts clean,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
 $(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
 else ifeq ($(HAS_RELEASE_BRANCHES),true)
 	# project has release branches and one was not specified, trigger target for all
 	BUILD_TARGETS=build/release-branches/all
 	RELEASE_TARGETS=release/release-branches/all
-	RELEASE_UPLOAD_TARGETS=release-upload/release-branches/all
 	
 	# avoid warnings when trying to read GIT_TAG file which wont exist when no release_branch is given
 	GIT_TAG=non-existent
@@ -185,8 +184,7 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 
 #################### TARGETS FOR OVERRIDING ########
 BUILD_TARGETS?=validate-checksums local-images attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
-RELEASE_TARGETS?=validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
-RELEASE_UPLOAD_TARGETS?=release $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+RELEASE_TARGETS?=validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
 define BUILDCTL
@@ -337,7 +335,7 @@ ifeq ($(SIMPLE_CREATE_TARBALLS),true)
 endif
 
 .PHONY: upload-artifacts
-upload-artifacts:
+upload-artifacts: s3-artifacts
 	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH) $(LATEST_TAG)
 
 .PHONY: s3-artifacts
@@ -449,9 +447,6 @@ build: $(BUILD_TARGETS)
 .PHONY: release
 release: ## Called via prow postsubmit + release jobs, calls `binaries gather-licenses clean-repo images` by default
 release: $(RELEASE_TARGETS)
-
-.PHONY: release-upload
-release-upload: $(RELEASE_UPLOAD_TARGETS)
 
 .PHONY: %/release-branches/all
 %/release-branches/all:
