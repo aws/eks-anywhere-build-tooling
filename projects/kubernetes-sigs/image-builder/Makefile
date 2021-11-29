@@ -103,7 +103,7 @@ release-ami-ubuntu-2004-%: setup-ami-share deps-ami setup-packer-configs
 	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" make -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
 
 .PHONY: release-ova-ubuntu-2004
-build-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
+release-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
 release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(OVA_PATH)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
