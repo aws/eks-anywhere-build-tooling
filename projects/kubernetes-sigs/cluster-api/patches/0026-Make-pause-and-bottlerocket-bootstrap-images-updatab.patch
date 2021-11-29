@@ -1,0 +1,95 @@
+From eb7e60a8a221f396d172e0663fe9b2e295412150 Mon Sep 17 00:00:00 2001
+From: Guillermo Gaston <gaslor@amazon.com>
+Date: Tue, 31 Aug 2021 15:56:28 +0000
+Subject: [PATCH 26/36] Make pause and bottlerocket bootstrap images updatable
+ in validation webhook
+
+cr: https://code.amazon.com/reviews/CR-56335855
+---
+ .../v1beta1/kubeadm_control_plane_webhook.go  |  4 +++
+ .../kubeadm_control_plane_webhook_test.go     | 36 +++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+
+diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
+index 2b9caeac0..bfc1b85f2 100644
+--- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
++++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
+@@ -120,6 +120,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+ 	// For example, {"spec", "*"} will allow any path under "spec" to change.
+ 	allowedPaths := [][]string{
+ 		{"metadata", "*"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs", "*"},
+@@ -127,10 +128,13 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageRepository"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageTag"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "imageRepository"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, apiServer, "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, controllerManager, "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler, "*"},
+ 		{spec, kubeadmConfigSpec, initConfiguration, nodeRegistration, "*"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
+ 		{spec, kubeadmConfigSpec, preKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, postKubeadmCommands},
+diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
+index b999b3ba1..bb96321ed 100644
+--- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
++++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
+@@ -538,6 +538,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 	disableNTPServers := before.DeepCopy()
+ 	disableNTPServers.Spec.KubeadmConfigSpec.NTP.Enabled = pointer.BoolPtr(false)
+ 
++	validUpdateClusterConfPauseImage := before.DeepCopy()
++	validUpdateClusterConfPauseImage.Spec.KubeadmConfigSpec.ClusterConfiguration.Pause = bootstrapv1.Pause{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++
++	validUpdateClusterConfBRBootstrapImage := before.DeepCopy()
++	validUpdateClusterConfBRBootstrapImage.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++
++	validUpdateJoinConfPauseImage := before.DeepCopy()
++	validUpdateJoinConfPauseImage.Spec.KubeadmConfigSpec.JoinConfiguration.Pause = bootstrapv1.Pause{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++
++	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
++	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++
+ 	tests := []struct {
+ 		name      string
+ 		expectErr bool
+@@ -826,6 +838,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before:    before,
+ 			kcp:       disableNTPServers,
+ 		},
++		{
++			name:      "should allow changes to cluster configuration pause image",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfPauseImage,
++		},
++		{
++			name:      "should allow changes to cluster configuration bottlerocket bootstrap image",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfBRBootstrapImage,
++		},
++		{
++			name:      "should allow changes to join configuration pause image",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfPauseImage,
++		},
++		{
++			name:      "should allow changes to join configuration bottlerocket bootstrap image",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfBRBootstrapImage,
++		},
+ 	}
+ 
+ 	for _, tt := range tests {
+-- 
+2.30.1
+

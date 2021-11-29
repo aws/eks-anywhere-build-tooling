@@ -1,0 +1,657 @@
+From ea40cb7268f4ede7517e1c9b6c52326a3c32b9e3 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Tue, 16 Nov 2021 16:46:24 -0800
+Subject: [PATCH 19/36] Add external etcd api changes to v1beta1 capi CRDs
+
+---
+ api/v1beta1/cluster_types.go                  |  14 ++
+ api/v1beta1/condition_consts.go               |  16 +++
+ api/v1beta1/machine_types.go                  |   3 +
+ .../bottlerocket/controlplane_init.go         |   2 -
+ .../config/manifest/clusterctl-api.yaml       |  17 ++-
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 123 ++++++++++++------
+ config/rbac/role.yaml                         |  16 ++-
+ controllers/cluster_controller.go             |  20 ++-
+ controllers/cluster_controller_phases.go      |   4 +-
+ controllers/cluster_controller_test.go        |   4 -
+ controllers/machine_controller_phases.go      |   2 +-
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  28 ++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  28 ++++
+ controlplane/kubeadm/config/rbac/role.yaml    |  16 +--
+ .../kubeadm/controllers/controller.go         |   6 +-
+ util/collections/machine_filters.go           |  26 ++++
+ 16 files changed, 251 insertions(+), 74 deletions(-)
+
+diff --git a/api/v1beta1/cluster_types.go b/api/v1beta1/cluster_types.go
+index 4cb7fceb0..28f34b387 100644
+--- a/api/v1beta1/cluster_types.go
++++ b/api/v1beta1/cluster_types.go
+@@ -56,6 +56,11 @@ type ClusterSpec struct {
+ 	// +optional
+ 	ControlPlaneRef *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
+ 
++	// ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
++	// for provisioning an external etcd cluster
++	// +optional
++	ManagedExternalEtcdRef *corev1.ObjectReference `json:"managedExternalEtcdRef,omitempty"`
++
+ 	// InfrastructureRef is a reference to a provider-specific resource that holds the details
+ 	// for provisioning infrastructure for a cluster in said provider.
+ 	// +optional
+@@ -226,6 +231,15 @@ type ClusterStatus struct {
+ 	// ObservedGeneration is the latest generation observed by the controller.
+ 	// +optional
+ 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
++
++	// ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
++	// so remaining etcd members can lookup the address to join the cluster
++	// +optional
++	ManagedExternalEtcdInitialized bool `json:"managedExternalEtcdInitialized"`
++
++	// ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned
++	// +optional
++	ManagedExternalEtcdReady bool `json:"managedExternalEtcdReady"`
+ }
+ 
+ // ANCHOR_END: ClusterStatus
+diff --git a/api/v1beta1/condition_consts.go b/api/v1beta1/condition_consts.go
+index c056e844b..2370823ff 100644
+--- a/api/v1beta1/condition_consts.go
++++ b/api/v1beta1/condition_consts.go
+@@ -251,3 +251,19 @@ const (
+ 	// ScalingDownReason (Severity=Info) documents a MachineSet is decreasing the number of replicas.
+ 	ScalingDownReason = "ScalingDown"
+ )
++
++// Conditions used by the Etcd provider objects
++const (
++	// ManagedExternalEtcdClusterInitializedCondition is set once the first member of an etcd cluster is provisioned and running
++	ManagedExternalEtcdClusterInitializedCondition ConditionType = "ManagedEtcdInitialized"
++
++	// ManagedExternalEtcdClusterReadyCondition indicates if the etcd cluster is ready and all members have passed healthchecks.
++	ManagedExternalEtcdClusterReadyCondition ConditionType = "ManagedEtcdReady"
++
++	// WaitingForEtcdClusterInitializedReason (Severity=Info) documents a cluster waiting for the etcd cluster
++	// to report successful etcd cluster initialization.
++	WaitingForEtcdClusterInitializedReason = "WaitingForEtcdClusterProviderInitialized"
++
++	// EtcdHealthCheckFailedReason (Severity=Error) documents that healthcheck on an etcd member failed
++	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
++)
+diff --git a/api/v1beta1/machine_types.go b/api/v1beta1/machine_types.go
+index 9e263f368..8e5158dcb 100644
+--- a/api/v1beta1/machine_types.go
++++ b/api/v1beta1/machine_types.go
+@@ -29,6 +29,9 @@ const (
+ 	// MachineControlPlaneLabelName is the label set on machines or related objects that are part of a control plane.
+ 	MachineControlPlaneLabelName = "cluster.x-k8s.io/control-plane"
+ 
++	//MachineEtcdClusterLabelName is the label set on machines or related objects that are part of an etcd cluster
++	MachineEtcdClusterLabelName = "cluster.x-k8s.io/etcd-cluster"
++
+ 	// ExcludeNodeDrainingAnnotation annotation explicitly skips node draining if set.
+ 	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
+ 
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+index edf555b8c..8f9b6e12e 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+@@ -6,8 +6,6 @@
+ package bottlerocket
+ 
+ import (
+-	"fmt"
+-
+ 	"github.com/pkg/errors"
+ 	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
+ )
+diff --git a/cmd/clusterctl/config/manifest/clusterctl-api.yaml b/cmd/clusterctl/config/manifest/clusterctl-api.yaml
+index b9a56bd0d..1513e4548 100644
+--- a/cmd/clusterctl/config/manifest/clusterctl-api.yaml
++++ b/cmd/clusterctl/config/manifest/clusterctl-api.yaml
+@@ -36,10 +36,14 @@ spec:
+         description: Provider defines an entry in the provider inventory.
+         properties:
+           apiVersion:
+-            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+             type: string
+           kind:
+-            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+             type: string
+           metadata:
+             type: object
+@@ -47,13 +51,18 @@ spec:
+             description: ProviderName indicates the name of the provider.
+             type: string
+           type:
+-            description: Type indicates the type of the provider. See ProviderType for a list of supported values
++            description: Type indicates the type of the provider. See ProviderType
++              for a list of supported values
+             type: string
+           version:
+             description: Version indicates the component version.
+             type: string
+           watchedNamespace:
+-            description: 'WatchedNamespace indicates the namespace where the provider controller is is watching. if empty the provider controller is watching for objects in all namespaces. Deprecated: in clusterctl v1alpha4 all the providers watch all the namespaces; this field will be removed in a future version of this API'
++            description: 'WatchedNamespace indicates the namespace where the provider
++              controller is is watching. if empty the provider controller is watching
++              for objects in all namespaces. Deprecated: in clusterctl v1alpha4 all
++              the providers watch all the namespaces; this field will be removed in
++              a future version of this API'
+             type: string
+         type: object
+     served: true
+diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+index 2ca6d1214..e54c7bb59 100644
+--- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
++++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+@@ -168,6 +168,44 @@ spec:
+                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                     type: string
+                 type: object
++              managedExternalEtcdRef:
++                description: ManagedExternalEtcdRef is an optional reference to an
++                  etcd provider resource that holds details for provisioning an external
++                  etcd cluster
++                properties:
++                  apiVersion:
++                    description: API version of the referent.
++                    type: string
++                  fieldPath:
++                    description: 'If referring to a piece of an object instead of
++                      an entire object, this string should contain a valid JSON/Go
++                      field access statement, such as desiredState.manifest.containers[2].
++                      For example, if the object reference is to a container within
++                      a pod, this would take on a value like: "spec.containers{name}"
++                      (where "name" refers to the name of the container that triggered
++                      the event) or if no container name is specified "spec.containers[2]"
++                      (container with index 2 in this pod). This syntax is chosen
++                      only to have some well-defined way of referencing a part of
++                      an object. TODO: this design is not final and this field is
++                      subject to change in the future.'
++                    type: string
++                  kind:
++                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++                    type: string
++                  name:
++                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
++                    type: string
++                  namespace:
++                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
++                    type: string
++                  resourceVersion:
++                    description: 'Specific resourceVersion to which this reference
++                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
++                    type: string
++                  uid:
++                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
++                    type: string
++                type: object
+               paused:
+                 description: Paused can be used to prevent controllers from processing
+                   the Cluster and all its associated objects.
+@@ -260,6 +298,15 @@ spec:
+                 description: InfrastructureReady is the state of the infrastructure
+                   provider.
+                 type: boolean
++              managedExternalEtcdInitialized:
++                description: ManagedExternalEtcdInitialized indicates that first etcd
++                  member's IP address is set by machine controller, so remaining etcd
++                  members can lookup the address to join the cluster
++                type: boolean
++              managedExternalEtcdReady:
++                description: ManagedExternalEtcdReady indicates external etcd cluster
++                  is fully provisioned
++                type: boolean
+               observedGeneration:
+                 description: ObservedGeneration is the latest generation observed
+                   by the controller.
+@@ -427,44 +474,6 @@ spec:
+                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                     type: string
+                 type: object
+-              managedExternalEtcdRef:
+-                description: ManagedExternalEtcdRef is an optional reference to an
+-                  etcd provider resource that holds details for provisioning an external
+-                  etcd cluster
+-                properties:
+-                  apiVersion:
+-                    description: API version of the referent.
+-                    type: string
+-                  fieldPath:
+-                    description: 'If referring to a piece of an object instead of
+-                      an entire object, this string should contain a valid JSON/Go
+-                      field access statement, such as desiredState.manifest.containers[2].
+-                      For example, if the object reference is to a container within
+-                      a pod, this would take on a value like: "spec.containers{name}"
+-                      (where "name" refers to the name of the container that triggered
+-                      the event) or if no container name is specified "spec.containers[2]"
+-                      (container with index 2 in this pod). This syntax is chosen
+-                      only to have some well-defined way of referencing a part of
+-                      an object. TODO: this design is not final and this field is
+-                      subject to change in the future.'
+-                    type: string
+-                  kind:
+-                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+-                    type: string
+-                  name:
+-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+-                    type: string
+-                  namespace:
+-                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+-                    type: string
+-                  resourceVersion:
+-                    description: 'Specific resourceVersion to which this reference
+-                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+-                    type: string
+-                  uid:
+-                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+-                    type: string
+-                type: object
+               paused:
+                 description: Paused can be used to prevent controllers from processing
+                   the Cluster and all its associated objects.
+@@ -853,6 +862,44 @@ spec:
+                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                     type: string
+                 type: object
++              managedExternalEtcdRef:
++                description: ManagedExternalEtcdRef is an optional reference to an
++                  etcd provider resource that holds details for provisioning an external
++                  etcd cluster
++                properties:
++                  apiVersion:
++                    description: API version of the referent.
++                    type: string
++                  fieldPath:
++                    description: 'If referring to a piece of an object instead of
++                      an entire object, this string should contain a valid JSON/Go
++                      field access statement, such as desiredState.manifest.containers[2].
++                      For example, if the object reference is to a container within
++                      a pod, this would take on a value like: "spec.containers{name}"
++                      (where "name" refers to the name of the container that triggered
++                      the event) or if no container name is specified "spec.containers[2]"
++                      (container with index 2 in this pod). This syntax is chosen
++                      only to have some well-defined way of referencing a part of
++                      an object. TODO: this design is not final and this field is
++                      subject to change in the future.'
++                    type: string
++                  kind:
++                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++                    type: string
++                  name:
++                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
++                    type: string
++                  namespace:
++                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
++                    type: string
++                  resourceVersion:
++                    description: 'Specific resourceVersion to which this reference
++                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
++                    type: string
++                  uid:
++                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
++                    type: string
++                type: object
+               paused:
+                 description: Paused can be used to prevent controllers from processing
+                   the Cluster and all its associated objects.
+diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
+index bc1c00755..078e26e43 100644
+--- a/config/rbac/role.yaml
++++ b/config/rbac/role.yaml
+@@ -38,8 +38,22 @@ rules:
+ - apiGroups:
+   - bootstrap.cluster.x-k8s.io
+   - controlplane.cluster.x-k8s.io
+-  - infrastructure.cluster.x-k8s.io
+   - etcdcluster.cluster.x-k8s.io
++  - infrastructure.cluster.x-k8s.io
++  resources:
++  - '*'
++  verbs:
++  - create
++  - delete
++  - get
++  - list
++  - patch
++  - update
++  - watch
++- apiGroups:
++  - bootstrap.cluster.x-k8s.io
++  - controlplane.cluster.x-k8s.io
++  - infrastructure.cluster.x-k8s.io
+   resources:
+   - '*'
+   verbs:
+diff --git a/controllers/cluster_controller.go b/controllers/cluster_controller.go
+index e833201cf..9ea5ad858 100644
+--- a/controllers/cluster_controller.go
++++ b/controllers/cluster_controller.go
+@@ -58,7 +58,7 @@ const (
+ // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
+ // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;patch
+ // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
+-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io;bootstrap.cluster.x-k8s.io;controlplane.cluster.x-k8s.io,resources=*,verbs=get;list;watch;create;update;patch;delete
++// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io;bootstrap.cluster.x-k8s.io;controlplane.cluster.x-k8s.io;etcdcluster.cluster.x-k8s.io,resources=*,verbs=get;list;watch;create;update;patch;delete
+ // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status;clusters/finalizers,verbs=get;list;watch;create;update;patch;delete
+ // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
+ 
+@@ -88,9 +88,8 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
+ 
+ 	err = controller.Watch(
+ 		&source.Kind{Type: &clusterv1.Cluster{}},
+-		&handler.EnqueueRequestsFromMapFunc{
+-			ToRequests: handler.ToRequestsFunc(r.etcdMachineToCluster),
+-		})
++		handler.EnqueueRequestsFromMapFunc(r.etcdMachineToCluster),
++	)
+ 
+ 	if err != nil {
+ 		return errors.Wrap(err, "failed adding Watch for Clusters on etcd machines to controller manager")
+@@ -326,7 +325,7 @@ func (r *ClusterReconciler) reconcileDelete(ctx context.Context, cluster *cluste
+ 			}
+ 
+ 			// Return here so we don't remove the finalizer yet.
+-			logger.Info("Cluster still has descendants - need to requeue", "managedExternalEtcdRef", cluster.Spec.ManagedExternalEtcdRef.Name)
++			log.Info("Cluster still has descendants - need to requeue", "managedExternalEtcdRef", cluster.Spec.ManagedExternalEtcdRef.Name)
+ 			return ctrl.Result{}, nil
+ 		}
+ 	}
+@@ -463,7 +462,8 @@ func (r *ClusterReconciler) listDescendants(ctx context.Context, cluster *cluste
+ 	// Split machines into control plane and worker machines so we make sure we delete control plane machines last
+ 	machineCollection := collections.FromMachineList(&machines)
+ 	controlPlaneMachines := machineCollection.Filter(collections.ControlPlaneMachines(cluster.Name))
+-	workerMachines := machineCollection.Difference(controlPlaneMachines)
++	etcdMachines := machineCollection.Filter(collections.EtcdMachines(cluster.Name))
++	workerMachines := machineCollection.Difference(controlPlaneMachines).Difference(etcdMachines)
+ 	descendants.workerMachines = collections.ToMachineList(workerMachines)
+ 	// Only count control plane machines as descendants if there is no control plane provider.
+ 	if cluster.Spec.ControlPlaneRef == nil {
+@@ -577,11 +577,10 @@ func (r *ClusterReconciler) controlPlaneMachineToCluster(o client.Object) []ctrl
+ 
+ // etcdMachineToCluster is a handler.ToRequestsFunc to be used to enqueue requests for reconciliation
+ // for Cluster to update its status.ManagedExternalEtcdInitialized field
+-func (r *ClusterReconciler) etcdMachineToCluster(o handler.MapObject) []ctrl.Request {
+-	m, ok := o.Object.(*clusterv1.Machine)
++func (r *ClusterReconciler) etcdMachineToCluster(o client.Object) []ctrl.Request {
++	m, ok := o.(*clusterv1.Machine)
+ 	if !ok {
+-		r.Log.Error(nil, fmt.Sprintf("Expected a Machine but got a %T", o.Object))
+-		return nil
++		panic(fmt.Sprintf("Expected a Machine but got a %T", o))
+ 	}
+ 	if !util.IsEtcdMachine(m) {
+ 		return nil
+@@ -589,7 +588,6 @@ func (r *ClusterReconciler) etcdMachineToCluster(o handler.MapObject) []ctrl.Req
+ 
+ 	cluster, err := util.GetClusterByName(context.TODO(), r.Client, m.Namespace, m.Spec.ClusterName)
+ 	if err != nil {
+-		r.Log.Error(err, "Failed to get cluster", "machine", m.Name, "cluster", m.ClusterName, "namespace", m.Namespace)
+ 		return nil
+ 	}
+ 
+diff --git a/controllers/cluster_controller_phases.go b/controllers/cluster_controller_phases.go
+index 5de0ccc63..f4f7725ba 100644
+--- a/controllers/cluster_controller_phases.go
++++ b/controllers/cluster_controller_phases.go
+@@ -200,7 +200,7 @@ func (r *ClusterReconciler) reconcileInfrastructure(ctx context.Context, cluster
+ 
+ // reconcileControlPlane reconciles the Spec.ControlPlaneRef object on a Cluster.
+ func (r *ClusterReconciler) reconcileControlPlane(ctx context.Context, cluster *clusterv1.Cluster) (ctrl.Result, error) {
+-	log := r.Log.WithValues("cluster", cluster.Name, "namespace", cluster.Namespace)
++	log := ctrl.LoggerFrom(ctx)
+ 	if cluster.Spec.ControlPlaneRef == nil {
+ 		return ctrl.Result{}, nil
+ 	}
+@@ -289,7 +289,7 @@ func (r *ClusterReconciler) reconcileControlPlane(ctx context.Context, cluster *
+ }
+ 
+ func (r *ClusterReconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv1.Cluster) (ctrl.Result, error) {
+-	log := r.Log.WithValues("cluster", cluster.Name, "namespace", cluster.Namespace)
++	log := ctrl.LoggerFrom(ctx)
+ 
+ 	if cluster.Spec.ManagedExternalEtcdRef == nil {
+ 		return ctrl.Result{}, nil
+diff --git a/controllers/cluster_controller_test.go b/controllers/cluster_controller_test.go
+index ad9adf92f..dab6d7c0b 100644
+--- a/controllers/cluster_controller_test.go
++++ b/controllers/cluster_controller_test.go
+@@ -575,10 +575,6 @@ func (b *machineBuilder) build() clusterv1.Machine {
+ 	return b.m
+ }
+ 
+-type machinePoolBuilder struct {
+-	mp expv1.MachinePool
+-}
+-
+ func newMachinePoolBuilder() *machinePoolBuilder {
+ 	return &machinePoolBuilder{}
+ }
+diff --git a/controllers/machine_controller_phases.go b/controllers/machine_controller_phases.go
+index 8014e593e..4dbdc5a3e 100644
+--- a/controllers/machine_controller_phases.go
++++ b/controllers/machine_controller_phases.go
+@@ -391,7 +391,7 @@ func (r *MachineReconciler) reconcileInfrastructure(ctx context.Context, cluster
+ 						return ctrl.Result{}, err
+ 					}
+ 				} else {
+-					logger.Error(err, "error getting etcd init secret containing address")
++					log.Error(err, "error getting etcd init secret containing address")
+ 					return ctrl.Result{}, err
+ 				}
+ 			} else {
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 46d6e3a48..68318178f 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -2862,6 +2862,20 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      proxy:
++                        description: Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
+                       scheduler:
+                         description: Scheduler contains extra settings for the scheduler
+                           control plane component
+@@ -3440,6 +3454,20 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      proxy:
++                        description: Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
+                     type: object
+                   mounts:
+                     description: Mounts specifies a list of mount points to be setup.
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 8cc25d339..6307e607d 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -1541,6 +1541,20 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
+                                 type: object
++                              proxy:
++                                description: Proxy holds the https and no proxy information
++                                  This is only for bottlerocket
++                                properties:
++                                  httpsProxy:
++                                    description: HTTPS proxy
++                                    type: string
++                                  noProxy:
++                                    description: No proxy, list of ips that should
++                                      not use proxy
++                                    items:
++                                      type: string
++                                    type: array
++                                type: object
+                               scheduler:
+                                 description: Scheduler contains extra settings for
+                                   the scheduler control plane component
+@@ -2159,6 +2173,20 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
+                                 type: object
++                              proxy:
++                                description: Proxy holds the https and no proxy information
++                                  This is only for bottlerocket
++                                properties:
++                                  httpsProxy:
++                                    description: HTTPS proxy
++                                    type: string
++                                  noProxy:
++                                    description: No proxy, list of ips that should
++                                      not use proxy
++                                    items:
++                                      type: string
++                                    type: array
++                                type: object
+                             type: object
+                           mounts:
+                             description: Mounts specifies a list of mount points to
+diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
+index 7448814db..ae9940bc9 100644
+--- a/controlplane/kubeadm/config/rbac/role.yaml
++++ b/controlplane/kubeadm/config/rbac/role.yaml
+@@ -27,14 +27,6 @@ rules:
+   - patch
+   - update
+   - watch
+-- apiGroups:
+-  - etcdcluster.cluster.x-k8s.io
+-  resources:
+-    - '*'
+-  verbs:
+-    - get
+-    - list
+-    - watch
+ - apiGroups:
+   - cluster.x-k8s.io
+   resources:
+@@ -78,3 +70,11 @@ rules:
+   - patch
+   - update
+   - watch
++- apiGroups:
++  - etcdcluster.cluster.x-k8s.io
++  resources:
++  - '*'
++  verbs:
++  - get
++  - list
++  - watch
+diff --git a/controlplane/kubeadm/controllers/controller.go b/controlplane/kubeadm/controllers/controller.go
+index fd6e5d7ef..6c7f89640 100644
+--- a/controlplane/kubeadm/controllers/controller.go
++++ b/controlplane/kubeadm/controllers/controller.go
+@@ -29,7 +29,6 @@ import (
+ 	corev1 "k8s.io/api/core/v1"
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+-	"k8s.io/apimachinery/pkg/runtime"
+ 	kerrors "k8s.io/apimachinery/pkg/util/errors"
+ 	"k8s.io/client-go/tools/record"
+ 	"k8s.io/utils/pointer"
+@@ -63,6 +62,7 @@ import (
+ // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
+ // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch;create;update;patch;delete
+ // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list
++// +kubebuilder:rbac:groups=etcdcluster.cluster.x-k8s.io,resources=*,verbs=get;list;watch
+ 
+ // KubeadmControlPlaneReconciler reconciles a KubeadmControlPlane object.
+ type KubeadmControlPlaneReconciler struct {
+@@ -168,7 +168,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+ 			return ctrl.Result{}, err
+ 		}
+ 		if !found {
+-			logger.Info("Etcd endpoints not available")
++			log.Info("Etcd endpoints not available")
+ 			return ctrl.Result{Requeue: true}, nil
+ 		}
+ 		currentEtcdEndpoints := strings.Split(endpoints, ",")
+@@ -177,7 +177,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+ 		if !reflect.DeepEqual(currentEtcdEndpoints, currentKCPEndpoints) {
+ 			kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints = currentEtcdEndpoints
+ 			if err := patchHelper.Patch(ctx, kcp); err != nil {
+-				logger.Error(err, "Failed to patch KubeadmControlPlane to update external etcd endpoints")
++				log.Error(err, "Failed to patch KubeadmControlPlane to update external etcd endpoints")
+ 				return ctrl.Result{}, err
+ 			}
+ 		}
+diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
+index 53b5b4161..832a5123f 100644
+--- a/util/collections/machine_filters.go
++++ b/util/collections/machine_filters.go
+@@ -119,6 +119,18 @@ func ControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) b
+ 	}
+ }
+ 
++// EtcdMachines returns a filter to find all etcd machines for a cluster, regardless of ownership.
++// Usage: GetFilteredMachinesForCluster(ctx, client, cluster, EtcdMachines(cluster.Name)).
++func EtcdMachines(clusterName string) func(machine *clusterv1.Machine) bool {
++	selector := EtcdSelectorForCluster(clusterName)
++	return func(machine *clusterv1.Machine) bool {
++		if machine == nil {
++			return false
++		}
++		return selector.Matches(labels.Set(machine.Labels))
++	}
++}
++
+ // AdoptableControlPlaneMachines returns a filter to find all un-controlled control plane machines.
+ // Usage: GetFilteredMachinesForCluster(ctx, client, cluster, AdoptableControlPlaneMachines(cluster.Name, controlPlane)).
+ func AdoptableControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) bool {
+@@ -204,6 +216,20 @@ func ControlPlaneSelectorForCluster(clusterName string) labels.Selector {
+ 	)
+ }
+ 
++// EtcdSelectorForCluster returns the label selector necessary to get etcd machines for a given cluster.
++func EtcdSelectorForCluster(clusterName string) labels.Selector {
++	must := func(r *labels.Requirement, err error) labels.Requirement {
++		if err != nil {
++			panic(err)
++		}
++		return *r
++	}
++	return labels.NewSelector().Add(
++		must(labels.NewRequirement(clusterv1.ClusterLabelName, selection.Equals, []string{clusterName})),
++		must(labels.NewRequirement(clusterv1.MachineEtcdClusterLabelName, selection.Exists, []string{})),
++	)
++}
++
+ // MatchesKubernetesVersion returns a filter to find all machines that match a given Kubernetes version.
+ func MatchesKubernetesVersion(kubernetesVersion string) Func {
+ 	return func(machine *clusterv1.Machine) bool {
+-- 
+2.30.1
+
