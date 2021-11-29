@@ -39,8 +39,6 @@ RELEASE_TARGETS=release-ova-ubuntu-2004 upload-artifacts release-ova-bottlerocke
 # Kubeadm hardcodes the version of the pause image it pulls, even tho containerd config
 # overrides which image is actually used
 # Setting up this mapping so we can build the additional image into the image
-ADDITIONAL_PAUSE_1-18_FROM=1-18
-ADDITIONAL_PAUSE_1-19_FROM=1-18
 ADDITIONAL_PAUSE_1-20_FROM=1-19
 ADDITIONAL_PAUSE_1-21_FROM=1-20
 
