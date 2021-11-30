@@ -34,33 +34,33 @@ KUBE_RBAC_PROXY_LATEST_TAG=latest
 
 make set-manifest-image \
     MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/cluster-api-controller MANIFEST_TAG=$IMAGE_TAG \
-    TARGET_RESOURCE="./config/manager/manager_image_patch.yaml"
+    TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
 
 # Set the kubeadm bootstrap image to the production bucket.
 make set-manifest-image \
     MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/kubeadm-bootstrap-controller MANIFEST_TAG=$IMAGE_TAG \
-    TARGET_RESOURCE="./bootstrap/kubeadm/config/manager/manager_image_patch.yaml"
+    TARGET_RESOURCE="./bootstrap/kubeadm/config/default/manager_image_patch.yaml"
 
 # Set the kubeadm control plane image to the production bucket.
 make set-manifest-image \
     MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/kubeadm-control-plane-controller MANIFEST_TAG=$IMAGE_TAG  \
-    TARGET_RESOURCE="./controlplane/kubeadm/config/manager/manager_image_patch.yaml"
+    TARGET_RESOURCE="./controlplane/kubeadm/config/default/manager_image_patch.yaml"
 
 make set-manifest-image \
     MANIFEST_IMG=${IMAGE_REPO}/brancz/kube-rbac-proxy MANIFEST_TAG=$KUBE_RBAC_PROXY_LATEST_TAG \
-    TARGET_RESOURCE="./config/manager/manager_auth_proxy_patch.yaml"
+    TARGET_RESOURCE="./config/default/manager_auth_proxy_patch.yaml"
 
 make set-manifest-image \
     MANIFEST_IMG=${IMAGE_REPO}/brancz/kube-rbac-proxy MANIFEST_TAG=$KUBE_RBAC_PROXY_LATEST_TAG \
-    TARGET_RESOURCE="./bootstrap/kubeadm/config/manager/manager_auth_proxy_patch.yaml"
+    TARGET_RESOURCE="./bootstrap/kubeadm/config/default/manager_auth_proxy_patch.yaml"
 
 make set-manifest-image \
     MANIFEST_IMG=${IMAGE_REPO}/brancz/kube-rbac-proxy MANIFEST_TAG=$KUBE_RBAC_PROXY_LATEST_TAG \
-    TARGET_RESOURCE="./controlplane/kubeadm/config/manager/manager_auth_proxy_patch.yaml"
+    TARGET_RESOURCE="./controlplane/kubeadm/config/default/manager_auth_proxy_patch.yaml"
 
-make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./config/manager/manager_pull_policy.yaml"
-make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./bootstrap/kubeadm/config/manager/manager_pull_policy.yaml"
-make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./controlplane/kubeadm/config/manager/manager_pull_policy.yaml"
+make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
+make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./bootstrap/kubeadm/config/default/manager_pull_policy.yaml"
+make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./controlplane/kubeadm/config/default/manager_pull_policy.yaml"
 
 ## Build the manifests
 make release-manifests
