@@ -55,7 +55,7 @@ s3-artifacts: $(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
 
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
 $(FAKE_UBUNTU_OVA_PATH):
-	@mkdir $(@D)
+	@mkdir -p $(@D)
 	touch $@
 
 $(FINAL_UBUNTU_OVA_PATH):
