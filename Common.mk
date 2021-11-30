@@ -9,6 +9,7 @@ GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
 COMPONENT=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
+PROJECT_PATH?=$(subst $(BASE_DIRECTORY)/,,$(MAKE_ROOT))
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
 OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 
@@ -29,12 +30,20 @@ LATEST_TAG?=$(LATEST)
 ####################################################
 
 #################### CODEBUILD #####################
-ifdef CODEBUILD_SRC_DIR
+ifeq ("$(CODEBUILD_CI)","true")
 	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
 	CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
+	UPLOAD_DRY_RUN=false
+	BUILD_IDENTIFIER=$(CODEBUILD_BUILD_NUMBER)
 else
 	ARTIFACTS_PATH?=$(MAKE_ROOT)/_output/tar
-	CLONE_URL=https://github.com/$(COMPONENT).git	
+	CLONE_URL=https://github.com/$(COMPONENT).git
+	UPLOAD_DRY_RUN=true
+	ifeq ("$(CI)","true")
+		BUILD_IDENTIFIER=$(PROW_JOB_ID)
+	else
+		BUILD_IDENTIFIER=$(shell date "+%F-%s")
+	endif
 endif
 ####################################################
 
@@ -183,7 +192,7 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums local-images attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
+BUILD_TARGETS?=validate-checksums local-images attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 RELEASE_TARGETS?=validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
@@ -336,7 +345,7 @@ endif
 
 .PHONY: upload-artifacts
 upload-artifacts: s3-artifacts
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH) $(LATEST_TAG)
+	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST_TAG) $(UPLOAD_DRY_RUN)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs

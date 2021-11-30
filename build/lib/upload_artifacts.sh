@@ -24,9 +24,9 @@ PROJECT_PATH="${3? Specify third argument - project path}"
 BUILD_IDENTIFIER="${4? Specify fourth argument - build identifier}"
 GIT_HASH="${5?Specify fifth argument - git hash of the tar builds}"
 LATEST_TAG="${6?Specify sixth argument - folder name corresponding to latest build}"
-
+UPLOAD_DRY_RUN="${7?Specify seventh argument - Dry run upload}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
-build::common::upload_artifacts $SRC_TAR_PATH $ARTIFACTS_BUCKET $PROJECT_PATH $BUILD_IDENTIFIER $GIT_HASH $LATEST_TAG
+build::common::upload_artifacts $SRC_TAR_PATH $ARTIFACTS_BUCKET $PROJECT_PATH $BUILD_IDENTIFIER $GIT_HASH $LATEST_TAG $UPLOAD_DRY_RUN

@@ -76,12 +76,18 @@ function build::common::upload_artifacts() {
   local -r buildidentifier=$4
   local -r githash=$5
   local -r latesttag=$6
+  local -r dry_run=$7
 
-  # Upload artifacts to s3 
-  # 1. To proper path on s3 with buildId-githash
-  # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
-  aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read
-  aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read
+  if [ "$dry_run" = "true" ]; then
+    aws s3 cp "$artifactspath" s3://"$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
+    aws s3 cp "$artifactspath" s3://"$artifactsbucket"/"$projectpath"/latest --recursive --dryrun
+  else
+    # Upload artifacts to s3 
+    # 1. To proper path on s3 with buildId-githash
+    # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
+    aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read
+    aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read
+  fi
 }
 
 function build::gather_licenses() {
