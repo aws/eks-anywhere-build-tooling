@@ -6,7 +6,6 @@ REPO_OWNER=kubernetes-sigs
 
 IMAGE_BUILDER_DIR=$(REPO)/images/capi
 
-
 FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)
 # Force non release-branched
 CARGO_HOME=$(MAKE_ROOT)/_output/cargo
@@ -28,9 +27,6 @@ PACKER_OVA_VAR_FILES+=$(MAKE_ROOT)/packer/ova/vsphere-library.json
 PACKER_TYPE_VAR_FILES?=
 PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(PACKER_TYPE_VAR_FILES) $(FULL_OUTPUT_DIR)/config/common.json $(FULL_OUTPUT_DIR)/config/cni.json $(FULL_OUTPUT_DIR)/config/additional_components.json
 
-BUILD_TARGETS=build-ami-ubuntu-2004 release-ova-bottlerocket fake-ubuntu-ova upload-artifacts
-RELEASE_TARGETS=release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts
-
 # Kubeadm hardcodes the version of the pause image it pulls, even tho containerd config
 # overrides which image is actually used
 # Setting up this mapping so we can build the additional image into the image
@@ -46,6 +42,10 @@ BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-c
 
 FINAL_UBUNTU_OVA_PATH=$(ARTIFACTS_PATH)/ubuntu.ova
 FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/bottlerocket.ova
+FAKE_UBUNTU_OVA_PATH=$(IMAGE_BUILDER_DIR)/output/fake-ubuntu.ova
+
+BUILD_TARGETS=build-ami-ubuntu-2004 release-ova-bottlerocket $(FAKE_UBUNTU_OVA_PATH) upload-artifacts
+RELEASE_TARGETS=release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -54,9 +54,9 @@ export PATH:=$(CARGO_HOME)/bin:$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PA
 s3-artifacts: $(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
 
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
-.PHONY: fake-ubuntu-ova
-fake-ubuntu-ova:
-	touch $(IMAGE_BUILDER_DIR)/output/fake-ubuntu.ova
+$(FAKE_UBUNTU_OVA_PATH):
+	@mkdir $(@D)
+	touch $@
 
 $(FINAL_UBUNTU_OVA_PATH):
 	mv $(IMAGE_BUILDER_DIR)/output/*.ova $@
