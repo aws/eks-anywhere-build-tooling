@@ -121,7 +121,6 @@ release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		make -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
-	build/get_artifacts.sh $(IMAGE_BUILDER_DIR) ubuntu
 
 .PHONY: release-ova-bottlerocket
 release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
