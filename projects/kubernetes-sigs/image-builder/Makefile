@@ -6,12 +6,6 @@ REPO_OWNER=kubernetes-sigs
 
 IMAGE_BUILDER_DIR=$(REPO)/images/capi
 
-PROJECT_PATH?=projects/$(REPO_OWNER)/$(REPO)
-OVA_PATH=$(IMAGE_BUILDER_DIR)/output
-ifdef CODEBUILD_SRC_DIR
-	OVA_PATH=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/image-builder/images/capi/output
-endif
-
 FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)
 # Force non release-branched
 CARGO_HOME=$(MAKE_ROOT)/_output/cargo
@@ -33,9 +27,6 @@ PACKER_OVA_VAR_FILES+=$(MAKE_ROOT)/packer/ova/vsphere-library.json
 PACKER_TYPE_VAR_FILES?=
 PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(PACKER_TYPE_VAR_FILES) $(FULL_OUTPUT_DIR)/config/common.json $(FULL_OUTPUT_DIR)/config/cni.json $(FULL_OUTPUT_DIR)/config/additional_components.json
 
-BUILD_TARGETS=build-ami-ubuntu-2004 release-ova-bottlerocket
-RELEASE_TARGETS=release-ova-ubuntu-2004 upload-artifacts release-ova-bottlerocket
-
 # Kubeadm hardcodes the version of the pause image it pulls, even tho containerd config
 # overrides which image is actually used
 # Setting up this mapping so we can build the additional image into the image
@@ -43,13 +34,35 @@ ADDITIONAL_PAUSE_1-20_FROM=1-19
 ADDITIONAL_PAUSE_1-21_FROM=1-20
 
 HAS_RELEASE_BRANCHES=true
+HAS_LICENSES=false
+SIMPLE_CREATE_TARBALLS=false
 
 TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
 BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
+FINAL_UBUNTU_OVA_PATH=$(ARTIFACTS_PATH)/ubuntu.ova
+FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/bottlerocket.ova
+FAKE_UBUNTU_OVA_PATH=$(IMAGE_BUILDER_DIR)/output/fake-ubuntu.ova
+
+BUILD_TARGETS=build-ami-ubuntu-2004 release-ova-bottlerocket $(FAKE_UBUNTU_OVA_PATH) upload-artifacts
+RELEASE_TARGETS=release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts
+
 include $(BASE_DIRECTORY)/Common.mk
 
 export PATH:=$(CARGO_HOME)/bin:$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
+
+s3-artifacts: $(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
+
+# Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
+$(FAKE_UBUNTU_OVA_PATH):
+	@mkdir -p $(@D)
+	touch $@
+
+$(FINAL_UBUNTU_OVA_PATH):
+	mv $(IMAGE_BUILDER_DIR)/output/*.ova $@
+
+$(FINAL_BOTTLEROCKET_OVA_PATH):
+	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ova/*.ova $@
 
 .PHONY: setup-ami-share
 setup-ami-share:
@@ -90,7 +103,7 @@ deps-ova: $(GIT_PATCH_TARGET)
 
 .PHONY: setup-packer-configs
 setup-packer-configs:
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $(OVA_PATH) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM)
+	build/setup_packer_configs.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM)
 
 .PHONY: build-ami-ubuntu-2004
 build-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
@@ -105,14 +118,14 @@ release-ami-ubuntu-2004-%: setup-ami-share deps-ami setup-packer-configs
 .PHONY: release-ova-ubuntu-2004
 release-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
 release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(OVA_PATH)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		make -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
 	build/get_artifacts.sh $(IMAGE_BUILDER_DIR) ubuntu
 
 .PHONY: release-ova-bottlerocket
 release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
-	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
+	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs

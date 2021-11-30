@@ -23,14 +23,16 @@ IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazo
 #################### LATEST TAG ####################
 BRANCH_NAME?=main
 LATEST=latest
-ifneq ("$(BRANCH_NAME)","main")
+ifneq ($(BRANCH_NAME),main)
 	LATEST=$(BRANCH_NAME)
 endif
 LATEST_TAG?=$(LATEST)
 ####################################################
 
 #################### CODEBUILD #####################
-ifeq ("$(CODEBUILD_CI)","true")
+CODEBUILD_CI?=false
+CI?=false
+ifeq ($(CODEBUILD_CI),true)
 	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
 	CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
 	UPLOAD_DRY_RUN=false
@@ -39,7 +41,7 @@ else
 	ARTIFACTS_PATH?=$(MAKE_ROOT)/_output/tar
 	CLONE_URL=https://github.com/$(COMPONENT).git
 	UPLOAD_DRY_RUN=true
-	ifeq ("$(CI)","true")
+	ifeq ($(CI),true)
 		BUILD_IDENTIFIER=$(PROW_JOB_ID)
 	else
 		BUILD_IDENTIFIER=$(shell date "+%F-%s")
