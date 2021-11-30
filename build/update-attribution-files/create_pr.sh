@@ -18,7 +18,7 @@ set -o pipefail
 set -x
 
 if [[ -z "$JOB_TYPE" ]]; then
-    return 0
+    exit 0
 fi
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
