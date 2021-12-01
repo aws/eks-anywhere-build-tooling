@@ -16,11 +16,11 @@ You can find the latest versions of these images on ECR Public Gallery.
 
 1. Review releases and changelogs in upstream [repo](https://github.com/kubernetes-sigs/cluster-api) and decide on new version.
    Please review carefully and if there are questions about changes necessary to eks-anywhere to support the new version
-   and/or automatically update between eks-anywhere version reach out to @jgw, @vgg, @gaslor or @mrajashree.
+   and/or automatically update between eks-anywhere version reach out to @jaxesn, @vignesh-goutham, @g-gaston or @mrajashree.
 1. Follow these steps for changes to the patches/ folder:
    1. Checkout the desired tag on our [CAPI fork](https://github.com/mrajashree/cluster-api) and create a new branch.
    1. Review the patches under patches/ folder in this repo. Apply the required patches to the new branch created in the above step. Remove any patches that are either
-   merged upstream or no longer needed. Please reach out to @jgw, @vgg, @gaslor or @mrajashree if there are any questions regarding keeping/removing patches.
+   merged upstream or no longer needed. Please reach out to @jaxesn, @vignesh-goutham, @g-gaston or @mrajashree if there are any questions regarding keeping/removing patches.
    1. Run `git format-patch <commit>`, where `<commit>` is the last upstream commit on that tag. Move the generated patches under the patches/ folder in this repo.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
