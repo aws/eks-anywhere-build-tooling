@@ -1,0 +1,79 @@
+From ea1c1d2ab62c30c50600b7a8d309a20c85e53b17 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Sat, 24 Jul 2021 23:05:04 -0700
+Subject: [PATCH 18/36] Update KCP controller to use renamed etcd endpoints
+ field
+
+The field 'endpoint' on EtcdadmCluster's status has been renamed
+to 'endpoints'. This commit updates the KCP controller to use the
+renamed field
+
+cr https://code.amazon.com/reviews/CR-54310674
+---
+ controllers/external/util.go                   | 12 +++++++++++-
+ controlplane/kubeadm/controllers/controller.go | 15 +++++++--------
+ 2 files changed, 18 insertions(+), 9 deletions(-)
+
+diff --git a/controllers/external/util.go b/controllers/external/util.go
+index 23c2bfc7e..b833bc4be 100644
+--- a/controllers/external/util.go
++++ b/controllers/external/util.go
+@@ -242,4 +242,14 @@ func IsInitialized(obj *unstructured.Unstructured) (bool, error) {
+ 			obj.GroupVersionKind(), obj.GetName())
+ 	}
+ 	return initialized && found, nil
+-}
+\ No newline at end of file
++}
++
++func GetExternalEtcdEndpoints(externalEtcd *unstructured.Unstructured) (string, bool, error) {
++	endpoints, found, err := unstructured.NestedString(externalEtcd.Object, "status", "endpoints")
++	if err != nil {
++		return "", false, errors.Wrapf(err, "failed to get external etcd endpoints from %v %q", externalEtcd.GroupVersionKind(),
++			externalEtcd.GetName())
++	}
++
++	return endpoints, found, nil
++}
+diff --git a/controlplane/kubeadm/controllers/controller.go b/controlplane/kubeadm/controllers/controller.go
+index 6c61ee2b4..fd6e5d7ef 100644
+--- a/controlplane/kubeadm/controllers/controller.go
++++ b/controlplane/kubeadm/controllers/controller.go
+@@ -29,7 +29,6 @@ import (
+ 	corev1 "k8s.io/api/core/v1"
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+ 	"k8s.io/apimachinery/pkg/runtime"
+ 	kerrors "k8s.io/apimachinery/pkg/util/errors"
+ 	"k8s.io/client-go/tools/record"
+@@ -164,19 +163,19 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+ 		if err != nil {
+ 			return ctrl.Result{}, err
+ 		}
+-		endpoint, found, err := unstructured.NestedString(externalEtcd.Object, "status", "endpoint")
++		endpoints, found, err := external.GetExternalEtcdEndpoints(externalEtcd)
+ 		if err != nil {
+-			return ctrl.Result{}, errors.Wrapf(err, "failed to get endpoint field from %v", externalEtcd.GetName())
++			return ctrl.Result{}, err
+ 		}
+ 		if !found {
+ 			logger.Info("Etcd endpoints not available")
+ 			return ctrl.Result{Requeue: true}, nil
+ 		}
+-		endpoints := strings.Split(endpoint, ",")
+-		sort.Strings(endpoints)
+-		currentEndpoints := kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints
+-		if !reflect.DeepEqual(endpoints, currentEndpoints) {
+-			kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints = endpoints
++		currentEtcdEndpoints := strings.Split(endpoints, ",")
++		sort.Strings(currentEtcdEndpoints)
++		currentKCPEndpoints := kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints
++		if !reflect.DeepEqual(currentEtcdEndpoints, currentKCPEndpoints) {
++			kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints = currentEtcdEndpoints
+ 			if err := patchHelper.Patch(ctx, kcp); err != nil {
+ 				logger.Error(err, "Failed to patch KubeadmControlPlane to update external etcd endpoints")
+ 				return ctrl.Result{}, err
+-- 
+2.30.1
+
