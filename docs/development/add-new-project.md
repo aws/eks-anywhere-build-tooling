@@ -57,7 +57,7 @@ The key pieces to setup in the Makefile  are:
 	$(BINARY_PLATFORMS).  Passed to `go build -o`.
 * SOURCE_PATTERNS - The patterns to pass to `go build`.  Must follow the same ordering as $(BINARY_TARGET_FILES)
 * IMAGE_NAMES (optional) - When building multiple images define them via `IMAGE_NAMES` and `local-images` and `images` will automatically
-	be created to build the	`amd64` platform in `local-images` and `push` for images.  If not set, weill default to `REPO`.
+	be created to build the	`amd64` platform in `local-images` and `push` for images.  If not set, will default to `REPO`.
 	These names need to match `IMAGE_NAME` in the below variable `<IMAGE_NAME>_IMAGE`.
 * <IMAGE_NAME>_IMAGE_COMPONENT (optional) - Common Makefile will use this if set to override the default 
 	component in the `IMAGE` variable.  By default `IMAGE` will be set to `$(IMAGE_REPO)/$(COMPONENT):$(IMAGE_TAG)`
