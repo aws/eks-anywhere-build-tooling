@@ -57,6 +57,7 @@ s3-artifacts: $(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
 $(FAKE_UBUNTU_OVA_PATH):
 	@mkdir -p $(@D)
 	touch $@
+	touch $(ARTIFACTS_PATH)/packer.log
 
 $(FINAL_UBUNTU_OVA_PATH):
 	mv $(IMAGE_BUILDER_DIR)/output/*.ova $@
