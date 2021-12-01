@@ -27,7 +27,8 @@ You can find the latest version of this image [on ECR Public Gallery](https://ga
    1. Run `git format-patch <commit>`, where `<commit>` is the last upstream commit on that tag. Move the generated patches under the patches/ folder in this repo.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
-   ex: [0.7.10 compared to 1.0.1](https://github.com/kubernetes-sigs/provider-vsphere/compare/v0.7.10...v1.0.1).
+   ex: [0.7.10 compared to 1.0.1](https://github.com/kubernetes-sigs/provider-vsphere/compare/v0.7.10...v1.0.1). Check if the [manifests](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/blob/v1.0.1/Makefile#L284)
+   target has changed in the Makefile, and make the required changes in create_manifests.sh
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=kubernetes-sigs/cluster-api-provider-vsphere` from the root of the repo.
