@@ -26,11 +26,20 @@ You can find the latest versions of these images on ECR Public Gallery.
    to cluster-api tag v1.0.1, update cert-manager tag to v1.5.3
 1. Review releases and changelogs in upstream [repo](https://github.com/jetstack/cert-manager) and decide on new version.
    Please review carefully and if there are questions about changes necessary to eks-anywhere to support the new version
-   and/or automatically update between eks-anywhere version reach out to @jgw or @mrajashree.
+   and/or automatically update between eks-anywhere version reach out to @jaxesn or @g-gaston.
 1. Review the patches under patches/ folder and remove any that are either merged upstream or no longer needed.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
-1. Compare the old tag to the new, looking specifically for Makefile changes.
-   ex: [1.1.0 compared to 1.5.3](https://github.com/jetstack/cert-manager/compare/v1.1.0...v1.5.3).
+1. Changes to cert-manager CRs:
+   1. Usually we will update cert-manager tag only when updating CAPI tag and if the new CAPI tag uses a new cert-manager tag.
+   1. If the updated cert-manager tag introduces a new API version for the cert-manager CRDs, the updated tags of upstream cluster-api providers 
+      (including CAPI, CAPBK, KCP, CAPD and CAPV) will already be using the new API version for cert-manager CRs so we won't have to make any changes there.
+   1. But we also use cert-manager in our custom providers like the [etcdadm-bootstrap-provider](https://github.com/mrajashree/etcdadm-bootstrap-provider/tree/v1beta1/config/certmanager)
+   and [etcdadm-controller](https://github.com/mrajashree/etcdadm-controller/tree/v1beta1/config/certmanager) and we should use the same API version for cert-manager in these providers
+   as used by the upstream providers. To make the required changes to cert-manager CRs in our providers, checkout the CAPI book's [Provider Implementers](https://cluster-api.sigs.k8s.io/developer/providers/implementers.html)
+   section and review the page containing details for upgrading to the desired capi version. 
+   1. For instance, when updating CAPI from v1alpha3 to v1beta1, cert-manager tag changed from v1.1.0 to v1.5.3, and upstream CAPI providers made [these](https://cluster-api.sigs.k8s.io/developer/providers/v1alpha3-to-v1alpha4.html#upgrade-cert-manager-to-v110)
+   changes to their cert-manager CRs. So we made the same changes to the etcdadm providers. Similarly, check the instructions corresponding to the new
+   capi version you are updating to.
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=jetstack/cert-manager` from the root of the repo.
