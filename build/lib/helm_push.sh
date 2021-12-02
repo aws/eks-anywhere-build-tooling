@@ -24,12 +24,10 @@ export IMAGE_TAG="${3?Third argument is image tag}"
 export OUTPUT_DIR="${4?Fourth arguement is output directory}"
 export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 
-HELM_TEMP_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
+CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
 
-mkdir -p ${OUTPUT_DIR}/helm/${CHART_NAME}
-cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${HELM_TEMP_DIR}/
-cp -r helm/${CHART_NAME}/. ${HELM_TEMP_DIR}
-envsubst <helm/Chart.yaml.template >${HELM_TEMP_DIR}/Chart.yaml
-envsubst <helm/values.yaml.template >${HELM_TEMP_DIR}/values.yaml
-cd ${HELM_TEMP_DIR}
-helm package .
+export HELM_EXPERIMENTAL_OCI=1
+export DOCKER_CONFIG=~/.docker
+export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
+helm push ${CHART_FILE} oci://${IMAGE_REGISTRY} ||
+   (echo "If authentication failed: aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}" && false)
