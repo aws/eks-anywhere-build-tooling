@@ -29,5 +29,11 @@ CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
 export HELM_EXPERIMENTAL_OCI=1
 export DOCKER_CONFIG=~/.docker
 export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
-helm push ${CHART_FILE} oci://${IMAGE_REGISTRY} ||
-   (echo "If authentication failed: aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}" && false)
+if echo ${IMAGE_REGISTRY} | grep public.ecr.aws >/dev/null
+then
+  echo "If authentication fails: aws ecr-public get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin public.ecr.aws"
+else
+  echo "If authentication fails: aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}"
+fi
+DIGEST=$(helm push ${CHART_FILE} oci://${IMAGE_REGISTRY} | grep Digest | sed -e 's/Digest: //')
+echo "helm install oci://${IMAGE_REGISTRY}/${CHART_NAME} --version ${DIGEST} --generate-name"
