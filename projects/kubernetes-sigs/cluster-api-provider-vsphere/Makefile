@@ -1,6 +1,6 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.16"
+GOLANG_VERSION?="1.15"
 
 REPO=cluster-api-provider-vsphere
 REPO_OWNER=kubernetes-sigs
