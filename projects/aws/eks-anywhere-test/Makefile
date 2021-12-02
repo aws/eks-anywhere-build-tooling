@@ -16,8 +16,12 @@ RELEASE_TARGETS=images
 
 include $(BASE_DIRECTORY)/Common.mk
 
+copy-attribution:
+	@cp $(ATTRIBUTION_TARGETS) $(OUTPUT_DIR)
+	@echo Done
+
 .PHONY: local-images
-local-images: eks-anywhere-test/images/amd64 helm/build
+local-images: copy-attribution eks-anywhere-test/images/amd64 helm/build
 	
 .PHONY: images
-images: eks-anywhere-test/images/push helm/push
+images: copy-attribution eks-anywhere-test/images/push helm/push
