@@ -11,7 +11,7 @@ import (
 	"github.com/aws/eks-anywhere-test-tool/pkg/awsprofiles"
 	"github.com/aws/eks-anywhere-test-tool/pkg/cloudwatch"
 	"github.com/aws/eks-anywhere-test-tool/pkg/codebuild"
-	filewriter2 "github.com/aws/eks-anywhere-test-tool/pkg/filewriter"
+	"github.com/aws/eks-anywhere-test-tool/pkg/filewriter"
 	logs2 "github.com/aws/eks-anywhere-test-tool/pkg/logfetcher"
 )
 
@@ -43,7 +43,7 @@ var e2eFetchLogsCommand = &cobra.Command{
 		}
 
 		now := time.Now().Format(time.RFC3339 + "-logs")
-		writer, err := filewriter2.NewWriter(now)
+		writer, err := filewriter.NewWriter(now)
 		if err != nil {
 			return fmt.Errorf("error when setting up writer: %v", err)
 		}

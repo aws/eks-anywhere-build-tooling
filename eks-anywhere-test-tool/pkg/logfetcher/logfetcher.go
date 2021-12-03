@@ -12,7 +12,7 @@ import (
 	"github.com/aws/eks-anywhere-test-tool/pkg/cloudwatch"
 	"github.com/aws/eks-anywhere-test-tool/pkg/codebuild"
 	"github.com/aws/eks-anywhere-test-tool/pkg/constants"
-	filewriter2 "github.com/aws/eks-anywhere-test-tool/pkg/filewriter"
+	"github.com/aws/eks-anywhere-test-tool/pkg/filewriter"
 	"github.com/aws/eks-anywhere-test-tool/pkg/logger"
 )
 
@@ -50,10 +50,10 @@ type testLogFetcher struct {
 	buildAccountCwClient        *cloudwatch.Cloudwatch
 	testAccountCwClient         *cloudwatch.Cloudwatch
 	buildAccountCodebuildClient *codebuild.Codebuild
-	writer                      filewriter2.FileWriter
+	writer                      filewriter.FileWriter
 }
 
-func New(buildAccountCwClient *cloudwatch.Cloudwatch, testAccountCwClient *cloudwatch.Cloudwatch, buildAccountCodebuildCient *codebuild.Codebuild, writer filewriter2.FileWriter) *testLogFetcher {
+func New(buildAccountCwClient *cloudwatch.Cloudwatch, testAccountCwClient *cloudwatch.Cloudwatch, buildAccountCodebuildCient *codebuild.Codebuild, writer filewriter.FileWriter) *testLogFetcher {
 	return &testLogFetcher{
 		buildAccountCwClient:        buildAccountCwClient,
 		testAccountCwClient:         testAccountCwClient,
@@ -104,18 +104,18 @@ func (l *testLogFetcher) GetBuildProjectLogs() (failed []testResult, err error) 
 		return nil, err
 	}
 
-	_, err = l.writer.Write(constants.BuildDescriptionFile, []byte(latestBuild.String()), filewriter2.PersistentFile)
+	_, err = l.writer.Write(constants.BuildDescriptionFile, []byte(latestBuild.String()), filewriter.PersistentFile)
 	if err != nil {
 		logger.Info("error when writing build description to file")
 		os.Exit(1)
 	}
 
-	_, err = l.writer.Write(constants.FailedTestsFile, failedMsg.Bytes(), filewriter2.PersistentFile)
+	_, err = l.writer.Write(constants.FailedTestsFile, failedMsg.Bytes(), filewriter.PersistentFile)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = l.writer.Write(constants.LogOutputFile, allMsg.Bytes(), filewriter2.PersistentFile)
+	_, err = l.writer.Write(constants.LogOutputFile, allMsg.Bytes(), filewriter.PersistentFile)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (l *testLogFetcher) FetchTestLogs(tests []testResult) error {
 			buf.WriteString(*log.Message)
 		}
 
-		_, err = l.writer.Write(test.Tests, buf.Bytes(), filewriter2.PersistentFile)
+		_, err = l.writer.Write(test.Tests, buf.Bytes(), filewriter.PersistentFile)
 		if err != nil {
 			return err
 		}

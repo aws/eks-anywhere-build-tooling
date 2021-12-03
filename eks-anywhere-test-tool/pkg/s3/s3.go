@@ -3,13 +3,15 @@ package s3
 import (
 	"bytes"
 	"fmt"
+	"os"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+
 	"github.com/aws/eks-anywhere-test-tool/pkg/awsprofiles"
 	"github.com/aws/eks-anywhere-test-tool/pkg/constants"
 	"github.com/aws/eks-anywhere-test-tool/pkg/logger"
-	"os"
 )
 
 type S3 struct {

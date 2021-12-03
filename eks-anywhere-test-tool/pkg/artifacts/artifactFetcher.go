@@ -3,13 +3,14 @@ package artifacts
 import (
 	"context"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/aws/eks-anywhere-test-tool/pkg/codebuild"
 	"github.com/aws/eks-anywhere-test-tool/pkg/constants"
-	filewriter2 "github.com/aws/eks-anywhere-test-tool/pkg/filewriter"
+	"github.com/aws/eks-anywhere-test-tool/pkg/filewriter"
 	"github.com/aws/eks-anywhere-test-tool/pkg/logger"
 	"github.com/aws/eks-anywhere-test-tool/pkg/s3"
 )
@@ -32,10 +33,10 @@ type fetchArtifactConfig struct {
 type testArtifactFetcher struct {
 	testAccountS3Client         *s3.S3
 	buildAccountCodebuildClient *codebuild.Codebuild
-	writer                      filewriter2.FileWriter
+	writer                      filewriter.FileWriter
 }
 
-func New(testAccountS3Client *s3.S3, buildAccountCodebuildCient *codebuild.Codebuild, writer filewriter2.FileWriter) *testArtifactFetcher {
+func New(testAccountS3Client *s3.S3, buildAccountCodebuildCient *codebuild.Codebuild, writer filewriter.FileWriter) *testArtifactFetcher {
 	return &testArtifactFetcher{
 		testAccountS3Client:         testAccountS3Client,
 		buildAccountCodebuildClient: buildAccountCodebuildCient,
