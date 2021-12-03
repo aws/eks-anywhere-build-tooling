@@ -309,7 +309,7 @@ $(OUTPUT_DIR)/images/%:
 	@mkdir -p $(@D)
 
 $(OUTPUT_DIR)/ATTRIBUTION.txt:
-	@mkdir $(OUTPUT_DIR)
+	@mkdir -p $(OUTPUT_DIR)
 	@cp $(ATTRIBUTION_TARGETS) $(OUTPUT_DIR)
 
 
