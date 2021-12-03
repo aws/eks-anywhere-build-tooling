@@ -100,7 +100,6 @@ BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
 
 #################### IMAGES ########################
 IMAGE_COMPONENT?=$(COMPONENT)
-IMAGE_DESCRIPTION?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
 IMAGE_TARGET?=
@@ -390,11 +389,12 @@ validate-checksums: $(BINARY_TARGETS)
 
 .PHONY: helm/build
 helm/build: ## Build helm chart
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION)
+	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 .PHONY: helm/push
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION) $(IMAGE_REPO)
+	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 %/images/amd64: ## Build image using buildkit only builds linux/amd64 and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64
