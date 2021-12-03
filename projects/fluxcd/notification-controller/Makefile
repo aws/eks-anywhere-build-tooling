@@ -5,8 +5,6 @@ GOLANG_VERSION?="1.15"
 REPO=notification-controller
 REPO_OWNER=fluxcd
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=notification-controller
 
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/notification-controller/api/LICENSE
@@ -21,12 +19,6 @@ include $(BASE_DIRECTORY)/Common.mk
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_K0KUBUN_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
 $(call IMAGE_TARGETS_FOR_NAME, notification-controller): notification-controller-useradd/images/export
-
-.PHONY: local-images
-local-images: notification-controller/images/amd64
-
-.PHONY: images
-images: notification-controller/images/push
 
 $(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # Internal go.mod under /api directory

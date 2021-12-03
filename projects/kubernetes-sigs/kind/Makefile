@@ -48,6 +48,8 @@ ORGANIZE_BINARIES_TARGETS=$(addsuffix /LICENSES,$(addprefix $(BINARY_DEPS_DIR)/l
 # Binary targets are added manually in this makefile instead of relying on simple_create logic
 SIMPLE_CREATE_BINARIES=false
 
+IMAGE_NAMES=kindnetd kind-base 
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
@@ -55,6 +57,9 @@ ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS))),)
 -include $(KIND_BASE_IMAGE_BUILD_ARGS)
 -include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
+
+images: kind-base-versioned/images/push kind-node/images/push extract-kindnetd-manifest
+
 
 $(OUTPUT_BIN_DIR)/%/kindnetd $(REPO)/images/kindnetd/eks-anywhere-go-mod-download \
 	$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv: REPO_SUBPATH=images/kindnetd
@@ -103,18 +108,12 @@ kind-node/images/% kind-node-extract-kindnetd/images/%: LATEST_TAG=$(EKSD_KUBE_V
 kind-node/images/% kind-node-extract-kindnetd/images/%: IMAGE_BUILD_ARGS=IMAGE_REPO AL2_HELPER_IMAGE DEBIAN_BASE_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE \
 	PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG KIND_KINDNETD_RELEASE_OVERRIDE KINDNETD_IMAGE_TAG
 
-kind-node/images/%: IMAGE_TARGET=node
-$(call IMAGE_TARGETS_FOR_NAME, kind-node): $(KIND_NODE_IMAGE_BUILD_ARGS) $(BINARY_DEPS_DIR)/files
+kind-node/images/push: IMAGE_TARGET=node
+kind-node/images/push: build-kind-node-amd64 build-kind-node-arm64 $(KIND_NODE_IMAGE_BUILD_ARGS) $(BINARY_DEPS_DIR)/files
 
 kind-node-extract-kindnetd/images/amd64: IMAGE_TARGET=export
 kind-node-extract-kindnetd/images/amd64: IMAGE_OUTPUT_TYPE=local
 kind-node-extract-kindnetd/images/amd64: IMAGE_OUTPUT=dest=$(ARTIFACTS_PATH)
-
-.PHONY: local-images
-local-images: kindnetd/images/amd64 kind-base/images/amd64
-
-.PHONY: images
-images: kindnetd/images/push kind-base/images/push kind-base-versioned/images/push build-kind-node-amd64 build-kind-node-arm64 kind-node/images/push extract-kindnetd-manifest
 
 $(KIND_BASE_IMAGE_BUILD_ARGS):
 	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@

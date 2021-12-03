@@ -5,13 +5,13 @@ GOLANG_VERSION?="1.15"
 REPO=kustomize-controller
 REPO_OWNER=fluxcd
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=kustomize-controller
 
 DEFAULT_KUBECONFIG_TARGET=$(OUTPUT_DIR)/files/kubeconfig
 FIX_LICENSES_MOZILLA_TARGET=$(REPO)/vendor/go.mozilla.org/gopgagent/LICENSE.txt
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/kustomize-controller/api/LICENSE
+
+FETCH_BINARIES_TARGETS=eksd/kubernetes/client
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-git
 IMAGE_USERADD_USER_NAME=controller
@@ -21,19 +21,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_MOZILLA_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
-$(call IMAGE_TARGETS_FOR_NAME, kustomize-controller): fetch-binaries $(DEFAULT_KUBECONFIG_TARGET) kustomize-controller-useradd/images/export
-
-.PHONY: local-images
-local-images: kustomize-controller/images/amd64
-
-.PHONY: images
-images: kustomize-controller/images/push
-
-kubernetes:
-	build/fetch_binaries.sh
-
-.PHONY: fetch-binaries
-fetch-binaries: kubernetes
+$(call IMAGE_TARGETS_FOR_NAME, kustomize-controller): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS)) $(DEFAULT_KUBECONFIG_TARGET) kustomize-controller-useradd/images/export
 
 $(DEFAULT_KUBECONFIG_TARGET): | $(GIT_CHECKOUT_TARGET)
 	@mkdir $(@D)
