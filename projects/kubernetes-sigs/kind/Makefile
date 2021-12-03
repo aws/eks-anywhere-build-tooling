@@ -26,8 +26,8 @@ GO_MOD_DOWNLOAD_TARGETS=$(REPO)/eks-anywhere-go-mod-download $(REPO)/images/kind
 GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/attribution/go-license.csv $(OUTPUT_DIR)/kindnetd/attribution/go-license.csv
 ATTRIBUTION_TARGETS=ATTRIBUTION.txt KINDNETD_ATTRIBUTION.txt
 
-KIND_BASE_IMAGE_COMPONENT=kindest/base
-KIND_BASE_VERSIONED_IMAGE_COMPONENT=kindest/base
+KIND_BASE_IMAGE_COMPONENT=kubernetes-sigs/kind/base
+KIND_BASE_VERSIONED_IMAGE_COMPONENT=kubernetes-sigs/kind/base
 KIND_NODE_IMAGE_COMPONENT=kubernetes-sigs/kind/node
 KINDNETD_IMAGE_COMPONENT=kubernetes-sigs/kind/kindnetd
 
@@ -43,7 +43,11 @@ HAS_S3_ARTIFACTS=true
 HAS_RELEASE_BRANCHES=true
 
 FETCH_BINARIES_TARGETS=eksd/kubernetes/client eksa/kubernetes-sigs/etcdadm eksd/cni-plugins eksa/kubernetes-sigs/cri-tools eksd/etcd/etcd.tar.gz
-ORGANIZE_BINARIES_TARGETS=$(addsuffix /LICENSES,$(addprefix $(BINARY_DEPS_DIR)/linux-,amd64 arm64))
+ORGANIZE_BINARIES_AMD64_TARGET=$(BINARY_DEPS_DIR)/linux-amd64/files/rootfs/LICENSES
+ORGANIZE_BINARIES_ARM64_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/LICENSES
+ARM_ENV_CONF_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/etc
+KIND_NODE_BUILD_AMD64_TARGET=$(BINARY_DEPS_DIR)/linux-amd64/files/io.containerd.metadata.v1.bolt/meta.db
+KIND_NODE_BUILD_ARM64_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/io.containerd.metadata.v1.bolt/meta.db
 
 # Binary targets are added manually in this makefile instead of relying on simple_create logic
 SIMPLE_CREATE_BINARIES=false
@@ -58,7 +62,11 @@ ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS))),)
 -include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
 
-images: kind-base-versioned/images/push kind-node/images/push extract-kindnetd-manifest
+# During build the node image is never built so we can extract this file
+# instead fake it to keep s3-artifacts happy
+s3-artifacts: $(ARTIFACTS_PATH)/manifests/kindnetd.yaml
+
+images: kind-base-versioned/images/push kind-node/images/push
 
 
 $(OUTPUT_BIN_DIR)/%/kindnetd $(REPO)/images/kindnetd/eks-anywhere-go-mod-download \
@@ -92,6 +100,7 @@ $(call IMAGE_TARGETS_FOR_NAME, kind-base): $(KIND_BASE_IMAGE_BUILD_ARGS)
 
 kind-base-versioned/images/%: IMAGE_TARGET=base-versioned
 kind-base-versioned/images/%: IMAGE_TAG=$(EKSD_KUBE_VERSION)
+kind-base-versioned/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
 kind-base-versioned/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base
 kind-base-versioned/images/%: BUILDER_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):latest
 $(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_KUBEADM_OVERRIDE)
@@ -100,20 +109,15 @@ $(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_KUBEADM_OVERRID
 kind-base/images/push kind-base-versioned/images/push: IMAGE_REPO=$(LOCAL_REGISTRY)
 
 # Kind-node
-kind-node/images/% kind-node-extract-kindnetd/images/%: DOCKERFILE_FOLDER=./images/node
-kind-node/images/% kind-node-extract-kindnetd/images/%: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
-kind-node/images/% kind-node-extract-kindnetd/images/%: BUILDER_IMAGE=$(INTERMEDIATE_NODE_IMAGE)
-kind-node/images/% kind-node-extract-kindnetd/images/%: BASE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):latest
-kind-node/images/% kind-node-extract-kindnetd/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
-kind-node/images/% kind-node-extract-kindnetd/images/%: IMAGE_BUILD_ARGS=IMAGE_REPO AL2_HELPER_IMAGE DEBIAN_BASE_IMAGE_TAG LOCAL_PATH_PROVISONER_IMAGE_TAG LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE \
-	PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG KIND_KINDNETD_RELEASE_OVERRIDE KINDNETD_IMAGE_TAG
+kind-node/images/%: DOCKERFILE_FOLDER=./images/node
+kind-node/images/%: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
+kind-node/images/%: BUILDER_IMAGE=$(INTERMEDIATE_NODE_IMAGE)
+kind-node/images/%: BASE_IMAGE=$(INTERMEDIATE_BASE_IMAGE)
+kind-node/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
+kind-node/images/%: IMAGE_BUILD_ARGS=PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG
 
 kind-node/images/push: IMAGE_TARGET=node
-kind-node/images/push: build-kind-node-amd64 build-kind-node-arm64 $(KIND_NODE_IMAGE_BUILD_ARGS) $(BINARY_DEPS_DIR)/files
-
-kind-node-extract-kindnetd/images/amd64: IMAGE_TARGET=export
-kind-node-extract-kindnetd/images/amd64: IMAGE_OUTPUT_TYPE=local
-kind-node-extract-kindnetd/images/amd64: IMAGE_OUTPUT=dest=$(ARTIFACTS_PATH)
+kind-node/images/push: $(KIND_NODE_BUILD_AMD64_TARGET) $(KIND_NODE_BUILD_ARM64_TARGET) $(KIND_NODE_IMAGE_BUILD_ARGS) $(ARM_ENV_CONF_TARGET)
 
 $(KIND_BASE_IMAGE_BUILD_ARGS):
 	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@
@@ -135,25 +139,29 @@ $(KIND_BASE_KUBEADM_OVERRIDE):
 		> $(KUBEADM_CONFIG_DIR)/kubeadm.config
 	cp ./images/base/kubeadm-override.sh $@
 
-.PHONY: build-kind-node-%
-build-kind-node-%: $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_TARGETS)
-	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(INTERMEDIATE_BASE_IMAGE) \
-		$(INTERMEDIATE_NODE_IMAGE)-$* $*
+# kind build node-image process, also extracts kindnetd manifest to push to s3
+$(KIND_NODE_BUILD_AMD64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_AMD64_TARGET)
+	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(INTERMEDIATE_BASE_IMAGE) $(INTERMEDIATE_NODE_IMAGE)-amd64 amd64
+	@mkdir -p $(ARTIFACTS_PATH)/manifests
+	cp $(BINARY_DEPS_DIR)/linux-amd64/files/rootfs/kind/manifests/default-cni.yaml $(ARTIFACTS_PATH)/manifests/kindnetd.yaml
+	sed -i -e 's/{{ .PodSubnet }}/192.168.0.0\/16/' $(ARTIFACTS_PATH)/manifests/kindnetd.yaml 
 
-$(ORGANIZE_BINARIES_TARGETS): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
-	build/organize_binaries.sh $(RELEASE_BRANCH) $(lastword $(subst -, ,$(@D)))
+$(KIND_NODE_BUILD_ARM64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_ARM64_TARGET)
+	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(INTERMEDIATE_BASE_IMAGE) $(INTERMEDIATE_NODE_IMAGE)-arm64 arm64
 
-$(BINARY_DEPS_DIR)/files:
-	@cp -rf images/node/files $(BINARY_DEPS_DIR)
+$(ORGANIZE_BINARIES_AMD64_TARGET): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+	build/organize_binaries.sh $(RELEASE_BRANCH) amd64
 
-.PHONY: extract-kindnetd-manifest
-extract-kindnetd-manifest: kind-node-extract-kindnetd/images/amd64
-	sed -i -e 's/{{ .PodSubnet }}/192.168.0.0\/16/' $(ARTIFACTS_PATH)/manifests/kindnetd.yaml  
+$(ORGANIZE_BINARIES_ARM64_TARGET): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+	build/organize_binaries.sh $(RELEASE_BRANCH) arm64
 
-# During build the node image is never built so we can extract this file
-# instead fake it to keep s3-artifacts happy
-s3-artifacts: $(ARTIFACTS_PATH)/manifests/kindnetd.yaml
+$(ARM_ENV_CONF_TARGET):
+	@cp -rf images/node/files/* $(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/
 
 $(ARTIFACTS_PATH)/manifests/kindnetd.yaml:
 	@mkdir -p $(@D)
 	@touch $@
+
+.PHONY: create-kind-cluster-%
+create-kind-cluster-%:
+	build/create-kind-cluster.sh $(IMAGE_REPO)/$(KIND_NODE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)-latest $* $(RELEASE_BRANCH)
