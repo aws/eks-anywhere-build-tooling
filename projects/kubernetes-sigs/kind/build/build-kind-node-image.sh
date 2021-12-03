@@ -18,14 +18,15 @@ set -o pipefail
 
 EKSD_RELEASE_BRANCH="${1?Specify first argument - release branch}"
 INTERMEDIATE_BASE_IMAGE="${2?Specify second argument - kind base tag}"
-INTERMEDIATE_NODE_IMAGE="${3?Specify third argument - kind node image name}"
-ARCH="${4?Specify fifth argument - Targetarch}"
+ARCH="${3?Specify third argument - Targetarch}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 # Include common constants and other vars needed when building image
 source "${MAKE_ROOT}/_output/$EKSD_RELEASE_BRANCH/kind-node-image-build-args"
+
+INTERMEDIATE_NODE_IMAGE="kind/build/node-image:$KUBE_VERSION-$EKSD_RELEASE_BRANCH"
 
 # Uses kind cli to build node-image, usually the fake kubernetes src
 # to download the eks-d release artifacts instead of building from src

@@ -35,9 +35,11 @@ KIND_BASE_IMAGE_BUILD_ARGS=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/kind-base-image-build
 KIND_BASE_KUBEADM_OVERRIDE=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base/files/usr/local/bin/kubeadm
 KIND_NODE_IMAGE_BUILD_ARGS=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/kind-node-image-build-args
 
-LOCAL_REGISTRY=localhost:5000
-INTERMEDIATE_BASE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)
-INTERMEDIATE_NODE_IMAGE=$(LOCAL_REGISTRY)/$(KIND_NODE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)
+# Overriding since kind is released branch it will try to add git_tag to latest tag
+LATEST_TAG=$(LATEST)
+
+UNVERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(GIT_TAG)-$(GIT_HASH)
+VERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)-$(GIT_TAG)-$(GIT_HASH)
 
 HAS_S3_ARTIFACTS=true
 HAS_RELEASE_BRANCHES=true
@@ -85,7 +87,6 @@ $(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BO
 # Kindnetd
 kindnetd/images/%: DOCKERFILE_FOLDER=./images/kindnetd
 kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_IPTABLES_BASE_IMAGE_NAME)
-kindnetd/images/%: LATEST_TAG=latest
 
 # Kind-base
 kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/images/base
@@ -94,26 +95,21 @@ kind-base/images/% kind-base-versioned/images/%: IMAGE_BUILD_ARGS=CNI_PLUGINS_AM
 	CNI_PLUGINS_ARM64_SHA256SUM CRICTL_AMD64_SHA256SUM_URL CRICTL_ARM64_SHA256SUM_URL CRICTL_AMD64_URL CRICTL_ARM64_URL
 
 kind-base/images/%: IMAGE_TARGET=base
-kind-base/images/%: IMAGE_TAG=latest
 kind-base/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/base
 $(call IMAGE_TARGETS_FOR_NAME, kind-base): $(KIND_BASE_IMAGE_BUILD_ARGS)
 
 kind-base-versioned/images/%: IMAGE_TARGET=base-versioned
-kind-base-versioned/images/%: IMAGE_TAG=$(EKSD_KUBE_VERSION)
-kind-base-versioned/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
+kind-base-versioned/images/%: IMAGE_TAG:=$(EKSD_KUBE_VERSION)-$(IMAGE_TAG)
+kind-base-versioned/images/%: LATEST_TAG:=$(EKSD_KUBE_VERSION)-$(LATEST_TAG)
 kind-base-versioned/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base
-kind-base-versioned/images/%: BUILDER_IMAGE=$(LOCAL_REGISTRY)/$(KIND_BASE_IMAGE_COMPONENT):latest
+kind-base-versioned/images/%: BUILDER_IMAGE=$(UNVERSIONED_BASE_IMAGE)
 $(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_KUBEADM_OVERRIDE)
-
-# Avoid pushing to remote repo, this image is used by the `kind build node-image`
-kind-base/images/push kind-base-versioned/images/push: IMAGE_REPO=$(LOCAL_REGISTRY)
 
 # Kind-node
 kind-node/images/%: DOCKERFILE_FOLDER=./images/node
 kind-node/images/%: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
-kind-node/images/%: BUILDER_IMAGE=$(INTERMEDIATE_NODE_IMAGE)
-kind-node/images/%: BASE_IMAGE=$(INTERMEDIATE_BASE_IMAGE)
-kind-node/images/%: LATEST_TAG=$(EKSD_KUBE_VERSION)-$(LATEST)
+kind-node/images/%: BASE_IMAGE=$(VERSIONED_BASE_IMAGE)
+kind-node/images/%: IMAGE_TAG=$(NODE_IMAGE_TAG)
 kind-node/images/%: IMAGE_BUILD_ARGS=PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG
 
 kind-node/images/push: IMAGE_TARGET=node
@@ -141,13 +137,13 @@ $(KIND_BASE_KUBEADM_OVERRIDE):
 
 # kind build node-image process, also extracts kindnetd manifest to push to s3
 $(KIND_NODE_BUILD_AMD64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_AMD64_TARGET)
-	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(INTERMEDIATE_BASE_IMAGE) $(INTERMEDIATE_NODE_IMAGE)-amd64 amd64
+	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) amd64
 	@mkdir -p $(ARTIFACTS_PATH)/manifests
 	cp $(BINARY_DEPS_DIR)/linux-amd64/files/rootfs/kind/manifests/default-cni.yaml $(ARTIFACTS_PATH)/manifests/kindnetd.yaml
 	sed -i -e 's/{{ .PodSubnet }}/192.168.0.0\/16/' $(ARTIFACTS_PATH)/manifests/kindnetd.yaml 
 
 $(KIND_NODE_BUILD_ARM64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_ARM64_TARGET)
-	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(INTERMEDIATE_BASE_IMAGE) $(INTERMEDIATE_NODE_IMAGE)-arm64 arm64
+	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) arm64
 
 $(ORGANIZE_BINARIES_AMD64_TARGET): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 	build/organize_binaries.sh $(RELEASE_BRANCH) amd64
