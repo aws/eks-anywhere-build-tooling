@@ -53,7 +53,6 @@ func (t *writer) Dir() string {
 	return t.dir
 }
 
-
 func (t *writer) WriteS3KeyToFile(key string, data []byte) error {
 	i := strings.LastIndex(key, "/")
 	d := path.Join(t.dir, key[:i])
