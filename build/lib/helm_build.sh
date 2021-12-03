@@ -27,10 +27,7 @@ export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 HELM_TEMP_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 
 mkdir -p ${OUTPUT_DIR}/helm/${CHART_NAME}
-if [-f "${OUTPUT_DIR}/ATTRIBUTION.txt" ]
-then
-  cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${HELM_TEMP_DIR}/
-fi
+cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${HELM_TEMP_DIR}/
 cp -r helm/${CHART_NAME}/. ${HELM_TEMP_DIR}
 envsubst <helm/Chart.yaml.template >${HELM_TEMP_DIR}/Chart.yaml
 envsubst <helm/values.yaml.template >${HELM_TEMP_DIR}/values.yaml

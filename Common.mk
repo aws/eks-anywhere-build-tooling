@@ -309,6 +309,7 @@ $(OUTPUT_DIR)/images/%:
 	@mkdir -p $(@D)
 
 $(OUTPUT_DIR)/ATTRIBUTION.txt:
+	@mkdir -p $(OUTPUT_DIR)
 	@cp $(ATTRIBUTION_TARGETS) $(OUTPUT_DIR)
 
 
@@ -389,9 +390,11 @@ validate-checksums: $(BINARY_TARGETS)
 
 .PHONY: helm/build
 helm/build: ## Build helm chart
+helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 .PHONY: helm/push
+helm/push: $(OUTPUT_DIR)/ATTRIBUTION.txt
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
