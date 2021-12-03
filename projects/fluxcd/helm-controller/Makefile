@@ -5,8 +5,6 @@ GOLANG_VERSION?="1.16"
 REPO=helm-controller
 REPO_OWNER=fluxcd
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=helm-controller
 
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
@@ -21,12 +19,6 @@ include $(BASE_DIRECTORY)/Common.mk
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
 $(call IMAGE_TARGETS_FOR_NAME, helm-controller): helm-controller-useradd/images/export
-
-.PHONY: local-images
-local-images: helm-controller/images/amd64
-
-.PHONY: images
-images: helm-controller/images/push
 
 $(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The xeipuuv dependency github repos all have licenses however they all do not have go.mod files

@@ -5,6 +5,7 @@ REPO=eks-anwyhere-build-tooling
 REPO_OWNER=aws
 
 IMAGE_COMPONENT=eks-anywhere-cli-tools
+IMAGE_NAMES=$(IMAGE_COMPONENT)
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-docker-client
 
@@ -23,12 +24,6 @@ include $(BASE_DIRECTORY)/Common.mk
 
 
 $(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-cli-tools): $(ORGANIZE_BINARIES_TARGETS)
-
-.PHONY: local-images
-local-images: eks-anywhere-cli-tools/images/amd64
-
-.PHONY: images
-images: eks-anywhere-cli-tools/images/push
 
 .PHONY: fetch-binaries
 fetch-binaries: $(FETCH_BINARIES_TARGET)

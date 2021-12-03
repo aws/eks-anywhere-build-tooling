@@ -10,6 +10,7 @@ SIMPLE_CREATE_BINARIES=false
 HAS_LICENSES=false
 
 IMAGE_COMPONENT=eks-anywhere-diagnostic-collector
+IMAGE_NAMES=$(IMAGE_COMPONENT)
 
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
@@ -20,9 +21,3 @@ include $(BASE_DIRECTORY)/Common.mk
 
 
 $(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-diagnostic-collector): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
-
-.PHONY: local-images
-local-images: eks-anywhere-diagnostic-collector/images/amd64
-	
-.PHONY: images
-images: eks-anywhere-diagnostic-collector/images/push

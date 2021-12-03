@@ -51,25 +51,16 @@ The key pieces to setup in the Makefile  are:
 * REPO - upstream repo name.
 * COMPONENT - upstream org/repo.
 * LICENSE_PACKAGE_FILTER - This should be the pattern used to gather dependencies for this
-	specific project.  Typically this will be `.` or `./cmd/<project-name>`. For more
-	refer to [attribution-files](attribution-files.md).
+	specific project.  Typically this will be `.` or `./cmd/<project-name>`. If not set, will default to `SOURCE_PATTERNS`.
+	For more refer to [attribution-files](attribution-files.md).
 * BINARY_TARGET_FILES - The binary file names to be built, automatically appended with $(OUTPUT_BIN_DIR) and generated for each
 	$(BINARY_PLATFORMS).  Passed to `go build -o`.
 * SOURCE_PATTERNS - The patterns to pass to `go build`.  Must follow the same ordering as $(BINARY_TARGET_FILES)
+* IMAGE_NAMES (optional) - When building multiple images define them via `IMAGE_NAMES` and `local-images` and `images` will automatically
+	be created to build the	`amd64` platform in `local-images` and `push` for images.  If not set, will default to `REPO`.
+	These names need to match `IMAGE_NAME` in the below variable `<IMAGE_NAME>_IMAGE`.
 * <IMAGE_NAME>_IMAGE_COMPONENT (optional) - Common Makefile will use this if set to override the default 
 	component in the `IMAGE` variable.  By default `IMAGE` will be set to `$(IMAGE_REPO)/$(COMPONENT):$(IMAGE_TAG)`
-
-The only required targets to add are `local-images` and `images`.  These will generally look like:
-
-```
-.PHONY: images
-images: <repo>/images/push
-
-.PHONY: local-images
-local-images: <repo>/images/amd64
-```
-
-The image targets use wildcards so `<repo>` needs to match `IMAGE_NAME` in the above variable `<IMAGE_NAME>_IMAGE`
 
 ### Scripts
 

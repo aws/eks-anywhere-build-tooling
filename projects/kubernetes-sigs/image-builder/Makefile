@@ -95,33 +95,38 @@ $(BOTTLEROCKET_SETUP_TARGET):
 	sha512sum -c $(BOTTLEROCKET_SETUP_TARGET)
 
 .PHONY: deps-ami
+deps-ami: MAKEFLAGS=
 deps-ami: $(GIT_PATCH_TARGET)
-	make -C $(IMAGE_BUILDER_DIR) deps-ami
+	$(MAKE) -C $(IMAGE_BUILDER_DIR) deps-ami
 
 .PHONY: deps-ova
+deps-ova: MAKEFLAGS=
 deps-ova: $(GIT_PATCH_TARGET)
-	make -C $(IMAGE_BUILDER_DIR) deps-ova
+	$(MAKE) -C $(IMAGE_BUILDER_DIR) deps-ova
 
 .PHONY: setup-packer-configs
 setup-packer-configs:
 	build/setup_packer_configs.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM)
 
 .PHONY: build-ami-ubuntu-2004
+build-ami-ubuntu-2004: MAKEFLAGS=
 build-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
 build-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs
-	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" make -C $(IMAGE_BUILDER_DIR) validate-ami-ubuntu-2004
+	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) validate-ami-ubuntu-2004
 
 .PHONY: release-ami-ubuntu-2004
+release-ami-ubuntu-2004: MAKEFLAGS=
 release-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
 release-ami-ubuntu-2004-%: setup-ami-share deps-ami setup-packer-configs
-	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" make -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
+	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
 
 .PHONY: release-ova-ubuntu-2004
+release-ova-ubuntu-2004: MAKEFLAGS=
 release-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
 release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
-		make -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
 
 .PHONY: release-ova-bottlerocket
 release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)

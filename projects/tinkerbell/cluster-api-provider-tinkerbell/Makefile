@@ -19,12 +19,6 @@ include $(BASE_DIRECTORY)/Common.mk
 
 s3-artifacts: create-manifests
 
-.PHONY: local-images
-local-images: cluster-api-tinkerbell-provider/images/amd64
-
-.PHONY: images
-images: cluster-api-tinkerbell-provider/images/push
-
 .PHONY: create-manifests
 create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
