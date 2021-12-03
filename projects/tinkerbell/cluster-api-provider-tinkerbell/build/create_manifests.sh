@@ -33,7 +33,6 @@ cd $REPO
 make release \
   RELEASE_DIR="out" \
   REGISTRY=${IMAGE_REPO} \
-  IMAGE_NAME="tinkerbell/cluster-api-provider-tinkerbell/release/manager" \
   TAG=${IMAGE_TAG}
 
 mkdir -p $OUTPUT_DIR/manifests/infrastructure-tinkerbell/$TAG

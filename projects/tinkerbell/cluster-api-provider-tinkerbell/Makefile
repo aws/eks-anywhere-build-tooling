@@ -13,20 +13,17 @@ BINARY_TARGET_FILES=manager
 SOURCE_PATTERNS=.
 EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api-provider-packet/version)
 
-IMAGE_COMPONENT=tinkerbell/cluster-api-provider-tinkerbell/release/manager
-
 HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
 s3-artifacts: create-manifests
 
 .PHONY: local-images
-local-images: cluster-api-tinkerbell-controller/images/amd64
+local-images: cluster-api-tinkerbell-provider/images/amd64
 
 .PHONY: images
-images: cluster-api-tinkerbell-controller/images/push
+images: cluster-api-tinkerbell-provider/images/push
 
 .PHONY: create-manifests
 create-manifests: tarballs
