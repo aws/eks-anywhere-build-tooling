@@ -17,3 +17,7 @@ You can find the latest versions of these images on ECR Public Gallery.
 [cert-manager Controller](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-controller) | 
 [CA injector](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-cainjector) | 
 [cert-manager Webhook Server](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-webhook)
+
+### Helm Chart
+
+The helm chart is a modified version of the source helm chart located in the jetstck/cert-manager repo at `deploy/charts/cert-manager/`.
