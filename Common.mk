@@ -149,6 +149,10 @@ BINARY_TARGETS?=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS, $(BINARY_TARGET_FILE
 BINARY_TARGET_FILES?=
 SOURCE_PATTERNS?=.
 
+#################### HELM ######################
+HELM_BUILD?=
+HELM_RELEASE?=
+
 #### CGO ############
 CGO_CREATE_BINARIES?=false
 CGO_SOURCE=$(OUTPUT_DIR)/source
@@ -215,8 +219,8 @@ GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),local-images,) attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
-RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),local-images,) attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) $(HELM_BUILD)
+RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) $(HELM_RELEASE)
 ####################################################
 
 define BUILDCTL
