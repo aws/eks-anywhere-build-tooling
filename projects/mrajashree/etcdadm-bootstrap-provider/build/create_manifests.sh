@@ -30,10 +30,8 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 cd $REPO
 
 MANIFEST_IMAGE_OVERRIDE="${IMAGE_REPO}/mrajashree/etcdadm-bootstrap-provider:${IMAGE_TAG}"
-KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
 
 sed -i "s,\${ETCDADM_BOOTSTRAP_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ./config/manager/manager.yaml
-sed -i 's,image: .*,image: '"${KUBE_RBAC_PROXY_IMAGE_OVERRIDE}"',' ./config/default/manager_auth_proxy_patch.yaml
 
 mkdir -p $OUTPUT_DIR/manifests/bootstrap-etcdadm-bootstrap/${TAG}
 kustomize build config/default > bootstrap-components.yaml
