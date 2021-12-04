@@ -18,8 +18,7 @@ IMAGE_NAMES=cert-manager-acmesolver cert-manager-cainjector cert-manager-control
 BINARY_TARGET_FILES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook
 SOURCE_PATTERNS=./cmd/acmesolver ./cmd/cainjector ./cmd/controller ./cmd/webhook
 
-HELM_BUILD=helm/build
-HELM_RELEASE=helm/push
+HAS_HELM_CHART=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
