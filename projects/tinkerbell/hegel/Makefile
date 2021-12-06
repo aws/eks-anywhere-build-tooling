@@ -5,8 +5,6 @@ GOLANG_VERSION?="1.15"
 REPO=hegel
 REPO_OWNER=tinkerbell
 
-LICENSE_PACKAGE_FILTER?=./cmd/hegel
-
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
 BINARY_TARGET_FILES=hegel
@@ -27,9 +25,3 @@ $(FIX_LICENSES_STRPTIME_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The project owner had mentioned a MIT License and has it embeded in strptime.go file.
 # We copied the license out to STRPTIME_LICENSE.txt and moved it into vendor during build.
 	cp STRPTIME_LICENSE.txt $(REPO)/vendor/github.com/pbnjay/strptime/LICENSE.txt
-
-.PHONY: local-images
-local-images: hegel/images/amd64
-
-.PHONY: images
-images: hegel/images/push
