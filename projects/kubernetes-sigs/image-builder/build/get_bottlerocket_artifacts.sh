@@ -30,29 +30,17 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
 # Setting version and URL parameters for downloading the OVA
-OVA_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/${RELEASE_CHANNEL}
+OVA_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/ova
 KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
 BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.releaseVersion" $MAKE_ROOT/BOTTLEROCKET_OVA_RELEASES)
 OVA="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
 BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/vmware-k8s-${KUBEVERSION}/x86_64/"
 BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
 
+rm -rf $OVA_DOWNLOAD_PATH
 # Downloading the OVA from the Bottlerocket target location using Tuftool
 $CARGO_HOME/bin/tuftool download "${OVA_DOWNLOAD_PATH}" \
     --target-name "${OVA}" \
     --root "${BOTTLEROCKET_DOWNLOAD_PATH}/root.json" \
     --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
     --targets-url "${BOTTLEROCKET_TARGETS_URL}"
-
-# We do this to get the artifact name to upload to S3
-mv ${OVA_DOWNLOAD_PATH}/${OVA} ${OVA_DOWNLOAD_PATH}/${OS}.ova
-sha256sum ${OVA_DOWNLOAD_PATH}/${OS}.ova > ${OVA_DOWNLOAD_PATH}/${OS}.ova.sha256
-sha512sum ${OVA_DOWNLOAD_PATH}/${OS}.ova > ${OVA_DOWNLOAD_PATH}/${OS}.ova.sha512
-
-# If not running the script on Codebuild, i.e., running on a 
-# Prow presubmit or locally, exit gracefully
-if [ "$CODEBUILD_CI" = "false" ]; then
-    exit 0
-fi
-
-aws s3 sync ${OVA_DOWNLOAD_PATH} ${ARTIFACTS_BUCKET}/${PROJECT_PATH}/${LATEST_TAG} --acl public-read

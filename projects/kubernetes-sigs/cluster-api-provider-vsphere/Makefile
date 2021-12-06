@@ -7,10 +7,7 @@ REPO_OWNER=kubernetes-sigs
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-nonroot
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=manager
-SOURCE_PATTERNS=.
 EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api-provider-vsphere/pkg/version)
 
 IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-vsphere/release/manager
@@ -21,12 +18,6 @@ include $(BASE_DIRECTORY)/Common.mk
 
 
 s3-artifacts: create-manifests
-
-.PHONY: local-images
-local-images: cluster-api-vsphere-controller/images/amd64
-
-.PHONY: images
-images: cluster-api-vsphere-controller/images/push
 
 .PHONY: create-manifests
 create-manifests: tarballs

@@ -5,8 +5,6 @@ GOLANG_VERSION?="1.13"
 REPO=cluster-api-provider-aws
 REPO_OWNER=kubernetes-sigs
 
-LICENSE_PACKAGE_FILTER?=./cmd/clusterawsadm sigs.k8s.io/cluster-api-provider-aws/bootstrap/eks sigs.k8s.io/cluster-api-provider-aws/controlplane/eks ./
-
 BINARY_TARGET_FILES=manager eks-bootstrap-manager eks-controlplane-manager clusterawsadm
 SOURCE_PATTERNS=. sigs.k8s.io/cluster-api-provider-aws/bootstrap/eks sigs.k8s.io/cluster-api-provider-aws/controlplane/eks ./cmd/clusterawsadm
 
@@ -17,18 +15,14 @@ CLUSTER_API_AWS_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-
 EKS_BOOTSTRAP_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-aws/eks-bootstrap-controller
 EKS_CONTROL_PLANE_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-aws/eks-control-plane-controller
 
+IMAGE_NAMES= cluster-api-aws-controller eks-bootstrap-controller eks-control-plane-controller
+
 HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
 s3-artifacts: create-manifests
-
-.PHONY: local-images
-local-images: cluster-api-aws-controller/images/amd64 eks-bootstrap-controller/images/amd64 eks-control-plane-controller/images/amd64
-
-.PHONY: images
-images: cluster-api-aws-controller/images/push eks-bootstrap-controller/images/push eks-control-plane-controller/images/push
 
 .PHONY: create-manifests
 create-manifests: tarballs

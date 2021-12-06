@@ -5,8 +5,6 @@ GOLANG_VERSION?="1.16"
 REPO=etcdadm-controller
 REPO_OWNER=mrajashree
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=manager
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
@@ -15,14 +13,7 @@ HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
 s3-artifacts: create-manifests
-
-.PHONY: local-images
-local-images: etcdadm-controller/images/amd64
-
-.PHONY: images
-images: etcdadm-controller/images/push
 
 .PHONY: create-manifests
 create-manifests: export PATH:=$(MAKE_ROOT)/$(OUTPUT_DIR):$(PATH)

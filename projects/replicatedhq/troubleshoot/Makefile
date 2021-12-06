@@ -5,16 +5,16 @@ GOLANG_VERSION?="1.14"
 REPO=troubleshoot
 REPO_OWNER=replicatedhq
 
-LICENSE_PACKAGE_FILTER?=./cmd/troubleshoot
-
 BINARY_TARGET_FILES=support-bundle
-SOURCE_PATTERNS=github.com/replicatedhq/troubleshoot/cmd/troubleshoot
+SOURCE_PATTERNS=./cmd/troubleshoot
 EXTRA_GO_LDFLAGS=-X github.com/replicatedhq/troubleshoot/pkg/version.version=$(GIT_TAG)	\
 	-X github.com/replicatedhq/troubleshoot/pkg/version.gitSHA=$(shell git -C $(REPO) rev-list -n 1 $(GIT_TAG))
 EXTRA_GOBUILD_FLAGS=-installsuffix netgo -tags netgo,containers_image_ostree_stub,exclude_graphdriver_devicemapper,exclude_graphdriver_btrfs,containers_image_openpgp
 FIX_LICENSES_TARGET=$(REPO)/vendor/github.com/tj/go-spin/LICENSE
 
 HAS_S3_ARTIFACTS=true
+
+IMAGE_NAMES=
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -27,9 +27,3 @@ $(FIX_LICENSES_TARGET):
 # it in the respective folder under vendor directory so that they is available for go-licenses
 # to pick up
 	wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE -O $@
-
-.PHONY: local-images
-local-images: #noop
-
-.PHONY: images
-images: #noop

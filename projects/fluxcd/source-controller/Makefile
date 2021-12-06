@@ -5,15 +5,13 @@ GOLANG_VERSION?="1.16"
 REPO=source-controller
 REPO_OWNER=fluxcd
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=source-controller
-SOURCE_PATTERNS=.
 
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/source-controller/api/LICENSE
 LIBGIT2_LICENSES_TARGET=$(OUTPUT_DIR)/LICENSES/github.com/libgit2/libgit2/COPYING
 BASE_IMAGE_NAME?=eks-distro-minimal-base-git
+IMAGE_USERADD_USER_NAME=controller
 
 CGO_DEPS_TARGET=$(CGO_SOURCE)/linux-%/lib64/libgit2.so
 CGO_CREATE_BINARIES=true
@@ -24,18 +22,13 @@ include $(BASE_DIRECTORY)/Common.mk
 # source-controller depends on building with cgo to include git2go
 $(OUTPUT_BIN_DIR)/linux-amd64/source-controller: | $(CGO_SOURCE)/linux-amd64/usr/lib64/libgit2.so
 $(OUTPUT_BIN_DIR)/linux-arm64/source-controller: | $(CGO_SOURCE)/linux-arm64/usr/lib64/libgit2.so
-%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(BASE_IMAGE_REPO)/builder-base:latest
 
 $(CGO_SOURCE)/linux-%/usr/lib64/libgit2.so:
 	$(MAKE) binary-builder-deps/cgo/$* IMAGE_TARGET=deps IMAGE_OUTPUT=dest=$(CGO_SOURCE)/linux-$*
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET) $(LIBGIT2_LICENSES_TARGET)
 
-.PHONY: local-images
-local-images: source-controller/images/amd64
-
-.PHONY: images
-images: source-controller/images/push
+$(call IMAGE_TARGETS_FOR_NAME, source-controller): source-controller-useradd/images/export
 
 $(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The xeipuuv dependency github repos all have licenses however they all do not have go.mod files

@@ -4,37 +4,48 @@ MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
 .SUFFIXES:
 
 RELEASE_ENVIRONMENT?=development
-ARTIFACTS_BUCKET?=my-s3-bucket
+
 GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
-COMPONENT=$(REPO_OWNER)/$(REPO)
+COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
+PROJECT_PATH?=$(subst $(BASE_DIRECTORY)/,,$(MAKE_ROOT))
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
 OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 
 #################### AWS ###########################
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-ARTIFACT_BUCKET?=my-s3-bucket
+ARTIFACTS_BUCKET?=my-s3-bucket
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 ####################################################
 
 #################### LATEST TAG ####################
 BRANCH_NAME?=main
 LATEST=latest
-ifneq ("$(BRANCH_NAME)","main")
+ifneq ($(BRANCH_NAME),main)
 	LATEST=$(BRANCH_NAME)
 endif
 LATEST_TAG?=$(LATEST)
 ####################################################
 
 #################### CODEBUILD #####################
-ifdef CODEBUILD_SRC_DIR
+CODEBUILD_CI?=false
+CI?=false
+ifeq ($(CODEBUILD_CI),true)
 	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
 	CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
+	UPLOAD_DRY_RUN=false
+	BUILD_IDENTIFIER=$(CODEBUILD_BUILD_NUMBER)
 else
 	ARTIFACTS_PATH?=$(MAKE_ROOT)/_output/tar
-	CLONE_URL=https://github.com/$(COMPONENT).git	
+	CLONE_URL=https://github.com/$(COMPONENT).git
+	UPLOAD_DRY_RUN=true
+	ifeq ($(CI),true)
+		BUILD_IDENTIFIER=$(PROW_JOB_ID)
+	else
+		BUILD_IDENTIFIER=$(shell date "+%F-%s")
+	endif
 endif
 ####################################################
 
@@ -42,6 +53,7 @@ endif
 GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
 GO_MOD_DOWNLOAD_TARGETS?=$(REPO)/eks-anywhere-go-mod-download
+REPO_NO_CLONE?=false
 ####################################################
 
 #################### RELEASE BRANCHES ##############
@@ -49,28 +61,27 @@ HAS_RELEASE_BRANCHES?=false
 RELEASE_BRANCH?=
 SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
 BINARIES_ARE_RELEASE_BRANCHED?=true
-ifneq ($(RELEASE_BRANCH),)
-	RELEASE_BRANCH_SUFFIX=/$(RELEASE_BRANCH)
+ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)),$(RELEASE_BRANCH)),)
+	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
 
-	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)
-	# Deps are always released branched
-	BINARY_DEPS_DIR=$(OUTPUT_DIR)$(if $(filter-out true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)/dependencies
-	OUTPUT_DIR?=_output$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),$(RELEASE_BRANCH_SUFFIX),)
+	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)$(RELEASE_BRANCH_SUFFIX)
+	OUTPUT_DIR?=_output$(RELEASE_BRANCH_SUFFIX)
 	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)
+
+	# Deps are always released branched
+	BINARY_DEPS_DIR?=_output/$(RELEASE_BRANCH)/dependencies
 
 	# include release branch info in latest tag
 	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
-	$(filter-out build release upload-artifacts release-upload attribution clean,$(MAKECMDGOALS))),)
+	$(filter-out build release clean,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
 $(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
 else ifeq ($(HAS_RELEASE_BRANCHES),true)
 	# project has release branches and one was not specified, trigger target for all
 	BUILD_TARGETS=build/release-branches/all
 	RELEASE_TARGETS=release/release-branches/all
-	RELEASE_UPLOAD_TARGETS=release-upload/release-branches/all
-	ATTRIBUTION_TARGETS=attribution/release-branches/all
-	
+
 	# avoid warnings when trying to read GIT_TAG file which wont exist when no release_branch is given
 	GIT_TAG=non-existent
 else
@@ -91,19 +102,29 @@ BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
 
 #################### IMAGES ########################
 IMAGE_COMPONENT?=$(COMPONENT)
-IMAGE_DESCRIPTION?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
 IMAGE_TARGET?=
 
+IMAGE_NAMES?=$(REPO)
+
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
 IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
-
 # For projects with multiple containers this is defined to override the default
 # ex: CLUSTER_API_CONTROLLER_IMAGE_COMPONENT
 IMAGE_COMPONENT_VARIABLE=$(shell echo '$(IMAGE_NAME)' | tr '[:lower:]' '[:upper:]' | tr '-' '_' )_IMAGE_COMPONENT
 IMAGE=$(IMAGE_REPO)/$(if $(value $(IMAGE_COMPONENT_VARIABLE)),$(value $(IMAGE_COMPONENT_VARIABLE)),$(IMAGE_COMPONENT)):$(IMAGE_TAG)
 LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))
+
+IMAGE_USERADD_USER_ID?=1000
+IMAGE_USERADD_USER_NAME?=
+
+# Branch builds should look at the current branch latest image for cache as well as main branch latest for cache to cover the cases
+# where its the first build from a new release branch
+IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST))
+
+BUILD_OCI_TARS?=false
+HAS_HELM_CHART?=false
 ####################################################
 
 #################### BINARIES ######################
@@ -156,7 +177,7 @@ FETCH_BINARIES_TARGETS?=
 ####################################################
 
 #################### LICENSES ######################
-LICENSE_PACKAGE_FILTER?=
+LICENSE_PACKAGE_FILTER?=$(SOURCE_PATTERNS)
 REPO_SUBPATH?=
 HAS_LICENSES?=true
 ATTRIBUTION_TARGETS?=$(if $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt),$(RELEASE_BRANCH)/ATTRIBUTION.txt,ATTRIBUTION.txt)
@@ -170,7 +191,8 @@ HAS_S3_ARTIFACTS?=false
 
 SIMPLE_CREATE_TARBALLS?=true
 TAR_FILE_PREFIX?=$(REPO)
-FAKE_ARM_ARTIFACTS_FOR_VALIDATION?=false
+FAKE_ARM_BINARIES_FOR_VALIDATION?=$(if $(filter linux/arm64,$(BINARY_PLATFORMS)),false,true)
+FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 ####################################################
 
 #################### OTHER #########################
@@ -178,9 +200,8 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums local-images attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
-RELEASE_TARGETS?=validate-checksums images $(if $(filter true,$(HAS_S3_ARTIFACTS)),s3-artifacts,)
-RELEASE_UPLOAD_TARGETS?=release $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),local-images,) attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
 define BUILDCTL
@@ -197,8 +218,9 @@ define BUILDCTL
 		--local context=$(IMAGE_CONTEXT_DIR) \
 		--opt target=$(IMAGE_TARGET) \
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT) \
-		--export-cache type=inline \
-  		--import-cache type=registry,ref=$(LATEST_IMAGE)
+		$(if $(filter push=true,$(IMAGE_OUTPUT)),--export-cache type=inline,) \
+		$(foreach IMPORT_CACHE,$(IMAGE_IMPORT_CACHE),--import-cache $(IMPORT_CACHE))
+
 endef 
 
 define WRITE_LOCAL_IMAGE_TAG
@@ -215,11 +237,13 @@ define FULL_FETCH_BINARIES_TARGETS
 endef
 
 define BINARY_TARGETS_FROM_FILES_PLATFORMS
-	$(foreach platform, $(2), $(foreach target, $(1), $(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/$(target)))
+	$(foreach platform, $(2), $(foreach target, $(1), \
+		$(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/$(if $(findstring windows,$(platform)),$(target).exe,$(target))))
 endef
 
 define BINARY_TARGET_BODY_ALL_PLATFORMS
-	$(eval $(foreach platform, $(BINARY_PLATFORMS), $(call $(if $(call needs-cgo-builder,$(platform)),CGO_BINARY_TARGET_BODY,BINARY_TARGET_BODY),$(platform),$(1),$(2))))
+	$(eval $(foreach platform, $(BINARY_PLATFORMS), \
+		$(call $(if $(call needs-cgo-builder,$(platform)),CGO_BINARY_TARGET_BODY,BINARY_TARGET_BODY),$(platform),$(if $(findstring windows,$(platform)),$(1).exe,$(1)),$(2))))
 endef
 
 define BINARY_TARGET_BODY
@@ -255,12 +279,13 @@ help: ## Display this help
 
 
 ##@ Source repo + binary Targets
-
+ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
 	git clone $(CLONE_URL) $(REPO)
+endif
 
 $(GIT_CHECKOUT_TARGET): | $(REPO)
-	rm -f $(REPO)/eks-anywhere-*
+	@rm -f $(REPO)/eks-anywhere-*
 	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
 	git -C $(REPO) checkout -f $(GIT_TAG)
 	touch $@
@@ -268,11 +293,11 @@ $(GIT_CHECKOUT_TARGET): | $(REPO)
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) config user.email prow@amazonaws.com
 	git -C $(REPO) config user.name "Prow Bot"
-	git -C $(REPO) am $(MAKE_ROOT)/patches/*
+	git -C $(REPO) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches))/*
 	@touch $@
 
-%eks-anywhere-go-mod-download: $(if $(wildcard patches),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
-	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(REPO_SUBPATH)
+%eks-anywhere-go-mod-download: $(if $(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches)),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
+	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
 	@touch $@
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
@@ -294,6 +319,7 @@ $(OUTPUT_DIR)/images/%:
 	@mkdir -p $(@D)
 
 $(OUTPUT_DIR)/ATTRIBUTION.txt:
+	@mkdir -p $(OUTPUT_DIR)
 	@cp $(ATTRIBUTION_TARGETS) $(OUTPUT_DIR)
 
 
@@ -315,6 +341,10 @@ gather-licenses: $(GATHER_LICENSES_TARGETS)
 attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
 attribution: $(ATTRIBUTION_TARGETS)
 
+.PHONY: attribution-pr
+attribution-pr: ## Generates PR to update attribution files for projects
+attribution-pr:
+	$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
 
 ##@ Tarball Targets
 
@@ -326,13 +356,13 @@ ifeq ($(SIMPLE_CREATE_TARBALLS),true)
 endif
 
 .PHONY: upload-artifacts
-upload-artifacts:
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH) $(LATEST_TAG)
+upload-artifacts: s3-artifacts
+	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST_TAG) $(UPLOAD_DRY_RUN)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_ARTIFACTS_FOR_VALIDATION)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
 
 ##@ Checksum Targets
 	
@@ -344,7 +374,7 @@ checksums: $(BINARY_TARGETS)
 .PHONY: validate-checksums
 validate-checksums: ## Validate checksums of currently built binaries against checksums file.
 validate-checksums: $(BINARY_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_ARTIFACTS_FOR_VALIDATION)
+	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
 
 ## Image Targets
 
@@ -370,11 +400,14 @@ validate-checksums: $(BINARY_TARGETS)
 
 .PHONY: helm/build
 helm/build: ## Build helm chart
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION)
+helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
+	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 .PHONY: helm/push
+helm/push: $(OUTPUT_DIR)/ATTRIBUTION.txt
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_COMPONENT) $(IMAGE_TAG) $(IMAGE_DESCRIPTION) $(IMAGE_REPO)
+	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 %/images/amd64: ## Build image using buildkit only builds linux/amd64 and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64
@@ -401,6 +434,7 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
+%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/builder-base:latest
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/amd64:
@@ -411,6 +445,19 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/cgo/arm64:
 	@mkdir -p $(CGO_SOURCE)
 	$(BUILDCTL)
+
+%-useradd/images/export: IMAGE_OUTPUT_TYPE=local
+%-useradd/images/export: IMAGE_OUTPUT=dest=$(OUTPUT_DIR)/files/$*
+%-useradd/images/export: IMAGE_BUILD_ARGS=IMAGE_USERADD_USER_ID IMAGE_USERADD_USER_NAME
+%-useradd/images/export: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/useradd
+%-useradd/images/export: IMAGE_PLATFORMS=linux/amd64
+%-useradd/images/export:
+	$(BUILDCTL)
+
+ifneq ($(IMAGE_NAMES),)
+local-images: $(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
+images: $(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
+endif
 
 ##@ Fetch Binary Targets
 $(BINARY_DEPS_DIR)/linux-%:
@@ -430,9 +477,6 @@ build: $(BUILD_TARGETS)
 .PHONY: release
 release: ## Called via prow postsubmit + release jobs, calls `binaries gather-licenses clean-repo images` by default
 release: $(RELEASE_TARGETS)
-
-.PHONY: release-upload
-release-upload: $(RELEASE_UPLOAD_TARGETS)
 
 .PHONY: %/release-branches/all
 %/release-branches/all:

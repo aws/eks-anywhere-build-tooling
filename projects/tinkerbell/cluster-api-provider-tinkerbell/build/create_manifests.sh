@@ -13,15 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 set -x
 set -o errexit
-set -o nounset
 set -o pipefail
 
+REPO="$1"
+OUTPUT_DIR="$2"
+ARTIFACTS_PATH="$3"
+TAG="$4"
+IMAGE_REPO="$5"
+IMAGE_TAG="$6"
 
-IMAGE_BUILDER_DIR="${1?Specify first argument - image builder directory in the cloned repo}"
-OS="${2?Specify second argument - base os of ova built}"
+MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
-mv "${IMAGE_BUILDER_DIR}"/output/*.ova "${IMAGE_BUILDER_DIR}"/output/"${OS}".ova
-sha256sum "${IMAGE_BUILDER_DIR}"/output/"${OS}".ova > "${IMAGE_BUILDER_DIR}"/output/"${OS}".ova.sha256
-sha512sum "${IMAGE_BUILDER_DIR}"/output/"${OS}".ova > "${IMAGE_BUILDER_DIR}"/output/"${OS}".ova.sha512
+cd $REPO
+
+make release \
+  RELEASE_DIR="out" \
+  REGISTRY=${IMAGE_REPO} \
+  TAG=${IMAGE_TAG}
+
+mkdir -p $OUTPUT_DIR/manifests/infrastructure-tinkerbell/$TAG
+cp out/cluster-template.yaml "$OUTPUT_DIR/manifests/infrastructure-tinkerbell/$TAG"
+cp out/infrastructure-components.yaml "$OUTPUT_DIR/manifests/infrastructure-tinkerbell/$TAG"
+cp out/metadata.yaml "$OUTPUT_DIR/manifests/infrastructure-tinkerbell/$TAG"
+
+cp -rf $OUTPUT_DIR/manifests $ARTIFACTS_PATH

@@ -22,7 +22,9 @@ ARTIFACTS_FOLDER="$2"
 GIT_TAG="$3"
 FAKE_ARM_ARTIFACTS_FOR_VALIDATION="$4"
 
-PROJECT_NAME=$(basename $PROJECT_ROOT)
+EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts
+
+
 ACTUAL_FILES=$(mktemp)
 
 for file in $(find ${ARTIFACTS_FOLDER} -type f | sort); do
@@ -33,7 +35,7 @@ done
 EXPECTED_FILES=$(mktemp)
 export GIT_TAG=$GIT_TAG
 envsubst '$GIT_TAG' \
-	< $PROJECT_ROOT/expected_artifacts \
+	< $EXPECTED_FILES_PATH \
 	> $EXPECTED_FILES
 
 if $FAKE_ARM_ARTIFACTS_FOR_VALIDATION; then
@@ -43,7 +45,7 @@ fi
 if ! diff $EXPECTED_FILES $ACTUAL_FILES; then
 	echo "Artifacts directory does not matched expected!"
 	echo "******************* Actual ******************"
-	cat /tmp/actual-$PROJECT_NAME-files
+	cat $ACTUAL_FILES
 	echo "*********************************************"
 	exit 1
 fi

@@ -13,13 +13,6 @@ env:
     VSPHERE_CONNECTION_DATA: "vsphere_ci_beta_connection:vsphere_connection_data"
 
 phases:
-  # On AL2, the Cargo build system requires the openssl-devel package
-  # for installing OpenSSL headers/libraries
-  install:
-    run-as: root
-    commands:
-      - yum install -y openssl-devel
-
   pre_build:
     commands:
       - git config --global credential.helper '!aws codecommit credential-helper $@'
@@ -27,9 +20,4 @@ phases:
 
   build:
     commands:
-      - make release-ova-ubuntu-2004-1-20 -C $PROJECT_PATH
-
-  post_build:
-    commands:
-      - make upload-artifacts-1-20 -C $PROJECT_PATH
-      - make release-ova-bottlerocket-1-20 -C $PROJECT_PATH
+      - make release RELEASE_BRANCH=1-20 -C $PROJECT_PATH

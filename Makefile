@@ -3,15 +3,12 @@ AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output tex
 AWS_REGION?=us-west-2
 IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
-PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller
+PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell
 BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 
 EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi
 EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQS))
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
-OVA_TARGETS=$(addprefix release-upload-ova-ubuntu-2004-, $(SUPPORTED_K8S_VERSIONS))
-OVA_TARGETS+=$(addprefix release-ova-bottlerocket-, $(SUPPORTED_K8S_VERSIONS))
 RELEASE_BRANCH?=
 
 .PHONY: build-all-projects
@@ -28,14 +25,14 @@ aws_eks-anywhere-build-tooling: $(EKSA_TOOLS_PREREQS_BUILD_TARGETS)
 .PHONY: build-project-%
 build-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
-	$(MAKE) release-upload -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
+	$(MAKE) release -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
 
 .PHONY: release-binaries-images
 release-binaries-images: build-all-projects
 
 .PHONY: release-ovas
 release-ovas:
-	$(MAKE) $(OVA_TARGETS) -C projects/kubernetes-sigs/image-builder
+	$(MAKE) release -C projects/kubernetes-sigs/image-builder
 
 .PHONY: clean
 clean:
@@ -62,6 +59,7 @@ clean:
 	make -C projects/mrajashree/etcdadm-controller clean
 	make -C projects/aws/bottlerocket-bootstrap clean
 	make -C projects/replicatedhq/troubleshoot clean
+	make -C projects/tinkerbell/cluster-api-provider-tinkerbell clean
 
 	make -C projects/kubernetes-sigs/image-builder clean
 	make -C projects/aws/eks-anywhere-test clean
@@ -94,6 +92,7 @@ attribution-files:
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-controller
 	build/update-attribution-files/make_attribution.sh projects/aws/bottlerocket-bootstrap
 	build/update-attribution-files/make_attribution.sh projects/replicatedhq/troubleshoot
+	build/update-attribution-files/make_attribution.sh projects/tinkerbell/cluster-api-provider-tinkerbell
 
 	cat _output/total_summary.txt
 
