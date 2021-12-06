@@ -23,6 +23,7 @@ RELEASE_BRANCH="${1?Specify first argument - release branch}"
 ARTIFACTS_BUCKET="${2?Specify second argument - artifact bucket}"
 OVA_PATH="${3? Specify the third argument - ova output path}"
 ADDITIONAL_PAUSE_IMAGE_FROM="${4? Specify the fourth argument - additional pause image}"
+LATEST_TAG="${5? Specify the fifth argument - latest tag}"
 
 CI="${CI:-false}"
 
@@ -70,10 +71,10 @@ export KUBERNETES_FULL_VERSION="$KUBERNETES_VERSION-eks-$RELEASE_BRANCH-$EKSD_RE
 export ETCD_HTTP_SOURCE=$(build::eksd_releases::get_eksd_component_url "etcd" $RELEASE_BRANCH)
 export ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $RELEASE_BRANCH)
 export ETCD_SHA256=$(build::eksd_releases::get_eksd_component_sha "etcd" $RELEASE_BRANCH)
-export ETCDADM_HTTP_SOURCE=${ETCDADM_HTTP_SOURCE:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm')}
+export ETCDADM_HTTP_SOURCE=${ETCDADM_HTTP_SOURCE:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm' 'amd64' $LATEST_TAG)}
 # TODO: fix etcdadm build to set correct version
 export ETCDADM_VERSION='v0.0.0-master+$Format:%h$'
-export CRICTL_URL=${CRICTL_URL:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools')}
+export CRICTL_URL=${CRICTL_URL:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' 'amd64' $LATEST_TAG))}
 export CRICTL_SHA256="$CRICTL_URL.sha256"
 
 envsubst '$IMAGE_REPO:$KUBERNETES_ASSET_BASE_URL:$KUBERNETES_VERSION:$KUBERNETES_SERIES:$CRICTL_URL:$CRICTL_SHA256:$ETCD_HTTP_SOURCE:$ETCD_VERSION:$ETCDADM_HTTP_SOURCE:$ETCD_SHA256:$ETCDADM_VERSION:$KUBERNETES_FULL_VERSION' \

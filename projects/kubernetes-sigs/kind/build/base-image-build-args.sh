@@ -20,6 +20,7 @@ set -o pipefail
 EKSD_RELEASE_BRANCH="$1"
 ARTIFACTS_BUCKET="$2"
 OUTPUT_FILE="$3"
+LATEST_TAG="$4"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BUILD_LIB="${MAKE_ROOT}/../../../build/lib"
@@ -39,8 +40,8 @@ CNI_PLUGINS_ARM64_URL=$(build::eksd_releases::get_eksd_component_url "cni-plugin
 CNI_PLUGINS_AMD64_SHA256SUM=$(build::eksd_releases::get_eksd_component_sha "cni-plugins" $EKSD_RELEASE_BRANCH amd64)
 CNI_PLUGINS_ARM64_SHA256SUM=$(build::eksd_releases::get_eksd_component_sha "cni-plugins" $EKSD_RELEASE_BRANCH arm64)
 
-CRICTL_AMD64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' amd64)
-CRICTL_ARM64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' arm64)
+CRICTL_AMD64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' amd64 $LATEST_TAG))
+CRICTL_ARM64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' arm64 $LATEST_TAG)
 CRICTL_AMD64_SHA256SUM_URL=$CRICTL_AMD64_URL.sha256
 CRICTL_ARM64_SHA256SUM_URL=$CRICTL_ARM64_URL.sha256
 

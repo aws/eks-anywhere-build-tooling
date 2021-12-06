@@ -21,9 +21,15 @@ IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazo
 ####################################################
 
 #################### LATEST TAG ####################
+# codebuild
 BRANCH_NAME?=main
+# prow
+PULL_BASE_REF?=main
 LATEST=latest
 ifneq ($(BRANCH_NAME),main)
+	LATEST=$(BRANCH_NAME)
+endif
+ifneq ($(PULL_BASE_REF),main)
 	LATEST=$(BRANCH_NAME)
 endif
 LATEST_TAG?=$(LATEST)
@@ -461,7 +467,7 @@ endif
 
 ##@ Fetch Binary Targets
 $(BINARY_DEPS_DIR)/linux-%:
-	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(RELEASE_BRANCH)
+	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(LATEST_TAG) $(RELEASE_BRANCH)
 
 # Do not binary deps as intermediate files
 ifneq ($(FETCH_BINARIES_TARGETS),)
