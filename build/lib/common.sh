@@ -267,8 +267,14 @@ function build::common::get_latest_eksa_asset_url() {
   local -r latesttag=${4-latest}
 
   local -r git_tag=$(cat $BUILD_ROOT/../../projects/${project}/GIT_TAG)
-  echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$latesttag/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
 
+  local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $url)
+  if [[ "$http_code" == "200" ]]; then 
+    echo "$url"
+  else
+    echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+  fi
 }
 
 function build::common::wait_for_tag() {
