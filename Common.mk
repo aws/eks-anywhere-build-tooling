@@ -16,15 +16,21 @@ OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 #################### AWS ###########################
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-ARTIFACTS_BUCKET?=my-s3-bucket
+ARTIFACTS_BUCKET?=s3://my-s3-bucket
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 ####################################################
 
 #################### LATEST TAG ####################
+# codebuild
 BRANCH_NAME?=main
+# prow
+PULL_BASE_REF?=main
 LATEST=latest
 ifneq ($(BRANCH_NAME),main)
 	LATEST=$(BRANCH_NAME)
+endif
+ifneq ($(PULL_BASE_REF),main)
+	LATEST=$(PULL_BASE_REF)
 endif
 LATEST_TAG?=$(LATEST)
 ####################################################
@@ -67,6 +73,7 @@ ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)),$(RELEASE_BRANCH)),)
 	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)$(RELEASE_BRANCH_SUFFIX)
 	OUTPUT_DIR?=_output$(RELEASE_BRANCH_SUFFIX)
 	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)
+	ARTIFACTS_UPLOAD_PATH?=$(PROJECT_PATH)$(RELEASE_BRANCH_SUFFIX)
 
 	# Deps are always released branched
 	BINARY_DEPS_DIR?=_output/$(RELEASE_BRANCH)/dependencies
@@ -86,6 +93,7 @@ else ifeq ($(HAS_RELEASE_BRANCHES),true)
 	GIT_TAG=non-existent
 else
 	PROJECT_ROOT?=$(MAKE_ROOT)
+	ARTIFACTS_UPLOAD_PATH?=$(PROJECT_PATH)
 	OUTPUT_DIR?=_output
 endif
 
@@ -200,7 +208,7 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),local-images,) attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),local-images,) attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
 RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
@@ -357,7 +365,7 @@ endif
 
 .PHONY: upload-artifacts
 upload-artifacts: s3-artifacts
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST_TAG) $(UPLOAD_DRY_RUN)
+	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
@@ -461,7 +469,7 @@ endif
 
 ##@ Fetch Binary Targets
 $(BINARY_DEPS_DIR)/linux-%:
-	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(RELEASE_BRANCH)
+	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(LATEST) $(RELEASE_BRANCH)
 
 # Do not binary deps as intermediate files
 ifneq ($(FETCH_BINARIES_TARGETS),)

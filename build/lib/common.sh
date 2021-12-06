@@ -79,8 +79,8 @@ function build::common::upload_artifacts() {
   local -r dry_run=$7
 
   if [ "$dry_run" = "true" ]; then
-    aws s3 cp "$artifactspath" s3://"$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
-    aws s3 cp "$artifactspath" s3://"$artifactsbucket"/"$projectpath"/latest --recursive --dryrun
+    aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
+    aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --recursive --dryrun
   else
     # Upload artifacts to s3 
     # 1. To proper path on s3 with buildId-githash
@@ -264,10 +264,17 @@ function build::common::get_latest_eksa_asset_url() {
   local -r artifact_bucket=$1
   local -r project=$2
   local -r arch=${3-amd64}
+  local -r latesttag=${4-latest}
 
   local -r git_tag=$(cat $BUILD_ROOT/../../projects/${project}/GIT_TAG)
-  echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$latesttag/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
 
+  local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $url)
+  if [[ "$http_code" == "200" ]]; then 
+    echo "$url"
+  else
+    echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+  fi
 }
 
 function build::common::wait_for_tag() {

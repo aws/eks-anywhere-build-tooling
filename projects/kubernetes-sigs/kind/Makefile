@@ -116,7 +116,7 @@ kind-node-extract-kindnetd/images/amd64: IMAGE_OUTPUT_TYPE=local
 kind-node-extract-kindnetd/images/amd64: IMAGE_OUTPUT=dest=$(ARTIFACTS_PATH)
 
 $(KIND_BASE_IMAGE_BUILD_ARGS):
-	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@
+	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@ $(LATEST)
 
 $(KIND_NODE_IMAGE_BUILD_ARGS):
 	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) $(ARTIFACTS_BUCKET) $(IMAGE_TAG) $(LATEST_TAG) $(LATEST) $@
