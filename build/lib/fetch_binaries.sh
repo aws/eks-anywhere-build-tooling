@@ -25,7 +25,8 @@ source "${SCRIPT_ROOT}/common.sh"
 BINARY_DEPS_DIR="$1" 
 DEP="$2"
 ARTIFACTS_BUCKET="$3"
-RELEASE_BRANCH="${4-$(build::eksd_releases::get_release_branch)}"
+LATEST_TAG="$4"
+RELEASE_BRANCH="${5-$(build::eksd_releases::get_release_branch)}"
 
 DEP=${DEP#"$BINARY_DEPS_DIR"}
 OS_ARCH="$(cut -d '/' -f1 <<< ${DEP})"
@@ -53,7 +54,7 @@ if [[ $PRODUCT = 'eksd' ]]; then
     fi
 else
     TARBALL="$REPO-linux-$ARCH.tar.gz"
-    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH)
+    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $LATEST_TAG)
 fi
 
 if [[ $REPO == *.tar.gz ]]; then
