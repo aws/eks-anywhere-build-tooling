@@ -7,14 +7,18 @@ REPO_OWNER=tinkerbell
 
 LICENSE_PACKAGE_FILTER?=./cmd/hegel
 
-BASE_IMAGE_NAME?=eks-distro-base
+BASE_IMAGE_NAME?=eks-distro-minimal-base
 
 BINARY_TARGET_FILES=hegel
 SOURCE_PATTERNS=./cmd/hegel
 
 FIX_LICENSES_STRPTIME_TARGET=$(REPO)/vendor/github.com/pbnjay/strptime/LICENSE.txt
 
+IMAGE_USERADD_USER_NAME=tinkerbell
+
 include $(BASE_DIRECTORY)/Common.mk
+
+$(call IMAGE_TARGETS_FOR_NAME, hegel): hegel-useradd/images/export
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_STRPTIME_TARGET)
 
