@@ -264,9 +264,10 @@ function build::common::get_latest_eksa_asset_url() {
   local -r artifact_bucket=$1
   local -r project=$2
   local -r arch=${3-amd64}
+  local -r latesttag=${4-latest}
 
   local -r git_tag=$(cat $BUILD_ROOT/../../projects/${project}/GIT_TAG)
-  echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+  echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$latesttag/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
 
 }
 

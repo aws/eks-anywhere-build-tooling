@@ -106,7 +106,7 @@ deps-ova: $(GIT_PATCH_TARGET)
 
 .PHONY: setup-packer-configs
 setup-packer-configs:
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM)
+	build/setup_packer_configs.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST_TAG)
 
 .PHONY: build-ami-ubuntu-2004
 build-ami-ubuntu-2004: MAKEFLAGS=
