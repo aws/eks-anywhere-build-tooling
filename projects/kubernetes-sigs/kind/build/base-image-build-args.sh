@@ -40,7 +40,7 @@ CNI_PLUGINS_ARM64_URL=$(build::eksd_releases::get_eksd_component_url "cni-plugin
 CNI_PLUGINS_AMD64_SHA256SUM=$(build::eksd_releases::get_eksd_component_sha "cni-plugins" $EKSD_RELEASE_BRANCH amd64)
 CNI_PLUGINS_ARM64_SHA256SUM=$(build::eksd_releases::get_eksd_component_sha "cni-plugins" $EKSD_RELEASE_BRANCH arm64)
 
-CRICTL_AMD64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' amd64 $LATEST_TAG))
+CRICTL_AMD64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' amd64 $LATEST_TAG)
 CRICTL_ARM64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' arm64 $LATEST_TAG)
 CRICTL_AMD64_SHA256SUM_URL=$CRICTL_AMD64_URL.sha256
 CRICTL_ARM64_SHA256SUM_URL=$CRICTL_ARM64_URL.sha256
