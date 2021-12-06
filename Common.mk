@@ -16,7 +16,7 @@ OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 #################### AWS ###########################
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-ARTIFACTS_BUCKET?=my-s3-bucket
+ARTIFACTS_BUCKET?=s3://my-s3-bucket
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 ####################################################
 
@@ -73,6 +73,7 @@ ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)),$(RELEASE_BRANCH)),)
 	ARTIFACTS_PATH:=$(ARTIFACTS_PATH)$(RELEASE_BRANCH_SUFFIX)
 	OUTPUT_DIR?=_output$(RELEASE_BRANCH_SUFFIX)
 	PROJECT_ROOT?=$(MAKE_ROOT)$(RELEASE_BRANCH_SUFFIX)
+	ARTIFACTS_UPLOAD_PATH?=$(PROJECT_PATH)$(RELEASE_BRANCH_SUFFIX)
 
 	# Deps are always released branched
 	BINARY_DEPS_DIR?=_output/$(RELEASE_BRANCH)/dependencies
@@ -92,6 +93,7 @@ else ifeq ($(HAS_RELEASE_BRANCHES),true)
 	GIT_TAG=non-existent
 else
 	PROJECT_ROOT?=$(MAKE_ROOT)
+	ARTIFACTS_UPLOAD_PATH?=$(PROJECT_PATH)
 	OUTPUT_DIR?=_output
 endif
 
@@ -363,7 +365,7 @@ endif
 
 .PHONY: upload-artifacts
 upload-artifacts: s3-artifacts
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN)
+	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
