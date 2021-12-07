@@ -12,15 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+set -x
 set -o errexit
 set -o nounset
 set -o pipefail
 
-EKSD_RELEASE_BRANCH="$1"
-ARTIFACTS_BUCKET="$2"
-OUTPUT_FILE="$3"
-LATEST_TAG="$4"
+IMAGE="$1"
+ARCH="$2"
+EKSD_RELEASE_BRANCH="$3"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BUILD_LIB="${MAKE_ROOT}/../../../build/lib"
@@ -36,27 +35,31 @@ EKSD_KUBE_VERSION="$KUBE_VERSION-$EKSD_VERSION_SUFFIX"
 COREDNS_VERSION=$(build::eksd_releases::get_eksd_component_version "coredns" $EKSD_RELEASE_BRANCH)-$EKSD_VERSION_SUFFIX
 ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_RELEASE_BRANCH)-$EKSD_VERSION_SUFFIX
 
-CNI_PLUGINS_AMD64_URL=$(build::eksd_releases::get_eksd_component_url "cni-plugins" $EKSD_RELEASE_BRANCH amd64)
-CNI_PLUGINS_ARM64_URL=$(build::eksd_releases::get_eksd_component_url "cni-plugins" $EKSD_RELEASE_BRANCH arm64)
-CNI_PLUGINS_AMD64_SHA256SUM=$(build::eksd_releases::get_eksd_component_sha "cni-plugins" $EKSD_RELEASE_BRANCH amd64)
-CNI_PLUGINS_ARM64_SHA256SUM=$(build::eksd_releases::get_eksd_component_sha "cni-plugins" $EKSD_RELEASE_BRANCH arm64)
+# Make sure the correct arch image is pulled and tagged
+docker pull --platform linux/$ARCH $IMAGE
 
-CRICTL_AMD64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' amd64 $LATEST_TAG)
-CRICTL_ARM64_URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' arm64 $LATEST_TAG)
-CRICTL_AMD64_SHA256SUM_URL=$CRICTL_AMD64_URL.sha256
-CRICTL_ARM64_SHA256SUM_URL=$CRICTL_ARM64_URL.sha256
-
-mkdir -p $(dirname $OUTPUT_FILE)
-cat <<EOF >> $OUTPUT_FILE
-EKSD_KUBE_VERSION=$EKSD_KUBE_VERSION
-COREDNS_VERSION=$COREDNS_VERSION
-ETCD_VERSION=$ETCD_VERSION
-CNI_PLUGINS_AMD64_URL=$CNI_PLUGINS_AMD64_URL
-CNI_PLUGINS_ARM64_URL=$CNI_PLUGINS_ARM64_URL
-CNI_PLUGINS_AMD64_SHA256SUM=$CNI_PLUGINS_AMD64_SHA256SUM
-CNI_PLUGINS_ARM64_SHA256SUM=$CNI_PLUGINS_ARM64_SHA256SUM
-CRICTL_AMD64_SHA256SUM_URL=$CRICTL_AMD64_SHA256SUM_URL
-CRICTL_ARM64_SHA256SUM_URL=$CRICTL_ARM64_SHA256SUM_URL
-CRICTL_AMD64_URL=$CRICTL_AMD64_URL
-CRICTL_ARM64_URL=$CRICTL_ARM64_URL
+KIND_PATH="$MAKE_ROOT/_output/bin/kind/$(uname | tr '[:upper:]' '[:lower:]')-$(go env GOHOSTARCH)/kind"
+cat << EOF \
+  | $KIND_PATH create cluster \
+    --name "eks-a-kind-test-$ARCH" \
+    --image="$IMAGE" \
+    --wait="5m" -v9 --retain \
+    --config=/dev/stdin \
+    || true
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+kubeadmConfigPatches:
+- |
+    apiVersion: kubeadm.k8s.io/v1beta2
+    kind: ClusterConfiguration
+    dns:
+        type: CoreDNS
+        imageRepository: public.ecr.aws/eks-distro/coredns
+        imageTag: $COREDNS_VERSION
+    etcd:
+        local:
+            imageRepository: public.ecr.aws/eks-distro/etcd-io
+            imageTag: $ETCD_VERSION
+    imageRepository: public.ecr.aws/eks-distro/kubernetes
+    kubernetesVersion: $EKSD_KUBE_VERSION
 EOF

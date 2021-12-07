@@ -22,16 +22,20 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 EKSD_RELEASE_BRANCH="${1?Specify first argument - release branch}"
 ARCH="${2?Specify second argument - Targetarch}"
 
-OUTPUT_FOLDER="$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH"
+DEP_FOLDER="$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH"
+OUTPUT_FOLDER="$DEP_FOLDER/files/rootfs"
 mkdir -p $OUTPUT_FOLDER/LICENSES
 
 for FOLDER in eksd/kubernetes eksa/kubernetes-sigs/etcdadm eksd/cni-plugins eksa/kubernetes-sigs/cri-tools; do
-    cp -rf $OUTPUT_FOLDER/$FOLDER/LICENSES "$OUTPUT_FOLDER/LICENSES/$(echo $(basename $FOLDER) | tr a-z A-Z  | tr -d '-'  )_LICENSES"
-    cp $OUTPUT_FOLDER/$FOLDER/ATTRIBUTION.txt "$OUTPUT_FOLDER/LICENSES/$(echo $(basename $FOLDER) | tr a-z A-Z  | tr -d '-'  )_ATTRIBUTION.txt"
+    cp -rf $DEP_FOLDER/$FOLDER/LICENSES "$OUTPUT_FOLDER/LICENSES/$(echo $(basename $FOLDER) | tr a-z A-Z  | tr -d '-'  )_LICENSES"
+    cp $DEP_FOLDER/$FOLDER/ATTRIBUTION.txt "$OUTPUT_FOLDER/LICENSES/$(echo $(basename $FOLDER) | tr a-z A-Z  | tr -d '-'  )_ATTRIBUTION.txt"
 done
+
+mkdir -p $OUTPUT_FOLDER/usr/bin/
+cp $DEP_FOLDER/eksa/kubernetes-sigs/etcdadm/etcdadm $OUTPUT_FOLDER/usr/bin/
 
 # Place etcd tarball etcdadm cache directory to avoid downloading at runtime   
 ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_RELEASE_BRANCH $ARCH)
-FOLDER="$OUTPUT_FOLDER/cache/etcdadm/etcd/$ETCD_VERSION"
+FOLDER="$OUTPUT_FOLDER/var/cache/etcdadm/etcd/$ETCD_VERSION"
 mkdir -p $FOLDER
-cp $OUTPUT_FOLDER/eksd/etcd/etcd.tar.gz $FOLDER/etcd-$ETCD_VERSION-linux-$ARCH.tar.gz
+cp $DEP_FOLDER/eksd/etcd/etcd.tar.gz $FOLDER/etcd-$ETCD_VERSION-linux-$ARCH.tar.gz

@@ -18,14 +18,15 @@ set -o pipefail
 
 EKSD_RELEASE_BRANCH="${1?Specify first argument - release branch}"
 INTERMEDIATE_BASE_IMAGE="${2?Specify second argument - kind base tag}"
-INTERMEDIATE_NODE_IMAGE="${3?Specify third argument - kind node image name}"
-ARCH="${4?Specify fifth argument - Targetarch}"
+ARCH="${3?Specify third argument - Targetarch}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 # Include common constants and other vars needed when building image
 source "${MAKE_ROOT}/_output/$EKSD_RELEASE_BRANCH/kind-node-image-build-args"
+
+INTERMEDIATE_NODE_IMAGE="kind/build/node-image:$KUBE_VERSION-$EKSD_RELEASE_BRANCH"
 
 # Uses kind cli to build node-image, usually the fake kubernetes src
 # to download the eks-d release artifacts instead of building from src
@@ -103,13 +104,12 @@ function build::kind::load_images(){
         $PAUSE_IMAGE_TAG  
     )
     for image in "${IMAGES[@]}"; do
-        # in case kind didnt include the image we are expected, ignore the error
-        # there is a final validation to make sure all images are from public.ecr
-        docker exec --privileged -i $CONTAINER_ID crictl rmi $image || true
+        docker exec --privileged -i $CONTAINER_ID crictl rmi $image
     done
 
     # pull local-path-provisioner + al2 helper image
-    mkdir -p $MAKE_ROOT/_output/dependencies
+    IMAGES_FOLDER=$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/images
+    mkdir -p $IMAGES_FOLDER
     IMAGES=("$AL2_HELPER_IMAGE" "$LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE" "$PAUSE_IMAGE_TAG_OVERRIDE" "$KIND_KINDNETD_IMAGE_OVERRIDE")
 
     declare -A release_image_overrides
@@ -122,16 +122,16 @@ function build::kind::load_images(){
         docker pull --platform linux/$ARCH $image
         image_id=$(docker images $image --format "{{.ID}}")
 
-        if [ ! -f $MAKE_ROOT/_output/dependencies/$image_id.tar ]; then
+        if [ ! -f $IMAGES_FOLDER/$image_id.tar ]; then
             if [[ $image =~ local-path-provisioner ]] || [[ $image =~ kindnetd ]]; then
                 docker tag $image_id ${release_image_overrides[$image]}
-                docker save ${release_image_overrides[$image]} -o $MAKE_ROOT/_output/dependencies/$image_id.tar
+                docker save ${release_image_overrides[$image]} -o $IMAGES_FOLDER/$image_id.tar
             else
-                docker save $image -o $MAKE_ROOT/_output/dependencies/$image_id.tar
+                docker save $image -o $IMAGES_FOLDER/$image_id.tar
             fi
         fi
         docker exec --privileged -i $CONTAINER_ID \
-            ctr --namespace=k8s.io images import --all-platforms --no-unpack - < $MAKE_ROOT/_output/dependencies/$image_id.tar
+            ctr --namespace=k8s.io images import --all-platforms --no-unpack - < $IMAGES_FOLDER/$image_id.tar
 
         if [[ $ARCH != $(docker exec --privileged -i $CONTAINER_ID \
             crictl inspecti -o go-template --template={{.info.imageSpec.architecture}} $image_id) ]]; then
@@ -155,12 +155,31 @@ function build::kind::load_images(){
 
     docker exec --privileged -i $CONTAINER_ID pkill containerd
 
-    NEW_IMAGE_ID=$(docker commit --change 'ENTRYPOINT [ "/usr/local/bin/entrypoint", "/sbin/init" ]' $CONTAINER_ID | sed -E 's/.*sha256:(.*)$/\1/')
-    docker tag $NEW_IMAGE_ID $INTERMEDIATE_NODE_IMAGE
-    docker push $INTERMEDIATE_NODE_IMAGE
+    docker commit --change 'ENTRYPOINT [ "/usr/local/bin/entrypoint", "/sbin/init" ]' $CONTAINER_ID | sed -E 's/.*sha256:(.*)$/\1/'
 
     docker kill $CONTAINER_ID
-    rm -rf $MAKE_ROOT/_output/dependencies
+
+    # Copy files created by the node build process and ctr import out to be used in next build
+    FILES_DIR=$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH/files
+    ROOT_FS=$FILES_DIR/rootfs
+    mkdir -p $ROOT_FS/var/lib/containerd
+    docker cp $CONTAINER_ID:/kind $ROOT_FS
+    docker cp $CONTAINER_ID:/var/lib/containerd/io.containerd.content.v1.content $ROOT_FS/var/lib/containerd
+
+    mkdir -p $ROOT_FS/usr/bin
+    for binary in kubeadm kubelet kubectl; do
+        docker cp $CONTAINER_ID:/usr/bin/$binary $ROOT_FS/usr/bin
+    done
+    
+    # meta.db is the databse for containerd and its not reproducible since dates are included
+    # moving out of file directly to support reusing buildkit cache as much as possible
+    docker cp $CONTAINER_ID:/var/lib/containerd/io.containerd.metadata.v1.bolt $FILES_DIR
+
+    # update kind default manifests to use overridden images
+	sed -i "s,image: $LOCAL_PATH_PROVISONER_IMAGE_TAG,image: $LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE," $ROOT_FS/kind/manifests/default-storage.yaml
+	sed -i "s,$DEBIAN_BASE_IMAGE_TAG,$AL2_HELPER_IMAGE," $ROOT_FS/kind/manifests/default-storage.yaml
+	sed -i "s,image: $KINDNETD_IMAGE_TAG,image: $KIND_KINDNETD_RELEASE_OVERRIDE," $ROOT_FS/kind/manifests/default-cni.yaml
+
 }
 
 if command -v docker &> /dev/null && docker info > /dev/null 2>&1 ; then
