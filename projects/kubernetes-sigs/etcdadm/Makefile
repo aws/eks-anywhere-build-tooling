@@ -6,6 +6,7 @@ REPO=etcdadm
 REPO_OWNER=kubernetes-sigs
 
 BINARY_TARGET_FILES=etcdadm
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) k8s.io/component-base/version)
 
 HAS_S3_ARTIFACTS=true
 

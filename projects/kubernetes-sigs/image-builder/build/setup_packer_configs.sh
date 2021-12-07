@@ -72,8 +72,7 @@ export ETCD_HTTP_SOURCE=$(build::eksd_releases::get_eksd_component_url "etcd" $R
 export ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $RELEASE_BRANCH)
 export ETCD_SHA256=$(build::eksd_releases::get_eksd_component_sha "etcd" $RELEASE_BRANCH)
 export ETCDADM_HTTP_SOURCE=${ETCDADM_HTTP_SOURCE:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm' 'amd64' $LATEST_TAG)}
-# TODO: fix etcdadm build to set correct version
-export ETCDADM_VERSION='v0.0.0-master+$Format:%h$'
+export ETCDADM_VERSION='v0.1.5'
 export CRICTL_URL=${CRICTL_URL:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' 'amd64' $LATEST_TAG)}
 export CRICTL_SHA256="$CRICTL_URL.sha256"
 
