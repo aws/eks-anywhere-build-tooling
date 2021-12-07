@@ -30,7 +30,7 @@ ifneq ($(BRANCH_NAME),main)
 	LATEST=$(BRANCH_NAME)
 endif
 ifneq ($(PULL_BASE_REF),main)
-	LATEST=$(BRANCH_NAME)
+	LATEST=$(PULL_BASE_REF)
 endif
 LATEST_TAG?=$(LATEST)
 ####################################################
