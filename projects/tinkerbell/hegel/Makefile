@@ -22,6 +22,6 @@ $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_STRPTIME_TARGET)
 
 $(FIX_LICENSES_STRPTIME_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # One of the project dependencies github.com/pbnjay/strptime does not have a license file.
-# The project owner had mentioned a MIT License and has it embeded in strptime.go file.
+# The project owner had mentioned a MIT License and has it embedded in github.com/pbnjay/strptime/strptime.go.
 # We copied the license out to STRPTIME_LICENSE.txt and moved it into vendor during build.
 	cp STRPTIME_LICENSE.txt $(REPO)/vendor/github.com/pbnjay/strptime/LICENSE.txt

@@ -60,6 +60,7 @@ clean:
 	make -C projects/aws/bottlerocket-bootstrap clean
 	make -C projects/replicatedhq/troubleshoot clean
 	make -C projects/tinkerbell/cluster-api-provider-tinkerbell clean
+	make -C projects/tinkerbell/hegel clean
 
 	make -C projects/kubernetes-sigs/image-builder clean
 	make -C projects/aws/eks-anywhere-test clean
