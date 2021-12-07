@@ -30,9 +30,6 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 cd $REPO
 
-KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
-
-sed -i 's,image: .*,image: '"${KUBE_RBAC_PROXY_IMAGE_OVERRIDE}"',' ./config/manager/manager_auth_proxy_patch.yaml
 make manifests STAGE="release" \
   MANIFEST_DIR="out" \
   PULL_POLICY="IfNotPresent" \
