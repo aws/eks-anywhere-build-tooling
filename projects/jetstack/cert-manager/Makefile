@@ -23,7 +23,9 @@ include $(BASE_DIRECTORY)/Common.mk
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-cainjector): cert-manager-cainjector-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-controller-useradd/images/export
+$(call IMAGE_TARGETS_FOR_NAME, cert-manager-webhook): cert-manager-webhook-useradd/images/export
 
 cert-manager-acmesolver-useradd/images/export: IMAGE_USERADD_USER_NAME=acmesolver
 cert-manager-cainjector-useradd/images/export: IMAGE_USERADD_USER_NAME=cainjector
 cert-manager-controller-useradd/images/export: IMAGE_USERADD_USER_NAME=cert-manager
+cert-manager-webhook-useradd/images/export: IMAGE_USERADD_USER_NAME=webhook
