@@ -79,7 +79,7 @@ ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)),$(RELEASE_BRANCH)),)
 	BINARY_DEPS_DIR?=_output/$(RELEASE_BRANCH)/dependencies
 
 	# include release branch info in latest tag
-	LATEST_TAG:=$(GIT_TAG)-$(LATEST_TAG)
+	LATEST_TAG?=$(GIT_TAG)-$(LATEST)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
 	$(filter-out build release clean,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
