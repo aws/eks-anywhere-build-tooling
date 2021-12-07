@@ -60,6 +60,7 @@ GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
 GO_MOD_DOWNLOAD_TARGETS?=$(REPO)/eks-anywhere-go-mod-download
 REPO_NO_CLONE?=false
+PATCHES_DIR=$(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches))
 ####################################################
 
 #################### RELEASE BRANCHES ##############
@@ -81,7 +82,7 @@ ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)),$(RELEASE_BRANCH)),)
 	# include release branch info in latest tag
 	LATEST_TAG?=$(GIT_TAG)-$(LATEST)
 else ifneq ($(and $(filter true,$(HAS_RELEASE_BRANCHES)), \
-	$(filter-out build release clean,$(MAKECMDGOALS))),)
+	$(filter-out build release clean help,$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
 $(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
 else ifeq ($(HAS_RELEASE_BRANCHES),true)
@@ -133,6 +134,9 @@ IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(IMAGE:
 
 BUILD_OCI_TARS?=false
 HAS_HELM_CHART?=false
+
+LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
+IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
 ####################################################
 
 #################### BINARIES ######################
@@ -188,7 +192,7 @@ FETCH_BINARIES_TARGETS?=
 LICENSE_PACKAGE_FILTER?=$(SOURCE_PATTERNS)
 REPO_SUBPATH?=
 HAS_LICENSES?=true
-ATTRIBUTION_TARGETS?=$(if $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt),$(RELEASE_BRANCH)/ATTRIBUTION.txt,ATTRIBUTION.txt)
+ATTRIBUTION_TARGETS?=$(and $(filter true,$(HAS_LICENSES)), $(if $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt),$(RELEASE_BRANCH)/ATTRIBUTION.txt,ATTRIBUTION.txt))
 GATHER_LICENSES_TARGETS?=$(OUTPUT_DIR)/attribution/go-license.csv
 LICENSES_OUTPUT_DIR?=$(OUTPUT_DIR)
 LICENSES_TARGETS_FOR_PREREQ=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSES_TARGETS) $(OUTPUT_DIR)/ATTRIBUTION.txt,)
@@ -278,15 +282,7 @@ define CGO_BINARY_TARGET_BODY
 
 endef
 
-## --------------------------------------
-## Help
-## --------------------------------------
-##@ Helpers
-help: ## Display this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-35s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
-
-
-##@ Source repo + binary Targets
+#### Source repo + binary Targets
 ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
 	git clone $(CLONE_URL) $(REPO)
@@ -301,10 +297,10 @@ $(GIT_CHECKOUT_TARGET): | $(REPO)
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) config user.email prow@amazonaws.com
 	git -C $(REPO) config user.name "Prow Bot"
-	git -C $(REPO) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches))/*
+	git -C $(REPO) am --committer-date-is-author-date $(PATCHES_DIR)/*
 	@touch $@
 
-%eks-anywhere-go-mod-download: $(if $(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches)),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
+%eks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
 	@touch $@
 
@@ -313,13 +309,20 @@ $(call pairmap,BINARY_TARGET_BODY_ALL_PLATFORMS,$(BINARY_TARGET_FILES),$(SOURCE_
 endif
 
 .PHONY: binaries
-binaries: ## Build binaries by calling build/lib/simple_create_binaries.sh unless SIMPLE_CREATE_BINARIES=false, then calls build/create_binaries.sh from the project root.
 binaries: $(BINARY_TARGETS)
 
 $(KUSTOMIZE_TARGET):
 	@mkdir -p $(OUTPUT_DIR)
 	curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- $(OUTPUT_DIR)
 
+.PHONY: clone-repo
+clone-rpeo: $(REPO)
+
+.PHONY: checkout-repo
+checkout-repo: $(GIT_CHECKOUT_TARGET)
+
+.PHONY: patch-repo
+patch-repo: $(GIT_PATCH_TARGET)
 
 ## File/Folder Targets
 
@@ -331,7 +334,7 @@ $(OUTPUT_DIR)/ATTRIBUTION.txt:
 	@cp $(ATTRIBUTION_TARGETS) $(OUTPUT_DIR)
 
 
-##@ License Targets
+## License Targets
 
 ## Gather licenses for project based on dependencies in REPO.
 $(GATHER_LICENSES_TARGETS): $(GO_MOD_DOWNLOAD_TARGETS)
@@ -342,22 +345,18 @@ $(GATHER_LICENSES_TARGETS): $(GO_MOD_DOWNLOAD_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) $(@F) $(RELEASE_BRANCH)
 
 .PHONY: gather-licenses
-gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
 gather-licenses: $(GATHER_LICENSES_TARGETS)
 
 .PHONY: attribution
-attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
 attribution: $(ATTRIBUTION_TARGETS)
 
 .PHONY: attribution-pr
-attribution-pr: ## Generates PR to update attribution files for projects
 attribution-pr:
 	$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
 
-##@ Tarball Targets
+#### Tarball Targets
 
 .PHONY: tarballs
-tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then calls build/create_tarballs.sh from project directory
 tarballs: $(LICENSES_TARGETS_FOR_PREREQ)
 ifeq ($(SIMPLE_CREATE_TARBALLS),true)
 	$(BASE_DIRECTORY)/build/lib/simple_create_tarballs.sh $(TAR_FILE_PREFIX) $(MAKE_ROOT)/$(OUTPUT_DIR) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(ARTIFACTS_PATH) $(GIT_HASH)
@@ -372,19 +371,18 @@ s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
 	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
 
-##@ Checksum Targets
+
+### Checksum Targets
 	
 .PHONY: checksums
-checksums: ## Update checksums file based on currently built binaries.
 checksums: $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
 
 .PHONY: validate-checksums
-validate-checksums: ## Validate checksums of currently built binaries against checksums file.
 validate-checksums: $(BINARY_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
 
-## Image Targets
+#### Image Helpers
 
 
 #	IMAGE_NAME is dynamically set based on target prefix. \
@@ -399,28 +397,30 @@ validate-checksums: $(BINARY_TARGETS)
 %/images/push %/images/amd64 %/images/arm64: IMAGE_CONTEXT_DIR?=.
 %/images/push %/images/amd64 %/images/arm64: IMAGE_BUILD_ARGS?=
 
-%/images/push: ## Build image using buildkit for all platforms, by default pushes to registry defined in IMAGE_REPO.
+# Build image using buildkit for all platforms, by default pushes to registry defined in IMAGE_REPO.
 %/images/push: IMAGE_PLATFORMS?=linux/amd64,linux/arm64
 %/images/push: IMAGE_OUTPUT_TYPE?=image
 %/images/push: IMAGE_OUTPUT?=push=true
 %/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ)
 	$(BUILDCTL)
 
+# Build helm chart
 .PHONY: helm/build
-helm/build: ## Build helm chart
+
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
+# Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
 helm/push: $(OUTPUT_DIR)/ATTRIBUTION.txt
-helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
+helm/push:
 	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
-%/images/amd64: ## Build image using buildkit only builds linux/amd64 and saves to local tar.
+# Build image using buildkit only builds linux/amd64 oci and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64
 
-%/images/arm64: ## Build image using buildkit only builds linux/arm64 and saves to local tar.
+# Build image using buildkit only builds linux/arm64 oci and saves to local tar.
 %/images/arm64: IMAGE_PLATFORMS?=linux/arm64
 
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE?=oci
@@ -463,11 +463,11 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 	$(BUILDCTL)
 
 ifneq ($(IMAGE_NAMES),)
-local-images: $(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
-images: $(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
+local-images: $(LOCAL_IMAGE_TARGETS)
+images: $(IMAGE_TARGETS)
 endif
 
-##@ Fetch Binary Targets
+## Fetch Binary Targets
 $(BINARY_DEPS_DIR)/linux-%:
 	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(LATEST) $(RELEASE_BRANCH)
 
@@ -476,14 +476,12 @@ ifneq ($(FETCH_BINARIES_TARGETS),)
 .SECONDARY: $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 endif
 
-##@ Build Targets
-
+## Build Targets
 .PHONY: build
-build: ## Called via prow presubmit, calls `binaries gather-licenses clean-repo local-images attribution checksums` by default
+
 build: $(BUILD_TARGETS)
 
 .PHONY: release
-release: ## Called via prow postsubmit + release jobs, calls `binaries gather-licenses clean-repo images` by default
 release: $(RELEASE_TARGETS)
 
 .PHONY: %/release-branches/all
@@ -492,14 +490,31 @@ release: $(RELEASE_TARGETS)
 		$(MAKE) $* RELEASE_BRANCH=$$version; \
 	done;
 
-##@ Clean Targets
+###  Clean Targets
 
 .PHONY: clean-repo
-clean-repo: ## Removes source directory
 clean-repo:
 	@rm -rf $(REPO)	
 
 .PHONY: clean
-clean: ## Removes source and _output directory
 clean: clean-repo
 	@rm -rf _output	
+
+## --------------------------------------
+## Help
+## --------------------------------------
+#@  Helpers
+.PHONY: help
+help: # Display this help
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% \/a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-55s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 4) } ' $(MAKEFILE_LIST)
+
+.PHONY: help-list
+help-list: 
+	@awk 'BEGIN {FS = ":.*#";} /^[$$()% \/a-zA-Z0-9_-]+:.*?#/ { printf "%s: ##%s\n", $$1, $$2 } /^#@/ { printf "\n##@%s\n", substr($$0, 4) } ' $(MAKEFILE_LIST)
+
+.PHONY: add-generated-help-block
+add-generated-help-block: # Add or update generated help block to document project make file and support shell auto completion
+add-generated-help-block:
+	$(BUILD_LIB)/generate_help_body.sh $(MAKE_ROOT) "$(BINARY_TARGET_FILES)" "$(BINARY_PLATFORMS)" "${BINARY_TARGETS}" \
+		$(REPO) $(if $(PATCHES_DIR),true,false) "$(LOCAL_IMAGE_TARGETS)" "$(IMAGE_TARGETS)" "$(BUILD_TARGETS)" "$(RELEASE_TARGETS)" \
+		"$(HAS_S3_ARTIFACTS)" "$(HAS_LICENSES)" "$(REPO_NO_CLONE)" "$(call FULL_FETCH_BINARIES_TARGETS,$(FETCH_BINARIES_TARGETS))"

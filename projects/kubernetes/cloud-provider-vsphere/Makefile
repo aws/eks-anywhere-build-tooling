@@ -33,3 +33,11 @@ $(FIX_LICENSES_VSPHERE_AUTOMATION_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 		wget -q https://raw.githubusercontent.com/vmware/vsphere-automation-sdk-go/master/LICENSE.txt -O \
 			$(REPO)/vendor/github.com/vmware/vsphere-automation-sdk-go/$$package/LICENSE.txt; \
 	done;
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################
