@@ -3,7 +3,7 @@ AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output tex
 AWS_REGION?=us-west-2
 IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
-PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell
+PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell tinkerbell_hegel
 BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 
 EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi
@@ -60,6 +60,7 @@ clean:
 	make -C projects/aws/bottlerocket-bootstrap clean
 	make -C projects/replicatedhq/troubleshoot clean
 	make -C projects/tinkerbell/cluster-api-provider-tinkerbell clean
+	make -C projects/tinkerbell/hegel clean
 
 	make -C projects/kubernetes-sigs/image-builder clean
 	make -C projects/aws/eks-anywhere-test clean
@@ -93,6 +94,7 @@ attribution-files:
 	build/update-attribution-files/make_attribution.sh projects/aws/bottlerocket-bootstrap
 	build/update-attribution-files/make_attribution.sh projects/replicatedhq/troubleshoot
 	build/update-attribution-files/make_attribution.sh projects/tinkerbell/cluster-api-provider-tinkerbell
+	build/update-attribution-files/make_attribution.sh projects/tinkerbell/hegel
 
 	cat _output/total_summary.txt
 
