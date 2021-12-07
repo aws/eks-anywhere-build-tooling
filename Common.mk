@@ -442,7 +442,7 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
-%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/builder-base:latest
+%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(BASE_IMAGE_REPO)/builder-base:latest
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/amd64:
