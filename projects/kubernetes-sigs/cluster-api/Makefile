@@ -9,7 +9,7 @@ LICENSE_PACKAGE_FILTER?=./cmd/clusterctl ./bootstrap/kubeadm ./controlplane/kube
 
 BINARY_TARGET_FILES=clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager
 SOURCE_PATTERNS=sigs.k8s.io/cluster-api/cmd/clusterctl sigs.k8s.io/cluster-api sigs.k8s.io/cluster-api/bootstrap/kubeadm sigs.k8s.io/cluster-api/controlplane/kubeadm sigs.k8s.io/cluster-api/test/infrastructure/docker
-EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/cmd/version)
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/version)
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-nonroot
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
