@@ -43,7 +43,7 @@ $(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSES_OUT
 
 s3-artifacts: create-manifests
 
-cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
+cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
 $(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 .PHONY: create-manifests
