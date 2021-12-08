@@ -9,7 +9,7 @@ BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi
 EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQS))
 
-ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS)
+ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling kubernetes-sigs_image-builder
 
 RELEASE_BRANCH?=
 
