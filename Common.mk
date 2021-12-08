@@ -192,7 +192,7 @@ FETCH_BINARIES_TARGETS?=
 LICENSE_PACKAGE_FILTER?=$(SOURCE_PATTERNS)
 REPO_SUBPATH?=
 HAS_LICENSES?=true
-ATTRIBUTION_TARGETS?=$(and $(filter true,$(HAS_LICENSES)), $(if $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt),$(RELEASE_BRANCH)/ATTRIBUTION.txt,ATTRIBUTION.txt))
+ATTRIBUTION_TARGETS?=$(if $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt),$(RELEASE_BRANCH)/ATTRIBUTION.txt,ATTRIBUTION.txt)
 GATHER_LICENSES_TARGETS?=$(OUTPUT_DIR)/attribution/go-license.csv
 LICENSES_OUTPUT_DIR?=$(OUTPUT_DIR)
 LICENSES_TARGETS_FOR_PREREQ=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSES_TARGETS) $(OUTPUT_DIR)/ATTRIBUTION.txt,)
@@ -348,7 +348,7 @@ $(GATHER_LICENSES_TARGETS): $(GO_MOD_DOWNLOAD_TARGETS)
 gather-licenses: $(GATHER_LICENSES_TARGETS)
 
 .PHONY: attribution
-attribution: $(ATTRIBUTION_TARGETS)
+attribution: $(and $(filter true,$(HAS_LICENSES)),$(ATTRIBUTION_TARGETS))
 
 .PHONY: attribution-pr
 attribution-pr:
@@ -376,7 +376,9 @@ s3-artifacts: tarballs
 	
 .PHONY: checksums
 checksums: $(BINARY_TARGETS)
+ifneq ($(strip $(BINARY_TARGETS)),)
 	$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
+endif
 
 .PHONY: validate-checksums
 validate-checksums: $(BINARY_TARGETS)
