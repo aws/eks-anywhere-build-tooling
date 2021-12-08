@@ -51,24 +51,16 @@ The key pieces to setup in the Makefile  are:
 * REPO - upstream repo name.
 * COMPONENT - upstream org/repo.
 * LICENSE_PACKAGE_FILTER - This should be the pattern used to gather dependencies for this
-	specific project.  Typically this will be `.` or `./cmd/<project-name>`. For more
-	refer to [attribution-files](attribution-files.md).
-* BINARY_TARGET - The path where the built binary will be placed, should generally start with
-	$(OUTPUT_BIN_DIR)
+	specific project.  Typically this will be `.` or `./cmd/<project-name>`. If not set, will default to `SOURCE_PATTERNS`.
+	For more refer to [attribution-files](attribution-files.md).
+* BINARY_TARGET_FILES - The binary file names to be built, automatically appended with $(OUTPUT_BIN_DIR) and generated for each
+	$(BINARY_PLATFORMS).  Passed to `go build -o`.
+* SOURCE_PATTERNS - The patterns to pass to `go build`.  Must follow the same ordering as $(BINARY_TARGET_FILES)
+* IMAGE_NAMES (optional) - When building multiple images define them via `IMAGE_NAMES` and `local-images` and `images` will automatically
+	be created to build the	`amd64` platform in `local-images` and `push` for images.  If not set, will default to `REPO`.
+	These names need to match `IMAGE_NAME` in the below variable `<IMAGE_NAME>_IMAGE`.
 * <IMAGE_NAME>_IMAGE_COMPONENT (optional) - Common Makefile will use this if set to override the default 
 	component in the `IMAGE` variable.  By default `IMAGE` will be set to `$(IMAGE_REPO)/$(COMPONENT):$(IMAGE_TAG)`
-
-The only required targets to add are `local-images` and `images`.  These will generally look like:
-
-```
-.PHONY: images
-images: <repo>/images/push
-
-.PHONY: local-images
-local-images: <repo>/images/amd64
-```
-
-The image targets use wildcards so `<repo>` needs to match `IMAGE_NAME` in the above variable `<IMAGE_NAME>_IMAGE`
 
 ### Scripts
 
@@ -125,25 +117,8 @@ Please refer to [building-locally](building-locally.md) for resources for genera
 ### s3-artifacts/tarballs 
 
 Some projects deliver tarballs to s3 and to support this there are additional targets necessary. [cluster-api](../../projects/kubernetes-sigs/cluster-api/Makefile)
-is a good example for reference of this. Typically,two new targets are added `s3-artifacts` and `upload-artifacts` which generally follow this pattern:
-
-```
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BASE_DIRECTORY)/build/lib/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BASE_DIRECTORY)/build/lib/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
-	
-.PHONY: upload-artifacts
-upload-artifacts: s3-artifacts	
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(GIT_HASH)
-```
-
-In additional to the new targets, `build` and `release` have additional pre-reqs added:
-
-```
-build: s3-artifacts
-release: upload-artifacts
-```
+is a good example for reference of this. Setting `HAS_S3_ARTIFACTS` to true in the project's Makefile
+will automatically add the necessary pre-reqs to the `build` and `release` targets.
 
 Projects with this requirement need to supply the `expected_artifacts_<repo>` file in their root.
 
@@ -152,6 +127,15 @@ Projects with this requirement need to supply the `expected_artifacts_<repo>` fi
 For projects which build multiple containers, DOCKERFILE_FOLDER generally needs overridden and additional <IMAGE_NAME>_NAME variables need to be set
 in the Makefile, one per container image to be built. Refer to [cert-manager](../../projects/jetstack/cert-manager/Makefile) as
 an example of this.
+
+### additional pre-reqs for image builds
+
+Sometimes projects need to run additional targets before building images. [release](../../projects/kubernetes/release/Makefile) is a good example to refer
+to for this situation. To add additional pre-reqs to the image builds:
+
+```
+$(call IMAGE_TARGETS_FOR_NAME, kube-proxy-base): <new_pre_preq>
+```
 
 ### fixing licenses
 
@@ -168,19 +152,20 @@ $(FIX_LICENSES_TARGET):
 
 ### patching
 
-There are several projects in EKS Anywhere that require patching, such as Kind, Cluster API, Flux, etc. To support these, the following target is added to Makefiles of projects that require patching.
+There are several projects in EKS Anywhere that require patching, such as Kind, Cluster API, Flux, etc. To support these, the Common.mk will automatically add the following
+if a `patches` directory exists.
 
 ```
 GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
 
-$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
+$(BINARY_TARGETS): | $(GIT_PATCH_TARGET)
 
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
+	git -C $(REPO) am $(MAKE_ROOT)/patches/*
 	@touch $@ 
 
 ```
 
 ## Upstream projects tracker
 
-This repository has a [script](../../build/lib/generate_projects_list.sh) that generates a [list](../../UPSTREAM_PROJECTS.yaml) of the Github projects that are being built from this repository. When adding a new project, the `generate` target is to be used to re-generate this list and check in the updated file. This file must only be generated through the script and not edited by hand.
+This repository has a [script](../../build/lib/generate_projects_list.sh) that generates a [list](../../UPSTREAM_PROJECTS.yaml) of the Github projects that are being built from this repository, along with the tag or commit built. When adding a new project or bumping up the tag for a project, the `generate` target is to be used to re-generate this list and check in the updated file. This file must only be modified through the script and not edited by hand.

@@ -48,22 +48,39 @@ if [[ -z "${EKSD_ASSET_URL}" ]]; then
     exit 1
 fi
 
+if [[ -z "${KUBE_ARCH}" ]]; then
+    echo "KUBE_ARCH env var not set"
+    exit 1
+fi
+
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
+# symlink to project root _output to make sure files are properly cleaned up
+# when running make clean
+PROJECT_ROOT="$(cd "$SOURCE_ROOT/../../.." && pwd -P)"
+rm -f $SOURCE_ROOT/_output
+ln -s $PROJECT_ROOT/_output/$EKSD_RELEASE_BRANCH $SOURCE_ROOT/_output
+
 # Download binaries
-mkdir -p $SOURCE_ROOT/_output/dockerized/bin/linux/amd64 
+mkdir -p $SOURCE_ROOT/_output/dockerized/bin/linux/$KUBE_ARCH 
 
 for binary in "kubeadm" "kubelet" "kubectl"; do
-    curl $EKSD_ASSET_URL/bin/linux/amd64/$binary -o $SOURCE_ROOT/_output/dockerized/bin/linux/amd64/$binary 
+    FILE="$SOURCE_ROOT/_output/dockerized/bin/linux/$KUBE_ARCH/$binary "
+    if [ ! -f $FILE ]; then
+        curl $EKSD_ASSET_URL/bin/linux/$KUBE_ARCH/$binary -o $FILE
+    fi
 done
 
 # Download container images
 EKSD_TAG="$KUBE_VERSION-eks-$EKSD_RELEASE_BRANCH-$EKSD_RELEASE"
 
-mkdir -p $SOURCE_ROOT/_output/release-images/amd64/   
+mkdir -p $SOURCE_ROOT/_output/release-images/$KUBE_ARCH/   
 
 for container in "kube-apiserver" "kube-controller-manager" "kube-scheduler" "kube-proxy"; do
     IMAGE_TAG="$EKSD_IMAGE_REPO/kubernetes/$container:$EKSD_TAG"
-    docker pull $IMAGE_TAG
-    docker save $IMAGE_TAG -o $SOURCE_ROOT/_output/release-images/amd64/$container.tar
+    FILE="$SOURCE_ROOT/_output/release-images/$KUBE_ARCH/$container.tar"
+    if [ ! -f $FILE ]; then
+        docker pull --platform linux/$KUBE_ARCH $IMAGE_TAG
+        docker save $IMAGE_TAG -o $FILE
+    fi
 done

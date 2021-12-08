@@ -21,7 +21,7 @@ PROJECT="$1"
 TARGET="$2"
 IMAGE_REPO="${3:-}"
 RELEASE_BRANCH="${4:-}"
-
+ARTIFACTS_BUCKET="${5:-}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
@@ -36,6 +36,10 @@ if ! docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
 		public.ecr.aws/eks-distro-build-tooling/builder-base:latest  infinity 
 fi
 
-rsync -e 'docker exec -i' -a --exclude '*_output*' ./ eks-a-builder:/eks-anywhere-build-tooling
+rsync -e 'docker exec -i' -rm --exclude='.git/logs/***' \
+	--exclude="projects/$PROJECT/_output/***" --exclude="projects/$PROJECT/$(basename $PROJECT)/***" \
+	--include="projects/$PROJECT/***" --include="projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES" \
+	--include="projects/kubernetes-sigs/cri-tools/GIT_TAG" \
+	--include='*/' --exclude='projects/***' ./ eks-a-builder:/eks-anywhere-build-tooling
 
-docker exec -it eks-a-builder make $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT RELEASE_BRANCH=$RELEASE_BRANCH IMAGE_REPO=$IMAGE_REPO
+docker exec -it eks-a-builder make $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT RELEASE_BRANCH=$RELEASE_BRANCH IMAGE_REPO=$IMAGE_REPO ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET

@@ -1,65 +1,35 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 GIT_TAG?=$(shell cat GIT_TAG)
-BRANCH_NAME?=main
-LATEST_TAG?=latest
-ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
-endif
 
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION=us-west-2
+REPO=eks-anwyhere-build-tooling
+REPO_OWNER=aws
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
+IMAGE_COMPONENT=eks-anywhere-cli-tools
+IMAGE_NAMES=$(IMAGE_COMPONENT)
+
 BASE_IMAGE_NAME?=eks-distro-minimal-base-docker-client
-BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_DOCKER_CLIENT_TAG_FILE)
-BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_NAME=eks-anywhere-cli-tools
-IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_TAG)
-LATEST_IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME):$(LATEST_TAG)
+SIMPLE_CREATE_BINARIES=false
+HAS_LICENSES=false
+
+BUILD_TARGETS=local-images
+RELEASE_TARGETS=images
+
+FETCH_BINARIES_TARGETS=eksa/fluxcd/flux2 eksa/kubernetes-sigs/cluster-api eksa/kubernetes-sigs/cluster-api-provider-aws \
+	eksa/kubernetes-sigs/kind eksa/replicatedhq/troubleshoot eksa/vmware/govmomi eksd/kubernetes/client
+
+ORGANIZE_BINARIES_TARGETS=$(addsuffix /eks-a-tools,$(addprefix $(BINARY_DEPS_DIR)/linux-,amd64 arm64))
+
+include $(BASE_DIRECTORY)/Common.mk
+
+
+$(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-cli-tools): $(ORGANIZE_BINARIES_TARGETS)
 
 .PHONY: fetch-binaries
-fetch-binaries:
-	build/fetch_binaries.sh $(RELEASE_BRANCH) $(RELEASE) $(EKS_DISTRO_RELEASE_VERSION)
+fetch-binaries: $(FETCH_BINARIES_TARGET)
 
-.PHONY: local-images
-local-images: fetch-binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",dest=/tmp/eks-anywhere-cli-tools.tar
+$(FETCH_BINARIES_TARGET):
+	build/fetch_binaries.sh $(ARTIFACTS_BUCKET)
 
-.PHONY: images
-images: fetch-binaries
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",push=true
-
-.PHONY: build
-build: local-images
-	echo "Done $(COMPONENT)"
-
-.PHONY: release
-release: images
-	echo "Done $(COMPONENT)"
-
-.PHONY: all
-all: release
-
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
+$(ORGANIZE_BINARIES_TARGETS): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+	build/organize_binaries.sh $(lastword $(subst -, ,$(@D)))

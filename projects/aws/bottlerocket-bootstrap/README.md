@@ -5,3 +5,14 @@ The Bottlerocket bootstrap is a tool to help [Bottlerocket nodes](https://github
 This tool can bootstrap control plane, worker and standalone etcd nodes.
 
 You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/bottlerocket-bootstrap)
+
+## Building
+This project depends on other artifacts from this repo.  To build image locally, `ARTIFACTS_BUCKET` must be supplied. For ex
+the following is the presubmit bucket:
+
+`ARTIFACTS_BUCKET=s3://projectbuildpipeline-857-pipelineoutputartifactsb-10ajmk30khe3f make build`
+
+When building a `.git` directory is created to support go-licenses and attribution generation. After running desired targets
+run `make clean` to ensure you aren't left with this `.git` which could confusion.
+
+Refer to [building locally](../../../docs/development/building-locally.md) for more instructions.

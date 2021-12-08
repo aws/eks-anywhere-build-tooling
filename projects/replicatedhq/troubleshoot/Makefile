@@ -5,31 +5,21 @@ GOLANG_VERSION?="1.14"
 REPO=troubleshoot
 REPO_OWNER=replicatedhq
 
-LICENSE_PACKAGE_FILTER?=./cmd/troubleshoot
-
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/support-bundle
-GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
+BINARY_TARGET_FILES=support-bundle
+SOURCE_PATTERNS=./cmd/troubleshoot
+EXTRA_GO_LDFLAGS=-X github.com/replicatedhq/troubleshoot/pkg/version.version=$(GIT_TAG)	\
+	-X github.com/replicatedhq/troubleshoot/pkg/version.gitSHA=$(shell git -C $(REPO) rev-list -n 1 $(GIT_TAG))
+EXTRA_GOBUILD_FLAGS=-installsuffix netgo -tags netgo,containers_image_ostree_stub,exclude_graphdriver_devicemapper,exclude_graphdriver_btrfs,containers_image_openpgp
 FIX_LICENSES_TARGET=$(REPO)/vendor/github.com/tj/go-spin/LICENSE
+
+HAS_S3_ARTIFACTS=true
+
+IMAGE_NAMES=
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
-build: s3-artifacts
-release: upload-artifacts
-
-# Patch source before building
-$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
-
-$(GATHER_LICENSES_TARGET): $(FIX_LICENSES_TARGET)
-
-$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
-	@touch $@ 
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
+$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_TARGET)
 
 $(FIX_LICENSES_TARGET):
 # The tj/go-spin dependency github repo has a license file however it does not have a go.mod file
@@ -37,9 +27,3 @@ $(FIX_LICENSES_TARGET):
 # it in the respective folder under vendor directory so that they is available for go-licenses
 # to pick up
 	wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE -O $@
-
-.PHONY: local-images
-local-images: #noop
-
-.PHONY: images
-images: #noop

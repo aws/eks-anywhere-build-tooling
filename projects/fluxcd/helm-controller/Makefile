@@ -5,34 +5,22 @@ GOLANG_VERSION?="1.15"
 REPO=helm-controller
 REPO_OWNER=fluxcd
 
-LICENSE_PACKAGE_FILTER?=.
+BINARY_TARGET_FILES=helm-controller
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/helm-controller
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/helm-controller/api/LICENSE
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
+IMAGE_USERADD_USER_NAME=controller
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
-build: s3-artifacts
-release: upload-artifacts
+$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
 
-$(GATHER_LICENSES_TARGET): $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_API_LICENSE_TARGET)
+$(call IMAGE_TARGETS_FOR_NAME, helm-controller): helm-controller-useradd/images/export
 
-.PHONY: local-images
-local-images: helm-controller/images/amd64
-
-.PHONY: images
-images: helm-controller/images/push
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
-
-$(FIX_LICENSES_XEIPUUV_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The xeipuuv dependency github repos all have licenses however they all do not have go.mod files
 # checked in to the repo. Hence we need to manually download licenses from Github for each of them 
 # and place them in the respective folders under vendor directory so that they is available for 
@@ -42,6 +30,6 @@ $(FIX_LICENSES_XEIPUUV_TARGET): | $(GIT_CHECKOUT_TARGET)
 			$(REPO)/vendor/github.com/xeipuuv/$$package/LICENSE.txt; \
 	done;
 
-$(FIX_LICENSES_API_LICENSE_TARGET): | $(GIT_CHECKOUT_TARGET)
+$(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # Internal go.mod under /api directory
 	cp $(REPO)/LICENSE $@

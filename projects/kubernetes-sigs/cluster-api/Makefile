@@ -7,9 +7,9 @@ REPO_OWNER=kubernetes-sigs
 
 LICENSE_PACKAGE_FILTER?=./cmd/clusterctl ./bootstrap/kubeadm ./controlplane/kubeadm ./
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/clusterctl
-
-GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
+BINARY_TARGET_FILES=clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager
+SOURCE_PATTERNS=sigs.k8s.io/cluster-api/cmd/clusterctl sigs.k8s.io/cluster-api sigs.k8s.io/cluster-api/bootstrap/kubeadm sigs.k8s.io/cluster-api/controlplane/kubeadm sigs.k8s.io/cluster-api/test/infrastructure/docker
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/cmd/version)
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-nonroot
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
@@ -19,56 +19,33 @@ KUBEADM_BOOTSTRAP_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/kubeadm
 KUBEADM_CONTROL_PLANE_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/kubeadm-control-plane-controller
 CLUSTER_API_DOCKER_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/capd-manager
 
-CAPD_GATHER_LICENSES_TARGET=$(OUTPUT_DIR)/capd/attribution/go-license.csv
-CAPD_ATTRIBUTION_TARGET=CAPD_ATTRIBUTION.txt
+IMAGE_NAMES=cluster-api-controller kubeadm-bootstrap-controller kubeadm-control-plane-controller cluster-api-docker-controller
+
+GO_MOD_DOWNLOAD_TARGETS=$(REPO)/eks-anywhere-go-mod-download $(REPO)/test/infrastructure/docker/eks-anywhere-go-mod-download
+GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/attribution/go-license.csv $(OUTPUT_DIR)/capd/attribution/go-license.csv
+ATTRIBUTION_TARGETS=ATTRIBUTION.txt CAPD_ATTRIBUTION.txt
+
+FETCH_BINARIES_TARGETS=eksd/kubernetes/client
+
+HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=
 
-build: $(CAPD_ATTRIBUTION_TARGET) s3-artifacts
-release: upload-artifacts
+$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager \
+	$(REPO)/test/infrastructure/docker/eks-anywhere-go-mod-download \
+	$(OUTPUT_DIR)/capd/attribution/go-license.csv: REPO_SUBPATH=test/infrastructure/docker
 
-clean: clean-binary-deps
-attribution: $(CAPD_ATTRIBUTION_TARGET)
+$(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSE_PACKAGE_FILTER=.
+$(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/capd
 
-# Patch source before building
-$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
 
-$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
-	@touch $@ 
-
-$(CAPD_GATHER_LICENSES_TARGET): $(BINARY_TARGET)
-	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/capd . test/infrastructure/docker
-
-$(CAPD_ATTRIBUTION_TARGET): $(CAPD_GATHER_LICENSES_TARGET)
-	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(OUTPUT_DIR)/capd CAPD_ATTRIBUTION.txt
-
-.PHONY: local-images
-local-images: cluster-api-controller/images/amd64 kubeadm-bootstrap-controller/images/amd64 kubeadm-control-plane-controller/images/amd64 cluster-api-docker-controller/images/amd64 
-
-.PHONY: images
-images: cluster-api-controller/images/push kubeadm-bootstrap-controller/images/push kubeadm-control-plane-controller/images/push cluster-api-docker-controller/images/push 
+s3-artifacts: create-manifests
 
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
-$(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): fetch-binaries $(CAPD_GATHER_LICENSES_TARGET)
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs create-manifests
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
+$(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 .PHONY: create-manifests
-create-manifests:
+create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
-
-kubernetes:
-	build/fetch_binaries.sh
-
-.PHONY: fetch-binaries
-fetch-binaries: kubernetes
-
-.PHONY: clean-binary-deps
-clean-binary-deps:
-	@rm -rf kubernetes
-	@rm -f kubernetes-client-linux-amd64.tar.gz

@@ -4,19 +4,14 @@ GIT_TAG?=$(shell cat GIT_TAG)
 REPO=eks-anywhere-test
 REPO_OWNER=aws
 IMAGE_COMPONENT=eks-anywhere-test
-IMAGE_DESCRIPTION="EKS Anywhere Add-ons Test Application"
-IMAGE_PLATFORMS?=linux/amd64
+IMAGE_BUILD_ARGS?=IMAGE_TAG
+HAS_HELM_CHART=true
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
+SIMPLE_CREATE_BINARIES=false
+HAS_LICENSES=false
+
+BUILD_TARGETS=local-images
+RELEASE_TARGETS=images
 
 include $(BASE_DIRECTORY)/Common.mk
-
-# overriding targets called by build + release to be no-ops 
-# these do not apply here since there is no binary/checksums/attribution/licenses
-$(BINARY_TARGET) validate-checksums $(GATHER_LICENSES_TARGET) $(ATTRIBUTION_TARGET) $(OUTPUT_DIR)/ATTRIBUTION.txt: ;
-
-.PHONY: local-images
-local-images: eks-anywhere-test/images/amd64 helm/build
-	
-.PHONY: images
-images: eks-anywhere-test/images/push helm/push

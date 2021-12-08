@@ -20,15 +20,16 @@ set -o pipefail
 
 TAG="${1?Specify first argument - git version tag}"
 HELM_REPO_VERSION="${2?Specify second argument - helm repo version}"
+ARTIFACTS_PATH="${3?Specify third argument - artifacts path}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 HELM_BIN="${MAKE_ROOT}/_output/helm-bin"
 
+mkdir -p $ARTIFACTS_PATH
+
 function build::install::helm(){
   mkdir -p $HELM_BIN
   export PATH=$HELM_BIN:$PATH
-  # TODO: install on builder base to avoid limitting this to linux machines for building
-  yum install -y openssl
   curl -s https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | HELM_INSTALL_DIR=$HELM_BIN bash
 }
 
@@ -40,3 +41,5 @@ function build::cilium::manifests(){
 
 build::install::helm
 build::cilium::manifests
+
+cp -rf _output/manifests $ARTIFACTS_PATH

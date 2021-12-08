@@ -5,23 +5,15 @@ GOLANG_VERSION?="1.14"
 REPO=cri-tools
 REPO_OWNER=kubernetes-sigs
 
-LICENSE_PACKAGE_FILTER?=./cmd/critest ./cmd/crictl
+BINARY_TARGET_FILES=crictl critest
+SOURCE_PATTERNS=./cmd/crictl ./cmd/critest
+EXTRA_GO_LDFLAGS=-X github.com/kubernetes-sigs/cri-tools/pkg/version.Version=$(GIT_TAG:v%=%)
+EXTRA_GOBUILD_FLAGS=-tags selinux
 
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/crictl
+HAS_S3_ARTIFACTS=true
+IMAGE_NAMES=
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
-build: s3-artifacts
-release: upload-artifacts
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
-
-.PHONY: local-images
-local-images: #noop
-
-.PHONY: images
-images: #noop
+$(OUTPUT_BIN_DIR)/linux-%/critest: GOBUILD_COMMAND=test
+$(OUTPUT_BIN_DIR)/linux-%/critest: EXTRA_GOBUILD_FLAGS+=-c

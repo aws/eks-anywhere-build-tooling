@@ -1,41 +1,23 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
 HELM_REPO_VERSION?=$(shell cat HELM_REPO_VERSION)
-BRANCH_NAME?=main
-LATEST_TAG?=latest
-ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
-endif
 
-ifdef CODEBUILD_SRC_DIR
-	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-else
-	ARTIFACTS_PATH?="_output/artifacts"
-endif
+REPO=cilium
+REPO_OWNER=cilium
 
-.PHONY: upload-artifacts
-upload-artifacts:
-	mkdir -p $(ARTIFACTS_PATH)
-	cp -rf _output/manifests/ $(ARTIFACTS_PATH)
-	build/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
+HAS_S3_ARTIFACTS=true
+SIMPLE_CREATE_BINARIES=false
+SIMPLE_CREATE_TARBALLS=false
+HAS_LICENSES=false
 
-.PHONY: manifests
-manifests:
-	build/create_manifests.sh $(GIT_TAG) $(HELM_REPO_VERSION)
+BUILD_TARGETS=s3-artifacts
+RELEASE_TARGETS=s3-artifacts
 
-.PHONY: build
-build: manifests
-	echo "Done $(COMPONENT)"
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: release
-release: build
-	echo "Done $(COMPONENT)"
 
-.PHONY: all
-all: release
+s3-artifacts: create-manifests
 
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
+.PHONY: create-manifests
+create-manifests:
+	build/create_manifests.sh $(GIT_TAG) $(HELM_REPO_VERSION) $(ARTIFACTS_PATH)

@@ -18,29 +18,18 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-IMAGE_REPOSITORY="${1?First argument is image repository}"
-IMAGE_TAG="${2?Second argument is image tag}"
-IMAGE_DESCRIPTION="${3?Third argument is image description}"
-IMAGE_REGISTRY="${4:-}"
+export IMAGE_REGISTRY="${1?First argument is image registry}"
+export IMAGE_REPOSITORY="${2?Second argument is image repository}"
+export IMAGE_TAG="${3?Third argument is image tag}"
+export OUTPUT_DIR="${4?Fourth arguement is output directory}"
+export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 
-cd helm
-cat >${IMAGE_REPOSITORY}/Chart.yaml <<!
-apiVersion: v2
-name: ${IMAGE_REPOSITORY}
-description: ${IMAGE_DESCRIPTION}
-type: application
-version: ${IMAGE_TAG}-helm
-appVersion: "${IMAGE_TAG}-helm"
-!
-trap "rm -f ${IMAGE_REPOSITORY}-${IMAGE_TAG}-helm.tgz ${IMAGE_REPOSITORY}/Chart.yaml" err exit
-helm package ${IMAGE_REPOSITORY}
+HELM_TEMP_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 
-if [ -n "${IMAGE_REGISTRY}" ]
-then
-  export HELM_EXPERIMENTAL_OCI=1
-  export DOCKER_CONFIG=~/.docker
-  export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
-  helm push ${IMAGE_REPOSITORY}-${IMAGE_TAG}-helm.tgz oci://${IMAGE_REGISTRY} ||
-   (echo "If authentication failed: aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}" &&
-   false)
-fi
+mkdir -p ${OUTPUT_DIR}/helm/${CHART_NAME}
+cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${HELM_TEMP_DIR}/
+cp -r helm/${CHART_NAME}/. ${HELM_TEMP_DIR}
+envsubst <helm/Chart.yaml.template >${HELM_TEMP_DIR}/Chart.yaml
+envsubst <helm/values.yaml.template >${HELM_TEMP_DIR}/values.yaml
+cd ${HELM_TEMP_DIR}
+helm package .

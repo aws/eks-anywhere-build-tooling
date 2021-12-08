@@ -5,31 +5,11 @@ GOLANG_VERSION?="1.16"
 REPO=etcdadm
 REPO_OWNER=kubernetes-sigs
 
-LICENSE_PACKAGE_FILTER?=.
+BINARY_TARGET_FILES=etcdadm
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) k8s.io/component-base/version)
 
-GIT_PATCH_TARGET=$(REPO)/eks-anywhere-patched
-BINARY_TARGET=$(OUTPUT_BIN_DIR)/linux-amd64/etcdadm
+HAS_S3_ARTIFACTS=true
+
+IMAGE_NAMES=
 
 include $(BASE_DIRECTORY)/Common.mk
-
-
-build: s3-artifacts
-release: upload-artifacts
-
-# Patch source before building
-$(BINARY_TARGET): | $(GIT_PATCH_TARGET)
-
-$(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
-	git -C $(REPO) apply --verbose $(MAKE_ROOT)/patches/*
-	@touch $@ 
-
-.PHONY: s3-artifacts
-s3-artifacts: tarballs
-	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG)
-
-.PHONY: local-images
-local-images: #noop
-
-.PHONY: images
-images: #noop

@@ -9,9 +9,6 @@ BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi
 EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQS))
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
-OVA_TARGETS=$(addprefix release-upload-ova-ubuntu-2004-, $(SUPPORTED_K8S_VERSIONS))
-OVA_TARGETS+=$(addprefix release-ova-bottlerocket-, $(SUPPORTED_K8S_VERSIONS))
 RELEASE_BRANCH?=
 
 .PHONY: build-all-projects
@@ -28,14 +25,14 @@ aws_eks-anywhere-build-tooling: $(EKSA_TOOLS_PREREQS_BUILD_TARGETS)
 .PHONY: build-project-%
 build-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
-	$(MAKE) release-upload -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
+	$(MAKE) release -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
 
 .PHONY: release-binaries-images
 release-binaries-images: build-all-projects
 
 .PHONY: release-ovas
 release-ovas:
-	$(MAKE) $(OVA_TARGETS) -C projects/kubernetes-sigs/image-builder
+	$(MAKE) release -C projects/kubernetes-sigs/image-builder
 
 .PHONY: clean
 clean:
@@ -60,6 +57,14 @@ clean:
 	make -C projects/fluxcd/source-controller clean
 	make -C projects/mrajashree/etcdadm-bootstrap-provider clean
 	make -C projects/mrajashree/etcdadm-controller clean
+	make -C projects/aws/bottlerocket-bootstrap clean
+	make -C projects/replicatedhq/troubleshoot clean
+
+	make -C projects/kubernetes-sigs/image-builder clean
+	make -C projects/aws/eks-anywhere-test clean
+	make -C projects/aws/eks-anywhere-build-tooling clean
+	make -C projects/cilium/cilium clean
+
 	rm -rf _output
 
 .PHONY: attribution-files
@@ -84,7 +89,8 @@ attribution-files:
 	build/update-attribution-files/make_attribution.sh projects/fluxcd/source-controller
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-bootstrap-provider
 	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-controller
-
+	build/update-attribution-files/make_attribution.sh projects/aws/bottlerocket-bootstrap
+	build/update-attribution-files/make_attribution.sh projects/replicatedhq/troubleshoot
 
 	cat _output/total_summary.txt
 
@@ -94,11 +100,11 @@ update-attribution-files: attribution-files
 
 .PHONY: run-target-in-docker
 run-target-in-docker:
-	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH)
+	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET)
 
 .PHONY: update-attribution-checksums-docker
 update-attribution-checksums-docker:
-	build/lib/update_checksum_docker.sh $(PROJECT) $(RELEASE_BRANCH)
+	build/lib/update_checksum_docker.sh $(PROJECT) $(IMAGE_REPO) $(RELEASE_BRANCH)
 
 .PHONY: stop-docker-builder
 stop-docker-builder:
