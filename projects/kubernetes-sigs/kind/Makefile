@@ -106,20 +106,20 @@ kind-base-versioned/images/%: BUILDER_IMAGE=$(UNVERSIONED_BASE_IMAGE)
 $(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_KUBEADM_OVERRIDE)
 
 # Kind-node
-kind-node/images/%: DOCKERFILE_FOLDER=./images/node
-kind-node/images/%: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
-kind-node/images/%: BASE_IMAGE=$(VERSIONED_BASE_IMAGE)
-kind-node/images/%: IMAGE_TAG=$(NODE_IMAGE_TAG)
-kind-node/images/%: IMAGE_BUILD_ARGS=PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG
-
+kind-node/images/push: DOCKERFILE_FOLDER=./images/node
+kind-node/images/push: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
+kind-node/images/push: BASE_IMAGE=$(VERSIONED_BASE_IMAGE)
+kind-node/images/push: IMAGE_TAG=$(NODE_IMAGE_TAG)
+kind-node/images/push: LATEST_TAG=$(NODE_IMAGE_LATEST_TAG)
+kind-node/images/push: IMAGE_BUILD_ARGS=PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG
 kind-node/images/push: IMAGE_TARGET=node
-kind-node/images/push: $(KIND_NODE_BUILD_AMD64_TARGET) $(KIND_NODE_BUILD_ARM64_TARGET) $(KIND_NODE_IMAGE_BUILD_ARGS) $(ARM_ENV_CONF_TARGET)
+kind-node/images/push: $(KIND_NODE_BUILD_AMD64_TARGET) $(KIND_NODE_BUILD_ARM64_TARGET) $(ARM_ENV_CONF_TARGET)
 
 $(KIND_BASE_IMAGE_BUILD_ARGS):
 	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@ $(LATEST)
 
 $(KIND_NODE_IMAGE_BUILD_ARGS):
-	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) $(ARTIFACTS_BUCKET) $(IMAGE_TAG) $(LATEST_TAG) $(LATEST) $@
+	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) $(ARTIFACTS_BUCKET) $(IMAGE_TAG) $(LATEST) $@
 
 # Tweak the kind/base image to have a hardcode kubeadm config
 # so that during the image pull phase it pulls eks-d images
@@ -160,4 +160,4 @@ $(ARTIFACTS_PATH)/manifests/kindnetd.yaml:
 
 .PHONY: create-kind-cluster-%
 create-kind-cluster-%:
-	build/create-kind-cluster.sh $(IMAGE_REPO)/$(KIND_NODE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)-latest $* $(RELEASE_BRANCH)
+	build/create-kind-cluster.sh $(IMAGE_REPO)/$(KIND_NODE_IMAGE_COMPONENT):$(NODE_IMAGE_LATEST_TAG) $* $(RELEASE_BRANCH)

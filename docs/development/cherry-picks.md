@@ -11,7 +11,7 @@ Most patch bumps to dependency projects should also be backported.  Minor bumps 
 
 ## Currently supported release branches
 
-- [release-0.1](https://github.com/aws/eks-anywhere-build-tooling/tree/release-0.1)
+- [release-0.6](https://github.com/aws/eks-anywhere-build-tooling/tree/release-0.6)
 
 # "Automated" Cherry Picks
 
