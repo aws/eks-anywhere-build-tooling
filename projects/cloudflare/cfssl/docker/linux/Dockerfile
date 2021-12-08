@@ -4,7 +4,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-copy _output/gitdependencies/cfssl_trust /etc/cfssl
+COPY _output/gitdependencies/cfssl_trust /etc/cfssl
 COPY _output/bin/cfssl/$TARGETOS-$TARGETARCH/* /usr/bin/
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt

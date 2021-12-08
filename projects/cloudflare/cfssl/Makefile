@@ -14,13 +14,13 @@ EXTRA_GO_LDFLAGS=-s -w -X github.com/cloudflare/cfssl/cli/version.version=$(GIT_
 
 HAS_S3_ARTIFACTS=true
 
-include $(BASE_DIRECTORY)/Common.mk
-
 RICE_BINARY_PLATFORMS=$(BUILDER_PLATFORM)
 
 RICE_EMBED_TARGET=$(REPO)/cli/serve/rice-box.go
 
 GIT_CLONE_DEPENDENCY=$(GIT_DEPS_DIR)/cfssl_trust/LICENSE
+
+include $(BASE_DIRECTORY)/Common.mk
 
 $(OUTPUT_BIN_DIR)/linux-%/rice: EXTRA_GO_LDFLAGS=
 
@@ -30,8 +30,7 @@ $(OUTPUT_BIN_DIR)/linux-amd64/cfssl $(OUTPUT_BIN_DIR)/linux-arm64/cfssl: $(RICE_
 $(eval $(foreach platform, $(RICE_BINARY_PLATFORMS), $(call BINARY_TARGET_BODY,$(platform),rice,./vendor/github.com/GeertJohan/go.rice/rice)))
 
 $(RICE_EMBED_TARGET): $(OUTPUT_BIN_DIR)/$(subst /,-,$(RICE_BINARY_PLATFORMS))/rice
-	cd $(BASE_DIRECTORY)
-	$(OUTPUT_BIN_DIR)/$(subst /,-,$(RICE_BINARY_PLATFORMS))/rice embed-go -i=./$(REPO)/cli/serve
+	$^ embed-go -i=./$(REPO)/cli/serve
 
 $(GIT_CLONE_DEPENDENCY):
 	git clone https://github.com/cloudflare/cfssl_trust.git $(GIT_DEPS_DIR)/cfssl_trust
