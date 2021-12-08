@@ -209,6 +209,7 @@ FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 
 #################### OTHER #########################
 KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
+GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
