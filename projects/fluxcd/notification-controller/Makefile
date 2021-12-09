@@ -29,3 +29,11 @@ $(FIX_LICENSES_K0KUBUN_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # which does not have a LICENSE file committed to the repo. Hence we are fetching the license file 
 # from the master branch so that it is available in the vendor directory for go-licenses to pick up
 	wget -q -O $@  https://raw.githubusercontent.com/k0kubun/pp/master/LICENSE.txt
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################

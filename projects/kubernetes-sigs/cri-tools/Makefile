@@ -17,3 +17,11 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(OUTPUT_BIN_DIR)/linux-%/critest: GOBUILD_COMMAND=test
 $(OUTPUT_BIN_DIR)/linux-%/critest: EXTRA_GOBUILD_FLAGS+=-c
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################

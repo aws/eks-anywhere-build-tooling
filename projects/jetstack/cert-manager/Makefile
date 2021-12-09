@@ -27,3 +27,11 @@ $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-controller
 cert-manager-acmesolver-useradd/images/export: IMAGE_USERADD_USER_NAME=acmesolver
 cert-manager-cainjector-useradd/images/export: IMAGE_USERADD_USER_NAME=cainjector
 cert-manager-controller-useradd/images/export: IMAGE_USERADD_USER_NAME=cert-manager
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################
