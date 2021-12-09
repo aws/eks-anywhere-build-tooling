@@ -30,6 +30,10 @@ $(OUTPUT_BIN_DIR)/linux-amd64/cfssl $(OUTPUT_BIN_DIR)/linux-arm64/cfssl: $(RICE_
 $(eval $(foreach platform, $(RICE_BINARY_PLATFORMS), $(call BINARY_TARGET_BODY,$(platform),rice,./vendor/github.com/GeertJohan/go.rice/rice)))
 
 $(RICE_EMBED_TARGET): $(OUTPUT_BIN_DIR)/$(subst /,-,$(RICE_BINARY_PLATFORMS))/rice
+# We need to set the timestamp of the static file cfssl/cli/serve/static/assets/cfssl.js
+# The timestamp is being used in the generated file from the embed-go command cfssl/cli/serve/rice-box.go
+# When running git clone the timestamp gets set initially and we need this to be a static value to prevent checksum issues.
+	touch -a -m -t $(shell git -C $(REPO) log -1 --format="%cd" --date=format:%Y%m%d%H%M.%S  -- ./cli/serve/static/assets/cfssl.js) ./$(REPO)/cli/serve/static/assets/cfssl.js
 	$^ embed-go -i=./$(REPO)/cli/serve
 
 $(GIT_CLONE_DEPENDENCY):
