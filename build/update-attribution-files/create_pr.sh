@@ -78,7 +78,7 @@ function pr:create()
 function pr::create::attribution() {
     local -r pr_title="Update ATTRIBUTION.txt files"
     local -r commit_message="[PR BOT] Update ATTRIBUTION.txt files"
-    local -r pr_branch="attribution-files-update"
+    local -r pr_branch="attribution-files-update-$MAIN_BRANCH"
     local -r pr_body=$(cat <<EOF
 This PR updates the ATTRIBUTION.txt files across all dependency projects if there have been changes.
 
@@ -93,7 +93,7 @@ EOF
 function pr::create::checksums() {
     local -r pr_title="Update CHECKSUMS files"
     local -r commit_message="[PR BOT] Update CHECKSUMS files"
-    local -r pr_branch="checksums-files-update"
+    local -r pr_branch="checksums-files-update-$MAIN_BRANCH"
     local -r pr_body=$(cat <<EOF
 This PR updates the CHECKSUMS files across all dependency projects if there have been changes.
 
