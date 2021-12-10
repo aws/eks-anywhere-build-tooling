@@ -37,6 +37,8 @@ HAS_RELEASE_BRANCHES=true
 HAS_LICENSES=false
 SIMPLE_CREATE_TARBALLS=false
 
+# to support a no op attribution target
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=build release clean help binaries checksums attribution
 TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
 BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
