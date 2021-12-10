@@ -36,6 +36,8 @@ ADDITIONAL_PAUSE_1-21_FROM=1-20
 HAS_RELEASE_BRANCHES=true
 HAS_LICENSES=false
 SIMPLE_CREATE_TARBALLS=false
+# allow make binaries/checksums to pass through since this project has no binaries to build anyway
+BINARIES_ARE_RELEASE_BRANCHED=false
 
 TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
 BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
