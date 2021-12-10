@@ -70,6 +70,7 @@ SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kube
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
 IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums,$(MAKECMDGOALS)))
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=build release clean help
 ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BRANCH_TARGET))),)
 	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
 
@@ -83,7 +84,7 @@ ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BR
 
 	# include release branch info in latest tag
 	LATEST_TAG?=$(GIT_TAG)-$(LATEST)
-else ifneq ($(and $(IS_RELEASE_BRANCH_BUILD), $(filter-out build release clean help,$(MAKECMDGOALS))),)
+else ifneq ($(and $(IS_RELEASE_BRANCH_BUILD), $(filter-out $(TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH),$(MAKECMDGOALS))),)
 	# if project has release branches and not calling one of the above targets
 $(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
 else ifneq ($(IS_RELEASE_BRANCH_BUILD),)
