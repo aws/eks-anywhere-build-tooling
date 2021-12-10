@@ -5,8 +5,6 @@ GOLANG_VERSION?="1.17"
 REPO=tink
 REPO_OWNER=tinkerbell
 
-LICENSE_PACKAGE_FILTER?=./cmd/tink-cli ./cmd/tink-server ./cmd/tink-worker
-
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
