@@ -7,7 +7,7 @@ RELEASE_ENVIRONMENT?=development
 
 GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
-COMPONENT?=$(REPO_OWNER)/$(repo)
+COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
 PROJECT_PATH?=$(subst $(BASE_DIRECTORY)/,,$(MAKE_ROOT))
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
@@ -140,10 +140,11 @@ BUILD_OCI_TARS?=false
 #################### HELM ##########################
 HAS_HELM_CHART?=false
 HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
-HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
 HELM_GIT_TAG?=$(GIT_TAG)
 HELM_DIRECTORY?=.
-HELM_REPOSITORY?=$(REPO_OWNER)/$(REPO)
+HELM_REPOSITORY?=$(shell basename $(HELM_SOURCE_REPOSITORY))
+HELM_GIT_CHECKOUT_TARGET?=$(HELM_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
+HELM_GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-helm-patched
 ####################################################
 
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
@@ -300,11 +301,6 @@ $(REPO):
 	git clone $(CLONE_URL) $(REPO)
 endif
 
-ifneq ($(HAS_HELM_CHART),true)
-$(HELM_SOURCE_REPOSITORY):
-	git clone $(CLONE_URL) $(HELM_REPOSITORY)
-endif
-
 $(GIT_CHECKOUT_TARGET): | $(REPO)
 	@rm -f $(REPO)/eks-anywhere-*
 	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
@@ -319,6 +315,23 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 
 %eks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
+	@touch $@
+
+ifneq ($(HAS_HELM_CHART),true)
+$(HELM_REPOSITORY):
+	git clone $(CLONE_URL) $(HELM_REPOSITORY)
+
+$(HELM_GIT_CHECKOUT_TARGET): | $(HELM_REPOSITORY)
+	@echo rm -f $(HELM_REPOSITORY)/eks-anywhere-*
+	(cd $(HELM_REPOSITORY) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(HELM_GIT_TAG))
+	git -C $(HELM_REPOSITORY) checkout -f $(HELM_GIT_TAG)
+	touch $@
+endif
+
+$(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
+	git -C $(HELM_REPOSITORY) config user.email prow@amazonaws.com
+	git -C $(HELM_REPOSITORY) config user.name "Prow Bot"
+	git -C $(HELM_REPOSITORY) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/helm_patches),$(wildcard $(MAKE_ROOT)/patches))/*
 	@touch $@
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
@@ -426,7 +439,8 @@ validate-checksums: $(BINARY_TARGETS)
 # Build helm chart
 .PHONY: helm/build
 helm/build: ## Build helm chart
-helm/build: $(HELM_SOURCE_REPOSITORY) $(OUTPUT_DIR)/ATTRIBUTION.txt
+helm/build: $(if $(or $(wildcard $(PROJECT_ROOT)/helm_patches),$(wildcard $(MAKE_ROOT)/helm_patches)),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET))
+helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 	$(BUILD_LIB)/helm_prepare.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(HELM_REPOSITORY) $(OUTPUT_DIR)
 

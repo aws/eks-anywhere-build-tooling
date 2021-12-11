@@ -25,7 +25,7 @@ export IMAGE_TAG="${4?Fourth argument is image repository}"
 export OUTPUT_DIR="${5?Fifth arguement is output directory}"
 export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 
-SOURCE_DIR=$(basename ${HELM_REPOSITORY})/${HELM_DIRECTORY}
+SOURCE_DIR=$(basename ${HELM_REPOSITORY})/${HELM_DIRECTORY}/.
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 
 mkdir -p ${OUTPUT_DIR}/helm/${CHART_NAME}
