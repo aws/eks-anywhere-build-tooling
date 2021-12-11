@@ -19,6 +19,7 @@ BINARY_TARGET_FILES=cert-manager-acmesolver cert-manager-cainjector cert-manager
 SOURCE_PATTERNS=./cmd/acmesolver ./cmd/cainjector ./cmd/controller ./cmd/webhook
 
 HAS_HELM_CHART=true
+HELM_DIRECTORY=deploy/charts/cert-manager
 
 include $(BASE_DIRECTORY)/Common.mk
 

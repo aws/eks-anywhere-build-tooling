@@ -7,7 +7,7 @@ RELEASE_ENVIRONMENT?=development
 
 GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
-COMPONENT?=$(REPO_OWNER)/$(REPO)
+COMPONENT?=$(REPO_OWNER)/$(repo)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
 PROJECT_PATH?=$(subst $(BASE_DIRECTORY)/,,$(MAKE_ROOT))
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
@@ -135,11 +135,20 @@ IMAGE_USERADD_USER_NAME?=
 IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=latest)
 
 BUILD_OCI_TARS?=false
+####################################################
+
+#################### HELM ##########################
 HAS_HELM_CHART?=false
+HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
+HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
+HELM_GIT_TAG?=$(GIT_TAG)
+HELM_DIRECTORY?=.
+HELM_REPOSITORY?=$(REPO_OWNER)/$(REPO)
+####################################################
 
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
-####################################################
+=======
 
 #################### BINARIES ######################
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
@@ -291,6 +300,11 @@ $(REPO):
 	git clone $(CLONE_URL) $(REPO)
 endif
 
+ifneq ($(HAS_HELM_CHART),true)
+$(HELM_SOURCE_REPOSITORY):
+	git clone $(CLONE_URL) $(HELM_REPOSITORY)
+endif
+
 $(GIT_CHECKOUT_TARGET): | $(REPO)
 	@rm -f $(REPO)/eks-anywhere-*
 	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
@@ -411,15 +425,15 @@ validate-checksums: $(BINARY_TARGETS)
 
 # Build helm chart
 .PHONY: helm/build
-
-helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+helm/build: ## Build helm chart
+helm/build: $(HELM_SOURCE_REPOSITORY) $(OUTPUT_DIR)/ATTRIBUTION.txt
+	$(BUILD_LIB)/helm_prepare.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(HELM_REPOSITORY) $(OUTPUT_DIR)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
 helm/push: $(OUTPUT_DIR)/ATTRIBUTION.txt
-helm/push:
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+helm/push: helm/build ## Build helm chart and push to registry defined in IMAGE_REPO.
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 # Build image using buildkit only builds linux/amd64 oci and saves to local tar.

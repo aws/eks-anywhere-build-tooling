@@ -21,3 +21,5 @@ You can find the latest versions of these images on ECR Public Gallery.
 ### Helm Chart
 
 The helm chart is a modified version of the source helm chart located in the jetstck/cert-manager repo at `deploy/charts/cert-manager/`.
+
+If there are any patches to the make file, use `git format-patch $(cat ../GIT_TAG)` and add them to the `patches` directory.
