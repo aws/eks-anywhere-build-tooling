@@ -22,7 +22,5 @@ HELM_REPOSITORY="${1?First argument is image repository}"
 OUTPUT_DIR="${2?Second arguement is output directory}"
 CHART_NAME=$(basename ${HELM_REPOSITORY})
 
-HELM_TEMP_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
-
-cd ${HELM_TEMP_DIR}
-helm package .
+cd ${OUTPUT_DIR}/helm
+helm package "${CHART}"
