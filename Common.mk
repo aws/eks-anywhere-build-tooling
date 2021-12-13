@@ -111,17 +111,8 @@ BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
 ####################################################
 
-#################### HELM ##########################
-HAS_HELM_CHART?=false
-HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
-HELM_GIT_TAG?=$(GIT_TAG)
-HELM_DIRECTORY?=.
-HELM_REPOSITORY?=$(REPO)
-HELM_GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(HELM_GIT_TAG)
-HELM_GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-helm-patched
-####################################################
-
 #################### IMAGES ########################
+HAS_HELM_CHART?=false
 IMAGE_COMPONENT?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
 IMAGE_OUTPUT_NAME?=$(IMAGE_NAME)
@@ -148,6 +139,15 @@ BUILD_OCI_TARS?=false
 
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
+####################################################
+
+#################### HELM ##########################
+HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
+HELM_GIT_TAG?=$(GIT_TAG)
+HELM_DIRECTORY?=.
+HELM_REPOSITORY?=$(REPO)
+HELM_GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(HELM_GIT_TAG)
+HELM_GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-helm-patched
 ####################################################
 
 #################### BINARIES ######################
