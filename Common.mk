@@ -111,6 +111,16 @@ BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
 ####################################################
 
+#################### HELM ##########################
+HAS_HELM_CHART?=false
+HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
+HELM_GIT_TAG?=$(GIT_TAG)
+HELM_DIRECTORY?=.
+HELM_REPOSITORY?=$(REPO)
+HELM_GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(HELM_GIT_TAG)
+HELM_GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-helm-patched
+####################################################
+
 #################### IMAGES ########################
 IMAGE_COMPONENT?=$(COMPONENT)
 IMAGE_OUTPUT_DIR?=/tmp
@@ -135,20 +145,10 @@ IMAGE_USERADD_USER_NAME?=
 IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=latest)
 
 BUILD_OCI_TARS?=false
-####################################################
-
-#################### HELM ##########################
-HAS_HELM_CHART?=false
-HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
-HELM_GIT_TAG?=$(GIT_TAG)
-HELM_DIRECTORY?=.
-HELM_REPOSITORY?=$(REPO)
-HELM_GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(HELM_GIT_TAG)
-HELM_GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-helm-patched
-####################################################
 
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
+####################################################
 
 #################### BINARIES ######################
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
@@ -325,13 +325,13 @@ $(HELM_GIT_CHECKOUT_TARGET): | $(HELM_REPOSITORY)
 	(cd $(HELM_REPOSITORY) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(HELM_GIT_TAG))
 	git -C $(HELM_REPOSITORY) checkout -f $(HELM_GIT_TAG)
 	touch $@
-endif
 
 $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
 	git -C $(HELM_REPOSITORY) config user.email prow@amazonaws.com
 	git -C $(HELM_REPOSITORY) config user.name "Prow Bot"
 	git -C $(HELM_REPOSITORY) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/patches))/*
 	@touch $@
+endif
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
 $(call pairmap,BINARY_TARGET_BODY_ALL_PLATFORMS,$(BINARY_TARGET_FILES),$(SOURCE_PATTERNS))
@@ -436,6 +436,7 @@ validate-checksums: $(BINARY_TARGETS)
 	$(BUILDCTL)
 
 # Build helm chart
+ifeq ($(HAS_HELM_CHART),true)
 .PHONY: helm/build
 helm/build: ## Build helm chart
 helm/build: $(if $(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/helm/patches)),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET))
@@ -448,6 +449,7 @@ helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 .PHONY: helm/push
 helm/push: helm/build ## Build helm chart and push to registry defined in IMAGE_REPO.
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+endif
 
 # Build image using buildkit only builds linux/amd64 oci and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64
