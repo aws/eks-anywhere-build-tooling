@@ -24,7 +24,7 @@ export IMAGE_TAG="${3?Third argument is image tag}"
 export OUTPUT_DIR="${4?Fourth arguement is output directory}"
 export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 
-CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
+CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
 
 export HELM_EXPERIMENTAL_OCI=1
 export DOCKER_CONFIG=~/.docker

@@ -21,8 +21,7 @@ set -o pipefail
 export HELM_REPOSITORY="${1?First argument is helm repoistory}"
 export HELM_DIRECTORY="${2?Second argument is helm directory}"
 export IMAGE_REPOSITORY="${3?Third argument is image repository}"
-export IMAGE_TAG="${4?Fourth argument is image repository}"
-export OUTPUT_DIR="${5?Fifth arguement is output directory}"
+export OUTPUT_DIR="${4?Fourth arguement is output directory}"
 export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 
 SOURCE_DIR=$(basename ${HELM_REPOSITORY})/${HELM_DIRECTORY}/.
@@ -31,5 +30,3 @@ DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 mkdir -p ${OUTPUT_DIR}/helm/${CHART_NAME}
 cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${DEST_DIR}/
 cp -r ${SOURCE_DIR} ${DEST_DIR}
-envsubst <helm/Chart.yaml.template >${DEST_DIR}/Chart.yaml
-envsubst <helm/values.yaml.template >${DEST_DIR}/values.yaml

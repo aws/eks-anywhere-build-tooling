@@ -441,7 +441,7 @@ validate-checksums: $(BINARY_TARGETS)
 helm/build: ## Build helm chart
 helm/build: $(if $(or $(wildcard $(PROJECT_ROOT)/helm_patches),$(wildcard $(MAKE_ROOT)/helm_patches)),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
-	$(BUILD_LIB)/helm_prepare.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_prepare.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(IMAGE_COMPONENT) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(HELM_REPOSITORY) $(OUTPUT_DIR)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
