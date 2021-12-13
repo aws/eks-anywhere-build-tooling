@@ -149,7 +149,6 @@ HELM_GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-helm-patched
 
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
-=======
 
 #################### BINARIES ######################
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
@@ -442,6 +441,9 @@ helm/build: ## Build helm chart
 helm/build: $(if $(or $(wildcard $(PROJECT_ROOT)/helm_patches),$(wildcard $(MAKE_ROOT)/helm_patches)),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 	$(BUILD_LIB)/helm_prepare.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(IMAGE_COMPONENT) $(OUTPUT_DIR)
+	HELM_REGISTRY=$(IMAGE_REPO) \
+	IMAGE_TAG=$(IMAGE_TAG) \
+	$(BUILD_LIB)/helm_template.sh $(IMAGE_COMPONENT) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(HELM_REPOSITORY) $(OUTPUT_DIR)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.

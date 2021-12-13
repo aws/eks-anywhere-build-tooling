@@ -23,4 +23,4 @@ OUTPUT_DIR="${2?Second arguement is output directory}"
 CHART_NAME=$(basename ${HELM_REPOSITORY})
 
 cd ${OUTPUT_DIR}/helm
-helm package "${CHART}"
+helm package "${CHART_NAME}"
