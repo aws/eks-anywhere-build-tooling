@@ -330,7 +330,7 @@ endif
 $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
 	git -C $(HELM_REPOSITORY) config user.email prow@amazonaws.com
 	git -C $(HELM_REPOSITORY) config user.name "Prow Bot"
-	git -C $(HELM_REPOSITORY) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/helm_patches),$(wildcard $(MAKE_ROOT)/patches))/*
+	git -C $(HELM_REPOSITORY) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/patches))/*
 	@touch $@
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
@@ -438,7 +438,7 @@ validate-checksums: $(BINARY_TARGETS)
 # Build helm chart
 .PHONY: helm/build
 helm/build: ## Build helm chart
-helm/build: $(if $(or $(wildcard $(PROJECT_ROOT)/helm_patches),$(wildcard $(MAKE_ROOT)/helm_patches)),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET))
+helm/build: $(if $(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/helm/patches)),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 	$(BUILD_LIB)/helm_prepare.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(IMAGE_COMPONENT) $(OUTPUT_DIR)
 	HELM_REGISTRY=$(IMAGE_REPO) \
