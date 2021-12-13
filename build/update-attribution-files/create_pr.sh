@@ -26,6 +26,8 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ORIGIN_ORG="eks-distro-pr-bot"
 UPSTREAM_ORG="aws"
 
+MAIN_BRANCH="${PULL_BASE_REF:-main}"
+
 cd ${SCRIPT_ROOT}/../../
 git config --global push.default current
 git config user.name "EKS Distro PR Bot"
@@ -38,7 +40,7 @@ git stash
 git fetch upstream
 # there will be conflicts before we are on the bots fork at this point
 # -Xtheirs instructs git to favor the changes from the current branch
-git rebase -Xtheirs upstream/main
+git rebase -Xtheirs upstream/$MAIN_BRANCH
 
 if [ "$(git stash list)" != "" ]; then
     git stash pop
@@ -113,7 +115,7 @@ git stash --keep-index
 
 pr::create::attribution
 
-git checkout main
+git checkout $MAIN_BRANCH
 
 if [ "$(git stash list)" != "" ]; then
     git stash pop
