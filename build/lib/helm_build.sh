@@ -18,9 +18,37 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-HELM_REPOSITORY="${1?First argument is image repository}"
-OUTPUT_DIR="${2?Second arguement is output directory}"
-CHART_NAME=$(basename ${HELM_REPOSITORY})
+HELM_REPOSITORY="${1?First argument is helm repoistory}"
+HELM_DIRECTORY="${2?Second argument is helm directory}"
+OUTPUT_DIR="${3?Third arguement is output directory}"
 
+CHART_NAME=$(basename ${HELM_REPOSITORY})
+DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
+SOURCE_DIR=$(basename ${HELM_REPOSITORY})/${HELM_DIRECTORY}/.
+
+#
+# Copy
+#
+mkdir -p ${DEST_DIR}
+cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${DEST_DIR}/
+cp -r ${SOURCE_DIR} ${DEST_DIR}
+
+#
+# Search and replace
+#
+SEDFILE=${OUTPUT_DIR}/helm/sedfile
+envsubst <helm/sedfile.template >${SEDFILE}
+TEMPLATE_DIR=helm/templates
+cat helm/files.txt | while read SOURCE_FILE DESTINATION_FILE
+do
+  TMPFILE=/tmp/$(basename ${SOURCE_FILE})
+  cp ${SOURCE_FILE} ${TMPFILE}
+  sed -f ${SEDFILE} ${TMPFILE} >${DEST_DIR}/${DESTINATION_FILE}
+  rm -f ${TMPFILE}
+done
+
+#
+# Build
+#
 cd ${OUTPUT_DIR}/helm
 helm package "${CHART_NAME}"

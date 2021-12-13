@@ -142,8 +142,8 @@ HAS_HELM_CHART?=false
 HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
 HELM_GIT_TAG?=$(GIT_TAG)
 HELM_DIRECTORY?=.
-HELM_REPOSITORY?=$(shell basename $(HELM_SOURCE_REPOSITORY))
-HELM_GIT_CHECKOUT_TARGET?=$(HELM_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
+HELM_REPOSITORY?=$(REPO)
+HELM_GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(HELM_GIT_TAG)
 HELM_GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-helm-patched
 ####################################################
 
@@ -316,7 +316,7 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
 	@touch $@
 
-ifneq ($(HAS_HELM_CHART),true)
+ifeq ($(HAS_HELM_CHART),true)
 $(HELM_REPOSITORY):
 	git clone $(CLONE_URL) $(HELM_REPOSITORY)
 
@@ -440,11 +440,9 @@ validate-checksums: $(BINARY_TARGETS)
 helm/build: ## Build helm chart
 helm/build: $(if $(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/helm/patches)),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
-	$(BUILD_LIB)/helm_prepare.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(IMAGE_COMPONENT) $(OUTPUT_DIR)
 	HELM_REGISTRY=$(IMAGE_REPO) \
 	IMAGE_TAG=$(IMAGE_TAG) \
-	$(BUILD_LIB)/helm_template.sh $(IMAGE_COMPONENT) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(HELM_REPOSITORY) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
