@@ -446,7 +446,6 @@ helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
-helm/push: $(OUTPUT_DIR)/ATTRIBUTION.txt
 helm/push: helm/build ## Build helm chart and push to registry defined in IMAGE_REPO.
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
