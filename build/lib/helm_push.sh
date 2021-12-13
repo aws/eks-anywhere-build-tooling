@@ -18,11 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export IMAGE_REGISTRY="${1?First argument is image registry}"
-export IMAGE_REPOSITORY="${2?Second argument is image repository}"
-export IMAGE_TAG="${3?Third argument is image tag}"
-export OUTPUT_DIR="${4?Fourth arguement is output directory}"
-export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
+IMAGE_REGISTRY="${1?First argument is image registry}"
+IMAGE_REPOSITORY="${2?Second argument is image repository}"
+IMAGE_TAG="${3?Third argument is image tag}"
+OUTPUT_DIR="${4?Fourth arguement is output directory}"
+CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 
 CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
 

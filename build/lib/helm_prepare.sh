@@ -18,11 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export HELM_REPOSITORY="${1?First argument is helm repoistory}"
-export HELM_DIRECTORY="${2?Second argument is helm directory}"
-export IMAGE_REPOSITORY="${3?Third argument is image repository}"
-export OUTPUT_DIR="${4?Fourth arguement is output directory}"
-export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
+HELM_REPOSITORY="${1?First argument is helm repoistory}"
+HELM_DIRECTORY="${2?Second argument is helm directory}"
+IMAGE_REPOSITORY="${3?Third argument is image repository}"
+OUTPUT_DIR="${4?Fourth arguement is output directory}"
+CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 
 SOURCE_DIR=$(basename ${HELM_REPOSITORY})/${HELM_DIRECTORY}/.
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}

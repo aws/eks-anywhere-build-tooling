@@ -18,8 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export IMAGE_REPOSITORY="${1?First argument is image repository}"
-export OUTPUT_DIR="${2?Second arguement is output directory}"
+IMAGE_REPOSITORY="${1?First argument is image repository}"
+OUTPUT_DIR="${2?Second arguement is output directory}"
 CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 DESTINATION=${OUTPUT_DIR}/helm/${CHART_NAME}
 
@@ -27,8 +27,10 @@ mkdir -p ${DESTINATION}
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 envsubst <helm/sedfile.template >${SEDFILE}
 TEMPLATE_DIR=helm/templates
-find ${TEMPLATE_DIR} -type f |sed -e "s,${TEMPLATE_DIR}/,," | while read SOURCE
+cat helm/files.txt | while read SOURCE_FILE DESTINATION_FILE
 do
-  mkdir -p ${DESTINATION}/$(dirname "${SOURCE}")
-  sed -f ${SEDFILE} "${TEMPLATE_DIR}/${SOURCE}" >"${DESTINATION}/${SOURCE}"
+  TMPFILE=/tmp/$(basename ${SOURCE_FILE})
+  cp ${SOURCE_FILE} ${TMPFILE}
+  sed -f ${SEDFILE} ${TMPFILE} >${DESTINATION}/${DESTINATION_FILE}
+  rm -f ${TMPFILE}
 done
