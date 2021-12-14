@@ -15,7 +15,6 @@ BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
 HAS_HELM_CHART=true
-HELM_DIRECTORY=helm
 
 include $(BASE_DIRECTORY)/Common.mk
 
