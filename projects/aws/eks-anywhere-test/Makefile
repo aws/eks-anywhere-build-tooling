@@ -5,7 +5,6 @@ REPO=eks-anywhere-test
 REPO_OWNER=aws
 IMAGE_COMPONENT=eks-anywhere-test
 IMAGE_BUILD_ARGS?=IMAGE_TAG
-HAS_HELM_CHART=true
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 SIMPLE_CREATE_BINARIES=false
@@ -15,8 +14,9 @@ REPO_NO_CLONE=true
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
-include $(BASE_DIRECTORY)/Common.mk
+HAS_HELM_CHART=true
 
+include $(BASE_DIRECTORY)/Common.mk
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

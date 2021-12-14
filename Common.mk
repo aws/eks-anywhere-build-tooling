@@ -135,10 +135,19 @@ IMAGE_USERADD_USER_NAME?=
 IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=latest)
 
 BUILD_OCI_TARS?=false
-HAS_HELM_CHART?=false
 
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
+####################################################
+
+#################### HELM ##########################
+HAS_HELM_CHART?=false
+HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
+HELM_GIT_TAG?=$(GIT_TAG)
+HELM_DIRECTORY?=.
+HELM_REPOSITORY?=$(REPO)
+HELM_GIT_CHECKOUT_TARGET?=$(HELM_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
+HELM_GIT_PATCH_TARGET?=$(HELM_REPOSITORY)/eks-anywhere-helm-patched
 ####################################################
 
 #################### BINARIES ######################
@@ -307,6 +316,23 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
 	@touch $@
 
+ifneq ($(REPO),$(HELM_REPOSITORY))
+$(HELM_REPOSITORY):
+	git clone $(CLONE_URL) $(HELM_REPOSITORY)
+
+$(HELM_GIT_CHECKOUT_TARGET): | $(HELM_REPOSITORY)
+	@echo rm -f $(HELM_REPOSITORY)/eks-anywhere-*
+	(cd $(HELM_REPOSITORY) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(HELM_GIT_TAG))
+	git -C $(HELM_REPOSITORY) checkout -f $(HELM_GIT_TAG)
+	touch $@
+endif
+
+$(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
+	git -C $(HELM_REPOSITORY) config user.email prow@amazonaws.com
+	git -C $(HELM_REPOSITORY) config user.name "Prow Bot"
+	git -C $(HELM_REPOSITORY) am --committer-date-is-author-date $(wildcard $(MAKE_ROOT)/helm/patches)/*
+	@touch $@
+
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
 $(call pairmap,BINARY_TARGET_BODY_ALL_PLATFORMS,$(BINARY_TARGET_FILES),$(SOURCE_PATTERNS))
 endif
@@ -411,15 +437,17 @@ validate-checksums: $(BINARY_TARGETS)
 
 # Build helm chart
 .PHONY: helm/build
-
+helm/build: ## Build helm chart
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
+helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+	HELM_REGISTRY=$(IMAGE_REPO) \
+	IMAGE_TAG=$(IMAGE_TAG) \
+	$(BUILD_LIB)/helm_build.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
-helm/push: $(OUTPUT_DIR)/ATTRIBUTION.txt
-helm/push:
-	$(BUILD_LIB)/helm_build.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+helm/push: helm/build ## Build helm chart and push to registry defined in IMAGE_REPO.
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 # Build image using buildkit only builds linux/amd64 oci and saves to local tar.
@@ -502,7 +530,7 @@ clean-repo:
 	@rm -rf $(REPO)	
 
 .PHONY: clean
-clean: clean-repo
+clean: $(if $(filter true,$(REPO_NO_CLONE)),,clean-repo)
 	@rm -rf _output	
 
 ## --------------------------------------

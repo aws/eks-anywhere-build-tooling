@@ -18,6 +18,9 @@ IMAGE_NAMES=cert-manager-acmesolver cert-manager-cainjector cert-manager-control
 BINARY_TARGET_FILES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook
 SOURCE_PATTERNS=./cmd/acmesolver ./cmd/cainjector ./cmd/controller ./cmd/webhook
 
+HAS_HELM_CHART=true
+HELM_DIRECTORY=deploy/charts/cert-manager
+
 include $(BASE_DIRECTORY)/Common.mk
 
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver-useradd/images/export
