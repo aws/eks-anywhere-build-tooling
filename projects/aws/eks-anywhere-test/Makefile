@@ -18,6 +18,8 @@ HAS_HELM_CHART=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+clean:
+
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
