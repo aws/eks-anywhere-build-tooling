@@ -18,8 +18,9 @@ HAS_HELM_CHART=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-clean:
-
+.PHONY: clean-repo
+clean-repo:
+	@echo 'Done'
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
