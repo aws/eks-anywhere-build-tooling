@@ -316,6 +316,7 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
 	@touch $@
 
+ifneq ($(REPO),$(HELM_REPOSITORY))
 $(HELM_REPOSITORY):
 	git clone $(CLONE_URL) $(HELM_REPOSITORY)
 
@@ -324,6 +325,7 @@ $(HELM_GIT_CHECKOUT_TARGET): | $(HELM_REPOSITORY)
 	(cd $(HELM_REPOSITORY) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(HELM_GIT_TAG))
 	git -C $(HELM_REPOSITORY) checkout -f $(HELM_GIT_TAG)
 	touch $@
+endif
 
 $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
 	git -C $(HELM_REPOSITORY) config user.email prow@amazonaws.com
