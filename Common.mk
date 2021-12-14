@@ -146,8 +146,8 @@ HELM_SOURCE_REPOSITORY?=$(REPO_OWNER)/$(REPO)
 HELM_GIT_TAG?=$(GIT_TAG)
 HELM_DIRECTORY?=.
 HELM_REPOSITORY?=$(REPO)
-HELM_GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(HELM_GIT_TAG)
-HELM_GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-helm-patched
+HELM_GIT_CHECKOUT_TARGET?=$(HELM_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
+HELM_GIT_PATCH_TARGET?=$(HELM_REPOSITORY)/eks-anywhere-helm-patched
 ####################################################
 
 #################### BINARIES ######################
@@ -330,7 +330,7 @@ $(HELM_GIT_CHECKOUT_TARGET): | $(HELM_REPOSITORY)
 $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
 	git -C $(HELM_REPOSITORY) config user.email prow@amazonaws.com
 	git -C $(HELM_REPOSITORY) config user.name "Prow Bot"
-	git -C $(HELM_REPOSITORY) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/patches))/*
+	git -C $(HELM_REPOSITORY) am --committer-date-is-author-date $(wildcard $(MAKE_ROOT)/helm/patches)/*
 	@touch $@
 endif
 endif
@@ -441,9 +441,9 @@ validate-checksums: $(BINARY_TARGETS)
 ifeq ($(HAS_HELM_CHART),true)
 .PHONY: helm/build
 helm/build: ## Build helm chart
+helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 helm/build: $(if $(REPO_NO_CLONE),,$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET))
-helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 	HELM_REGISTRY=$(IMAGE_REPO) \
 	IMAGE_TAG=$(IMAGE_TAG) \
 	$(BUILD_LIB)/helm_build.sh $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
