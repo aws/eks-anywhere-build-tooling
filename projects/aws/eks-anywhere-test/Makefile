@@ -18,10 +18,6 @@ HAS_HELM_CHART=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: clean-repo
-clean-repo:
-	@echo 'Done'
-
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
