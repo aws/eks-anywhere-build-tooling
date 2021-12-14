@@ -317,6 +317,7 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	@touch $@
 
 ifeq ($(HAS_HELM_CHART),true)
+ifneq ($(REPO_NO_CLONE),true)
 $(HELM_REPOSITORY):
 	git clone $(CLONE_URL) $(HELM_REPOSITORY)
 
@@ -331,6 +332,7 @@ $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
 	git -C $(HELM_REPOSITORY) config user.name "Prow Bot"
 	git -C $(HELM_REPOSITORY) am --committer-date-is-author-date $(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/patches))/*
 	@touch $@
+endif
 endif
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
@@ -439,7 +441,8 @@ validate-checksums: $(BINARY_TARGETS)
 ifeq ($(HAS_HELM_CHART),true)
 .PHONY: helm/build
 helm/build: ## Build helm chart
-helm/build: $(if $(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/helm/patches)),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET))
+helm/build: $(if $(REPO_NO_CLONE),,$(HELM_GIT_CHECKOUT_TARGET))
+helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET))
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 	HELM_REGISTRY=$(IMAGE_REPO) \
 	IMAGE_TAG=$(IMAGE_TAG) \

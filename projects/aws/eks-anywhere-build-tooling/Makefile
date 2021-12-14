@@ -1,10 +1,10 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
 
-REPO=eks-anywhere-build-tooling
+REPO=eks-anywhere-test
 REPO_OWNER=aws
 
-IMAGE_COMPONENT=eks-anywhere-cli-tools
+IMAGE_COMPONENT=eks-anywhere-test
 IMAGE_NAMES=$(IMAGE_COMPONENT)
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-docker-client
@@ -20,7 +20,9 @@ FETCH_BINARIES_TARGETS=eksa/fluxcd/flux2 eksa/kubernetes-sigs/cluster-api eksa/k
 
 ORGANIZE_BINARIES_TARGETS=$(addsuffix /eks-a-tools,$(addprefix $(BINARY_DEPS_DIR)/linux-,amd64 arm64))
 
-REPO_NO_CLONE=true
+# REPO_NO_CLONE=true
+eks-anywhere-test:
+	mkdir eks-anywhere-test
 
 include $(BASE_DIRECTORY)/Common.mk
 

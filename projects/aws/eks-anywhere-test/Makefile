@@ -5,7 +5,6 @@ REPO=eks-anywhere-test
 REPO_OWNER=aws
 IMAGE_COMPONENT=eks-anywhere-test
 IMAGE_BUILD_ARGS?=IMAGE_TAG
-HAS_HELM_CHART=true
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 SIMPLE_CREATE_BINARIES=false
@@ -14,6 +13,9 @@ REPO_NO_CLONE=true
 
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
+
+HAS_HELM_CHART=true
+HELM_DIRECTORY=helm
 
 include $(BASE_DIRECTORY)/Common.mk
 
