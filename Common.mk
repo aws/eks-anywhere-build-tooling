@@ -149,8 +149,8 @@ HELM_GIT_TAG?=$(GIT_TAG)
 HELM_DIRECTORY?=.
 HELM_REPOSITORY?=$(REPO)
 HELM_ADDITIONAL_KEY_VALUES?=
-HELM_GIT_CHECKOUT_TARGET?=$(HELM_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
-HELM_GIT_PATCH_TARGET?=$(HELM_REPOSITORY)/eks-anywhere-helm-patched
+HELM_GIT_CHECKOUT_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
+HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
 ####################################################
 
 #################### BINARIES ######################
@@ -531,7 +531,7 @@ release: $(RELEASE_TARGETS)
 
 .PHONY: clean-repo
 clean-repo:
-	@rm -rf $(REPO)	
+	@rm -rf $(REPO)	$(HELM_SOURCE_REPOSITORY)
 
 .PHONY: clean
 clean: $(if $(filter true,$(REPO_NO_CLONE)),,clean-repo)

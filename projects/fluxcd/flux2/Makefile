@@ -19,6 +19,7 @@ HAS_HELM_CHART=true
 HELM_REPOSITORY=flux2
 HELM_SOURCE_OWNER=fluxcd-community
 HELM_SOURCE_REPOSITORY=helm-charts
+HELM_GIT_TAG?=$(shell cat HELM_GIT_TAG)
 HELM_DIRECTORY=charts/flux2
 HELM_ADDITIONAL_KEY_VALUES=\
   HELM_CONTROLLER_TAG=$(shell cat ../helm-controller/GIT_TAG) \
