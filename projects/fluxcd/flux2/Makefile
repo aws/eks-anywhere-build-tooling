@@ -15,6 +15,16 @@ BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
 HAS_S3_ARTIFACTS=true
 IMAGE_NAMES=
+HAS_HELM_CHART=true
+HELM_REPOSITORY=flux2
+HELM_SOURCE_OWNER=fluxcd-community
+HELM_SOURCE_REPOSITORY=helm-charts
+HELM_DIRECTORY=charts/flux2
+HELM_ADDITIONAL_KEY_VALUES=\
+  HELM_CONTROLLER_TAG=$(shell cat ../helm-controller/GIT_TAG) \
+  KUSTOMIZE_CONTROLLER_TAG=$(shell cat../kustomize-controller/GIT_TAG) \
+  NOTIFICATION_CONTROLLER_TAG=$(shell cat../notification-controller/GIT_TAG) \
+  SOURCE_CONTROLLER_TAG=$(shell cat../source-controller/GIT_TAG) \
 
 include $(BASE_DIRECTORY)/Common.mk
 
