@@ -15,11 +15,10 @@ FLUX_MANIFESTS_TARGET=$(REPO)/cmd/flux/manifests
 
 BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
-# BUILD_TARGETS=local-images
-# RELEASE_TARGETS=images
+BUILD_TARGETS=local-images
+RELEASE_TARGETS=images
 
 HAS_S3_ARTIFACTS=true
-IMAGE_NAMES=
 HAS_HELM_CHART=true
 HELM_DESTINATION_REPOSITORY=fluxcd/flux2
 HELM_SOURCE_OWNER=fluxcd-community
