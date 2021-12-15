@@ -23,9 +23,9 @@ HELM_GIT_TAG?=$(shell cat HELM_GIT_TAG)
 HELM_DIRECTORY=charts/flux2
 HELM_ADDITIONAL_KEY_VALUES=\
   HELM_CONTROLLER_TAG=$(shell cat ../helm-controller/GIT_TAG) \
-  KUSTOMIZE_CONTROLLER_TAG=$(shell cat../kustomize-controller/GIT_TAG) \
-  NOTIFICATION_CONTROLLER_TAG=$(shell cat../notification-controller/GIT_TAG) \
-  SOURCE_CONTROLLER_TAG=$(shell cat../source-controller/GIT_TAG) \
+  KUSTOMIZE_CONTROLLER_TAG=$(shell cat ../kustomize-controller/GIT_TAG) \
+  NOTIFICATION_CONTROLLER_TAG=$(shell cat ../notification-controller/GIT_TAG) \
+  SOURCE_CONTROLLER_TAG=$(shell cat ../source-controller/GIT_TAG) \
 
 include $(BASE_DIRECTORY)/Common.mk
 
