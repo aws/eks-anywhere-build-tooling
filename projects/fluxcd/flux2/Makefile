@@ -4,6 +4,8 @@ GOLANG_VERSION?="1.16"
 
 REPO=flux2
 REPO_OWNER=fluxcd
+IMAGE_COMPONENT=fluxcd/flux-cli
+IMAGE_NAMES=flux-cli
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
 
