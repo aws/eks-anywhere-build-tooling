@@ -5,6 +5,8 @@ GOLANG_VERSION?="1.16"
 REPO=flux2
 REPO_OWNER=fluxcd
 
+BASE_IMAGE_NAME=eks-distro-minimal-base
+
 BINARY_TARGET_FILES=flux
 SOURCE_PATTERNS=./cmd/flux
 EXTRA_GO_LDFLAGS=-X main.VERSION=$(GIT_TAG:v%=%)
@@ -13,10 +15,13 @@ FLUX_MANIFESTS_TARGET=$(REPO)/cmd/flux/manifests
 
 BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
+# BUILD_TARGETS=local-images
+# RELEASE_TARGETS=images
+
 HAS_S3_ARTIFACTS=true
 IMAGE_NAMES=
 HAS_HELM_CHART=true
-HELM_REPOSITORY=flux2
+HELM_DESTINATION_REPOSITORY=fluxcd/flux2
 HELM_SOURCE_OWNER=fluxcd-community
 HELM_SOURCE_REPOSITORY=helm-charts
 HELM_GIT_TAG?=$(shell cat HELM_GIT_TAG)
