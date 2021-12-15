@@ -23,9 +23,17 @@ HELM_DIRECTORY=deploy/charts/cert-manager
 
 include $(BASE_DIRECTORY)/Common.mk
 
+.PHONY: get-public-key
+get-public-key:
+	aws kms get-public-key --key-id alias/signingKey  | jq -r .PublicKey > publickey
+
 .PHONY: sign-file
 sign-file:
-	aws kms sign --key-id alias/signingKey --message fileb://helm/files.txt --signing-algorithm ECDSA_SHA_256 --message-type RAW
+	aws kms sign --key-id alias/signingKey --message fileb://helm/files.txt --signing-algorithm ECDSA_SHA_256 --message-type RAW | jq -r .Signature > signature.txt
+
+.PHONY: verify-signature
+verify-signature:
+	cosign verify-blob --key awskms:///alias/signingKey --signature signature.txt ./helm/files.txt
 
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-cainjector): cert-manager-cainjector-useradd/images/export
