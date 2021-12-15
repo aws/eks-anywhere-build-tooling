@@ -19,11 +19,11 @@ set -o nounset
 set -o pipefail
 
 HELM_SOURCE_REPOSITORY="${1?First argument is helm source repoistory}"
-HELM_REPOSITORY="${2?Second argument is helm destination repoistory}"
+HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repoistory}"
 HELM_DIRECTORY="${3?Third argument is helm directory}"
 OUTPUT_DIR="${4?Fouth arguement is output directory}"
 
-CHART_NAME=$(basename ${HELM_REPOSITORY})
+CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 SOURCE_DIR=$(basename ${HELM_SOURCE_REPOSITORY})/${HELM_DIRECTORY}/.
 

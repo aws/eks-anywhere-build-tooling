@@ -147,7 +147,7 @@ HELM_SOURCE_REPOSITORY?=$(REPO)
 HELM_CLONE_URL=https://github.com/$(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY).git
 HELM_GIT_TAG?=$(GIT_TAG)
 HELM_DIRECTORY?=.
-HELM_REPOSITORY?=$(REPO)
+HELM_DESTINATION_REPOSITORY?=$(IMAGE_COMPONENT)
 HELM_ADDITIONAL_KEY_VALUES?=
 HELM_GIT_CHECKOUT_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
 HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
@@ -447,12 +447,12 @@ helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),
 	HELM_REGISTRY=$(IMAGE_REPO) \
 	IMAGE_TAG=$(IMAGE_TAG) \
 	$(HELM_ADDITIONAL_KEY_VALUES) \
-	$(BUILD_LIB)/helm_build.sh $(HELM_SOURCE_REPOSITORY) $(HELM_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
 helm/push: helm/build ## Build helm chart and push to registry defined in IMAGE_REPO.
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(IMAGE_COMPONENT) $(IMAGE_TAG) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 # Build image using buildkit only builds linux/amd64 oci and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64
