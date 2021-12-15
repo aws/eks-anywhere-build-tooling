@@ -26,6 +26,7 @@ include $(BASE_DIRECTORY)/Common.mk
 .PHONY: get-public-key
 get-public-key:
 	aws kms get-public-key --key-id alias/signingKey  | jq -r .PublicKey > publickey
+	cat publickey
 
 .PHONY: sign-file
 sign-file:
@@ -33,6 +34,7 @@ sign-file:
 
 .PHONY: verify-signature
 verify-signature:
+	go install github.com/sigstore/cosign/cmd/cosign@latest
 	cosign verify-blob --key awskms:///alias/signingKey --signature signature.txt ./helm/files.txt
 
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver-useradd/images/export
