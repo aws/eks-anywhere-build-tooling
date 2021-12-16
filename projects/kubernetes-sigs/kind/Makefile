@@ -19,9 +19,9 @@ BINARIES_ARE_RELEASE_BRANCHED=false
 # do not look for checksums in release branch folder, instead use project root
 PROJECT_ROOT=$(MAKE_ROOT)
 
-BASE_IMAGE_NAME?=eks-distro-base
-MINIMAL_IPTABLES_BASE_IMAGE_NAME?=eks-distro-minimal-base-iptables
-MINIMAL_GLIBC_BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
+MINIMAL_BASE_IPTABLES_IMAGE_NAME?=eks-distro-minimal-base-iptables
+MINIMAL_BASE_HAPROXY_IMAGE_NAME?=eks-distro-minimal-base-haproxy
+MINIMAL_BASE_KIND_IMAGE_NAME?=eks-distro-minimal-base-kind
 
 GO_MOD_DOWNLOAD_TARGETS=$(REPO)/eks-anywhere-go-mod-download $(REPO)/images/kindnetd/eks-anywhere-go-mod-download
 GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/attribution/go-license.csv $(OUTPUT_DIR)/kindnetd/attribution/go-license.csv
@@ -88,10 +88,7 @@ $(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BO
 
 # haproxy
 haproxy/images/%: DOCKERFILE_FOLDER=./images/haproxy
-haproxy/images/%: BASE_IMAGE_NAME=$(MINIMAL_GLIBC_BASE_IMAGE_NAME)
-
-haproxy-useradd/images/export: IMAGE_USERADD_USER_NAME=haproxy
-$(call IMAGE_TARGETS_FOR_NAME, haproxy): haproxy-useradd/images/export $(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg
+haproxy/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_HAPROXY_IMAGE_NAME)
 
 $(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg: $(GIT_PATCH_TARGET)
 	@mkdir -p $(@D)
@@ -99,11 +96,11 @@ $(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg: $(GIT_PATCH_TARGE
 
 # Kindnetd
 kindnetd/images/%: DOCKERFILE_FOLDER=./images/kindnetd
-kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_IPTABLES_BASE_IMAGE_NAME)
+kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_IPTABLES_IMAGE_NAME)
 
 # Kind-base
 kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/images/base
-kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=eks-distro-base
+kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
 kind-base/images/% kind-base-versioned/images/%: IMAGE_BUILD_ARGS=CNI_PLUGINS_AMD64_URL CNI_PLUGINS_ARM64_URL CNI_PLUGINS_AMD64_SHA256SUM \
 	CNI_PLUGINS_ARM64_SHA256SUM CRICTL_AMD64_SHA256SUM_URL CRICTL_ARM64_SHA256SUM_URL CRICTL_AMD64_URL CRICTL_ARM64_URL
 
