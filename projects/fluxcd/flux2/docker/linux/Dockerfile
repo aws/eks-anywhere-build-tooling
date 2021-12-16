@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASE_IMAGE
-FROM $BASE_IMAGE
-
+ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base
 ARG TARGETARCH
 ARG TARGETOS
+
+FROM $BASE_IMAGE
 
 COPY _output/dependencies/linux-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
 COPY _output/bin/flux2/$TARGETOS-$TARGETARCH/flux /usr/local/bin/flux
