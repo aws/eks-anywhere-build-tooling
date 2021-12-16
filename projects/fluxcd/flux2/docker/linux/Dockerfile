@@ -16,9 +16,8 @@ ARG BASE_IMAGE
 ARG BUILDER_IMAGE
 FROM $BUILDER_IMAGE as generic-builder
 
-RUN set -x && \
-    curl https://distro.eks.amazonaws.com/kubernetes-1-21/releases/6/artifacts/kubernetes/v1.21.2/bin/linux/arm64/kubectl -o /usr/bin/kubectl \
-    chmod 755 /usr/bin/kubectl
+RUN curl https://distro.eks.amazonaws.com/kubernetes-1-21/releases/6/artifacts/kubernetes/v1.21.2/bin/linux/amd64/kubectl -o /usr/bin/kubectl
+RUN chmod 755 /usr/bin/kubectl
 
 FROM $BASE_IMAGE
 
@@ -29,7 +28,6 @@ ARG TARGETOS
 
 # COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/
 COPY --chmod=755 _output/bin/flux2/$TARGETOS-$TARGETARCH/flux /usr/bin/flux
-COPY --chmod=755 _output/bin/flux2/$TARGETOS-$TARGETARCH/kubectl /usr/bin/kubectl
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
