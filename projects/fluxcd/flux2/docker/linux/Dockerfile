@@ -27,7 +27,7 @@ ARG TARGETARCH
 ARG TARGETOS
 
 COPY --from=generic-builder /usr/local/bin/kubectl /usr/local/bin/
-COPY --chmod=755 _output/bin/flux2/$TARGETOS-$TARGETARCH/flux /usr/local/bin/flux
+COPY _output/bin/flux2/$TARGETOS-$TARGETARCH/flux /usr/local/bin/flux
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
