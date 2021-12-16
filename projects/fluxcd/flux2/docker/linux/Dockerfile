@@ -13,20 +13,12 @@
 # limitations under the License.
 
 ARG BASE_IMAGE
-ARG BUILDER_IMAGE
-FROM $BUILDER_IMAGE as generic-builder
-
-RUN curl https://distro.eks.amazonaws.com/kubernetes-1-21/releases/6/artifacts/kubernetes/v1.21.2/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl
-RUN chmod 755 /usr/local/bin/kubectl
-
 FROM $BASE_IMAGE
-
-COPY --from=generic-builder /newroot /
 
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY --from=generic-builder /usr/local/bin/kubectl /usr/local/bin/
+COPY _output/dependencies/linux-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
 COPY _output/bin/flux2/$TARGETOS-$TARGETARCH/flux /usr/local/bin/flux
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
