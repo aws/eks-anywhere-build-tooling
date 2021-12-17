@@ -26,10 +26,10 @@ HELM_SOURCE_REPOSITORY=helm-charts
 HELM_GIT_TAG?=$(shell cat HELM_GIT_TAG)
 HELM_DIRECTORY=charts/flux2
 HELM_ADDITIONAL_KEY_VALUES=\
-  HELM_CONTROLLER_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} fluxcd/helm-controller latest \
-  KUSTOMIZE_CONTROLLER_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} fluxcd/kustomize-controller latest \
-  NOTIFICATION_CONTROLLER_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} fluxcd/notification-controller latest \
-  SOURCE_CONTROLLER_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} fluxcd/source-controller latest
+  HELM_CONTROLLER_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} fluxcd/helm-controller latest) \
+  KUSTOMIZE_CONTROLLER_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} fluxcd/kustomize-controller latest) \
+  NOTIFICATION_CONTROLLER_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} fluxcd/notification-controller latest) \
+  SOURCE_CONTROLLER_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} fluxcd/source-controller latest)
 
 include $(BASE_DIRECTORY)/Common.mk
 
