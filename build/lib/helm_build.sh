@@ -18,8 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-HELM_SOURCE_REPOSITORY="${1?First argument is helm source repoistory}"
-HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repoistory}"
+HELM_SOURCE_REPOSITORY="${1?First argument is helm source repository}"
+HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
 HELM_DIRECTORY="${3?Third argument is helm directory}"
 OUTPUT_DIR="${4?Fouth arguement is output directory}"
 
