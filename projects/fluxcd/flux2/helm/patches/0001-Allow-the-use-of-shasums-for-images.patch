@@ -1,0 +1,220 @@
+From e89f7c5ee9c3b1b278504fbd744a42e816eb2398 Mon Sep 17 00:00:00 2001
+From: Terry Howe <tlhowe@amazon.com>
+Date: Fri, 17 Dec 2021 09:35:40 -0700
+Subject: [PATCH] Allow the use of shasums for images
+
+---
+ charts/flux2/templates/helm-controller.yaml   |  2 +-
+ charts/flux2/templates/helper.tpl             |  7 ++++
+ .../image-automation-controller.yaml          |  2 +-
+ .../templates/image-reflector-controller.yaml |  2 +-
+ .../flux2/templates/kustomize-controller.yaml |  2 +-
+ .../templates/notification-controller.yaml    |  2 +-
+ charts/flux2/templates/pre-install-job.yaml   |  2 +-
+ charts/flux2/templates/source-controller.yaml |  2 +-
+ charts/flux2/values.yaml                      | 42 ++++++++++++-------
+ 9 files changed, 42 insertions(+), 21 deletions(-)
+ create mode 100644 charts/flux2/templates/helper.tpl
+
+diff --git a/charts/flux2/templates/helm-controller.yaml b/charts/flux2/templates/helm-controller.yaml
+index 17b37c2..c99b857 100644
+--- a/charts/flux2/templates/helm-controller.yaml
++++ b/charts/flux2/templates/helm-controller.yaml
+@@ -36,7 +36,7 @@ spec:
+           valueFrom:
+             fieldRef:
+               fieldPath: metadata.namespace
+-        image: {{ .Values.helmcontroller.image }}:{{ .Values.helmcontroller.tag }}
++        image: {{ template "template.image" .Values.helmcontroller.image }}
+         imagePullPolicy: IfNotPresent
+         livenessProbe:
+           httpGet:
+diff --git a/charts/flux2/templates/helper.tpl b/charts/flux2/templates/helper.tpl
+new file mode 100644
+index 0000000..ec82fd2
+--- /dev/null
++++ b/charts/flux2/templates/helper.tpl
+@@ -0,0 +1,7 @@
++{{- define "template.image" -}}
++{{- if eq (substr 0 7 .version) "sha256:" -}}
++{{- printf "%s/%s@%s" .registry .repository .version -}}
++{{- else -}}
++{{- printf "%s/%s:%s" .registry .repository .version -}}
++{{- end -}}
++{{- end -}}
+diff --git a/charts/flux2/templates/image-automation-controller.yaml b/charts/flux2/templates/image-automation-controller.yaml
+index c3c6a58..0eee237 100644
+--- a/charts/flux2/templates/image-automation-controller.yaml
++++ b/charts/flux2/templates/image-automation-controller.yaml
+@@ -36,7 +36,7 @@ spec:
+           valueFrom:
+             fieldRef:
+               fieldPath: metadata.namespace
+-        image: {{ .Values.imageautomationcontroller.image }}:{{ .Values.imageautomationcontroller.tag }}
++        image: {{ template "template.image" .Values.imageautomationcontroller.image }}
+         imagePullPolicy: IfNotPresent
+         livenessProbe:
+           httpGet:
+diff --git a/charts/flux2/templates/image-reflector-controller.yaml b/charts/flux2/templates/image-reflector-controller.yaml
+index 292930d..6a185b2 100644
+--- a/charts/flux2/templates/image-reflector-controller.yaml
++++ b/charts/flux2/templates/image-reflector-controller.yaml
+@@ -36,7 +36,7 @@ spec:
+           valueFrom:
+             fieldRef:
+               fieldPath: metadata.namespace
+-        image: {{ .Values.imagereflectorcontroller.image }}:{{ .Values.imagereflectorcontroller.tag }}
++        image: {{ template "template.image" .Values.imagereflectorcontroller.image }}
+         imagePullPolicy: IfNotPresent
+         livenessProbe:
+           httpGet:
+diff --git a/charts/flux2/templates/kustomize-controller.yaml b/charts/flux2/templates/kustomize-controller.yaml
+index 1a1ea80..30a7772 100644
+--- a/charts/flux2/templates/kustomize-controller.yaml
++++ b/charts/flux2/templates/kustomize-controller.yaml
+@@ -47,7 +47,7 @@ spec:
+               name: {{ .Values.kustomizecontroller.envFrom.secret.name }}
+           {{- end }}
+         {{- end }}
+-        image: {{ .Values.kustomizecontroller.image }}:{{ .Values.kustomizecontroller.tag }}
++        image: {{ template "template.image" .Values.kustomizecontroller.image }}
+         imagePullPolicy: IfNotPresent
+         livenessProbe:
+           httpGet:
+diff --git a/charts/flux2/templates/notification-controller.yaml b/charts/flux2/templates/notification-controller.yaml
+index 72f99fb..94633c4 100644
+--- a/charts/flux2/templates/notification-controller.yaml
++++ b/charts/flux2/templates/notification-controller.yaml
+@@ -35,7 +35,7 @@ spec:
+           valueFrom:
+             fieldRef:
+               fieldPath: metadata.namespace
+-        image: {{ .Values.notificationcontroller.image }}:{{ .Values.notificationcontroller.tag }}
++        image: {{ template "template.image" .Values.notificationcontroller.image }}
+         imagePullPolicy: IfNotPresent
+         livenessProbe:
+           httpGet:
+diff --git a/charts/flux2/templates/pre-install-job.yaml b/charts/flux2/templates/pre-install-job.yaml
+index 74d7abe..e1e9f36 100644
+--- a/charts/flux2/templates/pre-install-job.yaml
++++ b/charts/flux2/templates/pre-install-job.yaml
+@@ -27,7 +27,7 @@ spec:
+       restartPolicy: Never
+       containers:
+       - name: flux-cli
+-        image: {{ .Values.cli.image }}:{{ .Values.cli.tag }}
++        image: {{ template "template.image" .Values.cli.image }}
+         command: ["/usr/local/bin/flux", "check",  "--pre", "--namespace", {{ .Release.Namespace }}]
+       {{- with .Values.cli.nodeSelector }}
+       nodeSelector: {{ toYaml . | nindent 8 }}
+diff --git a/charts/flux2/templates/source-controller.yaml b/charts/flux2/templates/source-controller.yaml
+index 218882c..15d2082 100644
+--- a/charts/flux2/templates/source-controller.yaml
++++ b/charts/flux2/templates/source-controller.yaml
+@@ -40,7 +40,7 @@ spec:
+           valueFrom:
+             fieldRef:
+               fieldPath: metadata.namespace
+-        image: {{ .Values.sourcecontroller.image }}:{{ .Values.sourcecontroller.tag }}
++        image: {{ template "template.image" .Values.sourcecontroller.image }}
+         imagePullPolicy: IfNotPresent
+         livenessProbe:
+           httpGet:
+diff --git a/charts/flux2/values.yaml b/charts/flux2/values.yaml
+index d21d2e3..8a94017 100644
+--- a/charts/flux2/values.yaml
++++ b/charts/flux2/values.yaml
+@@ -14,8 +14,10 @@ installCRDs: true
+ eventsaddr: http://notification-controller/
+ 
+ cli:
+-  image: ghcr.io/fluxcd/flux-cli
+-  tag: v0.24.1
++  image:
++    registry: ghcr.io
++    repository: fluxcd/flux-cli
++    version: v0.24.1
+   nodeSelector: {}
+   affinity: {}
+   tolerations: []
+@@ -24,8 +26,10 @@ cli:
+ 
+ helmcontroller:
+   create: true
+-  image: ghcr.io/fluxcd/helm-controller
+-  tag: v0.14.1
++  image:
++    registry: ghcr.io
++    repository: fluxcd/helm-controller
++    version: v0.14.1
+   resources:
+     limits:
+       cpu: 1000m
+@@ -64,8 +68,10 @@ helmcontroller:
+ 
+ imageautomationcontroller:
+   create: true
+-  image: ghcr.io/fluxcd/image-automation-controller
+-  tag: v0.18.0
++  image:
++    registry: ghcr.io
++    repository: fluxcd/image-automation-controller
++    version: v0.18.0
+   resources:
+     limits:
+       cpu: 1000m
+@@ -86,8 +92,10 @@ imageautomationcontroller:
+ 
+ imagereflectorcontroller:
+   create: true
+-  image: ghcr.io/fluxcd/image-reflector-controller
+-  tag: v0.14.0
++  image:
++    registry: ghcr.io
++    repository: fluxcd/image-reflector-controller
++    version: v0.14.0
+   resources:
+     limits:
+       cpu: 1000m
+@@ -108,8 +116,10 @@ imagereflectorcontroller:
+ 
+ kustomizecontroller:
+   create: true
+-  image: ghcr.io/fluxcd/kustomize-controller
+-  tag: v0.18.2
++  image:
++    registry: ghcr.io
++    repository: fluxcd/kustomize-controller
++    version: v0.18.2
+   resources:
+     limits:
+       cpu: 1000m
+@@ -149,8 +159,10 @@ kustomizecontroller:
+ 
+ notificationcontroller:
+   create: true
+-  image: ghcr.io/fluxcd/notification-controller
+-  tag: v0.19.0
++  image:
++    registry: ghcr.io
++    repository: fluxcd/notification-controller
++    version: v0.19.0
+   resources:
+     limits:
+       cpu: 1000m
+@@ -171,8 +183,10 @@ notificationcontroller:
+ 
+ sourcecontroller:
+   create: true
+-  image: ghcr.io/fluxcd/source-controller
+-  tag: v0.19.2
++  image:
++    registry: ghcr.io
++    repository: fluxcd/source-controller
++    version: v0.19.2
+   resources:
+     limits:
+       cpu: 1000m
+-- 
+2.29.2
+
