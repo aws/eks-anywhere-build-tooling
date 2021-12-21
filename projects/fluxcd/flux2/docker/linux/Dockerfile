@@ -18,7 +18,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/dependencies/linux-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
 COPY _output/bin/flux2/$TARGETOS-$TARGETARCH/flux /usr/local/bin/flux
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt

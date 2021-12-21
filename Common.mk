@@ -152,7 +152,7 @@ HELM_DESTINATION_REPOSITORY?=$(IMAGE_COMPONENT)
 HELM_ADDITIONAL_KEY_VALUES?=
 HELM_GIT_CHECKOUT_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
 HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
-PUBLIC_REGISTRY=$(shell aws ecr-public describe-registries --region us-east-1 --query 'registries[*].registryUri' --output text)
+PUBLIC_REGISTRY?=$(shell aws ecr-public describe-registries --region us-east-1 --query 'registries[*].registryUri' --output text)
 ####################################################
 
 #################### BINARIES ######################
