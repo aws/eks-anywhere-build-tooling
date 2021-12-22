@@ -32,7 +32,6 @@ endif
 ifneq ($(PULL_BASE_REF),main)
 	LATEST=$(PULL_BASE_REF)
 endif
-LATEST_TAG?=$(LATEST)
 ####################################################
 
 #################### CODEBUILD #####################
@@ -98,6 +97,7 @@ else
 	PROJECT_ROOT?=$(MAKE_ROOT)
 	ARTIFACTS_UPLOAD_PATH?=$(PROJECT_PATH)
 	OUTPUT_DIR?=_output
+	LATEST_TAG?=$(LATEST)
 endif
 
 ####################################################

@@ -13,7 +13,7 @@ SOURCE_PATTERNS=.
 REPO_SUBPATH=..
 
 GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".$(RELEASE_BRANCH).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
-LATEST_TAG=$(GIT_TAG)-$(LATEST)
+
 HAS_RELEASE_BRANCHES=true
 
 # This project is a bit of odd ball when it comes to using the standard makefile targets
