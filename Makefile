@@ -63,7 +63,7 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 	cat _output/total_summary.txt
 
 .PHONY: update-attribution-files
-update-attribution-files: attribution-files
+update-attribution-files: attribution-files add-generated-help-block
 	build/update-attribution-files/create_pr.sh
 
 .PHONY: run-target-in-docker
