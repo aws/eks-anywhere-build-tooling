@@ -132,7 +132,7 @@ IMAGE_USERADD_USER_NAME?=
 
 # Branch builds should look at the current branch latest image for cache as well as main branch latest for cache to cover the cases
 # where its the first build from a new release branch
-IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=latest)
+IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(subst $(LATEST),latest,$(LATEST_IMAGE))
 
 BUILD_OCI_TARS?=false
 
