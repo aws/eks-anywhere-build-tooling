@@ -34,7 +34,6 @@ git config user.name "EKS Distro PR Bot"
 git config user.email "aws-model-rocket-bots+eksdistroprbot@amazon.com"
 git config remote.origin.url >&- || git remote add origin git@github.com:${ORIGIN_ORG}/eks-anywhere-build-tooling.git
 git config remote.upstream.url >&- || git remote add upstream https://github.com/${UPSTREAM_ORG}/eks-anywhere-build-tooling.git
-git config advice.addIgnoredFile false
 
 # Files have already changed, stash to perform rebase
 git stash
@@ -152,7 +151,7 @@ if [ "$(git stash list)" != "" ]; then
 fi
 # Add help.mk/Makefile files
 for FILE in $(find . -type f \( -name Help.mk -o -name Makefile \)); do    
-    git add $FILE
+    git check-ignore -q $FILE || git add $FILE
 done
 
 pr::create::help
