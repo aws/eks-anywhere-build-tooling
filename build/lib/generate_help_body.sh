@@ -51,7 +51,7 @@ sed -i "/$HEADER/,/$FOOTER/d" $HELPFILE
 printf %s "$(< $HELPFILE)" > $HELPFILE
 
 # Generate help items from Common.mk
-EXTRA_HELP="$(make help-list)"
+EXTRA_HELP="$(make help-list --no-print-directory)"
 BINARY_TARGETS_HELP=""
 CHECKSUMS_TARGETS_HELP=""
 if [ ! -z "$(echo "$BINARY_TARGETS" | xargs)" ]; then
@@ -76,7 +76,7 @@ fi
 
 PATCHES_TARGET=""
 if [[ "$HAS_PATCHES" == "true" ]]; then
-    PATCHES_TARGET+="${NL}${NL}patch-repo: ## Patch upstream repo with patches in patches directory"
+    PATCHES_TARGET+="${NL}patch-repo: ## Patch upstream repo with patches in patches directory"
 fi
 
 IMAGE_TARGETS_HELP=""
