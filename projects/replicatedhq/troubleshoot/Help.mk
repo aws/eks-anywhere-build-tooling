@@ -7,20 +7,14 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `cluster-api-provider-tinkerbell`
+clone-repo:  ## Clone upstream `troubleshoot`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `manager` for `linux/amd64 linux/arm64`
-_output/bin/cluster-api-provider-tinkerbell/linux-amd64/manager: ## Build `_output/bin/cluster-api-provider-tinkerbell/linux-amd64/manager`
-_output/bin/cluster-api-provider-tinkerbell/linux-arm64/manager: ## Build `_output/bin/cluster-api-provider-tinkerbell/linux-arm64/manager`
-
-##@ Image Targets
-local-images: ## Builds `cluster-api-provider-tinkerbell/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `cluster-api-provider-tinkerbell/images/push` to IMAGE_REPO
-cluster-api-provider-tinkerbell/images/amd64: ## Builds/pushes `cluster-api-provider-tinkerbell/images/amd64`
-cluster-api-provider-tinkerbell/images/push: ## Builds/pushes `cluster-api-provider-tinkerbell/images/push`
+binaries: ## Build all binaries: `support-bundle` for `linux/amd64 linux/arm64`
+_output/bin/troubleshoot/linux-amd64/support-bundle: ## Build `_output/bin/troubleshoot/linux-amd64/support-bundle`
+_output/bin/troubleshoot/linux-arm64/support-bundle: ## Build `_output/bin/troubleshoot/linux-arm64/support-bundle`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
@@ -45,6 +39,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums local-images attribution attribution-pr upload-artifacts`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums  attribution attribution-pr upload-artifacts`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
 ########### END GENERATED ###########################

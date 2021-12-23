@@ -9,6 +9,7 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `cert-manager`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook` for `linux/amd64 linux/arm64`
@@ -21,19 +22,23 @@ _output/bin/cert-manager/linux-arm64/cert-manager-cainjector: ## Build `_output/
 _output/bin/cert-manager/linux-arm64/cert-manager-controller: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-controller`
 _output/bin/cert-manager/linux-arm64/cert-manager-webhook: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-webhook`
 
-patch-repo: ## Patch upstream repo with patches in patches directory
-
 ##@ Image Targets
-local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push` to IMAGE_REPO
+local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push helm/push` to IMAGE_REPO
 cert-manager-acmesolver/images/amd64: ## Builds/pushes `cert-manager-acmesolver/images/amd64`
 cert-manager-cainjector/images/amd64: ## Builds/pushes `cert-manager-cainjector/images/amd64`
 cert-manager-controller/images/amd64: ## Builds/pushes `cert-manager-controller/images/amd64`
 cert-manager-webhook/images/amd64: ## Builds/pushes `cert-manager-webhook/images/amd64`
+helm/build: ## Builds/pushes `helm/build`
 cert-manager-acmesolver/images/push: ## Builds/pushes `cert-manager-acmesolver/images/push`
 cert-manager-cainjector/images/push: ## Builds/pushes `cert-manager-cainjector/images/push`
 cert-manager-controller/images/push: ## Builds/pushes `cert-manager-controller/images/push`
 cert-manager-webhook/images/push: ## Builds/pushes `cert-manager-webhook/images/push`
+helm/push: ## Builds/pushes `helm/push`
+
+##@ Helm Targets
+helm/build: ## Build helm chart
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
