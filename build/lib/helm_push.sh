@@ -19,11 +19,12 @@ set -o nounset
 set -o pipefail
 
 IMAGE_REGISTRY="${1?First argument is image registry}"
-IMAGE_REPOSITORY="${2?Second argument is image repository}"
+HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
 OUTPUT_DIR="${4?Fourth arguement is output directory}"
-CHART_NAME=$(basename ${IMAGE_REPOSITORY})
 
+HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
+CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
 
 export HELM_EXPERIMENTAL_OCI=1
@@ -35,5 +36,8 @@ then
 else
   echo "If authentication fails: aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}"
 fi
-DIGEST=$(helm push ${CHART_FILE} oci://${IMAGE_REGISTRY} | grep Digest | sed -e 's/Digest: //')
-echo "helm install oci://${IMAGE_REGISTRY}/${CHART_NAME} --version ${DIGEST} --generate-name"
+TMPFILE=$(mktemp /tmp/helm-output.XXXXXX)
+helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
+DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
+#rm -f $TMPFILE
+echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
