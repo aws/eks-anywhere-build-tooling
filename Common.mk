@@ -452,7 +452,7 @@ helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
-helm/push: helm/build ## Build helm chart and push to registry defined in IMAGE_REPO.
+helm/push: helm/build
 	$(BUILD_LIB)/helm_push.sh $(PUBLIC_REGISTRY) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 # Build image using buildkit only builds linux/amd64 oci and saves to local tar.
