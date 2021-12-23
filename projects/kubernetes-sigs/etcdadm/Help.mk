@@ -9,17 +9,12 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `etcdadm`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `etcdadm` for `linux/amd64 linux/arm64`
 _output/bin/etcdadm/linux-amd64/etcdadm: ## Build `_output/bin/etcdadm/linux-amd64/etcdadm`
 _output/bin/etcdadm/linux-arm64/etcdadm: ## Build `_output/bin/etcdadm/linux-arm64/etcdadm`
-
-patch-repo: ## Patch upstream repo with patches in patches directory
-
-##@ Image Targets
-local-images: ## Builds `` as oci tars for presumbit validation
-images: ## Pushes `` to IMAGE_REPO
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.

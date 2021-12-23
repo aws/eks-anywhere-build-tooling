@@ -17,10 +17,6 @@ _output/bin/cri-tools/linux-amd64/critest: ## Build `_output/bin/cri-tools/linux
 _output/bin/cri-tools/linux-arm64/crictl: ## Build `_output/bin/cri-tools/linux-arm64/crictl`
 _output/bin/cri-tools/linux-arm64/critest: ## Build `_output/bin/cri-tools/linux-arm64/critest`
 
-##@ Image Targets
-local-images: ## Builds `` as oci tars for presumbit validation
-images: ## Pushes `` to IMAGE_REPO
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.

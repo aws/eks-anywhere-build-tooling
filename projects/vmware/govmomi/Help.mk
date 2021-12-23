@@ -15,10 +15,6 @@ binaries: ## Build all binaries: `govc` for `linux/amd64 linux/arm64`
 _output/bin/govmomi/linux-amd64/govc: ## Build `_output/bin/govmomi/linux-amd64/govc`
 _output/bin/govmomi/linux-arm64/govc: ## Build `_output/bin/govmomi/linux-arm64/govc`
 
-##@ Image Targets
-local-images: ## Builds `` as oci tars for presumbit validation
-images: ## Pushes `` to IMAGE_REPO
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.

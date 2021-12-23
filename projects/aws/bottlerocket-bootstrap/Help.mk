@@ -17,6 +17,14 @@ images: ## Pushes `bottlerocket-bootstrap/images/push` to IMAGE_REPO
 bottlerocket-bootstrap/images/amd64: ## Builds/pushes `bottlerocket-bootstrap/images/amd64`
 bottlerocket-bootstrap/images/push: ## Builds/pushes `bottlerocket-bootstrap/images/push`
 
+##@ Fetch Binary Targets
+_output/1-21/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/kubernetes/client`
+_output/1-21/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/kubernetes/server`
+_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
+_output/1-21/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/1-21/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/kubernetes/server`
+_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
+
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
