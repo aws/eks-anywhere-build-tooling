@@ -80,7 +80,7 @@ if [[ "$HAS_PATCHES" == "true" ]]; then
 fi
 
 IMAGE_TARGETS_HELP=""
-if [ ! -z "$LOCAL_IMAGE_TARGETS" ]; then
+if [ ! -z "$(echo "$LOCAL_IMAGE_TARGETS" | xargs)" ]; then
     IMAGE_TARGETS_HELP+="${NL}${NL}##@ Image Targets"
     IMAGE_TARGETS_HELP+="${NL}local-images: ## Builds \`$(echo ${LOCAL_IMAGE_TARGETS} | xargs)\` as oci tars for presumbit validation"
     IMAGE_TARGETS_HELP+="${NL}images: ## Pushes \`$(echo ${IMAGE_TARGETS} | xargs)\` to IMAGE_REPO"
@@ -144,7 +144,7 @@ cat >> $HELPFILE << EOF
 ${NL}${NL}${NL}${HEADER}
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
-${GIT_TARGETS_HELP}${BINARY_TARGETS_HELP}${PATCHES_TARGET}${IMAGE_TARGETS_HELP}${HELM_TARGETS}${FETCH_BINARY_TARGETS_HELP}${CHECKSUMS_TARGETS_HELP}${ARTIFACTS_TARGETS}${LICENSES_TARGETS}${CLEAN_TARGETS}
+${GIT_TARGETS_HELP}${PATCHES_TARGET}${BINARY_TARGETS_HELP}${IMAGE_TARGETS_HELP}${HELM_TARGETS}${FETCH_BINARY_TARGETS_HELP}${CHECKSUMS_TARGETS_HELP}${ARTIFACTS_TARGETS}${LICENSES_TARGETS}${CLEAN_TARGETS}
 ${EXTRA_HELP}
 
 ##@ Build Targets
