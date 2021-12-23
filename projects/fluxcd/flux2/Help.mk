@@ -17,10 +17,6 @@ _output/bin/flux2/linux-arm64/flux: ## Build `_output/bin/flux2/linux-arm64/flux
 _output/bin/flux2/darwin-amd64/flux: ## Build `_output/bin/flux2/darwin-amd64/flux`
 _output/bin/flux2/darwin-arm64/flux: ## Build `_output/bin/flux2/darwin-arm64/flux`
 
-##@ Image Targets
-local-images: ## Builds `` as oci tars for presumbit validation
-images: ## Pushes `` to IMAGE_REPO
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.

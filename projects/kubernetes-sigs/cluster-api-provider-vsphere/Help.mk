@@ -9,13 +9,12 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `cluster-api-provider-vsphere`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `manager` for `linux/amd64 linux/arm64`
 _output/bin/cluster-api-provider-vsphere/linux-amd64/manager: ## Build `_output/bin/cluster-api-provider-vsphere/linux-amd64/manager`
 _output/bin/cluster-api-provider-vsphere/linux-arm64/manager: ## Build `_output/bin/cluster-api-provider-vsphere/linux-arm64/manager`
-
-patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Image Targets
 local-images: ## Builds `cluster-api-provider-vsphere/images/amd64` as oci tars for presumbit validation

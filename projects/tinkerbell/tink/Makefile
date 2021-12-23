@@ -27,3 +27,11 @@ FETCH_BINARIES_TARGETS=eksa/cloudflare/cfssl
 include $(BASE_DIRECTORY)/Common.mk
 
 $(call IMAGE_TARGETS_FOR_NAME, tink-server): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################
