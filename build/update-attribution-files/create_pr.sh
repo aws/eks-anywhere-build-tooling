@@ -120,8 +120,8 @@ EOF
 
 
 # Add attribution files
-for FILE in $(find . -type f \( -name ATTRIBUTION.txt ! -path "*/_output/*" \)); do    
-    git add $FILE
+for FILE in $(find . -type f \( -name "*ATTRIBUTION.txt" ! -path "*/_output/*" \)); do    
+    git check-ignore -q $FILE || git add $FILE
 done
 
 # stash checksums files
@@ -136,7 +136,7 @@ if [ "$(git stash list)" != "" ]; then
 fi
 # Add checksum files
 for FILE in $(find . -type f -name CHECKSUMS); do    
-    git add $FILE
+    git check-ignore -q $FILE || git add $FILE
 done
 
 # stash help.mk files
