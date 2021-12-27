@@ -27,17 +27,21 @@ HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
 
-export HELM_EXPERIMENTAL_OCI=1
-export DOCKER_CONFIG=~/.docker
+DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
 export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
-if echo ${IMAGE_REGISTRY} | grep public.ecr.aws >/dev/null
-then
-  echo "If authentication fails: aws ecr-public get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin public.ecr.aws"
-else
-  echo "If authentication fails: aws ecr get-login-password --region ${AWS_REGION} | helm registry login --username AWS --password-stdin ${IMAGE_REGISTRY}"
-fi
+export HELM_EXPERIMENTAL_OCI=1
 TMPFILE=$(mktemp /tmp/helm-output.XXXXXX)
+function cleanup() {
+  if echo ${IMAGE_REGISTRY} | grep public.ecr.aws >/dev/null
+  then
+    echo "If authentication failed: aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws"
+  else
+    echo "If authentication failed: aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${IMAGE_REGISTRY}"
+  fi
+  rm -f "${TMPFILE}"
+}
+trap cleanup err
+trap "rm -f $TMPFILE" exit
 helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
 DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
-#rm -f $TMPFILE
 echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
