@@ -153,7 +153,6 @@ HELM_DESTINATION_REPOSITORY?=$(IMAGE_COMPONENT)
 HELM_ADDITIONAL_KEY_VALUES?=
 HELM_GIT_CHECKOUT_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
 HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
-HELM_LICENSES_TARGET=$(OUTPUT_DIR)/LICENSES/github.com/$(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY)
 ####################################################
 
 #################### BINARIES ######################
@@ -331,9 +330,6 @@ $(HELM_GIT_CHECKOUT_TARGET): | $(HELM_SOURCE_REPOSITORY)
 	(cd $(HELM_SOURCE_REPOSITORY) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(HELM_GIT_TAG))
 	git -C $(HELM_SOURCE_REPOSITORY) checkout -f $(HELM_GIT_TAG)
 	touch $@
-
-$(HELM_LICENSES_TARGET):
-	$(BASE_DIRECTORY)/build/lib/gather_non_golang_licenses.sh $(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY) $(HELM_GIT_TAG) $(MAKE_ROOT)/$(OUTPUT_DIR)
 endif
 
 $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
@@ -383,7 +379,7 @@ $(GATHER_LICENSES_TARGETS): $(GO_MOD_DOWNLOAD_TARGETS)
 	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) $(@F) $(RELEASE_BRANCH)
 
 .PHONY: gather-licenses
-gather-licenses: $(GATHER_LICENSES_TARGETS) $(if $(filter $(REPO),$(HELM_SOURCE_REPOSITORY)),,$(HELM_LICENSES_TARGET))
+gather-licenses: $(GATHER_LICENSES_TARGETS)
 
 .PHONY: attribution
 attribution: $(and $(filter true,$(HAS_LICENSES)),$(ATTRIBUTION_TARGETS))
