@@ -20,6 +20,10 @@ SOURCE_PATTERNS=./cmd/acmesolver ./cmd/cainjector ./cmd/controller ./cmd/webhook
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=deploy/charts/cert-manager
+HELM_ADDITIONAL_KEY_VALUES=\
+  CERT_MANAGER_CAINJECTOR_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} jetstack/cert-manager-cainjector $(LATEST)) \
+  CERT_MANAGER_CONTROLLER_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} jetstack/cert-manager-controller $(LATEST)) \
+  CERT_MANAGER_WEBHOOK_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} jetstack/cert-manager-webhook $(LATEST))
 
 include $(BASE_DIRECTORY)/Common.mk
 
