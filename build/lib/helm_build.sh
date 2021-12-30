@@ -27,12 +27,15 @@ CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 SOURCE_DIR=$(basename ${HELM_SOURCE_REPOSITORY})/${HELM_DIRECTORY}/.
 
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
+
 #
 # Copy
 #
 mkdir -p ${DEST_DIR}
-cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${DEST_DIR}/
 cp -r ${SOURCE_DIR} ${DEST_DIR}
+build::non-golang::copy_licenses ${HELM_SOURCE_REPOSITORY} $DEST_DIR/LICENSES/github.com/${HELM_SOURCE_REPOSITORY}
 
 #
 # Search and replace

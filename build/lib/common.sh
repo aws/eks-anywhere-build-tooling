@@ -181,6 +181,19 @@ function build::non-golang::gather_licenses(){
   rm -rf $project_name
 }
 
+function build::non-golang::copy_licenses(){
+  local -r source_dir="$1"
+  local -r destination_dir="$2"
+  cd $source_dir
+  license_files=($(find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)))
+  cd -
+  for file in "${license_files[@]}"; do
+    license_dest=$destination_dir/$(dirname $file)
+    mkdir -p $license_dest
+    cp "${source_dir}/${file}" $license_dest/$(basename $file)
+  done
+}
+
 function build::generate_attribution(){
   local -r project_root=$1
   local -r golang_version=$2
