@@ -179,10 +179,9 @@ function build::non-golang::gather_licenses(){
 function build::non-golang::copy_licenses(){
   local -r source_dir="$1"
   local -r destination_dir="$2"
-  cd $source_dir
-  license_files=($(find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)))
-  cd -
-  for file in "${license_files[@]}"; do
+  (cd $source_dir; find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)) |
+  while read file
+  do
     license_dest=$destination_dir/$(dirname $file)
     mkdir -p $license_dest
     cp "${source_dir}/${file}" $license_dest/$(basename $file)
