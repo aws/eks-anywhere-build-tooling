@@ -156,6 +156,7 @@ HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
 ####################################################
 
 #################### BINARIES ######################
+GOLANG_VERSION?="1.16"
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
 SIMPLE_CREATE_BINARIES?=true
 
