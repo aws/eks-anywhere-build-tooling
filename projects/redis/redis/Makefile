@@ -3,13 +3,15 @@ GIT_TAG?=$(shell cat GIT_TAG)
 
 REPO=redis
 REPO_OWNER=redis
+IMAGE_COMPONENT=redis/redis
+IMAGE_BUILD_ARGS?=IMAGE_TAG
 
+BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 SIMPLE_CREATE_BINARIES=false
-GO_MOD_DOWNLOAD_TARGETS=
 HAS_LICENSES=false
-BINARY_TARGET_FILES=redis-server
 
-BASE_IMAGE_NAME?=eks-distro-minimal-base
+BUILD_TARGETS=local-images
+RELEASE_TARGETS=images
 
 include $(BASE_DIRECTORY)/Common.mk
 

@@ -19,12 +19,25 @@ FROM $BUILDER_IMAGE as redis-builder
 COPY redis /redis
 RUN set -x && yum install -y gcc make
 WORKDIR /redis
-RUN make
+RUN case "$(uname -p)" in \
+    x86_64 | amd64) JEMALLOC_CONFIG_FLAGS="--with-lg-page=12 --with-lg-hugepage=21" ;; \
+    *) JEMALLOC_CONFIG_FLAGS="--with-lg-page=16 --with-lg-hugepage=21" ;; \
+    esac; \
+    make JEMALLOC_CONFIG_FLAGS=${JEMALLOC_CONFIG_FLAGS} -j "$(nproc)" all; \
+    make install;
 WORKDIR /
+RUN mkdir -p /data
 
 FROM $BASE_IMAGE
 ARG IMAGE_TAG=not-set
+ENV REDIS_VERSION $IMAGE_TAG
 
 COPY --from=redis-builder /redis/src/redis-server /redis-server
+COPY --from=redis-builder /data /
 
+WORKDIR /
+VOLUME /data
+WORKDIR /data
+
+EXPOSE 6379
 ENTRYPOINT ["/redis-server"]
