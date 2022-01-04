@@ -13,7 +13,7 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base
 
 include $(BASE_DIRECTORY)/Common.mk
 
-$(OUTPUT_BIN_DIR)/linux-amd64/redis-server:
+$(OUTPUT_BIN_DIR)/linux-amd64/redis-server: $(REPO)
 	$(MAKE_ROOT)/build/create_binaries.sh $(MAKE_ROOT) $(REPO)
 
 

@@ -18,8 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-PROJECT_ROOT="$1"
-REPO="$2"
+MAKE_ROOT="${1?First argument is make file root}"
+REPO="${2?Second argument is repository}"
 
-cd ${PROJECT_ROOT}/${REPO}
-make clean; make
+cd "${MAKE_ROOT}/${REPO}"
+unset MAKEFLAGS
+unset MAKELEVEL
+unset MFLAGS=
+make
