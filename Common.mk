@@ -32,6 +32,7 @@ endif
 ifneq ($(PULL_BASE_REF),main)
 	LATEST=$(PULL_BASE_REF)
 endif
+LATEST_TAG?=$(LATEST)
 ####################################################
 
 #################### CODEBUILD #####################
@@ -229,7 +230,7 @@ GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),local-images,) attribution attribution-pr $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),local-images,) attribution $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
 RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
