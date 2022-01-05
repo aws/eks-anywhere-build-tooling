@@ -17,6 +17,11 @@ images: ## Pushes `redis/images/push` to IMAGE_REPO
 redis/images/amd64: ## Builds/pushes `redis/images/amd64`
 redis/images/push: ## Builds/pushes `redis/images/push`
 
+##@ License Targets
+gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
+attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
+attribution-pr: ## Generates PR to update attribution files for projects
+
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-repo: ## Removes source directory
