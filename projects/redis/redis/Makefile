@@ -15,9 +15,6 @@ RELEASE_TARGETS=images
 
 include $(BASE_DIRECTORY)/Common.mk
 
-$(OUTPUT_BIN_DIR)/linux-amd64/redis-server: $(REPO)
-	$(MAKE_ROOT)/build/create_binaries.sh $(MAKE_ROOT) $(REPO)
-
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
