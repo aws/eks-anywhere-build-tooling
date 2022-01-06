@@ -16,28 +16,32 @@ ARG BASE_IMAGE
 ARG BUILDER_IMAGE
 FROM $BUILDER_IMAGE as redis-builder
 
-COPY redis /redis
-RUN set -x && yum install -y gcc make
-WORKDIR /redis
-RUN case "$(uname -p)" in \
-    x86_64 | amd64) JEMALLOC_CONFIG_FLAGS="--with-lg-page=12 --with-lg-hugepage=21" make -j "$(nproc)" redis-server ;; \
-    *) JEMALLOC_CONFIG_FLAGS="--with-lg-page=16 --with-lg-hugepage=21" make -j "$(nproc)" redis-server ;; \
-    esac;
 WORKDIR /
-RUN mkdir -p /data
+RUN set -x && \
+    amazon-linux-extras enable redis6 && \
+    cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo && \
+    clean_install systemd true true && \
+    clean_install redis6 && \
+    yum clean metadata && \
+    yum install -y redis
+RUN mkdir -p /newroot/LICENSES /newroot/etc /newroot/data && \
+    cp /usr/share/licenses/redis*/* /newroot/LICENSES && \
+    cp /etc/redis/redis.conf /newroot/etc && \
+    cp ./usr/lib64/libm.so.6 ./usr/lib64/libdl.so.2 ./usr/lib64/librt.so.1 ./usr/lib64/libsystemd.so.0 ./usr/lib64/libssl.so.10 ./usr/lib64/libcrypto.so.10 ./usr/lib64/libpthread.so.0 ./usr/lib64/libc.so.6 ./usr/lib64/ld-linux-x86-64.so.2 /newroot && \
+    cp /usr/bin/redis-server /newroot
 
 FROM $BASE_IMAGE
 ARG IMAGE_TAG=not-set
 ENV REDIS_VERSION $IMAGE_TAG
 
 WORKDIR /
-COPY --from=redis-builder /redis/src/redis-server /redis-server
-COPY --from=redis-builder /data /
-COPY _output/LICENSES /LICENSES
-COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+COPY --from=redis-builder /newroot/data/ /
+COPY --from=redis-builder /newroot/redis-server /redis-server
+COPY --from=redis-builder /newroot/l* /usr/lib64/
+COPY --from=redis-builder /newroot/etc/redis.conf /etc/
+COPY --from=redis-builder /newroot/LICENSES/ /
 
 VOLUME /data
-WORKDIR /data
 
 EXPOSE 6379
 ENTRYPOINT ["/redis-server"]
