@@ -306,3 +306,21 @@ function build::common::wait_for_tag() {
     fi
   done
 }
+
+function build::common::wait_for_tarball() {
+  local -r tarball_url=$1
+  sleep_interval=20
+  for i in {1..60}; do
+    echo "Checking for URL ${tarball_url}..."
+    local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $tarball_url)
+    if [[ "$http_code" == "200" ]]; then 
+      echo "Tarball exists!" && break
+    fi
+    echo "Tarball does not exist!"
+    echo "Waiting for tarball to be uploaded to ${tarball_url}"
+    sleep $sleep_interval
+    if [ "$i" = "60" ]; then
+      exit 1
+    fi
+  done
+}
