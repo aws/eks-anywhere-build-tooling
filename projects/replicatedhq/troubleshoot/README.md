@@ -30,16 +30,13 @@ make update-attribution-checksums-docker PROJECT=replicatedhq/troubleshoot
 1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
 
 
-### Manually Testing Troubleshoot Version Compatibility
+### Testing Troubleshoot Version Compatibility
 1. build the desired version locally from the Build Tooling repo.
    - The make target `make binaries` will generate linux and darwin binaries for Troubleshoot, outputting them to `./_output/bin/troubleshoot`
-1. copy the support-bundle binary to your path
+   - For more options, see [the Development documentation](https://github.com/aws/eks-anywhere-build-tooling/blob/main/docs/development/building-locally.md)
+1. add the `support-bundle` binary for your platform to your path
 1. set the env var `MR_TOOLS_DISABLE=false`, so that the EKS-A commands will use local binaries
 1. test the following commands against an existing EKS-A cluster:
-    - run `eksctl-anywhere generate support-bundle-config`
-    - run `eksctl-anywehre generate support-bundle`
-   
-#### Test Troubleshoot version with EKS-A
 ```bash
 export MR_TOOLS_DISABLE=true
 eksctl-anywhere generate support-bundle -f $MY_CLUSTER_CONFIG_FILE
