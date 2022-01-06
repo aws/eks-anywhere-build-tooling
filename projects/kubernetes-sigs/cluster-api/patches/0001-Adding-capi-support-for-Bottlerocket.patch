@@ -1,0 +1,281 @@
+From a402324ce22d0a619caa295a1134bb78491261a9 Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Fri, 11 Jun 2021 10:43:09 -0700
+Subject: [PATCH 01/36] Adding capi support for Bottlerocket
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+---
+ .../api/v1alpha3/kubeadmconfig_types.go       |  5 +-
+ .../api/v1beta1/kubeadmconfig_types.go        |  5 +-
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  1 +
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  1 +
+ .../controllers/kubeadmconfig_controller.go   | 48 +++++++++++++++--
+ .../bottlerocket/controlplane_init.go         | 54 +++++++++++++++++++
+ .../kubeadm/internal/bottlerocket/node.go     |  9 ++++
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  1 +
+ 8 files changed, 118 insertions(+), 6 deletions(-)
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/node.go
+
+diff --git a/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
+index 919b71417..295ce7a3b 100644
+--- a/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
++++ b/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
+@@ -23,12 +23,15 @@ import (
+ )
+ 
+ // Format specifies the output format of the bootstrap data
+-// +kubebuilder:validation:Enum=cloud-config
++// +kubebuilder:validation:Enum=cloud-config;bottlerocket
+ type Format string
+ 
+ const (
+ 	// CloudConfig make the bootstrap data to be of cloud-config format.
+ 	CloudConfig Format = "cloud-config"
++
++	// Bottlerocket make the bootstrap data to be of bottlerocket format.
++	Bottlerocket Format = "bottlerocket"
+ )
+ 
+ // KubeadmConfigSpec defines the desired state of KubeadmConfig.
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
+index 71fa3edbc..c2f43e083 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
+@@ -22,12 +22,15 @@ import (
+ )
+ 
+ // Format specifies the output format of the bootstrap data
+-// +kubebuilder:validation:Enum=cloud-config
++// +kubebuilder:validation:Enum=cloud-config;bottlerocket
+ type Format string
+ 
+ const (
+ 	// CloudConfig make the bootstrap data to be of cloud-config format.
+ 	CloudConfig Format = "cloud-config"
++
++	// Bottlerocket make the bootstrap data to be of bottlerocket format.
++	Bottlerocket Format = "bottlerocket"
+ )
+ 
+ // KubeadmConfigSpec defines the desired state of KubeadmConfig.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index 65fdb534b..2dd794c25 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -1480,6 +1480,7 @@ spec:
+                 description: Format specifies the output format of the bootstrap data
+                 enum:
+                 - cloud-config
++                - bottlerocket
+                 type: string
+               initConfiguration:
+                 description: InitConfiguration along with ClusterConfiguration are
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index dad843599..5ca367733 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -1502,6 +1502,7 @@ spec:
+                           data
+                         enum:
+                         - cloud-config
++                        - bottlerocket
+                         type: string
+                       initConfiguration:
+                         description: InitConfiguration along with ClusterConfiguration
+diff --git a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
+index b80ee52a7..cd10c1b60 100644
+--- a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
+@@ -18,6 +18,7 @@ package controllers
+ 
+ import (
+ 	"context"
++	"encoding/base64"
+ 	"fmt"
+ 	"strconv"
+ 	"time"
+@@ -34,6 +35,7 @@ import (
+ 	"k8s.io/utils/pointer"
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
++	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/bottlerocket"
+ 	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
+ 	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/locking"
+ 	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types"
+@@ -432,7 +434,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		return ctrl.Result{}, err
+ 	}
+ 
+-	cloudInitData, err := cloudinit.NewInitControlPlane(&cloudinit.ControlPlaneInput{
++	controlPlaneInput := &cloudinit.ControlPlaneInput{
+ 		BaseUserData: cloudinit.BaseUserData{
+ 			AdditionalFiles:     files,
+ 			NTP:                 scope.Config.Spec.NTP,
+@@ -446,13 +448,28 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		InitConfiguration:    initdata,
+ 		ClusterConfiguration: clusterdata,
+ 		Certificates:         certificates,
+-	})
++	}
++
++	var bootstrapInitData []byte
++	bootstrapInitData, err = cloudinit.NewInitControlPlane(controlPlaneInput)
+ 	if err != nil {
+ 		scope.Error(err, "Failed to generate cloud init for bootstrap control plane")
+ 		return ctrl.Result{}, err
+ 	}
+ 
+-	if err := r.storeBootstrapData(ctx, scope, cloudInitData); err != nil {
++	// Consume the created cloudinit controlplane data and create the bottlerocket cloudinit data
++	if scope.Config.Spec.Format == bootstrapv1.Bottlerocket {
++		// Convert the cloudinit to base64 encoding before using it
++		b64BootStrapCloudInit := base64.StdEncoding.EncodeToString(bootstrapInitData)
++
++		bootstrapInitData, err = bottlerocket.NewInitControlPlane(b64BootStrapCloudInit, scope.Config.Spec.Users)
++		if err != nil {
++			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
++			return ctrl.Result{}, err
++		}
++	}
++
++	if err := r.storeBootstrapData(ctx, scope, bootstrapInitData); err != nil {
+ 		scope.Error(err, "Failed to store bootstrap data")
+ 		return ctrl.Result{}, err
+ 	}
+@@ -532,6 +549,17 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		return ctrl.Result{}, err
+ 	}
+ 
++	// Consume the join cloudinit to generate Bottlerocket cloudinit for worker
++	if scope.Config.Spec.Format == bootstrapv1.Bottlerocket {
++		// Convert the cloudinit to base64 encoding before using it
++		b64BootStrapCloudInit := base64.StdEncoding.EncodeToString(cloudJoinData)
++		cloudJoinData, err = bottlerocket.NewNode(b64BootStrapCloudInit, scope.Config.Spec.Users)
++		if err != nil {
++			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
++			return ctrl.Result{}, err
++		}
++	}
++
+ 	if err := r.storeBootstrapData(ctx, scope, cloudJoinData); err != nil {
+ 		scope.Error(err, "Failed to store bootstrap data")
+ 		return ctrl.Result{}, err
+@@ -616,6 +644,17 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		return ctrl.Result{}, err
+ 	}
+ 
++	// Consume the created cloudinit controlplane data and create the bottlerocket cloudinit data
++	if scope.Config.Spec.Format == bootstrapv1.Bottlerocket {
++		// Convert the cloudinit to base64 encoding before using it
++		b64BootStrapCloudInit := base64.StdEncoding.EncodeToString(cloudJoinData)
++		cloudJoinData, err = bottlerocket.NewInitControlPlane(b64BootStrapCloudInit, scope.Config.Spec.Users)
++		if err != nil {
++			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
++			return ctrl.Result{}, err
++		}
++	}
++
+ 	if err := r.storeBootstrapData(ctx, scope, cloudJoinData); err != nil {
+ 		scope.Error(err, "Failed to store bootstrap data")
+ 		return ctrl.Result{}, err
+@@ -877,7 +916,8 @@ func (r *KubeadmConfigReconciler) storeBootstrapData(ctx context.Context, scope
+ 			},
+ 		},
+ 		Data: map[string][]byte{
+-			"value": data,
++			"value":  data,
++			"format": []byte(scope.Config.Spec.Format),
+ 		},
+ 		Type: clusterv1.ClusterSecretType,
+ 	}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+new file mode 100644
+index 000000000..3143fa50e
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+@@ -0,0 +1,54 @@
++// TODO: make bottlerocket(init) more agnostic. In addition to other changes to make things
++// less hacky, also move calling cloudinit from controller and passing it to
++// bottlerocket bootstrap, to all control to bottlerocket bootstrap itself.
++// That way, bottlerocket bootstrap will call cloudinit to generate that userdata
++// which is much more cleaner.
++package bottlerocket
++
++import (
++	"encoding/base64"
++	"fmt"
++	"strings"
++
++	capbk "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
++)
++
++type ControlPlaneInput struct {
++	BootstrapSettings     string
++	KubernetesSettings    string
++	HostContainerSettings string
++}
++
++func NewInitControlPlane(cloudinitInput string, sshAuthUsers []capbk.User) ([]byte, error) {
++	// Parse ssh auth keys
++	keys := ""
++	for _, user := range sshAuthUsers {
++		for _, key := range user.SSHAuthorizedKeys {
++			keys += "\"" + key + "\","
++		}
++	}
++	authInitData := fmt.Sprintf("{\"ssh\":{\"authorized-keys\":[%s]}}\n", strings.TrimRight(keys, ","))
++	b64AuthInitString := base64.StdEncoding.EncodeToString([]byte(authInitData))
++
++	cpInput := new(ControlPlaneInput)
++	cpInput.BootstrapSettings = fmt.Sprintf(`[settings.host-containers.kubeadm-the-hard-way]
++enabled = true
++superpowered = true
++source = "public.ecr.aws/k1e6s8o8/kubeadm-the-hard-way:0.0.1"
++user-data = "%s"
++`, cloudinitInput)
++
++	cpInput.KubernetesSettings = `[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false`
++
++	// TODO: replace user data??
++	cpInput.HostContainerSettings = fmt.Sprintf(`[settings.host-containers.admin]
++enabled = true
++user-data = "%s"`, b64AuthInitString)
++
++	userData := fmt.Sprintf("%s%s\n%s", cpInput.BootstrapSettings, cpInput.KubernetesSettings, cpInput.HostContainerSettings)
++	return []byte(userData), nil
++}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/node.go b/bootstrap/kubeadm/internal/bottlerocket/node.go
+new file mode 100644
+index 000000000..6a699c060
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/node.go
+@@ -0,0 +1,9 @@
++package bottlerocket
++
++import capbk "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
++
++// Worker node configuration for bottlerocket is as same as for controlplane
++// Only the cloudinit userdata is different, which cloudinit package handles
++func NewNode(cloudinitInput string, sshAuthKeys []capbk.User) ([]byte, error) {
++	return NewInitControlPlane(cloudinitInput, sshAuthKeys)
++}
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 67b80eab1..1dce778ea 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -583,6 +583,7 @@ spec:
+                       data
+                     enum:
+                     - cloud-config
++                    - bottlerocket
+                     type: string
+                   initConfiguration:
+                     description: InitConfiguration along with ClusterConfiguration
+-- 
+2.30.1
+

@@ -1,6 +1,6 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.13"
+GOLANG_VERSION?="1.16"
 
 REPO=cluster-api
 REPO_OWNER=kubernetes-sigs
@@ -9,7 +9,7 @@ LICENSE_PACKAGE_FILTER?=./cmd/clusterctl ./bootstrap/kubeadm ./controlplane/kube
 
 BINARY_TARGET_FILES=clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager
 SOURCE_PATTERNS=sigs.k8s.io/cluster-api/cmd/clusterctl sigs.k8s.io/cluster-api sigs.k8s.io/cluster-api/bootstrap/kubeadm sigs.k8s.io/cluster-api/controlplane/kubeadm sigs.k8s.io/cluster-api/test/infrastructure/docker
-EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/cmd/version)
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/version)
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-nonroot
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
@@ -43,7 +43,7 @@ $(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSES_OUT
 
 s3-artifacts: create-manifests
 
-cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-docker-client
+cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
 $(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 .PHONY: create-manifests
