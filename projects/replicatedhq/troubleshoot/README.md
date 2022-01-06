@@ -5,6 +5,8 @@
 
 The EKS-A diagnostic bundle functionality is built on top of troubleshoot.
 
+> Pro tip: `make help` to see the various targets and actions available
+
 ### Updating
 
 1. Review releases and changelogs in upstream [repo](https://github.com/replicatedhq/troubleshoot) and decide on new version.
@@ -29,23 +31,14 @@ make update-attribution-checksums-docker PROJECT=replicatedhq/troubleshoot
 
 
 ### Manually Testing Troubleshoot Version Compatibility
-1. build the desired version locally (`make support-bundle`)
+1. build the desired version locally from the Build Tooling repo.
+   - The make target `make binaries` will generate linux and darwin binaries for Troubleshoot, outputting them to `./_output/bin/troubleshoot`
 1. copy the support-bundle binary to your path
 1. set the env var `MR_TOOLS_DISABLE=false`, so that the EKS-A commands will use local binaries
 1. test the following commands against an existing EKS-A cluster:
     - run `eksctl-anywhere generate support-bundle-config`
     - run `eksctl-anywehre generate support-bundle`
-
-#### Get and build Troubleshoot locally
-```bash
-git clone https://github.com/replicatedhq/troubleshoot
-cd ./troubleshoot
-git checkout $DESIRED_RELEASE_TAG
-make support-bundle
-cp ./bin/support-bundle /usr/local/bin
-support-bundle version
-```
-
+   
 #### Test Troubleshoot version with EKS-A
 ```bash
 export MR_TOOLS_DISABLE=true

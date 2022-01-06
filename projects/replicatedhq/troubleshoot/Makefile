@@ -5,6 +5,8 @@ GOLANG_VERSION?="1.17"
 REPO=troubleshoot
 REPO_OWNER=replicatedhq
 
+BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
+
 BINARY_TARGET_FILES=support-bundle
 SOURCE_PATTERNS=./cmd/troubleshoot
 EXTRA_GO_LDFLAGS=-X github.com/replicatedhq/troubleshoot/pkg/version.version=$(GIT_TAG)	\
