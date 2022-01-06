@@ -156,7 +156,7 @@ HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
 ####################################################
 
 #################### BINARIES ######################
-GOLANG_VERSION?="1.16"
+GOLANG_VERSION?=""
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
 SIMPLE_CREATE_BINARIES?=true
 
@@ -378,7 +378,11 @@ $(GATHER_LICENSES_TARGETS): $(GO_MOD_DOWNLOAD_TARGETS)
 
 # Match all variables of ATTRIBUTION.txt `ATTRIBUTION.txt` `{RELEASE_BRANCH}/ATTRIBUTION.txt` `CAPD_ATTRIBUTION.txt`
 %TTRIBUTION.txt: $(GATHER_LICENSES_TARGETS)
+ifeq ($(GOLANG_VERSION),"")
+	$(BASE_DIRECTORY)/build/lib/non_golang_attribution.sh $(MAKE_ROOT) $(REPO_OWNER) $(REPO) $(GIT_TAG) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) $(@F)
+else
 	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) $(@F) $(RELEASE_BRANCH)
+endif
 
 .PHONY: gather-licenses
 gather-licenses: $(GATHER_LICENSES_TARGETS)

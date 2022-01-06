@@ -188,6 +188,30 @@ function build::non-golang::copy_licenses(){
   done
 }
 
+function build::non-golang::generate_attribution(){
+  local -r project_root="$1"
+  local -r repo_owner="$2"
+  local -r repo="$3"
+  local -r version="$4"
+  local -r output_dir="$5"
+  local -r filename="$6"
+  find $repo \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \) |
+  while read file
+  do
+    echo "** github/${repo_owner}/${repo}; version $version --"
+    echo "https://github/${repo_owner}/${repo}/${file}"
+    echo
+    case "$file" in
+    "*NOTICE*") echo "* For github.com/${repo_owner}/${repo}/ see also this required NOTICE:";;
+    esac
+    cat $file
+    echo
+    echo '------'
+    echo
+  done >${output_dir}/${filename}
+  cp ${output_dir}/${filename} ${project_root}/${filename}
+}
+
 function build::generate_attribution(){
   local -r project_root=$1
   local -r golang_version=$2
