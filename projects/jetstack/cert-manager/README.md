@@ -24,6 +24,15 @@ The helm chart is a modified version of the source helm chart located in the jet
 
 If there are any patches to the make file, use `git format-patch $(cat ../GIT_TAG)` and add them to the `helm/patches` directory.
 
+### Cert manager manifest
+
+The cert-manager.yaml manifest is currently stored in the build/ repo. This is the cert-manager.yaml from the assets of the current GIT_TAG(v1.5.3)
+The later tags of cert-manager (v1.7.0-alpha.0 onwards) have a make target that helps create this static cert-manager.yaml from the helm chart.
+But right now we're not upgrading the cert-manager tag beyond v1.5.3 since that's what the currently used tag of Cluster API(v1.0.1) uses.
+So till we use cert-manager tags lesser between v1.5.3 and v1.7.0, we need to get the cert-manager.yaml for each release from the assets section
+and replace build/cert-manager.yaml with that. The reason we are doing this instead of fetching the file from github is to avoid getting the file
+from github during each build, and so we're sure nothing changes in the file even if something changes later in the release assets.
+
 ### Updating
 
 1. Update cert-manager tag when updating cluster-api tag if cluster-api is using a newer tag.
@@ -48,6 +57,7 @@ If there are any patches to the make file, use `git format-patch $(cat ../GIT_TA
    capi version you are updating to.
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
+1. Update the cert-manager.yaml manifest using `make update-cert-manager-manifest` from this directory
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=jetstack/cert-manager` from the root of the repo.
 1. Update the version at the top of this Readme.
 1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.

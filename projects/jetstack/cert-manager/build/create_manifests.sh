@@ -17,12 +17,9 @@ set -x
 set -o errexit
 set -o pipefail
 
-REPO="$1"
-OUTPUT_DIR="$2"
-ARTIFACTS_PATH="$3"
-TAG="$4"
+ARTIFACTS_PATH="$1"
+BASE_DIRECTORY="$2"
 
-mkdir -p $OUTPUT_DIR/assets
-#TODO: find cert-manager make target to use to generate the cert-manager.yaml file
-wget -q https://github.com/jetstack/cert-manager/releases/download/$TAG/cert-manager.yaml -O $OUTPUT_DIR/assets/cert-manager.yaml
-cp -rf $OUTPUT_DIR/assets $ARTIFACTS_PATH
+#TODO: use cert-manager make target to generate the cert-manager.yaml file when we upgrade cert-manager version (v1.7.0-alpha.0)
+mkdir -p $ARTIFACTS_PATH/assets
+cp $BASE_DIRECTORY/projects/jetstack/cert-manager/build/cert-manager.yaml $ARTIFACTS_PATH/assets

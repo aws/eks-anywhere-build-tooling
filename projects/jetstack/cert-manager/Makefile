@@ -43,7 +43,11 @@ s3-artifacts: create-manifests
 
 .PHONY: create-manifests
 create-manifests:
-	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG)
+	build/create_manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY)
+
+.PHONY: update-cert-manager-manifest
+update-cert-manager-manifest:
+	wget -q https://github.com/jetstack/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O build/cert-manager.yaml
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
