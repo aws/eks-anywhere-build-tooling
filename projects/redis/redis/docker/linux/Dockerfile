@@ -20,11 +20,9 @@ COPY redis /redis
 RUN set -x && yum install -y gcc make
 WORKDIR /redis
 RUN case "$(uname -p)" in \
-    x86_64 | amd64) JEMALLOC_CONFIG_FLAGS="--with-lg-page=12 --with-lg-hugepage=21" ;; \
-    *) JEMALLOC_CONFIG_FLAGS="--with-lg-page=16 --with-lg-hugepage=21" ;; \
-    esac; \
-    make JEMALLOC_CONFIG_FLAGS=${JEMALLOC_CONFIG_FLAGS} -j "$(nproc)" all; \
-    make install;
+    x86_64 | amd64) JEMALLOC_CONFIG_FLAGS="--with-lg-page=12 --with-lg-hugepage=21" make -j "$(nproc)" redis-server ;; \
+    *) JEMALLOC_CONFIG_FLAGS="--with-lg-page=16 --with-lg-hugepage=21" make -j "$(nproc)" redis-server ;; \
+    esac;
 WORKDIR /
 RUN mkdir -p /data
 
@@ -32,10 +30,12 @@ FROM $BASE_IMAGE
 ARG IMAGE_TAG=not-set
 ENV REDIS_VERSION $IMAGE_TAG
 
+WORKDIR /
 COPY --from=redis-builder /redis/src/redis-server /redis-server
 COPY --from=redis-builder /data /
+COPY _output/LICENSES /LICENSES
+COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
-WORKDIR /
 VOLUME /data
 WORKDIR /data
 
