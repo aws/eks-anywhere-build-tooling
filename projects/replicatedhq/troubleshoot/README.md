@@ -15,9 +15,11 @@ The EKS-A diagnostic bundle functionality is built on top of troubleshoot.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
    ex: [0.13.2 compared to 0.23.0](https://github.com/replicatedhq/troubleshoot/compare/v0.13.10...v0.26.0). Check the `support-bundle` target for
    any build flag changes, tag changes, dependencies, etc.
-- When proforming significant version upgrades, it is prudent to manually test that the new troubleshoot version works with the existing EKS-A workflow. You can do this by:
+- When proforming significant version upgrades, it is prudent to manually test that the new troubleshoot version 
+  works with the existing EKS-A workflow. You can do this using the instructions in the section "Manually Testing Troubleshoot Version Compatibility".
 
 1. Verify the golang version has not changed. The version specified in `go.mod` and the `Makefile` is kept up-to-date.
+   - if the Go version has changed, you'll need to bump the Go version set in the [project specific `Makefile`](https://github.com/aws/eks-anywhere-build-tooling/blob/main/projects/replicatedhq/troubleshoot/Makefile) to match. 
 1. Update checksums and attribution by running the following command from the root of the build tooling repo:
 ```
 make update-attribution-checksums-docker PROJECT=replicatedhq/troubleshoot
@@ -26,7 +28,7 @@ make update-attribution-checksums-docker PROJECT=replicatedhq/troubleshoot
 1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
 
 
-### Manually Testing Troubleshoot Version Compatiability
+### Manually Testing Troubleshoot Version Compatibility
 1. build the desired version locally (`make support-bundle`)
 1. copy the support-bundle binary to your path
 1. set the env var `MR_TOOLS_DISABLE=false`, so that the EKS-A commands will use local binaries
@@ -34,7 +36,7 @@ make update-attribution-checksums-docker PROJECT=replicatedhq/troubleshoot
     - run `eksctl-anywhere generate support-bundle-config`
     - run `eksctl-anywehre generate support-bundle`
 
-### Get and build Troubleshoot locally
+#### Get and build Troubleshoot locally
 ```bash
 git clone https://github.com/replicatedhq/troubleshoot
 cd ./troubleshoot
@@ -44,7 +46,7 @@ cp ./bin/support-bundle /usr/local/bin
 support-bundle version
 ```
 
-### Test Troubleshoot version with EKS-A
+#### Test Troubleshoot version with EKS-A
 ```bash
 export MR_TOOLS_DISABLE=true
 eksctl-anywhere generate support-bundle -f $MY_CLUSTER_CONFIG_FILE
