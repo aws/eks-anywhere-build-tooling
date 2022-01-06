@@ -32,7 +32,6 @@ endif
 ifneq ($(PULL_BASE_REF),main)
 	LATEST=$(PULL_BASE_REF)
 endif
-LATEST_TAG?=$(LATEST)
 ####################################################
 
 #################### CODEBUILD #####################
