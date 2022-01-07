@@ -40,13 +40,13 @@ FOOTER="########### END GENERATED ###########################"
 MAKEFILE=$PROJECT_ROOT/Makefile
 HELPFILE=$PROJECT_ROOT/Help.mk
 
-gsed -i "/$HEADER/,/$FOOTER/d" $MAKEFILE
+sed -i "/$HEADER/,/$FOOTER/d" $MAKEFILE
 # remove trailing newlines
 printf %s "$(< $MAKEFILE)" > $MAKEFILE
 
 touch $HELPFILE
 
-gsed -i "/$HEADER/,/$FOOTER/d" $HELPFILE
+sed -i "/$HEADER/,/$FOOTER/d" $HELPFILE
 # remove trailing newlines
 printf %s "$(< $HELPFILE)" > $HELPFILE
 
