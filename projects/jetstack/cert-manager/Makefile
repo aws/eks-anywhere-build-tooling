@@ -43,7 +43,7 @@ s3-artifacts: create-manifests
 
 .PHONY: create-manifests
 create-manifests:
-	build/create_manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY)
+	build/create_manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY) $(GIT_TAG)
 
 .PHONY: update-cert-manager-manifest
 update-cert-manager-manifest:
