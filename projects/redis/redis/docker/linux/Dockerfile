@@ -21,27 +21,21 @@ RUN set -x && \
     amazon-linux-extras enable redis6 && \
     cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo && \
     clean_install systemd true true && \
-    clean_install redis6 && \
-    yum clean metadata && \
-    yum install -y redis
-RUN mkdir -p /newroot/LICENSES /newroot/etc /newroot/data && \
-    cp /usr/share/licenses/redis*/* /newroot/LICENSES && \
-    cp /etc/redis/redis.conf /newroot/etc && \
-    cp ./usr/lib64/libm.so.6 ./usr/lib64/libdl.so.2 ./usr/lib64/librt.so.1 ./usr/lib64/libsystemd.so.0 ./usr/lib64/libssl.so.10 ./usr/lib64/libcrypto.so.10 ./usr/lib64/libpthread.so.0 ./usr/lib64/libc.so.6 ./usr/lib64/ld-linux-x86-64.so.2 /newroot && \
-    cp /usr/bin/redis-server /newroot
+    clean_install redis && \
+    remove_package systemd true && \
+    cleanup "redis"
+RUN set -x && \
+    sed -i -e 's/^logfile .*/logfile ""/' /newroot/etc/redis/redis.conf
 
 FROM $BASE_IMAGE
 ARG IMAGE_TAG=not-set
 ENV REDIS_VERSION $IMAGE_TAG
 
+COPY --from=redis-builder /newroot /
+
 WORKDIR /
-COPY --from=redis-builder /newroot/data/ /
-COPY --from=redis-builder /newroot/redis-server /redis-server
-COPY --from=redis-builder /newroot/l* /usr/lib64/
-COPY --from=redis-builder /newroot/etc/redis.conf /etc/
-COPY --from=redis-builder /newroot/LICENSES/ /
 
 VOLUME /data
-
 EXPOSE 6379
-ENTRYPOINT ["/redis-server"]
+ENTRYPOINT ["/usr/bin/redis-server"]
+CMD ["/etc/redis/redis.conf"]
