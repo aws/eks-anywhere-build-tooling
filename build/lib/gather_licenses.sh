@@ -17,20 +17,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REPO_OWNER="${1?First argument is repository owner}"
-REPO="${2?Second argument is repository}"
-OUTPUT_DIR="${3?Third argument is output directory}"
-PACKAGE_FILTER="${4?Fourth argument is package filter}"
-REPO_SUBPATH="${5?Fifth argument is repository subpath}"
-GO_LICENSES="${6?Sixth argument is go license flag}"
+REPO="$1"
+OUTPUT_DIR="$2"
+PACKAGE_FILTER="$3"
+REPO_SUBPATH="${4:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
-if [ "${GO_LICENSES}" == "false" ]
-then
-  build::non-golang::copy_licenses ${REPO}/${REPO_SUBPATH} $OUTPUT_DIR/LICENSES/github.com/${REPO_OWNER}/${REPO}
-else
-  cd $REPO/$REPO_SUBPATH
-  build::gather_licenses $OUTPUT_DIR "$PACKAGE_FILTER"
-fi
+cd $REPO/$REPO_SUBPATH
+build::gather_licenses $OUTPUT_DIR "$PACKAGE_FILTER"

@@ -156,7 +156,6 @@ HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
 ####################################################
 
 #################### BINARIES ######################
-GOLANG_VERSION?=
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
 SIMPLE_CREATE_BINARIES?=true
 
@@ -209,7 +208,6 @@ FETCH_BINARIES_TARGETS?=
 LICENSE_PACKAGE_FILTER?=$(SOURCE_PATTERNS)
 REPO_SUBPATH?=
 HAS_LICENSES?=true
-HAS_GO_LICENSES?=true
 ATTRIBUTION_TARGETS?=$(if $(wildcard $(RELEASE_BRANCH)/ATTRIBUTION.txt),$(RELEASE_BRANCH)/ATTRIBUTION.txt,ATTRIBUTION.txt)
 GATHER_LICENSES_TARGETS?=$(OUTPUT_DIR)/attribution/go-license.csv
 LICENSES_OUTPUT_DIR?=$(OUTPUT_DIR)
@@ -374,15 +372,11 @@ $(OUTPUT_DIR)/ATTRIBUTION.txt:
 
 ## Gather licenses for project based on dependencies in REPO.
 $(GATHER_LICENSES_TARGETS): $(GO_MOD_DOWNLOAD_TARGETS)
-	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO_OWNER) $(REPO) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) "$(LICENSE_PACKAGE_FILTER)" "$(REPO_SUBPATH)" "$(HAS_GO_LICENSES)"
+	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) "$(LICENSE_PACKAGE_FILTER)" "$(REPO_SUBPATH)" "$(HAS_GO_LICENSES)"
 
 # Match all variables of ATTRIBUTION.txt `ATTRIBUTION.txt` `{RELEASE_BRANCH}/ATTRIBUTION.txt` `CAPD_ATTRIBUTION.txt`
 %TTRIBUTION.txt: $(GATHER_LICENSES_TARGETS)
-ifeq ($(GOLANG_VERSION),)
-	$(BASE_DIRECTORY)/build/lib/non_golang_attribution.sh $(MAKE_ROOT) $(REPO_OWNER) $(REPO) $(GIT_TAG) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) $(@F)
-else
 	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSES_OUTPUT_DIR) $(@F) $(RELEASE_BRANCH)
-endif
 
 .PHONY: gather-licenses
 gather-licenses: $(GATHER_LICENSES_TARGETS)
