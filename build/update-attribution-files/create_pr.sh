@@ -108,7 +108,7 @@ EOF
 function pr::create::help() {
     local -r pr_title="Update Makefile generated help"
     local -r commit_message="[PR BOT] Update Help.mk files"
-    local -r pr_branch="checksums-files-update-$MAIN_BRANCH"
+    local -r pr_branch="help-makefiles-update-$MAIN_BRANCH"
     local -r pr_body=$(cat <<EOF
 This PR updates the Help.mk files across all dependency projects if there have been changes.
 
