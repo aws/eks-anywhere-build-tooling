@@ -1,0 +1,203 @@
+From 78851a4becc003c47c1fae52db482a164fc59bb3 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Thu, 5 Aug 2021 13:13:18 -0700
+Subject: [PATCH] Synchronize upgrade flow
+
+Etcd machines need to be rolled out first so that KCP can get the
+correct set of etcd endpoints. KCP rollout should be stalled till etcd upgrade
+is done. Cluster controller may not be able to add the paused annotation on time
+once updated spec is applied, since etcd and KCP controllers could have
+started reconciling at the same time. So KCP checks if etcd cluster has the
+upgrading annotation, and does not proceed further until the annotation is removed.
+Once KCP has rolled out updated machines, it will add an annotation on the etcd
+cluster to indicate that the KCP upgrade is complete. In absence of static etcd
+endpoints, currently etcd controller retains older etcd members for KCP upgrade,
+and once KCP upgrade complete annotation is set, the etcd controller will
+remove these older etcd members
+
+cr: https://code.amazon.com/reviews/CR-54933898
+---
+ .../kubeadm/api/v1alpha3/condition_consts.go  |  8 ++++
+ .../kubeadm/api/v1beta1/condition_consts.go   |  8 ++++
+ .../kubeadm/controllers/controller.go         | 41 +++++++++++++++++++
+ controlplane/kubeadm/controllers/upgrade.go   |  6 +++
+ .../kubeadm/internal/workload_cluster.go      |  1 +
+ .../kubeadm/internal/workload_cluster_etcd.go |  9 +++-
+ 6 files changed, 72 insertions(+), 1 deletion(-)
+
+diff --git a/controlplane/kubeadm/api/v1alpha3/condition_consts.go b/controlplane/kubeadm/api/v1alpha3/condition_consts.go
+index 5178960bc..d1ffc27f1 100644
+--- a/controlplane/kubeadm/api/v1alpha3/condition_consts.go
++++ b/controlplane/kubeadm/api/v1alpha3/condition_consts.go
+@@ -54,6 +54,14 @@ const (
+ 	// RollingUpdateInProgressReason (Severity=Warning) documents a KubeadmControlPlane object executing a
+ 	// rolling upgrade for aligning the machines spec to the desired state.
+ 	RollingUpdateInProgressReason = "RollingUpdateInProgress"
++
++	// ExternalEtcdEndpointsAvailable documents that the external etcd cluster's endpoints are available, and if KCP spec has changed
++	// then a KCP rollout can progress.
++	ExternalEtcdEndpointsAvailable clusterv1.ConditionType = "ExternalEtcdEndpointsAvailable"
++
++	// ExternalEtcdUndergoingUpgrade (Severity=Info) documents the external etcd cluster being used by current KCP object is
++	// undergoing an upgrade and that the etcd endpoints will change once the upgrade completes
++	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
+ )
+ 
+ const (
+diff --git a/controlplane/kubeadm/api/v1beta1/condition_consts.go b/controlplane/kubeadm/api/v1beta1/condition_consts.go
+index be78c7670..1b884b8ba 100644
+--- a/controlplane/kubeadm/api/v1beta1/condition_consts.go
++++ b/controlplane/kubeadm/api/v1beta1/condition_consts.go
+@@ -54,6 +54,14 @@ const (
+ 	// RollingUpdateInProgressReason (Severity=Warning) documents a KubeadmControlPlane object executing a
+ 	// rolling upgrade for aligning the machines spec to the desired state.
+ 	RollingUpdateInProgressReason = "RollingUpdateInProgress"
++
++	// ExternalEtcdEndpointsAvailable documents that the external etcd cluster's endpoints are available, and if KCP spec has changed
++	// then a KCP rollout can progress.
++	ExternalEtcdEndpointsAvailable clusterv1.ConditionType = "ExternalEtcdEndpointsAvailable"
++
++	// ExternalEtcdUndergoingUpgrade (Severity=Info) documents the external etcd cluster being used by current KCP object is
++	// undergoing an upgrade and that the etcd endpoints will change once the upgrade completes
++	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
+ )
+ 
+ const (
+diff --git a/controlplane/kubeadm/controllers/controller.go b/controlplane/kubeadm/controllers/controller.go
+index e9a51b6f7..6e1cd50e7 100644
+--- a/controlplane/kubeadm/controllers/controller.go
++++ b/controlplane/kubeadm/controllers/controller.go
+@@ -175,12 +175,35 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+ 		sort.Strings(currentEtcdEndpoints)
+ 		currentKCPEndpoints := kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints
+ 		if !reflect.DeepEqual(currentEtcdEndpoints, currentKCPEndpoints) {
++			/* During upgrade, KCP spec's endpoints will again be an empty list, and will get populated by the cluster controller once the
++			external etcd controller has set them. If the KCP controller proceeds without checking whether the etcd cluster is undergoing upgrade,
++			there is a chance it will get the current un-updated endpoints from the etcd cluster object, and those would end up being endpoints of the
++			etcd members that will get deleted during upgrade. Hence the controller checks and stalls if the etcd cluster is undergoing upgrade and proceeds
++			only after the etcd upgrade is completed as that guarantees that the KCP has latest set of endpoints.
++			*/
++			etcdUpgradeInProgress, err := external.IsExternalEtcdUpgrading(externalEtcd)
++			if err != nil {
++				return ctrl.Result{}, err
++			}
++			if etcdUpgradeInProgress {
++				log.Info("Etcd undergoing upgrade, marking etcd endpoints available condition as false, since new endpoints will be available only after etcd upgrade")
++				if conditions.IsTrue(kcp, controlplanev1.ExternalEtcdEndpointsAvailable) || conditions.IsUnknown(kcp, controlplanev1.ExternalEtcdEndpointsAvailable) {
++					conditions.MarkFalse(kcp, controlplanev1.ExternalEtcdEndpointsAvailable, controlplanev1.ExternalEtcdUndergoingUpgrade, clusterv1.ConditionSeverityInfo, "")
++					if err := patchKubeadmControlPlane(ctx, patchHelper, kcp); err != nil {
++						return ctrl.Result{}, err
++					}
++				}
++				return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
++			}
+ 			kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints = currentEtcdEndpoints
+ 			if err := patchHelper.Patch(ctx, kcp); err != nil {
+ 				log.Error(err, "Failed to patch KubeadmControlPlane to update external etcd endpoints")
+ 				return ctrl.Result{}, err
+ 			}
+ 		}
++		if conditions.IsFalse(kcp, controlplanev1.ExternalEtcdEndpointsAvailable) {
++			conditions.MarkTrue(kcp, controlplanev1.ExternalEtcdEndpointsAvailable)
++		}
+ 	}
+ 
+ 	// Add finalizer first if not exist to avoid the race condition between init and delete
+@@ -246,6 +269,7 @@ func patchKubeadmControlPlane(ctx context.Context, patchHelper *patch.Helper, kc
+ 			controlplanev1.MachinesReadyCondition,
+ 			controlplanev1.AvailableCondition,
+ 			controlplanev1.CertificatesAvailableCondition,
++			controlplanev1.ExternalEtcdEndpointsAvailable,
+ 		),
+ 	)
+ 
+@@ -261,6 +285,7 @@ func patchKubeadmControlPlane(ctx context.Context, patchHelper *patch.Helper, kc
+ 			controlplanev1.MachinesReadyCondition,
+ 			controlplanev1.AvailableCondition,
+ 			controlplanev1.CertificatesAvailableCondition,
++			controlplanev1.ExternalEtcdEndpointsAvailable,
+ 		}},
+ 		patch.WithStatusObservedGeneration{},
+ 	)
+@@ -384,6 +409,22 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, cluster *
+ 				}
+ 			}
+ 			conditions.MarkTrue(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition)
++			/* Once KCP upgrade has completed, the controller will annotate the external etcd object to indicate that the older KCP machines
++			are no longer part of the cluster, and so any older out-of-date etcd members and machines can be deleted
++			*/
++			if cluster.Spec.ManagedExternalEtcdRef != nil {
++				etcdRef := cluster.Spec.ManagedExternalEtcdRef
++				externalEtcd, err := external.Get(ctx, r.Client, etcdRef, cluster.Namespace)
++				if err != nil {
++					return ctrl.Result{}, err
++				}
++				if err := external.SetKCPUpdateCompleteAnnotationOnEtcdadmCluster(externalEtcd); err != nil {
++					return ctrl.Result{}, err
++				}
++				if err := r.Client.Update(ctx, externalEtcd); err != nil {
++					return ctrl.Result{}, err
++				}
++			}
+ 		}
+ 	}
+ 
+diff --git a/controlplane/kubeadm/controllers/upgrade.go b/controlplane/kubeadm/controllers/upgrade.go
+index ca5116846..b11194034 100644
+--- a/controlplane/kubeadm/controllers/upgrade.go
++++ b/controlplane/kubeadm/controllers/upgrade.go
+@@ -92,6 +92,12 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
+ 		}
+ 	}
+ 
++	if kcp.Spec.KubeadmConfigSpec.ClusterConfiguration != nil && kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External != nil {
++		if err := workloadCluster.UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints, parsedVersion); err != nil {
++			return ctrl.Result{}, errors.Wrap(err, "failed to update the external etcd endpoints in the kubeadm config map")
++		}
++	}
++
+ 	if kcp.Spec.KubeadmConfigSpec.ClusterConfiguration != nil {
+ 		if err := workloadCluster.UpdateAPIServerInKubeadmConfigMap(ctx, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer, parsedVersion); err != nil {
+ 			return ctrl.Result{}, errors.Wrap(err, "failed to update api server in the kubeadm config map")
+diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
+index 9ea74cbc2..6ea29a6c9 100644
+--- a/controlplane/kubeadm/internal/workload_cluster.go
++++ b/controlplane/kubeadm/internal/workload_cluster.go
+@@ -94,6 +94,7 @@ type WorkloadCluster interface {
+ 	UpdateImageRepositoryInKubeadmConfigMap(ctx context.Context, imageRepository string, version semver.Version) error
+ 	UpdateEtcdVersionInKubeadmConfigMap(ctx context.Context, imageRepository, imageTag string, version semver.Version) error
+ 	UpdateEtcdExtraArgsInKubeadmConfigMap(ctx context.Context, extraArgs map[string]string, version semver.Version) error
++	UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx context.Context, endpoints []string, version semver.Version) error
+ 	UpdateAPIServerInKubeadmConfigMap(ctx context.Context, apiServer bootstrapv1.APIServer, version semver.Version) error
+ 	UpdateControllerManagerInKubeadmConfigMap(ctx context.Context, controllerManager bootstrapv1.ControlPlaneComponent, version semver.Version) error
+ 	UpdateSchedulerInKubeadmConfigMap(ctx context.Context, scheduler bootstrapv1.ControlPlaneComponent, version semver.Version) error
+diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd.go b/controlplane/kubeadm/internal/workload_cluster_etcd.go
+index a5b1f7c3e..8eb0ba944 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_etcd.go
++++ b/controlplane/kubeadm/internal/workload_cluster_etcd.go
+@@ -18,7 +18,6 @@ package internal
+ 
+ import (
+ 	"context"
+-
+ 	"github.com/blang/semver"
+ 	"github.com/pkg/errors"
+ 	kerrors "k8s.io/apimachinery/pkg/util/errors"
+@@ -101,6 +100,14 @@ func (w *Workload) UpdateEtcdExtraArgsInKubeadmConfigMap(ctx context.Context, ex
+ 	}, version)
+ }
+ 
++func (w *Workload) UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx context.Context, endpoints []string, version semver.Version) error {
++	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++		if c.Etcd.External != nil {
++			c.Etcd.External.Endpoints = endpoints
++		}
++	}, version)
++}
++
+ // RemoveEtcdMemberForMachine removes the etcd member from the target cluster's etcd cluster.
+ // Removing the last remaining member of the cluster is not supported.
+ func (w *Workload) RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error {
+-- 
+2.30.1
+
