@@ -19,9 +19,14 @@ You can find the latest versions of these images on ECR Public Gallery.
    and/or automatically update between eks-anywhere version reach out to @jaxesn, @vignesh-goutham, @g-gaston or @mrajashree.
 1. Follow these steps for changes to the patches/ folder:
    1. Checkout the desired tag on our [CAPI fork](https://github.com/mrajashree/cluster-api) and create a new branch.
-   1. Review the patches under patches/ folder in this repo. Apply the required patches to the new branch created in the above step. Remove any patches that are either
-   merged upstream or no longer needed. Please reach out to @jaxesn, @vignesh-goutham, @g-gaston or @mrajashree if there are any questions regarding keeping/removing patches.
-   1. Run `git format-patch <commit>`, where `<commit>` is the last upstream commit on that tag. Move the generated patches under the patches/ folder in this repo.
+   1. Review the patches under patches/ folder in this repo. Apply the required patches to the new branch created in the above step.
+      1. Run `git am *.patch`
+      1. For patches that need some manual changes, you will see a similar error: `Patch failed at *`
+      1. For that patch, run `git apply --reject --whitespace=fix *.patch`. This will apply hunks of the patch that do apply correctly, leaving
+      the failing parts in a new file ending in `.rej`. This file shows what changes weren't applied and you need to manually apply.
+      1. Once the changes are done, delete the `.rej` file and run `git add .` and `git am --continue`
+   1. Remove any patches that are either merged upstream or no longer needed. Please reach out to @jaxesn, @vignesh-goutham, @g-gaston or @mrajashree if there are any questions regarding keeping/removing patches.
+   1. Run `git format-patch <commit>`, where `<commit>` is the last upstream commit on that tag. Move the generated patches from under the CAPI fork to the projects/kubernetes-sigs/cluster-api/patches/ folder in this repo.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
    ex: [0.3.19 compared to 1.0.1](https://github.com/kubernetes-sigs/cluster-api/compare/v0.3.19...v1.0.1). Check the targets in the Makefile
