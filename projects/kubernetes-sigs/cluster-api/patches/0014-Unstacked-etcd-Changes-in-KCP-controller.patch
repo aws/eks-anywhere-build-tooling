@@ -1,7 +1,7 @@
-From c8b7674875b2df2be3109518cf919af679fb6526 Mon Sep 17 00:00:00 2001
+From 96794938b8150a0786cbce5aa35f5b53e6fe5f71 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:46:47 -0700
-Subject: [PATCH 14/36] Unstacked etcd: Changes in KCP controller
+Subject: [PATCH 14/40] Unstacked etcd: Changes in KCP controller
 
 The KubeadmControlPlane controller will get the external etcd endpoints
 from the object referenced by cluster.spec.managedExternalEtcdRef.
@@ -15,7 +15,7 @@ The validating webhook will allow the external etcd endpoints to be updated.
  5 files changed, 46 insertions(+)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index 63338bd41..2b9caeac0 100644
+index 0c78691c3..fd0b3e914 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 @@ -123,6 +123,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
@@ -27,10 +27,10 @@ index 63338bd41..2b9caeac0 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageTag"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "imageRepository"},
 diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
-index eb403e145..7448814db 100644
+index db79d8df4..48faaff6d 100644
 --- a/controlplane/kubeadm/config/rbac/role.yaml
 +++ b/controlplane/kubeadm/config/rbac/role.yaml
-@@ -27,6 +27,14 @@ rules:
+@@ -28,6 +28,14 @@ rules:
    - patch
    - update
    - watch
@@ -46,7 +46,7 @@ index eb403e145..7448814db 100644
    - cluster.x-k8s.io
    resources:
 diff --git a/controlplane/kubeadm/controllers/controller.go b/controlplane/kubeadm/controllers/controller.go
-index 92b799936..503d83084 100644
+index f304d0487..002f03af8 100644
 --- a/controlplane/kubeadm/controllers/controller.go
 +++ b/controlplane/kubeadm/controllers/controller.go
 @@ -19,6 +19,9 @@ package controllers
