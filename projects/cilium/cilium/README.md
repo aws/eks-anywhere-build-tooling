@@ -16,3 +16,4 @@ The Cilium operator image includes the generic cilium-operator binary and the `g
 2. Install `skopeo` if you don't have it ([instructions](https://github.com/containers/skopeo/blob/main/install.md)).
 3. Run `make update-digests` in this folder.
 4. Update the version at the top of this Readme.
+5. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
