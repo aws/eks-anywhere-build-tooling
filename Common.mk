@@ -1,5 +1,6 @@
 # Disable built-in rules and variables
 MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
+SHELL=/bin/bash
 .SHELLFLAGS:=-eu -o pipefail -c
 .SUFFIXES:
 
