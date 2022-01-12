@@ -11,6 +11,9 @@ SIMPLE_CREATE_BINARIES=false
 HAS_LICENSES=false
 REPO_NO_CLONE=true
 
+BUILD_TARGETS=local-images
+RELEASE_TARGETS=images
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
