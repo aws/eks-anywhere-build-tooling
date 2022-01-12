@@ -16,8 +16,8 @@ SIMPLE_CREATE_BINARIES=false
 SIMPLE_CREATE_TARBALLS=false
 HAS_LICENSES=false
 
-BUILD_TARGETS=s3-artifacts
-RELEASE_TARGETS=s3-artifacts
+BUILD_TARGETS=upload-artifacts
+RELEASE_TARGETS=upload-artifacts
 
 include $(BASE_DIRECTORY)/Common.mk
 
