@@ -1,0 +1,121 @@
+From 1cf869a526a254156820c55f2fda572f268692d0 Mon Sep 17 00:00:00 2001
+From: Aravind Ramalingam <ramaliar@amazon.com>
+Date: Wed, 12 Jan 2022 16:11:42 -0800
+Subject: [PATCH 4/5] Adding BmcRef to hardware and PowerOn machine
+
+---
+ .gitignore                                    |  1 +
+ config/crd/bases/tinkerbell.org_hardware.yaml |  4 ++
+ controllers/machine.go                        | 39 +++++++++++++++++++
+ tink/api/v1alpha1/hardware_types.go           |  4 ++
+ 4 files changed, 48 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index 6f520c7..0198760 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -19,6 +19,7 @@
+ *.swp
+ *.swo
+ *~
++.DS_Store
+ 
+ tmp/
+ out/
+diff --git a/config/crd/bases/tinkerbell.org_hardware.yaml b/config/crd/bases/tinkerbell.org_hardware.yaml
+index 1b43446..47f5edb 100644
+--- a/config/crd/bases/tinkerbell.org_hardware.yaml
++++ b/config/crd/bases/tinkerbell.org_hardware.yaml
+@@ -38,6 +38,10 @@ spec:
+           spec:
+             description: HardwareSpec defines the desired state of Hardware.
+             properties:
++              bmcRef:
++                description: BmcRef is BMC that corresponds to the Hardware
++                minLength: 1
++                type: string
+               id:
+                 description: ID is the ID of the hardware in Tinkerbell
+                 minLength: 1
+diff --git a/controllers/machine.go b/controllers/machine.go
+index a091c8e..241eb95 100644
+--- a/controllers/machine.go
++++ b/controllers/machine.go
+@@ -35,6 +35,7 @@ import (
+ 
+ 	infrastructurev1 "github.com/tinkerbell/cluster-api-provider-tinkerbell/api/v1beta1"
+ 	"github.com/tinkerbell/cluster-api-provider-tinkerbell/internal/templates"
++	pbnjv1 "github.com/tinkerbell/cluster-api-provider-tinkerbell/pbnj/api/v1alpha1"
+ 	tinkv1 "github.com/tinkerbell/cluster-api-provider-tinkerbell/tink/api/v1alpha1"
+ )
+ 
+@@ -344,6 +345,10 @@ func (mrc *machineReconcileContext) ensureHardware() (*tinkv1.Hardware, error) {
+ 		return nil, fmt.Errorf("ensuring Hardware user data: %w", err)
+ 	}
+ 
++	if err := mrc.ensureHardwarePowerOn(hardware); err != nil {
++		return nil, fmt.Errorf("ensuring Hardware Power On actionL %w", err)
++	}
++
+ 	return hardware, mrc.setStatus(hardware)
+ }
+ 
+@@ -367,6 +372,40 @@ func (mrc *machineReconcileContext) hardwareForMachine() (*tinkv1.Hardware, erro
+ 	return nextAvailableHardware(mrc.ctx, mrc.client, nil)
+ }
+ 
++func (mrc *machineReconcileContext) ensureHardwarePowerOn(hardware *tinkv1.Hardware) error {
++	if hardware.Spec.BmcRef == "" {
++		mrc.log.Info("Skipping PowerOn for hardware", "BMC Ref", hardware.Spec.BmcRef, "Hardware name", hardware.Name)
++
++		return nil
++	}
++	// Fetch the bmc.
++	bmc := &pbnjv1.BMC{}
++	namespacedName := types.NamespacedName{
++		Name: hardware.Spec.BmcRef,
++	}
++
++	if err := mrc.client.Get(mrc.ctx, namespacedName, bmc); err != nil {
++		if apierrors.IsNotFound(err) {
++			return fmt.Errorf("BMC not found: %w", err)
++		}
++
++		return fmt.Errorf("failed to get bmc: %w", err)
++	}
++
++	patchHelper, err := patch.NewHelper(bmc, mrc.client)
++	if err != nil {
++		return fmt.Errorf("initializing patch helper for bmc: %w", err)
++	}
++
++	bmc.Spec.PowerAction = "POWER_ACTION_ON"
++
++	if err := patchHelper.Patch(mrc.ctx, bmc); err != nil {
++		return fmt.Errorf("patching BMC object: %w", err)
++	}
++
++	return nil
++}
++
+ func (mrc *machineReconcileContext) workflowExists() (bool, error) {
+ 	namespacedName := types.NamespacedName{
+ 		Name: mrc.tinkerbellMachine.Name,
+diff --git a/tink/api/v1alpha1/hardware_types.go b/tink/api/v1alpha1/hardware_types.go
+index e4e010d..e9dbf29 100644
+--- a/tink/api/v1alpha1/hardware_types.go
++++ b/tink/api/v1alpha1/hardware_types.go
+@@ -41,6 +41,10 @@ type HardwareSpec struct {
+ 	// metadata
+ 	//+optional
+ 	UserData *string `json:"userData,omitempty"`
++
++	// BmcRef is BMC that corresponds to the Hardware
++	// +kubebuilder:validation:MinLength=1
++	BmcRef string `json:"bmcRef,omitempty"`
+ }
+ 
+ // HardwareStatus defines the observed state of Hardware.
+-- 
+2.34.1
+
