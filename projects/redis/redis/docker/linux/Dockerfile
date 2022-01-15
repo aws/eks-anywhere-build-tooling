@@ -22,6 +22,7 @@ RUN set -x && \
     cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo && \
     clean_install systemd true true && \
     clean_install redis && \
+    remove_package "bash gawk ncurses ncurses-base info sed shadow-utils grep" && \
     remove_package systemd true && \
     cleanup "redis"
 RUN set -x && \
