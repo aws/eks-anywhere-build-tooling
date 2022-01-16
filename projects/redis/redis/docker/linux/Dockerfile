@@ -36,6 +36,7 @@ COPY --from=redis-builder /newroot /
 
 WORKDIR /
 
+USER redis:redis
 VOLUME /data
 EXPOSE 6379
 ENTRYPOINT ["/usr/bin/redis-server"]
