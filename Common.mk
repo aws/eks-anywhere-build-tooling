@@ -17,7 +17,7 @@ OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 #################### AWS ###########################
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-ARTIFACTS_BUCKET?=s3://projectbuildpipeline-857-pipelineoutputartifactsb-10ajmk30khe3f
+ARTIFACTS_BUCKET?=s3://my-s3-bucket
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 ####################################################
 
