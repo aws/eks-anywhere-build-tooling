@@ -22,6 +22,8 @@ VERSION?=$(shell git -C $(REPO) rev-parse --short HEAD)
 # When we track a tag instead of commit, this would become $(GIT_TAG)-$(VERSION)
 EXTRA_GO_LDFLAGS=-X main.version=$(VERSION)
 
+HAS_S3_ARTIFACTS=true
+
 FETCH_BINARIES_TARGETS=eksa/cloudflare/cfssl
 
 include $(BASE_DIRECTORY)/Common.mk
