@@ -31,9 +31,8 @@ cd $REPO
 
 MANIFEST_IMAGE_OVERRIDE="${IMAGE_REPO}/mrajashree/etcdadm-controller:${IMAGE_TAG}"
 
-sed -i '' "s,\${ETCDADM_CONTROLLER_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ./config/manager/manager.yaml
-sed -i '' 's/^\( *\)args:$/&\
-\1- "--namespace=eksa-system"/' ./config/manager/manager.yaml
+sed -i "s,\${ETCDADM_CONTROLLER_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ./config/manager/manager.yaml
+yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" config/manager/manager.yaml
 
 mkdir -p $OUTPUT_DIR/manifests/bootstrap-etcdadm-controller/${TAG}
 kustomize build config/default > bootstrap-components.yaml
