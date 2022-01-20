@@ -12,9 +12,11 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `support-bundle` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `support-bundle` for `linux/amd64 linux/arm64 darwin/amd64 darwin/arm64`
 _output/bin/troubleshoot/linux-amd64/support-bundle: ## Build `_output/bin/troubleshoot/linux-amd64/support-bundle`
 _output/bin/troubleshoot/linux-arm64/support-bundle: ## Build `_output/bin/troubleshoot/linux-arm64/support-bundle`
+_output/bin/troubleshoot/darwin-amd64/support-bundle: ## Build `_output/bin/troubleshoot/darwin-amd64/support-bundle`
+_output/bin/troubleshoot/darwin-arm64/support-bundle: ## Build `_output/bin/troubleshoot/darwin-arm64/support-bundle`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
@@ -39,6 +41,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums  attribution attribution-pr upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums  attribution upload-artifacts attribution-pr`
 release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
 ########### END GENERATED ###########################

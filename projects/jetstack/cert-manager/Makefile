@@ -1,6 +1,6 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.15"
+GOLANG_VERSION?="1.16"
 
 REPO=cert-manager
 REPO_OWNER=jetstack
@@ -25,15 +25,29 @@ HELM_ADDITIONAL_KEY_VALUES=\
   CERT_MANAGER_CONTROLLER_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} jetstack/cert-manager-controller $(LATEST)) \
   CERT_MANAGER_WEBHOOK_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} jetstack/cert-manager-webhook $(LATEST))
 
+HAS_S3_ARTIFACTS=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-cainjector): cert-manager-cainjector-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-controller-useradd/images/export
+$(call IMAGE_TARGETS_FOR_NAME, cert-manager-webhook): cert-manager-webhook-useradd/images/export
 
 cert-manager-acmesolver-useradd/images/export: IMAGE_USERADD_USER_NAME=acmesolver
 cert-manager-cainjector-useradd/images/export: IMAGE_USERADD_USER_NAME=cainjector
 cert-manager-controller-useradd/images/export: IMAGE_USERADD_USER_NAME=cert-manager
+cert-manager-webhook-useradd/images/export: IMAGE_USERADD_USER_NAME=webhook
+
+s3-artifacts: create-manifests
+
+.PHONY: create-manifests
+create-manifests:
+	build/create_manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY) $(GIT_TAG)
+
+.PHONY: update-cert-manager-manifest
+update-cert-manager-manifest:
+	wget -q https://github.com/jetstack/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O build/cert-manager.yaml
 
 
 ########### DO NOT EDIT #############################

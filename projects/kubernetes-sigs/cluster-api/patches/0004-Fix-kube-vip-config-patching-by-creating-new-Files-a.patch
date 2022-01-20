@@ -1,0 +1,76 @@
+From abc4fdcb43d78238f416e89b2ec3b9a2731aeb0d Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Mon, 26 Jul 2021 15:48:45 -0700
+Subject: [PATCH 04/41] Fix kube-vip config patching by creating new Files
+ array
+
+---
+ .../controllers/kubeadmconfig_controller.go   | 22 ++++++++++---------
+ .../internal/bottlerocket/bottlerocket.go     |  4 +++-
+ 2 files changed, 15 insertions(+), 11 deletions(-)
+
+diff --git a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
+index aba0c4efc..6bd5fbbc5 100644
+--- a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
+@@ -411,24 +411,26 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		}
+ 
+ 		// Add controllerManager extra volumes
+-		scope.Config.Spec.ClusterConfiguration.ControllerManager.ExtraVolumes = append(scope.Config.Spec.ClusterConfiguration.ControllerManager.ExtraVolumes,
+-			bootstrapv1.HostPathMount{
+-				Name:      "kubeconfig",
+-				HostPath:  "/var/lib/kubeadm/controller-manager.conf",
++		scope.Config.Spec.ClusterConfiguration.ControllerManager.ExtraVolumes = []bootstrapv1.HostPathMount{
++			{
++				Name: "kubeconfig",
++				HostPath: "/var/lib/kubeadm/controller-manager.conf",
+ 				MountPath: "/etc/kubernetes/controller-manager.conf",
+-				ReadOnly:  true,
+-				PathType:  "File",
+-			})
++				ReadOnly: true,
++				PathType: "File",
++			},
++		}
+ 
+ 		// Add scheduler extraVol
+-		scope.Config.Spec.ClusterConfiguration.Scheduler.ExtraVolumes = append(scope.Config.Spec.ClusterConfiguration.Scheduler.ExtraVolumes,
+-			bootstrapv1.HostPathMount{
++		scope.Config.Spec.ClusterConfiguration.Scheduler.ExtraVolumes = []bootstrapv1.HostPathMount{
++			{
+ 				Name:      "kubeconfig",
+ 				HostPath:  "/var/lib/kubeadm/scheduler.conf",
+ 				MountPath: "/etc/kubernetes/scheduler.conf",
+ 				ReadOnly:  true,
+ 				PathType:  "File",
+-			})
++			},
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 3de3304b3..6a63ac089 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -132,6 +132,7 @@ func getAllAuthorizedKeys(users []bootstrapv1.User) string {
+ }
+ 
+ func patchKubeVipFile(writeFiles []bootstrapv1.File) ([]bootstrapv1.File, error) {
++	var patchedFiles []bootstrapv1.File
+ 	for _, file := range writeFiles {
+ 		if file.Path == "/etc/kubernetes/manifests/kube-vip.yaml" {
+ 			// unmarshal the yaml file from contents
+@@ -156,6 +157,7 @@ func patchKubeVipFile(writeFiles []bootstrapv1.File) ([]bootstrapv1.File, error)
+ 			}
+ 			file.Content = string(patchedYaml)
+ 		}
++		patchedFiles = append(patchedFiles, file)
+ 	}
+-	return writeFiles, nil
++	return patchedFiles, nil
+ }
+-- 
+2.27.0
+

@@ -30,15 +30,13 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 cd $REPO
 
 MANIFEST_IMAGE_OVERRIDE="${IMAGE_REPO}/mrajashree/etcdadm-controller:${IMAGE_TAG}"
-KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
 
 sed -i "s,\${ETCDADM_CONTROLLER_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ./config/manager/manager.yaml
-sed -i 's,image: .*,image: '"${KUBE_RBAC_PROXY_IMAGE_OVERRIDE}"',' ./config/default/manager_auth_proxy_patch.yaml
+yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" config/manager/manager.yaml
 
 mkdir -p $OUTPUT_DIR/manifests/bootstrap-etcdadm-controller/${TAG}
 kustomize build config/default > bootstrap-components.yaml
 
-sed -i "s,\${ETCDADM_CONTROLLER_IMAGE},$MANIFEST_IMAGE_OVERRIDE," bootstrap-components.yaml
 cp bootstrap-components.yaml "$OUTPUT_DIR/manifests/bootstrap-etcdadm-controller/${TAG}"
 cp ../manifests/metadata.yaml "$OUTPUT_DIR/manifests/bootstrap-etcdadm-controller/${TAG}"
 

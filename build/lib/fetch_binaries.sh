@@ -33,8 +33,8 @@ OS_ARCH="$(cut -d '/' -f1 <<< ${DEP})"
 PRODUCT=$(cut -d '/' -f2 <<< ${DEP})
 REPO_OWNER=$(cut -d '/' -f3 <<< ${DEP})
 REPO=$(cut -d '/' -f4 <<< ${DEP})
-
 ARCH="$(cut -d '-' -f2 <<< ${OS_ARCH})"
+CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
 OUTPUT_DIR_FILE=$BINARY_DEPS_DIR/linux-$ARCH/$PRODUCT/$REPO_OWNER/$REPO
 if [[ $REPO == *.tar.gz ]]; then
@@ -55,6 +55,10 @@ if [[ $PRODUCT = 'eksd' ]]; then
 else
     TARBALL="$REPO-linux-$ARCH.tar.gz"
     URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $LATEST_TAG)
+fi
+
+if [ "$CODEBUILD_CI" = "true" ]; then
+    build::common::wait_for_tarball $URL
 fi
 
 if [[ $REPO == *.tar.gz ]]; then

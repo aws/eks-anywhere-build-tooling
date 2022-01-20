@@ -1,16 +1,16 @@
-From 3d7c8034283ffa59e3a30a613547317e17cfba0d Mon Sep 17 00:00:00 2001
-From: Vignesh Goutham Ganesh <vgg@amazon.com>
-Date: Fri, 11 Jun 2021 10:59:56 -0700
+From bc55b9e8c52165064c9b340863fcce3457da42db Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Wed, 1 Dec 2021 10:07:41 -0800
 Subject: [PATCH] Adding capv support for Bottlerocket
 
-Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
- pkg/services/govmomi/vcenter/clone.go | 28 ++++++++++++++++++++++-----
- templates/cluster-template.yaml       |  4 +++-
- 2 files changed, 26 insertions(+), 6 deletions(-)
+ pkg/services/govmomi/vcenter/clone.go         | 28 +++++++++++++++----
+ .../v1alpha3/cluster-template.yaml            |  2 ++
+ .../v1alpha4/cluster-template.yaml            |  2 ++
+ 3 files changed, 27 insertions(+), 5 deletions(-)
 
 diff --git a/pkg/services/govmomi/vcenter/clone.go b/pkg/services/govmomi/vcenter/clone.go
-index 300f24e9..0e62865b 100644
+index f29dc782..0c56155a 100644
 --- a/pkg/services/govmomi/vcenter/clone.go
 +++ b/pkg/services/govmomi/vcenter/clone.go
 @@ -54,6 +54,8 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
@@ -108,11 +108,11 @@ index 300f24e9..0e62865b 100644
  
  	disk := disks[0].(*types.VirtualDisk)
  	cloneCapacityKB := int64(ctx.VSphereVM.Spec.DiskGiB) * 1024 * 1024
-diff --git a/templates/cluster-template.yaml b/templates/cluster-template.yaml
-index 6f223391..f3ede2a1 100644
---- a/templates/cluster-template.yaml
-+++ b/templates/cluster-template.yaml
-@@ -145,6 +145,7 @@ spec:
+diff --git a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml
+index a1684260..7b04eb79 100644
+--- a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml
++++ b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml
+@@ -165,6 +165,7 @@ spec:
      - echo "127.0.0.1   {{ ds.meta_data.hostname }}" >>/etc/hosts
      - echo "{{ ds.meta_data.hostname }}" >/etc/hostname
      useExperimentalRetryJoin: true
@@ -120,16 +120,7 @@ index 6f223391..f3ede2a1 100644
      users:
      - name: capv
        sshAuthorizedKeys:
-@@ -166,7 +167,7 @@ spec:
-           criSocket: /var/run/containerd/containerd.sock
-           kubeletExtraArgs:
-             cloud-provider: external
--          name: '{{ ds.meta_data.hostname}}'
-+          name: '{{ ds.meta_data.hostname }}'
-       preKubeadmCommands:
-       - hostname "{{ ds.meta_data.hostname }}"
-       - echo "::1         ipv6-localhost ipv6-loopback" >/etc/hosts
-@@ -178,6 +179,7 @@ spec:
+@@ -198,6 +199,7 @@ spec:
          sshAuthorizedKeys:
          - '${VSPHERE_SSH_AUTHORIZED_KEY}'
          sudo: ALL=(ALL) NOPASSWD:ALL
@@ -137,6 +128,26 @@ index 6f223391..f3ede2a1 100644
  ---
  apiVersion: cluster.x-k8s.io/v1alpha3
  kind: MachineDeployment
+diff --git a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha4/cluster-template.yaml b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha4/cluster-template.yaml
+index 0332d4bd..9f6ed4a5 100644
+--- a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha4/cluster-template.yaml
++++ b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha4/cluster-template.yaml
+@@ -141,6 +141,7 @@ spec:
+     - echo "127.0.0.1   {{ ds.meta_data.hostname }}" >>/etc/hosts
+     - echo "{{ ds.meta_data.hostname }}" >/etc/hostname
+     useExperimentalRetryJoin: true
++    format: '${VSPHERE_TEMPLATE_BOOTSTRAP_FORMAT}'
+     users:
+     - name: capv
+       sshAuthorizedKeys:
+@@ -179,6 +180,7 @@ spec:
+         sshAuthorizedKeys:
+         - '${VSPHERE_SSH_AUTHORIZED_KEY}'
+         sudo: ALL=(ALL) NOPASSWD:ALL
++      format: '${VSPHERE_TEMPLATE_BOOTSTRAP_FORMAT}'
+ ---
+ apiVersion: cluster.x-k8s.io/v1alpha4
+ kind: MachineDeployment
 -- 
-2.24.3 (Apple Git-128)
+2.30.1
 
