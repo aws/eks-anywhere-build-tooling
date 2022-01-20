@@ -1,0 +1,98 @@
+From a0a226d1a12ca1a238cd4fa506467d22eb972d72 Mon Sep 17 00:00:00 2001
+From: danbudris <budris@amazon.com>
+Date: Thu, 13 Jan 2022 11:48:47 -0500
+Subject: [PATCH] Add nil check to analyzer processing
+
+If a deployment analyzer is run targeting a namespace which does not exist, the returned analyze result is nil.
+The converter does not handle nil values properly and will attempt to process them regardless, causing a nil pointer.
+Addressing this via a patch to ensure our support bundle functionality is working properly while working on an upstream fix.
+
+Signed-off-by: Dan Budris <budris@amazon.com>
+---
+ pkg/convert/supportbundle.go | 64 +++++++++++++++++++-----------------
+ 1 file changed, 33 insertions(+), 31 deletions(-)
+
+diff --git a/pkg/convert/supportbundle.go b/pkg/convert/supportbundle.go
+index fbf7140..87c6f38 100644
+--- a/pkg/convert/supportbundle.go
++++ b/pkg/convert/supportbundle.go
+@@ -69,43 +69,45 @@ func FromAnalyzerResult(input []*analyze.AnalyzeResult) []*Result {
+ 
+ 	result := make([]*Result, 0)
+ 	for _, i := range input {
+-		name := reg.ReplaceAllString(strings.ToLower(i.Title), ".")
+-		r := &Result{
+-			Meta: Meta{
+-				Name: name,
+-				Labels: map[string]string{
+-					"desiredPosition": "1",
+-					"iconKey":         i.IconKey,
+-					"iconUri":         i.IconURI,
+-				},
+-			},
+-			Insight: &Insight{
++		if i != nil {
++			name := reg.ReplaceAllString(strings.ToLower(i.Title), ".")
++			r := &Result{
+ 				Meta: Meta{
+ 					Name: name,
+ 					Labels: map[string]string{
+-						"iconKey": i.IconKey,
+-						"iconUri": i.IconURI,
++						"desiredPosition": "1",
++						"iconKey":         i.IconKey,
++						"iconUri":         i.IconURI,
+ 					},
+ 				},
+-				Primary: i.Title,
+-				Detail:  i.Message,
+-			},
+-			AnalyzerSpec:   "",
+-			Variables:      map[string]interface{}{},
+-			InvolvedObject: i.InvolvedObject,
+-		}
+-		if i.IsFail {
+-			r.Severity = SeverityError
+-			r.Insight.Severity = SeverityError
+-			r.Error = i.Message
+-		} else if i.IsWarn {
+-			r.Severity = SeverityWarn
+-			r.Insight.Severity = SeverityWarn
+-		} else if i.IsPass {
+-			r.Severity = SeverityDebug
+-			r.Insight.Severity = SeverityDebug
++				Insight: &Insight{
++					Meta: Meta{
++						Name: name,
++						Labels: map[string]string{
++							"iconKey": i.IconKey,
++							"iconUri": i.IconURI,
++						},
++					},
++					Primary: i.Title,
++					Detail:  i.Message,
++				},
++				AnalyzerSpec:   "",
++				Variables:      map[string]interface{}{},
++				InvolvedObject: i.InvolvedObject,
++			}
++			if i.IsFail {
++				r.Severity = SeverityError
++				r.Insight.Severity = SeverityError
++				r.Error = i.Message
++			} else if i.IsWarn {
++				r.Severity = SeverityWarn
++				r.Insight.Severity = SeverityWarn
++			} else if i.IsPass {
++				r.Severity = SeverityDebug
++				r.Insight.Severity = SeverityDebug
++			}
++			result = append(result, r)
+ 		}
+-		result = append(result, r)
+ 	}
+ 
+ 	return result
+-- 
+2.30.1 (Apple Git-130)
+
