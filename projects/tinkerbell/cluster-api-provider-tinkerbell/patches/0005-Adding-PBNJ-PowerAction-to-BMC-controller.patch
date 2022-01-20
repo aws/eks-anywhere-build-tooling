@@ -1,4 +1,4 @@
-From 6b27cba82015ce7d9418f9d2c407f7d70f3cc911 Mon Sep 17 00:00:00 2001
+From 0aca7e52bfb89627ac03f588ef05c2c4c0695fb5 Mon Sep 17 00:00:00 2001
 From: Aravind Ramalingam <ramaliar@amazon.com>
 Date: Tue, 4 Jan 2022 20:40:46 -0800
 Subject: [PATCH 2/5] Adding PBNJ PowerAction to BMC controller
@@ -10,10 +10,10 @@ Subject: [PATCH 2/5] Adding PBNJ PowerAction to BMC controller
  3 files changed, 39 insertions(+), 16 deletions(-)
 
 diff --git a/config/crd/bases/tinkerbell.org_bmc.yaml b/config/crd/bases/tinkerbell.org_bmc.yaml
-index a6683d0..0193c71 100644
+index 0219089..50c8e8e 100644
 --- a/config/crd/bases/tinkerbell.org_bmc.yaml
 +++ b/config/crd/bases/tinkerbell.org_bmc.yaml
-@@ -48,6 +48,12 @@ spec:
+@@ -56,6 +56,12 @@ spec:
                  description: Host is the host IP address of the BMC
                  minLength: 1
                  type: string
@@ -26,7 +26,7 @@ index a6683d0..0193c71 100644
                vendor:
                  description: Vendor is the vendor name of the BMC
                  minLength: 1
-@@ -60,7 +66,7 @@ spec:
+@@ -68,7 +74,7 @@ spec:
            status:
              description: BMCStatus defines the observed state of BMC.
              properties:
@@ -36,10 +36,10 @@ index a6683d0..0193c71 100644
                  type: string
              type: object
 diff --git a/pbnj/api/v1alpha1/bmc_types.go b/pbnj/api/v1alpha1/bmc_types.go
-index f89bd53..32124e3 100644
+index 471105c..36a9bd6 100644
 --- a/pbnj/api/v1alpha1/bmc_types.go
 +++ b/pbnj/api/v1alpha1/bmc_types.go
-@@ -7,11 +7,6 @@ import (
+@@ -8,11 +8,6 @@ import (
  // BMCState represents the template state.
  type BMCState string
  
@@ -70,7 +70,7 @@ index f89bd53..32124e3 100644
  
  // +kubebuilder:subresource:status
 diff --git a/pbnj/controllers/controller.go b/pbnj/controllers/controller.go
-index 0a12a7a..6255ee8 100644
+index 4946a11..24d9b77 100644
 --- a/pbnj/controllers/controller.go
 +++ b/pbnj/controllers/controller.go
 @@ -52,7 +52,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
@@ -90,7 +90,7 @@ index 0a12a7a..6255ee8 100644
 +		return r.reconcileStatus(ctx, bmc)
 +	}
 +
- 	username, password, err := r.resolveAuthSecret(ctx, bmc.Spec.AuthSecret)
+ 	username, password, err := r.resolveAuthSecretRef(ctx, bmc.Spec.AuthSecretRef)
  	if err != nil {
  		return ctrl.Result{}, fmt.Errorf("error resolving authentication from Secret: %w", err)
  	}
@@ -136,7 +136,7 @@ index 0a12a7a..6255ee8 100644
 +	return nil
  }
  
- func (r *Reconciler) resolveAuthSecret(ctx context.Context, authSecret string) (string, string, error) {
+ func (r *Reconciler) resolveAuthSecretRef(ctx context.Context, secretRef corev1.SecretReference) (string, string, error) { //nolint:lll
 @@ -125,7 +142,7 @@ func (r *Reconciler) reconcileStatus(ctx context.Context, bmc *pbnjv1alpha1.BMC)
  	logger := ctrl.LoggerFrom(ctx).WithValues("bmc", bmc.Name)
  	patch := client.MergeFrom(bmc.DeepCopy())

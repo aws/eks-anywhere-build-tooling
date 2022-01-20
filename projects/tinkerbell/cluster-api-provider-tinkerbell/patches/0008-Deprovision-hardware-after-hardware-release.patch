@@ -1,4 +1,4 @@
-From bebb6e167670d7c7ff23cbb4b3fc52a7cea3c582 Mon Sep 17 00:00:00 2001
+From 1a37bb617e518cb8bfa315f0a854050193c2a6ad Mon Sep 17 00:00:00 2001
 From: Aravind Ramalingam <ramaliar@amazon.com>
 Date: Wed, 12 Jan 2022 18:57:51 -0800
 Subject: [PATCH 5/5] Deprovision hardware after hardware release
@@ -9,7 +9,7 @@ Subject: [PATCH 5/5] Deprovision hardware after hardware release
  2 files changed, 39 insertions(+)
 
 diff --git a/controllers/base.go b/controllers/base.go
-index bfb28a2..f74961a 100644
+index bfb28a2..9b5e6a7 100644
 --- a/controllers/base.go
 +++ b/controllers/base.go
 @@ -32,6 +32,7 @@ import (
@@ -54,7 +54,7 @@ index bfb28a2..f74961a 100644
 +	}
 +
 +	bmc.Spec.BootDevice = "BOOT_DEVICE_PXE"
-+	bmc.Spec.PowerAction = "POWER_ACTION_RESET"
++	bmc.Spec.PowerAction = "POWER_ACTION_HARDOFF"
 +
 +	if err := patchHelper.Patch(bmrc.ctx, bmc); err != nil {
 +		return fmt.Errorf("patching BMC object: %w", err)
@@ -64,7 +64,7 @@ index bfb28a2..f74961a 100644
  }
  
 diff --git a/pbnj/controllers/controller.go b/pbnj/controllers/controller.go
-index a14d81b..139bbbd 100644
+index 0221d74..591b55f 100644
 --- a/pbnj/controllers/controller.go
 +++ b/pbnj/controllers/controller.go
 @@ -146,6 +146,8 @@ func (r *Reconciler) setBootDevice(ctx context.Context, username, password strin
