@@ -30,6 +30,9 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 cd $REPO
 
+sed -i '' 's/^\( *\) - --enable-leader-election$/&\
+\1 - --namespace=eksa-system/' ./config/manager/manager.yaml
+
 make manifests STAGE="release" \
   MANIFEST_DIR="out" \
   PULL_POLICY="IfNotPresent" \

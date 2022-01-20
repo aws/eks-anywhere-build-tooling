@@ -50,6 +50,15 @@ make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./config
 make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./bootstrap/kubeadm/config/default/manager_pull_policy.yaml"
 make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./controlplane/kubeadm/config/default/manager_pull_policy.yaml"
 
+sed -i '' 's/^\( *\)args:$/&\
+\1- "--namespace=eksa-system"/' ./config/manager/manager.yaml
+
+sed -i '' 's/^\( *\)args:$/&\
+\1- "--namespace=eksa-system"/' ./bootstrap/kubeadm/config/manager/manager.yaml
+
+sed -i '' 's/^\( *\)args:$/&\
+\1- "--namespace=eksa-system"/' ./controlplane/kubeadm/config/manager/manager.yaml
+
 ## Build the manifests
 make release-manifests
 
@@ -57,7 +66,10 @@ make release-manifests
 make -C test/infrastructure/docker set-manifest-image \
 MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/capd-manager MANIFEST_TAG=$IMAGE_TAG
 make -C test/infrastructure/docker set-manifest-pull-policy PULL_POLICY=IfNotPresent
-PATH="$(pwd)/hack/tools/bin:$PATH" make -C test/infrastructure/docker release-manifests 
+sed -i '' 's/^\( *\) - "--leader-elect"$/&\
+\1 - "--namespace=eksa-system"/' test/infrastructure/docker/config/manager/manager.yaml
+PATH="$(pwd)/hack/tools/bin:$PATH" make -C test/infrastructure/docker release-manifests
+
 
 mkdir -p $OUTPUT_DIR/manifests/{bootstrap-kubeadm,cluster-api,control-plane-kubeadm,infrastructure-docker}/$TAG
 cp out/bootstrap-components.yaml "$OUTPUT_DIR/manifests/bootstrap-kubeadm/$TAG"
