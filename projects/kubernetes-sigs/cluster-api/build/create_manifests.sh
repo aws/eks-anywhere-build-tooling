@@ -61,7 +61,6 @@ make release-manifests
 make -C test/infrastructure/docker set-manifest-image \
 MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/capd-manager MANIFEST_TAG=$IMAGE_TAG
 make -C test/infrastructure/docker set-manifest-pull-policy PULL_POLICY=IfNotPresent
-yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" test/infrastructure/docker/config/manager/manager.yaml
 PATH="$(pwd)/hack/tools/bin:$PATH" make -C test/infrastructure/docker release-manifests
 
 
