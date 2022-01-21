@@ -12,11 +12,11 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `tink-cli tink-server tink-worker` for `linux/amd64 linux/arm64`
-_output/bin/tink/linux-amd64/tink-cli: ## Build `_output/bin/tink/linux-amd64/tink-cli`
+binaries: ## Build all binaries: `tink tink-server tink-worker` for `linux/amd64 linux/arm64`
+_output/bin/tink/linux-amd64/tink: ## Build `_output/bin/tink/linux-amd64/tink`
 _output/bin/tink/linux-amd64/tink-server: ## Build `_output/bin/tink/linux-amd64/tink-server`
 _output/bin/tink/linux-amd64/tink-worker: ## Build `_output/bin/tink/linux-amd64/tink-worker`
-_output/bin/tink/linux-arm64/tink-cli: ## Build `_output/bin/tink/linux-arm64/tink-cli`
+_output/bin/tink/linux-arm64/tink: ## Build `_output/bin/tink/linux-arm64/tink`
 _output/bin/tink/linux-arm64/tink-server: ## Build `_output/bin/tink/linux-arm64/tink-server`
 _output/bin/tink/linux-arm64/tink-worker: ## Build `_output/bin/tink/linux-arm64/tink-worker`
 
@@ -38,6 +38,11 @@ _output/dependencies/linux-arm64/eksa/cloudflare/cfssl: ## Fetch `_output/depend
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
 
+##@ Artifact Targets
+tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
+s3-artifacts: # Prepare ARTIFACTS_PATH folder structure with tarballs/manifests/other items to be uploaded to s3
+upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S3
+
 ##@ License Targets
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
 attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
@@ -52,6 +57,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums local-images attribution  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums local-images attribution upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
 ########### END GENERATED ###########################

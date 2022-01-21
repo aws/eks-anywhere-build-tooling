@@ -14,7 +14,7 @@ TINK_WORKER_IMAGE_COMPONENT=tinkerbell/tink/tink-worker
 
 IMAGE_NAMES=tink-cli tink-server tink-worker
 
-BINARY_TARGET_FILES=tink-cli tink-server tink-worker
+BINARY_TARGET_FILES=tink tink-server tink-worker
 SOURCE_PATTERNS=./cmd/tink-cli ./cmd/tink-server ./cmd/tink-worker
 
 VERSION?=$(shell git -C $(REPO) rev-parse --short HEAD)

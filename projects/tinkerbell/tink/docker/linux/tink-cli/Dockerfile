@@ -4,7 +4,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/bin/tink/$TARGETOS-$TARGETARCH/tink-cli /usr/bin/tink
+COPY _output/bin/tink/$TARGETOS-$TARGETARCH/tink /usr/bin/tink
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
