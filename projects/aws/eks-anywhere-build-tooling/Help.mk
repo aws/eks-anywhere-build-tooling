@@ -21,6 +21,7 @@ _output/dependencies/linux-amd64/eksa/replicatedhq/troubleshoot: ## Fetch `_outp
 _output/dependencies/linux-amd64/eksa/vmware/govmomi: ## Fetch `_output/dependencies/linux-amd64/eksa/vmware/govmomi`
 _output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
 _output/dependencies/linux-amd64/eksa/helm/helm: ## Fetch `_output/dependencies/linux-amd64/eksa/helm/helm`
+_output/dependencies/linux-amd64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/tink`
 _output/dependencies/linux-arm64/eksa/fluxcd/flux2: ## Fetch `_output/dependencies/linux-arm64/eksa/fluxcd/flux2`
 _output/dependencies/linux-arm64/eksa/kubernetes-sigs/cluster-api: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes-sigs/cluster-api`
 _output/dependencies/linux-arm64/eksa/kubernetes-sigs/cluster-api-provider-aws: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes-sigs/cluster-api-provider-aws`
@@ -29,6 +30,7 @@ _output/dependencies/linux-arm64/eksa/replicatedhq/troubleshoot: ## Fetch `_outp
 _output/dependencies/linux-arm64/eksa/vmware/govmomi: ## Fetch `_output/dependencies/linux-arm64/eksa/vmware/govmomi`
 _output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
 _output/dependencies/linux-arm64/eksa/helm/helm: ## Fetch `_output/dependencies/linux-arm64/eksa/helm/helm`
+_output/dependencies/linux-arm64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/tink`
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
