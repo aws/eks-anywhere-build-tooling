@@ -42,3 +42,11 @@ $(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 		wget -q https://raw.githubusercontent.com/xeipuuv/$$package/master/LICENSE-APACHE-2.0.txt -O \
 			$(REPO)/vendor/github.com/xeipuuv/$$package/LICENSE.txt; \
 	done;
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################
