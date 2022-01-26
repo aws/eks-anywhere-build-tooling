@@ -40,14 +40,14 @@ CODEBUILD_CI?=false
 CI?=false
 ifeq ($(CODEBUILD_CI),true)
 	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
+	CLONE_URL?=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
 	#HELM_CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(HELM_SOURCE_OWNER).$(HELM_SOURCE_REPOSITORY)
 	HELM_CLONE_URL=https://github.com/$(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY).git
 	UPLOAD_DRY_RUN=false
 	BUILD_IDENTIFIER=$(CODEBUILD_BUILD_NUMBER)
 else
 	ARTIFACTS_PATH?=$(MAKE_ROOT)/_output/tar
-	CLONE_URL=https://github.com/$(COMPONENT).git
+	CLONE_URL?=https://github.com/$(COMPONENT).git
 	HELM_CLONE_URL=https://github.com/$(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY).git
 	UPLOAD_DRY_RUN=true
 	ifeq ($(CI),true)
@@ -318,7 +318,7 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) am --committer-date-is-author-date $(PATCHES_DIR)/*
 	@touch $@
 
-%eks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
+%eks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET)) $(PRECOMPILE_PREPARE)
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
 	@touch $@
 

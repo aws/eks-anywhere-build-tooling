@@ -1,0 +1,53 @@
+ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-base
+
+FROM node:16.5.0 as nodeportal
+
+WORKDIR /build_dir
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python-yaml
+
+COPY ../harbor/src/portal/package.json /build_dir
+COPY ../harbor/src/portal/package-lock.json /build_dir
+COPY ../harbor/src/portal/scripts /build_dir
+COPY ../harbor/api/v2.0/legacy_swagger.yaml /build_dir/swagger.yaml
+COPY ../harbor/api/v2.0/swagger.yaml /build_dir/swagger2.yaml
+COPY ../harbor/api/swagger.yaml /build_dir/swagger3.yaml
+
+COPY ../harbor/src/portal /build_dir
+
+ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org
+RUN npm install --unsafe-perm
+RUN npm run generate-build-timestamp
+RUN node --max_old_space_size=2048 'node_modules/@angular/cli/bin/ng' build --configuration production
+RUN python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json
+RUN python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger2.yaml > dist/swagger2.json
+RUN python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger3.yaml > dist/swagger3.json
+
+RUN cp swagger.yaml dist
+COPY ../harbor/LICENSE /build_dir/dist
+
+FROM $BASE_IMAGE
+
+RUN amazon-linux-extras enable nginx1 \
+    && yum install -y nginx shadow-utils >> /dev/null \
+    && yum clean all \
+    && userdel nginx \
+    && groupadd -f -r -g 10000 nginx && useradd --no-log-init -r -g 10000 -u 10000 nginx \
+    && ln -sf /dev/stdout /var/log/nginx/access.log && chown -R nginx:nginx /dev/stdout \
+    && ln -sf /dev/stderr /var/log/nginx/error.log && chown -R nginx:nginx /dev/stderr \
+    && chown -R nginx:nginx /etc/nginx
+
+COPY --from=nodeportal /build_dir/dist /usr/share/nginx/html
+COPY --from=nodeportal /build_dir/package*.json /usr/share/nginx/
+# COPY _output/LICENSES /LICENSES
+# COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+
+VOLUME /var/cache/nginx /var/log/nginx /run
+
+STOPSIGNAL SIGQUIT
+
+HEALTHCHECK CMD curl --fail -s http://localhost:8080 || curl -k --fail -s https://localhost:8443 || exit 1
+USER nginx
+CMD ["nginx", "-g", "daemon off;"]
+
