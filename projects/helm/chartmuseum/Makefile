@@ -13,6 +13,17 @@ BINARY_TARGET_FILES=chartm
 HAS_S3_ARTIFACTS=true
 IMAGE_NAMES=
 
+PRECOMPILE_PREPARE=harbor_patch
+
+HARBOR_VERSION=v2.4.1
+
+harbor_patch:
+	cd $(PROJECT_ROOT) \
+	&& git clone https://github.com/goharbor/harbor.git harbor \
+	&& git -C harbor checkout -f $(HARBOR_VERSION) \
+	&& cd $(REPO) && git apply ../harbor/make/photon/chartserver/redis.patch \
+	&& cd - && rm -rf harbor
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
