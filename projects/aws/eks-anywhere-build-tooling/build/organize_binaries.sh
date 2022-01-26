@@ -40,6 +40,7 @@ declare -A project_bin_licenses=(["eksa/fluxcd/flux2"]="flux FLUX2"
                                  ["eksa/vmware/govmomi"]="govc GOVMOMI"
                                  ['eksa/helm/helm']="helm HELM"
                                  ['eksa/tinkerbell/tink']="tink TINK")
+                                 ["eksa/apache/cloudstack-cloudmonkey"]="cmk CLOUDMONKEY")
 
 for project in "${!project_bin_licenses[@]}"
 do
