@@ -11,7 +11,6 @@ SOURCE_PATTERNS=./cmk.go
 HAS_S3_ARTIFACTS=true
 
 IMAGE_NAMES=
-HAS_HELM_CHART=false
 
 include $(BASE_DIRECTORY)/Common.mk
 

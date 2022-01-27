@@ -16,11 +16,10 @@ HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
 s3-artifacts: create-manifests
 
 .PHONY: create-manifests
-create-manifests: tarballs
+create-manifests: $(KUSTOMIZE_TARGET) tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
 
 
