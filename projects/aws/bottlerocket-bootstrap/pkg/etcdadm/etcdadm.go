@@ -90,6 +90,6 @@ func parseCmd(bootstrapCmd string) (command, error) {
 
 		return &joinCommand{repository: words[1], version: words[2], cipherSuites: words[3], endpoint: words[4]}, nil
 	default:
-		return nil, errors.Errorf("invalid etcadm bootstrap command %s", bootstrapCmd)
+		return nil, errors.Errorf("invalid etcdadm bootstrap command %s", bootstrapCmd)
 	}
 }

@@ -21,12 +21,14 @@ PROJECT_ROOT="$1"
 ARTIFACTS_FOLDER="$2"
 GIT_TAG="$3"
 FAKE_ARM_ARTIFACTS_FOR_VALIDATION="$4"
+IMAGE_FORMAT="${5:-}"
 
 EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts
-
+if [ -n "$IMAGE_FORMAT" ]; then
+    EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_$IMAGE_FORMAT
+fi
 
 ACTUAL_FILES=$(mktemp)
-
 for file in $(find ${ARTIFACTS_FOLDER} -type f | sort); do
     filepath=$(realpath --relative-base=$ARTIFACTS_FOLDER $file)
 	echo $filepath >> $ACTUAL_FILES

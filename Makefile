@@ -34,7 +34,7 @@ release-binaries-images: build-all-projects
 
 .PHONY: release-ovas
 release-ovas:
-	$(MAKE) release -C projects/kubernetes-sigs/image-builder
+	$(MAKE) release IMAGE_FORMAT=ova -C projects/kubernetes-sigs/image-builder
 
 .PHONY: clean-project-%
 clean-project-%:
