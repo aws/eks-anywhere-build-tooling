@@ -26,6 +26,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `build-ami-ubuntu-2004 release-ova-bottlerocket image-builder/images/capi/output/fake-ubuntu.ova upload-artifacts`
-release: ## Called via prow postsubmit + release jobs, calls `release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts`
+build: ## Called via prow presubmit, calls `release-raw-ubuntu-2004 image-builder/images/capi/output/fake-ubuntu.gz /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/raw/ubuntu.gz upload-artifacts-raw build-ami-ubuntu-2004 setup-packer-configs-ova release-ova-bottlerocket image-builder/images/capi/output/fake-ubuntu.ova /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/ova/ubuntu.ova /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/ova/bottlerocket.ova upload-artifacts-ova`
+release: ## Called via prow postsubmit + release jobs, calls `release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts-ova`
 ########### END GENERATED ###########################
