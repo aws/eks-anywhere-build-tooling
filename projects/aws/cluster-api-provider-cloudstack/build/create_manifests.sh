@@ -28,11 +28,6 @@ IMAGE_TAG="$6"
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
-# HACK: Remove ME - Installing kustomize
-curl --silent --location --remote-name "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v3.2.3/kustomize_kustomize.v3.2.3_linux_amd64"
-chmod a+x kustomize_kustomize.v3.2.3_linux_amd64
-mv kustomize_kustomize.v3.2.3_linux_amd64 /usr/local/bin/kustomize
-
 cd $REPO
 make release-manifests \
   RELEASE_DIR="out" \

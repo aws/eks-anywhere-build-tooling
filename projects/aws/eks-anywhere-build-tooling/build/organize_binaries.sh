@@ -39,8 +39,7 @@ declare -A project_bin_licenses=(["eksa/fluxcd/flux2"]="flux FLUX2"
                                  ["eksa/replicatedhq/troubleshoot"]="support-bundle TROUBLESHOOT"
                                  ["eksa/vmware/govmomi"]="govc GOVMOMI"
                                  ['eksa/helm/helm']="helm HELM"
-                                 ['eksa/tinkerbell/tink']="tink TINK"
-                                 ["eksa/apache/cloudstack-cloudmonkey"]="cmk CLOUDMONKEY")
+                                 ['eksa/tinkerbell/tink']="tink TINK")
 
 for project in "${!project_bin_licenses[@]}"
 do
