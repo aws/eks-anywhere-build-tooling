@@ -10,11 +10,11 @@ RUN yum install -y shadow-utils >> /dev/null \
     && groupadd -f -r -g 10000 chart \
     && useradd --no-log-init -m -g 10000 -u 10000 chart
 
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/helm/chartmuseum/chartm /home/chart
-COPY ../harbor/make/photon/chartserver/docker-entrypoint.sh /home/chart/
-COPY ../harbor/make/photon/common/install_cert.sh /home/chart/
-COPY _output/LICENSES /LICENSES
-COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+COPY --chown chart:chart _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/helm/chartmuseum/chartm /home/chart
+COPY --chown chart:chart _output/make/photon/chartserver/docker-entrypoint.sh /home/chart/
+COPY --chown chart:chart _output/make/photon/common/install_cert.sh /home/chart/
+COPY --chown chart:chart _output/LICENSES /LICENSES
+COPY --chown chart:chart ATTRIBUTION.txt /ATTRIBUTION.txt
 
 RUN chown -R chart:chart /etc/pki/tls/certs \
     && chown -R chart:chart /home/chart \
