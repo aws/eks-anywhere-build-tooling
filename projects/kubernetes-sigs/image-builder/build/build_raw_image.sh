@@ -108,8 +108,9 @@ fi
 
 # Run permissions setup for KVM builds on instance
 # Run make command to build raw image
-ssh $SSH_OPTS $REMOTE_HOST "sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 make build-raw-ubuntu-2004 -C /home/ec2-user/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT"
+ssh $SSH_OPTS $REMOTE_HOST "sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 PACKER_LOG_PATH=/home/ec2-user/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT/output/packer.log make build-raw-ubuntu-2004 -C /home/ec2-user/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT"
 
 # Copy built raw image from the instance back into the CI build environment
 mkdir -p $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output
 scp $SSH_OPTS $REMOTE_HOST:/home/ec2-user/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT/output/*.gz $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output/
+scp $SSH_OPTS $REMOTE_HOST:/home/ec2-user/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT/output/packer.log $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output/
