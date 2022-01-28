@@ -53,6 +53,8 @@ ARM_ENV_CONF_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/etc
 KIND_NODE_BUILD_AMD64_TARGET=$(BINARY_DEPS_DIR)/linux-amd64/files/io.containerd.metadata.v1.bolt/meta.db
 KIND_NODE_BUILD_ARM64_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/io.containerd.metadata.v1.bolt/meta.db
 
+HAPROXY_CFG=$(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg
+
 # Binary targets are added manually in this makefile instead of relying on simple_create logic
 SIMPLE_CREATE_BINARIES=false
 
@@ -89,8 +91,9 @@ $(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BO
 # haproxy
 haproxy/images/%: DOCKERFILE_FOLDER=./images/haproxy
 haproxy/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_HAPROXY_IMAGE_NAME)
+$(call IMAGE_TARGETS_FOR_NAME, haproxy): $(HAPROXY_CFG)
 
-$(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg: $(GIT_PATCH_TARGET)
+$(HAPROXY_CFG): $(GIT_PATCH_TARGET)
 	@mkdir -p $(@D)
 	cp $(REPO)/images/haproxy/haproxy.cfg $@
 

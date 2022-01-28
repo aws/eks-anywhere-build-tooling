@@ -1,9 +1,6 @@
 ARG BASE_IMAGE
 FROM $BASE_IMAGE
 
-# add haproxy user 
-COPY _output/files/haproxy/etc /etc
-
 # upstream minimal config
 COPY --chown=haproxy:haproxy _output/files/haproxy/usr /usr
 
