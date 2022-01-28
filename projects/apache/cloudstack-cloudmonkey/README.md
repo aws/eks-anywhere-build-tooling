@@ -20,7 +20,7 @@ The `eks-a` tool invokes cloudmonkey to perform validations on templates, fetchi
 1. Review releases and changelogs in upstream [repo](https://github.com/apache/cloudstack-cloudmonkey) and decide on new version.
    CloudMonkey maintainers are pretty good about calling breaking changes and other upgrade gotchas between release.  Please
    review carefully and if there are questions about changes necessary to eks-anywhere to support the new version
-   and/or automatically update between eks-anywhere version reach out to @vgg
+   and/or automatically update between eks-anywhere version reach out to @vignesh-goutham
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes. Check the `build` target for
    any build flag changes, tag changes, dependencies, etc. Check that the manifest target has not changed, this is called
