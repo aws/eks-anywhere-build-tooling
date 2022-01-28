@@ -56,7 +56,15 @@ chmod 600 $KEY_LOCATION
 # Create a single EC2 instance with provided instance type and AMI
 # Query the instance ID for use in future commands
 # Wait in loop until instance is running
-INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME --query "Instances[0].InstanceId" --output text)
+RUN_INSTANCE_EXTRA_ARGS=""
+if [ "$CODEBUILD_CI" = "true" ]; then
+    SUBNET_ID_LIST=$RAW_IMAGE_BUILD_SUBNET_ID
+    SUBNET_COUNT=$(echo $SUBNET_ID_LIST | awk -F\, '{print NF}')
+    INDEX=$(($RANDOM % $SUBNET_COUNT))
+    SUBNET_ID=$(cut -d',' -f${INDEX} <<< $SUBNET_ID_LIST)
+    RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address"
+fi
+INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text)
 aws ec2 wait instance-running --instance-ids $INSTANCE_ID
 
 # Get the public DNS of the instance to use as SSH hostname
