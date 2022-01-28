@@ -15,7 +15,7 @@ FULL_OUTPUT_DIR=
 # Force non release-branched
 CARGO_HOME=$(MAKE_ROOT)/_output/cargo
 RUSTUP_HOME=$(MAKE_ROOT)/_output/rustup
-BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
+export BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 
 VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
@@ -108,6 +108,7 @@ $(TUFTOOL_TARGET):
 	$(CARGO_HOME)/bin/rustup default stable
 	CARGO_NET_GIT_FETCH_WITH_CLI=true $(CARGO_HOME)/bin/cargo install --force --root $(CARGO_HOME) tuftool
 
+$(BOTTLEROCKET_SETUP_TARGET): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
 $(BOTTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
 $(BOTTLEROCKET_SETUP_TARGET):
 	@mkdir -p $(BOTTLEROCKET_DOWNLOAD_PATH)
@@ -152,6 +153,7 @@ release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs-ova
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
 
 .PHONY: release-ova-bottlerocket
+release-ova-bottlerocket: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
 release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
 	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
