@@ -77,7 +77,7 @@ for i in $(seq 1 $MAX_RETRIES); do
     echo "Attempt $(($i))"
 
     # Transfer the repo contents from the CI environment to the EC2 instance
-    rsync -avzhR --progress --max-size=500K -e "ssh $SSH_OPTS" $REPO_ROOT $REMOTE_HOST:~/ && echo "Files transferred!" && break
+    rsync -avzh --progress --max-size=500K -e "ssh $SSH_OPTS" $REPO_ROOT $REMOTE_HOST:~/ && echo "Files transferred!" && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
