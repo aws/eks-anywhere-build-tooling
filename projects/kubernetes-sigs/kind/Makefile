@@ -19,8 +19,9 @@ BINARIES_ARE_RELEASE_BRANCHED=false
 # do not look for checksums in release branch folder, instead use project root
 PROJECT_ROOT=$(MAKE_ROOT)
 
-BASE_IMAGE_NAME?=eks-distro-base
-MINIMAL_IPTABLES_BASE_IMAGE_NAME?=eks-distro-minimal-base-iptables
+MINIMAL_BASE_IPTABLES_IMAGE_NAME?=eks-distro-minimal-base-iptables
+MINIMAL_BASE_HAPROXY_IMAGE_NAME?=eks-distro-minimal-base-haproxy
+MINIMAL_BASE_KIND_IMAGE_NAME?=eks-distro-minimal-base-kind
 
 GO_MOD_DOWNLOAD_TARGETS=$(REPO)/eks-anywhere-go-mod-download $(REPO)/images/kindnetd/eks-anywhere-go-mod-download
 GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/attribution/go-license.csv $(OUTPUT_DIR)/kindnetd/attribution/go-license.csv
@@ -30,6 +31,7 @@ KIND_BASE_IMAGE_COMPONENT=kubernetes-sigs/kind/base
 KIND_BASE_VERSIONED_IMAGE_COMPONENT=kubernetes-sigs/kind/base
 KIND_NODE_IMAGE_COMPONENT=kubernetes-sigs/kind/node
 KINDNETD_IMAGE_COMPONENT=kubernetes-sigs/kind/kindnetd
+HAPROXY_IMAGE_COMPONENT=kubernetes-sigs/kind/haproxy
 
 KIND_BASE_IMAGE_BUILD_ARGS=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/kind-base-image-build-args
 KIND_BASE_KUBEADM_OVERRIDE=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base/files/usr/local/bin/kubeadm
@@ -51,10 +53,12 @@ ARM_ENV_CONF_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/etc
 KIND_NODE_BUILD_AMD64_TARGET=$(BINARY_DEPS_DIR)/linux-amd64/files/io.containerd.metadata.v1.bolt/meta.db
 KIND_NODE_BUILD_ARM64_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/io.containerd.metadata.v1.bolt/meta.db
 
+HAPROXY_CFG=$(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg
+
 # Binary targets are added manually in this makefile instead of relying on simple_create logic
 SIMPLE_CREATE_BINARIES=false
 
-IMAGE_NAMES=kindnetd kind-base 
+IMAGE_NAMES=haproxy kindnetd kind-base 
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -84,13 +88,22 @@ $(OUTPUT_DIR)/kindnetd/attribution/go-license.csv KINDNETD_ATTRIBUTION.txt: LICE
 $(eval $(foreach platform, $(BINARY_PLATFORMS), $(call BINARY_TARGET_BODY,$(platform),kind,.)))
 $(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BODY,$(platform),kindnetd,./cmd/kindnetd)))
 
+# haproxy
+haproxy/images/%: DOCKERFILE_FOLDER=./images/haproxy
+haproxy/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_HAPROXY_IMAGE_NAME)
+$(call IMAGE_TARGETS_FOR_NAME, haproxy): $(HAPROXY_CFG)
+
+$(HAPROXY_CFG): $(GIT_PATCH_TARGET)
+	@mkdir -p $(@D)
+	cp $(REPO)/images/haproxy/haproxy.cfg $@
+
 # Kindnetd
 kindnetd/images/%: DOCKERFILE_FOLDER=./images/kindnetd
-kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_IPTABLES_BASE_IMAGE_NAME)
+kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_IPTABLES_IMAGE_NAME)
 
 # Kind-base
 kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/images/base
-kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=eks-distro-base
+kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
 kind-base/images/% kind-base-versioned/images/%: IMAGE_BUILD_ARGS=CNI_PLUGINS_AMD64_URL CNI_PLUGINS_ARM64_URL CNI_PLUGINS_AMD64_SHA256SUM \
 	CNI_PLUGINS_ARM64_SHA256SUM CRICTL_AMD64_SHA256SUM_URL CRICTL_ARM64_SHA256SUM_URL CRICTL_AMD64_URL CRICTL_ARM64_URL
 
