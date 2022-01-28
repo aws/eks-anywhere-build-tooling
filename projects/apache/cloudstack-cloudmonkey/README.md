@@ -14,3 +14,18 @@ can be used with Apache CloudStack 4.0-incubating and above.
 For documentation, kindly see the [wiki](https://github.com/apache/cloudstack-cloudmonkey/wiki).
 
 The `eks-a` tool invokes cloudmonkey to perform validations on templates, fetching OVAs for building Cloudstack clusters, cleaning up stale VMs, etc.
+
+### Updating
+
+1. Review releases and changelogs in upstream [repo](https://github.com/apache/cloudstack-cloudmonkey) and decide on new version.
+   CloudMonkey maintainers are pretty good about calling breaking changes and other upgrade gotchas between release.  Please
+   review carefully and if there are questions about changes necessary to eks-anywhere to support the new version
+   and/or automatically update between eks-anywhere version reach out to @vgg
+1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
+1. Compare the old tag to the new, looking specifically for Makefile changes. Check the `build` target for
+   any build flag changes, tag changes, dependencies, etc. Check that the manifest target has not changed, this is called
+   from our Makefile.
+1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.
+1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=apache/cloudstack-cloudmonkey` from the root of the repo.
+1. Update the version at the top of this Readme.
+1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
