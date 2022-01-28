@@ -5,7 +5,6 @@ REPO=image-builder
 REPO_OWNER=kubernetes-sigs
 
 IMAGE_BUILDER_DIR=$(REPO)/images/capi
-IMAGE_FORMAT?=ova
 RAW_IMAGE_BUILD_AMI?=ami-0bd99362b6ccd24ea
 RAW_IMAGE_BUILD_INSTANCE_TYPE?=t1.micro
 RAW_IMAGE_BUILD_KEY_NAME?=raw-image-build
@@ -57,18 +56,17 @@ BUILD_AMI_TARGETS=build-ami-ubuntu-2004
 BUILD_OVA_TARGETS=setup-packer-configs-ova release-ova-bottlerocket $(FAKE_UBUNTU_OVA_PATH) $(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova
 BUILD_RAW_TARGETS=release-raw-ubuntu-2004 $(FAKE_UBUNTU_RAW_PATH) $(FINAL_UBUNTU_RAW_IMAGE_PATH) upload-artifacts-raw
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
-RELEASE_TARGETS=release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts-ova
-S3_TARGET_PREREQUISITES=$(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
-ifeq ($(IMAGE_FORMAT),raw)
-	RELEASE_TARGETS=release-raw-ubuntu-2004 upload-artifacts-raw
+ifeq ($(IMAGE_FORMAT),ova)
+	S3_TARGET_PREREQUISITES=$(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
+	RELEASE_TARGETS=release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts-ova
+else ifeq ($(IMAGE_FORMAT),raw)
 	S3_TARGET_PREREQUISITES=$(FINAL_UBUNTU_RAW_IMAGE_PATH)
+	RELEASE_TARGETS=release-raw-ubuntu-2004 upload-artifacts-raw
 endif
 
 include $(BASE_DIRECTORY)/Common.mk
 
 export PATH:=$(CARGO_HOME)/bin:$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
-
-s3-artifacts-%: $(S3_TARGET_PREREQUISITES)
 
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
 $(FAKE_UBUNTU_OVA_PATH):
@@ -175,7 +173,7 @@ check-env-validation:
 
 .PHONY: s3-artifacts-%
 s3-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*
-s3-artifacts-%:
+s3-artifacts-%: $(S3_TARGET_PREREQUISITES)
 	$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$*
 
 .PHONY: upload-artifacts-%
