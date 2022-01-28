@@ -18,7 +18,7 @@ The `Licenses` folders are dynamically generated during the build process using 
 to pull them based on the dependencies used by each project.
 
 The `generate-attribution` script is built into the builder-base image used to build all projects.  
-Please refer to the [Readme](https://github.com/aws/eks-distro-build-tooling/blob/main/generate-attribution/Readme.md)
+Please refer to the [README](https://github.com/aws/eks-distro-build-tooling/blob/main/generate-attribution/README.md)
 for more information on the process it follows to generate the `ATTRIBUTION.txt` files.
 
 ## Adding a new project
@@ -52,5 +52,5 @@ If trying to generate these files outside of CI and have them match what CI prod
 1. The `golang` version is included in the attribution file so the different golang versions used to build
    the various projects are required.  Follow the [steps](https://github.com/aws/eks-distro-build-tooling/blob/main/builder-base/install.sh)
    from `builder-base` in the `setupgo()` function to setup the golang versions.
-1. Follow the [Readme](https://github.com/aws/eks-distro-build-tooling/blob/main/generate-attribution/Readme.md)
+1. Follow the [README](https://github.com/aws/eks-distro-build-tooling/blob/main/generate-attribution/README.md)
    to setup the `generate-attribution` script.

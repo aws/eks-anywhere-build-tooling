@@ -3,10 +3,10 @@ AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output tex
 AWS_REGION?=us-west-2
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 
-PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell tinkerbell_hegel cloudflare_cfssl tinkerbell_tink
+PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell tinkerbell_hegel cloudflare_cfssl tinkerbell_boots
 BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 
-EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi replicatedhq_troubleshoot
+EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi replicatedhq_troubleshoot helm_helm tinkerbell_tink
 EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQS))
 
 ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling kubernetes-sigs_image-builder
@@ -34,7 +34,7 @@ release-binaries-images: build-all-projects
 
 .PHONY: release-ovas
 release-ovas:
-	$(MAKE) release -C projects/kubernetes-sigs/image-builder
+	$(MAKE) release IMAGE_FORMAT=ova -C projects/kubernetes-sigs/image-builder
 
 .PHONY: clean-project-%
 clean-project-%:
@@ -52,18 +52,28 @@ add-generated-help-block-project-%:
 
 .PHONY: add-generated-help-block
 add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_PROJECTS))
+	build/update-attribution-files/create_pr.sh
 
 .PHONY: attribution-files-project-%
 attribution-files-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
-	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH)
+	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
 
 .PHONY: attribution-files
 attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 	cat _output/total_summary.txt
 
+.PHONY: checksum-files-project-%
+checksum-files-project-%:
+	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) checksums
+
+.PHONY: checksum-files
+checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
+	build/update-attribution-files/create_pr.sh
+
 .PHONY: update-attribution-files
-update-attribution-files: attribution-files
+update-attribution-files: add-generated-help-block attribution-files checksum-files
 	build/update-attribution-files/create_pr.sh
 
 .PHONY: run-target-in-docker

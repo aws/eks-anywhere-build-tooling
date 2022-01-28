@@ -21,23 +21,32 @@ _output/bin/cert-manager/linux-arm64/cert-manager-cainjector: ## Build `_output/
 _output/bin/cert-manager/linux-arm64/cert-manager-controller: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-controller`
 _output/bin/cert-manager/linux-arm64/cert-manager-webhook: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-webhook`
 
-patch-repo: ## Patch upstream repo with patches in patches directory
-
 ##@ Image Targets
-local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push` to IMAGE_REPO
+local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push helm/push` to IMAGE_REPO
 cert-manager-acmesolver/images/amd64: ## Builds/pushes `cert-manager-acmesolver/images/amd64`
 cert-manager-cainjector/images/amd64: ## Builds/pushes `cert-manager-cainjector/images/amd64`
 cert-manager-controller/images/amd64: ## Builds/pushes `cert-manager-controller/images/amd64`
 cert-manager-webhook/images/amd64: ## Builds/pushes `cert-manager-webhook/images/amd64`
+helm/build: ## Builds/pushes `helm/build`
 cert-manager-acmesolver/images/push: ## Builds/pushes `cert-manager-acmesolver/images/push`
 cert-manager-cainjector/images/push: ## Builds/pushes `cert-manager-cainjector/images/push`
 cert-manager-controller/images/push: ## Builds/pushes `cert-manager-controller/images/push`
 cert-manager-webhook/images/push: ## Builds/pushes `cert-manager-webhook/images/push`
+helm/push: ## Builds/pushes `helm/push`
+
+##@ Helm Targets
+helm/build: ## Build helm chart
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
+
+##@ Artifact Targets
+tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
+s3-artifacts: # Prepare ARTIFACTS_PATH folder structure with tarballs/manifests/other items to be uploaded to s3
+upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S3
 
 ##@ License Targets
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
@@ -53,6 +62,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums local-images attribution attribution-pr `
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums local-images attribution upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
 ########### END GENERATED ###########################

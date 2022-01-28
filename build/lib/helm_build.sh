@@ -18,20 +18,24 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-HELM_REPOSITORY="${1?First argument is helm repoistory}"
-HELM_DIRECTORY="${2?Second argument is helm directory}"
-OUTPUT_DIR="${3?Third arguement is output directory}"
+HELM_SOURCE_REPOSITORY="${1?First argument is helm source repository}"
+HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
+HELM_DIRECTORY="${3?Third argument is helm directory}"
+OUTPUT_DIR="${4?Fouth arguement is output directory}"
 
-CHART_NAME=$(basename ${HELM_REPOSITORY})
+CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
-SOURCE_DIR=$(basename ${HELM_REPOSITORY})/${HELM_DIRECTORY}/.
+SOURCE_DIR=$(basename ${HELM_SOURCE_REPOSITORY})/${HELM_DIRECTORY}/.
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
 
 #
 # Copy
 #
 mkdir -p ${DEST_DIR}
-cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${DEST_DIR}/
 cp -r ${SOURCE_DIR} ${DEST_DIR}
+build::non-golang::copy_licenses ${HELM_SOURCE_REPOSITORY} $DEST_DIR/LICENSES/github.com/${HELM_SOURCE_REPOSITORY}
 
 #
 # Search and replace

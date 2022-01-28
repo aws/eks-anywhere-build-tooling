@@ -19,12 +19,14 @@ var joinPreKubeletPhases = []string{
 var joinPostKubeletPhases = []string{"health"}
 
 type joinCommand struct {
-	repository, version string
-	endpoint            string
+	repository   string
+	version      string
+	endpoint     string
+	cipherSuites string
 }
 
 func (j *joinCommand) run() error {
-	flags := buildFlags(j.repository, j.version)
+	flags := buildFlags(j.repository, j.version, j.cipherSuites)
 	fmt.Println("Running etcdadm join phases")
 	if err := runPhases("join", joinPreKubeletPhases, flags, j.endpoint); err != nil {
 		return err

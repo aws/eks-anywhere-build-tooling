@@ -22,6 +22,7 @@ function build::eksd_releases::load_release_yaml() {
     local -r echo=${2-true}
     oldopt=$-
     set +o nounset
+    set +x
 
     # if key exists, 1 is returned which would resolve to true
     if [ ! ${RELEASE_YAML[$release_branch]+1} ]; then

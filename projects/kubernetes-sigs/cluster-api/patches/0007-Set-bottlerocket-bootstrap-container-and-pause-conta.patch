@@ -1,0 +1,243 @@
+From 1b35848363027f6c04c81d341bc135ee350070b4 Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Tue, 27 Jul 2021 16:06:41 -0700
+Subject: [PATCH 07/42] Set bottlerocket bootstrap container and pause
+ container source in user data
+
+---
+ .../controllers/kubeadmconfig_controller.go   | 29 ++++++++++++++-----
+ .../internal/bottlerocket/bootstrap.go        |  7 +++--
+ .../internal/bottlerocket/bottlerocket.go     | 11 ++++++-
+ .../bottlerocket/controlplane_init.go         |  4 +--
+ .../bottlerocket/controlplane_join.go         |  6 ++--
+ .../kubeadm/internal/bottlerocket/files.go    |  1 -
+ .../kubeadm/internal/bottlerocket/node.go     |  5 ++--
+ 7 files changed, 44 insertions(+), 19 deletions(-)
+
+diff --git a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
+index 6bd5fbbc5..c0b0d4e9d 100644
+--- a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
+@@ -404,6 +404,8 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 	r.reconcileTopLevelObjectSettings(ctx, scope.Cluster, machine, scope.Config)
+ 
+ 	// Add extra config to cluster config for bottlerocket
++	// Extract bottlerocket config from kubeadm
++	var bottlerocketConfig *bottlerocket.BottlerocketConfig
+ 	if scope.Config.Spec.Format == bootstrapv1.Bottlerocket {
+ 		// Add certificates dir
+ 		if scope.Config.Spec.ClusterConfiguration.CertificatesDir == "" {
+@@ -413,11 +415,11 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		// Add controllerManager extra volumes
+ 		scope.Config.Spec.ClusterConfiguration.ControllerManager.ExtraVolumes = []bootstrapv1.HostPathMount{
+ 			{
+-				Name: "kubeconfig",
+-				HostPath: "/var/lib/kubeadm/controller-manager.conf",
++				Name:      "kubeconfig",
++				HostPath:  "/var/lib/kubeadm/controller-manager.conf",
+ 				MountPath: "/etc/kubernetes/controller-manager.conf",
+-				ReadOnly: true,
+-				PathType: "File",
++				ReadOnly:  true,
++				PathType:  "File",
+ 			},
+ 		}
+ 
+@@ -431,6 +433,11 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 				PathType:  "File",
+ 			},
+ 		}
++
++		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
++			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
++			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
+@@ -481,7 +488,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 
+ 	var bootstrapInitData []byte
+ 	if scope.Config.Spec.Format == bootstrapv1.Bottlerocket {
+-		bootstrapInitData, err = bottlerocket.NewInitControlPlane(controlPlaneInput)
++		bootstrapInitData, err = bottlerocket.NewInitControlPlane(controlPlaneInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
+ 			return ctrl.Result{}, err
+@@ -572,7 +579,11 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 
+ 	var cloudJoinData []byte
+ 	if scope.Config.Spec.Format == bootstrapv1.Bottlerocket {
+-		cloudJoinData, err = bottlerocket.NewNode(cloudJoinInput)
++		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
++			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++		}
++		cloudJoinData, err = bottlerocket.NewNode(cloudJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+ 			return ctrl.Result{}, err
+@@ -667,7 +678,11 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 
+ 	var cloudJoinData []byte
+ 	if scope.Config.Spec.Format == bootstrapv1.Bottlerocket {
+-		cloudJoinData, err = bottlerocket.NewJoinControlPlane(cloudJoinInput)
++		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
++			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++		}
++		cloudJoinData, err = bottlerocket.NewJoinControlPlane(cloudJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
+ 			return ctrl.Result{}, err
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index ef6cb98ff..bb221a6b6 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -15,13 +15,14 @@ cluster-domain = "cluster.local"
+ standalone-mode = true
+ authentication-mode = "tls"
+ server-tls-bootstrap = false
++pod-infra-container-image = "{{.PauseContainerSource}}"
+ {{- end -}}
+ `
+ 	bootstrapHostContainerTemplate = `{{define "bootstrapHostContainerSettings" -}}
+ [settings.host-containers.kubeadm-bootstrap]
+ enabled = true
+ superpowered = true
+-source = "public.ecr.aws/w4k1d8o8/kubeadm-bootstrap:latest"
++source = "{{.BootstrapContainerSource}}"
+ user-data = "{{.BootstrapContainerUserData}}"
+ {{- end -}}
+ `
+@@ -29,6 +30,6 @@ user-data = "{{.BootstrapContainerUserData}}"
+ 
+ {{template "adminContainerInitSettings" .}}
+ 
+-{{template "kubernetesInitSettings" }}
++{{template "kubernetesInitSettings" .}}
+ `
+-)
+\ No newline at end of file
++)
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 6a63ac089..c568082b9 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -20,9 +20,16 @@ const (
+ `
+ )
+ 
++type BottlerocketConfig struct {
++	Pause                 bootstrapv1.Pause
++	BottlerocketBootstrap bootstrapv1.BottlerocketBootstrap
++}
++
+ type BottlerocketSettingsInput struct {
+ 	BootstrapContainerUserData string
+ 	AdminContainerUserData     string
++	BootstrapContainerSource   string
++	PauseContainerSource       string
+ }
+ 
+ type HostPath struct {
+@@ -90,7 +97,7 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ }
+ 
+ // getBottlerocketNodeUserData returns the userdata for the host bottlerocket in toml format
+-func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []bootstrapv1.User) ([]byte, error) {
++func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []bootstrapv1.User, config *BottlerocketConfig) ([]byte, error) {
+ 	// base64 encode the bootstrapContainer's user data
+ 	b64BootstrapContainerUserData := base64.StdEncoding.EncodeToString(bootstrapContainerUserData)
+ 
+@@ -107,6 +114,8 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 	bottlerocketInput := &BottlerocketSettingsInput{
+ 		BootstrapContainerUserData: b64BootstrapContainerUserData,
+ 		AdminContainerUserData:     b64AdminContainerUserData,
++		BootstrapContainerSource:   fmt.Sprintf("%s:%s", config.BottlerocketBootstrap.ImageRepository, config.BottlerocketBootstrap.ImageTag),
++		PauseContainerSource:       fmt.Sprintf("%s:%s", config.Pause.ImageRepository, config.Pause.ImageTag),
+ 	}
+ 
+ 	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+index 24ded4739..2c5b97e14 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+@@ -30,7 +30,7 @@ runcmd: "ControlPlaneInit"
+ // NewInitControlPlane will take the cloudinit's controlplane input as an argument
+ // and generate the bottlerocket toml formatted userdata for the host node, which
+ // has the settings for bootstrap container which has its own embedded base64 encoded userdata.
+-func NewInitControlPlane(input *cloudinit.ControlPlaneInput) ([]byte, error) {
++func NewInitControlPlane(input *cloudinit.ControlPlaneInput, config *BottlerocketConfig) ([]byte, error) {
+ 	input.Header = cloudConfigHeader
+ 	input.WriteFiles = input.Certificates.AsFiles()
+ 	input.WriteFiles = append(input.WriteFiles, input.AdditionalFiles...)
+@@ -46,5 +46,5 @@ func NewInitControlPlane(input *cloudinit.ControlPlaneInput) ([]byte, error) {
+ 	}
+ 	fmt.Println(string(bootstrapContainerUserData))
+ 
+-	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users)
++	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users, config)
+ }
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
+index a060e68a4..b93e1164b 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
+@@ -17,7 +17,7 @@ runcmd: "ControlPlaneJoin"
+ )
+ 
+ // NewJoinControlPlane returns the user data string to be used on a new control plane instance.
+-func NewJoinControlPlane(input *cloudinit.ControlPlaneJoinInput) ([]byte, error) {
++func NewJoinControlPlane(input *cloudinit.ControlPlaneJoinInput, config *BottlerocketConfig) ([]byte, error) {
+ 	input.WriteFiles = input.Certificates.AsFiles()
+ 	input.ControlPlane = true
+ 	input.WriteFiles = append(input.WriteFiles, input.AdditionalFiles...)
+@@ -26,5 +26,5 @@ func NewJoinControlPlane(input *cloudinit.ControlPlaneJoinInput) ([]byte, error)
+ 		return nil, errors.Wrapf(err, "failed to generate user data for machine joining control plane")
+ 	}
+ 
+-	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users)
+-}
+\ No newline at end of file
++	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users, config)
++}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/files.go b/bootstrap/kubeadm/internal/bottlerocket/files.go
+index d21630e81..9be431ba8 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/files.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/files.go
+@@ -16,4 +16,3 @@ write_files:{{ range . }}
+ {{- end -}}
+ `
+ )
+-
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/node.go b/bootstrap/kubeadm/internal/bottlerocket/node.go
+index 573422eee..df52e59d5 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/node.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/node.go
+@@ -2,6 +2,7 @@ package bottlerocket
+ 
+ import (
+ 	"fmt"
++
+ 	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
+ )
+ 
+@@ -19,7 +20,7 @@ runcmd: "WorkerJoin"
+ 
+ // NewNode creates a toml formatted userdata including bootstrap host container settings that has
+ // a base64 encoded user data for the bootstrap container
+-func NewNode(input *cloudinit.NodeInput) ([]byte, error) {
++func NewNode(input *cloudinit.NodeInput, config *BottlerocketConfig) ([]byte, error) {
+ 	input.KubeadmCommand = fmt.Sprintf(standardJoinCommand, input.KubeadmVerbosity)
+ 	input.WriteFiles = append(input.WriteFiles, input.AdditionalFiles...)
+ 	bootstrapContainerUserData, err := generateBootstrapContainerUserData("Node", nodeBottleRocketInit, input)
+@@ -27,5 +28,5 @@ func NewNode(input *cloudinit.NodeInput) ([]byte, error) {
+ 		return nil, err
+ 	}
+ 
+-	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users)
++	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users, config)
+ }
+-- 
+2.27.0
+

@@ -78,18 +78,18 @@ func parseCmd(bootstrapCmd string) (command, error) {
 
 	switch cmd {
 	case initCmd:
-		if len(words) != 3 {
+		if len(words) != 4 {
 			return nil, errors.Errorf("invalid bootstrap etcdadm init command [%s]", bootstrapCmd)
 		}
 
-		return &initCommand{repository: words[1], version: words[2]}, nil
+		return &initCommand{repository: words[1], version: words[2], cipherSuites: words[3]}, nil
 	case joinCmd:
-		if len(words) != 4 {
+		if len(words) != 5 {
 			return nil, errors.Errorf("invalid bootstrap etcdadm join command [%s]", bootstrapCmd)
 		}
 
-		return &joinCommand{repository: words[1], version: words[2], endpoint: words[3]}, nil
+		return &joinCommand{repository: words[1], version: words[2], cipherSuites: words[3], endpoint: words[4]}, nil
 	default:
-		return nil, errors.Errorf("invalid etcadm bootstrap command %s", bootstrapCmd)
+		return nil, errors.Errorf("invalid etcdadm bootstrap command %s", bootstrapCmd)
 	}
 }

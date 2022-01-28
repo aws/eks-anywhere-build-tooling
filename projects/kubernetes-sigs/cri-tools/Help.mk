@@ -17,10 +17,6 @@ _output/bin/cri-tools/linux-amd64/critest: ## Build `_output/bin/cri-tools/linux
 _output/bin/cri-tools/linux-arm64/crictl: ## Build `_output/bin/cri-tools/linux-arm64/crictl`
 _output/bin/cri-tools/linux-arm64/critest: ## Build `_output/bin/cri-tools/linux-arm64/critest`
 
-##@ Image Targets
-local-images: ## Builds `` as oci tars for presumbit validation
-images: ## Pushes `` to IMAGE_REPO
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
@@ -44,6 +40,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums  attribution attribution-pr upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums  attribution upload-artifacts attribution-pr`
 release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
 ########### END GENERATED ###########################

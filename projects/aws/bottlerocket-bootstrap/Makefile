@@ -23,7 +23,7 @@ HAS_RELEASE_BRANCHES=true
 #   to add the https origin
 # - REPO target is overridden to create empty folder
 
-# force binarys to go to non-release branch bin folder
+# force binaries to go to non-release branch bin folder
 BINARIES_ARE_RELEASE_BRANCHED=false
 
 # do not look for checksums in release branch folder, instead use project root

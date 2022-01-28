@@ -1,0 +1,149 @@
+From 8fdbc925860261e78eefc9819d0aec68d233396b Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Tue, 16 Nov 2021 10:25:47 -0800
+Subject: [PATCH 08/42] Add proxy config fields to v1beta1 api
+
+---
+ .../kubeadm/api/v1beta1/kubeadm_types.go      | 20 +++++++++++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 26 +++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 28 +++++++++++++++++++
+ 3 files changed, 74 insertions(+)
+
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+index a4836b7f5..529f08299 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+@@ -70,6 +70,12 @@ type ClusterConfiguration struct {
+ 	// This is only for bottlerocket
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
+ 	// Etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -151,6 +157,15 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// ProxyConfiguration holds the settings for proxying bottlerocket services
++type ProxyConfiguration struct {
++	// HTTPS proxy
++	HTTPSProxy string `json:"httpsProxy,omitempty"`
++
++	// No proxy, list of ips that should not use proxy
++	NoProxy []string `json:"noProxy,omitempty"`
++}
++
+ // ControlPlaneComponent holds settings common to control plane component of the cluster.
+ type ControlPlaneComponent struct {
+ 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+@@ -371,6 +386,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
+ 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index 34d26dd9a..9a519a44c 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -2375,6 +2375,19 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  proxy:
++                    description: Proxy holds the https and no proxy information This
++                      is only for bottlerocket
++                    properties:
++                      httpsProxy:
++                        description: HTTPS proxy
++                        type: string
++                      noProxy:
++                        description: No proxy, list of ips that should not use proxy
++                        items:
++                          type: string
++                        type: array
++                    type: object
+                   scheduler:
+                     description: Scheduler contains extra settings for the scheduler
+                       control plane component
+@@ -2930,6 +2943,19 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  proxy:
++                    description: Proxy holds the https and no proxy information This
++                      is only for bottlerocket
++                    properties:
++                      httpsProxy:
++                        description: HTTPS proxy
++                        type: string
++                      noProxy:
++                        description: No proxy, list of ips that should not use proxy
++                        items:
++                          type: string
++                        type: array
++                    type: object
+                 type: object
+               mounts:
+                 description: Mounts specifies a list of mount points to be setup.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 740195de2..b2a952364 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -2385,6 +2385,20 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          proxy:
++                            description: Proxy holds the https and no proxy information
++                              This is only for bottlerocket
++                            properties:
++                              httpsProxy:
++                                description: HTTPS proxy
++                                type: string
++                              noProxy:
++                                description: No proxy, list of ips that should not
++                                  use proxy
++                                items:
++                                  type: string
++                                type: array
++                            type: object
+                           scheduler:
+                             description: Scheduler contains extra settings for the
+                               scheduler control plane component
+@@ -2976,6 +2990,20 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          proxy:
++                            description: Proxy holds the https and no proxy information
++                              This is only for bottlerocket
++                            properties:
++                              httpsProxy:
++                                description: HTTPS proxy
++                                type: string
++                              noProxy:
++                                description: No proxy, list of ips that should not
++                                  use proxy
++                                items:
++                                  type: string
++                                type: array
++                            type: object
+                         type: object
+                       mounts:
+                         description: Mounts specifies a list of mount points to be
+-- 
+2.27.0
+

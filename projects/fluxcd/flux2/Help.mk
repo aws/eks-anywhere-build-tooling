@@ -18,8 +18,20 @@ _output/bin/flux2/darwin-amd64/flux: ## Build `_output/bin/flux2/darwin-amd64/fl
 _output/bin/flux2/darwin-arm64/flux: ## Build `_output/bin/flux2/darwin-arm64/flux`
 
 ##@ Image Targets
-local-images: ## Builds `` as oci tars for presumbit validation
-images: ## Pushes `` to IMAGE_REPO
+local-images: ## Builds `flux-cli/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `flux-cli/images/push helm/push` to IMAGE_REPO
+flux-cli/images/amd64: ## Builds/pushes `flux-cli/images/amd64`
+helm/build: ## Builds/pushes `helm/build`
+flux-cli/images/push: ## Builds/pushes `flux-cli/images/push`
+helm/push: ## Builds/pushes `helm/push`
+
+##@ Helm Targets
+helm/build: ## Build helm chart
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
+
+##@ Fetch Binary Targets
+_output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
+_output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
@@ -44,6 +56,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums  attribution attribution-pr upload-artifacts`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums local-images attribution upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
 ########### END GENERATED ###########################

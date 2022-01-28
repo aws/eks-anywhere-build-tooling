@@ -9,6 +9,7 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `cluster-api`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager` for `linux/amd64 linux/arm64`
@@ -22,8 +23,6 @@ _output/bin/cluster-api/linux-arm64/manager: ## Build `_output/bin/cluster-api/l
 _output/bin/cluster-api/linux-arm64/kubeadm-bootstrap-manager: ## Build `_output/bin/cluster-api/linux-arm64/kubeadm-bootstrap-manager`
 _output/bin/cluster-api/linux-arm64/kubeadm-control-plane-manager: ## Build `_output/bin/cluster-api/linux-arm64/kubeadm-control-plane-manager`
 _output/bin/cluster-api/linux-arm64/cluster-api-provider-docker-manager: ## Build `_output/bin/cluster-api/linux-arm64/cluster-api-provider-docker-manager`
-
-patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Image Targets
 local-images: ## Builds `cluster-api-controller/images/amd64 kubeadm-bootstrap-controller/images/amd64 kubeadm-control-plane-controller/images/amd64 cluster-api-docker-controller/images/amd64` as oci tars for presumbit validation
@@ -64,6 +63,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums local-images attribution attribution-pr upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums local-images attribution upload-artifacts attribution-pr`
 release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
 ########### END GENERATED ###########################

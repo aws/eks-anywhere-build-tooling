@@ -60,3 +60,14 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create image name
+*/}}
+{{- define "template.image" -}}
+{{- if eq (substr 0 7 .tag) "sha256:" -}}
+{{- printf "%s@%s" .image .tag -}}
+{{- else -}}
+{{- printf "%s:%s" .image .tag -}}
+{{- end -}}
+{{- end -}}
