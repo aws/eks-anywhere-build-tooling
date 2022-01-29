@@ -68,7 +68,7 @@ if [ "$CODEBUILD_CI" = "true" ]; then
     # Select a random subnet from Codebuild project's private subnet list
     SUBNET_ID_LIST=$RAW_IMAGE_BUILD_SUBNET_ID
     SUBNET_COUNT=$(echo $SUBNET_ID_LIST | awk -F\, '{print NF}')
-    INDEX=$(($RANDOM % $SUBNET_COUNT))
+    INDEX=$((($RANDOM % $SUBNET_COUNT) + 1))
     SUBNET_ID=$(cut -d',' -f${INDEX} <<< $SUBNET_ID_LIST)
 
     # Define extra args to run the instance in the same subnet and use
