@@ -38,17 +38,15 @@ endif
 #################### CODEBUILD #####################
 CODEBUILD_CI?=false
 CI?=false
+CLONE_URL=$(call GET_CLONE_URL,$(REPO_OWNER),$(REPO))
+#HELM_CLONE_URL=$(call GET_CLONE_URL,$(HELM_SOURCE_OWNER),$(HELM_SOURCE_REPOSITORY))
+HELM_CLONE_URL=https://github.com/$(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY).git
 ifeq ($(CODEBUILD_CI),true)
 	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(REPO_OWNER).$(REPO)
-	#HELM_CLONE_URL=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/$(HELM_SOURCE_OWNER).$(HELM_SOURCE_REPOSITORY)
-	HELM_CLONE_URL=https://github.com/$(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY).git
 	UPLOAD_DRY_RUN=false
 	BUILD_IDENTIFIER=$(CODEBUILD_BUILD_NUMBER)
 else
 	ARTIFACTS_PATH?=$(MAKE_ROOT)/_output/tar
-	CLONE_URL=https://github.com/$(COMPONENT).git
-	HELM_CLONE_URL=https://github.com/$(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY).git
 	UPLOAD_DRY_RUN=true
 	ifeq ($(CI),true)
 		BUILD_IDENTIFIER=$(PROW_JOB_ID)
@@ -282,6 +280,13 @@ define BINARY_TARGET_BODY
 			$$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2) $$(REPO) $$(GOLANG_VERSION) $(1) $(3) \
 			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" $$(CGO_ENABLED) "$$(CGO_LDFLAGS)" $$(REPO_SUBPATH)
 
+endef
+
+# This "function" is used to construt the git clone URL for projects.
+# Indenting the block results in the URL getting prefixed with a
+# space, hence no indentation below.
+define GET_CLONE_URL
+$(shell source $(BUILD_LIB)/common.sh && build::common::get_clone_url $(1) $(2) $(AWS_REGION) $(CODEBUILD_CI))
 endef
 
 # to avoid dealing with cross compling issues using a buildctl
