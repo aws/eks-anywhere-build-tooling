@@ -404,7 +404,7 @@ upload-artifacts: s3-artifacts
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(IMAGE_FORMAT)
 
 
 ### Checksum Targets
@@ -494,11 +494,13 @@ helm/push: helm/build
 	$(BUILDCTL)
 
 %-useradd/images/export: IMAGE_OUTPUT_TYPE=local
-%-useradd/images/export: IMAGE_OUTPUT=dest=$(OUTPUT_DIR)/files/$*
+%-useradd/images/export: IMAGE_OUTPUT_DIR=$(OUTPUT_DIR)/files/$*
+%-useradd/images/export: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)
 %-useradd/images/export: IMAGE_BUILD_ARGS=IMAGE_USERADD_USER_ID IMAGE_USERADD_USER_NAME
 %-useradd/images/export: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/useradd
 %-useradd/images/export: IMAGE_PLATFORMS=linux/amd64
 %-useradd/images/export:
+	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 
 ifneq ($(IMAGE_NAMES),)

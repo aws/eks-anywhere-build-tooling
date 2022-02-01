@@ -6,7 +6,7 @@ REPO_OWNER=aws
 IMAGE_COMPONENT=eks-anywhere-test
 IMAGE_BUILD_ARGS?=IMAGE_TAG
 
-BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
+BASE_IMAGE_NAME?=eks-distro-minimal-base-nginx
 SIMPLE_CREATE_BINARIES=false
 HAS_LICENSES=false
 REPO_NO_CLONE=true
