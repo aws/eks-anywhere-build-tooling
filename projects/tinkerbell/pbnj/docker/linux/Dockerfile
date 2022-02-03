@@ -3,9 +3,6 @@ ARG BUILDER_IMAGE
 
 FROM $BUILDER_IMAGE as ipmitool-builder
 
-ARG IPMITOOL_CLONE_URL
-ARG IPMITOOL_GIT_TAG
-
 WORKDIR /
 
 RUN yum install -y \
@@ -16,9 +13,8 @@ RUN yum install -y \
     make \
     readline-devel
 
-RUN git clone $IPMITOOL_CLONE_URL && \
-    cd ipmitool && \
-    git checkout $IPMITOOL_COMMIT && \
+COPY ipmitool /ipmitool
+RUN cd ipmitool && \
     ./bootstrap && \
     ./configure \
         --prefix=/usr/local \

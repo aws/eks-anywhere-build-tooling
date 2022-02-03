@@ -9,6 +9,7 @@ GOLANG_VERSION?="1.16"
 REPO=pbnj
 REPO_OWNER=tinkerbell
 
+IPMITOOL_CLONE_TARGETS=$(MAKE_ROOT)/ipmitool/eks-anywhere-checkout-$(IPMITOOL_GIT_TAG)
 FIX_BMCLIB_TARGETS=$(REPO)/bmclib
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
@@ -16,7 +17,6 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 BINARY_TARGET_FILES=pbnj
 SOURCE_PATTERNS=.
 
-IMAGE_BUILD_ARGS=IPMITOOL_CLONE_URL IPMITOOL_GIT_TAG
 IMAGE_USERADD_USER_ID=10001
 IMAGE_USERADD_USER_NAME=pbnj
 
@@ -26,7 +26,12 @@ FETCH_BINARIES_TARGETS=eksa/grpc-ecosystem/grpc-health-probe
 
 $(GO_MOD_DOWNLOAD_TARGETS): $(FIX_BMCLIB_TARGETS)
 
-$(call IMAGE_TARGETS_FOR_NAME, pbnj): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS)) pbnj-useradd/images/export
+$(call IMAGE_TARGETS_FOR_NAME, pbnj): $(IPMITOOL_CLONE_TARGETS) $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS)) pbnj-useradd/images/export
+
+$(IPMITOOL_CLONE_TARGETS):
+	git clone $(IPMITOOL_CLONE_URL) $(@D)
+	git -C $(@D) checkout $(IPMITOOL_GIT_TAG)
+	touch $@
 
 # PBNJ had a dependency on an older commit of bmclib module, that
 # had an LGPL dependency (gebn/bmc). This was removed in 
