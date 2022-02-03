@@ -300,6 +300,11 @@ define CGO_BINARY_TARGET_BODY
 
 endef
 
+# intentionall no tab/space since it would come out in the result of calling this func
+define TO_UPPER
+$(shell echo '$(1)' | tr '[:lower:]' '[:upper:]')
+endef
+
 #### Source repo + binary Targets
 ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
