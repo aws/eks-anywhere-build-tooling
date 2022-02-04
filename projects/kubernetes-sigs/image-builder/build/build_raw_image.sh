@@ -39,6 +39,8 @@ fi
 REPO_NAME=$(basename $REPO_ROOT)
 KEY_LOCATION=$REPO_ROOT/$PROJECT_PATH/$KEY_NAME.pem
 IMAGE_BUILDER_MAKE_ROOT=$PROJECT_PATH/$IMAGE_BUILDER_DIR
+REMOTE_HOME_DIR="/home/ec2-user"
+REMOTE_IMAGE_BUILDER_MAKE_ROOT=$REMOTE_HOME_DIR/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT
 SSH_OPTS="-i $KEY_LOCATION -o StrictHostKeyChecking=no -o ConnectTimeout=120"
 
 terminate_instance() {
@@ -66,7 +68,7 @@ if [ "$CODEBUILD_CI" = "true" ]; then
     # Select a random subnet from Codebuild project's private subnet list
     SUBNET_ID_LIST=$RAW_IMAGE_BUILD_SUBNET_ID
     SUBNET_COUNT=$(echo $SUBNET_ID_LIST | awk -F\, '{print NF}')
-    INDEX=$(($RANDOM % $SUBNET_COUNT))
+    INDEX=$((($RANDOM % $SUBNET_COUNT) + 1))
     SUBNET_ID=$(cut -d',' -f${INDEX} <<< $SUBNET_ID_LIST)
 
     # Define extra args to run the instance in the same subnet and use
@@ -108,8 +110,9 @@ fi
 
 # Run permissions setup for KVM builds on instance
 # Run make command to build raw image
-ssh $SSH_OPTS $REMOTE_HOST "sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 make build-raw-ubuntu-2004 -C /home/ec2-user/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT"
+ssh $SSH_OPTS $REMOTE_HOST "sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 PACKER_LOG_PATH=$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log make build-raw-ubuntu-2004 -C $REMOTE_IMAGE_BUILDER_MAKE_ROOT"
 
 # Copy built raw image from the instance back into the CI build environment
 mkdir -p $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output
-scp $SSH_OPTS $REMOTE_HOST:/home/ec2-user/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT/output/*.gz $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output/
+scp $SSH_OPTS $REMOTE_HOST:$REMOTE_IMAGE_BUILDER_MAKE_ROOT/output/*.gz $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output/
+scp $SSH_OPTS $REMOTE_HOST:$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output/

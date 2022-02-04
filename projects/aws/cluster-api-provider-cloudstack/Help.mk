@@ -1,0 +1,51 @@
+
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+
+
+##@ GIT/Repo Targets
+clone-repo:  ## Clone upstream `cluster-api-provider-cloudstack`
+checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+
+##@ Binary Targets
+binaries: ## Build all binaries: `manager` for `linux/amd64 linux/arm64`
+_output/bin/cluster-api-provider-cloudstack/linux-amd64/manager: ## Build `_output/bin/cluster-api-provider-cloudstack/linux-amd64/manager`
+_output/bin/cluster-api-provider-cloudstack/linux-arm64/manager: ## Build `_output/bin/cluster-api-provider-cloudstack/linux-arm64/manager`
+
+##@ Image Targets
+local-images: ## Builds `cluster-api-provider-cloudstack/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `cluster-api-provider-cloudstack/images/push` to IMAGE_REPO
+cluster-api-provider-cloudstack/images/amd64: ## Builds/pushes `cluster-api-provider-cloudstack/images/amd64`
+cluster-api-provider-cloudstack/images/push: ## Builds/pushes `cluster-api-provider-cloudstack/images/push`
+
+##@ Checksum Targets
+checksums: ## Update checksums file based on currently built binaries.
+validate-checksums: # Validate checksums of currently built binaries against checksums file.
+
+##@ Artifact Targets
+tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
+s3-artifacts: # Prepare ARTIFACTS_PATH folder structure with tarballs/manifests/other items to be uploaded to s3
+upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S3
+
+##@ License Targets
+gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
+attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
+attribution-pr: ## Generates PR to update attribution files for projects
+
+##@ Clean Targets
+clean: ## Removes source and _output directory
+clean-repo: ## Removes source directory
+helm/build: ## Build helm chart
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
+
+##@ Helpers
+help: ## Display this help
+add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
+
+##@ Build Targets
+build: ## Called via prow presubmit, calls `validate-checksums local-images attribution attribution-pr upload-artifacts`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
+########### END GENERATED ###########################

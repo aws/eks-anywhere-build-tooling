@@ -77,13 +77,14 @@ $(FAKE_UBUNTU_OVA_PATH):
 $(FAKE_UBUNTU_RAW_PATH):
 	@mkdir -p $(@D)
 	touch $@
-	touch $(ARTIFACTS_PATH)/raw/packer.log
+	touch $(@D)/packer.log
 
 $(FINAL_UBUNTU_OVA_PATH):
 	mv $(IMAGE_BUILDER_DIR)/output/*.ova $@
 
 $(FINAL_UBUNTU_RAW_IMAGE_PATH):
 	mv $(IMAGE_BUILDER_DIR)/output/*.gz $@
+	mv $(IMAGE_BUILDER_DIR)/output/packer.log $(@D)/packer.log
 
 $(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
 $(FINAL_BOTTLEROCKET_OVA_PATH):
@@ -147,7 +148,7 @@ release-ova-ubuntu-2004: MAKEFLAGS=
 release-ova-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
 release-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
 release-ova-ubuntu-2004: deps-ova setup-vsphere setup-packer-configs-ova
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
 
