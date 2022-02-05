@@ -1,5 +1,6 @@
 ## **cfssl**
 ![Version](https://img.shields.io/badge/version-v1.6.1-blue)
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiWjdCKzFMUnRRZVRXeDhpK2xMNytRQ2ZkOUlmR1F2Y2pCSk9tMUdvblcrRVpQVkZzY28vWnlMbWZxcXh5anhCUms0Qjh4aGQ3dGxsUWZ1TS9sdFNOWTBFPSIsIml2UGFyYW1ldGVyU3BlYyI6IkFWS1Q0bndnNWxIeTh2OUgiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [cfssl](https://github.com/cloudflare/cfssl) is both a command line tool and an HTTP API server for signing, verifying, and bundling TLS certificates.
 
