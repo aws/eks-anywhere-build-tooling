@@ -1,5 +1,6 @@
 ## **PBNJ**
 ![Version](https://img.shields.io/badge/version-6b3bb36af744c896d7364cdf57b9f7f71540b573-blue)
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoid2ljSmVyT01VN0tXZ1N2YVNoZml3UVIycUluczh2NDUvaGgyWXhMaVp2NFFuV1M3RjZVelY5WFVEMmhhZlUwaDl6UWlwS2pxYUlpZ1RLdEU0NmNMNDFnPSIsIml2UGFyYW1ldGVyU3BlYyI6IkQwOWtkMmlEV0Yyb1dYSVoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [PBNJ](https://github.com/tinkerbell/pbnj) is a service handles BMC interactions in the Tinkerbell stack.
 
