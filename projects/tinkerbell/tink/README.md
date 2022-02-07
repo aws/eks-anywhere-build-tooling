@@ -1,5 +1,6 @@
 ## **Tink**
 ![Version](https://img.shields.io/badge/version-v0.6.0-blue)
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUmxrMmd4b2N6dk02TDRPVlVXQ1N3aEhsRzAxWFBtZ1Y1VVNXWEtVZlVNS0tkQlZ4MHFuNXJiWld0ZFMvVzVmMzZxWjhKK3FERWdQeEV6RWd6WFZBcGM0PSIsIml2UGFyYW1ldGVyU3BlYyI6ImEvZEhCemJsQXJWZXVmc2kiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Tink](https://github.com/tinkerbell/tink) consists of the tink-server, tink-worker, and tink-cli. The tink-worker and tink-server communicate over gRPC, and are responsible for processing workflows. The CLI is the user-interactive piece for creating workflows and their building blocks, templates and hardware data.
 
