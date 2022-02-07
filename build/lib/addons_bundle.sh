@@ -21,6 +21,8 @@ set -o pipefail
 # Clone Addons
 git clone https://github.com/aws/modelrocket-add-ons.git
 
-cd modelrocket-add-ons
+cd modelrocket-add-ons/generatebundlefile
 
-ls -la
+./vend.sh
+
+make run
