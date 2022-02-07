@@ -59,6 +59,8 @@ attribution-pr: ## Generates PR to update attribution files for projects
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-repo: ## Removes source directory
+create-kind-cluster-amd64: ## Create local kind cluster using built amd64 image
+create-kind-cluster-arm64: ## Create local kind cluster using built arm64 image
 
 ##@ Helpers
 help: ## Display this help
