@@ -1,16 +1,16 @@
-From 0d2af05bf029506e0e563d9e6cb515963d1333e9 Mon Sep 17 00:00:00 2001
+From 7476c8c48137973bec9c782b9518d99e2284bbb6 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 22 Jul 2021 12:59:46 -0500
 Subject: [PATCH] Switch to AL2 base image for node image
 
 Signed-off-by: Jackson West <jgw@amazon.com>
 ---
- images/base/Dockerfile                        | 141 ++++++++----------
+ images/base/Dockerfile                        | 145 +++++++++---------
  images/base/files/usr/local/bin/clean-install |   7 +-
- 2 files changed, 70 insertions(+), 78 deletions(-)
+ 2 files changed, 73 insertions(+), 79 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index ec8fcd7c..436f9854 100644
+index ec8fcd7c..f2a02a3e 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -20,40 +20,24 @@
@@ -70,24 +70,28 @@ index ec8fcd7c..436f9854 100644
  
  # copy in static files
  # all scripts are 0755: http://www.filepermissions.com/file-permission/0755
-@@ -99,10 +83,11 @@ COPY --chmod=0644 files/etc/systemd/system/kubelet.service.d/* /etc/systemd/syst
+@@ -99,56 +83,66 @@ COPY --chmod=0644 files/etc/systemd/system/kubelet.service.d/* /etc/systemd/syst
  RUN echo "Installing Packages ..." \
      && DEBIAN_FRONTEND=noninteractive clean-install \
        systemd \
 -      conntrack iptables iproute2 ethtool socat util-linux mount ebtables udev kmod \
 -      libseccomp2 pigz \
 +      conntrack iptables iproute ethtool socat util-linux ebtables udev kmod \
-+      seccomp2 pigz \
++      libseccomp pigz \
        bash ca-certificates curl rsync \
 -      nfs-common \
 +      nfs-utils \
 +      containerd which tar procps hostname \
      && find /lib/systemd/system/sysinit.target.wants/ -name "systemd-tmpfiles-setup.service" -delete \
      && rm -f /lib/systemd/system/multi-user.target.wants/* \
-     && rm -f /etc/systemd/system/*.wants/* \
-@@ -111,44 +96,51 @@ RUN echo "Installing Packages ..." \
+-    && rm -f /etc/systemd/system/*.wants/* \
++    && rm -vf /etc/systemd/system/*.wants/* \
+     && rm -f /lib/systemd/system/local-fs.target.wants/* \
+     && rm -f /lib/systemd/system/sockets.target.wants/*udev* \
      && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
      && rm -f /lib/systemd/system/basic.target.wants/* \
++    # avoid runaway agetty processes most likely due to al2 being based on older centos 7
++    && systemctl mask getty@tty1.service \
      && echo "ReadKMsg=no" >> /etc/systemd/journald.conf \
 -    && ln -s "$(which systemd)" /sbin/init \
 - && echo "Enabling kubelet ... " \
@@ -170,7 +174,7 @@ index ec8fcd7c..436f9854 100644
      && rm -f /tmp/cni.sha256 \
      && mkdir -p /opt/cni/bin \
      && tar -C /opt/cni/bin -xzvf /tmp/cni.${TARGETARCH}.tgz \
-@@ -159,13 +151,12 @@ RUN echo "Installing Packages ..." \
+@@ -159,13 +153,12 @@ RUN echo "Installing Packages ..." \
           -o -iname portmap \
           -o -iname loopback \
        \) \
@@ -210,5 +214,5 @@ index 33b3238b..d8c9db56 100755
     /var/lib/apt/lists/* \
     /var/log/* \
 -- 
-2.33.1
+2.35.1
 

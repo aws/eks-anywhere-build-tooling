@@ -36,6 +36,7 @@ HAPROXY_IMAGE_COMPONENT=kubernetes-sigs/kind/haproxy
 KIND_BASE_IMAGE_BUILD_ARGS=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/kind-base-image-build-args
 KIND_BASE_KUBEADM_OVERRIDE=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base/files/usr/local/bin/kubeadm
 KIND_NODE_IMAGE_BUILD_ARGS=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/kind-node-image-build-args
+EKSD_KUBE_VERSION=
 
 # Overriding since kind is released branch it will try to add git_tag to latest tag
 LATEST_TAG=$(LATEST)
@@ -174,6 +175,9 @@ $(ARTIFACTS_PATH)/manifests/kindnetd.yaml:
 .PHONY: create-kind-cluster-%
 create-kind-cluster-%:
 	build/create-kind-cluster.sh $(IMAGE_REPO)/$(KIND_NODE_IMAGE_COMPONENT):$(NODE_IMAGE_LATEST_TAG) $* $(RELEASE_BRANCH)
+
+create-kind-cluster-amd64: # Create local kind cluster using built amd64 image
+create-kind-cluster-arm64: # Create local kind cluster using built arm64 image
 
 
 ########### DO NOT EDIT #############################
