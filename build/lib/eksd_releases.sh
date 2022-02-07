@@ -15,11 +15,14 @@
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../" && pwd -P)"
 LASTEST_RELEASE_BRANCH=''
+PROD_DOMAIN="distro.eks.amazonaws.com"
+DEV_DOMAIN="eks-d-postsubmit-artifacts.s3.us-west-2.amazonaws.com"
 declare -A RELEASE_YAML=()
 
 function build::eksd_releases::load_release_yaml() {
     local -r release_branch=$1
     local -r echo=${2-true}
+    local -r dev_release=$(yq e ".${release_branch}.dev" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
     oldopt=$-
     set +o nounset
     set +x
@@ -27,7 +30,11 @@ function build::eksd_releases::load_release_yaml() {
     # if key exists, 1 is returned which would resolve to true
     if [ ! ${RELEASE_YAML[$release_branch]+1} ]; then
         local -r yaml_url=$(build::eksd_releases::get_release_yaml_url ${release_branch})
-        RELEASE_YAML[$release_branch]=$(curl -s --retry 5 $yaml_url)
+        YAML=$(curl -s --retry 5 $yaml_url)        
+        if [[ "$dev_release" == "true" ]]; then
+            YAML=${YAML//$PROD_DOMAIN/$DEV_DOMAIN}
+        fi
+        RELEASE_YAML[$release_branch]=$YAML
     fi
     if $echo; then
         echo "${RELEASE_YAML[$release_branch]}"
@@ -38,8 +45,13 @@ function build::eksd_releases::load_release_yaml() {
 function build::eksd_releases::get_release_yaml_url() {
     local -r release_branch=$1
     local -r release_number=$(yq e ".${release_branch}.number" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
-    local -r yaml_url="https://distro.eks.amazonaws.com/kubernetes-${release_branch}/kubernetes-${release_branch}-eks-${release_number}.yaml"
-    echo "$yaml_url"
+    local -r dev_release=$(yq e ".${release_branch}.dev" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
+    local -r yaml_uri="kubernetes-${release_branch}/kubernetes-${release_branch}-eks-${release_number}.yaml"
+    if [[ "$dev_release" == "true" ]]; then
+        echo "https://$DEV_DOMAIN/$yaml_uri"
+    else
+        echo "https://$PROD_DOMAIN/$yaml_uri"
+    fi
 }
 
 function build::eksd_releases::get_release_branch() {
