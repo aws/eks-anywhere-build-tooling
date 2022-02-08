@@ -103,7 +103,7 @@ function build::gather_licenses() {
 
   # use go 1.16 since 1.17 seems to be more agressive about wanting to update
   # the go.mod/sum file
-  build::common::use_go_version 1.16
+  build::common::use_go_version 1.17
 
   # Force deps to only be pulled form vendor directories
   # this is important in a couple cases where license files
