@@ -26,7 +26,13 @@ aws_region="us-west-2"
 # git clone https://github.com/aws/modelrocket-add-ons.git
 git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
 
-cd modelrocket-add-ons/generatebundlefile
+
+# cd modelrocket-add-ons/generatebundlefile
+ls -la
+cd aws.modelrocket-add-ons/
+
+ls -la
+cd generatebundlefile/
 
 ./vend.sh
 
