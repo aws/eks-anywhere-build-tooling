@@ -18,8 +18,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+org="aws"
+repo="modelrocket-add-ons"
+aws_region="us-west-2"
+
 # Clone Addons
-git clone https://github.com/aws/modelrocket-add-ons.git
+# git clone https://github.com/aws/modelrocket-add-ons.git
+git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
 
 cd modelrocket-add-ons/generatebundlefile
 
