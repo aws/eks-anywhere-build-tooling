@@ -22,22 +22,9 @@ org="aws"
 repo="modelrocket-add-ons"
 aws_region="us-west-2"
 
-
-# Change Go Version hack
-git clone https://github.com/syndbg/goenv.git $HOME/.goenv 
-echo 'export GOENV_ROOT="$HOME/.goenv"' >> ~/.bash_profile
-echo 'export PATH="$GOENV_ROOT/bin:$PATH"' >> ~/.bash_profile
-echo 'export PATH="$PATH:$GOPATH/bin"' >> ~/.bash_profile
-source ~/.bash_profile
-goenv install 1.17.2
-goenv local 1.17.2
-go version
-
-
 # Clone Addons
 # git clone https://github.com/aws/modelrocket-add-ons.git
 git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
-
 
 # cd modelrocket-add-ons/generatebundlefile
 ls -la
