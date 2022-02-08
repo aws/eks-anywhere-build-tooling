@@ -42,7 +42,7 @@ HAS_LICENSES=false
 SIMPLE_CREATE_TARBALLS=false
 
 # to support a no op attribution target
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=build release clean help binaries checksums attribution
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=build release clean help binaries checksums attribution release-ami-ubuntu-2004
 TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
 BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
@@ -138,10 +138,10 @@ build-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 
 .PHONY: release-ami-ubuntu-2004
 release-ami-ubuntu-2004: MAKEFLAGS=
-release-ova-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami
+release-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami
 release-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
-release-ami-ubuntu-2004-%: setup-ami-share deps-ami setup-packer-configs-ami
-	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
+release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
+	PACKER_LOG=1 PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
 
 .PHONY: release-ova-ubuntu-2004
 release-ova-ubuntu-2004: MAKEFLAGS=
