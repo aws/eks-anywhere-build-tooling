@@ -1,13 +1,12 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.17"
-REGISTRYVERSION=v2.7.1-patch-2819-2553-redis
-NOTARYVERSION=v0.7.0
+REGISTRYVERSION=2.7.1-patch-2819-2553-redis
+NOTARYVERSION=v0.6.1
 TRIVYVERSION=v0.20.1
 TRIVYADAPTERVERSION=v0.24.0
 CHARTMUSEUM_SRC_TAG=v0.13.1
 CHARTMUSEUMVERSION=$(CHARTMUSEUM_SRC_TAG)-redis
-REGISTRY_SRC_TAG=v2.7.1
 
 define VERSIONS_FOR_PREPARE
 REGISTRY_VERSION: $(REGISTRYVERSION)
@@ -17,11 +16,12 @@ TRIVY_ADAPTER_VERSION: $(TRIVYADAPTERVERSION)
 CHARTMUSEUM_VERSION: $(CHARTMUSEUMVERSION)
 endef
 
+export VERSIONS_FOR_PREPARE
+
 REPO=harbor
 REPO_OWNER=goharbor
 REPO_SUBPATH=./src
 
-BASE_IMAGE_NAME?=eks-distro-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 HARBOR_DB_IMAGE_COMPONENT=harbor/harbor-db
@@ -37,9 +37,20 @@ HARBOR_EXPORTER_IMAGE_COMPONENT=harbor/harbor-exporter
 
 IMAGE_NAMES=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-jobservice harbor-registry harbor-registryctl harbor-redis harbor-exporter
 
-BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registry harbor-registryctl harbor-exporter
-SOURCE_PATTERNS=./core ./jobservice ./registry ./registryctl ./cmd/exporter
-EXTRA_GOBUILD_FLAGS=-mod=vendor
+BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migrate-patch harbor-migrate harbor-exporter
+SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/standalone-db-migrator ./cmd/exporter
+
+
+PRECOMPILE_PREPARE=harbor_prepare
+
+harbor_base_namespace=goharbor
+IMAGE_BUILD_ARGS=harbor_base_namespace
+
+EXTRA_GOBUILD_FLAGS=-mod vendor
+
+FETCH_BINARIES_TARGETS=eksa/distribution/distribution
+
+include $(BASE_DIRECTORY)/Common.mk
 
 $(call IMAGE_TARGETS_FOR_NAME, harbor-db): harbor-db-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, harbor-portal): harbor-portal-useradd/images/export
@@ -52,45 +63,47 @@ $(call IMAGE_TARGETS_FOR_NAME, harbor-registryctl): harbor-registryctl-useradd/i
 $(call IMAGE_TARGETS_FOR_NAME, harbor-redis): harbor-redis-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, harbor-exporter): harbor-exporter-useradd/images/export
 
+IMAGE_USERADD_USER_ID=10000
+IMAGE_USERADD_USER_NAME=harbor
+
 harbor-db-useradd/images/export: IMAGE_USERADD_USER_NAME=postgres IMAGE_USERADD_USER_ID=999
-harbor-portal-useradd/images/export: IMAGE_USERADD_USER_NAME=nginx IMAGE_USERADD_USER_ID=10000
-harbor-core-useradd/images/export: IMAGE_USERADD_USER_NAME=harbor IMAGE_USERADD_USER_ID=10000
-harbor-log-useradd/images/export: IMAGE_USERADD_USER_NAME=syslog IMAGE_USERADD_USER_ID=10000
-harbor-nginx-useradd/images/export: IMAGE_USERADD_USER_NAME=nginx IMAGE_USERADD_USER_ID=10000
-harbor-jobservice-useradd/images/export: IMAGE_USERADD_USER_NAME=harbor IMAGE_USERADD_USER_ID=10000
-harbor-registry-useradd/images/export: IMAGE_USERADD_USER_NAME=harbor IMAGE_USERADD_USER_ID=10000
-harbor-registryctl-useradd/images/export: IMAGE_USERADD_USER_NAME=harbor IMAGE_USERADD_USER_ID=10000
+harbor-db-useradd/images/export: scripts_prepare
+harbor-portal-useradd/images/export: IMAGE_USERADD_USER_NAME=nginx
+harbor-portal-useradd/images/export: scripts_prepare
+harbor-core-useradd/images/export: scripts_prepare core_config_prepare
+harbor-log-useradd/images/export: IMAGE_USERADD_USER_NAME=syslog
+harbor-log-useradd/images/export: scripts_prepare
+harbor-nginx-useradd/images/export: IMAGE_USERADD_USER_NAME=nginx
+harbor-nginx-useradd/images/export: scripts_prepare
+harbor-jobservice-useradd/images/export: scripts_prepare
+harbor-registry-useradd/images/export: scripts_prepare
+harbor-registryctl-useradd/images/export: scripts_prepare
 harbor-redis-useradd/images/export: IMAGE_USERADD_USER_NAME=redis
-harbor-exporter-useradd/images/export: IMAGE_USERADD_USER_NAME=harbor IMAGE_USERADD_USER_ID=10000
+harbor-redis-useradd/images/export: scripts_prepare
+harbor-exporter-useradd/images/export: scripts_prepare
 
-PRECOMPILE_PREPARE=harbor_prepare
+harbor_prepare: version_prepare swagger_prepare
 
-DOCKERFILEPATH=$(PROJECT_ROOT)/$(REPO)/make/photon
-DOCKERFILEPATH_REG=$(DOCKERFILEPATH)/registry
-DOCKERFILEPATH_CHART_SERVER=$(DOCKERFILEPATH)/chartserver
-MAKE_PREPARE_PATH=$(DOCKERFILEPATH)/prepare
-
-harbor_base_namespace=goharbor
-IMAGE_BUILD_ARGS=harbor_base_namespace
-
-harbor_prepare: version_prepare swagger_prepare registry_prepare
-
-export VERSIONS_FOR_PREPARE
 version_prepare:
-	@echo "$$VERSIONS_FOR_PREPARE" > $(MAKE_PREPARE_PATH)/versions
+	@echo "$$VERSIONS_FOR_PREPARE" > $(PROJECT_ROOT)/$(REPO)/make/photon/prepare/versions
 
 swagger_prepare:
 	make -C $(REPO) gen_apis
 
-registry_prepare:
-	cd $(PROJECT_ROOT)/$(REPO)/$(REPO_SUBPATH) \
-	&& git clone -b $(REGISTRY_SRC_TAG) https://github.com/distribution/distribution.git registry && cd registry \
-	&& wget https://github.com/distribution/distribution/pull/2879.patch && git apply 2879.patch \
-	&& wget https://github.com/distribution/distribution/pull/3370.patch && git apply 3370.patch \
-	&& git apply $(DOCKERFILEPATH_REG)/redis.patch \
-	&& cp ./cmd/registry/config-example.yml $(DOCKERFILEPATH_REG)/config.yml
+scripts_prepare:
+	@mkdir -p $(OUTPUT_DIR)
+	@cp -r $(PROJECT_ROOT)/$(REPO)/make $(OUTPUT_DIR)
 
-include $(BASE_DIRECTORY)/Common.mk
+core_config_prepare:
+	@cp $(PROJECT_ROOT)/files/config-example.yml $(OUTPUT_DIR)/make/photon/registry/config.yml
+
+PKG_PATH=github.com/goharbor/harbor/src/pkg
+GITCOMMIT=$(shell git rev-parse --short=8 HEAD)
+RELEASEVERSION=$(shell cat VERSION)
+%/harbor-core: GO_LDFLAGS=-w -s -X $(PKG_PATH)/version.GitCommit=$(GITCOMMIT) -X $(PKG_PATH)/version.ReleaseVersion=$(RELEASEVERSION)
+%/harbor-core: EXTRA_GOBUILD_FLAGS=
+%/harbor-exporter: EXTRA_GOBUILD_FLAGS=
+
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

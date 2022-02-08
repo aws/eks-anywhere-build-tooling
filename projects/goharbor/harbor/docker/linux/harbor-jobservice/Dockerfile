@@ -8,8 +8,8 @@ RUN yum install -y tzdata shadow-utils >> /dev/null \
     && yum clean all \
     && groupadd -f -r -g 10000 harbor && useradd --no-log-init -r -m -g 10000 -u 10000 harbor 
 
-COPY ../harbor/make/photon/common/install_cert.sh /harbor/
-COPY ../harbor/make/photon/jobservice/entrypoint.sh /harbor/
+COPY _output/make/photon/common/install_cert.sh /harbor/
+COPY _output/make/photon/jobservice/entrypoint.sh /harbor/
 COPY _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-jobservice /harbor/harbor_jobservice
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt

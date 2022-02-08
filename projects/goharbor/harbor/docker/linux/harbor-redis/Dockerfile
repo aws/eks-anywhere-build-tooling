@@ -8,13 +8,12 @@ RUN amazon-linux-extras enable redis6 \
 VOLUME /var/lib/redis
 WORKDIR /var/lib/redis
 
-COPY ../harbor/make/photon/redis/docker-healthcheck /usr/bin/
-COPY ../harbor/make/photon/redis/redis.conf /etc/redis.conf
+COPY _output/make/photon/redis/docker-healthcheck /usr/bin/
+COPY --chown=redis:redis _output/make/photon/redis/redis.conf /etc/redis.conf
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
-RUN chmod +x /usr/bin/docker-healthcheck \
-    && chown redis:redis /etc/redis.conf
+RUN chmod +x /usr/bin/docker-healthcheck
 
 HEALTHCHECK CMD ["docker-healthcheck"]
 USER redis

@@ -10,7 +10,7 @@ RUN yum install -y tzdata shadow-utils >> /dev/null \
     && mkdir /harbor/
 
 COPY _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-exporter /harbor/harbor_exporter
-COPY ../harbor/make/photon/exporter/entrypoint.sh ../harbor/make/photon/common/install_cert.sh /harbor/
+COPY _output/make/photon/exporter/entrypoint.sh _output/make/photon/common/install_cert.sh /harbor/
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 

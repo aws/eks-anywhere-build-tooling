@@ -32,10 +32,11 @@ FROM $BASE_IMAGE
 RUN amazon-linux-extras enable nginx1 \
     && yum install -y nginx shadow-utils >> /dev/null \
     && yum clean all \
+    && chmod 755 /var/log/nginx \
+    && ln -sf /dev/stdout /var/log/nginx/access.log \
+    && ln -sf /dev/stderr /var/log/nginx/error.log \
     && userdel nginx \
     && groupadd -f -r -g 10000 nginx && useradd --no-log-init -r -g 10000 -u 10000 nginx \
-    && ln -sf /dev/stdout /var/log/nginx/access.log && chown -R nginx:nginx /dev/stdout \
-    && ln -sf /dev/stderr /var/log/nginx/error.log && chown -R nginx:nginx /dev/stderr \
     && chown -R nginx:nginx /etc/nginx
 
 COPY --from=nodeportal /build_dir/dist /usr/share/nginx/html

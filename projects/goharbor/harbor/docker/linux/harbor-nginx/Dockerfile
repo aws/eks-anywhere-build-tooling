@@ -6,6 +6,7 @@ RUN amazon-linux-extras enable nginx1 \
     && yum clean all \
     && userdel nginx \
     && groupadd -f -r -g 10000 nginx && useradd --no-log-init -r -g 10000 -u 10000 nginx \
+    && chmod 755 /var/log/nginx \
     && ln -sf /dev/stdout /var/log/nginx/access.log \
     && ln -sf /dev/stderr /var/log/nginx/error.log
 

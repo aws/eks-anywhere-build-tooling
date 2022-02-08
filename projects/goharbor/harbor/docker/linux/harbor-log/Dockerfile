@@ -7,16 +7,16 @@ RUN yum install -y cronie rsyslog logrotate shadow-utils tar gzip sudo >> /dev/n
     && yum clean all \
     && chage -M 99999 root
 
-COPY ../harbor/make/photon/log/rsyslog.conf /etc/rsyslog.conf
-COPY ../harbor/make/photon/log/rsyslog_docker.conf /etc/rsyslog.d/
+COPY --chown=10000:10000 _output/make/photon/log/rsyslog.conf /etc/rsyslog.conf
+COPY --chown=10000:10000 _output/make/photon/log/rsyslog_docker.conf /etc/rsyslog.d/
 RUN rm /etc/cron.daily/logrotate
-COPY ../harbor/make/photon/log/logrotate /etc/cron.hourly/
-COPY ../harbor/make/photon/log/start.sh /usr/local/bin/
+COPY _output/make/photon/log/logrotate /etc/cron.hourly/
+COPY _output/make/photon/log/start.sh /usr/local/bin/
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 RUN chmod +x /usr/local/bin/start.sh /etc/rsyslog.d/ && \
-    chown -R 10000:10000 /etc/rsyslog.conf /etc/rsyslog.d/ /run /var/lib/logrotate/
+    chown -R 10000:10000 /run /var/lib/logrotate/
 
 HEALTHCHECK CMD netstat -ltun|grep 10514
 
