@@ -22,6 +22,13 @@ org="aws"
 repo="modelrocket-add-ons"
 aws_region="us-west-2"
 
+# Change Go Version
+cd $HOME/.goenv && git pull --ff-only && cd -
+goenv install 1.17.2
+goenv local 1.17.2
+go version
+
+
 # Clone Addons
 # git clone https://github.com/aws/modelrocket-add-ons.git
 git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
