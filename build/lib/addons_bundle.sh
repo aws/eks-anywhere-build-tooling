@@ -38,7 +38,6 @@ cd generatebundlefile/
 
 which go
 go version
-rm -rf /usr/bin/go
 
 # Set up specific go version by using go get, additional versions apart from default can be installed by calling
 # the function again with the specific parameter.
@@ -46,6 +45,7 @@ setupgo() {
     local -r version=$1
     go get golang.org/dl/go${version}
     go${version} download
+    rm -rf /usr/bin/go
     # Removing the last number as we only care about the major version of golang
     local -r majorversion=${version%.*}
     mkdir -p ${GOPATH}/go${majorversion}/bin
