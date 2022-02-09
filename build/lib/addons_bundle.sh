@@ -37,7 +37,8 @@ cd generatebundlefile/
 
 
 which go
-go version 
+go version
+rm -rf /usr/bin/go
 
 # Set up specific go version by using go get, additional versions apart from default can be installed by calling
 # the function again with the specific parameter.
