@@ -166,6 +166,12 @@ function build::non-golang::gather_licenses(){
   local -r project="$1"
   local -r git_tag="$2"
   local -r output_dir="$3"
+  #Golang Stuff
+  export GOFLAGS=-mod=vendor
+  export GOOS=linux 
+  export GOARCH=amd64 
+  build::common::use_go_version 1.17
+  #Old Stuff
   project_org="$(cut -d '/' -f1 <<< ${project})"
   project_name="$(cut -d '/' -f2 <<< ${project})"
   git clone https://github.com/${project_org}/${project_name}
