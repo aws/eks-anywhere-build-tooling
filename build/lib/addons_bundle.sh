@@ -60,3 +60,7 @@ go version
 ./vend.sh
 
 make run
+
+pwd=$(pwd)
+
+go1.17.5 run . --input "$pwd/data"
