@@ -460,12 +460,12 @@ helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),
 	IMAGE_TAG=$(IMAGE_TAG) \
 	$(HELM_ADDITIONAL_KEY_VALUES) \
 	$(BUILD_LIB)/helm_build.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/addons_bundle.sh
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
 helm/push: helm/build
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(OUTPUT_DIR)
+	$(BUILD_LIB)/addons_bundle.sh
 
 # Build image using buildkit only builds linux/amd64 oci and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64

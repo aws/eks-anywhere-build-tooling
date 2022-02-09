@@ -63,4 +63,7 @@ make run
 
 pwd=$(pwd)
 
+echo $IMAGE_TAG
+echo $DIGEST
+
 go1.17.5 run . --input "$pwd/data/input_120.yaml"
