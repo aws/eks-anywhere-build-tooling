@@ -59,8 +59,6 @@ go version
 
 ./vend.sh
 
-make run
-
 pwd=$(pwd)
 
 echo $IMAGE_TAG
