@@ -38,12 +38,15 @@ $(OUTPUT_BIN_DIR)/%/tink-docker $(REPO)/tink-docker/eks-anywhere-go-mod-download
 
 $(OUTPUT_DIR)/tink-docker/attribution/go-license.csv TINK_DOCKER_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/tink-docker
 
+%/images/amd64: IMAGE_OUTPUT=push=true
+%/images/amd64: IMAGE_OUTPUT_TYPE=image
+
 kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:5.10.11
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
 $(CREATE_HOOK_FILES): tarballs
-	sed -e 's/ACCOUNT/$(AWS_ACCOUNT_ID)/g' linuxkit_config.yml > _linuxkit_config.yml
+	sed -e 's/IMAGE_REPO/$(IMAGE_REPO)/g' linuxkit_config.yml > _linuxkit_config.yml
 	LINUXKIT_CONFIG=$(BASE_DIRECTORY)/projects/tinkerbell/hook/_linuxkit_config.yml make dist-existing-images -C $(REPO)
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
 	cp $(REPO)/dist/* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
