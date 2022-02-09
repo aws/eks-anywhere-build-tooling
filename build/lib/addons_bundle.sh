@@ -30,6 +30,8 @@ git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${
 ls -la
 cd aws.modelrocket-add-ons/
 
+git checkout dont-delete/codebuild-fork
+
 ls -la
 cd generatebundlefile/
 
