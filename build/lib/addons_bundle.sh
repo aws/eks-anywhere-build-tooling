@@ -45,7 +45,6 @@ setupgo() {
     local -r version=$1
     go get golang.org/dl/go${version}
     go${version} download
-    rm -rf /usr/bin/go
     # Removing the last number as we only care about the major version of golang
     local -r majorversion=${version%.*}
     mkdir -p ${GOPATH}/go${majorversion}/bin
