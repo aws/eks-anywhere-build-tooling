@@ -152,7 +152,7 @@ $(KIND_BASE_KUBEADM_OVERRIDE):
 # kind build node-image process, also extracts kindnetd manifest to push to s3
 $(KIND_NODE_BUILD_AMD64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_AMD64_TARGET)
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) amd64
-	@mkdir -p $(ARTIFACTS_PATH)/manifests
+	@mkdir -p $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)
 	cp $(BINARY_DEPS_DIR)/linux-amd64/files/rootfs/kind/manifests/default-cni.yaml $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml
 	sed -i -e 's/{{ .PodSubnet }}/192.168.0.0\/16/' $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml 
 
