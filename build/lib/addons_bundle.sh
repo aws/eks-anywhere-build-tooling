@@ -35,21 +35,27 @@ git checkout dont-delete/codebuild-fork
 ls -la
 cd generatebundlefile/
 
-export 
 
 which go
 go version 
 
-goenv install 1.17.5
-goenv global  1.17.5
+# Set up specific go version by using go get, additional versions apart from default can be installed by calling
+# the function again with the specific parameter.
+setupgo() {
+    local -r version=$1
+    go get golang.org/dl/go${version}
+    go${version} download
+    # Removing the last number as we only care about the major version of golang
+    local -r majorversion=${version%.*}
+    mkdir -p ${GOPATH}/go${majorversion}/bin
+    ln -s ${GOPATH}/bin/go${version} ${GOPATH}/go${majorversion}/bin/go
+    ln -s /root/sdk/go${version}/bin/gofmt ${GOPATH}/go${majorversion}/bin/gofmt
+    go version
+}
 
-which go
-go version 
+setupgo "${GOLANG117_VERSION:-1.17.5}"
 
-# go install golang.org/dl/go1.17.5@latest
-# go1.17.5 download
-# export GOROOT=$HOME/sdk/go1.17.5
-# go version
+go version
 
 ./vend.sh
 
