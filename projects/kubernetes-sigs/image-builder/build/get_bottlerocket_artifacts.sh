@@ -35,6 +35,8 @@ KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
 BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.releaseVersion" $MAKE_ROOT/BOTTLEROCKET_OVA_RELEASES)
 if [[ $BOTTLEROCKET_RELEASE_VERSION == "null" ]]; then
   echo "Bottlerocket build for ${RELEASE_CHANNEL} is not enabled. Terminating silently."
+  mkdir -p $OVA_DOWNLOAD_PATH
+  touch $OVA_DOWNLOAD_PATH/temp_fake.ova
   exit 0
 fi
 OVA="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
