@@ -183,6 +183,8 @@ function build::non-golang::copy_licenses(){
   export GOOS=linux 
   export GOARCH=amd64 
   build::common::use_go_version 1.17
+  go version
+  pwd
   local -r source_dir="$1"
   local -r destination_dir="$2"
   (cd $source_dir; find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)) |
