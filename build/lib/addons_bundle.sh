@@ -35,7 +35,12 @@ git checkout dont-delete/codebuild-fork
 ls -la
 cd generatebundlefile/
 
-go version 
+export 
+
+go install golang.org/dl/go1.17.5@latest
+go1.17.5 download
+export GOROOT=$HOME/sdk/go1.17.5
+go version
 
 ./vend.sh
 
