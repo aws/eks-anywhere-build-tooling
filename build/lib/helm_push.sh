@@ -41,7 +41,37 @@ function cleanup() {
   rm -f "${TMPFILE}"
 }
 trap cleanup err
-trap "rm -f $TMPFILE" exit
+#trap "rm -f $TMPFILE" exit
 helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
 DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
 echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
+
+org="aws"
+repo="modelrocket-add-ons"
+aws_region="us-west-2"
+git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
+cd aws.modelrocket-add-ons/
+git checkout dont-delete/codebuild-fork
+cd generatebundlefile/
+
+# Set up specific go version by using go get, additional versions apart from default can be installed by calling
+# the function again with the specific parameter.
+setupgo() {
+    local -r version=$1
+    go get golang.org/dl/go${version}
+    go${version} download
+    # Removing the last number as we only care about the major version of golang
+    local -r majorversion=${version%.*}
+    mkdir -p ${GOPATH}/go${majorversion}/bin
+    ln -s ${GOPATH}/bin/go${version} ${GOPATH}/go${majorversion}/bin/go
+    ln -s /root/sdk/go${version}/bin/gofmt ${GOPATH}/go${majorversion}/bin/gofmt
+    go version
+}
+setupgo "${GOLANG117_VERSION:-1.17.5}"
+./vend.sh
+pwd=$(pwd)
+go1.17.5 run . --input "$pwd/data/input_120.yaml"
+cat "$pwd/output/1.20-bundle-crd.yaml"
+
+echo ${DIGEST}
+echo ${IMAGE_TAG}
