@@ -37,10 +37,19 @@ cd generatebundlefile/
 
 export 
 
-go install golang.org/dl/go1.17.5@latest
-go1.17.5 download
-export GOROOT=$HOME/sdk/go1.17.5
-go version
+which go
+go version 
+
+goenv install 1.17.5
+goenv global  1.17.5
+
+which go
+go version 
+
+# go install golang.org/dl/go1.17.5@latest
+# go1.17.5 download
+# export GOROOT=$HOME/sdk/go1.17.5
+# go version
 
 ./vend.sh
 
