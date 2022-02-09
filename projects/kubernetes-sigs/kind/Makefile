@@ -144,7 +144,7 @@ $(KIND_BASE_KUBEADM_OVERRIDE): KUBEADM_CONFIG_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH
 $(KIND_BASE_KUBEADM_OVERRIDE):
 	@mkdir -p $(@D)
 	@mkdir -p $(KUBEADM_CONFIG_DIR)
-	set -a && source $(KIND_BASE_IMAGE_BUILD_ARGS) && envsubst '$$COREDNS_VERSION:$$ETCD_VERSION:$$EKSD_KUBE_VERSION' \
+	set -a && source $(KIND_BASE_IMAGE_BUILD_ARGS) && envsubst '$$COREDNS_VERSION:$$ETCD_VERSION:$$EKSD_KUBE_VERSION:$$EKSD_IMAGE_REPO' \
 		< ./images/base/kubeadm.config.tmpl \
 		> $(KUBEADM_CONFIG_DIR)/kubeadm.config
 	cp ./images/base/kubeadm-override.sh $@
