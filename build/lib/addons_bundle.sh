@@ -35,6 +35,8 @@ git checkout dont-delete/codebuild-fork
 ls -la
 cd generatebundlefile/
 
+go version 
+
 ./vend.sh
 
 make run
