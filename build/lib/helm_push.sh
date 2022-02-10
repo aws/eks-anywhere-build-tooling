@@ -85,8 +85,7 @@ yq -y . "data/input_120.yaml"
 echo "...."
 echo "...."
 echo "...."
-bundle_file=$(< data/input_120.yaml  yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name":env.IMAGE_TAG}]]')
-echo ${bundle_file} > data/bundle.yaml
+cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name":env.IMAGE_TAG}]]' > data/bundle.yaml 
 echo "...."
 echo "...."
 echo "...."
