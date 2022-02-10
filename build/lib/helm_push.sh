@@ -70,8 +70,16 @@ setupgo() {
 setupgo "${GOLANG117_VERSION:-1.17.5}"
 ./vend.sh
 pwd=$(pwd)
-go1.17.5 run . --input "$pwd/data/input_120.yaml"
-cat "$pwd/output/1.20-bundle-crd.yaml"
 
+# Python3 pip and yq
+sudo yum update && sudo yum install python3-pip
+pip3 install yq
+
+#  Add the new helm build to the input file
+IMAGE_TAG="${IMAGE_TAG}-helm"
 echo ${DIGEST}
 echo ${IMAGE_TAG}
+cat data/input_120.yaml | yq -y '.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name":env.IMAGE_TAG}]' data/bundle.yaml
+
+go1.17.5 run . --input "$pwd/data/bundle.yaml"
+cat "$pwd/output/1.20-bundle-crd.yaml"
