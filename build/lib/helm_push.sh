@@ -81,10 +81,21 @@ IMAGE_TAG="${IMAGE_TAG}-helm"
 echo ${DIGEST}
 echo ${IMAGE_TAG}
 
-cat data/input_120.yaml
+yq -y . "data/input_120.yaml"
+echo "...."
+echo "...."
+echo "...."
 bundle_file=$(< data/input_120.yaml  yq -y '.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name":env.IMAGE_TAG}]')
 echo ${bundle_file} > data/bundle.yaml
-cat data/bundle.yaml
-
+echo "...."
+echo "...."
+echo "...."
+yq -y . "data/bundle.yaml"
+echo "...."
+echo "...."
+echo "...."
 go1.17.5 run . --input "$pwd/data/bundle.yaml"
-cat "$pwd/output/1.20-bundle-crd.yaml"
+echo "...."
+echo "...."
+echo "...."
+yq -y . "$pwd/output/1.20-bundle-crd.yaml"
