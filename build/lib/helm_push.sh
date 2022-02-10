@@ -27,8 +27,6 @@ HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
 
-go1.17.5 version
-
 DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
 export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
 export HELM_EXPERIMENTAL_OCI=1
@@ -56,20 +54,21 @@ cd aws.modelrocket-add-ons/
 git checkout dont-delete/codebuild-fork
 cd generatebundlefile/
 
-# Set up specific go version by using go get, additional versions apart from default can be installed by calling
-# the function again with the specific parameter.
-setupgo() {
-    local -r version=$1
-    go get golang.org/dl/go${version}
-    go${version} download
-    # Removing the last number as we only care about the major version of golang
-    local -r majorversion=${version%.*}
-    mkdir -p ${GOPATH}/go${majorversion}/bin
-    ln -s ${GOPATH}/bin/go${version} ${GOPATH}/go${majorversion}/bin/go
-    ln -s /root/sdk/go${version}/bin/gofmt ${GOPATH}/go${majorversion}/bin/gofmt
-    go version
-}
-setupgo "${GOLANG117_VERSION:-1.17.5}"
+# # Set up specific go version by using go get, additional versions apart from default can be installed by calling
+# # the function again with the specific parameter.
+# setupgo() {
+#     local -r version=$1
+#     go get golang.org/dl/go${version}
+#     go${version} download
+#     # Removing the last number as we only care about the major version of golang
+#     local -r majorversion=${version%.*}
+#     mkdir -p ${GOPATH}/go${majorversion}/bin
+#     ln -s ${GOPATH}/bin/go${version} ${GOPATH}/go${majorversion}/bin/go
+#     ln -s /root/sdk/go${version}/bin/gofmt ${GOPATH}/go${majorversion}/bin/gofmt
+#     go version
+# }
+# setupgo "${GOLANG117_VERSION:-1.17.5}"
+
 ./vend.sh
 pwd=$(pwd)
 
@@ -81,8 +80,11 @@ pip3 install yq
 IMAGE_TAG="${IMAGE_TAG}-helm"
 echo ${DIGEST}
 echo ${IMAGE_TAG}
-cat data/input_120.yaml | yq -y '.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name":env.IMAGE_TAG}]' > data/bundle.yaml
 
+cat data/input_120.yaml
+bundle_file=$(< data/input_120.yaml  yq -y '.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name":env.IMAGE_TAG}]')
+echo ${bundle_file} > data/bundle.yaml
 cat data/bundle.yaml
+
 go1.17.5 run . --input "$pwd/data/bundle.yaml"
 cat "$pwd/output/1.20-bundle-crd.yaml"
