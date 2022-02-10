@@ -77,9 +77,8 @@ sudo yum update && sudo yum install python3-pip
 pip3 install yq
 
 #  Add the new helm build to the input file
-IMAGE_TAG="${IMAGE_TAG}-helm"
-echo ${DIGEST}
-echo ${IMAGE_TAG}
+export IMAGE_TAG="${IMAGE_TAG}-helm"
+export CHART_NAME=${CHART_NAME}
 
 yq -y . "data/input_120.yaml"
 echo "...."
