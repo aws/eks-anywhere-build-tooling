@@ -81,5 +81,6 @@ echo ${DIGEST}
 echo ${IMAGE_TAG}
 cat data/input_120.yaml | yq -y '.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name":env.IMAGE_TAG}]' > data/bundle.yaml
 
+cat data/bundle.yaml
 go1.17.5 run . --input "$pwd/data/bundle.yaml"
 cat "$pwd/output/1.20-bundle-crd.yaml"
