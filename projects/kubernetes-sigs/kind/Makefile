@@ -71,7 +71,7 @@ endif
 
 # During build the node image is never built so we can extract this file
 # instead fake it to keep s3-artifacts happy
-s3-artifacts: $(ARTIFACTS_PATH)/manifests/kindnetd.yaml
+s3-artifacts: $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml
 
 images: kind-base-versioned/images/push kind-node/images/push
 
@@ -144,7 +144,7 @@ $(KIND_BASE_KUBEADM_OVERRIDE): KUBEADM_CONFIG_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH
 $(KIND_BASE_KUBEADM_OVERRIDE):
 	@mkdir -p $(@D)
 	@mkdir -p $(KUBEADM_CONFIG_DIR)
-	set -a && source $(KIND_BASE_IMAGE_BUILD_ARGS) && envsubst '$$COREDNS_VERSION:$$ETCD_VERSION:$$EKSD_KUBE_VERSION' \
+	set -a && source $(KIND_BASE_IMAGE_BUILD_ARGS) && envsubst '$$COREDNS_VERSION:$$ETCD_VERSION:$$EKSD_KUBE_VERSION:$$EKSD_IMAGE_REPO' \
 		< ./images/base/kubeadm.config.tmpl \
 		> $(KUBEADM_CONFIG_DIR)/kubeadm.config
 	cp ./images/base/kubeadm-override.sh $@
@@ -152,9 +152,9 @@ $(KIND_BASE_KUBEADM_OVERRIDE):
 # kind build node-image process, also extracts kindnetd manifest to push to s3
 $(KIND_NODE_BUILD_AMD64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_AMD64_TARGET)
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) amd64
-	@mkdir -p $(ARTIFACTS_PATH)/manifests
-	cp $(BINARY_DEPS_DIR)/linux-amd64/files/rootfs/kind/manifests/default-cni.yaml $(ARTIFACTS_PATH)/manifests/kindnetd.yaml
-	sed -i -e 's/{{ .PodSubnet }}/192.168.0.0\/16/' $(ARTIFACTS_PATH)/manifests/kindnetd.yaml 
+	@mkdir -p $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)
+	cp $(BINARY_DEPS_DIR)/linux-amd64/files/rootfs/kind/manifests/default-cni.yaml $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml
+	sed -i -e 's/{{ .PodSubnet }}/192.168.0.0\/16/' $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml 
 
 $(KIND_NODE_BUILD_ARM64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_ARM64_TARGET)
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) arm64
@@ -168,7 +168,7 @@ $(ORGANIZE_BINARIES_ARM64_TARGET): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_B
 $(ARM_ENV_CONF_TARGET):
 	@cp -rf images/node/files/* $(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/
 
-$(ARTIFACTS_PATH)/manifests/kindnetd.yaml:
+$(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml:
 	@mkdir -p $(@D)
 	@touch $@
 

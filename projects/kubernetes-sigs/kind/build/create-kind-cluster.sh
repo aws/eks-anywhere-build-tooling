@@ -34,6 +34,7 @@ EKSD_VERSION_SUFFIX="eks-$EKSD_RELEASE_BRANCH-$EKSD_RELEASE"
 EKSD_KUBE_VERSION="$KUBE_VERSION-$EKSD_VERSION_SUFFIX"
 COREDNS_VERSION=$(build::eksd_releases::get_eksd_component_version "coredns" $EKSD_RELEASE_BRANCH)-$EKSD_VERSION_SUFFIX
 ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_RELEASE_BRANCH)-$EKSD_VERSION_SUFFIX
+EKSD_IMAGE_REPO=$(build::eksd_releases::get_eksd_image_repo $EKSD_RELEASE_BRANCH)
 
 # Make sure the correct arch image is pulled and tagged
 docker pull --platform linux/$ARCH $IMAGE
@@ -54,12 +55,12 @@ kubeadmConfigPatches:
     kind: ClusterConfiguration
     dns:
         type: CoreDNS
-        imageRepository: public.ecr.aws/eks-distro/coredns
+        imageRepository: $EKSD_IMAGE_REPO/coredns
         imageTag: $COREDNS_VERSION
     etcd:
         local:
-            imageRepository: public.ecr.aws/eks-distro/etcd-io
+            imageRepository: $EKSD_IMAGE_REPO/etcd-io
             imageTag: $ETCD_VERSION
-    imageRepository: public.ecr.aws/eks-distro/kubernetes
+    imageRepository: $EKSD_IMAGE_REPO/kubernetes
     kubernetesVersion: $EKSD_KUBE_VERSION
 EOF
