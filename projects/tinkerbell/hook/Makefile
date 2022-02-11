@@ -41,6 +41,7 @@ $(OUTPUT_DIR)/tink-docker/attribution/go-license.csv TINK_DOCKER_ATTRIBUTION.txt
 %/images/amd64: IMAGE_OUTPUT=push=true
 %/images/amd64: IMAGE_OUTPUT_TYPE=image
 
+tink-docker/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:5.10.11
 
 s3-artifacts: $(CREATE_HOOK_FILES)
