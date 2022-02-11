@@ -4,4 +4,4 @@
 
 The [harbor-helm project](https://github.com/goharbor/harbor-helm) focuses on deploying Harbor chart via helm. A high available solution for Harbor based on chart can be find [here](https://github.com/goharbor/harbor-helm/blob/master/docs/High%20Availability.md). And refer to the [guide](https://github.com/goharbor/harbor-helm/blob/master/docs/Upgrade.md) to upgrade the existing deployment.
 
-You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/goharbor/harbor-helm).
+You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/harbor/harbor-helm).
