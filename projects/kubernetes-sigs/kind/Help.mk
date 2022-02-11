@@ -21,10 +21,12 @@ _output/bin/kind/linux-amd64/kindnetd: ## Build `_output/bin/kind/linux-amd64/ki
 _output/bin/kind/linux-arm64/kindnetd: ## Build `_output/bin/kind/linux-arm64/kindnetd`
 
 ##@ Image Targets
-local-images: ## Builds `kindnetd/images/amd64 kind-base/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `kindnetd/images/push kind-base/images/push` to IMAGE_REPO
+local-images: ## Builds `haproxy/images/amd64 kindnetd/images/amd64 kind-base/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `haproxy/images/push kindnetd/images/push kind-base/images/push` to IMAGE_REPO
+haproxy/images/amd64: ## Builds/pushes `haproxy/images/amd64`
 kindnetd/images/amd64: ## Builds/pushes `kindnetd/images/amd64`
 kind-base/images/amd64: ## Builds/pushes `kind-base/images/amd64`
+haproxy/images/push: ## Builds/pushes `haproxy/images/push`
 kindnetd/images/push: ## Builds/pushes `kindnetd/images/push`
 kind-base/images/push: ## Builds/pushes `kind-base/images/push`
 
@@ -57,6 +59,8 @@ attribution-pr: ## Generates PR to update attribution files for projects
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-repo: ## Removes source directory
+create-kind-cluster-amd64: ## Create local kind cluster using built amd64 image
+create-kind-cluster-arm64: ## Create local kind cluster using built arm64 image
 
 ##@ Helpers
 help: ## Display this help

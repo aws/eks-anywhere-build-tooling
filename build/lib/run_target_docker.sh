@@ -39,7 +39,7 @@ fi
 rsync -e 'docker exec -i' -rm --exclude='.git/logs/***' \
 	--exclude="projects/$PROJECT/_output/***" --exclude="projects/$PROJECT/$(basename $PROJECT)/***" \
 	--include="projects/$PROJECT/***" --include="projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES" \
-	--include="projects/kubernetes-sigs/cri-tools/GIT_TAG" \
+	--include="release/SUPPORTED_RELEASE_BRANCHES" --include="projects/kubernetes-sigs/cri-tools/GIT_TAG" \
 	--include='*/' --exclude='projects/***' ./ eks-a-builder:/eks-anywhere-build-tooling
 
 docker exec -it eks-a-builder make $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT RELEASE_BRANCH=$RELEASE_BRANCH IMAGE_REPO=$IMAGE_REPO ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET
