@@ -94,7 +94,7 @@ yq -y . "data/bundle.yaml"
 echo "...."
 echo "...."
 echo "...."
-cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == \"$CHART_NAME\").projects[].versions += [{"name": \"$IMAGE_TAG\"}]]' > data/bundle.yaml 
+cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == '\"$CHART_NAME\"').projects[].versions += [{"name": '\"$IMAGE_TAG\"'}]]' > data/bundle.yaml 
 echo "...."
 echo "...."
 echo "...."
