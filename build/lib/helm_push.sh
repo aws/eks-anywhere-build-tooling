@@ -78,13 +78,23 @@ pip3 install yq
 
 #  Add the new helm build to the input file
 export IMAGE_TAG="${IMAGE_TAG}-helm"
-export CHART_NAME=${CHART_NAME}
+export IMAGE_TAG=$( echo $IMAGE_TAG | sed s/\"//g )
+export CHART_NAME=$( echo $CHART_NAME | sed s/\"//g )
+
 
 yq -y . "data/input_120.yaml"
 echo "...."
 echo "...."
 echo "...."
-cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name":env.IMAGE_TAG}]]' > data/bundle.yaml 
+cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name": env.IMAGE_TAG}]]' > data/bundle.yaml 
+echo "...."
+echo "...."
+echo "...."
+yq -y . "data/bundle.yaml"
+echo "...."
+echo "...."
+echo "...."
+cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == \"$CHART_NAME\").projects[].versions += [{"name": \"$IMAGE_TAG\"}]]' > data/bundle.yaml 
 echo "...."
 echo "...."
 echo "...."
