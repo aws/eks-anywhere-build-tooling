@@ -20,12 +20,12 @@ set -o pipefail
 
 IMAGE_REGISTRY="${1?First argument is image registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
-IMAGE_TAG="${3?Third argument is image tag}"
+HELM_TAG="${3?Third argument is image tag}"
 OUTPUT_DIR="${4?Fourth arguement is output directory}"
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
-CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
+CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${HELM_TAG}-helm.tgz
 
 DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
 export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
@@ -46,6 +46,7 @@ helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee 
 DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
 echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
 
+# Download Addons and checkout generatebundlefile
 org="aws"
 repo="modelrocket-add-ons"
 aws_region="us-west-2"
@@ -53,57 +54,18 @@ git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${
 cd aws.modelrocket-add-ons/
 git checkout dont-delete/codebuild-fork
 cd generatebundlefile/
-
-# # Set up specific go version by using go get, additional versions apart from default can be installed by calling
-# # the function again with the specific parameter.
-# setupgo() {
-#     local -r version=$1
-#     go get golang.org/dl/go${version}
-#     go${version} download
-#     # Removing the last number as we only care about the major version of golang
-#     local -r majorversion=${version%.*}
-#     mkdir -p ${GOPATH}/go${majorversion}/bin
-#     ln -s ${GOPATH}/bin/go${version} ${GOPATH}/go${majorversion}/bin/go
-#     ln -s /root/sdk/go${version}/bin/gofmt ${GOPATH}/go${majorversion}/bin/gofmt
-#     go version
-# }
-# setupgo "${GOLANG117_VERSION:-1.17.5}"
-
 ./vend.sh
-pwd=$(pwd)
 
 # Python3 pip and yq
 sudo yum update && sudo yum install python3-pip
 pip3 install yq
 
 #  Add the new helm build to the input file
-export IMAGE_TAG="${IMAGE_TAG}-helm"
-export IMAGE_TAG=$( echo $IMAGE_TAG | sed s/\"//g )
-export CHART_NAME=$( echo $CHART_NAME | sed s/\"//g )
+export HELM_TAG="${HELM_TAG}"
+export CHART_NAME=${CHART_NAME}
 
-
-yq -y . "data/input_120.yaml"
-echo "...."
-echo "...."
-echo "...."
-cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name": env.IMAGE_TAG}]]' > data/bundle.yaml 
-echo "...."
-echo "...."
-echo "...."
+# Add new build to the input file
+cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name": env.HELM_TAG}]]' > data/bundle.yaml 
 yq -y . "data/bundle.yaml"
-echo "...."
-echo "...."
-echo "...."
-cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == '\"$CHART_NAME\"').projects[].versions += [{"name": '\"$IMAGE_TAG\"'}]]' > data/bundle.yaml 
-echo "...."
-echo "...."
-echo "...."
-yq -y . "data/bundle.yaml"
-echo "...."
-echo "...."
-echo "...."
-go1.17.5 run . --input "$pwd/data/bundle.yaml"
-echo "...."
-echo "...."
-echo "...."
-yq -y . "$pwd/output/1.20-bundle-crd.yaml"
+go1.17.5 run . --input "data/bundle.yaml"
+yq -y . "output/1.20-bundle-crd.yaml"
