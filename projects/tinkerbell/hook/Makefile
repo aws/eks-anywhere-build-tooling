@@ -38,17 +38,25 @@ $(OUTPUT_BIN_DIR)/%/tink-docker $(REPO)/tink-docker/eks-anywhere-go-mod-download
 
 $(OUTPUT_DIR)/tink-docker/attribution/go-license.csv TINK_DOCKER_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/tink-docker
 
+# For local image builds we override to push to local registry.
 %/images/amd64: IMAGE_OUTPUT=push=true
 %/images/amd64: IMAGE_OUTPUT_TYPE=image
 
+# tink-docker image required docker runtime.
+# We are using eks-distro-minimal-base-glibc as the base and builder to install docker.
 tink-docker/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
+
+# Currently the kernel image is being built off upstream.
+# TODO: Setup a build environment to build the linux kernel.
 kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:5.10.11
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
 $(CREATE_HOOK_FILES): tarballs
-	sed -e 's/IMAGE_REPO/$(IMAGE_REPO)/g' linuxkit_config.yml > _linuxkit_config.yml
-	LINUXKIT_CONFIG=$(BASE_DIRECTORY)/projects/tinkerbell/hook/_linuxkit_config.yml make dist-existing-images -C $(REPO)
+# Modify the linuxkit config file hook/hook.yaml to point to IMAGE_REPO.
+# Upstream make target `dist-existing-images` is triggered to perform linuxkit build and generate OSIE files.
+	sed -i -E -e 's,quay.io/tinkerbell/hook-(bootkit|docker|kernel).*,$(IMAGE_REPO)/tinkerbell/hook-\1:latest,g' $(REPO)/hook.yaml
+	make dist-existing-images -C $(REPO)
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
 	cp $(REPO)/dist/* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
 	cp -rf $(OUTPUT_DIR)/hook $(ARTIFACTS_PATH)
