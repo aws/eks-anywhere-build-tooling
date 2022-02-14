@@ -55,5 +55,6 @@ done
 # Build
 #
 cd ${OUTPUT_DIR}/helm
-cat Chart.yaml || true
+cat eks-anywhere-test/Chart.yaml || true
+ls -la
 helm package "${CHART_NAME}"
