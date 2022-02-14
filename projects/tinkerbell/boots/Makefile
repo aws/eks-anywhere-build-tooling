@@ -18,7 +18,7 @@ IPXE_DEPENDENCY_TARGET=$(REPO)/tftp/ipxe/undionly.kpxe
 
 include $(BASE_DIRECTORY)/Common.mk
 
-$(OUTPUT_BIN_DIR)/linux-amd64/boots $(OUTPUT_BIN_DIR)/linux-arm64/boots: $(IPXE_DEPENDENCY_TARGET)
+$(OUTPUT_BIN_DIR)/linux-amd64/boots $(OUTPUT_BIN_DIR)/linux-arm64/boots $(GATHER_LICENSES_TARGETS): $(IPXE_DEPENDENCY_TARGET)
 
 $(IPXE_DEPENDENCY_TARGET):
 # Boots has a dependency on 4 ipxe binaries that get embedded in the code.
