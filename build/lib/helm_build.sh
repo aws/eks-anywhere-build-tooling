@@ -55,4 +55,5 @@ done
 # Build
 #
 cd ${OUTPUT_DIR}/helm
+cat Chart.yaml || true
 helm package "${CHART_NAME}"
