@@ -46,18 +46,20 @@ helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee 
 DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
 echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
 
-# Download Addons and checkout generatebundlefile
-org="aws"
-repo="modelrocket-add-ons"
-aws_region="us-west-2"
-git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
-cd aws.modelrocket-add-ons/
-git checkout dont-delete/codebuild-fork
-cd generatebundlefile/
-./vend.sh
+# # Download Addons and checkout generatebundlefile
+# org="aws"
+# repo="modelrocket-add-ons"
+# aws_region="us-west-2"
+# git clone "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
+# cd aws.modelrocket-add-ons/
+# git checkout dont-delete/codebuild-fork
+# cd generatebundlefile/
+# ./vend.sh
+# go1.17.5 run . --input "data/bundle.yaml"
+
+aws s3 cp s3://eks-a-addons-generatebundle/generatebundlefile .
 
 # Python3 pip and yq
-sudo yum update && sudo yum install python3-pip
 pip3 install yq
 
 #  Add the new helm build to the input file
@@ -65,7 +67,7 @@ export HELM_TAG="${HELM_TAG}"
 export CHART_NAME=${CHART_NAME}
 
 # Add new build to the input file
-cat data/input_120.yaml | yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name": env.HELM_TAG}]]' > data/bundle.yaml 
-yq -y . "data/bundle.yaml"
-go1.17.5 run . --input "data/bundle.yaml"
+cat ${BUILD_ROOT}/addons/addons.yaml | yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name": env.HELM_TAG}]]' > ${BUILD_ROOT}/addons/bundle.yaml
+yq -y . "${BUILD_ROOT}/addons/bundle.yaml"
+./generatebundlefile  --input "${BUILD_ROOT}/addons/bundle.yaml"
 yq -y . "output/1.20-bundle-crd.yaml"
