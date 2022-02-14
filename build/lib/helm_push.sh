@@ -26,6 +26,7 @@ OUTPUT_DIR="${4?Fourth arguement is output directory}"
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${HELM_TAG}-helm.tgz
+BUILD_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
 export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
