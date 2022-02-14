@@ -37,6 +37,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
+COPY _output/files/pbnj /
 COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/grpc-ecosystem/grpc-health-probe /usr/local/bin
 COPY _output/bin/pbnj/$TARGETOS-$TARGETARCH/pbnj /usr/bin/pbnj
 COPY _output/LICENSES /LICENSES
