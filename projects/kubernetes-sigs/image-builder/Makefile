@@ -16,6 +16,8 @@ CARGO_HOME=$(MAKE_ROOT)/_output/cargo
 RUSTUP_HOME=$(MAKE_ROOT)/_output/rustup
 export BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 
+export BUILDER_ROOT=$(MAKE_ROOT)
+
 VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
 DEV_ACCOUNTS?=
