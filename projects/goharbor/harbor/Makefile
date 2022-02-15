@@ -35,6 +35,10 @@ HARBOR_REGISTRYCTL_IMAGE_COMPONENT=harbor/harbor-registryctl
 HARBOR_REDIS_IMAGE_COMPONENT=harbor/harbor-redis
 HARBOR_EXPORTER_IMAGE_COMPONENT=harbor/harbor-exporter
 
+PKG_PATH=github.com/goharbor/harbor/src/pkg
+GITCOMMIT=$(shell git rev-parse --short=8 HEAD)
+RELEASEVERSION=$(shell cat VERSION)
+
 IMAGE_NAMES=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-jobservice harbor-registry harbor-registryctl harbor-redis harbor-exporter
 
 BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migrate-patch harbor-migrate harbor-exporter
@@ -43,10 +47,8 @@ SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/stan
 
 PRECOMPILE_PREPARE=harbor_prepare
 
-harbor_base_namespace=goharbor
-IMAGE_BUILD_ARGS=harbor_base_namespace
-
-EXTRA_GOBUILD_FLAGS=-mod vendor
+HARBOR_BASE_NAMESPACE=goharbor
+IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
 
 FETCH_BINARIES_TARGETS=eksa/distribution/distribution
 
@@ -66,43 +68,25 @@ $(call IMAGE_TARGETS_FOR_NAME, harbor-exporter): harbor-exporter-useradd/images/
 IMAGE_USERADD_USER_ID=10000
 IMAGE_USERADD_USER_NAME=harbor
 
-harbor-db-useradd/images/export: IMAGE_USERADD_USER_NAME=postgres IMAGE_USERADD_USER_ID=999
-harbor-db-useradd/images/export: scripts_prepare
-harbor-portal-useradd/images/export: IMAGE_USERADD_USER_NAME=nginx
-harbor-portal-useradd/images/export: scripts_prepare
-harbor-core-useradd/images/export: scripts_prepare core_config_prepare
+COPY_FILE_LIST=harbor/make/photon/db/docker-entrypoint.sh harbor/make/photon/db/initdb.sh harbor/make/photon/db/upgrade.sh harbor/make/photon/db/docker-healthcheck.sh harbor/make/photon/db/initial-notaryserver.sql harbor/make/photon/db/initial-notarysigner.sql harbor/make/photon/db/initial-registry.sql harbor/make/photon/core/entrypoint.sh harbor/src/core/views harbor/make/migrations harbor/icons harbor/make/photon/prepare/versions harbor/api/v2.0/legacy_swagger.yaml harbor/api/v2.0/swagger.yaml harbor/api/swagger.yaml harbor/src/portal harbor/LICENSE harbor/make/photon/log/rsyslog.conf harbor/make/photon/log/rsyslog_docker.conf harbor/make/photon/log/logrotate harbor/make/photon/log/start.sh harbor/make/photon/common/install_cert.sh harbor/make/photon/jobservice/entrypoint.sh harbor/make/photon/registry/entrypoint.sh harbor/make/photon/registryctl/start.sh harbor/make/photon/redis/docker-healthcheck harbor/make/photon/redis/redis.conf harbor/make/photon/exporter/entrypoint.sh
+
+harbor-db-useradd/images/export: IMAGE_USERADD_USER_NAME=postgres
+harbor-db-useradd/images/export: IMAGE_USERADD_USER_ID=999
+harbor-portal-useradd/images/export: IMAGE_USERADD_USER_NAME=nginx 
 harbor-log-useradd/images/export: IMAGE_USERADD_USER_NAME=syslog
-harbor-log-useradd/images/export: scripts_prepare
 harbor-nginx-useradd/images/export: IMAGE_USERADD_USER_NAME=nginx
-harbor-nginx-useradd/images/export: scripts_prepare
-harbor-jobservice-useradd/images/export: scripts_prepare
-harbor-registry-useradd/images/export: scripts_prepare
-harbor-registryctl-useradd/images/export: scripts_prepare
 harbor-redis-useradd/images/export: IMAGE_USERADD_USER_NAME=redis
-harbor-redis-useradd/images/export: scripts_prepare
-harbor-exporter-useradd/images/export: scripts_prepare
 
-harbor_prepare: version_prepare swagger_prepare
-
-version_prepare:
+harbor_prepare:
 	@echo "$$VERSIONS_FOR_PREPARE" > $(PROJECT_ROOT)/$(REPO)/make/photon/prepare/versions
-
-swagger_prepare:
-	make -C $(REPO) gen_apis
-
-scripts_prepare:
+	@make -C $(REPO) gen_apis
 	@mkdir -p $(OUTPUT_DIR)
-	@cp -r $(PROJECT_ROOT)/$(REPO)/make $(OUTPUT_DIR)
-
-core_config_prepare:
-	@cp $(PROJECT_ROOT)/files/config-example.yml $(OUTPUT_DIR)/make/photon/registry/config.yml
+	@cp -r --parents $(COPY_FILE_LIST) $(OUTPUT_DIR)
 
 PKG_PATH=github.com/goharbor/harbor/src/pkg
-GITCOMMIT=$(shell git rev-parse --short=8 HEAD)
-RELEASEVERSION=$(shell cat VERSION)
-%/harbor-core: GO_LDFLAGS=-w -s -X $(PKG_PATH)/version.GitCommit=$(GITCOMMIT) -X $(PKG_PATH)/version.ReleaseVersion=$(RELEASEVERSION)
-%/harbor-core: EXTRA_GOBUILD_FLAGS=
-%/harbor-exporter: EXTRA_GOBUILD_FLAGS=
+GITCOMMIT=$(shell git -C $(REPO) rev-parse --short=8 HEAD)
+RELEASEVERSION=$(shell cat $(REPO)/VERSION)
+%/harbor-core: EXTRA_GO_LDFLAGS=-X $(PKG_PATH)/version.GitCommit=$(GITCOMMIT) -X $(PKG_PATH)/version.ReleaseVersion=$(RELEASEVERSION)
 
 
 ########### DO NOT EDIT #############################

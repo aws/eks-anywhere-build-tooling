@@ -185,7 +185,6 @@ else
 endif
 EXTRA_GO_LDFLAGS?=
 GOBUILD_COMMAND?=build
-GOBUILD_TAGS?=
 ######################
 
 #### HELPERS ########
@@ -280,7 +279,7 @@ define BINARY_TARGET_BODY
 	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): $(GO_MOD_DOWNLOAD_TARGETS)
 		$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $$(MAKE_ROOT) \
 			$$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2) $$(REPO) $$(GOLANG_VERSION) $(1) $(3) \
-			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" "$$(GOBUILD_TAGS)" $$(CGO_ENABLED) "$$(CGO_LDFLAGS)" $$(REPO_SUBPATH)
+			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" $$(CGO_ENABLED) "$$(CGO_LDFLAGS)" $$(REPO_SUBPATH)
 
 endef
 

@@ -7,14 +7,14 @@ WORKDIR /build_dir
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python-yaml
 
-COPY ../harbor/src/portal/package.json /build_dir
-COPY ../harbor/src/portal/package-lock.json /build_dir
-COPY ../harbor/src/portal/scripts /build_dir
-COPY ../harbor/api/v2.0/legacy_swagger.yaml /build_dir/swagger.yaml
-COPY ../harbor/api/v2.0/swagger.yaml /build_dir/swagger2.yaml
-COPY ../harbor/api/swagger.yaml /build_dir/swagger3.yaml
+COPY _output/harbor/src/portal/package.json /build_dir
+COPY _output/harbor/src/portal/package-lock.json /build_dir
+COPY _output/harbor/src/portal/scripts /build_dir
+COPY _output/harbor/api/v2.0/legacy_swagger.yaml /build_dir/swagger.yaml
+COPY _output/harbor/api/v2.0/swagger.yaml /build_dir/swagger2.yaml
+COPY _output/harbor/api/swagger.yaml /build_dir/swagger3.yaml
 
-COPY ../harbor/src/portal /build_dir
+COPY _output/harbor/src/portal /build_dir
 
 ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 RUN npm install --unsafe-perm
@@ -25,7 +25,7 @@ RUN python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json
 RUN python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger3.yaml > dist/swagger3.json
 
 RUN cp swagger.yaml dist
-COPY ../harbor/LICENSE /build_dir/dist
+COPY _output/harbor/LICENSE /build_dir/dist
 
 FROM $BASE_IMAGE
 
@@ -37,7 +37,8 @@ RUN amazon-linux-extras enable nginx1 \
     && ln -sf /dev/stderr /var/log/nginx/error.log \
     && userdel nginx \
     && groupadd -f -r -g 10000 nginx && useradd --no-log-init -r -g 10000 -u 10000 nginx \
-    && chown -R nginx:nginx /etc/nginx
+    && chown -R nginx:nginx /etc/nginx \
+    && yum erase -y shadow-utils
 
 COPY --from=nodeportal /build_dir/dist /usr/share/nginx/html
 COPY --from=nodeportal /build_dir/package*.json /usr/share/nginx/

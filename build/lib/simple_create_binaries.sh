@@ -27,10 +27,9 @@ SOURCE_PATTERN="$6"
 GOBUILD_COMMAND="$7" 
 EXTRA_GOBUILD_FLAGS="$8"
 GO_LDFLAGS="$9"
-GOBUILD_TAGS="${10}"
-CGO_ENABLED="${11}"
-CGO_LDFLAGS="${12}"
-REPO_SUBPATH="${13:-}"
+CGO_ENABLED="${10}"
+CGO_LDFLAGS="${11}"
+REPO_SUBPATH="${12:-}"
 
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -51,7 +50,7 @@ function build::simple::binaries(){
       export PKG_CONFIG_PATH=$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64/pkgconfig:${PKG_CONFIG_PATH-}
     fi
     CGO_ENABLED=$CGO_ENABLED GOOS=$OS GOARCH=$ARCH \
-      go $GOBUILD_COMMAND -trimpath -a -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -tags "$GOBUILD_TAGS" -o $TARGET_FILE $SOURCE_PATTERN
+      go $GOBUILD_COMMAND -trimpath -a -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -o $TARGET_FILE $SOURCE_PATTERN
   done
 }
 

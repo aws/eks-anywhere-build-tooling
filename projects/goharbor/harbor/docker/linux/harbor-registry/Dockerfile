@@ -8,10 +8,11 @@ ARG TARGETOS
 RUN yum install -y shadow-utils >> /dev/null \
     && yum clean all \
     && mkdir -p /etc/registry \
-    && groupadd -f -r -g 10000 harbor && useradd --no-log-init -m -g 10000 -u 10000 harbor
+    && groupadd -f -r -g 10000 harbor && useradd --no-log-init -m -g 10000 -u 10000 harbor \
+    && yum erase -y shadow-utils
 
-COPY --chown=harbor:harbor _output/make/photon/common/install_cert.sh /home/harbor
-COPY --chown=harbor:harbor _output/make/photon/registry/entrypoint.sh /home/harbor
+COPY --chown=harbor:harbor _output/harbor/make/photon/common/install_cert.sh /home/harbor
+COPY --chown=harbor:harbor _output/harbor/make/photon/registry/entrypoint.sh /home/harbor
 COPY --chown=harbor:harbor _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry /usr/bin/registry_DO_NOT_USE_GC
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt

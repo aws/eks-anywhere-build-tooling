@@ -8,8 +8,8 @@ RUN amazon-linux-extras enable redis6 \
 VOLUME /var/lib/redis
 WORKDIR /var/lib/redis
 
-COPY _output/make/photon/redis/docker-healthcheck /usr/bin/
-COPY --chown=redis:redis _output/make/photon/redis/redis.conf /etc/redis.conf
+COPY _output/harbor/make/photon/redis/docker-healthcheck /usr/bin/
+COPY --chown=redis:redis _output/harbor/make/photon/redis/redis.conf /etc/redis.conf
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 

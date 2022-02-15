@@ -6,10 +6,11 @@ ARG TARGETOS
 
 RUN yum install -y tzdata shadow-utils >> /dev/null \
     && yum clean all \
-    && groupadd -f -r -g 10000 harbor && useradd --no-log-init -r -m -g 10000 -u 10000 harbor 
+    && groupadd -f -r -g 10000 harbor && useradd --no-log-init -r -m -g 10000 -u 10000 harbor \
+    && yum erase -y shadow-utils
 
-COPY _output/make/photon/common/install_cert.sh /harbor/
-COPY _output/make/photon/jobservice/entrypoint.sh /harbor/
+COPY _output/harbor/make/photon/common/install_cert.sh /harbor/
+COPY _output/harbor/make/photon/jobservice/entrypoint.sh /harbor/
 COPY _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-jobservice /harbor/harbor_jobservice
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt

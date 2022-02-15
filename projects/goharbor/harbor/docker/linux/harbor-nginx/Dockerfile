@@ -8,7 +8,8 @@ RUN amazon-linux-extras enable nginx1 \
     && groupadd -f -r -g 10000 nginx && useradd --no-log-init -r -g 10000 -u 10000 nginx \
     && chmod 755 /var/log/nginx \
     && ln -sf /dev/stdout /var/log/nginx/access.log \
-    && ln -sf /dev/stderr /var/log/nginx/error.log
+    && ln -sf /dev/stderr /var/log/nginx/error.log \
+    && yum erase -y shadow-utils
 
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt

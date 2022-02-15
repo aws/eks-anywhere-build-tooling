@@ -7,21 +7,20 @@ ARG TARGETOS
 RUN yum install -y tzdata shadow-utils >> /dev/null \
     && yum clean all \
     && groupadd -f -r -g 10000 harbor && useradd --no-log-init -r -m -g 10000 -u 10000 harbor \
-    && mkdir /harbor/
+    && mkdir /harbor/ \
+    && yum erase -y shadow-utils
 
-HEALTHCHECK CMD curl --fail -s http://localhost:8080/api/v2.0/ping || curl -k --fail -s https://localhost:8443/api/v2.0/ping || exit 1
-COPY _output/make/photon/common/install_cert.sh /harbor/
-COPY _output/make/photon/core/entrypoint.sh /harbor/
-COPY ../harbor/src/core/views /harbor/views
-COPY _output/make/migrations /harbor/migrations
-COPY ../harbor/icons /harbor/icons
-COPY _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-core /harbor/harbor_core
-COPY _output/make/photon/prepare/versions /harbor/
+COPY --chown=harbor:harbor _output/harbor/make/photon/common/install_cert.sh /harbor/
+COPY --chown=harbor:harbor _output/harbor/make/photon/core/entrypoint.sh /harbor/
+COPY --chown=harbor:harbor _output/harbor/src/core/views /harbor/views
+COPY --chown=harbor:harbor _output/harbor/make/migrations /harbor/migrations
+COPY --chown=harbor:harbor _output/harbor/icons /harbor/icons
+COPY --chown=harbor:harbor _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-core /harbor/harbor_core
+COPY --chown=harbor:harbor _output/harbor/make/photon/prepare/versions /harbor/
 # COPY _output/LICENSES /LICENSES
 # COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 RUN chown -R harbor:harbor /etc/pki/tls/certs \
-    && chown -R harbor:harbor /harbor/ \
     && chmod u+x /harbor/entrypoint.sh \
     && chmod u+x /harbor/install_cert.sh \
     && chmod u+x /harbor/harbor_core
@@ -29,3 +28,4 @@ RUN chown -R harbor:harbor /etc/pki/tls/certs \
 WORKDIR /harbor/
 USER harbor
 ENTRYPOINT ["/harbor/entrypoint.sh"]
+HEALTHCHECK CMD curl --fail -s http://localhost:8080/api/v2.0/ping || curl -k --fail -s https://localhost:8443/api/v2.0/ping || exit 1
