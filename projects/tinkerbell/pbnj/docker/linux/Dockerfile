@@ -29,7 +29,7 @@ RUN cd ipmitool && \
 WORKDIR /newroot
 
 RUN set -x && \
-    clean_install "openssl-libs ncurses-libs readline" true true && \
+    clean_install "openssl-libs ncurses-libs readline" && \
     cleanup "glibc"
 
 FROM $BASE_IMAGE
