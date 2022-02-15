@@ -68,7 +68,7 @@ export HELM_TAG="${HELM_TAG}"
 export CHART_NAME=${CHART_NAME}
 
 # Add new build to the input file
-cat ${BUILD_ROOT}/addons/addons.yaml | yq -y '.addOns = [.addOns[] | select(.name == env.CHART_NAME).projects[].versions += [{"name": env.HELM_TAG}]]' > ${BUILD_ROOT}/addons/bundle.yaml
+cat ${BUILD_ROOT}/addons/addons.yaml | yq -y '.addOns = [.addOns[] | select(.projects[].name == env.CHART_NAME).projects[].versions += [{"name": env.HELM_TAG}]]' > ${BUILD_ROOT}/addons/bundle.yaml
 yq -y . "${BUILD_ROOT}/addons/bundle.yaml"
 ./generatebundlefile  --input "${BUILD_ROOT}/addons/bundle.yaml"
 yq -y . "output/1.20-bundle-crd.yaml"
