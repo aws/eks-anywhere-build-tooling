@@ -84,5 +84,5 @@ rm -rf oras_0.12.0_*.tar.gz oras-install/
 
 # Push Oras Bundle
 ECR_PASSWORD=$(aws ecr-public get-login-password --region us-east-1 | tr -d '\n')
-echo "${ECR_PASSWORD}" | oras login -u AWS --password-stdin "${IMAGE_REGISTRY}/${REPOSITORY}"
-oras push -u AWS -p "${ECR_PASSWORD}" "${IMAGE_REGISTRY}/${REPOSITORY}:${BUNDLE_TAG}" output/1.20-bundle-crd.yaml
+echo "${ECR_PASSWORD}" | oras login -u AWS --password-stdin "${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}"
+oras push -u AWS -p "${ECR_PASSWORD}" "${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}:${BUNDLE_TAG}" output/1.20-bundle-crd.yaml
