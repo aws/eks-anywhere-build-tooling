@@ -36,8 +36,8 @@ HARBOR_REDIS_IMAGE_COMPONENT=harbor/harbor-redis
 HARBOR_EXPORTER_IMAGE_COMPONENT=harbor/harbor-exporter
 
 PKG_PATH=github.com/goharbor/harbor/src/pkg
-GITCOMMIT=$(shell git rev-parse --short=8 HEAD)
-RELEASEVERSION=$(shell cat VERSION)
+GITCOMMIT=$(shell git -C $(REPO) rev-parse --short=8 HEAD)
+RELEASEVERSION=$(shell cat $(REPO)/VERSION)
 
 IMAGE_NAMES=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-jobservice harbor-registry harbor-registryctl harbor-redis harbor-exporter
 
@@ -83,9 +83,6 @@ harbor_prepare:
 	@mkdir -p $(OUTPUT_DIR)
 	@cp -r --parents $(COPY_FILE_LIST) $(OUTPUT_DIR)
 
-PKG_PATH=github.com/goharbor/harbor/src/pkg
-GITCOMMIT=$(shell git -C $(REPO) rev-parse --short=8 HEAD)
-RELEASEVERSION=$(shell cat $(REPO)/VERSION)
 %/harbor-core: EXTRA_GO_LDFLAGS=-X $(PKG_PATH)/version.GitCommit=$(GITCOMMIT) -X $(PKG_PATH)/version.ReleaseVersion=$(RELEASEVERSION)
 
 
