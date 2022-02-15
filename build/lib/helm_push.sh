@@ -64,7 +64,7 @@ chmod +x ./generatebundlefile
 pip3 install yq
 
 #  Add the new helm build to the input file
-export HELM_TAG="${HELM_TAG}"
+export HELM_TAG="${HELM_TAG}-helm"
 export CHART_NAME=${CHART_NAME}
 
 # Add new build to the input file
