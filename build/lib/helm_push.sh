@@ -59,7 +59,7 @@ echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPO
 # go1.17.5 run . --input "data/bundle.yaml"
 
 aws s3 cp s3://eks-a-addons-generatebundle/generatebundlefile .
-
+chmod +x ./generatebundlefile
 # Python3 pip and yq
 pip3 install yq
 
