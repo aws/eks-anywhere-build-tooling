@@ -57,18 +57,32 @@ echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPO
 # cd generatebundlefile/
 # ./vend.sh
 # go1.17.5 run . --input "data/bundle.yaml"
-
 aws s3 cp s3://eks-a-addons-generatebundle/generatebundlefile .
 chmod +x ./generatebundlefile
+
+
 # Python3 pip and yq
 pip3 install yq
 
 #  Add the new helm build to the input file
-export HELM_TAG="${HELM_TAG}-helm"
+export HELM_CHART_TAG="${HELM_TAG}-helm"
+export BUNDLE_TAG="${HELM_TAG}-bundle"
 export CHART_NAME=${CHART_NAME}
 
 # Add new build to the input file
-cat ${BUILD_ROOT}/addons/addons.yaml | yq -y '.addOns = [.addOns[] | select(.projects[].name == env.CHART_NAME).projects[].versions += [{"name": env.HELM_TAG}]]' > ${BUILD_ROOT}/addons/bundle.yaml
+cat ${BUILD_ROOT}/addons/addons.yaml | yq -y '.addOns = [.addOns[] | select(.projects[].name == env.CHART_NAME).projects[].versions += [{"name": env.HELM_CHART_TAG}]]' > ${BUILD_ROOT}/addons/bundle.yaml
 yq -y . "${BUILD_ROOT}/addons/bundle.yaml"
 ./generatebundlefile  --input "${BUILD_ROOT}/addons/bundle.yaml"
 yq -y . "output/1.20-bundle-crd.yaml"
+
+# Download Oras
+curl -LO https://github.com/oras-project/oras/releases/download/v0.12.0/oras_0.12.0_linux_amd64.tar.gz
+mkdir -p oras-install/
+tar -zxf oras_0.12.0_*.tar.gz -C oras-install/
+mv oras-install/oras /usr/local/bin/
+rm -rf oras_0.12.0_*.tar.gz oras-install/
+
+# Push Oras Bundle
+ECR_PASSWORD=$(aws ecr-public get-login-password --region us-east-1 | tr -d '\n')
+echo "${ECR_PASSWORD}" | oras login -u AWS --password-stdin "${IMAGE_REGISTRY}/${REPOSITORY}"
+oras push -u AWS -p "${ECR_PASSWORD}" "${IMAGE_REGISTRY}/${REPOSITORY}:${BUNDLE_TAG}" output/1.20-bundle-crd.yaml
