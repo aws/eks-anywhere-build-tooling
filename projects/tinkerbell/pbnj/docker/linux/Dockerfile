@@ -11,7 +11,8 @@ RUN yum install -y \
     git \
     libtool \
     make \
-    readline-devel
+    readline-devel \
+    openssl-devel
 
 COPY ipmitool /ipmitool
 RUN cd ipmitool && \
