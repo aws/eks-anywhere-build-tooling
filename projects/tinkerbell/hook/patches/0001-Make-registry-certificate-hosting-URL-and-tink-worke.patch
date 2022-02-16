@@ -1,0 +1,112 @@
+From 8487e1152cd574ad3500de48e7b42310c96c4b3c Mon Sep 17 00:00:00 2001
+From: Pooja Trivedi <poojatrivedi@gmail.com>
+Date: Wed, 16 Feb 2022 15:51:33 +0000
+Subject: [PATCH] Make registry certificate hosting URL and tink-worker image
+ name:tag configurable
+
+---
+ bootkit/main.go     | 16 +++++++++++++++-
+ tink-docker/main.go | 11 ++++++++++-
+ 2 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/bootkit/main.go b/bootkit/main.go
+index 845dceb..bc8f3f5 100644
+--- a/bootkit/main.go
++++ b/bootkit/main.go
+@@ -23,6 +23,7 @@ type tinkConfig struct {
+ 	registry string
+ 	username string
+ 	password string
++	certURL string
+ 
+ 	// Tinkerbell server configuration
+ 	baseURL    string
+@@ -38,6 +39,8 @@ type tinkConfig struct {
+ 
+ 	// Metadata ID ... plus the other IDs :shrug:
+ 	MetadataID string `json:"id"`
++
++	tinkWorkerImage string
+ }
+ 
+ func main() {
+@@ -61,7 +64,13 @@ func main() {
+ 	}
+ 
+ 	// Generate the path to the tink-worker
+-	imageName := fmt.Sprintf("%s/tink-worker:latest", cfg.registry)
++	var tinkWorkerImage string
++	if (len(cfg.tinkWorkerImage) > 0) {
++		tinkWorkerImage = cfg.tinkWorkerImage
++	} else {
++		tinkWorkerImage = "tink-worker:latest"
++	}
++	imageName := fmt.Sprintf("%s/%s", cfg.registry, tinkWorkerImage)
+ 
+ 	// Generate the configuration of the container
+ 	tinkContainer := &container.Config{
+@@ -70,6 +79,7 @@ func main() {
+ 			fmt.Sprintf("DOCKER_REGISTRY=%s", cfg.registry),
+ 			fmt.Sprintf("REGISTRY_USERNAME=%s", cfg.username),
+ 			fmt.Sprintf("REGISTRY_PASSWORD=%s", cfg.password),
++			fmt.Sprintf("REGISTRY_CERT_URL=%s", cfg.certURL),
+ 			fmt.Sprintf("TINKERBELL_GRPC_AUTHORITY=%s", cfg.grpcAuthority),
+ 			fmt.Sprintf("TINKERBELL_CERT_URL=%s", cfg.grpcCertURL),
+ 			fmt.Sprintf("WORKER_ID=%s", cfg.workerID),
+@@ -165,6 +175,8 @@ func parseCmdLine(cmdLines []string) (cfg tinkConfig) {
+ 			cfg.username = cmdLine[1]
+ 		case "registry_password":
+ 			cfg.password = cmdLine[1]
++		case "registry_cert_url":
++			cfg.certURL = cmdLine[1]
+ 		// Find Tinkerbell servers settings
+ 		case "packet_base_url":
+ 			cfg.baseURL = cmdLine[1]
+@@ -178,6 +190,8 @@ func parseCmdLine(cmdLines []string) (cfg tinkConfig) {
+ 		// Find the worker configuration
+ 		case "worker_id":
+ 			cfg.workerID = cmdLine[1]
++		case "tink_worker_image":
++			cfg.tinkWorkerImage = cmdLine[1]
+ 		}
+ 	}
+ 	return cfg
+diff --git a/tink-docker/main.go b/tink-docker/main.go
+index 1124258..617b91b 100644
+--- a/tink-docker/main.go
++++ b/tink-docker/main.go
+@@ -13,6 +13,7 @@ import (
+ 
+ type tinkConfig struct {
+ 	registry   string
++	registryCertURL string
+ 	baseURL    string
+ 	tinkerbell string
+ 
+@@ -39,7 +40,13 @@ func main() {
+ 		panic(err)
+ 	}
+ 	// Download the configuration
+-	err = downloadFile(path+"ca.crt", cfg.baseURL+"/ca.pem")
++	var baseCertURL string
++	if (len(cfg.registryCertURL) > 0) {
++		baseCertURL = cfg.registryCertURL
++	} else {
++		baseCertURL = cfg.baseURL
++	}
++	err = downloadFile(path+"ca.crt", baseCertURL+"/ca.pem")
+ 	if err != nil {
+ 		panic(err)
+ 	}
+@@ -67,6 +74,8 @@ func parseCmdLine(cmdLines []string) (cfg tinkConfig) {
+ 		// Find Registry configuration
+ 		case "docker_registry":
+ 			cfg.registry = cmdLine[1]
++		case "registry_cert_url":
++			cfg.registryCertURL = cmdLine[1]
+ 		case "packet_base_url":
+ 			cfg.baseURL = cmdLine[1]
+ 		case "tinkerbell":
+-- 
+2.25.1
+
