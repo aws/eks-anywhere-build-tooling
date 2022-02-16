@@ -16,6 +16,13 @@ HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+$(GATHER_LICENSES_TARGETS) $(OUTPUT_BIN_DIR)/linux-amd64/manager $(OUTPUT_BIN_DIR)/linux-arm64/manager: $(CAPC_MANIFESTS_TARGET) $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+
+$(CAPC_MANIFESTS_TARGET): export PATH:=$(MAKE_ROOT)/$(OUTPUT_DIR):$(PATH)
+$(CAPC_MANIFESTS_TARGET): $(KUSTOMIZE_TARGET)
+	echo "Running generate-mocks for capc"
+	make -C $(REPO) generate-mocks
+
 s3-artifacts: create-manifests
 
 .PHONY: create-manifests
