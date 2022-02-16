@@ -60,7 +60,7 @@ $(CREATE_HOOK_FILES): tarballs
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
 	cp $(REPO)/dist/* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
 	mkdir -p $(ARTIFACTS_PATH)
-	cp -rf $(OUTPUT_DIR)/hook $(ARTIFACTS_PATH)
+	cp -rf $(OUTPUT_DIR)/hook/* $(ARTIFACTS_PATH)
 
 
 ########### DO NOT EDIT #############################
