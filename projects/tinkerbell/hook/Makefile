@@ -60,3 +60,11 @@ $(CREATE_HOOK_FILES): tarballs
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
 	cp $(REPO)/dist/* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
 	cp -rf $(OUTPUT_DIR)/hook $(ARTIFACTS_PATH)
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################
