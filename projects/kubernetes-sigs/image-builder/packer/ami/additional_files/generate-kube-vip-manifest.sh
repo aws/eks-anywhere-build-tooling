@@ -1,8 +1,8 @@
 #!/bin/bash
 
-VIP=$1
+KUBE_VIP_IMAGE=$1
+VIP=$2
 DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
-KUBE_VIP_IMAGE='public.ecr.aws/eks-anywhere/plunder-app/kube-vip:v0.3.7-eks-a-1'
 
 cat<<EOF >/etc/kubernetes/manifests/kube-vip.yaml
 apiVersion: v1
