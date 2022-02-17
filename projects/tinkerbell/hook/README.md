@@ -16,6 +16,6 @@
 
 ### Development
 1. The project consists of 3 images. `bootkit`, `tink-docker` and `kernel`.
-1. For `kernel`, the image builds off upstream. The `hook` project uses the kernel.org [linux 5.10.11 kernel](https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.10.11.tar.xz) to build an image.
+1. For `kernel`, the image builds off upstream. The `hook` project uses the kernel.org [linux 5.10.57 kernel](https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.10.57.tar.xz) to build an image.
 1. For building the in-memory OSIE files, `hook` uses [linuxkit](https://github.com/linuxkit/linuxkit). `Linuxkit build` expects the project images to be present in the repository represented by `IMAGE_REPO` variable.
 1. To build locally, we suggest using a local registry and setting `IMAGE_REPO` variable.
