@@ -1,4 +1,4 @@
-ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base
+ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-glibc
 ARG BUILDER_IMAGE
 
 FROM $BUILDER_IMAGE as sleep-builder
