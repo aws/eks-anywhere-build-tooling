@@ -18,7 +18,8 @@ OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 ARTIFACTS_BUCKET?=s3://my-s3-bucket
-IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
+# IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
+IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),public.ecr.aws/y8n6a2y0,localhost:5000)
 ####################################################
 
 #################### LATEST TAG ####################
@@ -161,7 +162,6 @@ SIMPLE_CREATE_BINARIES?=true
 BINARY_TARGETS?=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS, $(BINARY_TARGET_FILES), $(BINARY_PLATFORMS))
 BINARY_TARGET_FILES?=
 SOURCE_PATTERNS?=.
-PRECOMPILE_PREPARE?=
 
 #### CGO ############
 CGO_CREATE_BINARIES?=false
@@ -329,7 +329,7 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) am --committer-date-is-author-date $(PATCHES_DIR)/*
 	@touch $@
 
-%eks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET)) $(PRECOMPILE_PREPARE)
+%eks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) $(REPO_SUBPATH)
 	@touch $@
 

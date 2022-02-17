@@ -29,21 +29,14 @@ COPY _output/harbor/LICENSE /build_dir/dist
 
 FROM $BASE_IMAGE
 
-RUN amazon-linux-extras enable nginx1 \
-    && yum install -y nginx shadow-utils >> /dev/null \
-    && yum clean all \
-    && chmod 755 /var/log/nginx \
+RUN chmod 755 /var/log/nginx \
     && ln -sf /dev/stdout /var/log/nginx/access.log \
-    && ln -sf /dev/stderr /var/log/nginx/error.log \
-    && userdel nginx \
-    && groupadd -f -r -g 10000 nginx && useradd --no-log-init -r -g 10000 -u 10000 nginx \
-    && chown -R nginx:nginx /etc/nginx \
-    && yum erase -y shadow-utils
+    && ln -sf /dev/stderr /var/log/nginx/error.log
 
 COPY --from=nodeportal /build_dir/dist /usr/share/nginx/html
 COPY --from=nodeportal /build_dir/package*.json /usr/share/nginx/
-# COPY _output/LICENSES /LICENSES
-# COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+COPY _output/LICENSES /LICENSES
+COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 VOLUME /var/cache/nginx /var/log/nginx /run
 

@@ -1,20 +1,26 @@
-ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-base
+ARG BASE_IMAGE
+ARG BUILDER_IMAGE
+FROM $BUILDER_IMAGE as redis-builder
+
+WORKDIR /
+RUN set -x && \
+    amazon-linux-extras enable redis6 && \
+    cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo && \
+    clean_install systemd true true && \
+    clean_install redis && \
+    remove_package "bash gawk ncurses ncurses-base info sed shadow-utils grep" && \
+    remove_package systemd true && \
+    cleanup "redis"
+
 FROM $BASE_IMAGE
 
-RUN amazon-linux-extras enable redis6 \
-    && yum install -y redis >> /dev/null \
-    && yum clean all
+COPY --from=redis-builder /newroot /
+COPY --chown=redis:redis _output/harbor/make/photon/redis/redis.conf /etc/redis.conf
+COPY _output/LICENSES /LICENSES
+COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 VOLUME /var/lib/redis
 WORKDIR /var/lib/redis
 
-COPY _output/harbor/make/photon/redis/docker-healthcheck /usr/bin/
-COPY --chown=redis:redis _output/harbor/make/photon/redis/redis.conf /etc/redis.conf
-# COPY _output/LICENSES /LICENSES
-# COPY ATTRIBUTION.txt /ATTRIBUTION.txt
-
-RUN chmod +x /usr/bin/docker-healthcheck
-
-HEALTHCHECK CMD ["docker-healthcheck"]
 USER redis
-CMD ["redis-server", "/etc/redis.conf"]
+CMD ["/usr/bin/redis-server", "/etc/redis.conf"]

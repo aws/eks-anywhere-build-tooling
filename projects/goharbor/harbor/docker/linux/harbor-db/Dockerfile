@@ -4,7 +4,7 @@ FROM $BASE_IMAGE
 ENV PGDATA /var/lib/postgresql/data
 
 RUN amazon-linux-extras enable postgresql13 \
-    && yum install -y shadow-utils gzip postgresql postgresql-server findutils bc >> /dev/null \
+    && yum install -y shadow-utils gzip postgresql postgresql-server findutils bc util-linux net-tools >> /dev/null \
     && userdel postgres \
     && groupadd -f -r postgres --gid=999 \
     && useradd -m -r -g postgres --uid=999 postgres \
@@ -16,8 +16,8 @@ RUN amazon-linux-extras enable postgresql13 \
     && sed -i "s|#listen_addresses = 'localhost'.*|listen_addresses = '*'|g" /usr/share/pgsql/postgresql.conf.sample \
     && sed -i "s|#unix_socket_directories = '/tmp'.*|unix_socket_directories = '/run/postgresql'|g" /usr/share/pgsql/postgresql.conf.sample \
     && sed -i "s|logging_collector = on.*|logging_collector = off|g" /usr/share/pgsql/postgresql.conf.sample \
-    && yum clean all \
-    && yum erase -y toybox shadow-utils && yum install -y util-linux net-tools
+    && yum erase -y toyboxs \
+    && yum clean all
 
 VOLUME /var/lib/postgresql/data
 
@@ -28,8 +28,8 @@ COPY --chown=postgres:postgres _output/harbor/make/photon/db/docker-healthcheck.
 COPY --chown=postgres:postgres _output/harbor/make/photon/db/initial-notaryserver.sql /docker-entrypoint-initdb.d/
 COPY --chown=postgres:postgres _output/harbor/make/photon/db/initial-notarysigner.sql /docker-entrypoint-initdb.d/
 COPY --chown=postgres:postgres _output/harbor/make/photon/db/initial-registry.sql /docker-entrypoint-initdb.d/
-# COPY _output/LICENSES /LICENSES
-# COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+COPY _output/LICENSES /LICENSES
+COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 RUN chmod u+x /docker-entrypoint.sh /docker-healthcheck.sh
 

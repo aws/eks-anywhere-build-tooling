@@ -7,8 +7,7 @@ ARG TARGETOS
 RUN yum install -y tzdata shadow-utils >> /dev/null \
     && yum clean all \
     && groupadd -f -r -g 10000 harbor && useradd --no-log-init -r -m -g 10000 -u 10000 harbor \
-    && mkdir /harbor/ \
-    && yum erase -y shadow-utils
+    && mkdir /harbor/
 
 COPY --chown=harbor:harbor _output/harbor/make/photon/common/install_cert.sh /harbor/
 COPY --chown=harbor:harbor _output/harbor/make/photon/core/entrypoint.sh /harbor/
@@ -17,10 +16,11 @@ COPY --chown=harbor:harbor _output/harbor/make/migrations /harbor/migrations
 COPY --chown=harbor:harbor _output/harbor/icons /harbor/icons
 COPY --chown=harbor:harbor _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-core /harbor/harbor_core
 COPY --chown=harbor:harbor _output/harbor/make/photon/prepare/versions /harbor/
-# COPY _output/LICENSES /LICENSES
-# COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+COPY _output/LICENSES /LICENSES
+COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 RUN chown -R harbor:harbor /etc/pki/tls/certs \
+    && chown -R harbor:harbor /harbor/ \
     && chmod u+x /harbor/entrypoint.sh \
     && chmod u+x /harbor/install_cert.sh \
     && chmod u+x /harbor/harbor_core
