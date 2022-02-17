@@ -7,7 +7,7 @@ WORKDIR /newroot
 
 RUN set -x && \
     clean_install "wget" && \
-    remove_package "bash coreutils gawk info sed grep pcre libidn" && \
+    remove_package "bash coreutils gawk info sed grep pcre" && \
     cleanup "wget"
 
 FROM $BASE_IMAGE
