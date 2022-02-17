@@ -47,9 +47,6 @@ IMAGE_NAMES=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-j
 BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migrate-patch harbor-migrate harbor-exporter
 SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/standalone-db-migrator ./cmd/exporter
 
-
-PRECOMPILE_PREPARE=harbor_prepare
-
 HARBOR_BASE_NAMESPACE=goharbor
 IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
 
