@@ -26,6 +26,7 @@ PACKER_VAR_FILES="${4?Specify fourth argument - Packer var files}"
 AMI_ID="${5?Specify fifth argument - AMI ID to create instance}"
 INSTANCE_TYPE="${6?Specify sixth argument - Instance type to create}"
 KEY_NAME="${7?Specify seventh argument - Key name to associate with instance}"
+BUILD_TARGET="${8?Specify eighth argument - Raw build target name}"
 
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 CI="${CI:-false}"
@@ -95,7 +96,7 @@ for i in $(seq 1 $MAX_RETRIES); do
     echo "Attempt $(($i))"
 
     # Transfer the repo contents from the CI environment to the EC2 instance
-    rsync -avzh --progress --max-size=500K -e "ssh $SSH_OPTS" $REPO_ROOT $REMOTE_HOST:~/ && echo "Files transferred!" && break
+    rsync -avzh --progress -e "ssh $SSH_OPTS" $REPO_ROOT $REMOTE_HOST:~/ && echo "Files transferred!" && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
@@ -104,13 +105,13 @@ for i in $(seq 1 $MAX_RETRIES); do
 done
 
 # If not running on Codebuild, exit gracefully
-if [ "$CODEBUILD_CI" = "false" ]; then
-    exit 0
-fi
+# if [ "$CODEBUILD_CI" = "false" ]; then
+#     exit 0
+# fi
 
 # Run permissions setup for KVM builds on instance
 # Run make command to build raw image
-ssh $SSH_OPTS $REMOTE_HOST "sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 PACKER_LOG_PATH=$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log make build-raw-ubuntu-2004 -C $REMOTE_IMAGE_BUILDER_MAKE_ROOT"
+ssh $SSH_OPTS $REMOTE_HOST "sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; sudo wget https://redhat-iso-images.s3.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso -P /home/ec2-user/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/image-builder/images/capi; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 PACKER_LOG_PATH=$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log make build-raw-$BUILD_TARGET -C $REMOTE_IMAGE_BUILDER_MAKE_ROOT"
 
 # Copy built raw image from the instance back into the CI build environment
 mkdir -p $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output

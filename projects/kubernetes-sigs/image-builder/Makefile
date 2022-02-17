@@ -5,7 +5,7 @@ REPO=image-builder
 REPO_OWNER=kubernetes-sigs
 
 IMAGE_BUILDER_DIR=$(REPO)/images/capi
-RAW_IMAGE_BUILD_AMI?=ami-0bd99362b6ccd24ea
+RAW_IMAGE_BUILD_AMI?=ami-08787dc9a0b58f98f
 RAW_IMAGE_BUILD_INSTANCE_TYPE?=t1.micro
 RAW_IMAGE_BUILD_KEY_NAME?=raw-image-build
 
@@ -70,7 +70,7 @@ ifeq ($(IMAGE_FORMAT),ova)
 	RELEASE_TARGETS=release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts-ova
 else ifeq ($(IMAGE_FORMAT),raw)
 	S3_TARGET_PREREQUISITES=$(FINAL_UBUNTU_RAW_IMAGE_PATH)
-	RELEASE_TARGETS=release-raw-ubuntu-2004 upload-artifacts-raw
+	RELEASE_TARGETS=release-raw-ubuntu-2004 release-raw-rhel-8 upload-artifacts-raw
 endif
 
 include $(BASE_DIRECTORY)/Common.mk
@@ -166,11 +166,11 @@ release-ova-bottlerocket: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
 release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
 	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
-.PHONY: release-raw-ubuntu-2004
-release-raw-ubuntu-2004: MAKEFLAGS=
-release-raw-ubuntu-2004: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-user/$(shell basename $(BASE_DIRECTORY)),$(MAKE_ROOT)/$(OUTPUT_DIR))/raw
-release-raw-ubuntu-2004: deps-raw setup-packer-configs-raw
-	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME)
+.PHONY: release-raw-%
+release-raw-%: MAKEFLAGS=
+release-raw-%: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-user/$(shell basename $(BASE_DIRECTORY)),$(MAKE_ROOT)/$(OUTPUT_DIR))/raw
+release-raw-%: deps-raw setup-packer-configs-raw
+	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
 
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
