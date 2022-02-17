@@ -17,6 +17,8 @@ RUSTUP_HOME=$(MAKE_ROOT)/_output/rustup
 export BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 
 export BUILDER_ROOT=$(MAKE_ROOT)
+export RHSM_USER=$(RHSM_USERNAME)
+export RHSM_PASS=$(RHSM_PASSWORD)
 
 VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
@@ -63,14 +65,14 @@ FAKE_UBUNTU_RAW_PATH=$(IMAGE_BUILDER_DIR)/output/fake-ubuntu.gz
 
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
 BUILD_OVA_TARGETS=setup-packer-configs-ova release-ova-bottlerocket $(FAKE_UBUNTU_OVA_PATH) $(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova
-BUILD_RAW_TARGETS=release-raw-ubuntu-2004 $(FAKE_UBUNTU_RAW_PATH) $(FINAL_UBUNTU_RAW_IMAGE_PATH) upload-artifacts-raw
+BUILD_RAW_TARGETS=release-raw-ubuntu-2004-efi $(FAKE_UBUNTU_RAW_PATH) $(FINAL_UBUNTU_RAW_IMAGE_PATH) upload-artifacts-raw
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
 ifeq ($(IMAGE_FORMAT),ova)
 	S3_TARGET_PREREQUISITES=$(FINAL_UBUNTU_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
 	RELEASE_TARGETS=release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts-ova
 else ifeq ($(IMAGE_FORMAT),raw)
 	S3_TARGET_PREREQUISITES=$(FINAL_UBUNTU_RAW_IMAGE_PATH)
-	RELEASE_TARGETS=release-raw-ubuntu-2004 upload-artifacts-raw
+	RELEASE_TARGETS=release-raw-ubuntu-2004-efi release-raw-rhel-8 upload-artifacts-raw
 endif
 
 include $(BASE_DIRECTORY)/Common.mk
@@ -173,11 +175,11 @@ release-ova-bottlerocket: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
 release-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
 	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
-.PHONY: release-raw-ubuntu-2004
-release-raw-ubuntu-2004: MAKEFLAGS=
-release-raw-ubuntu-2004: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-user/$(shell basename $(BASE_DIRECTORY)),$(MAKE_ROOT)/$(OUTPUT_DIR))/raw
-release-raw-ubuntu-2004: deps-raw setup-packer-configs-raw
-	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME)
+.PHONY: release-raw-%
+release-raw-%: MAKEFLAGS=
+release-raw-%: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-user/$(shell basename $(BASE_DIRECTORY)),$(MAKE_ROOT)/$(OUTPUT_DIR))/raw
+release-raw-%: deps-raw setup-packer-configs-raw
+	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
 
 .PHONY: build-qemu-rhel-local
 build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu

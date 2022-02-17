@@ -26,6 +26,7 @@ PACKER_VAR_FILES="${4?Specify fourth argument - Packer var files}"
 AMI_ID="${5?Specify fifth argument - AMI ID to create instance}"
 INSTANCE_TYPE="${6?Specify sixth argument - Instance type to create}"
 KEY_NAME="${7?Specify seventh argument - Key name to associate with instance}"
+BUILD_TARGET="${8?Specify eighth argument - Raw build target name}"
 
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 CI="${CI:-false}"
@@ -73,7 +74,7 @@ if [ "$CODEBUILD_CI" = "true" ]; then
 
     # Define extra args to run the instance in the same subnet and use
     # the same security group as Codebuild
-    RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address"
+    RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address --iam-instance-profile Name=eksa-imagebuilder-instance-profile"
 fi
 
 # Create a single EC2 instance with provided instance type and AMI
@@ -95,7 +96,7 @@ for i in $(seq 1 $MAX_RETRIES); do
     echo "Attempt $(($i))"
 
     # Transfer the repo contents from the CI environment to the EC2 instance
-    rsync -avzh --progress --max-size=500K -e "ssh $SSH_OPTS" $REPO_ROOT $REMOTE_HOST:~/ && echo "Files transferred!" && break
+    rsync -avzh --progress -e "ssh $SSH_OPTS" $REPO_ROOT $REMOTE_HOST:~/ && echo "Files transferred!" && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
@@ -108,9 +109,12 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-# Run permissions setup for KVM builds on instance
-# Run make command to build raw image
-ssh $SSH_OPTS $REMOTE_HOST "sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 PACKER_LOG_PATH=$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log make build-raw-ubuntu-2004 -C $REMOTE_IMAGE_BUILDER_MAKE_ROOT"
+SSH_COMMANDS="sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS='-force -debug' PACKER_LOG=1 PACKER_LOG_PATH=$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log make build-raw-$BUILD_TARGET -C $REMOTE_IMAGE_BUILDER_MAKE_ROOT"
+if [[ "$BUILD_TARGET" =~ "rhel" ]]; then
+    SSH_COMMANDS="sudo wget https://redhat-iso-images.s3.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso -P $REMOTE_IMAGE_BUILDER_MAKE_ROOT; export RHSM_USER='$RHSM_USER' RHSM_PASS='$RHSM_PASS'; $SSH_COMMANDS"
+fi
+
+ssh $SSH_OPTS $REMOTE_HOST $SSH_COMMANDS
 
 # Copy built raw image from the instance back into the CI build environment
 mkdir -p $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output
