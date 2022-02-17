@@ -11,8 +11,7 @@ RUN yum install -y shadow-utils >> /dev/null \
     && mkdir -p /etc/registry
 
 COPY --chown=harbor:harbor _output/harbor/make/photon/common/install_cert.sh /home/harbor
-# COPY --chown=harbor:harbor _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry /usr/bin/registry_DO_NOT_USE_GC
-COPY --chown=harbor:harbor _output/bin/harbor/$TARGETOS-$TARGETARCH/registry /usr/bin/registry_DO_NOT_USE_GC
+COPY --chown=harbor:harbor _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry /usr/bin/registry_DO_NOT_USE_GC
 COPY --chown=harbor:harbor _output/harbor/make/photon/registryctl/start.sh /home/harbor
 COPY --chown=harbor:harbor _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-registryctl /home/harbor/harbor_registryctl
 COPY _output/LICENSES /LICENSES

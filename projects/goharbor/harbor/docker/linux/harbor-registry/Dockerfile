@@ -12,8 +12,7 @@ RUN yum install -y shadow-utils >> /dev/null \
 
 COPY --chown=harbor:harbor _output/harbor/make/photon/common/install_cert.sh /home/harbor
 COPY --chown=harbor:harbor _output/harbor/make/photon/registry/entrypoint.sh /home/harbor
-# COPY --chown=harbor:harbor _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry /usr/bin/registry_DO_NOT_USE_GC
-COPY --chown=harbor:harbor _output/bin/harbor/$TARGETOS-$TARGETARCH/registry /usr/bin/registry_DO_NOT_USE_GC
+COPY --chown=harbor:harbor _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry /usr/bin/registry_DO_NOT_USE_GC
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
