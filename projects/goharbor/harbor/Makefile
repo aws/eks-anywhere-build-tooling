@@ -22,9 +22,6 @@ REPO=harbor
 REPO_OWNER=goharbor
 REPO_SUBPATH=./src
 
-NGINX_BASE_IMAGE=$(BASE_IMAGE_REPO)/eks-distro-minimal-base-nginx:$(shell cat $(BASE_DIRECTORY)/$(shell echo eks-distro-minimal-base-nginx | tr '[:lower:]' '[:upper:]' | tr '-' '_')_TAG_FILE)
-REDIS_BASE_IMAGE=$(BASE_IMAGE_REPO)/eks-distro-minimal-base-glibc:$(shell cat $(BASE_DIRECTORY)/$(shell echo eks-distro-minimal-base-glibc | tr '[:lower:]' '[:upper:]' | tr '-' '_')_TAG_FILE)
-REDIS_BUILDER_IMAGE=$(BASE_IMAGE_REPO)/eks-distro-minimal-base-glibc-builder:$(shell cat $(BASE_DIRECTORY)/$(shell echo eks-distro-minimal-base-glibc | tr '[:lower:]' '[:upper:]' | tr '-' '_')_TAG_FILE)
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 HARBOR_DB_IMAGE_COMPONENT=harbor/harbor-db
@@ -53,14 +50,13 @@ IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
 FETCH_BINARIES_TARGETS=eksa/distribution/distribution
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 
-include $(BASE_DIRECTORY)/Common.mk
-
 COPY_FILE_LIST=harbor/make/photon/db/docker-entrypoint.sh harbor/make/photon/db/initdb.sh harbor/make/photon/db/upgrade.sh harbor/make/photon/db/docker-healthcheck.sh harbor/make/photon/db/initial-notaryserver.sql harbor/make/photon/db/initial-notarysigner.sql harbor/make/photon/db/initial-registry.sql harbor/make/photon/core/entrypoint.sh harbor/src/core/views harbor/make/migrations harbor/icons harbor/make/photon/prepare/versions harbor/api/v2.0/legacy_swagger.yaml harbor/api/v2.0/swagger.yaml harbor/api/swagger.yaml harbor/src/portal harbor/LICENSE harbor/make/photon/log/rsyslog.conf harbor/make/photon/log/rsyslog_docker.conf harbor/make/photon/log/logrotate harbor/make/photon/log/start.sh harbor/make/photon/common/install_cert.sh harbor/make/photon/jobservice/entrypoint.sh harbor/make/photon/registry/entrypoint.sh harbor/make/photon/registryctl/start.sh harbor/make/photon/redis/docker-healthcheck harbor/make/photon/redis/redis.conf harbor/make/photon/exporter/entrypoint.sh
 
-harbor-nginx/images/%: BASE_IMAGE=$(NGINX_BASE_IMAGE)
-harbor-portal/images/%: BASE_IMAGE=$(NGINX_BASE_IMAGE)
-harbor-redis/images/%: BASE_IMAGE=$(REDIS_BASE_IMAGE)
-harbor-redis/images/%: BUILDER_IMAGE=$(REDIS_BUILDER_IMAGE)
+include $(BASE_DIRECTORY)/Common.mk
+
+harbor-nginx/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx
+harbor-portal/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx
+harbor-redis/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
 $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 

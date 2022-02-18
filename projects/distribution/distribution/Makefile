@@ -25,6 +25,10 @@ include $(BASE_DIRECTORY)/Common.mk
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_REDIS_TARGET)
 
 $(FIX_LICENSES_REDIS_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+# The garyburd/redigo dependency github repo has a license however redis and internal are subfolders 
+# without their own licenses. Hence we need to manually download parent license from Github for each of them 
+# and place them in the respective folders under vendor directory so that they is available for 
+# go-licenses to pick up	
 	for package in redis internal ; do \
 		dest=$(REPO)/vendor/github.com/garyburd/redigo/$$package/LICENSE.txt; \
 		mkdir -p $$(dirname $$dest); \
