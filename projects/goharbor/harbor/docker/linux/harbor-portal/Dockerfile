@@ -1,4 +1,4 @@
-ARG BASE_IMAGE #https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-nginx
+ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-nginx
 
 FROM node:16.5.0 as nodeportal
 
