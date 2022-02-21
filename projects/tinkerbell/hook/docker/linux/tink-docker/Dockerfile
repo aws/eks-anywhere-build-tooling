@@ -5,8 +5,6 @@ FROM $BUILDER_IMAGE as docker-builder
 WORKDIR /newroot
 
 RUN set -x && \
-    amazon-linux-extras enable docker && \
-    cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo && \
     clean_install "systemd" true true && \
     clean_install "docker procps e2fsprogs" && \
     remove_package "bash coreutils gawk info sed shadow-utils grep" && \
