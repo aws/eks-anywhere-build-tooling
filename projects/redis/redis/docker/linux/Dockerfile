@@ -24,7 +24,7 @@ RUN set -x && \
     remove_package systemd true && \
     cleanup "redis"
 RUN set -x && \
-    sed -i -e 's/^logfile .*/logfile ""/' /newroot/etc/redis/redis.conf
+    sed -i -e 's/^logfile .*/logfile ""/' /newroot/etc/redis6/redis6.conf
 
 FROM $BASE_IMAGE
 ARG IMAGE_TAG=not-set
@@ -38,4 +38,4 @@ USER redis:redis
 VOLUME /data
 EXPOSE 6379
 ENTRYPOINT ["/usr/bin/redis-server"]
-CMD ["/etc/redis/redis.conf"]
+CMD ["/etc/redis6/redis6.conf"]
