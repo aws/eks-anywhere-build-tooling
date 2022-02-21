@@ -18,6 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+ 
 PROJECT_ROOT="$1"
 TARGET_FILE="$2"
 REPO="$3"
