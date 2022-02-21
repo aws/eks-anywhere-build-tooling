@@ -19,7 +19,7 @@ FROM $BUILDER_IMAGE as redis-builder
 WORKDIR /
 RUN set -x && \
     clean_install systemd true true && \
-    clean_install redis && \
+    clean_install redis6 && \
     remove_package "bash gawk ncurses ncurses-base info sed shadow-utils grep" && \
     remove_package systemd true && \
     cleanup "redis"
