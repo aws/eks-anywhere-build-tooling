@@ -1,0 +1,101 @@
+name: "Install EKS-A in Ubuntu"
+description: "Component to install eks-anywhere in an ubuntu AMI"
+schemaVersion: 1.0
+parameters:
+  - EksctlVersion:
+      type: string
+      default: 'latest'
+      description: The eksctl version to install (example v0.0.0)
+  - EksAnywhereVersion:
+      type: string
+      default: 'latest'
+      description: The eks-a version to install (example v0.0.0)
+  - EksAnywhereReleaseUrl:
+      type: string
+      default: 'https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml'
+      description: The url poiting to the eks-a releases manifest
+phases:
+  - name: build
+    steps:
+      - name: InstallPackageDeps
+        action: ExecuteBash
+        inputs:
+          commands:
+            - sudo apt-get install -y tar
+            - sudo snap install yq
+      - name: DownloadEksctl
+        action: ExecuteBash
+        inputs:
+          commands:
+            - EKSCTL_VERSION='{{ EksctlVersion }}'
+            - mkdir eksctl_tmp
+            - |
+              if [[ "$EKSCTL_VERSION" == "latest" ]]; then
+                  EKSCTL_URL="https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_linux_amd64.tar.gz"
+              else
+                  EKSCTL_URL="https://github.com/weaveworks/eksctl/releases/download/${EKSCTL_VERSION}/eksctl_linux_amd64.tar.gz"
+              fi
+            - curl -L --silent $EKSCTL_URL | tar xz -C ./eksctl_tmp
+      - name: InstallEksctl
+        action: ExecuteBash
+        inputs:
+          commands:
+            - sudo mv eksctl_tmp/eksctl /usr/local/bin/
+            - rm -rf eksctl_tmp
+      - name: DownloadEksAnywhere
+        action: ExecuteBash
+        inputs:
+          commands:
+            - RELEASE_URL='{{ EksAnywhereReleaseUrl }}'
+            - EKSA_VERSION='{{ EksAnywhereVersion }}'
+            - |
+              if [[ "$EKSA_VERSION" == "latest" ]]; then
+                  EKSA_VERSION=$(curl -L --silent $RELEASE_URL |  yq e '.spec.latestVersion' -)
+              fi
+            - EKSA_TAR_URL=$(curl -L --silent $RELEASE_URL | yq e '.spec.releases[] | select(.version == "'$EKSA_VERSION'") | .eksABinary.linux.uri')
+            - mkdir eksa_tmp
+            - curl -L --silent $EKSA_TAR_URL | tar xz -C ./eksa_tmp
+      - name: InstallEksAnywhere
+        action: ExecuteBash
+        inputs:
+          commands:
+            - sudo mv eksa_tmp/eksctl-anywhere /usr/local/bin/
+            - rm -rf eksa_tmp
+  - name: validate
+    steps:
+      - name: VerifyEksctl
+        action: ExecuteBash
+        inputs:
+          commands:
+            - |
+              if type -p eksctl &>/dev/null; then
+                  echo "eksctl command exists."
+                  exit 0
+              else
+                  echo "eksctl command does not exist. Failing."
+                  exit 1
+              fi
+      - name: VerifyEksctlAnywhereBinary
+        action: ExecuteBash
+        inputs:
+          commands:
+            - |
+              if type -p eksctl-anywhere &>/dev/null; then
+                  echo "eksctl-anywhere binary exists."
+                  exit 0
+              else
+                  echo "eksctl-anywhere binary does not exist. Failing."
+                  exit 1
+              fi
+      - name: VerifyEksctlAnywhereCommand
+        action: ExecuteBash
+        inputs:
+          commands:
+            - |
+              if eksctl anywhere version &>/dev/null; then
+                  echo "eksctl anywhere command works."
+                  exit 0
+              else
+                  echo "eksctl anywhere command does not work. Failing."
+                  exit 1
+              fi    

@@ -1,0 +1,12 @@
+
+
+INSTANCE_TYPE=${INSTANCE_TYPE:-'t2.large'}
+AMI_ID=${AMI_ID:-'ami-0892d3c7ee96c0bf7'}
+KEY_NAME=$1
+KEY_PATH=$2
+USER=ubuntu
+DOCUMENTS=components/install_eksa.yaml
+PHASES=build,validate
+PARAMETERS=$3
+
+./test/toeInInstance.sh $AMI_ID $INSTANCE_TYPE $KEY_NAME $KEY_PATH $USER $DOCUMENTS $PHASES $PARAMETERS
