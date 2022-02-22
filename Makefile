@@ -101,3 +101,11 @@ stop-buildkit-and-registry:
 .PHONY: generate
 generate:
 	build/lib/generate_projects_list.sh $(BASE_DIRECTORY)
+
+.PHONY: check-project-path-exists
+check-project-path-exists:
+	@if ! stat $(PROJECT_PATH) &> /dev/null; then \
+		echo "false"; \
+	else \
+		echo "true"; \
+	fi
