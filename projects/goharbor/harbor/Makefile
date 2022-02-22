@@ -62,7 +62,6 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 
 $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@echo "$$VERSIONS_FOR_PREPARE" > $(PROJECT_ROOT)/$(REPO)/make/photon/prepare/versions
-	@make -C $(REPO) gen_apis
 	@mkdir -p $(OUTPUT_DIR)
 	@cp -r --parents $(COPY_FILE_LIST) $(OUTPUT_DIR)
 
