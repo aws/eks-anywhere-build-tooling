@@ -44,6 +44,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums local-images attribution upload-artifacts attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
+build: ## Called via prow presubmit, calls `checksums local-images attribution upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `checksums images upload-artifacts`
 ########### END GENERATED ###########################
