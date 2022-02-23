@@ -7,7 +7,7 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `cluster-api-provider-snow`
+clone-repo:  ## Clone upstream `cluster-api-provider-aws-snow`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Artifact Targets
@@ -24,6 +24,6 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `checksums  attribution upload-artifacts attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `checksums  upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums  attribution upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
 ########### END GENERATED ###########################
