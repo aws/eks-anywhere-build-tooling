@@ -25,7 +25,10 @@ $(call IMAGE_TARGETS_FOR_NAME, pbnj): $(IPMITOOL_CLONE_TARGETS) $(call FULL_FETC
 
 $(IPMITOOL_CLONE_TARGETS):
 	git clone $(IPMITOOL_CLONE_URL) $(@D)
+	git -C $(@D) config user.email prow@amazonaws.com
+	git -C $(@D) config user.name "Prow Bot"
 	git -C $(@D) checkout $(IPMITOOL_GIT_TAG)
+	git -C $(@D) am --committer-date-is-author-date $(MAKE_ROOT)/ipmitool_patches/*
 	touch $@
 
 
