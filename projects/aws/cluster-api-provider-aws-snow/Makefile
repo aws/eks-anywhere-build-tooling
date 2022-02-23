@@ -1,7 +1,7 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
 
-REPO=cluster-api-provder-aws-snow
+REPO=cluster-api-provider-aws-snow
 REPO_OWNER=aws
 
 HAS_S3_ARTIFACTS=true
