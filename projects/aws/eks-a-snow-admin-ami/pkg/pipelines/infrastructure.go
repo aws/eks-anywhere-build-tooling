@@ -60,50 +60,38 @@ func (p *Pipeline) setupInfraConfig(ctx context.Context, session *session.Sessio
 }
 
 func (p *Pipeline) setupInstanceProfile(ctx context.Context, session *session.Session) (name string, err error) {
-	instanceProfileName, err := p.createInstanceProfile(ctx, session)
+	instanceProf := p.instanceProfile()
+	err = instanceProf.create(ctx, session)
 	if err != nil {
 		return "", err
 	}
 
-	return instanceProfileName, nil
+	return instanceProf.name, nil
 }
 
-func (p *Pipeline) createInstanceProfile(ctx context.Context, session *session.Session) (name string, err error) {
-	name = fmt.Sprintf("%s-instance-profile", p.ValidNameForARN())
-	log.Printf("Creating instance profile [%s] for pipeline [%s]\n", name, p.Name)
-	iamService := iam.New(session)
-	_, err = iamService.CreateInstanceProfileWithContext(ctx, &iam.CreateInstanceProfileInput{
-		InstanceProfileName: aws.String(name),
-	})
-
-	if isAlreadyExistIAM(err) {
-		return name, nil
+func (p *Pipeline) instanceProfile() *instanceProfile {
+	return &instanceProfile{
+		name: fmt.Sprintf("%s-instance-profile", p.ValidNameForARN()),
+		role: &role{
+			name: fmt.Sprintf("%s-role", p.ValidNameForARN()),
+			policyARNs: []string{
+				"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+				"arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder",
+			},
+			assumeRolePolicyDocument: `{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ec2.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}`,
+		},
 	}
-
-	if err != nil {
-		return "", errors.Wrapf(err, "failed creating instance profile for pipeline %s", p.Name)
-	}
-
-	if err = addRoleToInstanceProfile(ctx, session, name, "EC2InstanceProfileForImageBuilder"); err != nil {
-		return "", err
-	}
-
-	return name, nil
-}
-
-func addRoleToInstanceProfile(ctx context.Context, session *session.Session, instanceProfileName, roleName string) error {
-	log.Printf("Adding role [%s] to instance profile [%s]\n", roleName, instanceProfileName)
-	iamService := iam.New(session)
-
-	_, err := iamService.AddRoleToInstanceProfileWithContext(ctx, &iam.AddRoleToInstanceProfileInput{
-		InstanceProfileName: aws.String(instanceProfileName),
-		RoleName:            aws.String(roleName),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "failed adding role %s to instance profile %s", roleName, instanceProfileName)
-	}
-
-	return nil
 }
 
 func isAlreadyExistIAM(err error) bool {
