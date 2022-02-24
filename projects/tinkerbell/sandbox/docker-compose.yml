@@ -10,38 +10,6 @@ services:
       - ${REPO_TOP_LEVEL:-.}:/code
       - certs:/certs/${FACILITY:-onprem}:rw
 
-  # User creds for the registry
-  registry-auth:
-    image: httpd:2
-    entrypoint: htpasswd
-    working_dir: /auth
-    command:
-      [
-        "-Bbc",
-        ".htpasswd",
-        "${TINKERBELL_REGISTRY_USERNAME:-admin}",
-        "${TINKERBELL_REGISTRY_PASSWORD:-Admin1234}",
-      ]
-    volumes:
-      - auth:/auth:rw
-
-  # Uploads images in /registry/registry_images.txt to the local registry
-  images-to-local-registry:
-    image: quay.io/containers/skopeo:v1.4.1
-    entrypoint: /registry/upload.sh
-    command:
-      [
-        "${TINKERBELL_REGISTRY_USERNAME:-admin}",
-        "${TINKERBELL_REGISTRY_PASSWORD:-Admin1234}",
-        "${TINKERBELL_HOST_IP}",
-        "/registry/registry_images.txt",
-      ]
-    volumes:
-      - ${REPO_TOP_LEVEL:-.}/registry:/registry
-    depends_on:
-      registry:
-        condition: service_healthy
-
   tink-server:
     image: ${TINK_SERVER_IMAGE}
     deploy:
@@ -145,41 +113,6 @@ services:
       db:
         condition: service_healthy
 
-  registry:
-    image: registry:2.7.1
-    init: true
-    deploy:
-      resources:
-        limits:
-          cpus: "0.50"
-          memory: "512M"
-    restart: unless-stopped
-    network_mode: host
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget --no-check-certificate https://$TINKERBELL_HOST_IP -O -",
-        ]
-      interval: 5s
-      timeout: 1s
-      retries: 5
-    environment:
-      REGISTRY_AUTH: htpasswd
-      REGISTRY_AUTH_HTPASSWD_REALM: Registry Realm
-      REGISTRY_AUTH_HTPASSWD_PATH: /auth/.htpasswd
-      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/${FACILITY:-onprem}/server-crt.pem
-      REGISTRY_HTTP_TLS_KEY: /certs/${FACILITY:-onprem}/server-key.pem
-      REGISTRY_HTTP_ADDR: $TINKERBELL_HOST_IP:443
-    volumes:
-      - certs:/certs/${FACILITY:-onprem}:ro
-      - auth:/auth:rw
-    depends_on:
-      tls-gen:
-        condition: service_completed_successfully
-      registry-auth:
-        condition: service_completed_successfully
-
   boots:
     image: ${BOOTS_SERVER_IMAGE}
     deploy:
@@ -198,40 +131,24 @@ services:
       PACKET_VERSION: ${PACKET_VERSION:-ignored}
       ROLLBAR_TOKEN: ${ROLLBAR_TOKEN:-ignored}
       ROLLBAR_DISABLE: ${ROLLBAR_DISABLE:-1}
-      MIRROR_HOST: ${TINKERBELL_HOST_IP:-127.0.0.1}:8080
-      OSIE_PATH_OVERRIDE: https://projectbuildpipeline-857-pipelineoutputartifactsb-10ajmk30khe3f.s3.us-west-2.amazonaws.com/projects/tinkerbell/hook/latest/54bae38625828b69259eccb3357e13c269437e28 
+      OSIE_PATH_OVERRIDE: https://tinkerbell-storage-for-eksa.s3.us-west-2.amazonaws.com/misc/osie/current
       DNS_SERVERS: 8.8.8.8
       PUBLIC_IP: $TINKERBELL_HOST_IP
       BOOTP_BIND: $TINKERBELL_HOST_IP:67
       HTTP_BIND: $TINKERBELL_HOST_IP:80
       SYSLOG_BIND: $TINKERBELL_HOST_IP:514
       TFTP_BIND: $TINKERBELL_HOST_IP:69
-      DOCKER_REGISTRY: $TINKERBELL_HOST_IP 
-      REGISTRY_USERNAME: ${TINKERBELL_REGISTRY_USERNAME:-admin}
-      REGISTRY_PASSWORD: ${TINKERBELL_REGISTRY_PASSWORD:-Admin1234}
+      DOCKER_REGISTRY: public.ecr.aws/l0g8r8j6
       TINKERBELL_GRPC_AUTHORITY: $TINKERBELL_HOST_IP:42113
       TINKERBELL_CERT_URL: http://$TINKERBELL_HOST_IP:42114/cert
       DATA_MODEL_VERSION: 1
+      TINK_WORKER_IMAGE: tinkerbell/tink/tink-worker:v0.6.0-eks-a-v0.0.0-dev-build.1627
+      USE_ABSOLUTE_ACTION_IMAGE_URI: "true"
     extra_hosts:
       - "tink-server:$TINKERBELL_HOST_IP"
     depends_on:
       tink-server:
         condition: service_healthy
-
-  osie-bootloader:
-    image: nginx:alpine
-    deploy:
-      resources:
-        limits:
-          cpus: "0.50"
-          memory: "512M"
-    restart: unless-stopped
-    tty: true
-    user: root
-    ports:
-      - 8080:80/tcp
-    volumes:
-      - ${REPO_TOP_LEVEL:-.}/state/webroot:/usr/share/nginx/html/
 
   hegel:
     image: ${HEGEL_SERVER_IMAGE}
@@ -274,4 +191,3 @@ services:
 volumes:
   postgres_data:
   certs:
-  auth:
