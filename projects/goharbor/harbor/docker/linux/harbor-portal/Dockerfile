@@ -4,9 +4,6 @@ FROM node:16.5.0 as nodeportal
 
 WORKDIR /build_dir
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends python-yaml
-
 COPY _output/harbor/src/portal/package.json /build_dir
 COPY _output/harbor/src/portal/package-lock.json /build_dir
 COPY _output/harbor/src/portal/scripts /build_dir
@@ -15,17 +12,19 @@ COPY _output/harbor/api/v2.0/swagger.yaml /build_dir/swagger2.yaml
 COPY _output/harbor/api/swagger.yaml /build_dir/swagger3.yaml
 
 COPY _output/harbor/src/portal /build_dir
+COPY _output/harbor/LICENSE /build_dir/dist
 
 ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org
-RUN npm install --unsafe-perm
-RUN npm run generate-build-timestamp
-RUN node --max_old_space_size=2048 'node_modules/@angular/cli/bin/ng' build --configuration production
-RUN python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json
-RUN python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger2.yaml > dist/swagger2.json
-RUN python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger3.yaml > dist/swagger3.json
 
-RUN cp swagger.yaml dist
-COPY _output/harbor/LICENSE /build_dir/dist
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python-yaml \
+    && npm install --unsafe-perm \
+    && npm run generate-build-timestamp \
+    && node --max_old_space_size=2048 'node_modules/@angular/cli/bin/ng' build --configuration production \
+    && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json \
+    && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger2.yaml > dist/swagger2.json \
+    && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger3.yaml > dist/swagger3.json \
+    && cp swagger.yaml dist
 
 FROM $BASE_IMAGE
 
