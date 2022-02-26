@@ -1,4 +1,4 @@
-## **Helm Controller**
+## **EKS Anywhere Package Controller**
 ![Version](https://img.shields.io/badge/version-v0.1.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=bogus%3D&branch=main)
 
