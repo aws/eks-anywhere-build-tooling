@@ -22,10 +22,8 @@ REGISTRY="${1?First argument is registry}"
 REPOSITORY="${2?Second argument is repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
 
-JSONPATH="imageDetails[?(@.imageTags[?(@ == '"${IMAGE_TAG}"')])].imageDigest"
-if [[ "${REGISTRY}" == *"public.ecr.aws"* ]]
-then
-  aws ecr-public describe-images --region us-east-1 --repository-name "${REPOSITORY}" --output text  --query "${JSONPATH}"
-else
-  aws ecr describe-images --repository-name "${REPOSITORY}" --output text  --query "${JSONPATH}"
-fi
+TMPFILE=$(mktemp)
+trap "rm -f $TMPFILE" exit
+TARGET=${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}
+skopeo inspect -n --raw docker://${TARGET} >${TMPFILE}
+skopeo manifest-digest ${TMPFILE}
