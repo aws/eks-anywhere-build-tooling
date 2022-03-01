@@ -14,3 +14,5 @@
 1. Update the version at the top of this Readme.
 1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
 1. Currently boots builds iPXE binaries that are [embedded](https://github.com/tinkerbell/boots/blob/v0.6.0/tftp/tftp.go#L14L24). These binaries are prebuilt and kept under [ipxe](https://github.com/aws/eks-anywhere-build-tooling/tree/main/projects/tinkerbell/boots/ipxe). Ensure to check for changes in the binaries when updating the release.
+
+You should also update `BOOTS_SERVER_IMAGE` under `tinkerbell/sandbox/.env` with the new image tag once it's built.

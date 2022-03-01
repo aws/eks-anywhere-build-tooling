@@ -13,3 +13,5 @@
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=tinkerbell/tink` from the root of the repo.
 1. Update the version at the top of this Readme.
 1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
+
+You should also update `TINK_CLI_IMAGE` and `TINK_SERVER_IMAGE` under `tinkerbell/sandbox/.env` with the new image tag once it's built.
