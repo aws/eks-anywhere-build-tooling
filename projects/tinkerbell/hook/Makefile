@@ -48,7 +48,7 @@ tink-docker/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
 # Currently the kernel image is being built off upstream.
 # TODO: Setup a build environment to build the linux kernel.
-kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:5.10.11
+kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:5.10.57
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 

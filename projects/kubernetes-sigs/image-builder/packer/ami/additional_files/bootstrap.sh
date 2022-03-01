@@ -1,6 +1,7 @@
 #!/bin/bash
 
-VIP="$1"
+KUBE_VIP_IMAGE=$1
+VIP="$2"
 
 DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
 
@@ -69,5 +70,4 @@ swapoff -a
 # if vip is not provided, it's a worker node, we don't need kube-vip manifest
 # if `kubeadm init` command doesn't exist in the user-data, it's not the first control plane node, we should generate the kube-vip manifest after the `kubeadm join` command finishes
 if [ ! -z $VIP ] && grep -q "kubeadm init --config /run/kubeadm/kubeadm.yaml" /var/lib/cloud/instance/user-data.txt ; then
-  /etc/eks/generate-kube-vip-manifest.sh $VIP
-fi
+  /etc/eks/generate-kube-vip-manifest.sh $KUBE_VIP_IMAGE $VIP

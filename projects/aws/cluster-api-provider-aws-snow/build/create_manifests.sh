@@ -13,17 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 set -x
 set -o errexit
-set -o nounset
 set -o pipefail
 
-REGISTRY="${1?First argument is registry}"
-REPOSITORY="${2?Second argument is repository}"
-IMAGE_TAG="${3?Third argument is image tag}"
+REPO="$1"
+OUTPUT_DIR="$2"
+ARTIFACTS_PATH="$3"
+TAG="$4"
+IMAGE_REPO="$5"
+IMAGE_TAG="$6"
 
-TMPFILE=$(mktemp)
-trap "rm -f $TMPFILE" exit
-TARGET=${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}
-skopeo inspect -n --raw docker://${TARGET} >${TMPFILE}
-skopeo manifest-digest ${TMPFILE}
+MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "${MAKE_ROOT}/../../../build/lib/common.sh"
+
+mkdir -p $ARTIFACTS_PATH
+
+# TODO: once cloning snow provider source run standard make targert
+mkdir -p $ARTIFACTS_PATH/manifests/infrastructure-snow/$TAG
+cp -rf manifests/* $ARTIFACTS_PATH/manifests/infrastructure-snow/$TAG
