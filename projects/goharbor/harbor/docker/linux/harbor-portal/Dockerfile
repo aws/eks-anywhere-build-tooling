@@ -4,21 +4,13 @@ FROM node:16.5.0 as nodeportal
 
 WORKDIR /build_dir
 
-COPY _output/harbor/src/portal/package.json /build_dir
-COPY _output/harbor/src/portal/package-lock.json /build_dir
-COPY _output/harbor/src/portal/scripts /build_dir
-COPY _output/harbor/api/v2.0/legacy_swagger.yaml /build_dir/swagger.yaml
-COPY _output/harbor/api/v2.0/swagger.yaml /build_dir/swagger2.yaml
-COPY _output/harbor/api/swagger.yaml /build_dir/swagger3.yaml
-
-COPY _output/harbor/src/portal /build_dir
-COPY _output/harbor/LICENSE /build_dir/dist
+COPY _output/harbor-portal/ /
 
 ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python-yaml \
-    && npm install --unsafe-perm \
+    && npm install --unsafe-perm \ 
     && npm run generate-build-timestamp \
     && node --max_old_space_size=2048 'node_modules/@angular/cli/bin/ng' build --configuration production \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json \
@@ -26,16 +18,15 @@ RUN apt-get update \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger3.yaml > dist/swagger3.json \
     && cp swagger.yaml dist
 
+
 FROM $BASE_IMAGE
+
+COPY --from=nodeportal /build_dir/dist /build_dir/package*.json /usr/share/nginx/html/
 
 RUN chmod 755 /var/log/nginx \
     && ln -sf /dev/stdout /var/log/nginx/access.log \
-    && ln -sf /dev/stderr /var/log/nginx/error.log
-
-COPY --from=nodeportal /build_dir/dist /usr/share/nginx/html
-COPY --from=nodeportal /build_dir/package*.json /usr/share/nginx/
-COPY _output/LICENSES /LICENSES
-COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+    && ln -sf /dev/stderr /var/log/nginx/error.log \
+    && mv /usr/share/nginx/html/package*.json /usr/share/nginx/
 
 VOLUME /var/cache/nginx /var/log/nginx /run
 
@@ -44,4 +35,3 @@ STOPSIGNAL SIGQUIT
 HEALTHCHECK CMD curl --fail -s http://localhost:8080 || curl -k --fail -s https://localhost:8443 || exit 1
 USER nginx
 CMD ["nginx", "-g", "daemon off;"]
-

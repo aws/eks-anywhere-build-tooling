@@ -50,8 +50,6 @@ IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
 FETCH_BINARIES_TARGETS=eksa/distribution/distribution
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 
-COPY_FILE_LIST=harbor/make/photon/db/docker-entrypoint.sh harbor/make/photon/db/initdb.sh harbor/make/photon/db/upgrade.sh harbor/make/photon/db/docker-healthcheck.sh harbor/make/photon/db/initial-notaryserver.sql harbor/make/photon/db/initial-notarysigner.sql harbor/make/photon/db/initial-registry.sql harbor/make/photon/core/entrypoint.sh harbor/src/core/views harbor/make/migrations harbor/icons harbor/make/photon/prepare/versions harbor/api/v2.0/legacy_swagger.yaml harbor/api/v2.0/swagger.yaml harbor/api/swagger.yaml harbor/src/portal harbor/LICENSE harbor/make/photon/log/rsyslog.conf harbor/make/photon/log/rsyslog_docker.conf harbor/make/photon/log/logrotate harbor/make/photon/log/start.sh harbor/make/photon/common/install_cert.sh harbor/make/photon/jobservice/entrypoint.sh harbor/make/photon/registry/entrypoint.sh harbor/make/photon/registryctl/start.sh harbor/make/photon/redis/docker-healthcheck harbor/make/photon/redis/redis.conf harbor/make/photon/exporter/entrypoint.sh
-
 include $(BASE_DIRECTORY)/Common.mk
 
 harbor-nginx/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx
@@ -63,7 +61,48 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@echo "$$VERSIONS_FOR_PREPARE" > $(PROJECT_ROOT)/$(REPO)/make/photon/prepare/versions
 	@mkdir -p $(OUTPUT_DIR)
-	@cp -r --parents $(COPY_FILE_LIST) $(OUTPUT_DIR)
+
+	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor/views
+	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor/migrations
+	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor/icons
+	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/core/entrypoint.sh harbor/make/photon/prepare/versions $(OUTPUT_DIR)/harbor-core/harbor/
+	@cp -r harbor/src/core/views $(OUTPUT_DIR)/harbor-core/harbor/views
+	@cp -r harbor/make/migrations $(OUTPUT_DIR)/harbor-core/harbor/migrations
+	@cp -r harbor/icons $(OUTPUT_DIR)/harbor-core/harbor/icons
+	
+	@mkdir -p $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d
+	@cp harbor/make/photon/db/docker-entrypoint.sh harbor/make/photon/db/initdb.sh harbor/make/photon/db/upgrade.sh harbor/make/photon/db/docker-healthcheck.sh $(OUTPUT_DIR)/harbor-db/
+	@cp harbor/make/photon/db/initial-notaryserver.sql harbor/make/photon/db/initial-notarysigner.sql harbor/make/photon/db/initial-registry.sql $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d/
+
+	@mkdir -p $(OUTPUT_DIR)/harbor-exporter/harbor
+	@cp harbor/make/photon/exporter/entrypoint.sh harbor/make/photon/common/install_cert.sh $(OUTPUT_DIR)/harbor-exporter/harbor/
+
+	@mkdir -p $(OUTPUT_DIR)/harbor-jobservice/harbor
+	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/jobservice/entrypoint.sh $(OUTPUT_DIR)/harbor-jobservice/harbor/
+	
+	@mkdir -p $(OUTPUT_DIR)/harbor-log/etc/rsyslog.d
+	@mkdir -p $(OUTPUT_DIR)/harbor-log/etc/cron.hourly
+	@mkdir -p $(OUTPUT_DIR)/harbor-log/usr/local/bin
+	@cp harbor/make/photon/log/rsyslog.conf $(OUTPUT_DIR)/harbor-log/etc/
+	@cp harbor/make/photon/log/rsyslog_docker.conf $(OUTPUT_DIR)/harbor-log/etc/rsyslog.d/
+	@cp harbor/make/photon/log/logrotate $(OUTPUT_DIR)/harbor-log/etc/cron.hourly/
+	@cp harbor/make/photon/log/start.sh $(OUTPUT_DIR)/harbor-log/usr/local/bin/
+
+	@mkdir -p $(OUTPUT_DIR)/harbor-portal/build_dir/dist
+	@cp -r harbor/src/portal/* $(OUTPUT_DIR)/harbor-portal/build_dir/
+	@cp harbor/api/v2.0/legacy_swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger.yaml
+	@cp harbor/api/v2.0/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger2.yaml
+	@cp harbor/api/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger3.yaml
+	@cp harbor/LICENSE $(OUTPUT_DIR)/harbor-portal/build_dir/dist/LICENSE
+
+	@mkdir -p $(OUTPUT_DIR)/harbor-redis/etc
+	@cp harbor/make/photon/redis/redis.conf $(OUTPUT_DIR)/harbor-redis/etc/
+
+	@mkdir -p $(OUTPUT_DIR)/harbor-registry/home/harbor
+	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/registry/entrypoint.sh $(OUTPUT_DIR)/harbor-registry/home/harbor/
+
+	@mkdir -p $(OUTPUT_DIR)/harbor-registryctl/home/harbor
+	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/registryctl/start.sh $(OUTPUT_DIR)/harbor-registryctl/home/harbor/
 
 %/harbor-core: EXTRA_GO_LDFLAGS=-X $(PKG_PATH)/version.GitCommit=$(GITCOMMIT) -X $(PKG_PATH)/version.ReleaseVersion=$(RELEASEVERSION)
 

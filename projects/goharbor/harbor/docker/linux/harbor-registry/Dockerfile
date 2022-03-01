@@ -5,18 +5,14 @@ ARG RELEASE_BRANCH
 ARG TARGETARCH
 ARG TARGETOS
 
+COPY _output/harbor-registry/ _output/LICENSES ATTRIBUTION.txt /
+
 RUN yum install -y shadow-utils >> /dev/null \
     && yum clean all \
     && mkdir -p /etc/registry \
-    && groupadd -f -r -g 10000 harbor && useradd --no-log-init -m -g 10000 -u 10000 harbor
-
-COPY --chown=harbor:harbor _output/harbor/make/photon/common/install_cert.sh /home/harbor
-COPY --chown=harbor:harbor _output/harbor/make/photon/registry/entrypoint.sh /home/harbor
-COPY --chown=harbor:harbor _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry /usr/bin/registry_DO_NOT_USE_GC
-COPY _output/LICENSES /LICENSES
-COPY ATTRIBUTION.txt /ATTRIBUTION.txt
-
-RUN chown -R harbor:harbor /etc/pki/tls/certs \
+    && groupadd -f -r -g 10000 harbor && useradd --no-log-init -m -g 10000 -u 10000 harbor \
+    && cp _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry /usr/bin/registry_DO_NOT_USE_GC \
+    && chown -R harbor:harbor /etc/pki/tls/certs /home/harbor /usr/bin/registry_DO_NOT_USE_GC \
     && chmod u+x /home/harbor/entrypoint.sh \
     && chmod u+x /home/harbor/install_cert.sh \
     && chmod u+x /usr/bin/registry_DO_NOT_USE_GC
