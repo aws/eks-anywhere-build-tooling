@@ -4,8 +4,6 @@ FROM $BUILDER_IMAGE as redis-builder
 
 WORKDIR /
 
-COPY _output/LICENSES ATTRIBUTION.txt /newroot/
-
 RUN set -x \
     && amazon-linux-extras enable redis6 \
     && cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo \
@@ -18,9 +16,7 @@ RUN set -x \
 FROM $BASE_IMAGE
 
 COPY --from=redis-builder /newroot/ /
-
-RUN cp -r _output/harbor-redis/ / \
-    && chown redis:redis /etc/redis.conf
+COPY --chown=redis:redis _output/harbor-redis _output/LICENSES ATTRIBUTION.txt /
 
 VOLUME /var/lib/redis
 WORKDIR /var/lib/redis
