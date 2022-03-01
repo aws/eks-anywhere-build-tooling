@@ -17,13 +17,26 @@ set -x
 set -o errexit
 set -o nounset
 set -o pipefail
+# HELM_REGISTRY
+# IMAGE_TAG
+# HELM_ADDITIONAL_KEY_VALUES
 
-OUTPUT_DIR="${1?First arguement is output directory}"
-HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
+HELM_DESTINATION_REPOSITORY="${1?First argument is helm destination repository}"
+OUTPUT_DIR="${2?Second arguement is output directory}"
+
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
+DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 
 #
-# Build
+# Search and replace
 #
-cd ${OUTPUT_DIR}/helm
-helm package "${CHART_NAME}"
+SEDFILE=${OUTPUT_DIR}/helm/sedfile
+envsubst <helm/sedfile.template >${SEDFILE}
+TEMPLATE_DIR=helm/templates
+cat helm/files.txt | while read SOURCE_FILE DESTINATION_FILE
+do
+  TMPFILE=/tmp/$(basename ${SOURCE_FILE})
+  cp ${SOURCE_FILE} ${TMPFILE}
+  sed -f ${SEDFILE} ${TMPFILE} >${DEST_DIR}/${DESTINATION_FILE}
+  rm -f ${TMPFILE}
+done
