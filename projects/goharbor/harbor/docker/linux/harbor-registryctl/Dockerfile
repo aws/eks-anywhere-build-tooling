@@ -5,14 +5,14 @@ ARG RELEASE_BRANCH
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/harbor-registryctl _output/LICENSES ATTRIBUTION.txt /
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-registryctl _output/harbor-registryctl _output/LICENSES ATTRIBUTION.txt /
 
 RUN yum install -y shadow-utils >> /dev/null \
     && yum clean all \
     && groupadd -f -r -g 10000 harbor && useradd --no-log-init -m -g 10000 -u 10000 harbor \
     && mkdir -p /etc/registry \
-    && cp _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry /usr/bin/registry_DO_NOT_USE_GC \
-    && _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-registryctl /home/harbor/harbor_registryctl \
+    && mv /registry /usr/bin/registry_DO_NOT_USE_GC \
+    && mv /harbor-registryctl /home/harbor/harbor_registryctl \
     && chown -R harbor:harbor /etc/pki/tls/certs /home/harbor /usr/bin/registry_DO_NOT_USE_GC \
     && chmod u+x /home/harbor/harbor_registryctl \
     && chmod u+x /usr/bin/registry_DO_NOT_USE_GC \

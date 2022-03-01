@@ -4,12 +4,12 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/harbor-jobservice/ _output/LICENSES ATTRIBUTION.txt /
+COPY _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-jobservice _output/harbor-jobservice/ _output/LICENSES ATTRIBUTION.txt /
 
 RUN yum install -y tzdata shadow-utils >> /dev/null \
     && yum clean all \
     && groupadd -f -r -g 10000 harbor && useradd --no-log-init -r -m -g 10000 -u 10000 harbor \
-    && cp _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-jobservice /harbor/harbor_jobservice \
+    && mv /harbor-jobservice /harbor/harbor_jobservice \
     && chown -R harbor:harbor /etc/pki/tls/certs \
     && chown -R harbor:harbor /harbor/ \
     && chmod u+x /harbor/entrypoint.sh \
