@@ -1,26 +1,52 @@
-From 7ec17f98e274fc5cdd922a5ade82ad9036cf6cb4 Mon Sep 17 00:00:00 2001
+From af420857b72d940863d02b8667ab241e6d16776e Mon Sep 17 00:00:00 2001
 From: Vincent Ni <kangqini@amazon.com>
-Date: Mon, 31 Jan 2022 10:19:55 -0800
+Date: Tue, 1 Mar 2022 08:50:51 -0800
 Subject: [PATCH 2/2] migrate to go module
 
 ---
- go.mod                   |  58 +++++++++++++++
- go.sum                   | 147 +++++++++++++++++++++++++++++++++++++++
- registry/handlers/app.go |   3 +-
- registry/registry.go     |  20 +++---
- 4 files changed, 215 insertions(+), 13 deletions(-)
+ go.mod                                        |   58 +
+ go.sum                                        |  150 ++
+ registry/registry.go                          |   20 +-
+ vendor/golang.org/x/crypto/acme/acme.go       | 1097 +++++++++++++++
+ .../x/crypto/acme/autocert/autocert.go        | 1249 +++++++++++++++++
+ .../x/crypto/acme/autocert/cache.go           |  136 ++
+ .../x/crypto/acme/autocert/listener.go        |  157 +++
+ .../x/crypto/acme/autocert/renewal.go         |  141 ++
+ vendor/golang.org/x/crypto/acme/http.go       |  321 +++++
+ vendor/golang.org/x/crypto/acme/jws.go        |  187 +++
+ vendor/golang.org/x/crypto/acme/rfc8555.go    |  392 ++++++
+ vendor/golang.org/x/crypto/acme/types.go      |  548 ++++++++
+ .../golang.org/x/crypto/acme/version_go112.go |   27 +
+ vendor/modules.txt                            |    4 +-
+ vendor/rsc.io/letsencrypt/LICENSE             |   27 -
+ vendor/rsc.io/letsencrypt/README.md           |    9 -
+ vendor/rsc.io/letsencrypt/doc.go              |   11 -
+ 17 files changed, 4473 insertions(+), 61 deletions(-)
  create mode 100644 go.mod
  create mode 100644 go.sum
+ create mode 100644 vendor/golang.org/x/crypto/acme/acme.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/autocert/autocert.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/autocert/cache.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/autocert/listener.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/autocert/renewal.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/http.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/jws.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/rfc8555.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/types.go
+ create mode 100644 vendor/golang.org/x/crypto/acme/version_go112.go
+ delete mode 100644 vendor/rsc.io/letsencrypt/LICENSE
+ delete mode 100644 vendor/rsc.io/letsencrypt/README.md
+ delete mode 100644 vendor/rsc.io/letsencrypt/doc.go
 
 diff --git a/go.mod b/go.mod
 new file mode 100644
-index 00000000..1cbed2bb
+index 00000000..43ece155
 --- /dev/null
 +++ b/go.mod
 @@ -0,0 +1,58 @@
 +module github.com/docker/distribution
 +
-+go 1.12
++go 1.13
 +
 +require (
 +	github.com/Azure/azure-sdk-for-go v16.2.1+incompatible
@@ -66,7 +92,7 @@ index 00000000..1cbed2bb
 +	github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43 // indirect
 +	github.com/yvasiyarov/gorelic v0.0.0-20141212073537-a9bba5b9ab50
 +	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f // indirect
-+	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
++	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
 +	golang.org/x/net v0.0.0-20190619014844-b5b0513f8c1b // indirect
 +	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 +	golang.org/x/sys v0.0.0-20190602015325-4c4f7f33c9ed // indirect
@@ -78,10 +104,10 @@ index 00000000..1cbed2bb
 +)
 diff --git a/go.sum b/go.sum
 new file mode 100644
-index 00000000..9d8012a1
+index 00000000..2e290182
 --- /dev/null
 +++ b/go.sum
-@@ -0,0 +1,147 @@
+@@ -0,0 +1,150 @@
 +cloud.google.com/go v0.34.0 h1:eOI3/cP2VTU6uZLDYAoic+eyzzB9YyGmJ7eIjl8rOPg=
 +cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 +github.com/Azure/azure-sdk-for-go v16.2.1+incompatible h1:KnPIugL51v3N3WwvaSmZbxukD1WuWXOiE9fRdu32f2I=
@@ -196,11 +222,13 @@ index 00000000..9d8012a1
 +github.com/yvasiyarov/gorelic v0.0.0-20141212073537-a9bba5b9ab50/go.mod h1:NUSPSUX/bi6SeDMUh6brw0nXpxHnc96TguQh0+r/ssA=
 +github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f h1:ERexzlUfuTvpE74urLSbIQW0Z/6hF9t8U4NsJLaioAY=
 +github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f/go.mod h1:GlGEuHIJweS1mbCqG+7vt2nvWLzLLnRHbXz5JKd/Qbg=
-+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2 h1:VklqNMn3ovrHsnt90PveolxSbWFaJdECFbxSq0Mqo2M=
 +golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
++golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d h1:9FCpayM9Egr1baVnV1SX0H87m+XB0B8S0hAMi99X/3U=
++golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 +golang.org/x/net v0.0.0-20180724234803-3673e40ba225/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 +golang.org/x/net v0.0.0-20190108225652-1e06a53dbb7e/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 +golang.org/x/net v0.0.0-20190311183353-d8887717615a/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
++golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
 +golang.org/x/net v0.0.0-20190619014844-b5b0513f8c1b h1:lkjdUzSyJ5P1+eal9fxXX9Xg2BTfswsonKUse48C0uE=
 +golang.org/x/net v0.0.0-20190619014844-b5b0513f8c1b/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 +golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 h1:SVwTIAaPC2U/AvvLNZ2a7OVsmBpC8L5BlwK1whH3hm0=
@@ -208,6 +236,7 @@ index 00000000..9d8012a1
 +golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 h1:YUO/7uOKsKeq9UokNS62b8FYywz3ker1l1vDZRCRefw=
 +golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 +golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
++golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 +golang.org/x/sys v0.0.0-20190422165155-953cdadca894/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 +golang.org/x/sys v0.0.0-20190602015325-4c4f7f33c9ed h1:uPxWBzB3+mlnjy9W58qY1j/cjyFjutgw/Vhan2zLy/A=
 +golang.org/x/sys v0.0.0-20190602015325-4c4f7f33c9ed/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
@@ -229,42 +258,21 @@ index 00000000..9d8012a1
 +gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 +gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c h1:dUUwHk2QECo/6vqA44rthZ8ie2QXMNeKRTHCNY2nXvo=
 +gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-diff --git a/registry/handlers/app.go b/registry/handlers/app.go
-index a8379071..fb07f007 100644
---- a/registry/handlers/app.go
-+++ b/registry/handlers/app.go
-@@ -42,6 +42,7 @@ import (
- 	"github.com/docker/go-metrics"
- 	"github.com/docker/libtrust"
- 	"github.com/garyburd/redigo/redis"
-+	gomoduleredis "github.com/gomodule/redigo/redis"
- 	"github.com/gorilla/mux"
- 	"github.com/sirupsen/logrus"
- )
-@@ -507,7 +508,7 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
- 		sntnl := &sentinel.Sentinel{
- 			Addrs:      strings.Split(configuration.Redis.Addr, ","),
- 			MasterName: configuration.Redis.SentinelMasterSet,
--			Dial: func(addr string) (redis.Conn, error) {
-+			Dial: func(addr string) (gomoduleredis.Conn, error) {
- 				c, err := redis.DialTimeout("tcp", addr,
- 					configuration.Redis.DialTimeout,
- 					configuration.Redis.ReadTimeout,
 diff --git a/registry/registry.go b/registry/registry.go
-index 18698f5b..c2439d50 100644
+index dc156f46..b98aefa0 100644
 --- a/registry/registry.go
 +++ b/registry/registry.go
-@@ -12,7 +12,8 @@ import (
+@@ -13,7 +13,8 @@ import (
  	"syscall"
  	"time"
  
 -	"rsc.io/letsencrypt"
-+  "golang.org/x/crypto/acme"
++	"golang.org/x/crypto/acme"
 +	"golang.org/x/crypto/acme/autocert"
  
- 	"github.com/Shopify/logrus-bugsnag"
- 	logstash "github.com/bshuster-repo/logrus-logstash-hook"
-@@ -154,19 +155,14 @@ func (registry *Registry) ListenAndServe() error {
+ 	logrus_bugsnag "github.com/Shopify/logrus-bugsnag"
+ 
+@@ -247,19 +248,14 @@ func (registry *Registry) ListenAndServe() error {
  			if config.HTTP.TLS.Certificate != "" {
  				return fmt.Errorf("cannot specify both certificate and Let's Encrypt")
  			}
@@ -279,7 +287,7 @@ index 18698f5b..c2439d50 100644
 -			}
 -			if len(config.HTTP.TLS.LetsEncrypt.Hosts) > 0 {
 -				m.SetHosts(config.HTTP.TLS.LetsEncrypt.Hosts)
-+        m := &autocert.Manager{
++			m := &autocert.Manager{
 +				HostPolicy: autocert.HostWhitelist(config.HTTP.TLS.LetsEncrypt.Hosts...),
 +				Cache:      autocert.DirCache(config.HTTP.TLS.LetsEncrypt.CacheFile),
 +				Email:      config.HTTP.TLS.LetsEncrypt.Email,
@@ -290,6 +298,4405 @@ index 18698f5b..c2439d50 100644
  		} else {
  			tlsConf.Certificates = make([]tls.Certificate, 1)
  			tlsConf.Certificates[0], err = tls.LoadX509KeyPair(config.HTTP.TLS.Certificate, config.HTTP.TLS.Key)
+diff --git a/vendor/golang.org/x/crypto/acme/acme.go b/vendor/golang.org/x/crypto/acme/acme.go
+new file mode 100644
+index 00000000..02fde12d
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/acme.go
+@@ -0,0 +1,1097 @@
++// Copyright 2015 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// Package acme provides an implementation of the
++// Automatic Certificate Management Environment (ACME) spec.
++// The intial implementation was based on ACME draft-02 and
++// is now being extended to comply with RFC 8555.
++// See https://tools.ietf.org/html/draft-ietf-acme-acme-02
++// and https://tools.ietf.org/html/rfc8555 for details.
++//
++// Most common scenarios will want to use autocert subdirectory instead,
++// which provides automatic access to certificates from Let's Encrypt
++// and any other ACME-based CA.
++//
++// This package is a work in progress and makes no API stability promises.
++package acme
++
++import (
++	"context"
++	"crypto"
++	"crypto/ecdsa"
++	"crypto/elliptic"
++	"crypto/rand"
++	"crypto/sha256"
++	"crypto/tls"
++	"crypto/x509"
++	"crypto/x509/pkix"
++	"encoding/asn1"
++	"encoding/base64"
++	"encoding/hex"
++	"encoding/json"
++	"encoding/pem"
++	"errors"
++	"fmt"
++	"io"
++	"io/ioutil"
++	"math/big"
++	"net/http"
++	"strings"
++	"sync"
++	"time"
++)
++
++const (
++	// LetsEncryptURL is the Directory endpoint of Let's Encrypt CA.
++	LetsEncryptURL = "https://acme-v02.api.letsencrypt.org/directory"
++
++	// ALPNProto is the ALPN protocol name used by a CA server when validating
++	// tls-alpn-01 challenges.
++	//
++	// Package users must ensure their servers can negotiate the ACME ALPN in
++	// order for tls-alpn-01 challenge verifications to succeed.
++	// See the crypto/tls package's Config.NextProtos field.
++	ALPNProto = "acme-tls/1"
++)
++
++// idPeACMEIdentifierV1 is the OID for the ACME extension for the TLS-ALPN challenge.
++var idPeACMEIdentifierV1 = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 30, 1}
++
++const (
++	maxChainLen = 5       // max depth and breadth of a certificate chain
++	maxCertSize = 1 << 20 // max size of a certificate, in DER bytes
++	// Used for decoding certs from application/pem-certificate-chain response,
++	// the default when in RFC mode.
++	maxCertChainSize = maxCertSize * maxChainLen
++
++	// Max number of collected nonces kept in memory.
++	// Expect usual peak of 1 or 2.
++	maxNonces = 100
++)
++
++// Client is an ACME client.
++// The only required field is Key. An example of creating a client with a new key
++// is as follows:
++//
++// 	key, err := rsa.GenerateKey(rand.Reader, 2048)
++// 	if err != nil {
++// 		log.Fatal(err)
++// 	}
++// 	client := &Client{Key: key}
++//
++type Client struct {
++	// Key is the account key used to register with a CA and sign requests.
++	// Key.Public() must return a *rsa.PublicKey or *ecdsa.PublicKey.
++	//
++	// The following algorithms are supported:
++	// RS256, ES256, ES384 and ES512.
++	// See RFC7518 for more details about the algorithms.
++	Key crypto.Signer
++
++	// HTTPClient optionally specifies an HTTP client to use
++	// instead of http.DefaultClient.
++	HTTPClient *http.Client
++
++	// DirectoryURL points to the CA directory endpoint.
++	// If empty, LetsEncryptURL is used.
++	// Mutating this value after a successful call of Client's Discover method
++	// will have no effect.
++	DirectoryURL string
++
++	// RetryBackoff computes the duration after which the nth retry of a failed request
++	// should occur. The value of n for the first call on failure is 1.
++	// The values of r and resp are the request and response of the last failed attempt.
++	// If the returned value is negative or zero, no more retries are done and an error
++	// is returned to the caller of the original method.
++	//
++	// Requests which result in a 4xx client error are not retried,
++	// except for 400 Bad Request due to "bad nonce" errors and 429 Too Many Requests.
++	//
++	// If RetryBackoff is nil, a truncated exponential backoff algorithm
++	// with the ceiling of 10 seconds is used, where each subsequent retry n
++	// is done after either ("Retry-After" + jitter) or (2^n seconds + jitter),
++	// preferring the former if "Retry-After" header is found in the resp.
++	// The jitter is a random value up to 1 second.
++	RetryBackoff func(n int, r *http.Request, resp *http.Response) time.Duration
++
++	// UserAgent is prepended to the User-Agent header sent to the ACME server,
++	// which by default is this package's name and version.
++	//
++	// Reusable libraries and tools in particular should set this value to be
++	// identifiable by the server, in case they are causing issues.
++	UserAgent string
++
++	cacheMu sync.Mutex
++	dir     *Directory // cached result of Client's Discover method
++	kid     keyID      // cached Account.URI obtained from registerRFC or getAccountRFC
++
++	noncesMu sync.Mutex
++	nonces   map[string]struct{} // nonces collected from previous responses
++}
++
++// accountKID returns a key ID associated with c.Key, the account identity
++// provided by the CA during RFC based registration.
++// It assumes c.Discover has already been called.
++//
++// accountKID requires at most one network roundtrip.
++// It caches only successful result.
++//
++// When in pre-RFC mode or when c.getRegRFC responds with an error, accountKID
++// returns noKeyID.
++func (c *Client) accountKID(ctx context.Context) keyID {
++	c.cacheMu.Lock()
++	defer c.cacheMu.Unlock()
++	if !c.dir.rfcCompliant() {
++		return noKeyID
++	}
++	if c.kid != noKeyID {
++		return c.kid
++	}
++	a, err := c.getRegRFC(ctx)
++	if err != nil {
++		return noKeyID
++	}
++	c.kid = keyID(a.URI)
++	return c.kid
++}
++
++// Discover performs ACME server discovery using c.DirectoryURL.
++//
++// It caches successful result. So, subsequent calls will not result in
++// a network round-trip. This also means mutating c.DirectoryURL after successful call
++// of this method will have no effect.
++func (c *Client) Discover(ctx context.Context) (Directory, error) {
++	c.cacheMu.Lock()
++	defer c.cacheMu.Unlock()
++	if c.dir != nil {
++		return *c.dir, nil
++	}
++
++	res, err := c.get(ctx, c.directoryURL(), wantStatus(http.StatusOK))
++	if err != nil {
++		return Directory{}, err
++	}
++	defer res.Body.Close()
++	c.addNonce(res.Header)
++
++	var v struct {
++		Reg          string `json:"new-reg"`
++		RegRFC       string `json:"newAccount"`
++		Authz        string `json:"new-authz"`
++		AuthzRFC     string `json:"newAuthz"`
++		OrderRFC     string `json:"newOrder"`
++		Cert         string `json:"new-cert"`
++		Revoke       string `json:"revoke-cert"`
++		RevokeRFC    string `json:"revokeCert"`
++		NonceRFC     string `json:"newNonce"`
++		KeyChangeRFC string `json:"keyChange"`
++		Meta         struct {
++			Terms           string   `json:"terms-of-service"`
++			TermsRFC        string   `json:"termsOfService"`
++			WebsiteRFC      string   `json:"website"`
++			CAA             []string `json:"caa-identities"`
++			CAARFC          []string `json:"caaIdentities"`
++			ExternalAcctRFC bool     `json:"externalAccountRequired"`
++		}
++	}
++	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
++		return Directory{}, err
++	}
++	if v.OrderRFC == "" {
++		// Non-RFC compliant ACME CA.
++		c.dir = &Directory{
++			RegURL:    v.Reg,
++			AuthzURL:  v.Authz,
++			CertURL:   v.Cert,
++			RevokeURL: v.Revoke,
++			Terms:     v.Meta.Terms,
++			Website:   v.Meta.WebsiteRFC,
++			CAA:       v.Meta.CAA,
++		}
++		return *c.dir, nil
++	}
++	// RFC compliant ACME CA.
++	c.dir = &Directory{
++		RegURL:                  v.RegRFC,
++		AuthzURL:                v.AuthzRFC,
++		OrderURL:                v.OrderRFC,
++		RevokeURL:               v.RevokeRFC,
++		NonceURL:                v.NonceRFC,
++		KeyChangeURL:            v.KeyChangeRFC,
++		Terms:                   v.Meta.TermsRFC,
++		Website:                 v.Meta.WebsiteRFC,
++		CAA:                     v.Meta.CAARFC,
++		ExternalAccountRequired: v.Meta.ExternalAcctRFC,
++	}
++	return *c.dir, nil
++}
++
++func (c *Client) directoryURL() string {
++	if c.DirectoryURL != "" {
++		return c.DirectoryURL
++	}
++	return LetsEncryptURL
++}
++
++// CreateCert requests a new certificate using the Certificate Signing Request csr encoded in DER format.
++// It is incompatible with RFC 8555. Callers should use CreateOrderCert when interfacing
++// with an RFC-compliant CA.
++//
++// The exp argument indicates the desired certificate validity duration. CA may issue a certificate
++// with a different duration.
++// If the bundle argument is true, the returned value will also contain the CA (issuer) certificate chain.
++//
++// In the case where CA server does not provide the issued certificate in the response,
++// CreateCert will poll certURL using c.FetchCert, which will result in additional round-trips.
++// In such a scenario, the caller can cancel the polling with ctx.
++//
++// CreateCert returns an error if the CA's response or chain was unreasonably large.
++// Callers are encouraged to parse the returned value to ensure the certificate is valid and has the expected features.
++func (c *Client) CreateCert(ctx context.Context, csr []byte, exp time.Duration, bundle bool) (der [][]byte, certURL string, err error) {
++	if _, err := c.Discover(ctx); err != nil {
++		return nil, "", err
++	}
++
++	req := struct {
++		Resource  string `json:"resource"`
++		CSR       string `json:"csr"`
++		NotBefore string `json:"notBefore,omitempty"`
++		NotAfter  string `json:"notAfter,omitempty"`
++	}{
++		Resource: "new-cert",
++		CSR:      base64.RawURLEncoding.EncodeToString(csr),
++	}
++	now := timeNow()
++	req.NotBefore = now.Format(time.RFC3339)
++	if exp > 0 {
++		req.NotAfter = now.Add(exp).Format(time.RFC3339)
++	}
++
++	res, err := c.post(ctx, nil, c.dir.CertURL, req, wantStatus(http.StatusCreated))
++	if err != nil {
++		return nil, "", err
++	}
++	defer res.Body.Close()
++
++	curl := res.Header.Get("Location") // cert permanent URL
++	if res.ContentLength == 0 {
++		// no cert in the body; poll until we get it
++		cert, err := c.FetchCert(ctx, curl, bundle)
++		return cert, curl, err
++	}
++	// slurp issued cert and CA chain, if requested
++	cert, err := c.responseCert(ctx, res, bundle)
++	return cert, curl, err
++}
++
++// FetchCert retrieves already issued certificate from the given url, in DER format.
++// It retries the request until the certificate is successfully retrieved,
++// context is cancelled by the caller or an error response is received.
++//
++// If the bundle argument is true, the returned value also contains the CA (issuer)
++// certificate chain.
++//
++// FetchCert returns an error if the CA's response or chain was unreasonably large.
++// Callers are encouraged to parse the returned value to ensure the certificate is valid
++// and has expected features.
++func (c *Client) FetchCert(ctx context.Context, url string, bundle bool) ([][]byte, error) {
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++	if dir.rfcCompliant() {
++		return c.fetchCertRFC(ctx, url, bundle)
++	}
++
++	// Legacy non-authenticated GET request.
++	res, err := c.get(ctx, url, wantStatus(http.StatusOK))
++	if err != nil {
++		return nil, err
++	}
++	return c.responseCert(ctx, res, bundle)
++}
++
++// RevokeCert revokes a previously issued certificate cert, provided in DER format.
++//
++// The key argument, used to sign the request, must be authorized
++// to revoke the certificate. It's up to the CA to decide which keys are authorized.
++// For instance, the key pair of the certificate may be authorized.
++// If the key is nil, c.Key is used instead.
++func (c *Client) RevokeCert(ctx context.Context, key crypto.Signer, cert []byte, reason CRLReasonCode) error {
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return err
++	}
++	if dir.rfcCompliant() {
++		return c.revokeCertRFC(ctx, key, cert, reason)
++	}
++
++	// Legacy CA.
++	body := &struct {
++		Resource string `json:"resource"`
++		Cert     string `json:"certificate"`
++		Reason   int    `json:"reason"`
++	}{
++		Resource: "revoke-cert",
++		Cert:     base64.RawURLEncoding.EncodeToString(cert),
++		Reason:   int(reason),
++	}
++	res, err := c.post(ctx, key, dir.RevokeURL, body, wantStatus(http.StatusOK))
++	if err != nil {
++		return err
++	}
++	defer res.Body.Close()
++	return nil
++}
++
++// AcceptTOS always returns true to indicate the acceptance of a CA's Terms of Service
++// during account registration. See Register method of Client for more details.
++func AcceptTOS(tosURL string) bool { return true }
++
++// Register creates a new account with the CA using c.Key.
++// It returns the registered account. The account acct is not modified.
++//
++// The registration may require the caller to agree to the CA's Terms of Service (TOS).
++// If so, and the account has not indicated the acceptance of the terms (see Account for details),
++// Register calls prompt with a TOS URL provided by the CA. Prompt should report
++// whether the caller agrees to the terms. To always accept the terms, the caller can use AcceptTOS.
++//
++// When interfacing with an RFC-compliant CA, non-RFC 8555 fields of acct are ignored
++// and prompt is called if Directory's Terms field is non-zero.
++// Also see Error's Instance field for when a CA requires already registered accounts to agree
++// to an updated Terms of Service.
++func (c *Client) Register(ctx context.Context, acct *Account, prompt func(tosURL string) bool) (*Account, error) {
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++	if dir.rfcCompliant() {
++		return c.registerRFC(ctx, acct, prompt)
++	}
++
++	// Legacy ACME draft registration flow.
++	a, err := c.doReg(ctx, dir.RegURL, "new-reg", acct)
++	if err != nil {
++		return nil, err
++	}
++	var accept bool
++	if a.CurrentTerms != "" && a.CurrentTerms != a.AgreedTerms {
++		accept = prompt(a.CurrentTerms)
++	}
++	if accept {
++		a.AgreedTerms = a.CurrentTerms
++		a, err = c.UpdateReg(ctx, a)
++	}
++	return a, err
++}
++
++// GetReg retrieves an existing account associated with c.Key.
++//
++// The url argument is an Account URI used with pre-RFC 8555 CAs.
++// It is ignored when interfacing with an RFC-compliant CA.
++func (c *Client) GetReg(ctx context.Context, url string) (*Account, error) {
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++	if dir.rfcCompliant() {
++		return c.getRegRFC(ctx)
++	}
++
++	// Legacy CA.
++	a, err := c.doReg(ctx, url, "reg", nil)
++	if err != nil {
++		return nil, err
++	}
++	a.URI = url
++	return a, nil
++}
++
++// UpdateReg updates an existing registration.
++// It returns an updated account copy. The provided account is not modified.
++//
++// When interfacing with RFC-compliant CAs, a.URI is ignored and the account URL
++// associated with c.Key is used instead.
++func (c *Client) UpdateReg(ctx context.Context, acct *Account) (*Account, error) {
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++	if dir.rfcCompliant() {
++		return c.updateRegRFC(ctx, acct)
++	}
++
++	// Legacy CA.
++	uri := acct.URI
++	a, err := c.doReg(ctx, uri, "reg", acct)
++	if err != nil {
++		return nil, err
++	}
++	a.URI = uri
++	return a, nil
++}
++
++// Authorize performs the initial step in the pre-authorization flow,
++// as opposed to order-based flow.
++// The caller will then need to choose from and perform a set of returned
++// challenges using c.Accept in order to successfully complete authorization.
++//
++// Once complete, the caller can use AuthorizeOrder which the CA
++// should provision with the already satisfied authorization.
++// For pre-RFC CAs, the caller can proceed directly to requesting a certificate
++// using CreateCert method.
++//
++// If an authorization has been previously granted, the CA may return
++// a valid authorization which has its Status field set to StatusValid.
++//
++// More about pre-authorization can be found at
++// https://tools.ietf.org/html/rfc8555#section-7.4.1.
++func (c *Client) Authorize(ctx context.Context, domain string) (*Authorization, error) {
++	return c.authorize(ctx, "dns", domain)
++}
++
++// AuthorizeIP is the same as Authorize but requests IP address authorization.
++// Clients which successfully obtain such authorization may request to issue
++// a certificate for IP addresses.
++//
++// See the ACME spec extension for more details about IP address identifiers:
++// https://tools.ietf.org/html/draft-ietf-acme-ip.
++func (c *Client) AuthorizeIP(ctx context.Context, ipaddr string) (*Authorization, error) {
++	return c.authorize(ctx, "ip", ipaddr)
++}
++
++func (c *Client) authorize(ctx context.Context, typ, val string) (*Authorization, error) {
++	if _, err := c.Discover(ctx); err != nil {
++		return nil, err
++	}
++
++	type authzID struct {
++		Type  string `json:"type"`
++		Value string `json:"value"`
++	}
++	req := struct {
++		Resource   string  `json:"resource"`
++		Identifier authzID `json:"identifier"`
++	}{
++		Resource:   "new-authz",
++		Identifier: authzID{Type: typ, Value: val},
++	}
++	res, err := c.post(ctx, nil, c.dir.AuthzURL, req, wantStatus(http.StatusCreated))
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++
++	var v wireAuthz
++	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
++		return nil, fmt.Errorf("acme: invalid response: %v", err)
++	}
++	if v.Status != StatusPending && v.Status != StatusValid {
++		return nil, fmt.Errorf("acme: unexpected status: %s", v.Status)
++	}
++	return v.authorization(res.Header.Get("Location")), nil
++}
++
++// GetAuthorization retrieves an authorization identified by the given URL.
++//
++// If a caller needs to poll an authorization until its status is final,
++// see the WaitAuthorization method.
++func (c *Client) GetAuthorization(ctx context.Context, url string) (*Authorization, error) {
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++
++	var res *http.Response
++	if dir.rfcCompliant() {
++		res, err = c.postAsGet(ctx, url, wantStatus(http.StatusOK))
++	} else {
++		res, err = c.get(ctx, url, wantStatus(http.StatusOK, http.StatusAccepted))
++	}
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++	var v wireAuthz
++	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
++		return nil, fmt.Errorf("acme: invalid response: %v", err)
++	}
++	return v.authorization(url), nil
++}
++
++// RevokeAuthorization relinquishes an existing authorization identified
++// by the given URL.
++// The url argument is an Authorization.URI value.
++//
++// If successful, the caller will be required to obtain a new authorization
++// using the Authorize or AuthorizeOrder methods before being able to request
++// a new certificate for the domain associated with the authorization.
++//
++// It does not revoke existing certificates.
++func (c *Client) RevokeAuthorization(ctx context.Context, url string) error {
++	// Required for c.accountKID() when in RFC mode.
++	if _, err := c.Discover(ctx); err != nil {
++		return err
++	}
++
++	req := struct {
++		Resource string `json:"resource"`
++		Status   string `json:"status"`
++		Delete   bool   `json:"delete"`
++	}{
++		Resource: "authz",
++		Status:   "deactivated",
++		Delete:   true,
++	}
++	res, err := c.post(ctx, nil, url, req, wantStatus(http.StatusOK))
++	if err != nil {
++		return err
++	}
++	defer res.Body.Close()
++	return nil
++}
++
++// WaitAuthorization polls an authorization at the given URL
++// until it is in one of the final states, StatusValid or StatusInvalid,
++// the ACME CA responded with a 4xx error code, or the context is done.
++//
++// It returns a non-nil Authorization only if its Status is StatusValid.
++// In all other cases WaitAuthorization returns an error.
++// If the Status is StatusInvalid, the returned error is of type *AuthorizationError.
++func (c *Client) WaitAuthorization(ctx context.Context, url string) (*Authorization, error) {
++	// Required for c.accountKID() when in RFC mode.
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++	getfn := c.postAsGet
++	if !dir.rfcCompliant() {
++		getfn = c.get
++	}
++
++	for {
++		res, err := getfn(ctx, url, wantStatus(http.StatusOK, http.StatusAccepted))
++		if err != nil {
++			return nil, err
++		}
++
++		var raw wireAuthz
++		err = json.NewDecoder(res.Body).Decode(&raw)
++		res.Body.Close()
++		switch {
++		case err != nil:
++			// Skip and retry.
++		case raw.Status == StatusValid:
++			return raw.authorization(url), nil
++		case raw.Status == StatusInvalid:
++			return nil, raw.error(url)
++		}
++
++		// Exponential backoff is implemented in c.get above.
++		// This is just to prevent continuously hitting the CA
++		// while waiting for a final authorization status.
++		d := retryAfter(res.Header.Get("Retry-After"))
++		if d == 0 {
++			// Given that the fastest challenges TLS-SNI and HTTP-01
++			// require a CA to make at least 1 network round trip
++			// and most likely persist a challenge state,
++			// this default delay seems reasonable.
++			d = time.Second
++		}
++		t := time.NewTimer(d)
++		select {
++		case <-ctx.Done():
++			t.Stop()
++			return nil, ctx.Err()
++		case <-t.C:
++			// Retry.
++		}
++	}
++}
++
++// GetChallenge retrieves the current status of an challenge.
++//
++// A client typically polls a challenge status using this method.
++func (c *Client) GetChallenge(ctx context.Context, url string) (*Challenge, error) {
++	// Required for c.accountKID() when in RFC mode.
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++
++	getfn := c.postAsGet
++	if !dir.rfcCompliant() {
++		getfn = c.get
++	}
++	res, err := getfn(ctx, url, wantStatus(http.StatusOK, http.StatusAccepted))
++	if err != nil {
++		return nil, err
++	}
++
++	defer res.Body.Close()
++	v := wireChallenge{URI: url}
++	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
++		return nil, fmt.Errorf("acme: invalid response: %v", err)
++	}
++	return v.challenge(), nil
++}
++
++// Accept informs the server that the client accepts one of its challenges
++// previously obtained with c.Authorize.
++//
++// The server will then perform the validation asynchronously.
++func (c *Client) Accept(ctx context.Context, chal *Challenge) (*Challenge, error) {
++	// Required for c.accountKID() when in RFC mode.
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++
++	var req interface{} = json.RawMessage("{}") // RFC-compliant CA
++	if !dir.rfcCompliant() {
++		auth, err := keyAuth(c.Key.Public(), chal.Token)
++		if err != nil {
++			return nil, err
++		}
++		req = struct {
++			Resource string `json:"resource"`
++			Type     string `json:"type"`
++			Auth     string `json:"keyAuthorization"`
++		}{
++			Resource: "challenge",
++			Type:     chal.Type,
++			Auth:     auth,
++		}
++	}
++	res, err := c.post(ctx, nil, chal.URI, req, wantStatus(
++		http.StatusOK,       // according to the spec
++		http.StatusAccepted, // Let's Encrypt: see https://goo.gl/WsJ7VT (acme-divergences.md)
++	))
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++
++	var v wireChallenge
++	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
++		return nil, fmt.Errorf("acme: invalid response: %v", err)
++	}
++	return v.challenge(), nil
++}
++
++// DNS01ChallengeRecord returns a DNS record value for a dns-01 challenge response.
++// A TXT record containing the returned value must be provisioned under
++// "_acme-challenge" name of the domain being validated.
++//
++// The token argument is a Challenge.Token value.
++func (c *Client) DNS01ChallengeRecord(token string) (string, error) {
++	ka, err := keyAuth(c.Key.Public(), token)
++	if err != nil {
++		return "", err
++	}
++	b := sha256.Sum256([]byte(ka))
++	return base64.RawURLEncoding.EncodeToString(b[:]), nil
++}
++
++// HTTP01ChallengeResponse returns the response for an http-01 challenge.
++// Servers should respond with the value to HTTP requests at the URL path
++// provided by HTTP01ChallengePath to validate the challenge and prove control
++// over a domain name.
++//
++// The token argument is a Challenge.Token value.
++func (c *Client) HTTP01ChallengeResponse(token string) (string, error) {
++	return keyAuth(c.Key.Public(), token)
++}
++
++// HTTP01ChallengePath returns the URL path at which the response for an http-01 challenge
++// should be provided by the servers.
++// The response value can be obtained with HTTP01ChallengeResponse.
++//
++// The token argument is a Challenge.Token value.
++func (c *Client) HTTP01ChallengePath(token string) string {
++	return "/.well-known/acme-challenge/" + token
++}
++
++// TLSSNI01ChallengeCert creates a certificate for TLS-SNI-01 challenge response.
++//
++// Deprecated: This challenge type is unused in both draft-02 and RFC versions of ACME spec.
++func (c *Client) TLSSNI01ChallengeCert(token string, opt ...CertOption) (cert tls.Certificate, name string, err error) {
++	ka, err := keyAuth(c.Key.Public(), token)
++	if err != nil {
++		return tls.Certificate{}, "", err
++	}
++	b := sha256.Sum256([]byte(ka))
++	h := hex.EncodeToString(b[:])
++	name = fmt.Sprintf("%s.%s.acme.invalid", h[:32], h[32:])
++	cert, err = tlsChallengeCert([]string{name}, opt)
++	if err != nil {
++		return tls.Certificate{}, "", err
++	}
++	return cert, name, nil
++}
++
++// TLSSNI02ChallengeCert creates a certificate for TLS-SNI-02 challenge response.
++//
++// Deprecated: This challenge type is unused in both draft-02 and RFC versions of ACME spec.
++func (c *Client) TLSSNI02ChallengeCert(token string, opt ...CertOption) (cert tls.Certificate, name string, err error) {
++	b := sha256.Sum256([]byte(token))
++	h := hex.EncodeToString(b[:])
++	sanA := fmt.Sprintf("%s.%s.token.acme.invalid", h[:32], h[32:])
++
++	ka, err := keyAuth(c.Key.Public(), token)
++	if err != nil {
++		return tls.Certificate{}, "", err
++	}
++	b = sha256.Sum256([]byte(ka))
++	h = hex.EncodeToString(b[:])
++	sanB := fmt.Sprintf("%s.%s.ka.acme.invalid", h[:32], h[32:])
++
++	cert, err = tlsChallengeCert([]string{sanA, sanB}, opt)
++	if err != nil {
++		return tls.Certificate{}, "", err
++	}
++	return cert, sanA, nil
++}
++
++// TLSALPN01ChallengeCert creates a certificate for TLS-ALPN-01 challenge response.
++// Servers can present the certificate to validate the challenge and prove control
++// over a domain name. For more details on TLS-ALPN-01 see
++// https://tools.ietf.org/html/draft-shoemaker-acme-tls-alpn-00#section-3
++//
++// The token argument is a Challenge.Token value.
++// If a WithKey option is provided, its private part signs the returned cert,
++// and the public part is used to specify the signee.
++// If no WithKey option is provided, a new ECDSA key is generated using P-256 curve.
++//
++// The returned certificate is valid for the next 24 hours and must be presented only when
++// the server name in the TLS ClientHello matches the domain, and the special acme-tls/1 ALPN protocol
++// has been specified.
++func (c *Client) TLSALPN01ChallengeCert(token, domain string, opt ...CertOption) (cert tls.Certificate, err error) {
++	ka, err := keyAuth(c.Key.Public(), token)
++	if err != nil {
++		return tls.Certificate{}, err
++	}
++	shasum := sha256.Sum256([]byte(ka))
++	extValue, err := asn1.Marshal(shasum[:])
++	if err != nil {
++		return tls.Certificate{}, err
++	}
++	acmeExtension := pkix.Extension{
++		Id:       idPeACMEIdentifierV1,
++		Critical: true,
++		Value:    extValue,
++	}
++
++	tmpl := defaultTLSChallengeCertTemplate()
++
++	var newOpt []CertOption
++	for _, o := range opt {
++		switch o := o.(type) {
++		case *certOptTemplate:
++			t := *(*x509.Certificate)(o) // shallow copy is ok
++			tmpl = &t
++		default:
++			newOpt = append(newOpt, o)
++		}
++	}
++	tmpl.ExtraExtensions = append(tmpl.ExtraExtensions, acmeExtension)
++	newOpt = append(newOpt, WithTemplate(tmpl))
++	return tlsChallengeCert([]string{domain}, newOpt)
++}
++
++// doReg sends all types of registration requests the old way (pre-RFC world).
++// The type of request is identified by typ argument, which is a "resource"
++// in the ACME spec terms.
++//
++// A non-nil acct argument indicates whether the intention is to mutate data
++// of the Account. Only Contact and Agreement of its fields are used
++// in such cases.
++func (c *Client) doReg(ctx context.Context, url string, typ string, acct *Account) (*Account, error) {
++	req := struct {
++		Resource  string   `json:"resource"`
++		Contact   []string `json:"contact,omitempty"`
++		Agreement string   `json:"agreement,omitempty"`
++	}{
++		Resource: typ,
++	}
++	if acct != nil {
++		req.Contact = acct.Contact
++		req.Agreement = acct.AgreedTerms
++	}
++	res, err := c.post(ctx, nil, url, req, wantStatus(
++		http.StatusOK,       // updates and deletes
++		http.StatusCreated,  // new account creation
++		http.StatusAccepted, // Let's Encrypt divergent implementation
++	))
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++
++	var v struct {
++		Contact        []string
++		Agreement      string
++		Authorizations string
++		Certificates   string
++	}
++	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
++		return nil, fmt.Errorf("acme: invalid response: %v", err)
++	}
++	var tos string
++	if v := linkHeader(res.Header, "terms-of-service"); len(v) > 0 {
++		tos = v[0]
++	}
++	var authz string
++	if v := linkHeader(res.Header, "next"); len(v) > 0 {
++		authz = v[0]
++	}
++	return &Account{
++		URI:            res.Header.Get("Location"),
++		Contact:        v.Contact,
++		AgreedTerms:    v.Agreement,
++		CurrentTerms:   tos,
++		Authz:          authz,
++		Authorizations: v.Authorizations,
++		Certificates:   v.Certificates,
++	}, nil
++}
++
++// popNonce returns a nonce value previously stored with c.addNonce
++// or fetches a fresh one from c.dir.NonceURL.
++// If NonceURL is empty, it first tries c.directoryURL() and, failing that,
++// the provided url.
++func (c *Client) popNonce(ctx context.Context, url string) (string, error) {
++	c.noncesMu.Lock()
++	defer c.noncesMu.Unlock()
++	if len(c.nonces) == 0 {
++		if c.dir != nil && c.dir.NonceURL != "" {
++			return c.fetchNonce(ctx, c.dir.NonceURL)
++		}
++		dirURL := c.directoryURL()
++		v, err := c.fetchNonce(ctx, dirURL)
++		if err != nil && url != dirURL {
++			v, err = c.fetchNonce(ctx, url)
++		}
++		return v, err
++	}
++	var nonce string
++	for nonce = range c.nonces {
++		delete(c.nonces, nonce)
++		break
++	}
++	return nonce, nil
++}
++
++// clearNonces clears any stored nonces
++func (c *Client) clearNonces() {
++	c.noncesMu.Lock()
++	defer c.noncesMu.Unlock()
++	c.nonces = make(map[string]struct{})
++}
++
++// addNonce stores a nonce value found in h (if any) for future use.
++func (c *Client) addNonce(h http.Header) {
++	v := nonceFromHeader(h)
++	if v == "" {
++		return
++	}
++	c.noncesMu.Lock()
++	defer c.noncesMu.Unlock()
++	if len(c.nonces) >= maxNonces {
++		return
++	}
++	if c.nonces == nil {
++		c.nonces = make(map[string]struct{})
++	}
++	c.nonces[v] = struct{}{}
++}
++
++func (c *Client) fetchNonce(ctx context.Context, url string) (string, error) {
++	r, err := http.NewRequest("HEAD", url, nil)
++	if err != nil {
++		return "", err
++	}
++	resp, err := c.doNoRetry(ctx, r)
++	if err != nil {
++		return "", err
++	}
++	defer resp.Body.Close()
++	nonce := nonceFromHeader(resp.Header)
++	if nonce == "" {
++		if resp.StatusCode > 299 {
++			return "", responseError(resp)
++		}
++		return "", errors.New("acme: nonce not found")
++	}
++	return nonce, nil
++}
++
++func nonceFromHeader(h http.Header) string {
++	return h.Get("Replay-Nonce")
++}
++
++func (c *Client) responseCert(ctx context.Context, res *http.Response, bundle bool) ([][]byte, error) {
++	b, err := ioutil.ReadAll(io.LimitReader(res.Body, maxCertSize+1))
++	if err != nil {
++		return nil, fmt.Errorf("acme: response stream: %v", err)
++	}
++	if len(b) > maxCertSize {
++		return nil, errors.New("acme: certificate is too big")
++	}
++	cert := [][]byte{b}
++	if !bundle {
++		return cert, nil
++	}
++
++	// Append CA chain cert(s).
++	// At least one is required according to the spec:
++	// https://tools.ietf.org/html/draft-ietf-acme-acme-03#section-6.3.1
++	up := linkHeader(res.Header, "up")
++	if len(up) == 0 {
++		return nil, errors.New("acme: rel=up link not found")
++	}
++	if len(up) > maxChainLen {
++		return nil, errors.New("acme: rel=up link is too large")
++	}
++	for _, url := range up {
++		cc, err := c.chainCert(ctx, url, 0)
++		if err != nil {
++			return nil, err
++		}
++		cert = append(cert, cc...)
++	}
++	return cert, nil
++}
++
++// chainCert fetches CA certificate chain recursively by following "up" links.
++// Each recursive call increments the depth by 1, resulting in an error
++// if the recursion level reaches maxChainLen.
++//
++// First chainCert call starts with depth of 0.
++func (c *Client) chainCert(ctx context.Context, url string, depth int) ([][]byte, error) {
++	if depth >= maxChainLen {
++		return nil, errors.New("acme: certificate chain is too deep")
++	}
++
++	res, err := c.get(ctx, url, wantStatus(http.StatusOK))
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++	b, err := ioutil.ReadAll(io.LimitReader(res.Body, maxCertSize+1))
++	if err != nil {
++		return nil, err
++	}
++	if len(b) > maxCertSize {
++		return nil, errors.New("acme: certificate is too big")
++	}
++	chain := [][]byte{b}
++
++	uplink := linkHeader(res.Header, "up")
++	if len(uplink) > maxChainLen {
++		return nil, errors.New("acme: certificate chain is too large")
++	}
++	for _, up := range uplink {
++		cc, err := c.chainCert(ctx, up, depth+1)
++		if err != nil {
++			return nil, err
++		}
++		chain = append(chain, cc...)
++	}
++
++	return chain, nil
++}
++
++// linkHeader returns URI-Reference values of all Link headers
++// with relation-type rel.
++// See https://tools.ietf.org/html/rfc5988#section-5 for details.
++func linkHeader(h http.Header, rel string) []string {
++	var links []string
++	for _, v := range h["Link"] {
++		parts := strings.Split(v, ";")
++		for _, p := range parts {
++			p = strings.TrimSpace(p)
++			if !strings.HasPrefix(p, "rel=") {
++				continue
++			}
++			if v := strings.Trim(p[4:], `"`); v == rel {
++				links = append(links, strings.Trim(parts[0], "<>"))
++			}
++		}
++	}
++	return links
++}
++
++// keyAuth generates a key authorization string for a given token.
++func keyAuth(pub crypto.PublicKey, token string) (string, error) {
++	th, err := JWKThumbprint(pub)
++	if err != nil {
++		return "", err
++	}
++	return fmt.Sprintf("%s.%s", token, th), nil
++}
++
++// defaultTLSChallengeCertTemplate is a template used to create challenge certs for TLS challenges.
++func defaultTLSChallengeCertTemplate() *x509.Certificate {
++	return &x509.Certificate{
++		SerialNumber:          big.NewInt(1),
++		NotBefore:             time.Now(),
++		NotAfter:              time.Now().Add(24 * time.Hour),
++		BasicConstraintsValid: true,
++		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
++		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
++	}
++}
++
++// tlsChallengeCert creates a temporary certificate for TLS-SNI challenges
++// with the given SANs and auto-generated public/private key pair.
++// The Subject Common Name is set to the first SAN to aid debugging.
++// To create a cert with a custom key pair, specify WithKey option.
++func tlsChallengeCert(san []string, opt []CertOption) (tls.Certificate, error) {
++	var key crypto.Signer
++	tmpl := defaultTLSChallengeCertTemplate()
++	for _, o := range opt {
++		switch o := o.(type) {
++		case *certOptKey:
++			if key != nil {
++				return tls.Certificate{}, errors.New("acme: duplicate key option")
++			}
++			key = o.key
++		case *certOptTemplate:
++			t := *(*x509.Certificate)(o) // shallow copy is ok
++			tmpl = &t
++		default:
++			// package's fault, if we let this happen:
++			panic(fmt.Sprintf("unsupported option type %T", o))
++		}
++	}
++	if key == nil {
++		var err error
++		if key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader); err != nil {
++			return tls.Certificate{}, err
++		}
++	}
++	tmpl.DNSNames = san
++	if len(san) > 0 {
++		tmpl.Subject.CommonName = san[0]
++	}
++
++	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, key.Public(), key)
++	if err != nil {
++		return tls.Certificate{}, err
++	}
++	return tls.Certificate{
++		Certificate: [][]byte{der},
++		PrivateKey:  key,
++	}, nil
++}
++
++// encodePEM returns b encoded as PEM with block of type typ.
++func encodePEM(typ string, b []byte) []byte {
++	pb := &pem.Block{Type: typ, Bytes: b}
++	return pem.EncodeToMemory(pb)
++}
++
++// timeNow is useful for testing for fixed current time.
++var timeNow = time.Now
+diff --git a/vendor/golang.org/x/crypto/acme/autocert/autocert.go b/vendor/golang.org/x/crypto/acme/autocert/autocert.go
+new file mode 100644
+index 00000000..2ea9e231
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/autocert/autocert.go
+@@ -0,0 +1,1249 @@
++// Copyright 2016 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// Package autocert provides automatic access to certificates from Let's Encrypt
++// and any other ACME-based CA.
++//
++// This package is a work in progress and makes no API stability promises.
++package autocert
++
++import (
++	"bytes"
++	"context"
++	"crypto"
++	"crypto/ecdsa"
++	"crypto/elliptic"
++	"crypto/rand"
++	"crypto/rsa"
++	"crypto/tls"
++	"crypto/x509"
++	"crypto/x509/pkix"
++	"encoding/pem"
++	"errors"
++	"fmt"
++	"io"
++	mathrand "math/rand"
++	"net"
++	"net/http"
++	"path"
++	"strings"
++	"sync"
++	"time"
++
++	"golang.org/x/crypto/acme"
++	"golang.org/x/net/idna"
++)
++
++// DefaultACMEDirectory is the default ACME Directory URL used when the Manager's Client is nil.
++const DefaultACMEDirectory = "https://acme-v02.api.letsencrypt.org/directory"
++
++// createCertRetryAfter is how much time to wait before removing a failed state
++// entry due to an unsuccessful createCert call.
++// This is a variable instead of a const for testing.
++// TODO: Consider making it configurable or an exp backoff?
++var createCertRetryAfter = time.Minute
++
++// pseudoRand is safe for concurrent use.
++var pseudoRand *lockedMathRand
++
++func init() {
++	src := mathrand.NewSource(time.Now().UnixNano())
++	pseudoRand = &lockedMathRand{rnd: mathrand.New(src)}
++}
++
++// AcceptTOS is a Manager.Prompt function that always returns true to
++// indicate acceptance of the CA's Terms of Service during account
++// registration.
++func AcceptTOS(tosURL string) bool { return true }
++
++// HostPolicy specifies which host names the Manager is allowed to respond to.
++// It returns a non-nil error if the host should be rejected.
++// The returned error is accessible via tls.Conn.Handshake and its callers.
++// See Manager's HostPolicy field and GetCertificate method docs for more details.
++type HostPolicy func(ctx context.Context, host string) error
++
++// HostWhitelist returns a policy where only the specified host names are allowed.
++// Only exact matches are currently supported. Subdomains, regexp or wildcard
++// will not match.
++//
++// Note that all hosts will be converted to Punycode via idna.Lookup.ToASCII so that
++// Manager.GetCertificate can handle the Unicode IDN and mixedcase hosts correctly.
++// Invalid hosts will be silently ignored.
++func HostWhitelist(hosts ...string) HostPolicy {
++	whitelist := make(map[string]bool, len(hosts))
++	for _, h := range hosts {
++		if h, err := idna.Lookup.ToASCII(h); err == nil {
++			whitelist[h] = true
++		}
++	}
++	return func(_ context.Context, host string) error {
++		if !whitelist[host] {
++			return fmt.Errorf("acme/autocert: host %q not configured in HostWhitelist", host)
++		}
++		return nil
++	}
++}
++
++// defaultHostPolicy is used when Manager.HostPolicy is not set.
++func defaultHostPolicy(context.Context, string) error {
++	return nil
++}
++
++// Manager is a stateful certificate manager built on top of acme.Client.
++// It obtains and refreshes certificates automatically using "tls-alpn-01"
++// or "http-01" challenge types, as well as providing them to a TLS server
++// via tls.Config.
++//
++// You must specify a cache implementation, such as DirCache,
++// to reuse obtained certificates across program restarts.
++// Otherwise your server is very likely to exceed the certificate
++// issuer's request rate limits.
++type Manager struct {
++	// Prompt specifies a callback function to conditionally accept a CA's Terms of Service (TOS).
++	// The registration may require the caller to agree to the CA's TOS.
++	// If so, Manager calls Prompt with a TOS URL provided by the CA. Prompt should report
++	// whether the caller agrees to the terms.
++	//
++	// To always accept the terms, the callers can use AcceptTOS.
++	Prompt func(tosURL string) bool
++
++	// Cache optionally stores and retrieves previously-obtained certificates
++	// and other state. If nil, certs will only be cached for the lifetime of
++	// the Manager. Multiple Managers can share the same Cache.
++	//
++	// Using a persistent Cache, such as DirCache, is strongly recommended.
++	Cache Cache
++
++	// HostPolicy controls which domains the Manager will attempt
++	// to retrieve new certificates for. It does not affect cached certs.
++	//
++	// If non-nil, HostPolicy is called before requesting a new cert.
++	// If nil, all hosts are currently allowed. This is not recommended,
++	// as it opens a potential attack where clients connect to a server
++	// by IP address and pretend to be asking for an incorrect host name.
++	// Manager will attempt to obtain a certificate for that host, incorrectly,
++	// eventually reaching the CA's rate limit for certificate requests
++	// and making it impossible to obtain actual certificates.
++	//
++	// See GetCertificate for more details.
++	HostPolicy HostPolicy
++
++	// RenewBefore optionally specifies how early certificates should
++	// be renewed before they expire.
++	//
++	// If zero, they're renewed 30 days before expiration.
++	RenewBefore time.Duration
++
++	// Client is used to perform low-level operations, such as account registration
++	// and requesting new certificates.
++	//
++	// If Client is nil, a zero-value acme.Client is used with DefaultACMEDirectory
++	// as the directory endpoint.
++	// If the Client.Key is nil, a new ECDSA P-256 key is generated and,
++	// if Cache is not nil, stored in cache.
++	//
++	// Mutating the field after the first call of GetCertificate method will have no effect.
++	Client *acme.Client
++
++	// Email optionally specifies a contact email address.
++	// This is used by CAs, such as Let's Encrypt, to notify about problems
++	// with issued certificates.
++	//
++	// If the Client's account key is already registered, Email is not used.
++	Email string
++
++	// ForceRSA used to make the Manager generate RSA certificates. It is now ignored.
++	//
++	// Deprecated: the Manager will request the correct type of certificate based
++	// on what each client supports.
++	ForceRSA bool
++
++	// ExtraExtensions are used when generating a new CSR (Certificate Request),
++	// thus allowing customization of the resulting certificate.
++	// For instance, TLS Feature Extension (RFC 7633) can be used
++	// to prevent an OCSP downgrade attack.
++	//
++	// The field value is passed to crypto/x509.CreateCertificateRequest
++	// in the template's ExtraExtensions field as is.
++	ExtraExtensions []pkix.Extension
++
++	clientMu sync.Mutex
++	client   *acme.Client // initialized by acmeClient method
++
++	stateMu sync.Mutex
++	state   map[certKey]*certState
++
++	// renewal tracks the set of domains currently running renewal timers.
++	renewalMu sync.Mutex
++	renewal   map[certKey]*domainRenewal
++
++	// challengeMu guards tryHTTP01, certTokens and httpTokens.
++	challengeMu sync.RWMutex
++	// tryHTTP01 indicates whether the Manager should try "http-01" challenge type
++	// during the authorization flow.
++	tryHTTP01 bool
++	// httpTokens contains response body values for http-01 challenges
++	// and is keyed by the URL path at which a challenge response is expected
++	// to be provisioned.
++	// The entries are stored for the duration of the authorization flow.
++	httpTokens map[string][]byte
++	// certTokens contains temporary certificates for tls-alpn-01 challenges
++	// and is keyed by the domain name which matches the ClientHello server name.
++	// The entries are stored for the duration of the authorization flow.
++	certTokens map[string]*tls.Certificate
++
++	// nowFunc, if not nil, returns the current time. This may be set for
++	// testing purposes.
++	nowFunc func() time.Time
++}
++
++// certKey is the key by which certificates are tracked in state, renewal and cache.
++type certKey struct {
++	domain  string // without trailing dot
++	isRSA   bool   // RSA cert for legacy clients (as opposed to default ECDSA)
++	isToken bool   // tls-based challenge token cert; key type is undefined regardless of isRSA
++}
++
++func (c certKey) String() string {
++	if c.isToken {
++		return c.domain + "+token"
++	}
++	if c.isRSA {
++		return c.domain + "+rsa"
++	}
++	return c.domain
++}
++
++// TLSConfig creates a new TLS config suitable for net/http.Server servers,
++// supporting HTTP/2 and the tls-alpn-01 ACME challenge type.
++func (m *Manager) TLSConfig() *tls.Config {
++	return &tls.Config{
++		GetCertificate: m.GetCertificate,
++		NextProtos: []string{
++			"h2", "http/1.1", // enable HTTP/2
++			acme.ALPNProto, // enable tls-alpn ACME challenges
++		},
++	}
++}
++
++// GetCertificate implements the tls.Config.GetCertificate hook.
++// It provides a TLS certificate for hello.ServerName host, including answering
++// tls-alpn-01 challenges.
++// All other fields of hello are ignored.
++//
++// If m.HostPolicy is non-nil, GetCertificate calls the policy before requesting
++// a new cert. A non-nil error returned from m.HostPolicy halts TLS negotiation.
++// The error is propagated back to the caller of GetCertificate and is user-visible.
++// This does not affect cached certs. See HostPolicy field description for more details.
++//
++// If GetCertificate is used directly, instead of via Manager.TLSConfig, package users will
++// also have to add acme.ALPNProto to NextProtos for tls-alpn-01, or use HTTPHandler for http-01.
++func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
++	if m.Prompt == nil {
++		return nil, errors.New("acme/autocert: Manager.Prompt not set")
++	}
++
++	name := hello.ServerName
++	if name == "" {
++		return nil, errors.New("acme/autocert: missing server name")
++	}
++	if !strings.Contains(strings.Trim(name, "."), ".") {
++		return nil, errors.New("acme/autocert: server name component count invalid")
++	}
++
++	// Note that this conversion is necessary because some server names in the handshakes
++	// started by some clients (such as cURL) are not converted to Punycode, which will
++	// prevent us from obtaining certificates for them. In addition, we should also treat
++	// example.com and EXAMPLE.COM as equivalent and return the same certificate for them.
++	// Fortunately, this conversion also helped us deal with this kind of mixedcase problems.
++	//
++	// Due to the "σςΣ" problem (see https://unicode.org/faq/idn.html#22), we can't use
++	// idna.Punycode.ToASCII (or just idna.ToASCII) here.
++	name, err := idna.Lookup.ToASCII(name)
++	if err != nil {
++		return nil, errors.New("acme/autocert: server name contains invalid character")
++	}
++
++	// In the worst-case scenario, the timeout needs to account for caching, host policy,
++	// domain ownership verification and certificate issuance.
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
++	defer cancel()
++
++	// Check whether this is a token cert requested for TLS-ALPN challenge.
++	if wantsTokenCert(hello) {
++		m.challengeMu.RLock()
++		defer m.challengeMu.RUnlock()
++		if cert := m.certTokens[name]; cert != nil {
++			return cert, nil
++		}
++		if cert, err := m.cacheGet(ctx, certKey{domain: name, isToken: true}); err == nil {
++			return cert, nil
++		}
++		// TODO: cache error results?
++		return nil, fmt.Errorf("acme/autocert: no token cert for %q", name)
++	}
++
++	// regular domain
++	ck := certKey{
++		domain: strings.TrimSuffix(name, "."), // golang.org/issue/18114
++		isRSA:  !supportsECDSA(hello),
++	}
++	cert, err := m.cert(ctx, ck)
++	if err == nil {
++		return cert, nil
++	}
++	if err != ErrCacheMiss {
++		return nil, err
++	}
++
++	// first-time
++	if err := m.hostPolicy()(ctx, name); err != nil {
++		return nil, err
++	}
++	cert, err = m.createCert(ctx, ck)
++	if err != nil {
++		return nil, err
++	}
++	m.cachePut(ctx, ck, cert)
++	return cert, nil
++}
++
++// wantsTokenCert reports whether a TLS request with SNI is made by a CA server
++// for a challenge verification.
++func wantsTokenCert(hello *tls.ClientHelloInfo) bool {
++	// tls-alpn-01
++	if len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto {
++		return true
++	}
++	return false
++}
++
++func supportsECDSA(hello *tls.ClientHelloInfo) bool {
++	// The "signature_algorithms" extension, if present, limits the key exchange
++	// algorithms allowed by the cipher suites. See RFC 5246, section 7.4.1.4.1.
++	if hello.SignatureSchemes != nil {
++		ecdsaOK := false
++	schemeLoop:
++		for _, scheme := range hello.SignatureSchemes {
++			const tlsECDSAWithSHA1 tls.SignatureScheme = 0x0203 // constant added in Go 1.10
++			switch scheme {
++			case tlsECDSAWithSHA1, tls.ECDSAWithP256AndSHA256,
++				tls.ECDSAWithP384AndSHA384, tls.ECDSAWithP521AndSHA512:
++				ecdsaOK = true
++				break schemeLoop
++			}
++		}
++		if !ecdsaOK {
++			return false
++		}
++	}
++	if hello.SupportedCurves != nil {
++		ecdsaOK := false
++		for _, curve := range hello.SupportedCurves {
++			if curve == tls.CurveP256 {
++				ecdsaOK = true
++				break
++			}
++		}
++		if !ecdsaOK {
++			return false
++		}
++	}
++	for _, suite := range hello.CipherSuites {
++		switch suite {
++		case tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
++			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
++			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
++			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
++			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
++			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
++			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305:
++			return true
++		}
++	}
++	return false
++}
++
++// HTTPHandler configures the Manager to provision ACME "http-01" challenge responses.
++// It returns an http.Handler that responds to the challenges and must be
++// running on port 80. If it receives a request that is not an ACME challenge,
++// it delegates the request to the optional fallback handler.
++//
++// If fallback is nil, the returned handler redirects all GET and HEAD requests
++// to the default TLS port 443 with 302 Found status code, preserving the original
++// request path and query. It responds with 400 Bad Request to all other HTTP methods.
++// The fallback is not protected by the optional HostPolicy.
++//
++// Because the fallback handler is run with unencrypted port 80 requests,
++// the fallback should not serve TLS-only requests.
++//
++// If HTTPHandler is never called, the Manager will only use the "tls-alpn-01"
++// challenge for domain verification.
++func (m *Manager) HTTPHandler(fallback http.Handler) http.Handler {
++	m.challengeMu.Lock()
++	defer m.challengeMu.Unlock()
++	m.tryHTTP01 = true
++
++	if fallback == nil {
++		fallback = http.HandlerFunc(handleHTTPRedirect)
++	}
++	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if !strings.HasPrefix(r.URL.Path, "/.well-known/acme-challenge/") {
++			fallback.ServeHTTP(w, r)
++			return
++		}
++		// A reasonable context timeout for cache and host policy only,
++		// because we don't wait for a new certificate issuance here.
++		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
++		defer cancel()
++		if err := m.hostPolicy()(ctx, r.Host); err != nil {
++			http.Error(w, err.Error(), http.StatusForbidden)
++			return
++		}
++		data, err := m.httpToken(ctx, r.URL.Path)
++		if err != nil {
++			http.Error(w, err.Error(), http.StatusNotFound)
++			return
++		}
++		w.Write(data)
++	})
++}
++
++func handleHTTPRedirect(w http.ResponseWriter, r *http.Request) {
++	if r.Method != "GET" && r.Method != "HEAD" {
++		http.Error(w, "Use HTTPS", http.StatusBadRequest)
++		return
++	}
++	target := "https://" + stripPort(r.Host) + r.URL.RequestURI()
++	http.Redirect(w, r, target, http.StatusFound)
++}
++
++func stripPort(hostport string) string {
++	host, _, err := net.SplitHostPort(hostport)
++	if err != nil {
++		return hostport
++	}
++	return net.JoinHostPort(host, "443")
++}
++
++// cert returns an existing certificate either from m.state or cache.
++// If a certificate is found in cache but not in m.state, the latter will be filled
++// with the cached value.
++func (m *Manager) cert(ctx context.Context, ck certKey) (*tls.Certificate, error) {
++	m.stateMu.Lock()
++	if s, ok := m.state[ck]; ok {
++		m.stateMu.Unlock()
++		s.RLock()
++		defer s.RUnlock()
++		return s.tlscert()
++	}
++	defer m.stateMu.Unlock()
++	cert, err := m.cacheGet(ctx, ck)
++	if err != nil {
++		return nil, err
++	}
++	signer, ok := cert.PrivateKey.(crypto.Signer)
++	if !ok {
++		return nil, errors.New("acme/autocert: private key cannot sign")
++	}
++	if m.state == nil {
++		m.state = make(map[certKey]*certState)
++	}
++	s := &certState{
++		key:  signer,
++		cert: cert.Certificate,
++		leaf: cert.Leaf,
++	}
++	m.state[ck] = s
++	go m.renew(ck, s.key, s.leaf.NotAfter)
++	return cert, nil
++}
++
++// cacheGet always returns a valid certificate, or an error otherwise.
++// If a cached certificate exists but is not valid, ErrCacheMiss is returned.
++func (m *Manager) cacheGet(ctx context.Context, ck certKey) (*tls.Certificate, error) {
++	if m.Cache == nil {
++		return nil, ErrCacheMiss
++	}
++	data, err := m.Cache.Get(ctx, ck.String())
++	if err != nil {
++		return nil, err
++	}
++
++	// private
++	priv, pub := pem.Decode(data)
++	if priv == nil || !strings.Contains(priv.Type, "PRIVATE") {
++		return nil, ErrCacheMiss
++	}
++	privKey, err := parsePrivateKey(priv.Bytes)
++	if err != nil {
++		return nil, err
++	}
++
++	// public
++	var pubDER [][]byte
++	for len(pub) > 0 {
++		var b *pem.Block
++		b, pub = pem.Decode(pub)
++		if b == nil {
++			break
++		}
++		pubDER = append(pubDER, b.Bytes)
++	}
++	if len(pub) > 0 {
++		// Leftover content not consumed by pem.Decode. Corrupt. Ignore.
++		return nil, ErrCacheMiss
++	}
++
++	// verify and create TLS cert
++	leaf, err := validCert(ck, pubDER, privKey, m.now())
++	if err != nil {
++		return nil, ErrCacheMiss
++	}
++	tlscert := &tls.Certificate{
++		Certificate: pubDER,
++		PrivateKey:  privKey,
++		Leaf:        leaf,
++	}
++	return tlscert, nil
++}
++
++func (m *Manager) cachePut(ctx context.Context, ck certKey, tlscert *tls.Certificate) error {
++	if m.Cache == nil {
++		return nil
++	}
++
++	// contains PEM-encoded data
++	var buf bytes.Buffer
++
++	// private
++	switch key := tlscert.PrivateKey.(type) {
++	case *ecdsa.PrivateKey:
++		if err := encodeECDSAKey(&buf, key); err != nil {
++			return err
++		}
++	case *rsa.PrivateKey:
++		b := x509.MarshalPKCS1PrivateKey(key)
++		pb := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: b}
++		if err := pem.Encode(&buf, pb); err != nil {
++			return err
++		}
++	default:
++		return errors.New("acme/autocert: unknown private key type")
++	}
++
++	// public
++	for _, b := range tlscert.Certificate {
++		pb := &pem.Block{Type: "CERTIFICATE", Bytes: b}
++		if err := pem.Encode(&buf, pb); err != nil {
++			return err
++		}
++	}
++
++	return m.Cache.Put(ctx, ck.String(), buf.Bytes())
++}
++
++func encodeECDSAKey(w io.Writer, key *ecdsa.PrivateKey) error {
++	b, err := x509.MarshalECPrivateKey(key)
++	if err != nil {
++		return err
++	}
++	pb := &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
++	return pem.Encode(w, pb)
++}
++
++// createCert starts the domain ownership verification and returns a certificate
++// for that domain upon success.
++//
++// If the domain is already being verified, it waits for the existing verification to complete.
++// Either way, createCert blocks for the duration of the whole process.
++func (m *Manager) createCert(ctx context.Context, ck certKey) (*tls.Certificate, error) {
++	// TODO: maybe rewrite this whole piece using sync.Once
++	state, err := m.certState(ck)
++	if err != nil {
++		return nil, err
++	}
++	// state may exist if another goroutine is already working on it
++	// in which case just wait for it to finish
++	if !state.locked {
++		state.RLock()
++		defer state.RUnlock()
++		return state.tlscert()
++	}
++
++	// We are the first; state is locked.
++	// Unblock the readers when domain ownership is verified
++	// and we got the cert or the process failed.
++	defer state.Unlock()
++	state.locked = false
++
++	der, leaf, err := m.authorizedCert(ctx, state.key, ck)
++	if err != nil {
++		// Remove the failed state after some time,
++		// making the manager call createCert again on the following TLS hello.
++		time.AfterFunc(createCertRetryAfter, func() {
++			defer testDidRemoveState(ck)
++			m.stateMu.Lock()
++			defer m.stateMu.Unlock()
++			// Verify the state hasn't changed and it's still invalid
++			// before deleting.
++			s, ok := m.state[ck]
++			if !ok {
++				return
++			}
++			if _, err := validCert(ck, s.cert, s.key, m.now()); err == nil {
++				return
++			}
++			delete(m.state, ck)
++		})
++		return nil, err
++	}
++	state.cert = der
++	state.leaf = leaf
++	go m.renew(ck, state.key, state.leaf.NotAfter)
++	return state.tlscert()
++}
++
++// certState returns a new or existing certState.
++// If a new certState is returned, state.exist is false and the state is locked.
++// The returned error is non-nil only in the case where a new state could not be created.
++func (m *Manager) certState(ck certKey) (*certState, error) {
++	m.stateMu.Lock()
++	defer m.stateMu.Unlock()
++	if m.state == nil {
++		m.state = make(map[certKey]*certState)
++	}
++	// existing state
++	if state, ok := m.state[ck]; ok {
++		return state, nil
++	}
++
++	// new locked state
++	var (
++		err error
++		key crypto.Signer
++	)
++	if ck.isRSA {
++		key, err = rsa.GenerateKey(rand.Reader, 2048)
++	} else {
++		key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
++	}
++	if err != nil {
++		return nil, err
++	}
++
++	state := &certState{
++		key:    key,
++		locked: true,
++	}
++	state.Lock() // will be unlocked by m.certState caller
++	m.state[ck] = state
++	return state, nil
++}
++
++// authorizedCert starts the domain ownership verification process and requests a new cert upon success.
++// The key argument is the certificate private key.
++func (m *Manager) authorizedCert(ctx context.Context, key crypto.Signer, ck certKey) (der [][]byte, leaf *x509.Certificate, err error) {
++	csr, err := certRequest(key, ck.domain, m.ExtraExtensions)
++	if err != nil {
++		return nil, nil, err
++	}
++
++	client, err := m.acmeClient(ctx)
++	if err != nil {
++		return nil, nil, err
++	}
++	dir, err := client.Discover(ctx)
++	if err != nil {
++		return nil, nil, err
++	}
++
++	var chain [][]byte
++	switch {
++	// Pre-RFC legacy CA.
++	case dir.OrderURL == "":
++		if err := m.verify(ctx, client, ck.domain); err != nil {
++			return nil, nil, err
++		}
++		der, _, err := client.CreateCert(ctx, csr, 0, true)
++		if err != nil {
++			return nil, nil, err
++		}
++		chain = der
++	// RFC 8555 compliant CA.
++	default:
++		o, err := m.verifyRFC(ctx, client, ck.domain)
++		if err != nil {
++			return nil, nil, err
++		}
++		der, _, err := client.CreateOrderCert(ctx, o.FinalizeURL, csr, true)
++		if err != nil {
++			return nil, nil, err
++		}
++		chain = der
++	}
++	leaf, err = validCert(ck, chain, key, m.now())
++	if err != nil {
++		return nil, nil, err
++	}
++	return chain, leaf, nil
++}
++
++// verify runs the identifier (domain) pre-authorization flow for legacy CAs
++// using each applicable ACME challenge type.
++func (m *Manager) verify(ctx context.Context, client *acme.Client, domain string) error {
++	// Remove all hanging authorizations to reduce rate limit quotas
++	// after we're done.
++	var authzURLs []string
++	defer func() {
++		go m.deactivatePendingAuthz(authzURLs)
++	}()
++
++	// errs accumulates challenge failure errors, printed if all fail
++	errs := make(map[*acme.Challenge]error)
++	challengeTypes := m.supportedChallengeTypes()
++	var nextTyp int // challengeType index of the next challenge type to try
++	for {
++		// Start domain authorization and get the challenge.
++		authz, err := client.Authorize(ctx, domain)
++		if err != nil {
++			return err
++		}
++		authzURLs = append(authzURLs, authz.URI)
++		// No point in accepting challenges if the authorization status
++		// is in a final state.
++		switch authz.Status {
++		case acme.StatusValid:
++			return nil // already authorized
++		case acme.StatusInvalid:
++			return fmt.Errorf("acme/autocert: invalid authorization %q", authz.URI)
++		}
++
++		// Pick the next preferred challenge.
++		var chal *acme.Challenge
++		for chal == nil && nextTyp < len(challengeTypes) {
++			chal = pickChallenge(challengeTypes[nextTyp], authz.Challenges)
++			nextTyp++
++		}
++		if chal == nil {
++			errorMsg := fmt.Sprintf("acme/autocert: unable to authorize %q", domain)
++			for chal, err := range errs {
++				errorMsg += fmt.Sprintf("; challenge %q failed with error: %v", chal.Type, err)
++			}
++			return errors.New(errorMsg)
++		}
++		cleanup, err := m.fulfill(ctx, client, chal, domain)
++		if err != nil {
++			errs[chal] = err
++			continue
++		}
++		defer cleanup()
++		if _, err := client.Accept(ctx, chal); err != nil {
++			errs[chal] = err
++			continue
++		}
++
++		// A challenge is fulfilled and accepted: wait for the CA to validate.
++		if _, err := client.WaitAuthorization(ctx, authz.URI); err != nil {
++			errs[chal] = err
++			continue
++		}
++		return nil
++	}
++}
++
++// verifyRFC runs the identifier (domain) order-based authorization flow for RFC compliant CAs
++// using each applicable ACME challenge type.
++func (m *Manager) verifyRFC(ctx context.Context, client *acme.Client, domain string) (*acme.Order, error) {
++	// Try each supported challenge type starting with a new order each time.
++	// The nextTyp index of the next challenge type to try is shared across
++	// all order authorizations: if we've tried a challenge type once and it didn't work,
++	// it will most likely not work on another order's authorization either.
++	challengeTypes := m.supportedChallengeTypes()
++	nextTyp := 0 // challengeTypes index
++AuthorizeOrderLoop:
++	for {
++		o, err := client.AuthorizeOrder(ctx, acme.DomainIDs(domain))
++		if err != nil {
++			return nil, err
++		}
++		// Remove all hanging authorizations to reduce rate limit quotas
++		// after we're done.
++		defer func(urls []string) {
++			go m.deactivatePendingAuthz(urls)
++		}(o.AuthzURLs)
++
++		// Check if there's actually anything we need to do.
++		switch o.Status {
++		case acme.StatusReady:
++			// Already authorized.
++			return o, nil
++		case acme.StatusPending:
++			// Continue normal Order-based flow.
++		default:
++			return nil, fmt.Errorf("acme/autocert: invalid new order status %q; order URL: %q", o.Status, o.URI)
++		}
++
++		// Satisfy all pending authorizations.
++		for _, zurl := range o.AuthzURLs {
++			z, err := client.GetAuthorization(ctx, zurl)
++			if err != nil {
++				return nil, err
++			}
++			if z.Status != acme.StatusPending {
++				// We are interested only in pending authorizations.
++				continue
++			}
++			// Pick the next preferred challenge.
++			var chal *acme.Challenge
++			for chal == nil && nextTyp < len(challengeTypes) {
++				chal = pickChallenge(challengeTypes[nextTyp], z.Challenges)
++				nextTyp++
++			}
++			if chal == nil {
++				return nil, fmt.Errorf("acme/autocert: unable to satisfy %q for domain %q: no viable challenge type found", z.URI, domain)
++			}
++			// Respond to the challenge and wait for validation result.
++			cleanup, err := m.fulfill(ctx, client, chal, domain)
++			if err != nil {
++				continue AuthorizeOrderLoop
++			}
++			defer cleanup()
++			if _, err := client.Accept(ctx, chal); err != nil {
++				continue AuthorizeOrderLoop
++			}
++			if _, err := client.WaitAuthorization(ctx, z.URI); err != nil {
++				continue AuthorizeOrderLoop
++			}
++		}
++
++		// All authorizations are satisfied.
++		// Wait for the CA to update the order status.
++		o, err = client.WaitOrder(ctx, o.URI)
++		if err != nil {
++			continue AuthorizeOrderLoop
++		}
++		return o, nil
++	}
++}
++
++func pickChallenge(typ string, chal []*acme.Challenge) *acme.Challenge {
++	for _, c := range chal {
++		if c.Type == typ {
++			return c
++		}
++	}
++	return nil
++}
++
++func (m *Manager) supportedChallengeTypes() []string {
++	m.challengeMu.RLock()
++	defer m.challengeMu.RUnlock()
++	typ := []string{"tls-alpn-01"}
++	if m.tryHTTP01 {
++		typ = append(typ, "http-01")
++	}
++	return typ
++}
++
++// deactivatePendingAuthz relinquishes all authorizations identified by the elements
++// of the provided uri slice which are in "pending" state.
++// It ignores revocation errors.
++//
++// deactivatePendingAuthz takes no context argument and instead runs with its own
++// "detached" context because deactivations are done in a goroutine separate from
++// that of the main issuance or renewal flow.
++func (m *Manager) deactivatePendingAuthz(uri []string) {
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
++	defer cancel()
++	client, err := m.acmeClient(ctx)
++	if err != nil {
++		return
++	}
++	for _, u := range uri {
++		z, err := client.GetAuthorization(ctx, u)
++		if err == nil && z.Status == acme.StatusPending {
++			client.RevokeAuthorization(ctx, u)
++		}
++	}
++}
++
++// fulfill provisions a response to the challenge chal.
++// The cleanup is non-nil only if provisioning succeeded.
++func (m *Manager) fulfill(ctx context.Context, client *acme.Client, chal *acme.Challenge, domain string) (cleanup func(), err error) {
++	switch chal.Type {
++	case "tls-alpn-01":
++		cert, err := client.TLSALPN01ChallengeCert(chal.Token, domain)
++		if err != nil {
++			return nil, err
++		}
++		m.putCertToken(ctx, domain, &cert)
++		return func() { go m.deleteCertToken(domain) }, nil
++	case "http-01":
++		resp, err := client.HTTP01ChallengeResponse(chal.Token)
++		if err != nil {
++			return nil, err
++		}
++		p := client.HTTP01ChallengePath(chal.Token)
++		m.putHTTPToken(ctx, p, resp)
++		return func() { go m.deleteHTTPToken(p) }, nil
++	}
++	return nil, fmt.Errorf("acme/autocert: unknown challenge type %q", chal.Type)
++}
++
++// putCertToken stores the token certificate with the specified name
++// in both m.certTokens map and m.Cache.
++func (m *Manager) putCertToken(ctx context.Context, name string, cert *tls.Certificate) {
++	m.challengeMu.Lock()
++	defer m.challengeMu.Unlock()
++	if m.certTokens == nil {
++		m.certTokens = make(map[string]*tls.Certificate)
++	}
++	m.certTokens[name] = cert
++	m.cachePut(ctx, certKey{domain: name, isToken: true}, cert)
++}
++
++// deleteCertToken removes the token certificate with the specified name
++// from both m.certTokens map and m.Cache.
++func (m *Manager) deleteCertToken(name string) {
++	m.challengeMu.Lock()
++	defer m.challengeMu.Unlock()
++	delete(m.certTokens, name)
++	if m.Cache != nil {
++		ck := certKey{domain: name, isToken: true}
++		m.Cache.Delete(context.Background(), ck.String())
++	}
++}
++
++// httpToken retrieves an existing http-01 token value from an in-memory map
++// or the optional cache.
++func (m *Manager) httpToken(ctx context.Context, tokenPath string) ([]byte, error) {
++	m.challengeMu.RLock()
++	defer m.challengeMu.RUnlock()
++	if v, ok := m.httpTokens[tokenPath]; ok {
++		return v, nil
++	}
++	if m.Cache == nil {
++		return nil, fmt.Errorf("acme/autocert: no token at %q", tokenPath)
++	}
++	return m.Cache.Get(ctx, httpTokenCacheKey(tokenPath))
++}
++
++// putHTTPToken stores an http-01 token value using tokenPath as key
++// in both in-memory map and the optional Cache.
++//
++// It ignores any error returned from Cache.Put.
++func (m *Manager) putHTTPToken(ctx context.Context, tokenPath, val string) {
++	m.challengeMu.Lock()
++	defer m.challengeMu.Unlock()
++	if m.httpTokens == nil {
++		m.httpTokens = make(map[string][]byte)
++	}
++	b := []byte(val)
++	m.httpTokens[tokenPath] = b
++	if m.Cache != nil {
++		m.Cache.Put(ctx, httpTokenCacheKey(tokenPath), b)
++	}
++}
++
++// deleteHTTPToken removes an http-01 token value from both in-memory map
++// and the optional Cache, ignoring any error returned from the latter.
++//
++// If m.Cache is non-nil, it blocks until Cache.Delete returns without a timeout.
++func (m *Manager) deleteHTTPToken(tokenPath string) {
++	m.challengeMu.Lock()
++	defer m.challengeMu.Unlock()
++	delete(m.httpTokens, tokenPath)
++	if m.Cache != nil {
++		m.Cache.Delete(context.Background(), httpTokenCacheKey(tokenPath))
++	}
++}
++
++// httpTokenCacheKey returns a key at which an http-01 token value may be stored
++// in the Manager's optional Cache.
++func httpTokenCacheKey(tokenPath string) string {
++	return path.Base(tokenPath) + "+http-01"
++}
++
++// renew starts a cert renewal timer loop, one per domain.
++//
++// The loop is scheduled in two cases:
++// - a cert was fetched from cache for the first time (wasn't in m.state)
++// - a new cert was created by m.createCert
++//
++// The key argument is a certificate private key.
++// The exp argument is the cert expiration time (NotAfter).
++func (m *Manager) renew(ck certKey, key crypto.Signer, exp time.Time) {
++	m.renewalMu.Lock()
++	defer m.renewalMu.Unlock()
++	if m.renewal[ck] != nil {
++		// another goroutine is already on it
++		return
++	}
++	if m.renewal == nil {
++		m.renewal = make(map[certKey]*domainRenewal)
++	}
++	dr := &domainRenewal{m: m, ck: ck, key: key}
++	m.renewal[ck] = dr
++	dr.start(exp)
++}
++
++// stopRenew stops all currently running cert renewal timers.
++// The timers are not restarted during the lifetime of the Manager.
++func (m *Manager) stopRenew() {
++	m.renewalMu.Lock()
++	defer m.renewalMu.Unlock()
++	for name, dr := range m.renewal {
++		delete(m.renewal, name)
++		dr.stop()
++	}
++}
++
++func (m *Manager) accountKey(ctx context.Context) (crypto.Signer, error) {
++	const keyName = "acme_account+key"
++
++	// Previous versions of autocert stored the value under a different key.
++	const legacyKeyName = "acme_account.key"
++
++	genKey := func() (*ecdsa.PrivateKey, error) {
++		return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
++	}
++
++	if m.Cache == nil {
++		return genKey()
++	}
++
++	data, err := m.Cache.Get(ctx, keyName)
++	if err == ErrCacheMiss {
++		data, err = m.Cache.Get(ctx, legacyKeyName)
++	}
++	if err == ErrCacheMiss {
++		key, err := genKey()
++		if err != nil {
++			return nil, err
++		}
++		var buf bytes.Buffer
++		if err := encodeECDSAKey(&buf, key); err != nil {
++			return nil, err
++		}
++		if err := m.Cache.Put(ctx, keyName, buf.Bytes()); err != nil {
++			return nil, err
++		}
++		return key, nil
++	}
++	if err != nil {
++		return nil, err
++	}
++
++	priv, _ := pem.Decode(data)
++	if priv == nil || !strings.Contains(priv.Type, "PRIVATE") {
++		return nil, errors.New("acme/autocert: invalid account key found in cache")
++	}
++	return parsePrivateKey(priv.Bytes)
++}
++
++func (m *Manager) acmeClient(ctx context.Context) (*acme.Client, error) {
++	m.clientMu.Lock()
++	defer m.clientMu.Unlock()
++	if m.client != nil {
++		return m.client, nil
++	}
++
++	client := m.Client
++	if client == nil {
++		client = &acme.Client{DirectoryURL: DefaultACMEDirectory}
++	}
++	if client.Key == nil {
++		var err error
++		client.Key, err = m.accountKey(ctx)
++		if err != nil {
++			return nil, err
++		}
++	}
++	if client.UserAgent == "" {
++		client.UserAgent = "autocert"
++	}
++	var contact []string
++	if m.Email != "" {
++		contact = []string{"mailto:" + m.Email}
++	}
++	a := &acme.Account{Contact: contact}
++	_, err := client.Register(ctx, a, m.Prompt)
++	if err == nil || isAccountAlreadyExist(err) {
++		m.client = client
++		err = nil
++	}
++	return m.client, err
++}
++
++// isAccountAlreadyExist reports whether the err, as returned from acme.Client.Register,
++// indicates the account has already been registered.
++func isAccountAlreadyExist(err error) bool {
++	if err == acme.ErrAccountAlreadyExists {
++		return true
++	}
++	ae, ok := err.(*acme.Error)
++	return ok && ae.StatusCode == http.StatusConflict
++}
++
++func (m *Manager) hostPolicy() HostPolicy {
++	if m.HostPolicy != nil {
++		return m.HostPolicy
++	}
++	return defaultHostPolicy
++}
++
++func (m *Manager) renewBefore() time.Duration {
++	if m.RenewBefore > renewJitter {
++		return m.RenewBefore
++	}
++	return 720 * time.Hour // 30 days
++}
++
++func (m *Manager) now() time.Time {
++	if m.nowFunc != nil {
++		return m.nowFunc()
++	}
++	return time.Now()
++}
++
++// certState is ready when its mutex is unlocked for reading.
++type certState struct {
++	sync.RWMutex
++	locked bool              // locked for read/write
++	key    crypto.Signer     // private key for cert
++	cert   [][]byte          // DER encoding
++	leaf   *x509.Certificate // parsed cert[0]; always non-nil if cert != nil
++}
++
++// tlscert creates a tls.Certificate from s.key and s.cert.
++// Callers should wrap it in s.RLock() and s.RUnlock().
++func (s *certState) tlscert() (*tls.Certificate, error) {
++	if s.key == nil {
++		return nil, errors.New("acme/autocert: missing signer")
++	}
++	if len(s.cert) == 0 {
++		return nil, errors.New("acme/autocert: missing certificate")
++	}
++	return &tls.Certificate{
++		PrivateKey:  s.key,
++		Certificate: s.cert,
++		Leaf:        s.leaf,
++	}, nil
++}
++
++// certRequest generates a CSR for the given common name cn and optional SANs.
++func certRequest(key crypto.Signer, cn string, ext []pkix.Extension, san ...string) ([]byte, error) {
++	req := &x509.CertificateRequest{
++		Subject:         pkix.Name{CommonName: cn},
++		DNSNames:        san,
++		ExtraExtensions: ext,
++	}
++	return x509.CreateCertificateRequest(rand.Reader, req, key)
++}
++
++// Attempt to parse the given private key DER block. OpenSSL 0.9.8 generates
++// PKCS#1 private keys by default, while OpenSSL 1.0.0 generates PKCS#8 keys.
++// OpenSSL ecparam generates SEC1 EC private keys for ECDSA. We try all three.
++//
++// Inspired by parsePrivateKey in crypto/tls/tls.go.
++func parsePrivateKey(der []byte) (crypto.Signer, error) {
++	if key, err := x509.ParsePKCS1PrivateKey(der); err == nil {
++		return key, nil
++	}
++	if key, err := x509.ParsePKCS8PrivateKey(der); err == nil {
++		switch key := key.(type) {
++		case *rsa.PrivateKey:
++			return key, nil
++		case *ecdsa.PrivateKey:
++			return key, nil
++		default:
++			return nil, errors.New("acme/autocert: unknown private key type in PKCS#8 wrapping")
++		}
++	}
++	if key, err := x509.ParseECPrivateKey(der); err == nil {
++		return key, nil
++	}
++
++	return nil, errors.New("acme/autocert: failed to parse private key")
++}
++
++// validCert parses a cert chain provided as der argument and verifies the leaf and der[0]
++// correspond to the private key, the domain and key type match, and expiration dates
++// are valid. It doesn't do any revocation checking.
++//
++// The returned value is the verified leaf cert.
++func validCert(ck certKey, der [][]byte, key crypto.Signer, now time.Time) (leaf *x509.Certificate, err error) {
++	// parse public part(s)
++	var n int
++	for _, b := range der {
++		n += len(b)
++	}
++	pub := make([]byte, n)
++	n = 0
++	for _, b := range der {
++		n += copy(pub[n:], b)
++	}
++	x509Cert, err := x509.ParseCertificates(pub)
++	if err != nil || len(x509Cert) == 0 {
++		return nil, errors.New("acme/autocert: no public key found")
++	}
++	// verify the leaf is not expired and matches the domain name
++	leaf = x509Cert[0]
++	if now.Before(leaf.NotBefore) {
++		return nil, errors.New("acme/autocert: certificate is not valid yet")
++	}
++	if now.After(leaf.NotAfter) {
++		return nil, errors.New("acme/autocert: expired certificate")
++	}
++	if err := leaf.VerifyHostname(ck.domain); err != nil {
++		return nil, err
++	}
++	// ensure the leaf corresponds to the private key and matches the certKey type
++	switch pub := leaf.PublicKey.(type) {
++	case *rsa.PublicKey:
++		prv, ok := key.(*rsa.PrivateKey)
++		if !ok {
++			return nil, errors.New("acme/autocert: private key type does not match public key type")
++		}
++		if pub.N.Cmp(prv.N) != 0 {
++			return nil, errors.New("acme/autocert: private key does not match public key")
++		}
++		if !ck.isRSA && !ck.isToken {
++			return nil, errors.New("acme/autocert: key type does not match expected value")
++		}
++	case *ecdsa.PublicKey:
++		prv, ok := key.(*ecdsa.PrivateKey)
++		if !ok {
++			return nil, errors.New("acme/autocert: private key type does not match public key type")
++		}
++		if pub.X.Cmp(prv.X) != 0 || pub.Y.Cmp(prv.Y) != 0 {
++			return nil, errors.New("acme/autocert: private key does not match public key")
++		}
++		if ck.isRSA && !ck.isToken {
++			return nil, errors.New("acme/autocert: key type does not match expected value")
++		}
++	default:
++		return nil, errors.New("acme/autocert: unknown public key algorithm")
++	}
++	return leaf, nil
++}
++
++type lockedMathRand struct {
++	sync.Mutex
++	rnd *mathrand.Rand
++}
++
++func (r *lockedMathRand) int63n(max int64) int64 {
++	r.Lock()
++	n := r.rnd.Int63n(max)
++	r.Unlock()
++	return n
++}
++
++// For easier testing.
++var (
++	// Called when a state is removed.
++	testDidRemoveState = func(certKey) {}
++)
+diff --git a/vendor/golang.org/x/crypto/acme/autocert/cache.go b/vendor/golang.org/x/crypto/acme/autocert/cache.go
+new file mode 100644
+index 00000000..03f63022
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/autocert/cache.go
+@@ -0,0 +1,136 @@
++// Copyright 2016 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package autocert
++
++import (
++	"context"
++	"errors"
++	"io/ioutil"
++	"os"
++	"path/filepath"
++)
++
++// ErrCacheMiss is returned when a certificate is not found in cache.
++var ErrCacheMiss = errors.New("acme/autocert: certificate cache miss")
++
++// Cache is used by Manager to store and retrieve previously obtained certificates
++// and other account data as opaque blobs.
++//
++// Cache implementations should not rely on the key naming pattern. Keys can
++// include any printable ASCII characters, except the following: \/:*?"<>|
++type Cache interface {
++	// Get returns a certificate data for the specified key.
++	// If there's no such key, Get returns ErrCacheMiss.
++	Get(ctx context.Context, key string) ([]byte, error)
++
++	// Put stores the data in the cache under the specified key.
++	// Underlying implementations may use any data storage format,
++	// as long as the reverse operation, Get, results in the original data.
++	Put(ctx context.Context, key string, data []byte) error
++
++	// Delete removes a certificate data from the cache under the specified key.
++	// If there's no such key in the cache, Delete returns nil.
++	Delete(ctx context.Context, key string) error
++}
++
++// DirCache implements Cache using a directory on the local filesystem.
++// If the directory does not exist, it will be created with 0700 permissions.
++type DirCache string
++
++// Get reads a certificate data from the specified file name.
++func (d DirCache) Get(ctx context.Context, name string) ([]byte, error) {
++	name = filepath.Join(string(d), name)
++	var (
++		data []byte
++		err  error
++		done = make(chan struct{})
++	)
++	go func() {
++		data, err = ioutil.ReadFile(name)
++		close(done)
++	}()
++	select {
++	case <-ctx.Done():
++		return nil, ctx.Err()
++	case <-done:
++	}
++	if os.IsNotExist(err) {
++		return nil, ErrCacheMiss
++	}
++	return data, err
++}
++
++// Put writes the certificate data to the specified file name.
++// The file will be created with 0600 permissions.
++func (d DirCache) Put(ctx context.Context, name string, data []byte) error {
++	if err := os.MkdirAll(string(d), 0700); err != nil {
++		return err
++	}
++
++	done := make(chan struct{})
++	var err error
++	go func() {
++		defer close(done)
++		var tmp string
++		if tmp, err = d.writeTempFile(name, data); err != nil {
++			return
++		}
++		defer os.Remove(tmp)
++		select {
++		case <-ctx.Done():
++			// Don't overwrite the file if the context was canceled.
++		default:
++			newName := filepath.Join(string(d), name)
++			err = os.Rename(tmp, newName)
++		}
++	}()
++	select {
++	case <-ctx.Done():
++		return ctx.Err()
++	case <-done:
++	}
++	return err
++}
++
++// Delete removes the specified file name.
++func (d DirCache) Delete(ctx context.Context, name string) error {
++	name = filepath.Join(string(d), name)
++	var (
++		err  error
++		done = make(chan struct{})
++	)
++	go func() {
++		err = os.Remove(name)
++		close(done)
++	}()
++	select {
++	case <-ctx.Done():
++		return ctx.Err()
++	case <-done:
++	}
++	if err != nil && !os.IsNotExist(err) {
++		return err
++	}
++	return nil
++}
++
++// writeTempFile writes b to a temporary file, closes the file and returns its path.
++func (d DirCache) writeTempFile(prefix string, b []byte) (name string, reterr error) {
++	// TempFile uses 0600 permissions
++	f, err := ioutil.TempFile(string(d), prefix)
++	if err != nil {
++		return "", err
++	}
++	defer func() {
++		if reterr != nil {
++			os.Remove(f.Name())
++		}
++	}()
++	if _, err := f.Write(b); err != nil {
++		f.Close()
++		return "", err
++	}
++	return f.Name(), f.Close()
++}
+diff --git a/vendor/golang.org/x/crypto/acme/autocert/listener.go b/vendor/golang.org/x/crypto/acme/autocert/listener.go
+new file mode 100644
+index 00000000..1e069818
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/autocert/listener.go
+@@ -0,0 +1,157 @@
++// Copyright 2017 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package autocert
++
++import (
++	"crypto/tls"
++	"log"
++	"net"
++	"os"
++	"path/filepath"
++	"runtime"
++	"time"
++)
++
++// NewListener returns a net.Listener that listens on the standard TLS
++// port (443) on all interfaces and returns *tls.Conn connections with
++// LetsEncrypt certificates for the provided domain or domains.
++//
++// It enables one-line HTTPS servers:
++//
++//     log.Fatal(http.Serve(autocert.NewListener("example.com"), handler))
++//
++// NewListener is a convenience function for a common configuration.
++// More complex or custom configurations can use the autocert.Manager
++// type instead.
++//
++// Use of this function implies acceptance of the LetsEncrypt Terms of
++// Service. If domains is not empty, the provided domains are passed
++// to HostWhitelist. If domains is empty, the listener will do
++// LetsEncrypt challenges for any requested domain, which is not
++// recommended.
++//
++// Certificates are cached in a "golang-autocert" directory under an
++// operating system-specific cache or temp directory. This may not
++// be suitable for servers spanning multiple machines.
++//
++// The returned listener uses a *tls.Config that enables HTTP/2, and
++// should only be used with servers that support HTTP/2.
++//
++// The returned Listener also enables TCP keep-alives on the accepted
++// connections. The returned *tls.Conn are returned before their TLS
++// handshake has completed.
++func NewListener(domains ...string) net.Listener {
++	m := &Manager{
++		Prompt: AcceptTOS,
++	}
++	if len(domains) > 0 {
++		m.HostPolicy = HostWhitelist(domains...)
++	}
++	dir := cacheDir()
++	if err := os.MkdirAll(dir, 0700); err != nil {
++		log.Printf("warning: autocert.NewListener not using a cache: %v", err)
++	} else {
++		m.Cache = DirCache(dir)
++	}
++	return m.Listener()
++}
++
++// Listener listens on the standard TLS port (443) on all interfaces
++// and returns a net.Listener returning *tls.Conn connections.
++//
++// The returned listener uses a *tls.Config that enables HTTP/2, and
++// should only be used with servers that support HTTP/2.
++//
++// The returned Listener also enables TCP keep-alives on the accepted
++// connections. The returned *tls.Conn are returned before their TLS
++// handshake has completed.
++//
++// Unlike NewListener, it is the caller's responsibility to initialize
++// the Manager m's Prompt, Cache, HostPolicy, and other desired options.
++func (m *Manager) Listener() net.Listener {
++	ln := &listener{
++		m:    m,
++		conf: m.TLSConfig(),
++	}
++	ln.tcpListener, ln.tcpListenErr = net.Listen("tcp", ":443")
++	return ln
++}
++
++type listener struct {
++	m    *Manager
++	conf *tls.Config
++
++	tcpListener  net.Listener
++	tcpListenErr error
++}
++
++func (ln *listener) Accept() (net.Conn, error) {
++	if ln.tcpListenErr != nil {
++		return nil, ln.tcpListenErr
++	}
++	conn, err := ln.tcpListener.Accept()
++	if err != nil {
++		return nil, err
++	}
++	tcpConn := conn.(*net.TCPConn)
++
++	// Because Listener is a convenience function, help out with
++	// this too.  This is not possible for the caller to set once
++	// we return a *tcp.Conn wrapping an inaccessible net.Conn.
++	// If callers don't want this, they can do things the manual
++	// way and tweak as needed. But this is what net/http does
++	// itself, so copy that. If net/http changes, we can change
++	// here too.
++	tcpConn.SetKeepAlive(true)
++	tcpConn.SetKeepAlivePeriod(3 * time.Minute)
++
++	return tls.Server(tcpConn, ln.conf), nil
++}
++
++func (ln *listener) Addr() net.Addr {
++	if ln.tcpListener != nil {
++		return ln.tcpListener.Addr()
++	}
++	// net.Listen failed. Return something non-nil in case callers
++	// call Addr before Accept:
++	return &net.TCPAddr{IP: net.IP{0, 0, 0, 0}, Port: 443}
++}
++
++func (ln *listener) Close() error {
++	if ln.tcpListenErr != nil {
++		return ln.tcpListenErr
++	}
++	return ln.tcpListener.Close()
++}
++
++func homeDir() string {
++	if runtime.GOOS == "windows" {
++		return os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")
++	}
++	if h := os.Getenv("HOME"); h != "" {
++		return h
++	}
++	return "/"
++}
++
++func cacheDir() string {
++	const base = "golang-autocert"
++	switch runtime.GOOS {
++	case "darwin":
++		return filepath.Join(homeDir(), "Library", "Caches", base)
++	case "windows":
++		for _, ev := range []string{"APPDATA", "CSIDL_APPDATA", "TEMP", "TMP"} {
++			if v := os.Getenv(ev); v != "" {
++				return filepath.Join(v, base)
++			}
++		}
++		// Worst case:
++		return filepath.Join(homeDir(), base)
++	}
++	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
++		return filepath.Join(xdg, base)
++	}
++	return filepath.Join(homeDir(), ".cache", base)
++}
+diff --git a/vendor/golang.org/x/crypto/acme/autocert/renewal.go b/vendor/golang.org/x/crypto/acme/autocert/renewal.go
+new file mode 100644
+index 00000000..665f870d
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/autocert/renewal.go
+@@ -0,0 +1,141 @@
++// Copyright 2016 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package autocert
++
++import (
++	"context"
++	"crypto"
++	"sync"
++	"time"
++)
++
++// renewJitter is the maximum deviation from Manager.RenewBefore.
++const renewJitter = time.Hour
++
++// domainRenewal tracks the state used by the periodic timers
++// renewing a single domain's cert.
++type domainRenewal struct {
++	m   *Manager
++	ck  certKey
++	key crypto.Signer
++
++	timerMu sync.Mutex
++	timer   *time.Timer
++}
++
++// start starts a cert renewal timer at the time
++// defined by the certificate expiration time exp.
++//
++// If the timer is already started, calling start is a noop.
++func (dr *domainRenewal) start(exp time.Time) {
++	dr.timerMu.Lock()
++	defer dr.timerMu.Unlock()
++	if dr.timer != nil {
++		return
++	}
++	dr.timer = time.AfterFunc(dr.next(exp), dr.renew)
++}
++
++// stop stops the cert renewal timer.
++// If the timer is already stopped, calling stop is a noop.
++func (dr *domainRenewal) stop() {
++	dr.timerMu.Lock()
++	defer dr.timerMu.Unlock()
++	if dr.timer == nil {
++		return
++	}
++	dr.timer.Stop()
++	dr.timer = nil
++}
++
++// renew is called periodically by a timer.
++// The first renew call is kicked off by dr.start.
++func (dr *domainRenewal) renew() {
++	dr.timerMu.Lock()
++	defer dr.timerMu.Unlock()
++	if dr.timer == nil {
++		return
++	}
++
++	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
++	defer cancel()
++	// TODO: rotate dr.key at some point?
++	next, err := dr.do(ctx)
++	if err != nil {
++		next = renewJitter / 2
++		next += time.Duration(pseudoRand.int63n(int64(next)))
++	}
++	dr.timer = time.AfterFunc(next, dr.renew)
++	testDidRenewLoop(next, err)
++}
++
++// updateState locks and replaces the relevant Manager.state item with the given
++// state. It additionally updates dr.key with the given state's key.
++func (dr *domainRenewal) updateState(state *certState) {
++	dr.m.stateMu.Lock()
++	defer dr.m.stateMu.Unlock()
++	dr.key = state.key
++	dr.m.state[dr.ck] = state
++}
++
++// do is similar to Manager.createCert but it doesn't lock a Manager.state item.
++// Instead, it requests a new certificate independently and, upon success,
++// replaces dr.m.state item with a new one and updates cache for the given domain.
++//
++// It may lock and update the Manager.state if the expiration date of the currently
++// cached cert is far enough in the future.
++//
++// The returned value is a time interval after which the renewal should occur again.
++func (dr *domainRenewal) do(ctx context.Context) (time.Duration, error) {
++	// a race is likely unavoidable in a distributed environment
++	// but we try nonetheless
++	if tlscert, err := dr.m.cacheGet(ctx, dr.ck); err == nil {
++		next := dr.next(tlscert.Leaf.NotAfter)
++		if next > dr.m.renewBefore()+renewJitter {
++			signer, ok := tlscert.PrivateKey.(crypto.Signer)
++			if ok {
++				state := &certState{
++					key:  signer,
++					cert: tlscert.Certificate,
++					leaf: tlscert.Leaf,
++				}
++				dr.updateState(state)
++				return next, nil
++			}
++		}
++	}
++
++	der, leaf, err := dr.m.authorizedCert(ctx, dr.key, dr.ck)
++	if err != nil {
++		return 0, err
++	}
++	state := &certState{
++		key:  dr.key,
++		cert: der,
++		leaf: leaf,
++	}
++	tlscert, err := state.tlscert()
++	if err != nil {
++		return 0, err
++	}
++	if err := dr.m.cachePut(ctx, dr.ck, tlscert); err != nil {
++		return 0, err
++	}
++	dr.updateState(state)
++	return dr.next(leaf.NotAfter), nil
++}
++
++func (dr *domainRenewal) next(expiry time.Time) time.Duration {
++	d := expiry.Sub(dr.m.now()) - dr.m.renewBefore()
++	// add a bit of randomness to renew deadline
++	n := pseudoRand.int63n(int64(renewJitter))
++	d -= time.Duration(n)
++	if d < 0 {
++		return 0
++	}
++	return d
++}
++
++var testDidRenewLoop = func(next time.Duration, err error) {}
+diff --git a/vendor/golang.org/x/crypto/acme/http.go b/vendor/golang.org/x/crypto/acme/http.go
+new file mode 100644
+index 00000000..c51943e7
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/http.go
+@@ -0,0 +1,321 @@
++// Copyright 2018 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package acme
++
++import (
++	"bytes"
++	"context"
++	"crypto"
++	"crypto/rand"
++	"encoding/json"
++	"fmt"
++	"io/ioutil"
++	"math/big"
++	"net/http"
++	"strconv"
++	"strings"
++	"time"
++)
++
++// retryTimer encapsulates common logic for retrying unsuccessful requests.
++// It is not safe for concurrent use.
++type retryTimer struct {
++	// backoffFn provides backoff delay sequence for retries.
++	// See Client.RetryBackoff doc comment.
++	backoffFn func(n int, r *http.Request, res *http.Response) time.Duration
++	// n is the current retry attempt.
++	n int
++}
++
++func (t *retryTimer) inc() {
++	t.n++
++}
++
++// backoff pauses the current goroutine as described in Client.RetryBackoff.
++func (t *retryTimer) backoff(ctx context.Context, r *http.Request, res *http.Response) error {
++	d := t.backoffFn(t.n, r, res)
++	if d <= 0 {
++		return fmt.Errorf("acme: no more retries for %s; tried %d time(s)", r.URL, t.n)
++	}
++	wakeup := time.NewTimer(d)
++	defer wakeup.Stop()
++	select {
++	case <-ctx.Done():
++		return ctx.Err()
++	case <-wakeup.C:
++		return nil
++	}
++}
++
++func (c *Client) retryTimer() *retryTimer {
++	f := c.RetryBackoff
++	if f == nil {
++		f = defaultBackoff
++	}
++	return &retryTimer{backoffFn: f}
++}
++
++// defaultBackoff provides default Client.RetryBackoff implementation
++// using a truncated exponential backoff algorithm,
++// as described in Client.RetryBackoff.
++//
++// The n argument is always bounded between 1 and 30.
++// The returned value is always greater than 0.
++func defaultBackoff(n int, r *http.Request, res *http.Response) time.Duration {
++	const max = 10 * time.Second
++	var jitter time.Duration
++	if x, err := rand.Int(rand.Reader, big.NewInt(1000)); err == nil {
++		// Set the minimum to 1ms to avoid a case where
++		// an invalid Retry-After value is parsed into 0 below,
++		// resulting in the 0 returned value which would unintentionally
++		// stop the retries.
++		jitter = (1 + time.Duration(x.Int64())) * time.Millisecond
++	}
++	if v, ok := res.Header["Retry-After"]; ok {
++		return retryAfter(v[0]) + jitter
++	}
++
++	if n < 1 {
++		n = 1
++	}
++	if n > 30 {
++		n = 30
++	}
++	d := time.Duration(1<<uint(n-1))*time.Second + jitter
++	if d > max {
++		return max
++	}
++	return d
++}
++
++// retryAfter parses a Retry-After HTTP header value,
++// trying to convert v into an int (seconds) or use http.ParseTime otherwise.
++// It returns zero value if v cannot be parsed.
++func retryAfter(v string) time.Duration {
++	if i, err := strconv.Atoi(v); err == nil {
++		return time.Duration(i) * time.Second
++	}
++	t, err := http.ParseTime(v)
++	if err != nil {
++		return 0
++	}
++	return t.Sub(timeNow())
++}
++
++// resOkay is a function that reports whether the provided response is okay.
++// It is expected to keep the response body unread.
++type resOkay func(*http.Response) bool
++
++// wantStatus returns a function which reports whether the code
++// matches the status code of a response.
++func wantStatus(codes ...int) resOkay {
++	return func(res *http.Response) bool {
++		for _, code := range codes {
++			if code == res.StatusCode {
++				return true
++			}
++		}
++		return false
++	}
++}
++
++// get issues an unsigned GET request to the specified URL.
++// It returns a non-error value only when ok reports true.
++//
++// get retries unsuccessful attempts according to c.RetryBackoff
++// until the context is done or a non-retriable error is received.
++func (c *Client) get(ctx context.Context, url string, ok resOkay) (*http.Response, error) {
++	retry := c.retryTimer()
++	for {
++		req, err := http.NewRequest("GET", url, nil)
++		if err != nil {
++			return nil, err
++		}
++		res, err := c.doNoRetry(ctx, req)
++		switch {
++		case err != nil:
++			return nil, err
++		case ok(res):
++			return res, nil
++		case isRetriable(res.StatusCode):
++			retry.inc()
++			resErr := responseError(res)
++			res.Body.Close()
++			// Ignore the error value from retry.backoff
++			// and return the one from last retry, as received from the CA.
++			if retry.backoff(ctx, req, res) != nil {
++				return nil, resErr
++			}
++		default:
++			defer res.Body.Close()
++			return nil, responseError(res)
++		}
++	}
++}
++
++// postAsGet is POST-as-GET, a replacement for GET in RFC8555
++// as described in https://tools.ietf.org/html/rfc8555#section-6.3.
++// It makes a POST request in KID form with zero JWS payload.
++// See nopayload doc comments in jws.go.
++func (c *Client) postAsGet(ctx context.Context, url string, ok resOkay) (*http.Response, error) {
++	return c.post(ctx, nil, url, noPayload, ok)
++}
++
++// post issues a signed POST request in JWS format using the provided key
++// to the specified URL. If key is nil, c.Key is used instead.
++// It returns a non-error value only when ok reports true.
++//
++// post retries unsuccessful attempts according to c.RetryBackoff
++// until the context is done or a non-retriable error is received.
++// It uses postNoRetry to make individual requests.
++func (c *Client) post(ctx context.Context, key crypto.Signer, url string, body interface{}, ok resOkay) (*http.Response, error) {
++	retry := c.retryTimer()
++	for {
++		res, req, err := c.postNoRetry(ctx, key, url, body)
++		if err != nil {
++			return nil, err
++		}
++		if ok(res) {
++			return res, nil
++		}
++		resErr := responseError(res)
++		res.Body.Close()
++		switch {
++		// Check for bad nonce before isRetriable because it may have been returned
++		// with an unretriable response code such as 400 Bad Request.
++		case isBadNonce(resErr):
++			// Consider any previously stored nonce values to be invalid.
++			c.clearNonces()
++		case !isRetriable(res.StatusCode):
++			return nil, resErr
++		}
++		retry.inc()
++		// Ignore the error value from retry.backoff
++		// and return the one from last retry, as received from the CA.
++		if err := retry.backoff(ctx, req, res); err != nil {
++			return nil, resErr
++		}
++	}
++}
++
++// postNoRetry signs the body with the given key and POSTs it to the provided url.
++// It is used by c.post to retry unsuccessful attempts.
++// The body argument must be JSON-serializable.
++//
++// If key argument is nil, c.Key is used to sign the request.
++// If key argument is nil and c.accountKID returns a non-zero keyID,
++// the request is sent in KID form. Otherwise, JWK form is used.
++//
++// In practice, when interfacing with RFC-compliant CAs most requests are sent in KID form
++// and JWK is used only when KID is unavailable: new account endpoint and certificate
++// revocation requests authenticated by a cert key.
++// See jwsEncodeJSON for other details.
++func (c *Client) postNoRetry(ctx context.Context, key crypto.Signer, url string, body interface{}) (*http.Response, *http.Request, error) {
++	kid := noKeyID
++	if key == nil {
++		key = c.Key
++		kid = c.accountKID(ctx)
++	}
++	nonce, err := c.popNonce(ctx, url)
++	if err != nil {
++		return nil, nil, err
++	}
++	b, err := jwsEncodeJSON(body, key, kid, nonce, url)
++	if err != nil {
++		return nil, nil, err
++	}
++	req, err := http.NewRequest("POST", url, bytes.NewReader(b))
++	if err != nil {
++		return nil, nil, err
++	}
++	req.Header.Set("Content-Type", "application/jose+json")
++	res, err := c.doNoRetry(ctx, req)
++	if err != nil {
++		return nil, nil, err
++	}
++	c.addNonce(res.Header)
++	return res, req, nil
++}
++
++// doNoRetry issues a request req, replacing its context (if any) with ctx.
++func (c *Client) doNoRetry(ctx context.Context, req *http.Request) (*http.Response, error) {
++	req.Header.Set("User-Agent", c.userAgent())
++	res, err := c.httpClient().Do(req.WithContext(ctx))
++	if err != nil {
++		select {
++		case <-ctx.Done():
++			// Prefer the unadorned context error.
++			// (The acme package had tests assuming this, previously from ctxhttp's
++			// behavior, predating net/http supporting contexts natively)
++			// TODO(bradfitz): reconsider this in the future. But for now this
++			// requires no test updates.
++			return nil, ctx.Err()
++		default:
++			return nil, err
++		}
++	}
++	return res, nil
++}
++
++func (c *Client) httpClient() *http.Client {
++	if c.HTTPClient != nil {
++		return c.HTTPClient
++	}
++	return http.DefaultClient
++}
++
++// packageVersion is the version of the module that contains this package, for
++// sending as part of the User-Agent header. It's set in version_go112.go.
++var packageVersion string
++
++// userAgent returns the User-Agent header value. It includes the package name,
++// the module version (if available), and the c.UserAgent value (if set).
++func (c *Client) userAgent() string {
++	ua := "golang.org/x/crypto/acme"
++	if packageVersion != "" {
++		ua += "@" + packageVersion
++	}
++	if c.UserAgent != "" {
++		ua = c.UserAgent + " " + ua
++	}
++	return ua
++}
++
++// isBadNonce reports whether err is an ACME "badnonce" error.
++func isBadNonce(err error) bool {
++	// According to the spec badNonce is urn:ietf:params:acme:error:badNonce.
++	// However, ACME servers in the wild return their versions of the error.
++	// See https://tools.ietf.org/html/draft-ietf-acme-acme-02#section-5.4
++	// and https://github.com/letsencrypt/boulder/blob/0e07eacb/docs/acme-divergences.md#section-66.
++	ae, ok := err.(*Error)
++	return ok && strings.HasSuffix(strings.ToLower(ae.ProblemType), ":badnonce")
++}
++
++// isRetriable reports whether a request can be retried
++// based on the response status code.
++//
++// Note that a "bad nonce" error is returned with a non-retriable 400 Bad Request code.
++// Callers should parse the response and check with isBadNonce.
++func isRetriable(code int) bool {
++	return code <= 399 || code >= 500 || code == http.StatusTooManyRequests
++}
++
++// responseError creates an error of Error type from resp.
++func responseError(resp *http.Response) error {
++	// don't care if ReadAll returns an error:
++	// json.Unmarshal will fail in that case anyway
++	b, _ := ioutil.ReadAll(resp.Body)
++	e := &wireError{Status: resp.StatusCode}
++	if err := json.Unmarshal(b, e); err != nil {
++		// this is not a regular error response:
++		// populate detail with anything we received,
++		// e.Status will already contain HTTP response code value
++		e.Detail = string(b)
++		if e.Detail == "" {
++			e.Detail = resp.Status
++		}
++	}
++	return e.error(resp.Header)
++}
+diff --git a/vendor/golang.org/x/crypto/acme/jws.go b/vendor/golang.org/x/crypto/acme/jws.go
+new file mode 100644
+index 00000000..76e3fdac
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/jws.go
+@@ -0,0 +1,187 @@
++// Copyright 2015 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package acme
++
++import (
++	"crypto"
++	"crypto/ecdsa"
++	"crypto/rand"
++	"crypto/rsa"
++	"crypto/sha256"
++	_ "crypto/sha512" // need for EC keys
++	"encoding/asn1"
++	"encoding/base64"
++	"encoding/json"
++	"fmt"
++	"math/big"
++)
++
++// keyID is the account identity provided by a CA during registration.
++type keyID string
++
++// noKeyID indicates that jwsEncodeJSON should compute and use JWK instead of a KID.
++// See jwsEncodeJSON for details.
++const noKeyID = keyID("")
++
++// noPayload indicates jwsEncodeJSON will encode zero-length octet string
++// in a JWS request. This is called POST-as-GET in RFC 8555 and is used to make
++// authenticated GET requests via POSTing with an empty payload.
++// See https://tools.ietf.org/html/rfc8555#section-6.3 for more details.
++const noPayload = ""
++
++// jwsEncodeJSON signs claimset using provided key and a nonce.
++// The result is serialized in JSON format containing either kid or jwk
++// fields based on the provided keyID value.
++//
++// If kid is non-empty, its quoted value is inserted in the protected head
++// as "kid" field value. Otherwise, JWK is computed using jwkEncode and inserted
++// as "jwk" field value. The "jwk" and "kid" fields are mutually exclusive.
++//
++// See https://tools.ietf.org/html/rfc7515#section-7.
++func jwsEncodeJSON(claimset interface{}, key crypto.Signer, kid keyID, nonce, url string) ([]byte, error) {
++	alg, sha := jwsHasher(key.Public())
++	if alg == "" || !sha.Available() {
++		return nil, ErrUnsupportedKey
++	}
++	var phead string
++	switch kid {
++	case noKeyID:
++		jwk, err := jwkEncode(key.Public())
++		if err != nil {
++			return nil, err
++		}
++		phead = fmt.Sprintf(`{"alg":%q,"jwk":%s,"nonce":%q,"url":%q}`, alg, jwk, nonce, url)
++	default:
++		phead = fmt.Sprintf(`{"alg":%q,"kid":%q,"nonce":%q,"url":%q}`, alg, kid, nonce, url)
++	}
++	phead = base64.RawURLEncoding.EncodeToString([]byte(phead))
++	var payload string
++	if claimset != noPayload {
++		cs, err := json.Marshal(claimset)
++		if err != nil {
++			return nil, err
++		}
++		payload = base64.RawURLEncoding.EncodeToString(cs)
++	}
++	hash := sha.New()
++	hash.Write([]byte(phead + "." + payload))
++	sig, err := jwsSign(key, sha, hash.Sum(nil))
++	if err != nil {
++		return nil, err
++	}
++
++	enc := struct {
++		Protected string `json:"protected"`
++		Payload   string `json:"payload"`
++		Sig       string `json:"signature"`
++	}{
++		Protected: phead,
++		Payload:   payload,
++		Sig:       base64.RawURLEncoding.EncodeToString(sig),
++	}
++	return json.Marshal(&enc)
++}
++
++// jwkEncode encodes public part of an RSA or ECDSA key into a JWK.
++// The result is also suitable for creating a JWK thumbprint.
++// https://tools.ietf.org/html/rfc7517
++func jwkEncode(pub crypto.PublicKey) (string, error) {
++	switch pub := pub.(type) {
++	case *rsa.PublicKey:
++		// https://tools.ietf.org/html/rfc7518#section-6.3.1
++		n := pub.N
++		e := big.NewInt(int64(pub.E))
++		// Field order is important.
++		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
++		return fmt.Sprintf(`{"e":"%s","kty":"RSA","n":"%s"}`,
++			base64.RawURLEncoding.EncodeToString(e.Bytes()),
++			base64.RawURLEncoding.EncodeToString(n.Bytes()),
++		), nil
++	case *ecdsa.PublicKey:
++		// https://tools.ietf.org/html/rfc7518#section-6.2.1
++		p := pub.Curve.Params()
++		n := p.BitSize / 8
++		if p.BitSize%8 != 0 {
++			n++
++		}
++		x := pub.X.Bytes()
++		if n > len(x) {
++			x = append(make([]byte, n-len(x)), x...)
++		}
++		y := pub.Y.Bytes()
++		if n > len(y) {
++			y = append(make([]byte, n-len(y)), y...)
++		}
++		// Field order is important.
++		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
++		return fmt.Sprintf(`{"crv":"%s","kty":"EC","x":"%s","y":"%s"}`,
++			p.Name,
++			base64.RawURLEncoding.EncodeToString(x),
++			base64.RawURLEncoding.EncodeToString(y),
++		), nil
++	}
++	return "", ErrUnsupportedKey
++}
++
++// jwsSign signs the digest using the given key.
++// The hash is unused for ECDSA keys.
++func jwsSign(key crypto.Signer, hash crypto.Hash, digest []byte) ([]byte, error) {
++	switch pub := key.Public().(type) {
++	case *rsa.PublicKey:
++		return key.Sign(rand.Reader, digest, hash)
++	case *ecdsa.PublicKey:
++		sigASN1, err := key.Sign(rand.Reader, digest, hash)
++		if err != nil {
++			return nil, err
++		}
++
++		var rs struct{ R, S *big.Int }
++		if _, err := asn1.Unmarshal(sigASN1, &rs); err != nil {
++			return nil, err
++		}
++
++		rb, sb := rs.R.Bytes(), rs.S.Bytes()
++		size := pub.Params().BitSize / 8
++		if size%8 > 0 {
++			size++
++		}
++		sig := make([]byte, size*2)
++		copy(sig[size-len(rb):], rb)
++		copy(sig[size*2-len(sb):], sb)
++		return sig, nil
++	}
++	return nil, ErrUnsupportedKey
++}
++
++// jwsHasher indicates suitable JWS algorithm name and a hash function
++// to use for signing a digest with the provided key.
++// It returns ("", 0) if the key is not supported.
++func jwsHasher(pub crypto.PublicKey) (string, crypto.Hash) {
++	switch pub := pub.(type) {
++	case *rsa.PublicKey:
++		return "RS256", crypto.SHA256
++	case *ecdsa.PublicKey:
++		switch pub.Params().Name {
++		case "P-256":
++			return "ES256", crypto.SHA256
++		case "P-384":
++			return "ES384", crypto.SHA384
++		case "P-521":
++			return "ES512", crypto.SHA512
++		}
++	}
++	return "", 0
++}
++
++// JWKThumbprint creates a JWK thumbprint out of pub
++// as specified in https://tools.ietf.org/html/rfc7638.
++func JWKThumbprint(pub crypto.PublicKey) (string, error) {
++	jwk, err := jwkEncode(pub)
++	if err != nil {
++		return "", err
++	}
++	b := sha256.Sum256([]byte(jwk))
++	return base64.RawURLEncoding.EncodeToString(b[:]), nil
++}
+diff --git a/vendor/golang.org/x/crypto/acme/rfc8555.go b/vendor/golang.org/x/crypto/acme/rfc8555.go
+new file mode 100644
+index 00000000..dfb57a66
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/rfc8555.go
+@@ -0,0 +1,392 @@
++// Copyright 2019 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package acme
++
++import (
++	"context"
++	"crypto"
++	"encoding/base64"
++	"encoding/json"
++	"encoding/pem"
++	"errors"
++	"fmt"
++	"io"
++	"io/ioutil"
++	"net/http"
++	"time"
++)
++
++// DeactivateReg permanently disables an existing account associated with c.Key.
++// A deactivated account can no longer request certificate issuance or access
++// resources related to the account, such as orders or authorizations.
++//
++// It only works with CAs implementing RFC 8555.
++func (c *Client) DeactivateReg(ctx context.Context) error {
++	url := string(c.accountKID(ctx))
++	if url == "" {
++		return ErrNoAccount
++	}
++	req := json.RawMessage(`{"status": "deactivated"}`)
++	res, err := c.post(ctx, nil, url, req, wantStatus(http.StatusOK))
++	if err != nil {
++		return err
++	}
++	res.Body.Close()
++	return nil
++}
++
++// registerRFC is quivalent to c.Register but for CAs implementing RFC 8555.
++// It expects c.Discover to have already been called.
++// TODO: Implement externalAccountBinding.
++func (c *Client) registerRFC(ctx context.Context, acct *Account, prompt func(tosURL string) bool) (*Account, error) {
++	c.cacheMu.Lock() // guard c.kid access
++	defer c.cacheMu.Unlock()
++
++	req := struct {
++		TermsAgreed bool     `json:"termsOfServiceAgreed,omitempty"`
++		Contact     []string `json:"contact,omitempty"`
++	}{
++		Contact: acct.Contact,
++	}
++	if c.dir.Terms != "" {
++		req.TermsAgreed = prompt(c.dir.Terms)
++	}
++	res, err := c.post(ctx, c.Key, c.dir.RegURL, req, wantStatus(
++		http.StatusOK,      // account with this key already registered
++		http.StatusCreated, // new account created
++	))
++	if err != nil {
++		return nil, err
++	}
++
++	defer res.Body.Close()
++	a, err := responseAccount(res)
++	if err != nil {
++		return nil, err
++	}
++	// Cache Account URL even if we return an error to the caller.
++	// It is by all means a valid and usable "kid" value for future requests.
++	c.kid = keyID(a.URI)
++	if res.StatusCode == http.StatusOK {
++		return nil, ErrAccountAlreadyExists
++	}
++	return a, nil
++}
++
++// updateGegRFC is equivalent to c.UpdateReg but for CAs implementing RFC 8555.
++// It expects c.Discover to have already been called.
++func (c *Client) updateRegRFC(ctx context.Context, a *Account) (*Account, error) {
++	url := string(c.accountKID(ctx))
++	if url == "" {
++		return nil, ErrNoAccount
++	}
++	req := struct {
++		Contact []string `json:"contact,omitempty"`
++	}{
++		Contact: a.Contact,
++	}
++	res, err := c.post(ctx, nil, url, req, wantStatus(http.StatusOK))
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++	return responseAccount(res)
++}
++
++// getGegRFC is equivalent to c.GetReg but for CAs implementing RFC 8555.
++// It expects c.Discover to have already been called.
++func (c *Client) getRegRFC(ctx context.Context) (*Account, error) {
++	req := json.RawMessage(`{"onlyReturnExisting": true}`)
++	res, err := c.post(ctx, c.Key, c.dir.RegURL, req, wantStatus(http.StatusOK))
++	if e, ok := err.(*Error); ok && e.ProblemType == "urn:ietf:params:acme:error:accountDoesNotExist" {
++		return nil, ErrNoAccount
++	}
++	if err != nil {
++		return nil, err
++	}
++
++	defer res.Body.Close()
++	return responseAccount(res)
++}
++
++func responseAccount(res *http.Response) (*Account, error) {
++	var v struct {
++		Status  string
++		Contact []string
++		Orders  string
++	}
++	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
++		return nil, fmt.Errorf("acme: invalid account response: %v", err)
++	}
++	return &Account{
++		URI:       res.Header.Get("Location"),
++		Status:    v.Status,
++		Contact:   v.Contact,
++		OrdersURL: v.Orders,
++	}, nil
++}
++
++// AuthorizeOrder initiates the order-based application for certificate issuance,
++// as opposed to pre-authorization in Authorize.
++// It is only supported by CAs implementing RFC 8555.
++//
++// The caller then needs to fetch each authorization with GetAuthorization,
++// identify those with StatusPending status and fulfill a challenge using Accept.
++// Once all authorizations are satisfied, the caller will typically want to poll
++// order status using WaitOrder until it's in StatusReady state.
++// To finalize the order and obtain a certificate, the caller submits a CSR with CreateOrderCert.
++func (c *Client) AuthorizeOrder(ctx context.Context, id []AuthzID, opt ...OrderOption) (*Order, error) {
++	dir, err := c.Discover(ctx)
++	if err != nil {
++		return nil, err
++	}
++
++	req := struct {
++		Identifiers []wireAuthzID `json:"identifiers"`
++		NotBefore   string        `json:"notBefore,omitempty"`
++		NotAfter    string        `json:"notAfter,omitempty"`
++	}{}
++	for _, v := range id {
++		req.Identifiers = append(req.Identifiers, wireAuthzID{
++			Type:  v.Type,
++			Value: v.Value,
++		})
++	}
++	for _, o := range opt {
++		switch o := o.(type) {
++		case orderNotBeforeOpt:
++			req.NotBefore = time.Time(o).Format(time.RFC3339)
++		case orderNotAfterOpt:
++			req.NotAfter = time.Time(o).Format(time.RFC3339)
++		default:
++			// Package's fault if we let this happen.
++			panic(fmt.Sprintf("unsupported order option type %T", o))
++		}
++	}
++
++	res, err := c.post(ctx, nil, dir.OrderURL, req, wantStatus(http.StatusCreated))
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++	return responseOrder(res)
++}
++
++// GetOrder retrives an order identified by the given URL.
++// For orders created with AuthorizeOrder, the url value is Order.URI.
++//
++// If a caller needs to poll an order until its status is final,
++// see the WaitOrder method.
++func (c *Client) GetOrder(ctx context.Context, url string) (*Order, error) {
++	if _, err := c.Discover(ctx); err != nil {
++		return nil, err
++	}
++
++	res, err := c.postAsGet(ctx, url, wantStatus(http.StatusOK))
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++	return responseOrder(res)
++}
++
++// WaitOrder polls an order from the given URL until it is in one of the final states,
++// StatusReady, StatusValid or StatusInvalid, the CA responded with a non-retryable error
++// or the context is done.
++//
++// It returns a non-nil Order only if its Status is StatusReady or StatusValid.
++// In all other cases WaitOrder returns an error.
++// If the Status is StatusInvalid, the returned error is of type *OrderError.
++func (c *Client) WaitOrder(ctx context.Context, url string) (*Order, error) {
++	if _, err := c.Discover(ctx); err != nil {
++		return nil, err
++	}
++	for {
++		res, err := c.postAsGet(ctx, url, wantStatus(http.StatusOK))
++		if err != nil {
++			return nil, err
++		}
++		o, err := responseOrder(res)
++		res.Body.Close()
++		switch {
++		case err != nil:
++			// Skip and retry.
++		case o.Status == StatusInvalid:
++			return nil, &OrderError{OrderURL: o.URI, Status: o.Status}
++		case o.Status == StatusReady || o.Status == StatusValid:
++			return o, nil
++		}
++
++		d := retryAfter(res.Header.Get("Retry-After"))
++		if d == 0 {
++			// Default retry-after.
++			// Same reasoning as in WaitAuthorization.
++			d = time.Second
++		}
++		t := time.NewTimer(d)
++		select {
++		case <-ctx.Done():
++			t.Stop()
++			return nil, ctx.Err()
++		case <-t.C:
++			// Retry.
++		}
++	}
++}
++
++func responseOrder(res *http.Response) (*Order, error) {
++	var v struct {
++		Status         string
++		Expires        time.Time
++		Identifiers    []wireAuthzID
++		NotBefore      time.Time
++		NotAfter       time.Time
++		Error          *wireError
++		Authorizations []string
++		Finalize       string
++		Certificate    string
++	}
++	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
++		return nil, fmt.Errorf("acme: error reading order: %v", err)
++	}
++	o := &Order{
++		URI:         res.Header.Get("Location"),
++		Status:      v.Status,
++		Expires:     v.Expires,
++		NotBefore:   v.NotBefore,
++		NotAfter:    v.NotAfter,
++		AuthzURLs:   v.Authorizations,
++		FinalizeURL: v.Finalize,
++		CertURL:     v.Certificate,
++	}
++	for _, id := range v.Identifiers {
++		o.Identifiers = append(o.Identifiers, AuthzID{Type: id.Type, Value: id.Value})
++	}
++	if v.Error != nil {
++		o.Error = v.Error.error(nil /* headers */)
++	}
++	return o, nil
++}
++
++// CreateOrderCert submits the CSR (Certificate Signing Request) to a CA at the specified URL.
++// The URL is the FinalizeURL field of an Order created with AuthorizeOrder.
++//
++// If the bundle argument is true, the returned value also contain the CA (issuer)
++// certificate chain. Otherwise, only a leaf certificate is returned.
++// The returned URL can be used to re-fetch the certificate using FetchCert.
++//
++// This method is only supported by CAs implementing RFC 8555. See CreateCert for pre-RFC CAs.
++//
++// CreateOrderCert returns an error if the CA's response is unreasonably large.
++// Callers are encouraged to parse the returned value to ensure the certificate is valid and has the expected features.
++func (c *Client) CreateOrderCert(ctx context.Context, url string, csr []byte, bundle bool) (der [][]byte, certURL string, err error) {
++	if _, err := c.Discover(ctx); err != nil { // required by c.accountKID
++		return nil, "", err
++	}
++
++	// RFC describes this as "finalize order" request.
++	req := struct {
++		CSR string `json:"csr"`
++	}{
++		CSR: base64.RawURLEncoding.EncodeToString(csr),
++	}
++	res, err := c.post(ctx, nil, url, req, wantStatus(http.StatusOK))
++	if err != nil {
++		return nil, "", err
++	}
++	defer res.Body.Close()
++	o, err := responseOrder(res)
++	if err != nil {
++		return nil, "", err
++	}
++
++	// Wait for CA to issue the cert if they haven't.
++	if o.Status != StatusValid {
++		o, err = c.WaitOrder(ctx, o.URI)
++	}
++	if err != nil {
++		return nil, "", err
++	}
++	// The only acceptable status post finalize and WaitOrder is "valid".
++	if o.Status != StatusValid {
++		return nil, "", &OrderError{OrderURL: o.URI, Status: o.Status}
++	}
++	crt, err := c.fetchCertRFC(ctx, o.CertURL, bundle)
++	return crt, o.CertURL, err
++}
++
++// fetchCertRFC downloads issued certificate from the given URL.
++// It expects the CA to respond with PEM-encoded certificate chain.
++//
++// The URL argument is the CertURL field of Order.
++func (c *Client) fetchCertRFC(ctx context.Context, url string, bundle bool) ([][]byte, error) {
++	res, err := c.postAsGet(ctx, url, wantStatus(http.StatusOK))
++	if err != nil {
++		return nil, err
++	}
++	defer res.Body.Close()
++
++	// Get all the bytes up to a sane maximum.
++	// Account very roughly for base64 overhead.
++	const max = maxCertChainSize + maxCertChainSize/33
++	b, err := ioutil.ReadAll(io.LimitReader(res.Body, max+1))
++	if err != nil {
++		return nil, fmt.Errorf("acme: fetch cert response stream: %v", err)
++	}
++	if len(b) > max {
++		return nil, errors.New("acme: certificate chain is too big")
++	}
++
++	// Decode PEM chain.
++	var chain [][]byte
++	for {
++		var p *pem.Block
++		p, b = pem.Decode(b)
++		if p == nil {
++			break
++		}
++		if p.Type != "CERTIFICATE" {
++			return nil, fmt.Errorf("acme: invalid PEM cert type %q", p.Type)
++		}
++
++		chain = append(chain, p.Bytes)
++		if !bundle {
++			return chain, nil
++		}
++		if len(chain) > maxChainLen {
++			return nil, errors.New("acme: certificate chain is too long")
++		}
++	}
++	if len(chain) == 0 {
++		return nil, errors.New("acme: certificate chain is empty")
++	}
++	return chain, nil
++}
++
++// sends a cert revocation request in either JWK form when key is non-nil or KID form otherwise.
++func (c *Client) revokeCertRFC(ctx context.Context, key crypto.Signer, cert []byte, reason CRLReasonCode) error {
++	req := &struct {
++		Cert   string `json:"certificate"`
++		Reason int    `json:"reason"`
++	}{
++		Cert:   base64.RawURLEncoding.EncodeToString(cert),
++		Reason: int(reason),
++	}
++	res, err := c.post(ctx, key, c.dir.RevokeURL, req, wantStatus(http.StatusOK))
++	if err != nil {
++		if isAlreadyRevoked(err) {
++			// Assume it is not an error to revoke an already revoked cert.
++			return nil
++		}
++		return err
++	}
++	defer res.Body.Close()
++	return nil
++}
++
++func isAlreadyRevoked(err error) bool {
++	e, ok := err.(*Error)
++	return ok && e.ProblemType == "urn:ietf:params:acme:error:alreadyRevoked"
++}
+diff --git a/vendor/golang.org/x/crypto/acme/types.go b/vendor/golang.org/x/crypto/acme/types.go
+new file mode 100644
+index 00000000..9c59097a
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/types.go
+@@ -0,0 +1,548 @@
++// Copyright 2016 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package acme
++
++import (
++	"crypto"
++	"crypto/x509"
++	"errors"
++	"fmt"
++	"net/http"
++	"strings"
++	"time"
++)
++
++// ACME status values of Account, Order, Authorization and Challenge objects.
++// See https://tools.ietf.org/html/rfc8555#section-7.1.6 for details.
++const (
++	StatusDeactivated = "deactivated"
++	StatusExpired     = "expired"
++	StatusInvalid     = "invalid"
++	StatusPending     = "pending"
++	StatusProcessing  = "processing"
++	StatusReady       = "ready"
++	StatusRevoked     = "revoked"
++	StatusUnknown     = "unknown"
++	StatusValid       = "valid"
++)
++
++// CRLReasonCode identifies the reason for a certificate revocation.
++type CRLReasonCode int
++
++// CRL reason codes as defined in RFC 5280.
++const (
++	CRLReasonUnspecified          CRLReasonCode = 0
++	CRLReasonKeyCompromise        CRLReasonCode = 1
++	CRLReasonCACompromise         CRLReasonCode = 2
++	CRLReasonAffiliationChanged   CRLReasonCode = 3
++	CRLReasonSuperseded           CRLReasonCode = 4
++	CRLReasonCessationOfOperation CRLReasonCode = 5
++	CRLReasonCertificateHold      CRLReasonCode = 6
++	CRLReasonRemoveFromCRL        CRLReasonCode = 8
++	CRLReasonPrivilegeWithdrawn   CRLReasonCode = 9
++	CRLReasonAACompromise         CRLReasonCode = 10
++)
++
++var (
++	// ErrUnsupportedKey is returned when an unsupported key type is encountered.
++	ErrUnsupportedKey = errors.New("acme: unknown key type; only RSA and ECDSA are supported")
++
++	// ErrAccountAlreadyExists indicates that the Client's key has already been registered
++	// with the CA. It is returned by Register method.
++	ErrAccountAlreadyExists = errors.New("acme: account already exists")
++
++	// ErrNoAccount indicates that the Client's key has not been registered with the CA.
++	ErrNoAccount = errors.New("acme: account does not exist")
++)
++
++// Error is an ACME error, defined in Problem Details for HTTP APIs doc
++// http://tools.ietf.org/html/draft-ietf-appsawg-http-problem.
++type Error struct {
++	// StatusCode is The HTTP status code generated by the origin server.
++	StatusCode int
++	// ProblemType is a URI reference that identifies the problem type,
++	// typically in a "urn:acme:error:xxx" form.
++	ProblemType string
++	// Detail is a human-readable explanation specific to this occurrence of the problem.
++	Detail string
++	// Instance indicates a URL that the client should direct a human user to visit
++	// in order for instructions on how to agree to the updated Terms of Service.
++	// In such an event CA sets StatusCode to 403, ProblemType to
++	// "urn:ietf:params:acme:error:userActionRequired" and a Link header with relation
++	// "terms-of-service" containing the latest TOS URL.
++	Instance string
++	// Header is the original server error response headers.
++	// It may be nil.
++	Header http.Header
++}
++
++func (e *Error) Error() string {
++	return fmt.Sprintf("%d %s: %s", e.StatusCode, e.ProblemType, e.Detail)
++}
++
++// AuthorizationError indicates that an authorization for an identifier
++// did not succeed.
++// It contains all errors from Challenge items of the failed Authorization.
++type AuthorizationError struct {
++	// URI uniquely identifies the failed Authorization.
++	URI string
++
++	// Identifier is an AuthzID.Value of the failed Authorization.
++	Identifier string
++
++	// Errors is a collection of non-nil error values of Challenge items
++	// of the failed Authorization.
++	Errors []error
++}
++
++func (a *AuthorizationError) Error() string {
++	e := make([]string, len(a.Errors))
++	for i, err := range a.Errors {
++		e[i] = err.Error()
++	}
++	return fmt.Sprintf("acme: authorization error for %s: %s", a.Identifier, strings.Join(e, "; "))
++}
++
++// OrderError is returned from Client's order related methods.
++// It indicates the order is unusable and the clients should start over with
++// AuthorizeOrder.
++//
++// The clients can still fetch the order object from CA using GetOrder
++// to inspect its state.
++type OrderError struct {
++	OrderURL string
++	Status   string
++}
++
++func (oe *OrderError) Error() string {
++	return fmt.Sprintf("acme: order %s status: %s", oe.OrderURL, oe.Status)
++}
++
++// RateLimit reports whether err represents a rate limit error and
++// any Retry-After duration returned by the server.
++//
++// See the following for more details on rate limiting:
++// https://tools.ietf.org/html/draft-ietf-acme-acme-05#section-5.6
++func RateLimit(err error) (time.Duration, bool) {
++	e, ok := err.(*Error)
++	if !ok {
++		return 0, false
++	}
++	// Some CA implementations may return incorrect values.
++	// Use case-insensitive comparison.
++	if !strings.HasSuffix(strings.ToLower(e.ProblemType), ":ratelimited") {
++		return 0, false
++	}
++	if e.Header == nil {
++		return 0, true
++	}
++	return retryAfter(e.Header.Get("Retry-After")), true
++}
++
++// Account is a user account. It is associated with a private key.
++// Non-RFC 8555 fields are empty when interfacing with a compliant CA.
++type Account struct {
++	// URI is the account unique ID, which is also a URL used to retrieve
++	// account data from the CA.
++	// When interfacing with RFC 8555-compliant CAs, URI is the "kid" field
++	// value in JWS signed requests.
++	URI string
++
++	// Contact is a slice of contact info used during registration.
++	// See https://tools.ietf.org/html/rfc8555#section-7.3 for supported
++	// formats.
++	Contact []string
++
++	// Status indicates current account status as returned by the CA.
++	// Possible values are StatusValid, StatusDeactivated, and StatusRevoked.
++	Status string
++
++	// OrdersURL is a URL from which a list of orders submitted by this account
++	// can be fetched.
++	OrdersURL string
++
++	// The terms user has agreed to.
++	// A value not matching CurrentTerms indicates that the user hasn't agreed
++	// to the actual Terms of Service of the CA.
++	//
++	// It is non-RFC 8555 compliant. Package users can store the ToS they agree to
++	// during Client's Register call in the prompt callback function.
++	AgreedTerms string
++
++	// Actual terms of a CA.
++	//
++	// It is non-RFC 8555 compliant. Use Directory's Terms field.
++	// When a CA updates their terms and requires an account agreement,
++	// a URL at which instructions to do so is available in Error's Instance field.
++	CurrentTerms string
++
++	// Authz is the authorization URL used to initiate a new authz flow.
++	//
++	// It is non-RFC 8555 compliant. Use Directory's AuthzURL or OrderURL.
++	Authz string
++
++	// Authorizations is a URI from which a list of authorizations
++	// granted to this account can be fetched via a GET request.
++	//
++	// It is non-RFC 8555 compliant and is obsoleted by OrdersURL.
++	Authorizations string
++
++	// Certificates is a URI from which a list of certificates
++	// issued for this account can be fetched via a GET request.
++	//
++	// It is non-RFC 8555 compliant and is obsoleted by OrdersURL.
++	Certificates string
++}
++
++// Directory is ACME server discovery data.
++// See https://tools.ietf.org/html/rfc8555#section-7.1.1 for more details.
++type Directory struct {
++	// NonceURL indicates an endpoint where to fetch fresh nonce values from.
++	NonceURL string
++
++	// RegURL is an account endpoint URL, allowing for creating new accounts.
++	// Pre-RFC 8555 CAs also allow modifying existing accounts at this URL.
++	RegURL string
++
++	// OrderURL is used to initiate the certificate issuance flow
++	// as described in RFC 8555.
++	OrderURL string
++
++	// AuthzURL is used to initiate identifier pre-authorization flow.
++	// Empty string indicates the flow is unsupported by the CA.
++	AuthzURL string
++
++	// CertURL is a new certificate issuance endpoint URL.
++	// It is non-RFC 8555 compliant and is obsoleted by OrderURL.
++	CertURL string
++
++	// RevokeURL is used to initiate a certificate revocation flow.
++	RevokeURL string
++
++	// KeyChangeURL allows to perform account key rollover flow.
++	KeyChangeURL string
++
++	// Term is a URI identifying the current terms of service.
++	Terms string
++
++	// Website is an HTTP or HTTPS URL locating a website
++	// providing more information about the ACME server.
++	Website string
++
++	// CAA consists of lowercase hostname elements, which the ACME server
++	// recognises as referring to itself for the purposes of CAA record validation
++	// as defined in RFC6844.
++	CAA []string
++
++	// ExternalAccountRequired indicates that the CA requires for all account-related
++	// requests to include external account binding information.
++	ExternalAccountRequired bool
++}
++
++// rfcCompliant reports whether the ACME server implements RFC 8555.
++// Note that some servers may have incomplete RFC implementation
++// even if the returned value is true.
++// If rfcCompliant reports false, the server most likely implements draft-02.
++func (d *Directory) rfcCompliant() bool {
++	return d.OrderURL != ""
++}
++
++// Order represents a client's request for a certificate.
++// It tracks the request flow progress through to issuance.
++type Order struct {
++	// URI uniquely identifies an order.
++	URI string
++
++	// Status represents the current status of the order.
++	// It indicates which action the client should take.
++	//
++	// Possible values are StatusPending, StatusReady, StatusProcessing, StatusValid and StatusInvalid.
++	// Pending means the CA does not believe that the client has fulfilled the requirements.
++	// Ready indicates that the client has fulfilled all the requirements and can submit a CSR
++	// to obtain a certificate. This is done with Client's CreateOrderCert.
++	// Processing means the certificate is being issued.
++	// Valid indicates the CA has issued the certificate. It can be downloaded
++	// from the Order's CertURL. This is done with Client's FetchCert.
++	// Invalid means the certificate will not be issued. Users should consider this order
++	// abandoned.
++	Status string
++
++	// Expires is the timestamp after which CA considers this order invalid.
++	Expires time.Time
++
++	// Identifiers contains all identifier objects which the order pertains to.
++	Identifiers []AuthzID
++
++	// NotBefore is the requested value of the notBefore field in the certificate.
++	NotBefore time.Time
++
++	// NotAfter is the requested value of the notAfter field in the certificate.
++	NotAfter time.Time
++
++	// AuthzURLs represents authorizations to complete before a certificate
++	// for identifiers specified in the order can be issued.
++	// It also contains unexpired authorizations that the client has completed
++	// in the past.
++	//
++	// Authorization objects can be fetched using Client's GetAuthorization method.
++	//
++	// The required authorizations are dictated by CA policies.
++	// There may not be a 1:1 relationship between the identifiers and required authorizations.
++	// Required authorizations can be identified by their StatusPending status.
++	//
++	// For orders in the StatusValid or StatusInvalid state these are the authorizations
++	// which were completed.
++	AuthzURLs []string
++
++	// FinalizeURL is the endpoint at which a CSR is submitted to obtain a certificate
++	// once all the authorizations are satisfied.
++	FinalizeURL string
++
++	// CertURL points to the certificate that has been issued in response to this order.
++	CertURL string
++
++	// The error that occurred while processing the order as received from a CA, if any.
++	Error *Error
++}
++
++// OrderOption allows customizing Client.AuthorizeOrder call.
++type OrderOption interface {
++	privateOrderOpt()
++}
++
++// WithOrderNotBefore sets order's NotBefore field.
++func WithOrderNotBefore(t time.Time) OrderOption {
++	return orderNotBeforeOpt(t)
++}
++
++// WithOrderNotAfter sets order's NotAfter field.
++func WithOrderNotAfter(t time.Time) OrderOption {
++	return orderNotAfterOpt(t)
++}
++
++type orderNotBeforeOpt time.Time
++
++func (orderNotBeforeOpt) privateOrderOpt() {}
++
++type orderNotAfterOpt time.Time
++
++func (orderNotAfterOpt) privateOrderOpt() {}
++
++// Authorization encodes an authorization response.
++type Authorization struct {
++	// URI uniquely identifies a authorization.
++	URI string
++
++	// Status is the current status of an authorization.
++	// Possible values are StatusPending, StatusValid, StatusInvalid, StatusDeactivated,
++	// StatusExpired and StatusRevoked.
++	Status string
++
++	// Identifier is what the account is authorized to represent.
++	Identifier AuthzID
++
++	// The timestamp after which the CA considers the authorization invalid.
++	Expires time.Time
++
++	// Wildcard is true for authorizations of a wildcard domain name.
++	Wildcard bool
++
++	// Challenges that the client needs to fulfill in order to prove possession
++	// of the identifier (for pending authorizations).
++	// For valid authorizations, the challenge that was validated.
++	// For invalid authorizations, the challenge that was attempted and failed.
++	//
++	// RFC 8555 compatible CAs require users to fuflfill only one of the challenges.
++	Challenges []*Challenge
++
++	// A collection of sets of challenges, each of which would be sufficient
++	// to prove possession of the identifier.
++	// Clients must complete a set of challenges that covers at least one set.
++	// Challenges are identified by their indices in the challenges array.
++	// If this field is empty, the client needs to complete all challenges.
++	//
++	// This field is unused in RFC 8555.
++	Combinations [][]int
++}
++
++// AuthzID is an identifier that an account is authorized to represent.
++type AuthzID struct {
++	Type  string // The type of identifier, "dns" or "ip".
++	Value string // The identifier itself, e.g. "example.org".
++}
++
++// DomainIDs creates a slice of AuthzID with "dns" identifier type.
++func DomainIDs(names ...string) []AuthzID {
++	a := make([]AuthzID, len(names))
++	for i, v := range names {
++		a[i] = AuthzID{Type: "dns", Value: v}
++	}
++	return a
++}
++
++// IPIDs creates a slice of AuthzID with "ip" identifier type.
++// Each element of addr is textual form of an address as defined
++// in RFC1123 Section 2.1 for IPv4 and in RFC5952 Section 4 for IPv6.
++func IPIDs(addr ...string) []AuthzID {
++	a := make([]AuthzID, len(addr))
++	for i, v := range addr {
++		a[i] = AuthzID{Type: "ip", Value: v}
++	}
++	return a
++}
++
++// wireAuthzID is ACME JSON representation of authorization identifier objects.
++type wireAuthzID struct {
++	Type  string `json:"type"`
++	Value string `json:"value"`
++}
++
++// wireAuthz is ACME JSON representation of Authorization objects.
++type wireAuthz struct {
++	Identifier   wireAuthzID
++	Status       string
++	Expires      time.Time
++	Wildcard     bool
++	Challenges   []wireChallenge
++	Combinations [][]int
++}
++
++func (z *wireAuthz) authorization(uri string) *Authorization {
++	a := &Authorization{
++		URI:          uri,
++		Status:       z.Status,
++		Identifier:   AuthzID{Type: z.Identifier.Type, Value: z.Identifier.Value},
++		Expires:      z.Expires,
++		Wildcard:     z.Wildcard,
++		Challenges:   make([]*Challenge, len(z.Challenges)),
++		Combinations: z.Combinations, // shallow copy
++	}
++	for i, v := range z.Challenges {
++		a.Challenges[i] = v.challenge()
++	}
++	return a
++}
++
++func (z *wireAuthz) error(uri string) *AuthorizationError {
++	err := &AuthorizationError{
++		URI:        uri,
++		Identifier: z.Identifier.Value,
++	}
++	for _, raw := range z.Challenges {
++		if raw.Error != nil {
++			err.Errors = append(err.Errors, raw.Error.error(nil))
++		}
++	}
++	return err
++}
++
++// Challenge encodes a returned CA challenge.
++// Its Error field may be non-nil if the challenge is part of an Authorization
++// with StatusInvalid.
++type Challenge struct {
++	// Type is the challenge type, e.g. "http-01", "tls-alpn-01", "dns-01".
++	Type string
++
++	// URI is where a challenge response can be posted to.
++	URI string
++
++	// Token is a random value that uniquely identifies the challenge.
++	Token string
++
++	// Status identifies the status of this challenge.
++	// In RFC 8555, possible values are StatusPending, StatusProcessing, StatusValid,
++	// and StatusInvalid.
++	Status string
++
++	// Validated is the time at which the CA validated this challenge.
++	// Always zero value in pre-RFC 8555.
++	Validated time.Time
++
++	// Error indicates the reason for an authorization failure
++	// when this challenge was used.
++	// The type of a non-nil value is *Error.
++	Error error
++}
++
++// wireChallenge is ACME JSON challenge representation.
++type wireChallenge struct {
++	URL       string `json:"url"` // RFC
++	URI       string `json:"uri"` // pre-RFC
++	Type      string
++	Token     string
++	Status    string
++	Validated time.Time
++	Error     *wireError
++}
++
++func (c *wireChallenge) challenge() *Challenge {
++	v := &Challenge{
++		URI:    c.URL,
++		Type:   c.Type,
++		Token:  c.Token,
++		Status: c.Status,
++	}
++	if v.URI == "" {
++		v.URI = c.URI // c.URL was empty; use legacy
++	}
++	if v.Status == "" {
++		v.Status = StatusPending
++	}
++	if c.Error != nil {
++		v.Error = c.Error.error(nil)
++	}
++	return v
++}
++
++// wireError is a subset of fields of the Problem Details object
++// as described in https://tools.ietf.org/html/rfc7807#section-3.1.
++type wireError struct {
++	Status   int
++	Type     string
++	Detail   string
++	Instance string
++}
++
++func (e *wireError) error(h http.Header) *Error {
++	return &Error{
++		StatusCode:  e.Status,
++		ProblemType: e.Type,
++		Detail:      e.Detail,
++		Instance:    e.Instance,
++		Header:      h,
++	}
++}
++
++// CertOption is an optional argument type for the TLS ChallengeCert methods for
++// customizing a temporary certificate for TLS-based challenges.
++type CertOption interface {
++	privateCertOpt()
++}
++
++// WithKey creates an option holding a private/public key pair.
++// The private part signs a certificate, and the public part represents the signee.
++func WithKey(key crypto.Signer) CertOption {
++	return &certOptKey{key}
++}
++
++type certOptKey struct {
++	key crypto.Signer
++}
++
++func (*certOptKey) privateCertOpt() {}
++
++// WithTemplate creates an option for specifying a certificate template.
++// See x509.CreateCertificate for template usage details.
++//
++// In TLS ChallengeCert methods, the template is also used as parent,
++// resulting in a self-signed certificate.
++// The DNSNames field of t is always overwritten for tls-sni challenge certs.
++func WithTemplate(t *x509.Certificate) CertOption {
++	return (*certOptTemplate)(t)
++}
++
++type certOptTemplate x509.Certificate
++
++func (*certOptTemplate) privateCertOpt() {}
+diff --git a/vendor/golang.org/x/crypto/acme/version_go112.go b/vendor/golang.org/x/crypto/acme/version_go112.go
+new file mode 100644
+index 00000000..b58f2456
+--- /dev/null
++++ b/vendor/golang.org/x/crypto/acme/version_go112.go
+@@ -0,0 +1,27 @@
++// Copyright 2019 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build go1.12
++
++package acme
++
++import "runtime/debug"
++
++func init() {
++	// Set packageVersion if the binary was built in modules mode and x/crypto
++	// was not replaced with a different module.
++	info, ok := debug.ReadBuildInfo()
++	if !ok {
++		return
++	}
++	for _, m := range info.Deps {
++		if m.Path != "golang.org/x/crypto" {
++			continue
++		}
++		if m.Replace == nil {
++			packageVersion = m.Version
++		}
++		break
++	}
++}
+diff --git a/vendor/modules.txt b/vendor/modules.txt
+index 9c479d28..160e647b 100644
+--- a/vendor/modules.txt
++++ b/vendor/modules.txt
+@@ -128,6 +128,8 @@ github.com/yvasiyarov/gorelic
+ # github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f
+ github.com/yvasiyarov/newrelic_platform_go
+ # golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
++golang.org/x/crypto/acme
++golang.org/x/crypto/acme/autocert
+ golang.org/x/crypto/bcrypt
+ golang.org/x/crypto/blowfish
+ # golang.org/x/net v0.0.0-20190619014844-b5b0513f8c1b
+@@ -187,5 +189,3 @@ google.golang.org/grpc/transport
+ gopkg.in/check.v1
+ # gopkg.in/yaml.v2 v2.2.2
+ gopkg.in/yaml.v2
+-# rsc.io/letsencrypt v0.0.3
+-rsc.io/letsencrypt
+diff --git a/vendor/rsc.io/letsencrypt/LICENSE b/vendor/rsc.io/letsencrypt/LICENSE
+deleted file mode 100644
+index 6a66aea5..00000000
+--- a/vendor/rsc.io/letsencrypt/LICENSE
++++ /dev/null
+@@ -1,27 +0,0 @@
+-Copyright (c) 2009 The Go Authors. All rights reserved.
+-
+-Redistribution and use in source and binary forms, with or without
+-modification, are permitted provided that the following conditions are
+-met:
+-
+-   * Redistributions of source code must retain the above copyright
+-notice, this list of conditions and the following disclaimer.
+-   * Redistributions in binary form must reproduce the above
+-copyright notice, this list of conditions and the following disclaimer
+-in the documentation and/or other materials provided with the
+-distribution.
+-   * Neither the name of Google Inc. nor the names of its
+-contributors may be used to endorse or promote products derived from
+-this software without specific prior written permission.
+-
+-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+diff --git a/vendor/rsc.io/letsencrypt/README.md b/vendor/rsc.io/letsencrypt/README.md
+deleted file mode 100644
+index 99cc2f98..00000000
+--- a/vendor/rsc.io/letsencrypt/README.md
++++ /dev/null
+@@ -1,9 +0,0 @@
+-## rsc.io/letsencrypt is superseded by [golang.org/x/crypto/acme/autocert](https://golang.org/x/crypto/acme/autocert).
+-
+-The latest old rsc.io/letsencrypt is tagged v0.0.2 if you must use it.
+-
+-But don't.
+-
+-It hasn't been updated in years and probably carries security problems with it.
+-
+-**Use [golang.org/x/crypto/acme/autocert](https://golang.org/x/crypto/acme/autocert) instead.**
+diff --git a/vendor/rsc.io/letsencrypt/doc.go b/vendor/rsc.io/letsencrypt/doc.go
+deleted file mode 100644
+index 63ebffe2..00000000
+--- a/vendor/rsc.io/letsencrypt/doc.go
++++ /dev/null
+@@ -1,11 +0,0 @@
+-// Copyright 2019 The Go Authors. All rights reserved.
+-// Use of this source code is governed by a BSD-style
+-// license that can be found in the LICENSE file.
+-
+-// Package letsencrypt is superseded by golang.org/x/crypto/acme/autocert.
+-// Use that instead.
+-//
+-// Everything in this package has been deleted.
+-// If you need the latest non-deleted copy, use v0.0.2
+-// (but really, use golang.org/x/crypto/acme/autocert).
+-package letsencrypt
 -- 
 2.32.0 (Apple Git-132)
 
