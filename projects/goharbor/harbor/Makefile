@@ -62,13 +62,11 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@echo "$$VERSIONS_FOR_PREPARE" > $(PROJECT_ROOT)/$(REPO)/make/photon/prepare/versions
 	@mkdir -p $(OUTPUT_DIR)
 
-	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor/views
-	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor/migrations
-	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor/icons
+	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor
 	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/core/entrypoint.sh harbor/make/photon/prepare/versions $(OUTPUT_DIR)/harbor-core/harbor/
-	@cp -r harbor/src/core/views $(OUTPUT_DIR)/harbor-core/harbor/views
-	@cp -r harbor/make/migrations $(OUTPUT_DIR)/harbor-core/harbor/migrations
-	@cp -r harbor/icons $(OUTPUT_DIR)/harbor-core/harbor/icons
+	@cp -r harbor/src/core/views $(OUTPUT_DIR)/harbor-core/harbor
+	@cp -r harbor/make/migrations $(OUTPUT_DIR)/harbor-core/harbor
+	@cp -r harbor/icons $(OUTPUT_DIR)/harbor-core/harbor
 	
 	@mkdir -p $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d
 	@cp harbor/make/photon/db/docker-entrypoint.sh harbor/make/photon/db/initdb.sh harbor/make/photon/db/upgrade.sh harbor/make/photon/db/docker-healthcheck.sh $(OUTPUT_DIR)/harbor-db/
