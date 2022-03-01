@@ -289,6 +289,12 @@ define GET_CLONE_URL
 $(shell source $(BUILD_LIB)/common.sh && build::common::get_clone_url $(1) $(2) $(AWS_REGION) $(CODEBUILD_CI))
 endef
 
+# Indenting the block results in the URL getting prefixed with a
+# space, hence no indentation below.
+define TO_UPPER
+$(shell echo '$(1)' | tr '[:lower:]' '[:upper:]')
+endef
+
 # to avoid dealing with cross compling issues using a buildctl
 # multi-stage build to build the binaries for both amd64 and arm64
 # licenses and attribution are also run from the builder image since
@@ -296,12 +302,16 @@ endef
 define CGO_BINARY_TARGET_BODY
 	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): $(GO_MOD_DOWNLOAD_TARGETS)
 		@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/
-		rsync -rm  --exclude='.git/logs/***' \
-			--exclude='projects/$(COMPONENT)/_output/bin/***' --exclude='projects/$(COMPONENT)/$(REPO)/***' \
+		rsync -rm  --exclude='.git/***' \
+			--exclude='***/_output/***' --exclude='projects/$(COMPONENT)/$(REPO)/***' \
 			--include='projects/$(COMPONENT)/***' --include='*/' --exclude='projects/***'  \
 			$(BASE_DIRECTORY)/ $(CGO_SOURCE)/eks-anywhere-build-tooling/
 		@mkdir -p $(OUTPUT_BIN_DIR)/$(subst /,-,$(1))
-		$(MAKE) binary-builder/cgo/$(1:linux/%=%) IMAGE_OUTPUT=dest=$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))
+		# Need so git properly finds the root of the repo
+		@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/.git/{refs,objects}
+		@cp $(BASE_DIRECTORY)/.git/HEAD $(CGO_SOURCE)/eks-anywhere-build-tooling/.git
+		$(MAKE) binary-builder/cgo/$(1:linux/%=%) \
+			IMAGE_OUTPUT=dest=$(OUTPUT_BIN_DIR)/$(subst /,-,$(1)) CGO_TARGET=$$@ IMAGE_BUILD_ARGS="GOPROXY COMPONENT CGO_TARGET"
 
 endef
 
@@ -487,9 +497,9 @@ helm/push: helm/build
 
 .PHONY: %/cgo/amd64 %/cgo/arm64
 %/cgo/amd64 %/cgo/arm64: IMAGE_OUTPUT_TYPE?=local
-%/cgo/amd64 %/cgo/arm64: DOCKERFILE_FOLDER?=./docker/build
+%/cgo/amd64 %/cgo/arm64: DOCKERFILE_FOLDER?=$(BUILD_LIB)/docker/linux/cgo
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
-%/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
+%/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY COMPONENT
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
 %/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(BASE_IMAGE_REPO)/builder-base:latest
 

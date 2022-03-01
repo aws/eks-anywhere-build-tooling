@@ -71,7 +71,7 @@ function pr:create()
     gh auth login --with-token < /secrets/github-secrets/token
     local -r pr_exists=$(gh pr list | grep -c "$pr_branch" || true)
     if [ $pr_exists -eq 0 ]; then
-        gh pr create --title "$pr_title" --body "$pr_body" --base $MAIN_BRANCH
+        gh pr create --title "$pr_title" --body "$pr_body" --base $MAIN_BRANCH --label "do-not-merge/hold"
     fi
 }
 

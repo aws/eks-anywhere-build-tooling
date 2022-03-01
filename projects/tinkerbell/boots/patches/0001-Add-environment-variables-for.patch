@@ -1,0 +1,120 @@
+From c1da694566fa50e98bb0f15a973de1572110ce81 Mon Sep 17 00:00:00 2001
+From: Pooja Trivedi <poojatrivedi@gmail.com>
+Date: Mon, 14 Feb 2022 23:57:58 +0000
+Subject: [PATCH] * Add environment variables for 	- OSIE path override  
+       - Custom URL for registry CA certificate         - tink-worker
+ image:tag and path   These environment variables allow 	- Bypassing
+ the requirement for OSIE artifacts to be under           predefined paths 
+ - Specifying custom URL for downloading CA certificate for           the
+ registry, which can be passed on to Hook for tink-docker 	  setup 
+ - Specifying custom tink-worker image:tag and path, which can 	  be passed to
+ hook for tink-worker image pull * Make registry username/password optional to
+ allow for public registry   pulls
+
+---
+ installers/osie/main.go   | 15 +++++++++++++--
+ installers/osie/mirror.go | 36 +++++++++++++++++++++++++++++-------
+ 2 files changed, 42 insertions(+), 9 deletions(-)
+
+diff --git a/installers/osie/main.go b/installers/osie/main.go
+index 38df5ba..2b080db 100644
+--- a/installers/osie/main.go
++++ b/installers/osie/main.go
+@@ -104,13 +104,21 @@ func kernelParams(ctx context.Context, action, state string, j job.Job, s ipxe.S
+ 	if j.CanWorkflow() {
+ 		buildWorkerParams()
+ 		s.Args("docker_registry=" + dockerRegistry)
++		if len(registryUsername) > 0 {
++			s.Args("registry_username=" + registryUsername)
++			s.Args("registry_password=" + registryPassword)
++		}
++		if len(registryCertUrl) > 0 {
++			s.Args("registry_cert_url=" + registryCertUrl)
++		}
+ 		s.Args("grpc_authority=" + grpcAuthority)
+ 		s.Args("grpc_cert_url=" + grpcCertURL)
+ 		s.Args("instance_id=" + j.InstanceID())
+-		s.Args("registry_username=" + registryUsername)
+-		s.Args("registry_password=" + registryPassword)
+ 		s.Args("packet_base_url=" + workflowBaseURL())
+ 		s.Args("worker_id=" + j.HardwareID().String())
++		if len(tinkWorkerImage) > 0 {
++			s.Args("tink_worker_image=" + tinkWorkerImage)
++		}
+ 	}
+ 
+ 	s.Args("packet_bootdev_mac=${bootdevmac}")
+@@ -190,6 +198,9 @@ func isCustomOSIE(j job.Job) bool {
+ 
+ // osieBaseURL returns the value of Custom OSIE Service Version or just /current
+ func osieBaseURL(j job.Job) string {
++	if osiePathOverride != "" {
++		return osiePathOverride
++	}
+ 	if u := j.OSIEBaseURL(); u != "" {
+ 		return u
+ 	}
+diff --git a/installers/osie/mirror.go b/installers/osie/mirror.go
+index 796beba..672143b 100644
+--- a/installers/osie/mirror.go
++++ b/installers/osie/mirror.go
+@@ -14,11 +14,15 @@ const (
+ )
+ 
+ var (
+-	osieURL                            = mustBuildOSIEURL().String()
+-	mirrorBaseURL                      = conf.MirrorBaseUrl
+-	dockerRegistry                     string
+-	grpcAuthority, grpcCertURL         string
+-	registryUsername, registryPassword string
++	osieURL                    = mustBuildOSIEURL().String()
++	osiePathOverride           = getOSIEPathOverride()
++	mirrorBaseURL              = conf.MirrorBaseUrl
++	dockerRegistry             string
++	grpcAuthority, grpcCertURL string
++	registryUsername           string
++	registryPassword           string
++	registryCertUrl            string		
++	tinkWorkerImage            string
+ )
+ 
+ func buildOSIEURL() (*url.URL, error) {
+@@ -42,6 +46,22 @@ func buildOSIEURL() (*url.URL, error) {
+ 	return u, nil
+ }
+ 
++func getOSIEPathOverride() string {
++	base, err := url.Parse(conf.MirrorBaseUrl)
++	if err != nil {
++		panic(errors.Wrap(err, "parsing MirrorBaseUrl"))
++	}
++	if s, ok := os.LookupEnv("OSIE_PATH_OVERRIDE"); ok {
++		u, err := base.Parse(s)
++		if err != nil {
++			panic(errors.Wrapf(err, "invalid OSIE_PATH_OVERRIDE: %s", s))
++		}
++
++		return u.String() 
++	}
++	return ""
++}
++
+ func mustBuildOSIEURL() *url.URL {
+ 	u, err := buildOSIEURL()
+ 	if err != nil {
+@@ -55,8 +75,10 @@ func buildWorkerParams() {
+ 	dockerRegistry = getParam("DOCKER_REGISTRY")
+ 	grpcAuthority = getParam("TINKERBELL_GRPC_AUTHORITY")
+ 	grpcCertURL = getParam("TINKERBELL_CERT_URL")
+-	registryUsername = getParam("REGISTRY_USERNAME")
+-	registryPassword = getParam("REGISTRY_PASSWORD")
++	registryUsername = os.Getenv("REGISTRY_USERNAME")
++	registryPassword = os.Getenv("REGISTRY_PASSWORD")
++	registryCertUrl = os.Getenv("REGISTRY_CERT_URL")
++	tinkWorkerImage = os.Getenv("TINK_WORKER_IMAGE")
+ }
+ 
+ func getParam(key string) string {
+-- 
+2.25.1
+
