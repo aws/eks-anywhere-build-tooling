@@ -9,6 +9,7 @@ COPY _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-core _output/harbor-core/ _
 RUN yum install -y tzdata shadow-utils >> /dev/null \
     && yum clean all \
     && groupadd -f -r -g 10000 harbor && useradd --no-log-init -r -m -g 10000 -u 10000 harbor \
+    && yum erase -y shadow-utils \
     && mv /harbor-core /harbor/harbor_core \
     && chown -R harbor:harbor /etc/pki/tls/certs \
     && chown -R harbor:harbor /harbor/ \

@@ -10,6 +10,7 @@ COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distributio
 RUN yum install -y shadow-utils >> /dev/null \
     && yum clean all \
     && groupadd -f -r -g 10000 harbor && useradd --no-log-init -m -g 10000 -u 10000 harbor \
+    && yum erase -y shadow-utils \
     && mkdir -p /etc/registry \
     && mv /registry /usr/bin/registry_DO_NOT_USE_GC \
     && mv /harbor-registryctl /home/harbor/harbor_registryctl \

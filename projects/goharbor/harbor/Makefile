@@ -50,6 +50,27 @@ IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
 FETCH_BINARIES_TARGETS=eksa/distribution/distribution
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 
+HAS_HELM_CHART=true
+
+HELM_GIT_TAG=v1.8.1
+HELM_SOURCE_REPOSITORY=harbor-helm
+HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
+
+HELM_ADDITIONAL_KEY_VALUES=\
+  NGINX_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-nginx $(LATEST)) \
+  PORTAL_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-portal $(LATEST)) \
+  CORE_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-core $(LATEST)) \
+  JOBSERVICE_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-jobservice $(LATEST)) \
+  REGISTRY_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-registry $(LATEST)) \
+  REGISTRYCTL_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-registryctl $(LATEST)) \
+  CHARTMUSEUM_IMAGE_DIGEST="" \
+  TRIVY_ADAPTER_IMAGE_DIGEST="" \
+  NOTARY_SERVER_IMAGE_DIGEST="" \
+  NOTARY_SIGNER_IMAGE_DIGEST="" \
+  DATABASE_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-db $(LATEST)) \
+  REDIS_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-redis $(LATEST)) \
+  EXPORTER_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-exporter $(LATEST))
+
 include $(BASE_DIRECTORY)/Common.mk
 
 harbor-nginx/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx

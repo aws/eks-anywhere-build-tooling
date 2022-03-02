@@ -11,6 +11,7 @@ RUN yum install -y shadow-utils >> /dev/null \
     && yum clean all \
     && mkdir -p /etc/registry \
     && groupadd -f -r -g 10000 harbor && useradd --no-log-init -m -g 10000 -u 10000 harbor \
+    && yum erase -y shadow-utils \
     && mv /registry /usr/bin/registry_DO_NOT_USE_GC \
     && chown -R harbor:harbor /etc/pki/tls/certs /home/harbor /usr/bin/registry_DO_NOT_USE_GC \
     && chmod u+x /home/harbor/entrypoint.sh \
