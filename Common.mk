@@ -468,10 +468,12 @@ endif
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 	HELM_REGISTRY=$(IMAGE_REPO) \
 	IMAGE_TAG=$(IMAGE_TAG) \
 	$(HELM_ADDITIONAL_KEY_VALUES) \
-	$(BUILD_LIB)/helm_build.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
