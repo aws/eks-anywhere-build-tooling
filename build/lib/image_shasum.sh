@@ -22,7 +22,7 @@ REGISTRY="${1?First argument is registry}"
 REPOSITORY="${2?Second argument is repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
 
-if [ "${REGISTRY}" == "316434458148.dkr.ecr.us-west-2.amazonaws.com" ]
+if [ "${JOB_TYPE}" == "presubmit" ]
 then
   echo latest
   exit 0
