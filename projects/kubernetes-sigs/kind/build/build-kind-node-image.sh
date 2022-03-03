@@ -46,7 +46,7 @@ function build::kind::build_node_image(){
 
 function build::kind::validate_versions(){
     local -r container_id=$1
-    local -r eksd_tag="$KUBE_VERSION-eks-$EKSD_RELEASE_BRANCH"
+    local -r eksd_tag="$KUBE_VERSION-eks-" # there is a commit hash at the end
     # We expect certain versions to be in the kind base/node images since we end up replacing them
     # validate they haven't changed
     if ! docker exec -i $container_id grep "image: $KINDNETD_IMAGE_TAG"  /kind/manifests/default-cni.yaml > /dev/null 2>&1; then
