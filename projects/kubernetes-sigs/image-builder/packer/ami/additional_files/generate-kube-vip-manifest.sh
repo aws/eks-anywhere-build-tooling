@@ -4,6 +4,8 @@ KUBE_VIP_IMAGE=$1
 VIP=$2
 DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
 
+echo "Generating kube-vip manifest: image = [$KUBE_VIP_IMAGE] VIP = [$VIP]"
+
 cat<<EOF >/etc/kubernetes/manifests/kube-vip.yaml
 apiVersion: v1
 kind: Pod
