@@ -215,6 +215,8 @@ spec:
               of an object. Servers should convert recognized schemas to the latest
               internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
             type: string
+          deviceIp:
+            type: string
           kind:
             description: 'Kind is a string value representing the REST resource this
               object represents. Servers may infer this from the endpoint the client
@@ -1140,38 +1142,6 @@ rules:
   - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  labels:
-    cluster.x-k8s.io/provider: infrastructure-aws-snow
-  name: capas-metrics-reader
-rules:
-- nonResourceURLs:
-  - /metrics
-  verbs:
-  - get
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  labels:
-    cluster.x-k8s.io/provider: infrastructure-aws-snow
-  name: capas-proxy-role
-rules:
-- apiGroups:
-  - authentication.k8s.io
-  resources:
-  - tokenreviews
-  verbs:
-  - create
-- apiGroups:
-  - authorization.k8s.io
-  resources:
-  - subjectaccessreviews
-  verbs:
-  - create
----
-apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   labels:
@@ -1202,21 +1172,6 @@ subjects:
   name: capas-controller-manager
   namespace: capas-system
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    cluster.x-k8s.io/provider: infrastructure-aws-snow
-  name: capas-proxy-rolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: capas-proxy-role
-subjects:
-- kind: ServiceAccount
-  name: capas-controller-manager
-  namespace: capas-system
----
 apiVersion: v1
 data:
   controller_manager_config.yaml: |
@@ -1240,16 +1195,6 @@ metadata:
 ---
 apiVersion: v1
 data:
-  device_ips: ${DEVICE_IPS}
-kind: ConfigMap
-metadata:
-  labels:
-    cluster.x-k8s.io/provider: infrastructure-aws-snow
-  name: capas-multi-device-config
-  namespace: capas-system
----
-apiVersion: v1
-data:
   ca-bundle: ${AWS_B64ENCODED_CA_BUNDLES}
   credentials: ${AWS_B64ENCODED_CREDENTIALS}
 kind: Secret
@@ -1259,23 +1204,6 @@ metadata:
   name: capas-manager-bootstrap-credentials
   namespace: capas-system
 type: Opaque
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    cluster.x-k8s.io/provider: infrastructure-aws-snow
-    control-plane: controller-manager
-  name: capas-controller-manager-metrics-service
-  namespace: capas-system
-spec:
-  ports:
-  - name: https
-    port: 8443
-    targetPort: https
-  selector:
-    cluster.x-k8s.io/provider: infrastructure-aws-snow
-    control-plane: controller-manager
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1299,8 +1227,6 @@ spec:
     spec:
       containers:
       - args:
-        - --health-probe-bind-address=:8081
-        - --metrics-bind-address=127.0.0.1:8080
         - --leader-elect
         command:
         - /manager
@@ -1310,6 +1236,7 @@ spec:
         - name: AWS_CA_BUNDLE
           value: /home/.aws/ca-bundle
         image: ${SNOW_CONTROLLER_IMAGE}
+        imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
             path: /healthz
@@ -1333,28 +1260,13 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
         volumeMounts:
-        - mountPath: /multi-device-config
-          name: multi-device-config
         - mountPath: /home/.aws
           name: ca-bundle
-      - args:
-        - --secure-listen-address=0.0.0.0:8443
-        - --upstream=http://127.0.0.1:8080/
-        - --logtostderr=true
-        - --v=10
-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 8443
-          name: https
       imagePullSecrets:
       - name: ${ECR_CREDS}
       serviceAccountName: capas-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
-      - configMap:
-          name: capas-multi-device-config
-        name: multi-device-config
       - name: credentials
         secret:
           secretName: capas-manager-bootstrap-credentials
