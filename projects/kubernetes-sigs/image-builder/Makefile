@@ -22,7 +22,7 @@ VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
 DEV_ACCOUNTS?=
 
-ARTIFACTS_BUCKET?=s3://projectbuildpipeline-857-pipelineoutputartifactsb-10ajmk30khe3f
+ARTIFACTS_BUCKET?=
 
 PACKER_AMI_VAR_FILES=$(MAKE_ROOT)/packer/ami/packer.json
 PACKER_AMI_SHARE_FILE=$(MAKE_ROOT)/packer/ami/share-ami.json
@@ -175,13 +175,9 @@ release-raw-ubuntu-2004: deps-raw setup-packer-configs-raw
 	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME)
 
 .PHONY: build-qemu-rhel-local
-build-qemu-rhel-local: deps-qemu setup-packer-config-qemu
-build-qemu-rhel-local: CHECKSUM=$(sha256sum $(BASE_IMAGE))
-build-qemu-rhel-local: QEMU_CONFIG_FILE=$(IMAGE_BUILDER_DIR)/packer/qemu/qemu-rhel-8.json
-	cat <<< $(jq '.iso_url="$(BASE_IMAGE)"' $(QEMU_CONFIG_FILE)) > $(QEMU_CONFIG_FILE)
-	cat <<< $(jq '.iso_checksum="$(CHECKSUM)"' $(QEMU_CONFIG_FILE)) > $(QEMU_CONFIG_FILE)
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
-	$(MAKE) -C $(IMAGE_BUILDER_DIR) build-qemu-rhel-8
+build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu
+build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
+	build/build_qemu_rhel_local.sh . $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
 
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
