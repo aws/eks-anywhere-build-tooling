@@ -60,15 +60,3 @@ if [ -f ${REQUIRES_CONFIG_FILE} ]
 then
   cat ${REQUIRES_CONFIG_FILE} >>${REQUIRES_FILE}
 fi
-
-#
-# Search and replace
-#
-TEMPLATE_DIR=helm/templates
-cat helm/files.txt | while read SOURCE_FILE DESTINATION_FILE
-do
-  TMPFILE=/tmp/$(basename ${SOURCE_FILE})
-  cp ${SOURCE_FILE} ${TMPFILE}
-  sed -f ${SEDFILE} ${TMPFILE} >${DEST_DIR}/${DESTINATION_FILE}
-  rm -f ${TMPFILE}
-done
