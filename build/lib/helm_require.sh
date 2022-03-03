@@ -25,7 +25,6 @@ IMAGE_TAG="${4?Fourth argument is image tag}"
 LATEST="${5?Fifth argument is latest tag}"
 HELM_IMAGE_LIST="${6?Sixth argument is image list}"
 
-export HELM_REGISTRY
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -45,6 +44,8 @@ spec:
 !
 REQUIRES_CONFIG_FILE=helm/requires-config.yaml
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
+export IMAGE_TAG
+export HELM_REGISTRY
 envsubst <helm/sedfile.template >${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
 do
