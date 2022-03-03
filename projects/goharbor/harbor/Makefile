@@ -55,21 +55,7 @@ HAS_HELM_CHART=true
 HELM_GIT_TAG=v1.8.1
 HELM_SOURCE_REPOSITORY=harbor-helm
 HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
-
-HELM_ADDITIONAL_KEY_VALUES=\
-  NGINX_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-nginx $(LATEST)) \
-  PORTAL_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-portal $(LATEST)) \
-  CORE_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-core $(LATEST)) \
-  JOBSERVICE_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-jobservice $(LATEST)) \
-  REGISTRY_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-registry $(LATEST)) \
-  REGISTRYCTL_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-registryctl $(LATEST)) \
-  CHARTMUSEUM_IMAGE_DIGEST="" \
-  TRIVY_ADAPTER_IMAGE_DIGEST="" \
-  NOTARY_SERVER_IMAGE_DIGEST="" \
-  NOTARY_SIGNER_IMAGE_DIGEST="" \
-  DATABASE_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-db $(LATEST)) \
-  REDIS_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-redis $(LATEST)) \
-  EXPORTER_IMAGE_DIGEST=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} harbor/harbor-exporter $(LATEST))
+HELM_IMAGE_LIST="harbor/harbor-nginx harbor/harbor-portal harbor/harbor-core harbor/harbor-jobservice harbor/harbor-registry harbor/harbor-registryctl harbor/harbor-db harbor/harbor-redis harbor/harbor-exporter"
 
 include $(BASE_DIRECTORY)/Common.mk
 
