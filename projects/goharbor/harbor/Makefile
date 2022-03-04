@@ -55,7 +55,7 @@ HAS_HELM_CHART=true
 HELM_GIT_TAG=v1.8.1
 HELM_SOURCE_REPOSITORY=harbor-helm
 HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
-HELM_IMAGE_LIST="harbor/harbor-nginx harbor/harbor-portal harbor/harbor-core harbor/harbor-jobservice harbor/harbor-registry harbor/harbor-registryctl harbor/harbor-db harbor/harbor-redis harbor/harbor-exporter"
+HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-exporter harbor/harbor-jobservice harbor/harbor-nginx harbor/harbor-portal harbor/harbor-redis harbor/harbor-registry harbor/harbor-registryctl
 
 include $(BASE_DIRECTORY)/Common.mk
 
