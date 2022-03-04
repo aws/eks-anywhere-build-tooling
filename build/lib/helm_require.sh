@@ -23,7 +23,7 @@ HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}
 OUTPUT_DIR="${3?Third argument is output directory}"
 IMAGE_TAG="${4?Fourth argument is image tag}"
 LATEST="${5?Fifth argument is latest tag}"
-HELM_IMAGE_LIST="${6?Sixth argument is image list}"
+HELM_IMAGE_LIST="${@:6}"
 
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
