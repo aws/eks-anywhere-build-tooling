@@ -1,0 +1,33 @@
+From cabdb1928aa68c080246b8827da74f602a195c03 Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Sat, 5 Mar 2022 18:16:29 -0600
+Subject: [PATCH] update coredns/corefile-migration to support 1.8.7
+
+EKS-D 1.22-1 ships with coredns 1.8.7.  The corefile-migration package
+does not currently have a release that supports 1.8.7 nor does cluster-api
+or kubeadm for that matter use a version which does.  Temporarily ovewriting the version
+to point to the comment upstream which added support.
+
+Without this change, capi's webhook will deny a cluster spec with coredns 1.8.7 with
+the following error:
+`invalid: spec.kubeadmConfigSpec.clusterConfiguration.dns.imageTag: Forbidden: cannot migrate
+CoreDNS up to '1.8.7' from '1.8.7': start version '1.8.7' not supported`
+
+Signed-off-by: Jackson West <jgw@amazon.com>
+---
+ go.mod | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/go.mod b/go.mod
+index a5d255491..b5ae75e39 100644
+--- a/go.mod
++++ b/go.mod
+@@ -41,3 +41,5 @@ require (
+ 	sigs.k8s.io/controller-runtime v0.10.3
+ 	sigs.k8s.io/yaml v1.3.0
+ )
++
++replace github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.15-0.20220217191920-333bf4008d5f
+-- 
+2.35.1
+
