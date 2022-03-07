@@ -57,7 +57,7 @@ func Bootstrap() {
 
 	fmt.Println("Initiating bottlerocket bootstrap")
 	acquireLock()
-	userData, err := utils.ParseUserData()
+	userData, err := utils.ResolveUserData()
 	if err != nil {
 		fmt.Printf("Error parsing user-data: %v\n", err)
 		os.Exit(1)
@@ -83,7 +83,7 @@ func Bootstrap() {
 	// Bootstrapping done
 	err = utils.DisableBootstrapContainer()
 	if err != nil {
-		fmt.Println("Error disabling bootstrap container: %v\n", err)
+		fmt.Printf("Error disabling bootstrap container: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("Bottlerocket bootstrap was successful. Disabled bootstrap container")

@@ -41,7 +41,8 @@ include $(BASE_DIRECTORY)/Common.mk
 $(REPO):
 	@mkdir $@
 
-$(call IMAGE_TARGETS_FOR_NAME, bottlerocket-bootstrap): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+
+$(call IMAGE_TARGETS_FOR_NAME, bottlerocket-bootstrap): unit-test $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS)) 
 
 $(GATHER_LICENSES_TARGETS): | $(FAKE_GIT_REPO_TARGET)
 
@@ -60,6 +61,8 @@ clean-extra:
 
 clean: clean-extra
 
+unit-test:
+	go test ./...
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
