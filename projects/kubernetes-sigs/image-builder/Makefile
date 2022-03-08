@@ -22,8 +22,6 @@ VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
 DEV_ACCOUNTS?=
 
-ARTIFACTS_BUCKET?=
-
 PACKER_AMI_VAR_FILES=$(MAKE_ROOT)/packer/ami/packer.json
 PACKER_AMI_SHARE_FILE=$(MAKE_ROOT)/packer/ami/share-ami.json
 PACKER_AMI_VAR_FILES+=$(PACKER_AMI_SHARE_FILE)
