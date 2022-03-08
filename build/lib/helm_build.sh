@@ -18,38 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-HELM_SOURCE_REPOSITORY="${1?First argument is helm source repository}"
+OUTPUT_DIR="${1?First arguement is output directory}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
-HELM_DIRECTORY="${3?Third argument is helm directory}"
-OUTPUT_DIR="${4?Fouth arguement is output directory}"
-
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
-DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
-SOURCE_DIR=$(basename ${HELM_SOURCE_REPOSITORY})/${HELM_DIRECTORY}/.
-
-SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-source "${SCRIPT_ROOT}/common.sh"
-
-#
-# Copy
-#
-mkdir -p ${DEST_DIR}
-cp -r ${SOURCE_DIR} ${DEST_DIR}
-build::non-golang::copy_licenses ${HELM_SOURCE_REPOSITORY} $DEST_DIR/LICENSES/github.com/${HELM_SOURCE_REPOSITORY}
-
-#
-# Search and replace
-#
-SEDFILE=${OUTPUT_DIR}/helm/sedfile
-envsubst <helm/sedfile.template >${SEDFILE}
-TEMPLATE_DIR=helm/templates
-cat helm/files.txt | while read SOURCE_FILE DESTINATION_FILE
-do
-  TMPFILE=/tmp/$(basename ${SOURCE_FILE})
-  cp ${SOURCE_FILE} ${TMPFILE}
-  sed -f ${SEDFILE} ${TMPFILE} >${DEST_DIR}/${DESTINATION_FILE}
-  rm -f ${TMPFILE}
-done
 
 #
 # Build

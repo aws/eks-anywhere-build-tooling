@@ -11,7 +11,8 @@ RUN yum install -y \
     git \
     libtool \
     make \
-    readline-devel
+    readline-devel \
+    openssl-devel
 
 COPY ipmitool /ipmitool
 RUN cd ipmitool && \
@@ -24,12 +25,12 @@ RUN cd ipmitool && \
         --enable-intf-lanplus \
         --enable-intf-open && \
     make && \
-    make install
+    make DESTDIR=/newroot install
 
 WORKDIR /newroot
 
 RUN set -x && \
-    clean_install "openssl-libs ncurses-libs readline" true true && \
+    clean_install "openssl-libs ncurses-libs readline" && \
     cleanup "glibc"
 
 FROM $BASE_IMAGE
@@ -37,15 +38,13 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
+COPY --from=ipmitool-builder /newroot /
+
+COPY _output/files/pbnj /
 COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/grpc-ecosystem/grpc-health-probe /usr/local/bin
 COPY _output/bin/pbnj/$TARGETOS-$TARGETARCH/pbnj /usr/bin/pbnj
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
-
-COPY --from=ipmitool-builder /usr/local/bin/ipmitool /usr/local/bin
-COPY --from=ipmitool-builder /ipmitool/COPYING /LICENSES/github.com/ipmitool/ipmitool/COPYING
-
-COPY --from=ipmitool-builder /newroot /
 
 ENV GIN_MODE release
 USER pbnj

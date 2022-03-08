@@ -16,6 +16,8 @@ CARGO_HOME=$(MAKE_ROOT)/_output/cargo
 RUSTUP_HOME=$(MAKE_ROOT)/_output/rustup
 export BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 
+export BUILDER_ROOT=$(MAKE_ROOT)
+
 VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
 DEV_ACCOUNTS?=
@@ -34,15 +36,22 @@ PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(PACKER_TYPE_VAR_FIL
 # Kubeadm hardcodes the version of the pause image it pulls, even tho containerd config
 # overrides which image is actually used
 # Setting up this mapping so we can build the additional image into the image
+# The versions are dependent on the tag set for the Kubernetes version we are consuming vs what is hardcoded in the
+# kubeadm constants for that specific version:
+# Example for v1.22.4 on why we rely on the pause tag from v1.21.5, which is the previous version that we support:
+# Kubernetes pause tag in v1.22.4: https://github.com/kubernetes/kubernetes/blob/v1.22.4/build/pause/Makefile#L20
+# Kubernetes pause tag in v1.21.5: https://github.com/kubernetes/kubernetes/blob/v1.21.5/build/pause/Makefile#L20
+# Kubeadm constants: https://github.com/kubernetes/kubernetes/blob/v1.22.4/cmd/kubeadm/app/constants/constants.go#L397
 ADDITIONAL_PAUSE_1-20_FROM=1-19
 ADDITIONAL_PAUSE_1-21_FROM=1-20
+ADDITIONAL_PAUSE_1-22_FROM=1-21
 
 HAS_RELEASE_BRANCHES=true
 HAS_LICENSES=false
 SIMPLE_CREATE_TARBALLS=false
 
 # to support a no op attribution target
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=build release clean help binaries checksums attribution
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=build release clean help binaries checksums attribution release-ami-ubuntu-2004
 TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
 BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
@@ -138,10 +147,10 @@ build-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 
 .PHONY: release-ami-ubuntu-2004
 release-ami-ubuntu-2004: MAKEFLAGS=
-release-ova-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami
+release-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami
 release-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
-release-ami-ubuntu-2004-%: setup-ami-share deps-ami setup-packer-configs-ami
-	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
+release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
+	PACKER_LOG=1 PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
 
 .PHONY: release-ova-ubuntu-2004
 release-ova-ubuntu-2004: MAKEFLAGS=
@@ -162,6 +171,11 @@ release-raw-ubuntu-2004: MAKEFLAGS=
 release-raw-ubuntu-2004: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-user/$(shell basename $(BASE_DIRECTORY)),$(MAKE_ROOT)/$(OUTPUT_DIR))/raw
 release-raw-ubuntu-2004: deps-raw setup-packer-configs-raw
 	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME)
+
+.PHONY: build-qemu-rhel-local
+build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu
+build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
+	build/build_qemu_rhel_local.sh . $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
 
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova

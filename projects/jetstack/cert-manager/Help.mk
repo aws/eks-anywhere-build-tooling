@@ -11,28 +11,32 @@ clone-repo:  ## Clone upstream `cert-manager`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook cert-manager-ctl` for `linux/amd64 linux/arm64`
 _output/bin/cert-manager/linux-amd64/cert-manager-acmesolver: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-acmesolver`
 _output/bin/cert-manager/linux-amd64/cert-manager-cainjector: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-cainjector`
 _output/bin/cert-manager/linux-amd64/cert-manager-controller: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-controller`
 _output/bin/cert-manager/linux-amd64/cert-manager-webhook: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-webhook`
+_output/bin/cert-manager/linux-amd64/cert-manager-ctl: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-ctl`
 _output/bin/cert-manager/linux-arm64/cert-manager-acmesolver: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-acmesolver`
 _output/bin/cert-manager/linux-arm64/cert-manager-cainjector: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-cainjector`
 _output/bin/cert-manager/linux-arm64/cert-manager-controller: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-controller`
 _output/bin/cert-manager/linux-arm64/cert-manager-webhook: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-webhook`
+_output/bin/cert-manager/linux-arm64/cert-manager-ctl: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-ctl`
 
 ##@ Image Targets
-local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push helm/push` to IMAGE_REPO
+local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64 cert-manager-ctl/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push cert-manager-ctl/images/push helm/push` to IMAGE_REPO
 cert-manager-acmesolver/images/amd64: ## Builds/pushes `cert-manager-acmesolver/images/amd64`
 cert-manager-cainjector/images/amd64: ## Builds/pushes `cert-manager-cainjector/images/amd64`
 cert-manager-controller/images/amd64: ## Builds/pushes `cert-manager-controller/images/amd64`
 cert-manager-webhook/images/amd64: ## Builds/pushes `cert-manager-webhook/images/amd64`
+cert-manager-ctl/images/amd64: ## Builds/pushes `cert-manager-ctl/images/amd64`
 helm/build: ## Builds/pushes `helm/build`
 cert-manager-acmesolver/images/push: ## Builds/pushes `cert-manager-acmesolver/images/push`
 cert-manager-cainjector/images/push: ## Builds/pushes `cert-manager-cainjector/images/push`
 cert-manager-controller/images/push: ## Builds/pushes `cert-manager-controller/images/push`
 cert-manager-webhook/images/push: ## Builds/pushes `cert-manager-webhook/images/push`
+cert-manager-ctl/images/push: ## Builds/pushes `cert-manager-ctl/images/push`
 helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets

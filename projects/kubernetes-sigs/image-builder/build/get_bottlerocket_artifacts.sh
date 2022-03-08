@@ -33,6 +33,12 @@ CODEBUILD_CI="${CODEBUILD_CI:-false}"
 OVA_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/ova
 KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
 BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.releaseVersion" $MAKE_ROOT/BOTTLEROCKET_OVA_RELEASES)
+if [[ $BOTTLEROCKET_RELEASE_VERSION == "null" ]]; then
+  echo "Bottlerocket build for ${RELEASE_CHANNEL} is not enabled. Terminating silently."
+  mkdir -p $OVA_DOWNLOAD_PATH
+  touch $OVA_DOWNLOAD_PATH/temp_fake.ova
+  exit 0
+fi
 OVA="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
 BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/vmware-k8s-${KUBEVERSION}/x86_64/"
 BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"

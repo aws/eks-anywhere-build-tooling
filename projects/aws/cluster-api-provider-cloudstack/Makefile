@@ -11,10 +11,17 @@ BINARY_TARGET_FILES=manager
 EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) aws/cluster-api-provider-cloudstack/pkg/version)
 
 IMAGE_COMPONENT=aws/cluster-api-provider-cloudstack/release/manager
+CAPC_MANIFESTS_TARGET=$(REPO)/pkg/mocks/mock_client.go
 
 HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
+
+$(REPO)/eks-anywhere-go-mod-download: $(CAPC_MANIFESTS_TARGET)
+
+$(CAPC_MANIFESTS_TARGET): $(GIT_CHECKOUT_TARGET)
+	echo "Running generate-mocks for capc"
+	make -C $(REPO) generate-mocks
 
 s3-artifacts: create-manifests
 

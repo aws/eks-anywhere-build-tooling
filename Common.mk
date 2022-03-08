@@ -1,6 +1,6 @@
 # Disable built-in rules and variables
 MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
-SHELL=/bin/bash
+SHELL=bash
 .SHELLFLAGS:=-eu -o pipefail -c
 .SUFFIXES:
 
@@ -289,6 +289,12 @@ define GET_CLONE_URL
 $(shell source $(BUILD_LIB)/common.sh && build::common::get_clone_url $(1) $(2) $(AWS_REGION) $(CODEBUILD_CI))
 endef
 
+# Indenting the block results in the URL getting prefixed with a
+# space, hence no indentation below.
+define TO_UPPER
+$(shell echo '$(1)' | tr '[:lower:]' '[:upper:]')
+endef
+
 # to avoid dealing with cross compling issues using a buildctl
 # multi-stage build to build the binaries for both amd64 and arm64
 # licenses and attribution are also run from the builder image since
@@ -296,12 +302,16 @@ endef
 define CGO_BINARY_TARGET_BODY
 	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): $(GO_MOD_DOWNLOAD_TARGETS)
 		@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/
-		rsync -rm  --exclude='.git/logs/***' \
-			--exclude='projects/$(COMPONENT)/_output/bin/***' --exclude='projects/$(COMPONENT)/$(REPO)/***' \
+		rsync -rm  --exclude='.git/***' \
+			--exclude='***/_output/***' --exclude='projects/$(COMPONENT)/$(REPO)/***' \
 			--include='projects/$(COMPONENT)/***' --include='*/' --exclude='projects/***'  \
 			$(BASE_DIRECTORY)/ $(CGO_SOURCE)/eks-anywhere-build-tooling/
 		@mkdir -p $(OUTPUT_BIN_DIR)/$(subst /,-,$(1))
-		$(MAKE) binary-builder/cgo/$(1:linux/%=%) IMAGE_OUTPUT=dest=$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))
+		# Need so git properly finds the root of the repo
+		@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/.git/{refs,objects}
+		@cp $(BASE_DIRECTORY)/.git/HEAD $(CGO_SOURCE)/eks-anywhere-build-tooling/.git
+		$(MAKE) binary-builder/cgo/$(1:linux/%=%) \
+			IMAGE_OUTPUT=dest=$(OUTPUT_BIN_DIR)/$(subst /,-,$(1)) CGO_TARGET=$$@ IMAGE_BUILD_ARGS="GOPROXY COMPONENT CGO_TARGET"
 
 endef
 
@@ -427,7 +437,9 @@ endif
 
 .PHONY: validate-checksums
 validate-checksums: $(BINARY_TARGETS)
+ifneq ($(strip $(BINARY_TARGETS)),)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
+endif
 
 #### Image Helpers
 
@@ -456,11 +468,13 @@ validate-checksums: $(BINARY_TARGETS)
 helm/build: $(OUTPUT_DIR)/ATTRIBUTION.txt
 helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 	HELM_REGISTRY=$(IMAGE_REPO) \
 	IMAGE_TAG=$(IMAGE_TAG) \
 	HELM_TAG=$(HELM_TAG) \
 	$(HELM_ADDITIONAL_KEY_VALUES) \
-	$(BUILD_LIB)/helm_build.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
@@ -488,9 +502,9 @@ helm/push: helm/build
 
 .PHONY: %/cgo/amd64 %/cgo/arm64
 %/cgo/amd64 %/cgo/arm64: IMAGE_OUTPUT_TYPE?=local
-%/cgo/amd64 %/cgo/arm64: DOCKERFILE_FOLDER?=./docker/build
+%/cgo/amd64 %/cgo/arm64: DOCKERFILE_FOLDER?=$(BUILD_LIB)/docker/linux/cgo
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
-%/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY
+%/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY COMPONENT
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
 %/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(BASE_IMAGE_REPO)/builder-base:latest
 
