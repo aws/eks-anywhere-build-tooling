@@ -172,6 +172,11 @@ release-raw-ubuntu-2004: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-use
 release-raw-ubuntu-2004: deps-raw setup-packer-configs-raw
 	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME)
 
+.PHONY: build-qemu-rhel-local
+build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu
+build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
+	build/build_qemu_rhel_local.sh . $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
+
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
 	sh validate/validate.sh $(FULL_OUTPUT_DIR)/config/validate_goss_inline_vars.json
