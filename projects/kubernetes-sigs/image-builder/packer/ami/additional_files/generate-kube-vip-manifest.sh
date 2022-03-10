@@ -2,7 +2,6 @@
 
 KUBE_VIP_IMAGE=$1
 VIP=$2
-DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
 
 echo "Generating kube-vip manifest: image = [$KUBE_VIP_IMAGE] VIP = [$VIP]"
 
@@ -20,8 +19,6 @@ spec:
     env:
     - name: vip_arp
       value: "true"
-    - name: vip_interface
-      value: $DNI
     - name: port
       value: "6443"
     - name: vip_cidr
@@ -35,12 +32,12 @@ spec:
     - name: vip_leaderelection
       value: "true"
     - name: vip_leaseduration
-      value: "5"
+      value: "15"
     - name: vip_renewdeadline
-      value: "3"
+      value: "10"
     - name: vip_retryperiod
-      value: "1"
-    - name: vip_address
+      value: "2"
+    - name: address
       value: $VIP
     image: $KUBE_VIP_IMAGE
     imagePullPolicy: IfNotPresent
@@ -51,7 +48,6 @@ spec:
         add:
         - NET_ADMIN
         - NET_RAW
-        - SYS_TIME
     volumeMounts:
     - mountPath: /etc/kubernetes/admin.conf
       name: kubeconfig
