@@ -8,12 +8,14 @@ HAS_S3_ARTIFACTS=true
 SIMPLE_CREATE_BINARIES=false
 SIMPLE_CREATE_TARBALLS=false
 HAS_LICENSES=false
-IMAGE_NAMES=
+IMAGE_NAMES=cluster-api-provider-aws-snow
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
 s3-artifacts: create-manifests
+
+cluster-api-provider-aws-snow/images/%: BASE_IMAGE=382577505035.dkr.ecr.us-west-2.amazonaws.com/cluster-api-provider-aws-snow:$(GIT_TAG)
 
 .PHONY: create-manifests
 create-manifests:
