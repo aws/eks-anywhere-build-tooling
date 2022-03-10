@@ -8,8 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
-var secretsManagerService SecretsManagerService
-
 type SecretsManagerService interface {
 	GetSecretValue(ctx context.Context, secretName string) (*secretsmanager.GetSecretValueOutput, error)
 	DeleteSecret(ctx context.Context, secretName string) (*secretsmanager.DeleteSecretOutput, error)
@@ -19,19 +17,12 @@ type SecretsManagerImpl struct {
 	BaseClient *secretsmanager.Client
 }
 
-func SetSecretsManagerService(service SecretsManagerService) {
-	secretsManagerService = service
-}
-
-func GetSecretsManagerService() SecretsManagerService {
-	if secretsManagerService == nil {
-		clientImpl := SecretsManagerImpl{}
-		cfg, _ := config.LoadDefaultConfig(context.TODO())
-		cfg.Region = "us-west-2"
-		clientImpl.BaseClient = secretsmanager.NewFromConfig(cfg)
-		secretsManagerService = clientImpl
-	}
-	return secretsManagerService
+func NewSecretsManagerService() SecretsManagerService {
+	clientImpl := new(SecretsManagerImpl)
+	cfg, _ := config.LoadDefaultConfig(context.TODO())
+	cfg.Region = "us-west-2"
+	clientImpl.BaseClient = secretsmanager.NewFromConfig(cfg)
+	return clientImpl
 }
 
 func (client SecretsManagerImpl) GetSecretValue(ctx context.Context, secretName string) (*secretsmanager.GetSecretValueOutput, error) {

@@ -51,10 +51,10 @@ func ResolveUserData() (*UserData, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Error reading user data file")
 	}
-	return processUserData(data)
+	return processUserData(data, service.NewSecretsManagerService())
 }
 
-func processUserData(data []byte) (*UserData, error) {
+func processUserData(data []byte, secretsManagerService service.SecretsManagerService) (*UserData, error) {
 	userData := &UserData{}
 	err := yaml.Unmarshal(data, userData)
 	if err != nil {
@@ -68,7 +68,7 @@ func processUserData(data []byte) (*UserData, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "Error unmarshalling user data")
 		}
-		bootstrapUserData, err := loadExternalUserData(externalUserData, service.GetSecretsManagerService())
+		bootstrapUserData, err := loadExternalUserData(externalUserData, secretsManagerService)
 		if err != nil {
 			fmt.Printf("Error loading external user data: %v\n", err)
 			os.Exit(1)

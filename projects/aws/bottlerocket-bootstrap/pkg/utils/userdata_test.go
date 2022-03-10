@@ -38,7 +38,7 @@ user_data_source:
 `
 
 func TestNormalUserData(t *testing.T) {
-	processedUserData, err := processUserData([]byte(UserDataString))
+	processedUserData, err := processUserData([]byte(UserDataString), nil)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 	}
@@ -52,7 +52,6 @@ func TestWithExternalUserData(t *testing.T) {
 
 	defer ctrl.Finish()
 	mockSecretsManagerService := service.NewMockSecretsManagerService(ctrl)
-	service.SetSecretsManagerService(mockSecretsManagerService)
 	base64UserData := base64.StdEncoding.EncodeToString([]byte(UserDataString))
 	compressedUserData, _ := GzipBytes([]byte(base64UserData))
 	getSecretValueOutput := secretsmanager.GetSecretValueOutput{}
@@ -61,7 +60,7 @@ func TestWithExternalUserData(t *testing.T) {
 	mockSecretsManagerService.EXPECT().GetSecretValue(gomock.Any(), "some-prefix-0").Return(&getSecretValueOutput, nil)
 	mockSecretsManagerService.EXPECT().DeleteSecret(gomock.Any(), "some-prefix-0").Return(&secretsmanager.DeleteSecretOutput{}, nil)
 
-	processedUserData, err := processUserData([]byte(ExternalUserDataString))
+	processedUserData, err := processUserData([]byte(ExternalUserDataString), mockSecretsManagerService)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 	}
