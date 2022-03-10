@@ -8,7 +8,7 @@ HAS_S3_ARTIFACTS=true
 SIMPLE_CREATE_BINARIES=false
 SIMPLE_CREATE_TARBALLS=false
 HAS_LICENSES=false
-IMAGE_NAMES=cluster-api-provider-aws-snow
+IMAGE_COMPONENT=aws/cluster-api-provider-aws-snow/manager
 
 include $(BASE_DIRECTORY)/Common.mk
 
