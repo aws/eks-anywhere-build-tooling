@@ -39,8 +39,7 @@ type AWSSecretsManagerData struct {
 
 type AWSSecretsManagerUserData struct {
 	// This field is set by the CAPI provider.
-	// It indicates whether this UserData is normal userdata,
-	// or a userdata that is stored remotely.
+	// It indicates whether this UserData is normal userdata, or a userdata that is stored remotely.
 	UserDataType   string                `yaml:"user_data_type"`
 	UserDataSource AWSSecretsManagerData `yaml:"secrets_manager_data"`
 }
