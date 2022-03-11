@@ -60,6 +60,10 @@ clean-extra:
 
 clean: clean-extra
 
+build: unit-test
+
+unit-test:
+	go test ./...
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
