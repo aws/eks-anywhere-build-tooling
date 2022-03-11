@@ -61,7 +61,7 @@ clean-extra:
 
 clean: clean-extra
 
-local-images: unit-test
+build: unit-test
 
 unit-test:
 	go test ./...

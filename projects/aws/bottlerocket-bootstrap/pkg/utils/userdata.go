@@ -14,11 +14,15 @@ import (
 	"syscall"
 
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/service"
+
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
 
-const userDataFile = "/.bottlerocket/host-containers/current/user-data"
+const (
+	userDataFile      = "/.bottlerocket/host-containers/current/user-data"
+	awsSecretsManager = "AWSSecretsManager"
+)
 
 type WriteFile struct {
 	Path        string
@@ -27,18 +31,23 @@ type WriteFile struct {
 	Content     string
 }
 
-type UserDataSource struct {
+type AWSSecretsManagerData struct {
 	Provider string
 	Prefix   string
 	Chunks   int
 }
 
-type ExternalUserData struct {
-	UserDataType   string         `yaml:"user_data_type"`
-	UserDataSource UserDataSource `yaml:"user_data_source"`
+type AWSSecretsManagerUserData struct {
+	// This field is set by the CAPI provider.
+	// It indicates whether this UserData is normal userdata,
+	// or a userdata that is stored remotely.
+	UserDataType   string                `yaml:"user_data_type"`
+	UserDataSource AWSSecretsManagerData `yaml:"secrets_manager_data"`
 }
 
 type UserData struct {
+	// This field is set by the CAPI provider.
+	// It indicates whether this UserData is normal userdata, or a userdata that is stored remotely.
 	UserDataType string      `yaml:"user_data_type"`
 	WriteFiles   []WriteFile `yaml:"write_files"`
 	RunCmd       string      `yaml:"runcmd"`
@@ -61,28 +70,30 @@ func processUserData(data []byte, secretsManagerService service.SecretsManagerSe
 		return nil, errors.Wrap(err, "Error unmarshalling user data")
 	}
 	fmt.Printf("\n%+v\n", userData)
-	if userData.UserDataType == "ExternalUserData" {
+	if userData.UserDataType == awsSecretsManager {
+		// If this is a AWSSecretsManager typped UserData, parse it as AWSSecretsManagerUserData
 		fmt.Println("The loaded userdata is referecing an external userdata, loading it...")
-		externalUserData := &ExternalUserData{}
-		err = yaml.Unmarshal(data, externalUserData)
+		awsSecretsManagerUserData := &AWSSecretsManagerUserData{}
+		err = yaml.Unmarshal(data, awsSecretsManagerUserData)
 		if err != nil {
 			return nil, errors.Wrap(err, "Error unmarshalling user data")
 		}
-		bootstrapUserData, err := loadExternalUserData(externalUserData, secretsManagerService)
+		bootstrapUserData, err := loadUserDataFromSecretsManager(awsSecretsManagerUserData, secretsManagerService)
 		if err != nil {
-			fmt.Printf("Error loading external user data: %v\n", err)
+			fmt.Printf("Error loading userdata from SecretsManager: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("Successfully loaded external userdata")
+		fmt.Println("Successfully loaded userdata from SecretsManager")
 		return bootstrapUserData, nil
+	} else {
+		return userData, nil
 	}
-	return userData, nil
 }
 
-func loadExternalUserData(externalUserData *ExternalUserData, secretManagerService service.SecretsManagerService) (*UserData, error) {
+func loadUserDataFromSecretsManager(awsSecretsManagerUserData *AWSSecretsManagerUserData, secretManagerService service.SecretsManagerService) (*UserData, error) {
 	compressedCloudConfigBinary := []byte{}
-	for i := 0; i < externalUserData.UserDataSource.Chunks; i++ {
-		secretName := fmt.Sprintf("%s-%d", externalUserData.UserDataSource.Prefix, i)
+	for i := 0; i < awsSecretsManagerUserData.UserDataSource.Chunks; i++ {
+		secretName := fmt.Sprintf("%s-%d", awsSecretsManagerUserData.UserDataSource.Prefix, i)
 		secret, err := secretManagerService.GetSecretValue(context.TODO(), secretName)
 		if err != nil {
 			return nil, err

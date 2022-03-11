@@ -26,13 +26,11 @@ write_files:
 runcmd: "ControlPlaneInit"
 `
 
-// User data that references an external UserData
-const ExternalUserDataString = `
-#cloud-config
-user_data_type: "ExternalUserData"
+// References userdata stored in AWS SecretsManager
+const AWSSecrentsManagerDataString = `
+user_data_type: "AWSSecretsManager"
 
-user_data_source:
-    provider: secret-manager
+secrets_manager_data:
     prefix: some-prefix
     chunks: 1
 `
@@ -47,7 +45,7 @@ func TestNormalUserData(t *testing.T) {
 	}
 }
 
-func TestWithExternalUserData(t *testing.T) {
+func TestWithAWSSecretsManagerUserData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	defer ctrl.Finish()
@@ -60,7 +58,7 @@ func TestWithExternalUserData(t *testing.T) {
 	mockSecretsManagerService.EXPECT().GetSecretValue(gomock.Any(), "some-prefix-0").Return(&getSecretValueOutput, nil)
 	mockSecretsManagerService.EXPECT().DeleteSecret(gomock.Any(), "some-prefix-0").Return(&secretsmanager.DeleteSecretOutput{}, nil)
 
-	processedUserData, err := processUserData([]byte(ExternalUserDataString), mockSecretsManagerService)
+	processedUserData, err := processUserData([]byte(AWSSecrentsManagerDataString), mockSecretsManagerService)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 	}
