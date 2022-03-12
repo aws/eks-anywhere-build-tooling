@@ -30,9 +30,8 @@ DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 #
 # Search and replace
 #
-SEDFILE=${OUTPUT_DIR}/helm/sedfile
-envsubst <helm/sedfile.template >${SEDFILE}
 TEMPLATE_DIR=helm/templates
+SEDFILE=${OUTPUT_DIR}/helm/sedfile
 cat helm/files.txt | while read SOURCE_FILE DESTINATION_FILE
 do
   TMPFILE=/tmp/$(basename ${SOURCE_FILE})
