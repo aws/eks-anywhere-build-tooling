@@ -10,6 +10,11 @@ IMAGE_NAMES=$(IMAGE_COMPONENT)
 BINARY_TARGET_FILES=package-manager
 BASE_IMAGE_NAME=eks-distro-minimal-base
 
+HAS_HELM_CHART=true
+HELM_GIT_TAG?=$(shell cat GIT_TAG)
+HELM_DIRECTORY=charts/eks-anywhere-packages
+HELM_IMAGE_LIST="$(REPO)"
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
