@@ -27,6 +27,9 @@ export HELM_EXPERIMENTAL_OCI=1
 
 pwd
 echo "ECR_REPO=${ECR_REPO}"
+ls -la ${BASE_DIRECTORY}/projects/${ECR_REPO}
+yum install -y tree
+tree ${BASE_DIRECTORY}/projects/${ECR_REPO}
 HELM_TAG=$(cat ${BASE_DIRECTORY}/projects/${ECR_REPO}/HELM_TAG)
 echo "HELM_TAG=${HELM_TAG}"
 
