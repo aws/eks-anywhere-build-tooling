@@ -72,5 +72,5 @@ echo "Image import for ami $AMI_ID succeed"
 for dst in "${REPLICAS_SPLIT[@]}"
 do
   echo "Copying exported image to $dst"
-  aws s3 cp --no-progress $EXPORTED_IMAGE_LOCATION $dst 
+  aws s3 cp --no-progress --acl public-read $EXPORTED_IMAGE_LOCATION $dst 
 done
