@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -41,7 +42,7 @@ EKSD_RELEASE=$(build::eksd_releases::get_eksd_release_name $EKSD_RELEASE_BRANCH)
 EXPORTED_IMAGE_PREFIX="$DST_PATH/$EKSD_RELEASE-"
 
 EXPORT_RESPONSE=$(aws ec2 export-image --disk-image-format $IMAGE_FORMAT --s3-export-location S3Bucket=$DST_BUCKET_NAME,S3Prefix=$EXPORTED_IMAGE_PREFIX --image-id $AMI_ID)
-echo $EXPORT_RESPONSE | jq
+echo $EXPORT_RESPONSE
 
 EXPORT_TASK_ID=$(echo $EXPORT_RESPONSE | jq -r '.ExportImageTaskId')
 EXPORTED_IMAGE_LOCATION="s3://${DST_BUCKET_NAME}/${EXPORTED_IMAGE_PREFIX}${EXPORT_TASK_ID}.${IMAGE_FORMAT}"
