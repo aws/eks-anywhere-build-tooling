@@ -60,7 +60,6 @@ echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPO
 aws s3 cp s3://eks-a-addons-generatebundle/generatebundlefile .
 chmod +x ./generatebundlefile
 
-
 # Python3 pip and yq
 pip3 install yq
 
@@ -87,3 +86,5 @@ ECR_PASSWORD=$(aws ecr-public get-login-password --region us-east-1 | tr -d '\n'
 echo "${ECR_PASSWORD}" | oras login -u AWS --password-stdin "${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}"
 cd output/
 oras push -u AWS -p "${ECR_PASSWORD}" "${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}:${BUNDLE_TAG}" 1.20-bundle-crd.yaml
+
+helm_tag=$(curl https://raw.githubusercontent.com/aws/eks-anywhere-build-tooling/main/projects/aws/eks-anywhere-test/GIT_TAG)

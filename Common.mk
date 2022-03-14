@@ -19,6 +19,7 @@ AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 ARTIFACTS_BUCKET?=s3://my-s3-bucket
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
+ECR_PUBLIC_URI?=$(shell AWS_REGION=us-east-1 && aws ecr-public describe-registries --query 'registries[*].registryUri' --output text)
 ####################################################
 
 #################### LATEST TAG ####################
@@ -480,6 +481,9 @@ helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),
 .PHONY: helm/push
 helm/push: helm/build
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(OUTPUT_DIR)
+
+helm/promotion:
+	$(BUILD_LIB)/addon_promotion.sh $(AWS_ACCOUNT_ID) $(ECR_PUBLIC_URI)
 
 # Build image using buildkit only builds linux/amd64 oci and saves to local tar.
 %/images/amd64: IMAGE_PLATFORMS?=linux/amd64
