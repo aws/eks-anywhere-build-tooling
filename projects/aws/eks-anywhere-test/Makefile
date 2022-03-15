@@ -1,6 +1,5 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
-HELM_TAG?=$(shell cat HELM_TAG)
 GOLANG_VERSION?="1.17"
 
 REPO=eks-anywhere-test
