@@ -103,7 +103,7 @@ function build::gather_licenses() {
 
   # use go 1.16 since 1.17 seems to be more agressive about wanting to update
   # the go.mod/sum file
-  build::common::use_go_version 1.17
+  build::common::use_go_version 1.16
 
   # Force deps to only be pulled form vendor directories
   # this is important in a couple cases where license files
@@ -166,7 +166,6 @@ function build::non-golang::gather_licenses(){
   local -r project="$1"
   local -r git_tag="$2"
   local -r output_dir="$3"
-  #Old Stuff
   project_org="$(cut -d '/' -f1 <<< ${project})"
   project_name="$(cut -d '/' -f2 <<< ${project})"
   git clone https://github.com/${project_org}/${project_name}
@@ -178,13 +177,6 @@ function build::non-golang::gather_licenses(){
 }
 
 function build::non-golang::copy_licenses(){
-  #Golang Stuff
-  export GOFLAGS=-mod=vendor
-  export GOOS=linux 
-  export GOARCH=amd64 
-  build::common::use_go_version 1.17
-  go version
-  pwd
   local -r source_dir="$1"
   local -r destination_dir="$2"
   (cd $source_dir; find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)) |

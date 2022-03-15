@@ -30,7 +30,7 @@ export HELM_EXPERIMENTAL_OCI=1
 
 export PRIV_ECR_REPO=$(echo ${ECR_REPO} | sed "s/aws\///") # We sed to remove aws/ from ECR repo names
 echo "ECR_REPO=${ECR_REPO}"
-HELM_TAG=$(cat ${BASE_DIRECTORY}/projects/${ECR_REPO}/HELM_TAG)
+HELM_TAG=$(cat ${BASE_DIRECTORY}/projects/${ECR_REPO}/GIT_TAG)
 echo "HELM_TAG=${HELM_TAG}"
 
 # Pull Helm chart from private ECR

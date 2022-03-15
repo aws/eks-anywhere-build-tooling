@@ -105,7 +105,7 @@ generate:
 	build/lib/generate_projects_list.sh $(BASE_DIRECTORY)
 
 helm/promotion:
-	$(BUILD_LIB)/addon_promotion.sh $(AWS_ACCOUNT_ID) $(ECR_PUBLIC_URI)
+	$(BUILD_LIB)/helm_promotion.sh $(AWS_ACCOUNT_ID) $(ECR_PUBLIC_URI)
 
 .PHONY: check-project-path-exists
 check-project-path-exists:

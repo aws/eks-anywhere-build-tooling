@@ -26,6 +26,4 @@ CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 # Build
 #
 cd ${OUTPUT_DIR}/helm
-cat eks-anywhere-test/Chart.yaml || true
-ls -la
 helm package "${CHART_NAME}"
