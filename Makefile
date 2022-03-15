@@ -14,6 +14,7 @@ EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQ
 ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling kubernetes-sigs_image-builder
 
 RELEASE_BRANCH?=
+GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
 .PHONY: build-all-projects
 build-all-projects: $(BUILD_TARGETS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling
@@ -105,7 +106,7 @@ generate:
 	build/lib/generate_projects_list.sh $(BASE_DIRECTORY)
 
 helm/promotion:
-	$(BUILD_LIB)/helm_promotion.sh $(AWS_ACCOUNT_ID) $(ECR_PUBLIC_URI)
+	$(BUILD_LIB)/helm_promotion.sh $(AWS_ACCOUNT_ID) $(ECR_PUBLIC_URI) $(GIT_HASH)
 
 .PHONY: check-project-path-exists
 check-project-path-exists:
