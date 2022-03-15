@@ -15,7 +15,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 s3-artifacts: create-manifests
 
-cluster-api-provider-aws-snow/images/%: BASE_IMAGE=382577505035.dkr.ecr.us-west-2.amazonaws.com/cluster-api-provider-aws-snow:$(GIT_TAG)
+cluster-api-provider-aws-snow/images/%: BASE_IMAGE=382577505035.dkr.ecr.us-west-2.amazonaws.com/cluster-api-provider-aws-snow-ecr:$(GIT_TAG)
 
 .PHONY: create-manifests
 create-manifests:
