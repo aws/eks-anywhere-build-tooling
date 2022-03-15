@@ -149,8 +149,14 @@ build-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 release-ami-ubuntu-2004: MAKEFLAGS=
 release-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami
 release-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
+release-ami-ubuntu-2004: export MANIFEST_OUTPUT=$(FULL_OUTPUT_DIR)/manifest.json
+release-ami-ubuntu-2004: EXPORT_AMI_BUCKET?=$(ARTIFACTS_BUCKET)
+release-ami-ubuntu-2004: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami
+release-ami-ubuntu-2004: EXPORT_AMI_DST=$(AMI_S3_DST)/$(GIT_HASH)
+release-ami-ubuntu-2004: LATEST_AMI_S3_URL=$(AMI_S3_DST)/$(LATEST)/ubuntu.raw
 release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 	PACKER_LOG=1 PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
+	build/export-ami-to-s3.sh $(RELEASE_BRANCH) $(MANIFEST_OUTPUT) raw $(EXPORT_AMI_DST) $(LATEST_AMI_S3_URL)
 
 .PHONY: release-ova-ubuntu-2004
 release-ova-ubuntu-2004: MAKEFLAGS=

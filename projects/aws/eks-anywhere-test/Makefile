@@ -17,8 +17,7 @@ BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
 HAS_HELM_CHART=true
-HELM_ADDITIONAL_KEY_VALUES=\
-  EKS_ANYWHERE_TAG=$(shell $(BASE_DIRECTORY)/build/lib/image_shasum.sh ${IMAGE_REPO} eks-anywhere-test $(LATEST)) \
+HELM_IMAGE_LIST="$(REPO)"
 
 include $(BASE_DIRECTORY)/Common.mk
 
