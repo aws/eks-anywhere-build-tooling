@@ -76,12 +76,18 @@ function build::common::upload_artifacts() {
   local -r buildidentifier=$4
   local -r githash=$5
   local -r latesttag=$6
+  local -r dry_run=$7
 
-  # Upload artifacts to s3 
-  # 1. To proper path on s3 with buildId-githash
-  # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
-  aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read
-  aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read
+  if [ "$dry_run" = "true" ]; then
+    aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
+    aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --recursive --dryrun
+  else
+    # Upload artifacts to s3 
+    # 1. To proper path on s3 with buildId-githash
+    # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
+    aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read
+    aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read
+  fi
 }
 
 function build::gather_licenses() {
@@ -142,7 +148,11 @@ function build::gather_licenses() {
   # which makes deleting them later awkward
   # this behavior may change in the future with the following PR
   # https://github.com/google/go-licenses/pull/28
-  chmod -R 777 "${outputdir}/LICENSES"  
+  # We can delete these additional files because we are running go mod vendor
+  # prior to this call so we know the source is the same as upstream
+  # go-licenses is copying this code because it doesnt know if its be modified or not
+  chmod -R 777 "${outputdir}/LICENSES"
+  find "${outputdir}/LICENSES" -type f \( -name '*.yml' -o -name '*.go' -o -name '*.mod' -o -name '*.sum' -o -name '*gitignore' \) -delete
 
   # most of the packages show up the go-license.csv file as the module name
   # from the go.mod file, storing that away since the source dirs usually get deleted
@@ -155,16 +165,26 @@ function build::gather_licenses() {
 function build::non-golang::gather_licenses(){
   local -r project="$1"
   local -r git_tag="$2"
+  local -r output_dir="$3"
   project_org="$(cut -d '/' -f1 <<< ${project})"
   project_name="$(cut -d '/' -f2 <<< ${project})"
   git clone https://github.com/${project_org}/${project_name}
   cd $project_name
   git checkout $git_tag
-  license_files=($(find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)))
-  for file in "${license_files[@]}"; do
-    license_dest=$MAKE_ROOT/_output/LICENSES/github.com/${project_org}/${project_name}/$(dirname $file)
+  cd ..
+  build::non-golang::copy_licenses $project_name $output_dir/LICENSES/github.com/${project_org}/${project_name}
+  rm -rf $project_name
+}
+
+function build::non-golang::copy_licenses(){
+  local -r source_dir="$1"
+  local -r destination_dir="$2"
+  (cd $source_dir; find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)) |
+  while read file
+  do
+    license_dest=$destination_dir/$(dirname $file)
     mkdir -p $license_dest
-    cp $file $license_dest/$(basename $file)
+    cp "${source_dir}/${file}" $license_dest/$(basename $file)
   done
 }
 
@@ -204,6 +224,9 @@ function build::common::get_go_path() {
   fi
   if [[ $version == "1.16"* ]]; then
     gobinaryversion="1.16"
+  fi
+  if [[ $version == "1.17"* ]]; then
+    gobinaryversion="1.17"
   fi
 
   if [[ "$gobinaryversion" == "" ]]; then
@@ -254,10 +277,18 @@ function build::common::re_quote() {
 function build::common::get_latest_eksa_asset_url() {
   local -r artifact_bucket=$1
   local -r project=$2
+  local -r arch=${3-amd64}
+  local -r latesttag=${4-latest}
 
   local -r git_tag=$(cat $BUILD_ROOT/../../projects/${project}/GIT_TAG)
-  echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-amd64-${git_tag}.tar.gz"
+  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$latesttag/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
 
+  local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $url)
+  if [[ "$http_code" == "200" ]]; then 
+    echo "$url"
+  else
+    echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+  fi
 }
 
 function build::common::wait_for_tag() {
@@ -274,4 +305,35 @@ function build::common::wait_for_tag() {
       exit 1
     fi
   done
+}
+
+function build::common::wait_for_tarball() {
+  local -r tarball_url=$1
+  sleep_interval=20
+  for i in {1..60}; do
+    echo "Checking for URL ${tarball_url}..."
+    local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $tarball_url)
+    if [[ "$http_code" == "200" ]]; then 
+      echo "Tarball exists!" && break
+    fi
+    echo "Tarball does not exist!"
+    echo "Waiting for tarball to be uploaded to ${tarball_url}"
+    sleep $sleep_interval
+    if [ "$i" = "60" ]; then
+      exit 1
+    fi
+  done
+}
+
+function build::common::get_clone_url() {
+  local -r org=$1
+  local -r repo=$2
+  local -r aws_region=$3
+  local -r codebuild_ci=$4
+
+  if [ "$codebuild_ci" = "true" ]; then
+    echo "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
+  else
+    echo "https://github.com/${org}/${repo}.git"
+  fi
 }

@@ -7,17 +7,14 @@ REPO_OWNER=rancher
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=local-path-provisioner
-
-HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
-.PHONY: local-images
-local-images: local-path-provisioner/images/amd64
-
-.PHONY: images
-images: local-path-provisioner/images/push
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################

@@ -1,0 +1,110 @@
+From 747ae7866b448048e8fbf6dbd53a957131face79 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Sun, 21 Nov 2021 01:15:08 -0800
+Subject: [PATCH 32/42] Add external etcd api to v1alpha4
+
+---
+ api/v1alpha4/cluster_types.go                 | 14 ++++++
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 47 +++++++++++++++++++
+ 2 files changed, 61 insertions(+)
+
+diff --git a/api/v1alpha4/cluster_types.go b/api/v1alpha4/cluster_types.go
+index 794363ab6..39f092710 100644
+--- a/api/v1alpha4/cluster_types.go
++++ b/api/v1alpha4/cluster_types.go
+@@ -56,6 +56,11 @@ type ClusterSpec struct {
+ 	// +optional
+ 	ControlPlaneRef *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
+ 
++	// ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
++	// for provisioning an external etcd cluster
++	// +optional
++	ManagedExternalEtcdRef *corev1.ObjectReference `json:"managedExternalEtcdRef,omitempty"`
++
+ 	// InfrastructureRef is a reference to a provider-specific resource that holds the details
+ 	// for provisioning infrastructure for a cluster in said provider.
+ 	// +optional
+@@ -222,6 +227,15 @@ type ClusterStatus struct {
+ 	// ObservedGeneration is the latest generation observed by the controller.
+ 	// +optional
+ 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
++
++	// ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
++	// so remaining etcd members can lookup the address to join the cluster
++	// +optional
++	ManagedExternalEtcdInitialized bool `json:"managedExternalEtcdInitialized"`
++
++	// ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned
++	// +optional
++	ManagedExternalEtcdReady bool `json:"managedExternalEtcdReady"`
+ }
+ 
+ // ANCHOR_END: ClusterStatus
+diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+index e54c7bb59..f103cefb6 100644
+--- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
++++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+@@ -474,6 +474,44 @@ spec:
+                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                     type: string
+                 type: object
++              managedExternalEtcdRef:
++                description: ManagedExternalEtcdRef is an optional reference to an
++                  etcd provider resource that holds details for provisioning an external
++                  etcd cluster
++                properties:
++                  apiVersion:
++                    description: API version of the referent.
++                    type: string
++                  fieldPath:
++                    description: 'If referring to a piece of an object instead of
++                      an entire object, this string should contain a valid JSON/Go
++                      field access statement, such as desiredState.manifest.containers[2].
++                      For example, if the object reference is to a container within
++                      a pod, this would take on a value like: "spec.containers{name}"
++                      (where "name" refers to the name of the container that triggered
++                      the event) or if no container name is specified "spec.containers[2]"
++                      (container with index 2 in this pod). This syntax is chosen
++                      only to have some well-defined way of referencing a part of
++                      an object. TODO: this design is not final and this field is
++                      subject to change in the future.'
++                    type: string
++                  kind:
++                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++                    type: string
++                  name:
++                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
++                    type: string
++                  namespace:
++                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
++                    type: string
++                  resourceVersion:
++                    description: 'Specific resourceVersion to which this reference
++                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
++                    type: string
++                  uid:
++                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
++                    type: string
++                type: object
+               paused:
+                 description: Paused can be used to prevent controllers from processing
+                   the Cluster and all its associated objects.
+@@ -691,6 +729,15 @@ spec:
+                 description: InfrastructureReady is the state of the infrastructure
+                   provider.
+                 type: boolean
++              managedExternalEtcdInitialized:
++                description: ManagedExternalEtcdInitialized indicates that first etcd
++                  member's IP address is set by machine controller, so remaining etcd
++                  members can lookup the address to join the cluster
++                type: boolean
++              managedExternalEtcdReady:
++                description: ManagedExternalEtcdReady indicates external etcd cluster
++                  is fully provisioned
++                type: boolean
+               observedGeneration:
+                 description: ObservedGeneration is the latest generation observed
+                   by the controller.
+-- 
+2.27.0
+

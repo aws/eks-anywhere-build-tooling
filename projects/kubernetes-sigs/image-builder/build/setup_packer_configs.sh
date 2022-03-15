@@ -20,9 +20,11 @@ set -o nounset
 set -o pipefail
 
 RELEASE_BRANCH="${1?Specify first argument - release branch}"
-ARTIFACTS_BUCKET="${2?Specify second argument - artifact bucket}"
-OVA_PATH="${3? Specify the third argument - ova output path}"
-ADDITIONAL_PAUSE_IMAGE="${4? Specify the fourth argument - additional pause image}"
+IMAGE_FORMAT="${2?Specify second argument - image format}"
+ARTIFACTS_BUCKET="${3?Specify third argument - artifact bucket}"
+OVA_PATH="${4? Specify fourth argument - ova output path}"
+ADDITIONAL_PAUSE_IMAGE_FROM="${5? Specify fifth argument - additional pause image}"
+LATEST_TAG="${6? Specify sixth argument - latest tag}"
 
 CI="${CI:-false}"
 
@@ -32,7 +34,7 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 # Preload release yaml
 build::eksd_releases::load_release_yaml $RELEASE_BRANCH
 
-OUTPUT_CONFIGS="$MAKE_ROOT/_output/$RELEASE_BRANCH/config"
+OUTPUT_CONFIGS="$MAKE_ROOT/_output/$RELEASE_BRANCH/$IMAGE_FORMAT/config"
 mkdir -p $OUTPUT_CONFIGS
 
 export CNI_SHA="sha256:$(build::eksd_releases::get_eksd_component_sha 'cni-plugins' $RELEASE_BRANCH)"
@@ -70,17 +72,18 @@ export KUBERNETES_FULL_VERSION="$KUBERNETES_VERSION-eks-$RELEASE_BRANCH-$EKSD_RE
 export ETCD_HTTP_SOURCE=$(build::eksd_releases::get_eksd_component_url "etcd" $RELEASE_BRANCH)
 export ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $RELEASE_BRANCH)
 export ETCD_SHA256=$(build::eksd_releases::get_eksd_component_sha "etcd" $RELEASE_BRANCH)
-export ETCDADM_HTTP_SOURCE=${ETCDADM_HTTP_SOURCE:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm')}
-# TODO: fix etcdadm build to set correct version
-export ETCDADM_VERSION='v0.0.0-master+$Format:%h$'
-export CRICTL_URL=${CRICTL_URL:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools')}
-export CRICTL_SHA256=$(curl $CRICTL_URL | sha256sum | cut -d ' ' -f1)
+export ETCDADM_HTTP_SOURCE=${ETCDADM_HTTP_SOURCE:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm' 'amd64' $LATEST_TAG)}
+export ETCDADM_VERSION='v0.1.5'
+export CRICTL_URL=${CRICTL_URL:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' 'amd64' $LATEST_TAG)}
+export CRICTL_SHA256="$CRICTL_URL.sha256"
 
 envsubst '$IMAGE_REPO:$KUBERNETES_ASSET_BASE_URL:$KUBERNETES_VERSION:$KUBERNETES_SERIES:$CRICTL_URL:$CRICTL_SHA256:$ETCD_HTTP_SOURCE:$ETCD_VERSION:$ETCDADM_HTTP_SOURCE:$ETCD_SHA256:$ETCDADM_VERSION:$KUBERNETES_FULL_VERSION' \
     < "$MAKE_ROOT/packer/config/kubernetes.json.tmpl" \
     > "$OUTPUT_CONFIGS/kubernetes.json"
 
-export ADDITIONAL_PAUSE_IMAGE=$(echo $PAUSE_IMAGE | cut -f1 -d":"):$ADDITIONAL_PAUSE_IMAGE
+ADDITIONAL_PAUSE_IMAGE_VERSION_BASE_URL=$(build::eksd_releases::get_eksd_kubernetes_asset_base_url $ADDITIONAL_PAUSE_IMAGE_FROM)
+ADDITIONAL_PAUSE_KUBERNETES_VERSION=$(build::eksd_releases::get_eksd_component_version "kubernetes" $ADDITIONAL_PAUSE_IMAGE_FROM)
+export ADDITIONAL_PAUSE_IMAGE=$ADDITIONAL_PAUSE_IMAGE_VERSION_BASE_URL/$ADDITIONAL_PAUSE_KUBERNETES_VERSION/bin/linux/amd64/pause.tar
 envsubst '$ADDITIONAL_PAUSE_IMAGE' \
     < "$MAKE_ROOT/packer/config/additional_components.json.tmpl" \
     > "$OUTPUT_CONFIGS/additional_components.json"
@@ -91,7 +94,7 @@ echo "$KUBERNETES_VERSION" > "$OVA_PATH"/KUBERNETES_VERSION
 export EKSD_MANIFEST_URL=$(build::eksd_releases::get_release_yaml_url $RELEASE_BRANCH)
 echo "$EKSD_MANIFEST_URL" > "$OVA_PATH"/EKSD_MANIFEST_URL
 
-envsubst '$CNI_VERSION:$KUBERNETES_FULL_VERSION:$ETCD_VERSION:$ETCD_SHA256:$ETCDADM_VERSION:$PAUSE_IMAGE:$CNI_HOST_DEVICE_SHA256' \
+envsubst '$CNI_VERSION:$ETCD_VERSION:$ETCD_SHA256:$ETCDADM_VERSION:$PAUSE_IMAGE:$CNI_HOST_DEVICE_SHA256' \
     < "$MAKE_ROOT/packer/config/validate_goss_inline_vars.json.tmpl" \
     > "$OUTPUT_CONFIGS/validate_goss_inline_vars.json"
 

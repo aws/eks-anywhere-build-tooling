@@ -20,6 +20,7 @@ set -o pipefail
 shopt -s globstar
 
 PROJECT="$1"
+TARGET="$2"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 PROJECT_ROOT=$MAKE_ROOT/$PROJECT
@@ -28,15 +29,28 @@ mkdir -p _output
 touch _output/total_summary.txt
 
 function build::attribution::generate(){
-    make -C $PROJECT_ROOT binaries
-    make -C $PROJECT_ROOT generate-attribution
-    for summary in $PROJECT_ROOT/_output/**/summary.txt; do
-        sed -i "s/+.*=/ =/g" $summary
-        awk -F" =\> " '{ count[$1]+=$2} END { for (item in count) printf("%s => %d\n", item, count[item]) }' \
-            $summary _output/total_summary.txt | sort > _output/total_summary.tmp && mv _output/total_summary.tmp _output/total_summary.txt
-    done    
-    make -C $PROJECT_ROOT clean
+    if [ $# -ge 1 ]; then
+        export RELEASE_BRANCH="$1"
+    fi
+    make -C $PROJECT_ROOT $TARGET
+    if [ -f $PROJECT_ROOT/_output/**/summary.txt ]; then
+        for summary in $PROJECT_ROOT/_output/**/summary.txt; do
+            sed -i "s/+.*=/ =/g" $summary
+            awk -F" =\> " '{ count[$1]+=$2} END { for (item in count) printf("%s => %d\n", item, count[item]) }' \
+                $summary _output/total_summary.txt | sort > _output/total_summary.tmp && mv _output/total_summary.tmp _output/total_summary.txt
+        done
+    fi
 }
 
 
-build::attribution::generate
+# Some projects have specific folders for different kubernetes release
+# dynamically find all versions to avoid having to update with every release
+RELEASE_FOLDER=$(find $PROJECT_ROOT -type d -name "1-*")
+
+if [ -z "${RELEASE_FOLDER}" ]; then
+    build::attribution::generate
+else
+    for release in $PROJECT_ROOT/1-*/ ; do
+        build::attribution::generate $(basename $release)
+    done
+fi

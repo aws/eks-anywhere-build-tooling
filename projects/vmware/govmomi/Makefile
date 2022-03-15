@@ -5,18 +5,19 @@ GOLANG_VERSION?="1.13"
 REPO=govmomi
 REPO_OWNER=vmware
 
-LICENSE_PACKAGE_FILTER?=./govc
-
 BINARY_TARGET_FILES=govc
 SOURCE_PATTERNS=./govc
 
 HAS_S3_ARTIFACTS=true
 
+IMAGE_NAMES=
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
-.PHONY: local-images
-local-images: #noop
-
-.PHONY: images
-images: #noop
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################

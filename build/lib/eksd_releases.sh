@@ -14,38 +14,46 @@
 # limitations under the License.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../" && pwd -P)"
-LASTEST_RELEASE_BRANCH=''
+LATEST_RELEASE_BRANCH=''
+PROD_DOMAIN="distro.eks.amazonaws.com"
+DEV_DOMAIN="eks-d-postsubmit-artifacts.s3.us-west-2.amazonaws.com"
 declare -A RELEASE_YAML=()
 
 function build::eksd_releases::load_release_yaml() {
     local -r release_branch=$1
-
+    local -r echo=${2-true}
     oldopt=$-
     set +o nounset
+    set +x
 
     # if key exists, 1 is returned which would resolve to true
     if [ ! ${RELEASE_YAML[$release_branch]+1} ]; then
         local -r yaml_url=$(build::eksd_releases::get_release_yaml_url ${release_branch})
-        RELEASE_YAML[$release_branch]=$(curl --retry 5 $yaml_url)
+        RELEASE_YAML[$release_branch]=$(curl -s --retry 5 $yaml_url)
     fi
-    echo "${RELEASE_YAML[$release_branch]}"
-    
+    if $echo; then
+        echo "${RELEASE_YAML[$release_branch]}"
+    fi
     set -$oldopt
 }
 
 function build::eksd_releases::get_release_yaml_url() {
     local -r release_branch=$1
-
-    local -r release_number=$(yq e ".${release_branch}.number" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
-    local -r yaml_url="https://distro.eks.amazonaws.com/kubernetes-${release_branch}/kubernetes-${release_branch}-eks-${release_number}.yaml"
+    local -r release_number=$(yq e ".releases[] | select(.branch==\"${release_branch}\").number" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
+    local -r dev=$(yq e ".releases[] | select(.branch==\"${release_branch}\").dev" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
+    local -r yaml_path="kubernetes-${release_branch}/kubernetes-${release_branch}-eks-${release_number}.yaml"
+    local yaml_url="https://$PROD_DOMAIN/$yaml_path"
+    if [[ $dev == "true" ]]; then
+      yaml_url="https://$DEV_DOMAIN/$yaml_path"
+    fi
     echo "$yaml_url"
 }
 
 function build::eksd_releases::get_release_branch() {
-    if [ -z $LASTEST_RELEASE_BRANCH ]; then
-        LASTEST_RELEASE_BRANCH=$(yq e ".latest" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
+    if [ -z $LATEST_RELEASE_BRANCH ]; then
+        LATEST_RELEASE_BRANCH=$(yq e ".latest" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
     fi
-    echo $LASTEST_RELEASE_BRANCH
+    echo $LATEST_RELEASE_BRANCH
 }
 
 function build::eksd_releases::get_eksd_release_number() {

@@ -1,41 +1,43 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-ARTIFACTS_BUCKET?=my-s3-bucket
 GIT_TAG?=$(shell cat GIT_TAG)
-HELM_REPO_VERSION?=$(shell cat HELM_REPO_VERSION)
-BRANCH_NAME?=main
-LATEST_TAG?=latest
-ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
-endif
+CHART_TAG=$(shell echo $(GIT_TAG) | sed 's/^v//')
 
-ifdef CODEBUILD_SRC_DIR
-	ARTIFACTS_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-else
-	ARTIFACTS_PATH?="_output/artifacts"
-endif
+REGISTRY=public.ecr.aws/isovalent
+CILIUM_IMAGE=cilium
+OPERATOR_IMAGE=operator-generic
+CILIUM_CHART=cilium
 
-.PHONY: upload-artifacts
-upload-artifacts:
-	mkdir -p $(ARTIFACTS_PATH)
-	cp -rf _output/manifests/ $(ARTIFACTS_PATH)
-	build/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
+REPO=cilium
+REPO_OWNER=cilium
 
-.PHONY: manifests
-manifests:
-	build/create_manifests.sh $(GIT_TAG) $(HELM_REPO_VERSION)
+HAS_S3_ARTIFACTS=true
+SIMPLE_CREATE_BINARIES=false
+SIMPLE_CREATE_TARBALLS=false
+HAS_LICENSES=false
+IMAGE_NAMES=
 
-.PHONY: build
-build: manifests
-	echo "Done $(COMPONENT)"
+BUILD_TARGETS=upload-artifacts
+RELEASE_TARGETS=upload-artifacts
 
-.PHONY: release
-release: build
-	echo "Done $(COMPONENT)"
+include $(BASE_DIRECTORY)/Common.mk
 
-.PHONY: all
-all: release
 
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
+s3-artifacts: create-manifests
+
+.PHONY: create-manifests
+create-manifests:
+	build/create_manifests.sh $(GIT_TAG) $(ARTIFACTS_PATH) $(REGISTRY)
+
+.PHONY: update-digests
+update-digests:
+	build/update_digest.sh $(REGISTRY) $(CILIUM_IMAGE) $(GIT_TAG) images/cilium/IMAGE_DIGEST
+	build/update_digest.sh $(REGISTRY) $(OPERATOR_IMAGE) $(GIT_TAG) images/operator-generic/IMAGE_DIGEST
+	build/update_digest.sh $(REGISTRY) $(CILIUM_CHART) $(CHART_TAG) images/cilium-chart/IMAGE_DIGEST
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################

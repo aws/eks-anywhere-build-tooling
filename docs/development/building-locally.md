@@ -16,7 +16,7 @@ an ECR repo in the currently logged in AWS account will be used.  A common alter
 this default behavior. This can be done with `IMAGE_REPO=localhost:5000 make images`. To run buildkit and the docker registry run from the repo root:
 	* `make run-buildkit-and-registry`
 	* `export BUILDKIT_HOST=docker-container://buildkitd`
-	* `make stop-build-and-registry` to cleanup
+	* `make stop-buildkit-and-registry` to cleanup
 
 ## Typical build targets
 
@@ -34,7 +34,7 @@ Each project folder contains a Makefile with the following build targets.
 	Builds will fail if these do not match, but the correct checksums will be outputted to make updating easier.
 * `build` - run via prow presubmit, clones repo, build binary(s), gather licenses, build container images, build tarballs and generate attribution file.
 	Uses `local-images` to build images which does not push to a registry.
-* `release` - run via prow postsubmit, same as `build` except runs `images` to push to a remote registry and `upload-artifacts` to push tars/binaries
+* `release` - run via prow postsubmit, same as `build` except runs `images` to push to a remote registry and to push tars/binaries
 	to s3.
 
 ## Running in builder-base

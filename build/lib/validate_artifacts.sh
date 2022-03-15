@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -20,24 +21,34 @@ set -o pipefail
 PROJECT_ROOT="$1"
 ARTIFACTS_FOLDER="$2"
 GIT_TAG="$3"
+FAKE_ARM_ARTIFACTS_FOR_VALIDATION="$4"
+IMAGE_FORMAT="${5:-}"
 
-PROJECT_NAME=$(basename $PROJECT_ROOT)
-rm -f /tmp/actual-$PROJECT_NAME-files
+EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts
+if [ -n "$IMAGE_FORMAT" ]; then
+    EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_$IMAGE_FORMAT
+fi
+
+ACTUAL_FILES=$(mktemp)
 for file in $(find ${ARTIFACTS_FOLDER} -type f | sort); do
     filepath=$(realpath --relative-base=$ARTIFACTS_FOLDER $file)
-	echo $filepath >> /tmp/actual-$PROJECT_NAME-files
+	echo $filepath >> $ACTUAL_FILES
 done
 
+EXPECTED_FILES=$(mktemp)
 export GIT_TAG=$GIT_TAG
 envsubst '$GIT_TAG' \
-	< $PROJECT_ROOT/expected_artifacts \
-	> /tmp/expected-$PROJECT_NAME-files
+	< $EXPECTED_FILES_PATH \
+	> $EXPECTED_FILES
 
+if $FAKE_ARM_ARTIFACTS_FOR_VALIDATION; then
+	sed -i '/arm64/d' $EXPECTED_FILES
+fi
 
-if ! diff /tmp/expected-$PROJECT_NAME-files /tmp/actual-$PROJECT_NAME-files; then
+if ! diff $EXPECTED_FILES $ACTUAL_FILES; then
 	echo "Artifacts directory does not matched expected!"
 	echo "******************* Actual ******************"
-	cat /tmp/actual-$PROJECT_NAME-files
+	cat $ACTUAL_FILES
 	echo "*********************************************"
 	exit 1
 fi

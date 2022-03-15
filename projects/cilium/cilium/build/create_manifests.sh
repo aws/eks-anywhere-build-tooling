@@ -19,10 +19,13 @@ set -o errexit
 set -o pipefail
 
 TAG="${1?Specify first argument - git version tag}"
-HELM_REPO_VERSION="${2?Specify second argument - helm repo version}"
+ARTIFACTS_PATH="${2?Specify second argument - artifacts path}"
+REGISTRY="${3?Specify third argument - image registry}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 HELM_BIN="${MAKE_ROOT}/_output/helm-bin"
+
+mkdir -p $ARTIFACTS_PATH
 
 function build::install::helm(){
   mkdir -p $HELM_BIN
@@ -31,10 +34,13 @@ function build::install::helm(){
 }
 
 function build::cilium::manifests(){
+  export HELM_EXPERIMENTAL_OCI=1
   mkdir -p _output/manifests/cilium/$TAG
-  helm repo add cilium https://helm.cilium.io
-  helm template cilium cilium/cilium --version $HELM_REPO_VERSION --namespace kube-system -f manifests/cilium-eksa.yaml > _output/manifests/cilium/${TAG}/cilium.yaml
+  helm template cilium oci://$REGISTRY/cilium --version ${TAG#"v"} --namespace kube-system -f manifests/cilium-eksa.yaml \
+    --set operator.image.tag=$TAG --set image.tag=$TAG --set image.repository="$REGISTRY/cilium" --set operator.image.repository="$REGISTRY/operator" > _output/manifests/cilium/${TAG}/cilium.yaml
 }
 
 build::install::helm
 build::cilium::manifests
+
+cp -rf _output/manifests $ARTIFACTS_PATH

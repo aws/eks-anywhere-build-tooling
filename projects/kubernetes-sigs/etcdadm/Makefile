@@ -5,17 +5,19 @@ GOLANG_VERSION?="1.16"
 REPO=etcdadm
 REPO_OWNER=kubernetes-sigs
 
-LICENSE_PACKAGE_FILTER?=.
-
 BINARY_TARGET_FILES=etcdadm
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) k8s.io/component-base/version)
 
 HAS_S3_ARTIFACTS=true
+
+IMAGE_NAMES=
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
-.PHONY: local-images
-local-images: #noop
-
-.PHONY: images
-images: #noop
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################

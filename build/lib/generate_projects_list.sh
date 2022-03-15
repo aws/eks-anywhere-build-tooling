@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 
 BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
-UPSTREAM_PROJECTS_FILE=$BASE_DIRECTORY/UPSTREAM_PROJECTS.yaml
+UPSTREAM_PROJECTS_FILE="$BASE_DIRECTORY/UPSTREAM_PROJECTS.yaml"
 
 YQ_LATEST_RELEASE_URL="https://github.com/mikefarah/yq/releases/latest"
 CURRENT_YQ_VERSION=$(yq -V | awk '{print $NF}')
@@ -25,6 +25,7 @@ yq eval --null-input ".projects = []" > $UPSTREAM_PROJECTS_FILE # Creates an emp
 for org_path in projects/*; do
     repos=() # Empty array for repos in the org
     org=$(cut -d/ -f2 <<< $org_path)
+    declare -i repo_count=0
     for repo_path in projects/$org/*; do
         repo="$(cut -d/ -f3 <<< $repo_path)"
         if [ "$org" = "aws" ] & [[ $repo =~ "eks-anywhere" ]]; then # Ignore self-referential repos
@@ -37,11 +38,26 @@ for org_path in projects/*; do
     if [ ${#repos[@]} -gt 0 ]; then
         yq eval -i -P ".projects += [{\"org\": \"$org\", \"repos\": []}]" $UPSTREAM_PROJECTS_FILE # Add an entry for this org in the projects array
         for repo in "${repos[@]}"; do
-            yq eval -i -P ".projects[$org_count].repos += [{\"name\": \"$repo\"}]" $UPSTREAM_PROJECTS_FILE # Add each repo to the repos array
+            yq eval -i -P ".projects[$org_count].repos += [{\"name\": \"$repo\", \"versions\": []}]" $UPSTREAM_PROJECTS_FILE # Add each repo to the repos array
+            git_tags=$(find projects/$org/$repo -type f -name "GIT_TAG")
+            for file in $git_tags; do
+                tag=$(cat $file)
+                if [ $repo = "cilium" ]; then
+                    yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"tag\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
+                else
+                    if [ "$(git ls-remote --tags https://github.com/$org/$repo | grep $tag || true)" ]; then
+                        yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"tag\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
+                    else
+                        yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"commit\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
+                    fi
+                fi
+            done
+            repo_count+=1
         done
         org_count+=1
     fi
 done
+
 HEAD_COMMENT=$(cat $BASE_DIRECTORY/hack/boilerplate.yq.txt)
 yq eval -i ". headComment=\"$HEAD_COMMENT\"" $UPSTREAM_PROJECTS_FILE # Add a header comment with license verbiage and no-edit warning
 yq eval $UPSTREAM_PROJECTS_FILE # Print generated YAML

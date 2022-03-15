@@ -22,13 +22,14 @@ PROJECT_ROOT="$1"
 TARGET_FILE="$2"
 REPO="$3"
 GOLANG_VERSION="$4"
-TAG="$5"
-BINARY_PLATFORMS="$6"
-SOURCE_PATTERN="$7"
-GOBUILD_COMMAND="$8" 
-EXTRA_GOBUILD_FLAGS="$9"
-GO_LDFLAGS="${10}"
-REPO_SUBPATH="${11:-}"
+BINARY_PLATFORMS="$5"
+SOURCE_PATTERN="$6"
+GOBUILD_COMMAND="$7" 
+EXTRA_GOBUILD_FLAGS="$8"
+GO_LDFLAGS="$9"
+CGO_ENABLED="${10}"
+CGO_LDFLAGS="${11}"
+REPO_SUBPATH="${12:-}"
 
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -37,15 +38,18 @@ source "${SCRIPT_ROOT}/common.sh"
 function build::simple::binaries(){
   mkdir -p $(dirname $TARGET_FILE)
   cd "$PROJECT_ROOT/$REPO/$REPO_SUBPATH"
-  local -r cache_key=$(echo $PROJECT_ROOT | sed 's/\(.*\)\//\1-/' | xargs basename)
   build::common::use_go_version $GOLANG_VERSION
-  build::common::set_go_cache $cache_key $TAG
-  go mod vendor
   SUPPORTED_PLATFORMS=(${BINARY_PLATFORMS// / })
   for platform in "${SUPPORTED_PLATFORMS[@]}"; do
     OS="$(cut -d '/' -f1 <<< ${platform})"
     ARCH="$(cut -d '/' -f2 <<< ${platform})"
-    CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH \
+    if [ $CGO_ENABLED = 1 ]; then
+      export CGO_LDFLAGS="$CGO_LDFLAGS,-L$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64"
+      export CGO_CFLAGS="-I$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/include"
+      export LD_LIBRARY_PATH=$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64:${LD_LIBRARY_PATH-}
+      export PKG_CONFIG_PATH=$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64/pkgconfig:${PKG_CONFIG_PATH-}
+    fi
+    CGO_ENABLED=$CGO_ENABLED GOOS=$OS GOARCH=$ARCH \
       go $GOBUILD_COMMAND -trimpath -a -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -o $TARGET_FILE $SOURCE_PATTERN
   done
 }

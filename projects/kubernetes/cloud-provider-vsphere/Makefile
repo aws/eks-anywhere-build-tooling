@@ -1,146 +1,43 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-BUILD_LIB=$(BASE_DIRECTORY)/build/lib
-ARTIFACTS_BUCKET?=my-s3-bucket
-BRANCH_NAME?=main
-LATEST_TAG?=latest
-ifneq ("$(BRANCH_NAME)","main")
-	LATEST_TAG=$(BRANCH_NAME)
-endif
-
-AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION?=us-west-2
+GIT_TAG?=$(shell cat ./$(RELEASE_BRANCH)/GIT_TAG)
+GOLANG_VERSION?=$(shell cat ./$(RELEASE_BRANCH)/GOLANG_VERSION)
 
 REPO=cloud-provider-vsphere
-COMPONENT=kubernetes/$(REPO)
-CLONE_URL?=https://github.com/$(COMPONENT).git
-ifdef CODEBUILD_SRC_DIR
-	TAR_PATH?=$(CODEBUILD_SRC_DIR)/$(PROJECT_PATH)/$(CODEBUILD_BUILD_NUMBER)-$(CODEBUILD_RESOLVED_SOURCE_VERSION)/artifacts
-	CLONE_URL?=https://git-codecommit.$(AWS_REGION).amazonaws.com/v1/repos/kubernetes.cloud-provider-vsphere
-else
-	TAR_PATH?="_output/tar"
-	CLONE_URL?=https://github.com/$(COMPONENT).git
-endif
+REPO_OWNER=kubernetes
 
-MAKE_ROOT=$(shell cd "$(shell dirname "${BASH_SOURCE[0]}")" && pwd -P)
-BASE_REPO?=public.ecr.aws/eks-distro-build-tooling
 BASE_IMAGE_NAME?=eks-distro-minimal-base
-BASE_TAG?=$(shell cat $(MAKE_ROOT)/../../../EKS_DISTRO_MINIMAL_BASE_TAG_FILE)
-BASE_IMAGE?=$(BASE_REPO)/$(BASE_IMAGE_NAME):$(BASE_TAG)
 
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-IMAGE_NAME=kubernetes/cloud-provider-vsphere/cpi/manager
-IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
+FIX_LICENSES_VSPHERE_AUTOMATION_TARGET=$(REPO)/vendor/github.com/vmware/vsphere-automation-sdk-go/lib/LICENSE.txt
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
-BINARY_TARGETS=$(addprefix binaries-, $(SUPPORTED_K8S_VERSIONS))
-BUILD_TARGETS=$(addprefix local-images-, $(SUPPORTED_K8S_VERSIONS)) $(addprefix tarballs-, $(SUPPORTED_K8S_VERSIONS))
-RELEASE_TARGETS=$(addprefix images-, $(SUPPORTED_K8S_VERSIONS)) $(addprefix tarballs-, $(SUPPORTED_K8S_VERSIONS))
-ATTRIBUTION_TARGETS=$(addprefix generate-attribution-, $(SUPPORTED_K8S_VERSIONS))
-## --------------------------------------
-## Help
-## --------------------------------------
-##@ Helpers
-help: ## Display this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-35s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+BINARY_TARGET_FILES=vsphere-cloud-controller-manager
+SOURCE_PATTERNS=./cmd/vsphere-cloud-controller-manager
+
+IMAGE_COMPONENT=kubernetes/cloud-provider-vsphere/cpi/manager
+
+HAS_RELEASE_BRANCHES=true
+
+include $(BASE_DIRECTORY)/Common.mk
 
 
-.PHONY: upload-artifacts
-upload-artifacts:
-	build/upload_artifacts.sh $(TAR_PATH) $(ARTIFACTS_BUCKET) $(PROJECT_PATH) $(CODEBUILD_BUILD_NUMBER) $(CODEBUILD_RESOLVED_SOURCE_VERSION) $(LATEST_TAG)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_VSPHERE_AUTOMATION_TARGET)
 
-.PHONY: binaries
-binaries: $(BINARY_TARGETS)
+$(FIX_LICENSES_VSPHERE_AUTOMATION_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+  # The vsphere-automation-sdk-go dependency github repo has a license however
+  # it is broken up into three separate go modules. Since the license file does not live in the same
+  # folder as the go.mod files it is not being included in the downloaded package. Manually
+  # downloading from github and placing in each of the packages from vsphere-automation-sdk-go
+  # under vendor to make go-licenses happy.  The license needs to be copied into each package
+  # folder, otherwise go-licenses will group them all together as vsphere-automation-sdk-go
+  # which would be wrong
+	for package in lib runtime services ; do \
+		wget -q https://raw.githubusercontent.com/vmware/vsphere-automation-sdk-go/master/LICENSE.txt -O \
+			$(REPO)/vendor/github.com/vmware/vsphere-automation-sdk-go/$$package/LICENSE.txt; \
+	done;
 
-.PHONY: binaries-%
-binaries-%: GOLANG_VERSION=$(shell cat ./$*/GOLANG_VERSION)
-binaries-%: GIT_TAG=$(shell cat ./$*/GIT_TAG)
-binaries-%:
-	build/create_binaries.sh $(REPO) $* $(CLONE_URL) $(GIT_TAG) $(GOLANG_VERSION)
 
-.PHONY: generate-attribution-%
-generate-attribution-%: GOLANG_VERSION=$(shell cat ./$*/GOLANG_VERSION)
-generate-attribution-%: binaries-%
-	build/create_attribution.sh $* $(GOLANG_VERSION)
-
-.PHONY: generate-attribution
-generate-attribution: $(ATTRIBUTION_TARGETS)
-
-.PHONY: tarballs-%
-tarballs-%: GIT_TAG=$(shell cat ./$*/GIT_TAG)
-tarballs-%: binaries-%
-	build/create_tarballs.sh $(REPO) $* $(GIT_TAG) $(TAR_PATH)
-
-.PHONY: local-images-%
-local-images-%: GIT_TAG=$(shell cat ./$*/GIT_TAG)
-local-images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-local-images-%: RELEASE_LATEST=$(GIT_TAG)-$(LATEST_TAG)
-local-images-%: binaries-%
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:RELEASE_BRANCH=$* \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=oci,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(IMAGE):$(RELEASE_LATEST)\",dest=/tmp/cloud-provider-vsphere.tar
-
-.PHONY: images-%
-images-%: GIT_TAG=$(shell cat ./$*/GIT_TAG)
-images-%: IMAGE_TAG?=$(GIT_TAG)-$(shell git rev-parse HEAD)
-images-%: RELEASE_LATEST=$(GIT_TAG)-$(LATEST_TAG)
-images-%: binaries-%
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=linux/amd64 \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:RELEASE_BRANCH=$* \
-		--local dockerfile=./docker/linux/ \
-		--local context=. \
-		--output type=image,oci-mediatypes=true,\"name=$(IMAGE):$(IMAGE_TAG),$(IMAGE):$(RELEASE_LATEST)\",push=true
-
-.PHONY: build
-build: $(BUILD_TARGETS)
-	echo "Done $(COMPONENT)"
-
-.PHONY: release
-release: $(RELEASE_TARGETS)
-	echo "Done $(COMPONENT)"
-
-.PHONY: release-upload
-release-upload: release upload-artifacts
-	echo "Done upload $(COMPONENT)"
-
-.PHONY: all
-all: release
-
-.PHONY: clean
-clean:
-	rm -rf $(REPO)
-	rm -rf "_output"
-
-## --------------------------------------
-## Document dynamic build targets
-## --------------------------------------
-##@ Builds
-binaries-1-18: ## Build binaries for 1-18 cloud-provider
-binaries-1-19: ## Build binaries for 1-19 cloud-provider
-binaries-1-20: ## Build binaries for 1-20 cloud-provider
-binaries-1-21: ## Build binaries for 1-21 cloud-provider
-
-local-images-1-18: ## Build image with 1-18 cloud-provider
-local-images-1-19: ## Build image with 1-19 cloud-provider
-local-images-1-20: ## Build image with 1-20 cloud-provider
-local-images-1-21: ## Build image with 1-21 cloud-provider
-
-##@ Releases
-images-1-18: ## Build and push image with 1-18 cloud-provider
-images-1-19: ## Build and push image with 1-19 cloud-provider
-images-1-20: ## Build and push image with 1-20 cloud-provider
-images-1-21: ## Build and push image with 1-21 cloud-provider
-
-tarballs-1-18: ## Build tarballs with 1-18 cloud-provider
-tarballs-1-19: ## Build tarballs with 1-19 cloud-provider
-tarballs-1-20: ## Build tarballs with 1-20 cloud-provider
-tarballs-1-21: ## Build tarballs with 1-21 cloud-provider
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################

@@ -1,18 +1,20 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=${BASE_DIRECTORY}/build/lib
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2
-IMAGE_REPO=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
+ECR_PUBLIC_URI?=$(shell AWS_REGION=us-east-1 && aws ecr-public describe-registries --query 'registries[*].registryUri' --output text)
 
-PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller
+PROJECTS?=aws_eks-anywhere brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell tinkerbell_hegel cloudflare_cfssl tinkerbell_boots tinkerbell_hub tinkerbell_pbnj tinkerbell_hook aws_cluster-api-provider-aws-snow distribution_distribution goharbor_harbor cilium_cilium
 BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 
-EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi
+EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi replicatedhq_troubleshoot helm_helm tinkerbell_tink
 EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQS))
 
-SUPPORTED_K8S_VERSIONS=$(shell yq e 'keys | .[]' $(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES)
-OVA_TARGETS=$(addprefix release-upload-ova-ubuntu-2004-, $(SUPPORTED_K8S_VERSIONS))
-OVA_TARGETS+=$(addprefix release-ova-bottlerocket-, $(SUPPORTED_K8S_VERSIONS))
+ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling kubernetes-sigs_image-builder
+
 RELEASE_BRANCH?=
+GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
 .PHONY: build-all-projects
 build-all-projects: $(BUILD_TARGETS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling
@@ -28,77 +30,62 @@ aws_eks-anywhere-build-tooling: $(EKSA_TOOLS_PREREQS_BUILD_TARGETS)
 .PHONY: build-project-%
 build-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
-	$(MAKE) release-upload -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
+	$(MAKE) release -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
 
 .PHONY: release-binaries-images
 release-binaries-images: build-all-projects
 
 .PHONY: release-ovas
 release-ovas:
-	$(MAKE) $(OVA_TARGETS) -C projects/kubernetes-sigs/image-builder
+	$(MAKE) release IMAGE_FORMAT=ova -C projects/kubernetes-sigs/image-builder
+
+.PHONY: clean-project-%
+clean-project-%:
+	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(MAKE) clean -C $(PROJECT_PATH)
 
 .PHONY: clean
-clean:
-	make -C projects/brancz/kube-rbac-proxy clean
-	make -C projects/kubernetes-sigs/cluster-api clean
-	make -C projects/kubernetes-sigs/cluster-api-provider-aws clean
-	make -C projects/kubernetes-sigs/cluster-api-provider-vsphere clean
-	make -C projects/kubernetes-sigs/cri-tools clean
-	make -C projects/kubernetes-sigs/kind clean
-	make -C projects/kubernetes/cloud-provider-vsphere clean
-	make -C projects/plunder-app/kube-vip clean
-	make -C projects/kubernetes-sigs/etcdadm clean
-	make -C projects/fluxcd/flux2 clean
-	make -C projects/kubernetes/cloud-provider-vsphere clean
-	make -C projects/kubernetes-sigs/vsphere-csi-driver clean
-	make -C projects/rancher/local-path-provisioner clean
-	make -C projects/vmware/govmomi clean
-	make -C projects/jetstack/cert-manager clean
-	make -C projects/fluxcd/helm-controller clean
-	make -C projects/fluxcd/kustomize-controller clean
-	make -C projects/fluxcd/notification-controller clean
-	make -C projects/fluxcd/source-controller clean
-	make -C projects/mrajashree/etcdadm-bootstrap-provider clean
-	make -C projects/mrajashree/etcdadm-controller clean
+clean: $(addprefix clean-project-, $(ALL_PROJECTS))
 	rm -rf _output
 
+.PHONY: add-generated-help-block-project-%
+add-generated-help-block-project-%:
+	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(MAKE) add-generated-help-block -C $(PROJECT_PATH) RELEASE_BRANCH=1-21
+
+.PHONY: add-generated-help-block
+add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_PROJECTS))
+	build/update-attribution-files/create_pr.sh
+
+.PHONY: attribution-files-project-%
+attribution-files-project-%:
+	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
+
 .PHONY: attribution-files
-attribution-files:
-	build/update-attribution-files/make_attribution.sh projects/brancz/kube-rbac-proxy
-	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/cluster-api
-	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/cluster-api-provider-aws
-	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/cluster-api-provider-vsphere
-	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/cri-tools
-	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/kind
-	build/update-attribution-files/make_attribution.sh projects/plunder-app/kube-vip
-	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/etcdadm
-	build/update-attribution-files/make_attribution.sh projects/fluxcd/flux2
-	build/update-attribution-files/make_attribution.sh projects/kubernetes/cloud-provider-vsphere
-	build/update-attribution-files/make_attribution.sh projects/kubernetes-sigs/vsphere-csi-driver
-	build/update-attribution-files/make_attribution.sh projects/rancher/local-path-provisioner
-	build/update-attribution-files/make_attribution.sh projects/vmware/govmomi
-	build/update-attribution-files/make_attribution.sh projects/jetstack/cert-manager
-	build/update-attribution-files/make_attribution.sh projects/fluxcd/helm-controller
-	build/update-attribution-files/make_attribution.sh projects/fluxcd/kustomize-controller
-	build/update-attribution-files/make_attribution.sh projects/fluxcd/notification-controller
-	build/update-attribution-files/make_attribution.sh projects/fluxcd/source-controller
-	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-bootstrap-provider
-	build/update-attribution-files/make_attribution.sh projects/mrajashree/etcdadm-controller
-
-
+attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 	cat _output/total_summary.txt
 
+.PHONY: checksum-files-project-%
+checksum-files-project-%:
+	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) checksums
+
+.PHONY: checksum-files
+checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
+	build/update-attribution-files/create_pr.sh
+
 .PHONY: update-attribution-files
-update-attribution-files: attribution-files
+update-attribution-files: add-generated-help-block attribution-files checksum-files
 	build/update-attribution-files/create_pr.sh
 
 .PHONY: run-target-in-docker
 run-target-in-docker:
-	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH)
+	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET)
 
 .PHONY: update-attribution-checksums-docker
 update-attribution-checksums-docker:
-	build/lib/update_checksum_docker.sh $(PROJECT) $(RELEASE_BRANCH)
+	build/lib/update_checksum_docker.sh $(PROJECT) $(IMAGE_REPO) $(RELEASE_BRANCH)
 
 .PHONY: stop-docker-builder
 stop-docker-builder:
@@ -117,3 +104,14 @@ stop-buildkit-and-registry:
 .PHONY: generate
 generate:
 	build/lib/generate_projects_list.sh $(BASE_DIRECTORY)
+
+helm/promotion:
+	$(BUILD_LIB)/helm_promotion.sh $(AWS_ACCOUNT_ID) $(ECR_PUBLIC_URI) $(GIT_HASH)
+
+.PHONY: check-project-path-exists
+check-project-path-exists:
+	@if ! stat $(PROJECT_PATH) &> /dev/null; then \
+		echo "false"; \
+	else \
+		echo "true"; \
+	fi

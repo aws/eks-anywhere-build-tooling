@@ -18,11 +18,13 @@ var initPreKubeletPhases = []string{
 var initPostKubeletPhases = []string{"health"}
 
 type initCommand struct {
-	repository, version string
+	repository   string
+	version      string
+	cipherSuites string
 }
 
 func (i *initCommand) run() error {
-	flags := buildFlags(i.repository, i.version)
+	flags := buildFlags(i.repository, i.version, i.cipherSuites)
 	fmt.Println("Running etcdadm init phases")
 	if err := runPhases("init", initPreKubeletPhases, flags); err != nil {
 		return err
