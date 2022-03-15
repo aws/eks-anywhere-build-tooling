@@ -23,7 +23,8 @@ HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}
 OUTPUT_DIR="${3?Third argument is output directory}"
 IMAGE_TAG="${4?Fourth argument is image tag}"
 LATEST="${5?Fifth argument is latest tag}"
-HELM_IMAGE_LIST="${@:6}"
+HELM_VERSION="${6?Sixth argument is the version of the helm chart}"
+HELM_IMAGE_LIST="${@:7}"
 
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
@@ -46,6 +47,7 @@ REQUIRES_CONFIG_FILE=helm/requires-config.yaml
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 export IMAGE_TAG
 export HELM_REGISTRY
+export HELM_VERSION
 envsubst <helm/sedfile.template >${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
 do

@@ -20,13 +20,12 @@ set -o pipefail
 
 IMAGE_REGISTRY="${1?First argument is image registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
-IMAGE_TAG="${3?Third argument is image tag}"
+HELM_VERSION="${3?Third argument is the version of the helm chart}"
 OUTPUT_DIR="${4?Fourth arguement is output directory}"
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
-CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
-LATEST_TAG=$(echo ${IMAGE_TAG} | sed -e 's/-.*/-latest/')
+CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${HELM_VERSION}.tgz
 
 DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
 export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
