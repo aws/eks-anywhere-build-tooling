@@ -25,11 +25,8 @@ IMAGE_REGISTRY="${2?Specify first argument - image registry}"
 
 export HELM_EXPERIMENTAL_OCI=1
 
-pwd
+export ECR_REPO=$(echo ${ECR_REPO} | sed "s/aws\///") # We sed to remove aws/ from ECR repo names
 echo "ECR_REPO=${ECR_REPO}"
-yum install -y tree
-tree ${BASE_DIRECTORY}
-ls -la ${BASE_DIRECTORY}
 HELM_TAG=$(cat ${BASE_DIRECTORY}/projects/${ECR_REPO}/HELM_TAG)
 echo "HELM_TAG=${HELM_TAG}"
 
