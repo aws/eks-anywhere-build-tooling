@@ -25,6 +25,9 @@ IMAGE_REGISTRY="${2?Specify first argument - image registry}"
 
 export HELM_EXPERIMENTAL_OCI=1
 
+# export ECR_REPO=$(echo ${PROJECT_PATH} | sed "s/aws\///") # We sed to remove aws/ from ECR repo names
+# echo "ECR_REPO=${ECR_REPO}"
+
 export PRIV_ECR_REPO=$(echo ${ECR_REPO} | sed "s/aws\///") # We sed to remove aws/ from ECR repo names
 echo "ECR_REPO=${ECR_REPO}"
 HELM_TAG=$(cat ${BASE_DIRECTORY}/projects/${ECR_REPO}/HELM_TAG)
