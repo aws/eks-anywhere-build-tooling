@@ -1,0 +1,222 @@
+From ca366001d2fed6cf0f13c37a54f737e2ff2e3938 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Tue, 20 Jul 2021 00:18:44 -0700
+Subject: [PATCH 17/42] Delete managed external etcd cluster last
+
+---
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  |  6 +--
+ controllers/cluster_controller.go             | 45 ++++++++++++++++++-
+ controllers/cluster_controller_test.go        | 19 ++++++++
+ controllers/external/util.go                  | 10 -----
+ .../kubeadm/controllers/controller.go         |  9 ++++
+ 5 files changed, 75 insertions(+), 14 deletions(-)
+
+diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+index 884309ab2..2ca6d1214 100644
+--- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
++++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+@@ -1072,9 +1072,9 @@ spec:
+                   provider.
+                 type: boolean
+               managedExternalEtcdInitialized:
+-                description: ManagedExternalEtcdInitialized indicates that first node's
+-                  IP address is set by machine controller, so etcd members join can
+-                  commence
++                description: ManagedExternalEtcdInitialized indicates that first etcd
++                  member's IP address is set by machine controller, so remaining etcd
++                  members can lookup the address to join the cluster
+                 type: boolean
+               managedExternalEtcdReady:
+                 description: ManagedExternalEtcdReady indicates external etcd cluster
+diff --git a/controllers/cluster_controller.go b/controllers/cluster_controller.go
+index cf283a54a..e833201cf 100644
+--- a/controllers/cluster_controller.go
++++ b/controllers/cluster_controller.go
+@@ -167,6 +167,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+ 		conditions.WithConditions(
+ 			clusterv1.ControlPlaneReadyCondition,
+ 			clusterv1.InfrastructureReadyCondition,
++			clusterv1.ManagedExternalEtcdClusterReadyCondition,
+ 		),
+ 	)
+ 
+@@ -178,6 +179,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+ 			clusterv1.ReadyCondition,
+ 			clusterv1.ControlPlaneReadyCondition,
+ 			clusterv1.InfrastructureReadyCondition,
++			clusterv1.ManagedExternalEtcdClusterReadyCondition,
+ 		}},
+ 	)
+ 	return patchHelper.Patch(ctx, cluster, options...)
+@@ -298,6 +300,37 @@ func (r *ClusterReconciler) reconcileDelete(ctx context.Context, cluster *cluste
+ 		}
+ 	}
+ 
++	if cluster.Spec.ManagedExternalEtcdRef != nil {
++		obj, err := external.Get(ctx, r.Client, cluster.Spec.ManagedExternalEtcdRef, cluster.Namespace)
++		switch {
++		case apierrors.IsNotFound(errors.Cause(err)):
++			// Etcd cluster has been deleted
++			conditions.MarkFalse(cluster, clusterv1.ManagedExternalEtcdClusterReadyCondition, clusterv1.DeletedReason, clusterv1.ConditionSeverityInfo, "")
++		case err != nil:
++			return ctrl.Result{}, errors.Wrapf(err, "failed to get %s %q for Cluster %s/%s",
++				path.Join(cluster.Spec.ManagedExternalEtcdRef.APIVersion, cluster.Spec.ManagedExternalEtcdRef.Kind),
++				cluster.Spec.ManagedExternalEtcdRef.Name, cluster.Namespace, cluster.Name)
++		default:
++			// Report a summary of current status of the external etcd object defined for this cluster.
++			conditions.SetMirror(cluster, clusterv1.ManagedExternalEtcdClusterReadyCondition,
++				conditions.UnstructuredGetter(obj),
++				conditions.WithFallbackValue(false, clusterv1.DeletingReason, clusterv1.ConditionSeverityInfo, ""),
++			)
++
++			// Issue a deletion request for the infrastructure object.
++			// Once it's been deleted, the cluster will get processed again.
++			if err := r.Client.Delete(ctx, obj); err != nil {
++				return ctrl.Result{}, errors.Wrapf(err,
++					"failed to delete %v %q for Cluster %q in namespace %q",
++					obj.GroupVersionKind(), obj.GetName(), cluster.Name, cluster.Namespace)
++			}
++
++			// Return here so we don't remove the finalizer yet.
++			logger.Info("Cluster still has descendants - need to requeue", "managedExternalEtcdRef", cluster.Spec.ManagedExternalEtcdRef.Name)
++			return ctrl.Result{}, nil
++		}
++	}
++
+ 	if cluster.Spec.InfrastructureRef != nil {
+ 		obj, err := external.Get(ctx, r.Client, cluster.Spec.InfrastructureRef, cluster.Namespace)
+ 		switch {
+@@ -339,6 +372,7 @@ type clusterDescendants struct {
+ 	controlPlaneMachines clusterv1.MachineList
+ 	workerMachines       clusterv1.MachineList
+ 	machinePools         expv1.MachinePoolList
++	etcdMachines         clusterv1.MachineList
+ }
+ 
+ // length returns the number of descendants.
+@@ -359,6 +393,13 @@ func (c *clusterDescendants) descendantNames() string {
+ 	if len(controlPlaneMachineNames) > 0 {
+ 		descendants = append(descendants, "Control plane machines: "+strings.Join(controlPlaneMachineNames, ","))
+ 	}
++	etcdMachines := make([]string, len(c.etcdMachines.Items))
++	for i, etcdMachine := range c.etcdMachines.Items {
++		etcdMachines[i] = etcdMachine.Name
++	}
++	if len(etcdMachines) > 0 {
++		descendants = append(descendants, "Etcd machines: "+strings.Join(etcdMachines, ","))
++	}
+ 	machineDeploymentNames := make([]string, len(c.machineDeployments.Items))
+ 	for i, machineDeployment := range c.machineDeployments.Items {
+ 		machineDeploymentNames[i] = machineDeployment.Name
+@@ -442,7 +483,6 @@ func (c clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster) (
+ 		if err != nil {
+ 			return nil // nolint:nilerr // We don't want to exit the EachListItem loop, just continue
+ 		}
+-
+ 		if util.IsOwnedByObject(acc, cluster) {
+ 			ownedDescendants = append(ownedDescendants, obj)
+ 		}
+@@ -456,6 +496,9 @@ func (c clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster) (
+ 		&c.workerMachines,
+ 		&c.controlPlaneMachines,
+ 	}
++	if cluster.Spec.ManagedExternalEtcdRef != nil {
++		lists = append(lists, &c.etcdMachines)
++	}
+ 	if feature.Gates.Enabled(feature.MachinePool) {
+ 		lists = append([]client.ObjectList{&c.machinePools}, lists...)
+ 	}
+diff --git a/controllers/cluster_controller_test.go b/controllers/cluster_controller_test.go
+index 2dd3199a3..ad9adf92f 100644
+--- a/controllers/cluster_controller_test.go
++++ b/controllers/cluster_controller_test.go
+@@ -562,6 +562,15 @@ func (b *machineBuilder) controlPlane() *machineBuilder {
+ 	return b
+ }
+ 
++func (b *machineBuilder) etcd() *machineBuilder {
++	b.m.Labels = map[string]string{clusterv1.MachineEtcdClusterLabelName: ""}
++	return b
++}
++
++type machinePoolBuilder struct {
++	mp expv1.MachinePool
++}
++
+ func (b *machineBuilder) build() clusterv1.Machine {
+ 	return b.m
+ }
+@@ -628,6 +637,9 @@ func TestFilterOwnedDescendants(t *testing.T) {
+ 	mp3NotOwnedByCluster := newMachinePoolBuilder().named("mp3").build()
+ 	mp4OwnedByCluster := newMachinePoolBuilder().named("mp4").ownedBy(&c).build()
+ 
++	me1EtcdOwnedByCluster := newMachineBuilder().named("me1").ownedBy(&c).etcd().build()
++	me2EtcdNotOwnedByCluster := newMachineBuilder().named("me2").build()
++
+ 	d := clusterDescendants{
+ 		machineDeployments: clusterv1.MachineDeploymentList{
+ 			Items: []clusterv1.MachineDeployment{
+@@ -667,6 +679,12 @@ func TestFilterOwnedDescendants(t *testing.T) {
+ 				mp4OwnedByCluster,
+ 			},
+ 		},
++		etcdMachines: clusterv1.MachineList{
++			Items: []clusterv1.Machine{
++				me1EtcdOwnedByCluster,
++				me2EtcdNotOwnedByCluster,
++			},
++		},
+ 	}
+ 
+ 	actual, err := d.filterOwnedDescendants(&c)
+@@ -683,6 +701,7 @@ func TestFilterOwnedDescendants(t *testing.T) {
+ 		&m5OwnedByCluster,
+ 		&m3ControlPlaneOwnedByCluster,
+ 		&m6ControlPlaneOwnedByCluster,
++		&me1EtcdOwnedByCluster,
+ 	}
+ 
+ 	g.Expect(actual).To(Equal(expected))
+diff --git a/controllers/external/util.go b/controllers/external/util.go
+index 98a752767..23c2bfc7e 100644
+--- a/controllers/external/util.go
++++ b/controllers/external/util.go
+@@ -242,14 +242,4 @@ func IsInitialized(obj *unstructured.Unstructured) (bool, error) {
+ 			obj.GroupVersionKind(), obj.GetName())
+ 	}
+ 	return initialized && found, nil
+-}
+-
+-// IsExternalEtcdCreated returns true if the Status.CreationComplete field on an external object is true.
+-func IsExternalEtcdCreated(obj *unstructured.Unstructured) (bool, error) {
+-	created, found, err := unstructured.NestedBool(obj.Object, "status", "creationComplete")
+-	if err != nil {
+-		return false, errors.Wrapf(err, "failed to determine if %v %q has been created",
+-			obj.GroupVersionKind(), obj.GetName())
+-	}
+-	return created && found, nil
+ }
+\ No newline at end of file
+diff --git a/controlplane/kubeadm/controllers/controller.go b/controlplane/kubeadm/controllers/controller.go
+index 002f03af8..e2423ca30 100644
+--- a/controlplane/kubeadm/controllers/controller.go
++++ b/controlplane/kubeadm/controllers/controller.go
+@@ -439,6 +439,15 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, clu
+ 	}
+ 	ownedMachines := allMachines.Filter(collections.OwnedMachines(kcp))
+ 
++	if cluster.Spec.ManagedExternalEtcdRef != nil {
++		for _, machine := range allMachines {
++			if util.IsEtcdMachine(machine) {
++				// remove external etcd-only machines from the "allMachines" collection so that the controlplane machines don't wait for etcd to be deleted first
++				delete(allMachines, machine.Name)
++			}
++		}
++	}
++
+ 	// If no control plane machines remain, remove the finalizer
+ 	if len(ownedMachines) == 0 {
+ 		controllerutil.RemoveFinalizer(kcp, controlplanev1.KubeadmControlPlaneFinalizer)
+-- 
+2.27.0
+

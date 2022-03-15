@@ -16,7 +16,7 @@ an ECR repo in the currently logged in AWS account will be used.  A common alter
 this default behavior. This can be done with `IMAGE_REPO=localhost:5000 make images`. To run buildkit and the docker registry run from the repo root:
 	* `make run-buildkit-and-registry`
 	* `export BUILDKIT_HOST=docker-container://buildkitd`
-	* `make stop-build-and-registry` to cleanup
+	* `make stop-buildkit-and-registry` to cleanup
 
 ## Typical build targets
 

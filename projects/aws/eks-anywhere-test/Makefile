@@ -1,13 +1,14 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
+HELM_TAG?=$(shell cat HELM_TAG)
+GOLANG_VERSION?="1.17"
 
 REPO=eks-anywhere-test
 REPO_OWNER=aws
 IMAGE_COMPONENT=eks-anywhere-test
 IMAGE_BUILD_ARGS?=IMAGE_TAG
-HAS_HELM_CHART=true
 
-BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
+BASE_IMAGE_NAME?=eks-distro-minimal-base-nginx
 SIMPLE_CREATE_BINARIES=false
 HAS_LICENSES=false
 REPO_NO_CLONE=true
@@ -15,8 +16,10 @@ REPO_NO_CLONE=true
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
-include $(BASE_DIRECTORY)/Common.mk
+HAS_HELM_CHART=true
+HELM_IMAGE_LIST="$(REPO)"
 
+include $(BASE_DIRECTORY)/Common.mk
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

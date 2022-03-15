@@ -148,7 +148,11 @@ function build::gather_licenses() {
   # which makes deleting them later awkward
   # this behavior may change in the future with the following PR
   # https://github.com/google/go-licenses/pull/28
-  chmod -R 777 "${outputdir}/LICENSES"  
+  # We can delete these additional files because we are running go mod vendor
+  # prior to this call so we know the source is the same as upstream
+  # go-licenses is copying this code because it doesnt know if its be modified or not
+  chmod -R 777 "${outputdir}/LICENSES"
+  find "${outputdir}/LICENSES" -type f \( -name '*.yml' -o -name '*.go' -o -name '*.mod' -o -name '*.sum' -o -name '*gitignore' \) -delete
 
   # most of the packages show up the go-license.csv file as the module name
   # from the go.mod file, storing that away since the source dirs usually get deleted
@@ -167,14 +171,21 @@ function build::non-golang::gather_licenses(){
   git clone https://github.com/${project_org}/${project_name}
   cd $project_name
   git checkout $git_tag
-  license_files=($(find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)))
-  for file in "${license_files[@]}"; do
-    license_dest=$output_dir/LICENSES/github.com/${project_org}/${project_name}/$(dirname $file)
-    mkdir -p $license_dest
-    cp $file $license_dest/$(basename $file)
-  done
   cd ..
+  build::non-golang::copy_licenses $project_name $output_dir/LICENSES/github.com/${project_org}/${project_name}
   rm -rf $project_name
+}
+
+function build::non-golang::copy_licenses(){
+  local -r source_dir="$1"
+  local -r destination_dir="$2"
+  (cd $source_dir; find . \( -name "*COPYING*" -o -name "*COPYRIGHT*" -o -name "*LICEN[C|S]E*" -o -name "*NOTICE*" \)) |
+  while read file
+  do
+    license_dest=$destination_dir/$(dirname $file)
+    mkdir -p $license_dest
+    cp "${source_dir}/${file}" $license_dest/$(basename $file)
+  done
 }
 
 function build::generate_attribution(){
@@ -294,4 +305,35 @@ function build::common::wait_for_tag() {
       exit 1
     fi
   done
+}
+
+function build::common::wait_for_tarball() {
+  local -r tarball_url=$1
+  sleep_interval=20
+  for i in {1..60}; do
+    echo "Checking for URL ${tarball_url}..."
+    local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $tarball_url)
+    if [[ "$http_code" == "200" ]]; then 
+      echo "Tarball exists!" && break
+    fi
+    echo "Tarball does not exist!"
+    echo "Waiting for tarball to be uploaded to ${tarball_url}"
+    sleep $sleep_interval
+    if [ "$i" = "60" ]; then
+      exit 1
+    fi
+  done
+}
+
+function build::common::get_clone_url() {
+  local -r org=$1
+  local -r repo=$2
+  local -r aws_region=$3
+  local -r codebuild_ci=$4
+
+  if [ "$codebuild_ci" = "true" ]; then
+    echo "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
+  else
+    echo "https://github.com/${org}/${repo}.git"
+  fi
 }

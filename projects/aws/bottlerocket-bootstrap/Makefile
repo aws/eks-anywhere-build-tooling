@@ -12,7 +12,7 @@ BINARY_TARGET_FILES=bottlerocket-bootstrap
 SOURCE_PATTERNS=.
 REPO_SUBPATH=..
 
-GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".$(RELEASE_BRANCH).number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
+GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".releases[] | select(.branch==\"${RELEASE_BRANCH}\").number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 
 HAS_RELEASE_BRANCHES=true
 
@@ -23,7 +23,7 @@ HAS_RELEASE_BRANCHES=true
 #   to add the https origin
 # - REPO target is overridden to create empty folder
 
-# force binarys to go to non-release branch bin folder
+# force binaries to go to non-release branch bin folder
 BINARIES_ARE_RELEASE_BRANCHED=false
 
 # do not look for checksums in release branch folder, instead use project root
@@ -59,6 +59,11 @@ clean-extra:
 	@rm -rf vendor .git GIT_TAG
 
 clean: clean-extra
+
+build: unit-test
+
+unit-test:
+	go test ./...
 
 
 ########### DO NOT EDIT #############################

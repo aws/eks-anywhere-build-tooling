@@ -18,18 +18,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export IMAGE_REGISTRY="${1?First argument is image registry}"
-export IMAGE_REPOSITORY="${2?Second argument is image repository}"
-export IMAGE_TAG="${3?Third argument is image tag}"
-export OUTPUT_DIR="${4?Fourth arguement is output directory}"
-export CHART_NAME=$(basename ${IMAGE_REPOSITORY})
+OUTPUT_DIR="${1?First arguement is output directory}"
+HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
+CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 
-HELM_TEMP_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
-
-mkdir -p ${OUTPUT_DIR}/helm/${CHART_NAME}
-cp ${OUTPUT_DIR}/ATTRIBUTION.txt ${HELM_TEMP_DIR}/
-cp -r helm/${CHART_NAME}/. ${HELM_TEMP_DIR}
-envsubst <helm/Chart.yaml.template >${HELM_TEMP_DIR}/Chart.yaml
-envsubst <helm/values.yaml.template >${HELM_TEMP_DIR}/values.yaml
-cd ${HELM_TEMP_DIR}
-helm package .
+#
+# Build
+#
+cd ${OUTPUT_DIR}/helm
+helm package "${CHART_NAME}"

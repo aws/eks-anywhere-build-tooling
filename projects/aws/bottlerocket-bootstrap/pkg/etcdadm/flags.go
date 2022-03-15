@@ -1,6 +1,6 @@
 package etcdadm
 
-func buildFlags(repository, version string) []string {
+func buildFlags(repository, version, cipherSuites string) []string {
 	return []string{
 		"-l", "debug",
 		"--version", version,
@@ -9,5 +9,6 @@ func buildFlags(repository, version string) []string {
 		"--certs-dir", certDir,
 		"--data-dir", dataDir,
 		"--podspec-dir", podSpecDir,
+		"--cipher-suites", cipherSuites,
 	}
 }

@@ -40,3 +40,11 @@ $(RICE_EMBED_TARGET): $(OUTPUT_BIN_DIR)/$(subst /,-,$(RICE_BINARY_PLATFORMS))/ri
 
 $(GIT_CLONE_DEPENDENCY):
 	git clone https://github.com/cloudflare/cfssl_trust.git $(GIT_DEPS_DIR)/cfssl_trust
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################

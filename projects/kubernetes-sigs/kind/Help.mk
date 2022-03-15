@@ -9,6 +9,7 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `kind`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `` for `linux/amd64 linux/arm64 darwin/amd64 darwin/arm64`
@@ -19,13 +20,13 @@ _output/bin/kind/darwin-arm64/kind: ## Build `_output/bin/kind/darwin-arm64/kind
 _output/bin/kind/linux-amd64/kindnetd: ## Build `_output/bin/kind/linux-amd64/kindnetd`
 _output/bin/kind/linux-arm64/kindnetd: ## Build `_output/bin/kind/linux-arm64/kindnetd`
 
-patch-repo: ## Patch upstream repo with patches in patches directory
-
 ##@ Image Targets
-local-images: ## Builds `kindnetd/images/amd64 kind-base/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `kindnetd/images/push kind-base/images/push` to IMAGE_REPO
+local-images: ## Builds `haproxy/images/amd64 kindnetd/images/amd64 kind-base/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `haproxy/images/push kindnetd/images/push kind-base/images/push` to IMAGE_REPO
+haproxy/images/amd64: ## Builds/pushes `haproxy/images/amd64`
 kindnetd/images/amd64: ## Builds/pushes `kindnetd/images/amd64`
 kind-base/images/amd64: ## Builds/pushes `kind-base/images/amd64`
+haproxy/images/push: ## Builds/pushes `haproxy/images/push`
 kindnetd/images/push: ## Builds/pushes `kindnetd/images/push`
 kind-base/images/push: ## Builds/pushes `kind-base/images/push`
 
@@ -58,12 +59,14 @@ attribution-pr: ## Generates PR to update attribution files for projects
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-repo: ## Removes source directory
+create-kind-cluster-amd64: ## Create local kind cluster using built amd64 image
+create-kind-cluster-arm64: ## Create local kind cluster using built arm64 image
 
 ##@ Helpers
 help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums local-images attribution attribution-pr upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums local-images attribution upload-artifacts attribution-pr`
 release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
 ########### END GENERATED ###########################
