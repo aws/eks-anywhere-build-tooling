@@ -26,10 +26,7 @@ GIT_HASH="${3?Specify first argument - git hash}"
 
 export HELM_EXPERIMENTAL_OCI=1
 
-# export ECR_REPO=$(echo ${PROJECT_PATH} | sed "s/aws\///") # We sed to remove aws/ from ECR repo names
-# echo "ECR_REPO=${ECR_REPO}"
-
-export PRIV_ECR_REPO=$(echo ${ECR_REPO} | sed "s/aws\///") # We sed to remove aws/ from ECR repo names
+ECR_REPO=$(echo ${PROJECT_PATH} | sed "s/aws\///") # We sed to remove aws/ from ECR repo names
 echo "ECR_REPO=${ECR_REPO}"
 GIT_TAG=$(cat ${BASE_DIRECTORY}/projects/${ECR_REPO}/GIT_TAG)
 
@@ -38,8 +35,9 @@ echo "IMAGE_TAG=${IMAGE_TAG}"
 
 # Pull Helm chart from private ECR
 aws ecr get-login-password --region us-west-2 | HELM_EXPERIMENTAL_OCI=1 helm registry login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com
-helm pull oci://${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/${PRIV_ECR_REPO} --version ${IMAGE_TAG}-helm
+helm pull oci://${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/${ECR_REPO} --version ${IMAGE_TAG}-helm
 
 # Push to public repo
 aws ecr-public get-login-password --region us-east-1 | HELM_EXPERIMENTAL_OCI=1 helm registry login --username AWS --password-stdin public.ecr.aws
-helm push ${PRIV_ECR_REPO}-${IMAGE_TAG}-helm.tgz oci://${IMAGE_REGISTRY}
+helm push ${ECR_REPO}-${IMAGE_TAG}-helm.tgz oci://${IMAGE_REGISTRY}
+
