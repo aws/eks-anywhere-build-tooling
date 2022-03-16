@@ -28,7 +28,7 @@ export HELM_EXPERIMENTAL_OCI=1
 
 ECR_REPO=$(echo ${PROJECT_PATH} | sed "s/aws\///") # We sed to remove aws/ from ECR repo names
 echo "ECR_REPO=${ECR_REPO}"
-GIT_TAG=$(cat ${BASE_DIRECTORY}/${PROJECT_PATH}/GIT_TAG)
+GIT_TAG=$(cat ${BASE_DIRECTORY}/projects/${PROJECT_PATH}/GIT_TAG)
 
 export IMAGE_TAG=${GIT_TAG}-${GIT_HASH}
 echo "IMAGE_TAG=${IMAGE_TAG}"
