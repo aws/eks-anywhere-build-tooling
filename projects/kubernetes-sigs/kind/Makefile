@@ -123,6 +123,8 @@ $(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_KUBEADM_OVERRID
 kind-node/images/push: DOCKERFILE_FOLDER=./images/node
 kind-node/images/push: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
 kind-node/images/push: BASE_IMAGE=$(VERSIONED_BASE_IMAGE)
+# We are fully overriding the base_image above, setting the name is to ensure the builder image is set correctly
+kind-node/images/push: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
 kind-node/images/push: IMAGE_TAG=$(NODE_IMAGE_TAG)
 kind-node/images/push: LATEST_TAG=$(NODE_IMAGE_LATEST_TAG)
 kind-node/images/push: IMAGE_BUILD_ARGS=PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG
