@@ -143,6 +143,10 @@ function build::kind::load_images(){
     docker exec --privileged -i $CONTAINER_ID crictl images
     
     # Validate all images in the image are from public.ecr
+    EXPECTED_FINAL_IMAGES=("amazonlinux/amazonlinux" "kind/kindnetd" "rancher/local-path-provisioner" \
+        "kubernetes/kube-apiserver" "kubernetes/kube-controller-manager" "kubernetes/kube-proxy" \
+        "kubernetes/kube-scheduler" "kubernetes/pause" "coredns/coredns" "etcd-io/etcd")
+    declare -a FOUND_EXPECTED_IMAGES
     FINAL_IMAGES=$(docker exec -i $CONTAINER_ID crictl images -o json | jq ".images[].repoTags[]" -r) 
     mapfile -t FINAL_IMAGES <<< "$FINAL_IMAGES"
     declare -p FINAL_IMAGES
@@ -151,7 +155,24 @@ function build::kind::load_images(){
             echo "$image is not from public.ecr.aws!"
             exit 1
         fi
+        EXPECTED_IMAGE=false
+        for expected in "${EXPECTED_FINAL_IMAGES[@]}"; do
+            if [[ $image =~ $expected ]]; then
+                FOUND_EXPECTED_IMAGES+=( "$expected}" )
+                EXPECTED_IMAGE=true
+                break
+            fi
+        done
+        if ! $EXPECTED_IMAGE; then
+            echo "$image is not expected to be included in final image!"
+            exit 1
+        fi
     done
+
+    if [[ "${#FOUND_EXPECTED_IMAGES[@]}" != "${#EXPECTED_FINAL_IMAGES[@]}" ]]; then
+        echo "${EXPECTED_FINAL_IMAGES[*]} are expected to be included in the final image but only ${FOUND_EXPECTED_IMAGES[*]} exist!"
+        exit 1
+    fi
 
     docker exec --privileged -i $CONTAINER_ID pkill containerd
 
