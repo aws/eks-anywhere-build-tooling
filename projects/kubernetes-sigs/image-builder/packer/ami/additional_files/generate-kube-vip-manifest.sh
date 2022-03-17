@@ -1,10 +1,22 @@
 #!/bin/bash
+source /etc/eks/logging.sh
+
+SCRIPT_LOG=/var/log/eks-bootstrap.log
+touch $SCRIPT_LOG
+
+# save stdout and stderr to file descriptors 3 and 4,
+# then redirect them to "$SCRIPT_LOG"
+# restore stdout and stderr at bottom of script
+exec 3>&1 4>&2 >>$SCRIPT_LOG 2>&1
 
 KUBE_VIP_IMAGE=$1
 VIP=$2
-DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
 
-echo "Generating kube-vip manifest: image = [$KUBE_VIP_IMAGE] VIP = [$VIP]"
+DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
+log::info "Generating kube-vip manifest"
+log::info "Using DNI: $DNI"
+log::info "Using kube-vip: $VIP"
+log::info "Using kube-vip image: $KUBE_VIP_IMAGE"
 
 cat<<EOF >/etc/kubernetes/manifests/kube-vip.yaml
 apiVersion: v1
@@ -62,3 +74,9 @@ spec:
     name: kubeconfig
 status: {}
 EOF
+
+log::info "Generated kube vip manifest successfully at /etc/kubernetes/manifests/kube-vip.yaml"
+log::info "Printing content of kube vip manifest"
+log::info "$(cat /etc/kubernetes/manifests/kube-vip.yaml)"
+# restore stdout and stderr
+exec 1>&3 2>&4
