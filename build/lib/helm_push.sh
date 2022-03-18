@@ -25,7 +25,7 @@ OUTPUT_DIR="${4?Fourth arguement is output directory}"
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
-CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
+CHART_FILE="${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG/v/}-helm.tgz"
 LATEST_TAG=$(echo ${IMAGE_TAG} | sed -e 's/-.*/-latest/')
 
 DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
