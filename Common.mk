@@ -249,7 +249,6 @@ define BUILDCTL
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT) \
 		$(if $(filter push=true,$(IMAGE_OUTPUT)),--export-cache type=inline,) \
 		$(foreach IMPORT_CACHE,$(IMAGE_IMPORT_CACHE),--import-cache $(IMPORT_CACHE))
-                buildctl prune --all
 
 endef 
 
