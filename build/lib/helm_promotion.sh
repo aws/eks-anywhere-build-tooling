@@ -21,8 +21,8 @@ export LANG=C.UTF-8
 
 BASE_DIRECTORY=$(git rev-parse --show-toplevel)
 ACCOUNT_ID="${1?Specify first argument - account id}"
-IMAGE_REGISTRY="${2?Specify first argument - image registry}"
-GIT_HASH="${3?Specify first argument - git hash}"
+IMAGE_REGISTRY="${2?Specify second argument - image registry}"
+GIT_HASH="${3?Specify third argument - git hash}"
 
 export HELM_EXPERIMENTAL_OCI=1
 
