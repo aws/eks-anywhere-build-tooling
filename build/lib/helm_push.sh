@@ -25,7 +25,7 @@ OUTPUT_DIR="${4?Fourth arguement is output directory}"
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
-CHART_FILE=${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG}-helm.tgz
+CHART_FILE="${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG/v/}-helm.tgz"
 LATEST_TAG=$(echo ${IMAGE_TAG} | sed -e 's/-.*/-latest/')
 
 DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
@@ -45,4 +45,11 @@ trap cleanup err
 trap "rm -f $TMPFILE" exit
 helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
 DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
-echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
+{
+    set +x
+    echo
+    echo
+    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
+    echo "  -- or --"
+    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${IMAGE_TAG/v}"
+}

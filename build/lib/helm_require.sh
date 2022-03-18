@@ -37,7 +37,7 @@ cat >${REQUIRES_FILE} <<!
 ---
 kind: EksaPackageRequires
 metadata:
-  name: ${HELM_DESTINATION_REPOSITORY}-${IMAGE_TAG}
+  name: ${HELM_DESTINATION_REPOSITORY}-${IMAGE_TAG/v}
   namespace: eksa-packages
 spec:
   images:
@@ -47,6 +47,7 @@ SEDFILE=${OUTPUT_DIR}/helm/sedfile
 export IMAGE_TAG
 export HELM_REGISTRY
 envsubst <helm/sedfile.template >${SEDFILE}
+echo "s,version: v,version: ,g" >>${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
 do
   IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${HELM_REGISTRY} ${IMAGE} ${LATEST})
