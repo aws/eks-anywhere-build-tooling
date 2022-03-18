@@ -37,7 +37,7 @@ cat >${REQUIRES_FILE} <<!
 ---
 kind: EksaPackageRequires
 metadata:
-  name: ${HELM_DESTINATION_REPOSITORY}-${IMAGE_TAG}
+  name: ${HELM_DESTINATION_REPOSITORY}-${IMAGE_TAG/v}
   namespace: eksa-packages
 spec:
   images:
