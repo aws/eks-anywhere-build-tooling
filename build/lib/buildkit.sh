@@ -42,3 +42,7 @@ else
     $CMD "$@"
 fi
 
+# space is limited on presubmit nodes, after each image build clear the build cache
+if [ "${JOB_TYPE:-}" == "presubmit" ]; then
+   $CMD "prune --all"
+fi
