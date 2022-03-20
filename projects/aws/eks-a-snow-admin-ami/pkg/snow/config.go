@@ -60,6 +60,15 @@ func snowAdminAMIRecipe(input *AdminAMIInput) *recipes.Recipe {
 				},
 				Parameters: eksaComponentParemeters(input),
 			},
+			{
+				Component: &components.Component{
+					Name:                "Download EKS Anywhere artifacts",
+					YamlFilePath:        "components/download_eksa_artifacts.yaml",
+					SupportedOsVersions: []string{"Ubuntu 20"},
+					Description:         "Download EKS Anywhere artifacts for disconnected use",
+					Platform:            "Linux",
+				},
+			},
 		},
 	}
 }

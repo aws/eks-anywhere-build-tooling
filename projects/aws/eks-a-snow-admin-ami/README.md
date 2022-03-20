@@ -26,6 +26,11 @@ The only two arguments needed are the name of one of your keys (however they are
 ./test/testComponents.sh my-key-pair ~/.ssh/my-key-pair.pem
 ```
 
+You can optionally pass arguments to the components:
+```shell
+./test/testComponents.sh my-key-pair ~/.ssh/my-key-pair.pem EksAnywhereVersion=v0.7.2
+```
+
 The script will copy all the logs to you local disk after the test is finished in the `logs` folder. Beware that it won't terminate the ec2 instance if the test fails so you will need to terminate it manually.
 
 The script already sets sane defaults but here are some things you can configure with env vars:

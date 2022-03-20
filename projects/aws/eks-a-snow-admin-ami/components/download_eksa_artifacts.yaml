@@ -1,0 +1,57 @@
+name: "Install EKS-A in Ubuntu"
+description: "Component to install eks-anywhere in an ubuntu AMI"
+schemaVersion: 1.0
+parameters:
+  - ManifestsPath:
+      type: string
+      default: '/usr/lib/eks-a/manifests'
+      description: The full path where eks-a manifests will be downloaded
+  - ImagesTarPath:
+      type: string
+      default: '/usr/lib/eks-a/images/images.tar'
+      description: The path where the tar containing all eks-a container images will be stored
+phases:
+  - name: build
+    steps:
+      - name: DownloadManifests
+        action: ExecuteBash
+        inputs:
+          commands:
+            - MANIFESTS_PATH='{{ ManifestsPath }}'
+            - mkdir -p $MANIFESTS_PATH
+            - eksctl anywhere download artifacts --retain-dir --download-dir $MANIFESTS_PATH -v4
+      - name: DownloadImages
+        action: ExecuteBash
+        inputs:
+          commands:
+            - IMAGES_PATH='{{ ImagesTarPath }}'
+            - mkdir -p $(dirname $IMAGES_PATH) 
+            - eksctl anywhere download images -o $IMAGES_PATH -v4
+  - name: validate
+    steps:
+      - name: VerifyManifests
+        action: ExecuteBash
+        inputs:
+          commands:
+            - MANIFESTS_PATH='{{ ManifestsPath }}'
+            - |
+              if type -d $MANIFESTS_PATH; then
+                  echo "manifests dir exists."
+                  exit 0
+              else
+                  echo "manifests dir does not exist. Failing."
+                  exit 1
+              fi
+      - name: VerifyImagesTar
+        action: ExecuteBash
+        inputs:
+          commands:
+            - IMAGES_PATH='{{ ImagesTarPath }}'
+            - |
+              if type -f $IMAGES_PATH; then
+                  echo "Images tarball exists."
+                  exit 0
+              else
+                  echo "Images tarball does not exist. Failing."
+                  exit 1
+              fi
