@@ -44,7 +44,7 @@ BASE_IMAGE_CHECKSUM=$(sha256sum $BASE_IMAGE| awk '{print $1}')
 
 echo "Base Image Checksum - $BASE_IMAGE_CHECKSUM"
 
-cat <<< $(jq '.iso_url="$(BUILDER_ROOT)/$(BASE_IMAGE)"|.iso_checksum="$(BASE_IMAGE_CHECKSUM)"' $RHEL_QEMU_CONFIG_FILE) > $RHEL_QEMU_CONFIG_FILE
+cat <<< $(jq --arg base_image $BUILDER_ROOT/$BASE_IMAGE --arg checksum $BASE_IMAGE_CHECKSUM '.iso_url=$base_image|.iso_checksum=$checksum' $RHEL_QEMU_CONFIG_FILE) > $RHEL_QEMU_CONFIG_FILE
 
 PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_VAR_FILES="$PACKER_VAR_FILES" make -C $IMAGE_BUILDER_DIR build-qemu-rhel-8
 
