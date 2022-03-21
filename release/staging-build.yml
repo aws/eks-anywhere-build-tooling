@@ -1,35 +1,192 @@
-version: 0.2
-
-run-as: imagebuilder
-
-env:
-  secrets-manager:
-    GOVC_DATACENTER: "vsphere_ci_beta_connection:vsphere_datacenter"
-    GOVC_URL: "vsphere_ci_beta_connection:vsphere_url"
-    GOVC_USERNAME: "vsphere_ci_beta_connection:vsphere_username"
-    GOVC_PASSWORD: "vsphere_ci_beta_connection:vsphere_password"
-    VSPHERE_CONNECTION_DATA: "vsphere_ci_beta_connection:vsphere_connection_data"
-
-phases:
-  # On AL2, the Cargo build system requires the openssl-devel package
-  # for installing OpenSSL libraries
-  install:
-    run-as: root
-    commands:
-      - yum install -y openssl-devel
-
-  pre_build:
-    run-as: root
-    commands:
-    - ./build/lib/setup.sh
-
-  build:
-    run-as: root
-    commands:
-    - make release-binaries-images
-  
-  post_build:
-    commands:
-    - export HOME="/home/imagebuilder"
-    - make release-ovas
-    
+batch:
+  fast-fail: true
+  build-graph:
+  - identifier: eks_anywhere_diagnostic_collector
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/aws/eks-anywhere
+  - identifier: kube_rbac_proxy
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/brancz/kube-rbac-proxy
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/brancz.kube-rbac-proxy
+  - identifier: cluster_api_provider_vsphere
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/cluster-api-provider-vsphere
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.cluster-api-provider-vsphere
+  - identifier: cri_tools
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/cri-tools
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.cri-tools
+  - identifier: etcdadm
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/etcdadm
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.etcdadm
+  - identifier: vsphere_csi_driver
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/vsphere-csi-driver
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.vsphere-csi-driver
+  - identifier: cert_manager
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/jetstack/cert-manager
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/jetstack.cert-manager
+  - identifier: kube_vip
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/plunder-app/kube-vip
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/plunder-app.kube-vip
+  - identifier: helm_controller
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/fluxcd/helm-controller
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.helm-controller
+  - identifier: kustomize_controller
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/fluxcd/kustomize-controller
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.kustomize-controller
+  - identifier: notification_controller
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/fluxcd/notification-controller
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.notification-controller
+  - identifier: source_controller
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/fluxcd/source-controller
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.source-controller
+  - identifier: local_path_provisioner
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/rancher/local-path-provisioner
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/rancher.local-path-provisioner
+  - identifier: etcdadm_bootstrap_provider
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/mrajashree/etcdadm-bootstrap-provider
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/mrajashree.etcdadm-bootstrap-provider
+  - identifier: etcdadm_controller
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/mrajashree/etcdadm-controller
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/mrajashree.etcdadm-controller
+  - identifier: cilium
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/cilium/cilium
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/cilium.cilium
+  - identifier: cluster_api
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/cluster-api
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.vsphere-csi-driver
+  - identifier: cluster_api_provider_aws
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/cluster-api-provider-aws
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.cluster-api-provider-aws
+  - identifier: kind
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/kind
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.kind
+    depend-on:
+    - cri_tools
+    - etcdadm
+    - local_path_provisioner
+  - identifier: flux2
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/fluxcd/flux2
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.flux2
+  - identifier: govmomi
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/vmware/govmomi
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/vmware.govmomi
+  - identifier: troubleshoot
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/replicatedhq/troubleshoot
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/replicatedhq.troubleshoot
+  - identifier: helm
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/helm/helm
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/helm.helm
+  - identifier: bottlerocket_bootstrap
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/aws/bottlerocket-bootstrap
+    depend-on:
+    - etcdadm
+  - identifier: eks_anywhere_cli_tools
+    buildspec: buildspec.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/aws/eks-anywhere-build-tooling
+    depend-on:
+    - cluster_api
+    - cluster_api_provider_aws
+    - kind
+    - flux2
+    - govmomi
+    - troubleshoot
+    - helm
+    - tink
+  - identifier: 1_20_ubuntu_ova
+    buildspec: projects/kubernetes-sigs/image-builder/buildspecs/build-1-20-ubuntu-ova.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/image-builder
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.image-builder
+    depend-on:
+    - cri_tools
+    - etcdadm
+  - identifier: 1_21_ubuntu_ova
+    buildspec: projects/kubernetes-sigs/image-builder/buildspecs/build-1-21-ubuntu-ova.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/image-builder
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.image-builder
+    depend-on:
+    - cri_tools
+    - etcdadm
+  - identifier: 1_22_ubuntu_ova
+    buildspec: projects/kubernetes-sigs/image-builder/buildspecs/build-1-22-ubuntu-ova.yml
+    env:
+      variables:
+       PROJECT_PATH: projects/kubernetes-sigs/image-builder
+       CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/kubernetes-sigs.image-builder
+    depend-on:
+    - cri_tools
+    - etcdadm
