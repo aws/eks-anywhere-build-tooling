@@ -1,7 +1,9 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BUILD_LIB=${BASE_DIRECTORY}/build/lib
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
+ECR_PUBLIC_URI?=$(shell AWS_REGION=us-east-1 && aws ecr-public describe-registries --query 'registries[*].registryUri' --output text)
 
 PROJECTS?=aws_eks-anywhere aws_eks-anywhere-packages brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell tinkerbell_hegel cloudflare_cfssl tinkerbell_boots tinkerbell_hub tinkerbell_pbnj tinkerbell_hook aws_cluster-api-provider-aws-snow distribution_distribution goharbor_harbor cilium_cilium
 BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
@@ -12,6 +14,7 @@ EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQ
 ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling kubernetes-sigs_image-builder
 
 RELEASE_BRANCH?=
+GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
 .PHONY: build-all-projects
 build-all-projects: $(BUILD_TARGETS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling
@@ -102,6 +105,9 @@ stop-buildkit-and-registry:
 generate:
 	build/lib/generate_projects_list.sh $(BASE_DIRECTORY)
 
+helm/promotion:
+	$(BUILD_LIB)/helm_promotion.sh $(AWS_ACCOUNT_ID) $(ECR_PUBLIC_URI) $(GIT_HASH)
+	
 .PHONY: check-project-path-exists
 check-project-path-exists:
 	@if ! stat $(PROJECT_PATH) &> /dev/null; then \
