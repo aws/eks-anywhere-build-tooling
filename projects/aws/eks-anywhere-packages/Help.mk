@@ -16,10 +16,16 @@ _output/bin/eks-anywhere-packages/linux-amd64/package-manager: ## Build `_output
 _output/bin/eks-anywhere-packages/linux-arm64/package-manager: ## Build `_output/bin/eks-anywhere-packages/linux-arm64/package-manager`
 
 ##@ Image Targets
-local-images: ## Builds `eks-anywhere-packages/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `eks-anywhere-packages/images/push` to IMAGE_REPO
+local-images: ## Builds `eks-anywhere-packages/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `eks-anywhere-packages/images/push helm/push` to IMAGE_REPO
 eks-anywhere-packages/images/amd64: ## Builds/pushes `eks-anywhere-packages/images/amd64`
+helm/build: ## Builds/pushes `helm/build`
 eks-anywhere-packages/images/push: ## Builds/pushes `eks-anywhere-packages/images/push`
+helm/push: ## Builds/pushes `helm/push`
+
+##@ Helm Targets
+helm/build: ## Build helm chart
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
