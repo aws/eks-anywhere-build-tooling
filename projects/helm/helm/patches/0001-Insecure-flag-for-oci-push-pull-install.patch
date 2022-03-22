@@ -1,16 +1,16 @@
-From bf6b45a01cb63a4ddb72d94ce5bfec86d317e334 Mon Sep 17 00:00:00 2001
+From 39f2c93ae1e2cafeaa8e94911e570f1e86602c62 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
-Date: Tue, 22 Mar 2022 09:32:29 -0700
-Subject: [PATCH] Push to OCI insecure registry
+Date: Tue, 22 Mar 2022 13:16:04 -0700
+Subject: [PATCH] Insecure flag for oci push pull install
 
 ---
  cmd/helm/flags.go                        |  1 +
  cmd/helm/push.go                         |  4 +++
  internal/experimental/action/push.go     | 12 +++++++--
  internal/experimental/registry/client.go | 31 ++++++++++++++++++++++++
- pkg/action/install.go                    |  1 +
+ pkg/action/install.go                    | 12 ++++++++-
  pkg/action/pull.go                       |  6 +++++
- 6 files changed, 53 insertions(+), 2 deletions(-)
+ 6 files changed, 63 insertions(+), 3 deletions(-)
 
 diff --git a/cmd/helm/flags.go b/cmd/helm/flags.go
 index aefa836c..13ad906f 100644
@@ -118,17 +118,41 @@ index cc9e1fe7..4757f9bb 100644
  	// LoginOption allows specifying various settings on login
  	LoginOption func(*loginOperation)
 diff --git a/pkg/action/install.go b/pkg/action/install.go
-index b84a5727..bdd3408c 100644
+index b84a5727..a9fe6822 100644
 --- a/pkg/action/install.go
 +++ b/pkg/action/install.go
-@@ -124,6 +124,7 @@ type ChartPathOptions struct {
+@@ -124,13 +124,17 @@ type ChartPathOptions struct {
  	Username              string // --username
  	Verify                bool   // --verify
  	Version               string // --version
 +	PlainHTTP             bool   // --plain-http
++	cfg                   *Configuration
  }
  
  // NewInstall creates a new Install object with the given configuration.
+ func NewInstall(cfg *Configuration) *Install {
+-	return &Install{
++	install := &Install{
+ 		cfg: cfg,
+ 	}
++	install.ChartPathOptions.cfg = cfg
++	return install
+ }
+ 
+ func (i *Install) installCRDs(crds []chart.CRD) error {
+@@ -692,6 +696,12 @@ func (c *ChartPathOptions) LocateChart(name string, settings *cli.EnvSettings) (
+ 		return name, errors.Errorf("path %q not found", name)
+ 	}
+ 
++	if c.InsecureSkipTLSverify {
++		if err := c.cfg.RegistryClient.WithResolver(c.InsecureSkipTLSverify, c.PlainHTTP); err != nil {
++			return "", err
++		}
++	}
++
+ 	dl := downloader.ChartDownloader{
+ 		Out:     os.Stdout,
+ 		Keyring: c.Keyring,
 diff --git a/pkg/action/pull.go b/pkg/action/pull.go
 index 2f5127ea..87ec6532 100644
 --- a/pkg/action/pull.go
