@@ -23,10 +23,12 @@ HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
 OUTPUT_DIR="${4?Fourth arguement is output directory}"
 
+SEMVER_TMP="${IMAGE_TAG#[^0-9]}" # remove any leading non-digits
+SEMVER="${SEMVER_TMP/-/+}" # replace the - between the tag and the hash with a +
+
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
-CHART_FILE="${OUTPUT_DIR}/helm/${CHART_NAME}-${IMAGE_TAG/v/}-helm.tgz"
-LATEST_TAG=$(echo ${IMAGE_TAG} | sed -e 's/-.*/-latest/')
+CHART_FILE="${OUTPUT_DIR}/helm/${CHART_NAME}-${SEMVER}.tgz"
 
 DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
 export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
@@ -37,7 +39,7 @@ function cleanup() {
   then
     echo "If authentication failed: aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws"
   else
-    echo "If authentication failed: aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${IMAGE_REGISTRY}"
+    echo "If authentication failed: aws ecr get-login-password --region \${AWS_REGION} | docker login --username AWS --password-stdin ${IMAGE_REGISTRY}"
   fi
   rm -f "${TMPFILE}"
 }
@@ -51,5 +53,5 @@ DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
     echo
     echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
     echo "  -- or --"
-    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${IMAGE_TAG/v}"
+    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${SEMVER}"
 }
