@@ -19,9 +19,9 @@ IMAGE_NAMES=cert-manager-acmesolver cert-manager-cainjector cert-manager-control
 BINARY_TARGET_FILES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook cert-manager-ctl
 SOURCE_PATTERNS=./cmd/acmesolver ./cmd/cainjector ./cmd/controller ./cmd/webhook ./cmd/ctl
 
-HAS_HELM_CHART=true
-HELM_DIRECTORY=deploy/charts/cert-manager
-HELM_IMAGE_LIST=jetstack/cert-manager-cainjector jetstack/cert-manager-controller jetstack/cert-manager-webhook jetstack/cert-manager-ctl
+# HAS_HELM_CHART=true
+# HELM_DIRECTORY=deploy/charts/cert-manager
+# HELM_IMAGE_LIST=jetstack/cert-manager-cainjector jetstack/cert-manager-controller jetstack/cert-manager-webhook jetstack/cert-manager-ctl
 
 HAS_S3_ARTIFACTS=true
 
