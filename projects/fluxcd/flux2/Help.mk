@@ -18,16 +18,10 @@ _output/bin/flux2/darwin-amd64/flux: ## Build `_output/bin/flux2/darwin-amd64/fl
 _output/bin/flux2/darwin-arm64/flux: ## Build `_output/bin/flux2/darwin-arm64/flux`
 
 ##@ Image Targets
-local-images: ## Builds `flux-cli/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `flux-cli/images/push helm/push` to IMAGE_REPO
+local-images: ## Builds `flux-cli/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `flux-cli/images/push` to IMAGE_REPO
 flux-cli/images/amd64: ## Builds/pushes `flux-cli/images/amd64`
-helm/build: ## Builds/pushes `helm/build`
 flux-cli/images/push: ## Builds/pushes `flux-cli/images/push`
-helm/push: ## Builds/pushes `helm/push`
-
-##@ Helm Targets
-helm/build: ## Build helm chart
-helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Fetch Binary Targets
 _output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
