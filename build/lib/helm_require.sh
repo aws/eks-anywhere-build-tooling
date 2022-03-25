@@ -47,7 +47,10 @@ SEDFILE=${OUTPUT_DIR}/helm/sedfile
 export IMAGE_TAG
 export HELM_REGISTRY
 envsubst <helm/sedfile.template >${SEDFILE}
+# Semver requires that our version begin with a digit, so strip the v.
 echo "s,version: v,version: ,g" >>${SEDFILE}
+# Semver requires that we use a + before the git hash to denote build info.
+echo "/^version:/s,-,+," >>${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
 do
   IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${HELM_REGISTRY} ${IMAGE} ${LATEST})

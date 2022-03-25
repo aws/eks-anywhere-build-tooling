@@ -19,13 +19,13 @@ BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 FETCH_BINARIES_TARGETS=eksd/kubernetes/client
 
 HAS_S3_ARTIFACTS=true
-HAS_HELM_CHART=true
-HELM_DESTINATION_REPOSITORY=fluxcd/flux2
-HELM_SOURCE_OWNER=fluxcd-community
-HELM_SOURCE_REPOSITORY=helm-charts
-HELM_GIT_TAG?=$(shell cat HELM_GIT_TAG)
-HELM_DIRECTORY=charts/flux2
-HELM_IMAGE_LIST="fluxcd/flux-cli fluxcd/helm-controller fluxcd/kustomize-controller fluxcd/notification-controller fluxcd/source-controller"
+# HAS_HELM_CHART=true
+# HELM_DESTINATION_REPOSITORY=fluxcd/flux2
+# HELM_SOURCE_OWNER=fluxcd-community
+# HELM_SOURCE_REPOSITORY=helm-charts
+# HELM_GIT_TAG?=$(shell cat HELM_GIT_TAG)
+# HELM_DIRECTORY=charts/flux2
+# HELM_IMAGE_LIST="fluxcd/flux-cli fluxcd/helm-controller fluxcd/kustomize-controller fluxcd/notification-controller fluxcd/source-controller"
 
 include $(BASE_DIRECTORY)/Common.mk
 
