@@ -45,10 +45,8 @@ function cleanup() {
 trap cleanup err
 trap "rm -f $TMPFILE" exit
 
-ls -la
-pwd
-yum install -y tree
-tree
+which helm
+
 
 helm push ${CHART_FILE} oci://${IMAGE_REGISTRY} | tee ${TMPFILE}
 DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
