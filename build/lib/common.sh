@@ -168,7 +168,7 @@ function build::non-golang::gather_licenses(){
   local -r output_dir="$3"
   project_org="$(cut -d '/' -f1 <<< ${project})"
   project_name="$(cut -d '/' -f2 <<< ${project})"
-  git clone https://github.com/jonahjon/${project_name}
+  git clone https://github.com/${project_org}/${project_name}
   cd $project_name
   git checkout $git_tag
   cd ..
@@ -332,7 +332,7 @@ function build::common::get_clone_url() {
   local -r codebuild_ci=$4
 
   if [ "$codebuild_ci" = "true" ]; then
-    echo "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/${org}.${repo}"
+    echo "https://git-codecommit.${aws_region}.amazonaws.com/v1/repos/jonahjon.${repo}"
   else
     echo "https://github.com/${org}/${repo}.git"
   fi
