@@ -47,6 +47,7 @@ network:
         $DNI:
             set-name: $DNI
             dhcp4: true
+            dhcp-identifier: mac
             dhcp4-overrides:
                 route-metric: 50
                 send-hostname: true
