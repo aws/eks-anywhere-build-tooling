@@ -26,7 +26,6 @@ OUTPUT_DIR="${4?Fourth arguement is output directory}"
 SEMVER_TMP="${IMAGE_TAG#[^0-9]}" # remove any leading non-digits
 SEMVER="${SEMVER_TMP/-/+}" # replace the - between the tag and the hash with a +
 
-HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 CHART_FILE="${OUTPUT_DIR}/helm/${CHART_NAME}-${SEMVER}.tgz"
 
@@ -45,7 +44,7 @@ function cleanup() {
 }
 trap cleanup err
 trap "rm -f $TMPFILE" exit
-helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
+helm push ${CHART_FILE} oci://${IMAGE_REGISTRY} | tee ${TMPFILE}
 DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
 {
     set +x
