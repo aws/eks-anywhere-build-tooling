@@ -12,7 +12,7 @@ BASE_IMAGE_NAME=eks-distro-minimal-base
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/eks-anywhere-packages
-HELM_IMAGE_LIST=eks-anywhere-packages
+HELM_IMAGE_LIST=eks-anywhere-packages brancz/kube-rbac-proxy
 
 include $(BASE_DIRECTORY)/Common.mk
 
