@@ -1,0 +1,205 @@
+From 48ce409daee1cb16a20727940914873d4a5df731 Mon Sep 17 00:00:00 2001
+From: Abhinav Pandey <abhinavmpandey08@gmail.com>
+Date: Tue, 29 Mar 2022 12:49:50 -0700
+Subject: [PATCH] Update tinkerbell hardware state through CAPT
+
+Signed-off-by: Abhinav Pandey <abhinavmpandey08@gmail.com>
+---
+ tink/api/v1alpha1/hardware_types.go     |  11 ++-
+ tink/controllers/hardware/controller.go | 103 +++++++++++++++++++++++-
+ tink/controllers/workflow/controller.go |   2 +-
+ 3 files changed, 111 insertions(+), 5 deletions(-)
+
+diff --git a/tink/api/v1alpha1/hardware_types.go b/tink/api/v1alpha1/hardware_types.go
+index e9dbf29..9c87d09 100644
+--- a/tink/api/v1alpha1/hardware_types.go
++++ b/tink/api/v1alpha1/hardware_types.go
+@@ -27,8 +27,17 @@ const (
+ 	// HardwareError represents hardware that is in an error state.
+ 	HardwareError = HardwareState("Error")
+ 
+-	// HardwareReady represents hardware that is in a ready state.
++	// HardwareReady represents hardware which has a completed workflow.
+ 	HardwareReady = HardwareState("Ready")
++
++	// HardwareRunning represents hardware which has a running workflow.
++	HardwareRunning = HardwareState("Running")
++
++	// HardwareAvailable represents hardware's ownerName label is not set.
++	HardwareAvailable = HardwareState("Available")
++
++	// HardwarePending represents hardware has ownerName set but doesn't have a running workflow yet.
++	HardwarePending = HardwareState("Pending")
+ )
+ 
+ // HardwareSpec defines the desired state of Hardware.
+diff --git a/tink/controllers/hardware/controller.go b/tink/controllers/hardware/controller.go
+index 69cb382..576f335 100644
+--- a/tink/controllers/hardware/controller.go
++++ b/tink/controllers/hardware/controller.go
+@@ -22,8 +22,10 @@ import (
+ 	"encoding/json"
+ 	"fmt"
+ 	"reflect"
++	"time"
+ 
+ 	"github.com/tinkerbell/tink/protos/hardware"
++	"github.com/tinkerbell/tink/protos/workflow"
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	"k8s.io/utils/pointer"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+@@ -33,6 +35,8 @@ import (
+ 	tinkv1alpha1 "github.com/tinkerbell/cluster-api-provider-tinkerbell/tink/api/v1alpha1"
+ )
+ 
++const HardwareOwnerNameLabel = "v1alpha1.tinkerbell.org/ownerName"
++
+ type hardwareClient interface {
+ 	// Create(ctx context.Context, h *hardware.Hardware) error
+ 	Update(ctx context.Context, h *hardware.Hardware) error
+@@ -105,7 +109,7 @@ func (r *Reconciler) reconcileNormal(ctx context.Context, h *tinkv1alpha1.Hardwa
+ 		return ctrl.Result{}, fmt.Errorf("failed to get hardware from Tinkerbell: %w", err)
+ 	}
+ 
+-	logger.Info("Found hardware in tinkerbell", "tinkHardware", tinkHardware)
++	logger.Info("Found hardware in tinkerbell")
+ 
+ 	// TODO: also allow for reconciling hw.metadata.instance.id and hw.metadata.instance.hostname if not set?
+ 	// TODO: bubble up storage information better in status
+@@ -226,8 +230,6 @@ func (r *Reconciler) reconcileStatus(
+ 		h.Status.Interfaces = append(h.Status.Interfaces, tinkInterface)
+ 	}
+ 
+-	h.Status.State = tinkv1alpha1.HardwareReady
+-
+ 	disks, err := disksFromMetaData(h.Status.TinkMetadata)
+ 	if err != nil {
+ 		// TODO: better way to bubble up an issue here?
+@@ -236,12 +238,55 @@ func (r *Reconciler) reconcileStatus(
+ 
+ 	h.Status.Disks = disks
+ 
++	if _, ok := h.Labels[HardwareOwnerNameLabel]; !ok {
++		logger.Info("Hardware ownerName label not set, setting hardware state to Available")
++		h.Status.State = tinkv1alpha1.HardwareAvailable
++	} else {
++		logger.Info("Hardware ownerName label is set, searching for its workflow")
++
++		workflowList := &tinkv1alpha1.WorkflowList{}
++		options := &client.ListOptions{}
++
++		if err := r.Client.List(ctx, workflowList, options); err != nil {
++			logger.Error(err, "Failed to list workflows")
++		}
++
++		workflowFound := false
++
++		for _, w := range workflowList.Items {
++			if w.Spec.HardwareRef == h.Name {
++				logger.Info("Workflow found for hardware", "workflow-name", w.Name)
++				workflowFound = true
++				if w.Status.State == workflow.State_STATE_RUNNING.String() {
++					h.Status.State = tinkv1alpha1.HardwareRunning
++				} else if w.Status.State == workflow.State_STATE_SUCCESS.String() {
++					h.Status.State = tinkv1alpha1.HardwareReady
++				}
++			}
++		}
++
++		if !workflowFound {
++			logger.Info("Workflow not found for hardware, setting state to pending")
++			h.Status.State = tinkv1alpha1.HardwarePending
++		}
++	}
++
++	if err := r.reconcileTinkerbellHardwareState(ctx, h.Status.State, h.Name, tinkHardware); err != nil {
++		return ctrl.Result{}, err
++	}
++
+ 	if err := r.Client.Status().Patch(ctx, h, patch); err != nil {
+ 		logger.Error(err, "Failed to patch hardware")
+ 
+ 		return ctrl.Result{}, fmt.Errorf("failed to patch hardware: %w", err)
+ 	}
+ 
++	if h.Status.State != tinkv1alpha1.HardwareAvailable && h.Status.State != tinkv1alpha1.HardwareReady && h.Status.State != tinkv1alpha1.HardwareRunning {
++		// If the hardware isn't ready, requeue in 10 seconds
++		logger.Info("Hardware not ready yet, requeueing after 10 seconds")
++		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
++	}
++
+ 	return ctrl.Result{}, nil
+ }
+ 
+@@ -285,3 +330,55 @@ func parseDisks(disks interface{}) []tinkv1alpha1.Disk {
+ 
+ 	return nil
+ }
++
++func (r *Reconciler) reconcileTinkerbellHardwareState(
++	ctx context.Context,
++	state tinkv1alpha1.HardwareState,
++	hardwareName string,
++	tinkHardware *hardware.Hardware,
++) error {
++	logger := ctrl.LoggerFrom(ctx).WithValues("hardware", hardwareName)
++
++	metadata, err := unmarshalMetadata(tinkHardware.Metadata)
++	if err != nil {
++		logger.Error(err, "Failed to unmarshal hardware metadata")
++		return err
++	}
++
++	if state == tinkv1alpha1.HardwareAvailable {
++		metadata["state"] = "provisioning"
++		metadata["userdata"] = ""
++	} else if state == tinkv1alpha1.HardwareReady || state == tinkv1alpha1.HardwareRunning {
++		metadata["state"] = "in_use"
++	}
++
++	if tinkHardware.Metadata, err = marshalMetadata(metadata); err != nil {
++		logger.Error(err, "Failed to marshal hardware metadata")
++		return err
++	}
++
++	if err := r.HardwareClient.Update(ctx, tinkHardware); err != nil {
++		logger.Error(err, "Failed to update hardware state", "hardware", tinkHardware)
++		return fmt.Errorf("failed to update hardware state: %w", err)
++	}
++
++	logger.Info("Updated tinkerbell hardware state", "state", metadata["state"])
++
++	return nil
++}
++
++func marshalMetadata(hwMetaData map[string]interface{}) (string, error) {
++	metadata, err := json.Marshal(hwMetaData)
++	if err != nil {
++		return "", fmt.Errorf("failed to marshal metadata to json: %w", err)
++	}
++	return string(metadata), nil
++}
++
++func unmarshalMetadata(metadata string) (map[string]interface{}, error) {
++	hwMetaData := make(map[string]interface{})
++	if err := json.Unmarshal([]byte(metadata), &hwMetaData); err != nil {
++		return nil, fmt.Errorf("failed to unmarshal metadata from json: %w", err)
++	}
++	return hwMetaData, nil
++}
+diff --git a/tink/controllers/workflow/controller.go b/tink/controllers/workflow/controller.go
+index 0b3dbbc..2533076 100644
+--- a/tink/controllers/workflow/controller.go
++++ b/tink/controllers/workflow/controller.go
+@@ -237,7 +237,7 @@ func (r *Reconciler) reconcileStatus(
+ 		// If the workflow hasn't successfully run, requeue in
+ 		// a minute. This is to workaround the lack of events
+ 		// for workflow status
+-		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
++		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+ 	}
+ 
+ 	return ctrl.Result{}, nil
+-- 
+2.32.0 (Apple Git-132)
+
