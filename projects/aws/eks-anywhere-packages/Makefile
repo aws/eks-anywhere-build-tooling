@@ -8,8 +8,7 @@ IMAGE_COMPONENT=eks-anywhere-packages
 IMAGE_NAMES=$(IMAGE_COMPONENT)
 
 BINARY_TARGET_FILES=package-manager
-# BASE_IMAGE_NAME=eks-distro-minimal-base
-BASE_IMAGE_NAME?=builder-base
+BASE_IMAGE_NAME=eks-distro-minimal-base
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/eks-anywhere-packages
