@@ -7,13 +7,14 @@ WORKDIR /newroot
 RUN set -x && \
     amazon-linux-extras enable docker && \
     cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo && \
-    # TODO (pokearu): check and remove unwanted binaries from systemd
-    # example bootctl, journalctl etc.
-    clean_install "systemd" true true true && \
+    clean_install "systemd" true true && \
     clean_install "docker procps e2fsprogs" && \
     remove_package "bash coreutils gawk info sed shadow-utils grep" && \
     remove_package "systemd" true && \
     cleanup "tink-docker" && \
+    curl https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox -o /newroot/usr/bin/busybox && \
+    chmod +x /newroot/usr/bin/busybox && \
+    ln -sf /usr/bin/busybox /newroot/usr/sbin/reboot && \
     ln -sf /usr/bin/docker-init /newroot/usr/local/bin/docker-init && \
     ln -sf /usr/bin/dockerd /newroot/usr/local/bin/dockerd
 
