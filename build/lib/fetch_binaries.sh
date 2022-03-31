@@ -61,8 +61,8 @@ fi
 #     build::common::wait_for_tarball $URL
 # fi
 
-if [[ $REPO == *.tar.gz ]]; then
-    curl -sSL $URL -o $OUTPUT_DIR_FILE
-else
-    curl -sSL $URL | tar xz -C $OUTPUT_DIR_FILE
-fi
+# if [[ $REPO == *.tar.gz ]]; then
+#     curl -sSL $URL -o $OUTPUT_DIR_FILE
+# else
+#     curl -sSL $URL | tar xz -C $OUTPUT_DIR_FILE
+# fi
