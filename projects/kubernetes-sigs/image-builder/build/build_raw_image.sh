@@ -109,7 +109,7 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS='-force -debug' PACKER_LOG=1 PACKER_LOG_PATH=$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log make build-raw-$BUILD_TARGET -C $REMOTE_IMAGE_BUILDER_MAKE_ROOT"
+SSH_COMMANDS="sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 PACKER_LOG_PATH=$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log make build-raw-$BUILD_TARGET -C $REMOTE_IMAGE_BUILDER_MAKE_ROOT"
 if [[ "$BUILD_TARGET" =~ "rhel" ]]; then
     SSH_COMMANDS="sudo wget https://redhat-iso-images.s3.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso -P $REMOTE_IMAGE_BUILDER_MAKE_ROOT; export RHSM_USER='$RHSM_USER' RHSM_PASS='$RHSM_PASS'; $SSH_COMMANDS"
 fi

@@ -1,4 +1,4 @@
-From 2cd3eb23b14038ff3f1f2fa91b118d9b5a29f172 Mon Sep 17 00:00:00 2001
+From 86a73cef853184a4ad5c9b9c45fd053c291c0b05 Mon Sep 17 00:00:00 2001
 From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 Date: Fri, 25 Mar 2022 14:17:33 -0700
 Subject: [PATCH] Add support for RHEL 8 RAW image builds
@@ -6,10 +6,9 @@ Subject: [PATCH] Add support for RHEL 8 RAW image builds
 ---
  images/capi/Makefile                          |  3 +-
  .../capi/packer/raw/linux/rhel/http/8/ks.cfg  | 74 +++++++++++++++++++
- .../linux/ubuntu/http/base/preseed-efi.cfg    | 10 +--
  images/capi/packer/raw/raw-rhel-8.json        | 15 ++++
  .../capi/packer/raw/raw-ubuntu-2004-efi.json  |  2 +-
- 5 files changed, 97 insertions(+), 7 deletions(-)
+ 4 files changed, 92 insertions(+), 2 deletions(-)
  create mode 100644 images/capi/packer/raw/linux/rhel/http/8/ks.cfg
  create mode 100644 images/capi/packer/raw/raw-rhel-8.json
 
@@ -115,34 +114,6 @@ index 000000000..d13f2df11
 +
 +%end 
 \ No newline at end of file
-diff --git a/images/capi/packer/raw/linux/ubuntu/http/base/preseed-efi.cfg b/images/capi/packer/raw/linux/ubuntu/http/base/preseed-efi.cfg
-index 14cb4008f..3cc957a04 100644
---- a/images/capi/packer/raw/linux/ubuntu/http/base/preseed-efi.cfg
-+++ b/images/capi/packer/raw/linux/ubuntu/http/base/preseed-efi.cfg
-@@ -59,6 +59,11 @@ d-i partman-auto/expert_recipe string         \
-       1 1 1 free                              \
-          $bios_boot{ }                        \
-          method{ biosgrub } .                 \
-+      512 20000 -1 ext4                       \
-+         $primary{ }                          \
-+         method{ format } format{ }           \
-+         use_filesystem{ } filesystem{ ext4 } \
-+         mountpoint{ / } .
-       200 200 200 fat32                       \
-          $primary{ }                          \
-          method{ efi } format{ } .            \
-@@ -67,11 +72,6 @@ d-i partman-auto/expert_recipe string         \
-       #    method{ format } format{ }           \
-       #    use_filesystem{ } filesystem{ ext3 } \
-       #    mountpoint{ /boot } .                \
--      512 20000 -1 ext4                      \
--         $primary{ }                          \
--         method{ format } format{ }           \
--         use_filesystem{ } filesystem{ ext4 } \
--         mountpoint{ / } .
- 
- d-i partman-partitioning/confirm_write_new_label boolean true
- d-i partman/choose_partition select finish
 diff --git a/images/capi/packer/raw/raw-rhel-8.json b/images/capi/packer/raw/raw-rhel-8.json
 new file mode 100644
 index 000000000..7bb3adf03
