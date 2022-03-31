@@ -23,6 +23,7 @@ ARTIFACTS_FOLDER="$2"
 GIT_TAG="$3"
 FAKE_ARM_ARTIFACTS_FOR_VALIDATION="$4"
 IMAGE_FORMAT="${5:-}"
+IMAGE_OS="${6:-}"
 
 EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts
 if [ -n "$IMAGE_FORMAT" ]; then
@@ -37,7 +38,8 @@ done
 
 EXPECTED_FILES=$(mktemp)
 export GIT_TAG=$GIT_TAG
-envsubst '$GIT_TAG' \
+export IMAGE_OS=$IMAGE_OS
+envsubst '$GIT_TAG:$IMAGE_OS' \
 	< $EXPECTED_FILES_PATH \
 	> $EXPECTED_FILES
 
