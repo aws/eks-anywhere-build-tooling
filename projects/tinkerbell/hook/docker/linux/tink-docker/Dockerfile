@@ -7,7 +7,9 @@ WORKDIR /newroot
 RUN set -x && \
     amazon-linux-extras enable docker && \
     cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo && \
-    clean_install "systemd" true true && \
+    # TODO (pokearu): check and remove unwanted binaries from systemd
+    # example bootctl, journalctl etc.
+    clean_install "systemd" true true true && \
     clean_install "docker procps e2fsprogs" && \
     remove_package "bash coreutils gawk info sed shadow-utils grep" && \
     remove_package "systemd" true && \
