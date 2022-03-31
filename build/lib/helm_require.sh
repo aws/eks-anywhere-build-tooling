@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-HELM_REGISTRY="${1?First argument is registry}"
+IMAGE_REGISTRY="${1?First argument is registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
 OUTPUT_DIR="${3?Third argument is output directory}"
 IMAGE_TAG="${4?Fourth argument is image tag}"
@@ -45,7 +45,7 @@ spec:
 REQUIRES_CONFIG_FILE=helm/requires-config.yaml
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 export IMAGE_TAG
-export HELM_REGISTRY
+export HELM_REGISTRY=$(aws ecr-public describe-registries --region us-east-1  --output text --query 'registries[*].registryUri')
 envsubst <helm/sedfile.template >${SEDFILE}
 # Semver requires that our version begin with a digit, so strip the v.
 echo "s,version: v,version: ,g" >>${SEDFILE}
@@ -53,7 +53,14 @@ echo "s,version: v,version: ,g" >>${SEDFILE}
 echo "/^version:/s,-,+," >>${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
 do
-  IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${HELM_REGISTRY} ${IMAGE} ${LATEST})
+  if [ "${IMAGE}" == "${HELM_DESTINATION_REPOSITORY}" ]
+  then
+    TAG="${IMAGE_TAG}"
+  else
+    TAG="${LATEST}"
+  fi
+  IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${HELM_REGISTRY} ${IMAGE} ${TAG}) ||
+  IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${IMAGE_REGISTRY} ${IMAGE} ${TAG})
   echo "s,{{${IMAGE}}},${IMAGE_SHASUM},g" >>${SEDFILE}
   cat >>${REQUIRES_FILE} <<!
   - repository: ${IMAGE}
