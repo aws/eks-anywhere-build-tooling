@@ -72,7 +72,7 @@ ifeq ($(IMAGE_FORMAT),ova)
 	RELEASE_TARGETS=release-ova-ubuntu-2004 release-ova-bottlerocket upload-artifacts-ova
 else ifeq ($(IMAGE_FORMAT),raw)
 	S3_TARGET_PREREQUISITES=$(FINAL_UBUNTU_RAW_IMAGE_PATH)
-	RELEASE_TARGETS=release-raw-ubuntu-2004-efi release-raw-rhel-8 upload-artifacts-raw
+	RELEASE_TARGETS=release-raw-ubuntu-2004-efi upload-artifacts-raw
 endif
 
 include $(BASE_DIRECTORY)/Common.mk
