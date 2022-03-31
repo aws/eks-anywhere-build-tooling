@@ -57,9 +57,9 @@ else
     URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $LATEST_TAG)
 fi
 
-if [ "$CODEBUILD_CI" = "true" ]; then
-    build::common::wait_for_tarball $URL
-fi
+# if [ "$CODEBUILD_CI" = "true" ]; then
+#     build::common::wait_for_tarball $URL
+# fi
 
 if [[ $REPO == *.tar.gz ]]; then
     curl -sSL $URL -o $OUTPUT_DIR_FILE
