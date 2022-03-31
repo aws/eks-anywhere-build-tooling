@@ -12,6 +12,6 @@ FROM $BASE_IMAGE
 
 WORKDIR /
 
-COPY --from=touch-builder /newroot/usr/bin/touch /touch
+COPY --from=touch-builder /newroot/usr/bin/touch /usr/bin/touch
 
-ENTRYPOINT [ "/touch", "/worker/reboot" ]
+ENTRYPOINT [ "/usr/bin/touch", "/worker/reboot" ]

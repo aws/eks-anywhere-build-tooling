@@ -14,9 +14,9 @@ OCI2DISK_IMAGE_COMPONENT=tinkerbell/hub/oci2disk
 WRITEFILE_IMAGE_COMPONENT=tinkerbell/hub/writefile
 REBOOT_IMAGE_COMPONENT=tinkerbell/hub/reboot
 
-BINARY_TARGET_FILES=cexec kexec image2disk oci2disk writefile reboot
+BINARY_TARGET_FILES=cexec kexec image2disk oci2disk writefile
 SOURCE_PATTERNS=. . . . .
-IMAGE_NAMES=$(BINARY_TARGET_FILES)
+IMAGE_NAMES=$(BINARY_TARGET_FILES) reboot
 
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
