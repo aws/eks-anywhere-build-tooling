@@ -12,8 +12,9 @@ KEXEC_IMAGE_COMPONENT=tinkerbell/hub/kexec
 IMAGE2DISK_IMAGE_COMPONENT=tinkerbell/hub/image2disk
 OCI2DISK_IMAGE_COMPONENT=tinkerbell/hub/oci2disk
 WRITEFILE_IMAGE_COMPONENT=tinkerbell/hub/writefile
+REBOOT_IMAGE_COMPONENT=tinkerbell/hub/reboot
 
-BINARY_TARGET_FILES=cexec kexec image2disk oci2disk writefile
+BINARY_TARGET_FILES=cexec kexec image2disk oci2disk writefile reboot
 SOURCE_PATTERNS=. . . . .
 IMAGE_NAMES=$(BINARY_TARGET_FILES)
 
