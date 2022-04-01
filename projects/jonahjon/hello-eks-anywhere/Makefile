@@ -5,18 +5,15 @@ GOLANG_VERSION?="1.17"
 REPO=packages/hello-eks-anywhere
 REPO_OWNER=jonahjon
 IMAGE_COMPONENT=hello-eks-anywhere
-IMAGE_BUILD_ARGS?=IMAGE_TAG
+IMAGE_NAMES=$(IMAGE_COMPONENT)
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-nginx
 SIMPLE_CREATE_BINARIES=false
 HAS_LICENSES=false
-REPO_NO_CLONE=true
-
-BUILD_TARGETS=local-images
-RELEASE_TARGETS=images
 
 HAS_HELM_CHART=true
-HELM_IMAGE_LIST="$(REPO)"
+HELM_DIRECTORY=charts/hello-eks-anywhere
+HELM_IMAGE_LIST=packages/hello-eks-anywhere
 
 include $(BASE_DIRECTORY)/Common.mk
 
