@@ -1,118 +1,19 @@
-From bc55b9e8c52165064c9b340863fcce3457da42db Mon Sep 17 00:00:00 2001
+From 58b37427fc8d2c3f9240fabd738d1812450536a2 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Wed, 1 Dec 2021 10:07:41 -0800
 Subject: [PATCH] Adding capv support for Bottlerocket
 
+Signed-off-by: Prow Bot <prow@amazonaws.com>
 ---
- pkg/services/govmomi/vcenter/clone.go         | 28 +++++++++++++++----
- .../v1alpha3/cluster-template.yaml            |  2 ++
- .../v1alpha4/cluster-template.yaml            |  2 ++
- 3 files changed, 27 insertions(+), 5 deletions(-)
+ .../capi-upgrades/v1alpha3/cluster-template.yaml                | 2 ++
+ .../capi-upgrades/v1alpha4/cluster-template.yaml                | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/pkg/services/govmomi/vcenter/clone.go b/pkg/services/govmomi/vcenter/clone.go
-index f29dc782..0c56155a 100644
---- a/pkg/services/govmomi/vcenter/clone.go
-+++ b/pkg/services/govmomi/vcenter/clone.go
-@@ -54,6 +54,8 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
- 	var extraConfig extra.Config
- 	if len(bootstrapData) > 0 {
- 		ctx.Logger.Info("applied bootstrap data to VM clone spec")
-+		ctx.Logger.Info("bootstrapData")
-+		ctx.Logger.Info(string(bootstrapData))
- 		if err := extraConfig.SetCloudInitUserData(bootstrapData); err != nil {
- 			return err
- 		}
-@@ -84,8 +86,11 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
- 				return errors.Wrapf(err, "error getting snapshot information for template %s", ctx.VSphereVM.Spec.Template)
- 			}
- 			if vm.Snapshot != nil {
-+				ctx.Logger.Info("Snapshot found")
- 				snapshotRef = vm.Snapshot.CurrentSnapshot
- 			}
-+			ctx.Logger.Info("Snapshot not found under template properties")
-+			ctx.Logger.Info(fmt.Sprintf("%s", vm.Snapshot))
- 		} else {
- 			ctx.Logger.Info("searching for snapshot by name", "snapshotName", snapshotName)
- 			var err error
-@@ -100,26 +105,32 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
- 	// from which to do a linked clone.
- 	diskMoveType := fullCloneDiskMoveType
- 	ctx.VSphereVM.Status.CloneMode = infrav1.FullClone
-+	ctx.Logger.Info("Full clone mode")
- 	if snapshotRef != nil {
- 		// Record the actual type of clone mode used as well as the name of
- 		// the snapshot (if not the current snapshot).
-+		ctx.Logger.Info("Linked clone mode --override")
- 		ctx.VSphereVM.Status.CloneMode = infrav1.LinkedClone
- 		ctx.VSphereVM.Status.Snapshot = snapshotRef.Value
- 		diskMoveType = linkCloneDiskMoveType
- 	}
--
-+	ctx.Logger.Info("Pre folder")
- 	folder, err := ctx.Session.Finder.FolderOrDefault(ctx, ctx.VSphereVM.Spec.Folder)
- 	if err != nil {
- 		return errors.Wrapf(err, "unable to get folder for %q", ctx)
- 	}
-+	ctx.Logger.Info(fmt.Sprintf("%+v", folder))
- 
- 	pool, err := ctx.Session.Finder.ResourcePoolOrDefault(ctx, ctx.VSphereVM.Spec.ResourcePool)
- 	if err != nil {
- 		return errors.Wrapf(err, "unable to get resource pool for %q", ctx)
- 	}
-+	ctx.Logger.Info("Resource pool")
-+	ctx.Logger.Info(fmt.Sprintf("%+v", pool))
- 
- 	devices, err := tpl.Device(ctx)
- 	if err != nil {
-+		ctx.Logger.Info("error getting devices")
- 		return errors.Wrapf(err, "error getting devices for %q", ctx)
- 	}
- 
-@@ -130,11 +141,13 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
- 	if snapshotRef == nil {
- 		diskSpec, err := getDiskSpec(ctx, devices)
- 		if err != nil {
-+			ctx.Logger.Info("error getting disk spec")
-+			ctx.Logger.Info(fmt.Sprintf("%+v", err))
- 			return errors.Wrapf(err, "error getting disk spec for %q", ctx)
- 		}
- 		deviceSpecs = append(deviceSpecs, diskSpec)
- 	}
--
-+	ctx.Logger.Info("pre-network")
- 	networkSpecs, err := getNetworkSpecs(ctx, devices)
- 	if err != nil {
- 		return errors.Wrapf(err, "error getting network specs for %q", ctx)
-@@ -179,6 +192,8 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
- 		PowerOn:  false,
- 		Snapshot: snapshotRef,
- 	}
-+	ctx.Logger.Info("Spec for vm before turning on")
-+	ctx.Logger.Info(fmt.Sprintf("%+v", spec))
- 
- 	var datastoreRef *types.ManagedObjectReference
- 	if ctx.VSphereVM.Spec.Datastore != "" {
-@@ -291,9 +306,12 @@ func getDiskSpec(
- 	devices object.VirtualDeviceList) (types.BaseVirtualDeviceConfigSpec, error) {
- 
- 	disks := devices.SelectByType((*types.VirtualDisk)(nil))
--	if len(disks) != 1 {
--		return nil, errors.Errorf("invalid disk count: %d", len(disks))
--	}
-+	// Bottlerocket has 2 disks. TODO: Follow up and check out why there is a 1 disk restriction
-+	// Testing bottlerocket with 2 disks just works fine, as the userdata is injected in the correct first disk
-+	// if len(disks) != 1 {
-+	// 	ctx.Logger.Info(fmt.Sprintf("error invalid disk count:%d", len(disks)))
-+	// 	return nil, errors.Errorf("invalid disk count: %d", len(disks))
-+	// }
- 
- 	disk := disks[0].(*types.VirtualDisk)
- 	cloneCapacityKB := int64(ctx.VSphereVM.Spec.DiskGiB) * 1024 * 1024
 diff --git a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml
-index a1684260..7b04eb79 100644
+index 69fe199b..73fbb0bb 100644
 --- a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml
 +++ b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml
-@@ -165,6 +165,7 @@ spec:
+@@ -174,6 +174,7 @@ spec:
      - echo "127.0.0.1   {{ ds.meta_data.hostname }}" >>/etc/hosts
      - echo "{{ ds.meta_data.hostname }}" >/etc/hostname
      useExperimentalRetryJoin: true
@@ -120,7 +21,7 @@ index a1684260..7b04eb79 100644
      users:
      - name: capv
        sshAuthorizedKeys:
-@@ -198,6 +199,7 @@ spec:
+@@ -207,6 +208,7 @@ spec:
          sshAuthorizedKeys:
          - '${VSPHERE_SSH_AUTHORIZED_KEY}'
          sudo: ALL=(ALL) NOPASSWD:ALL
@@ -129,10 +30,10 @@ index a1684260..7b04eb79 100644
  apiVersion: cluster.x-k8s.io/v1alpha3
  kind: MachineDeployment
 diff --git a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha4/cluster-template.yaml b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha4/cluster-template.yaml
-index 0332d4bd..9f6ed4a5 100644
+index 96ca172b..01394e65 100644
 --- a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha4/cluster-template.yaml
 +++ b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha4/cluster-template.yaml
-@@ -141,6 +141,7 @@ spec:
+@@ -150,6 +150,7 @@ spec:
      - echo "127.0.0.1   {{ ds.meta_data.hostname }}" >>/etc/hosts
      - echo "{{ ds.meta_data.hostname }}" >/etc/hostname
      useExperimentalRetryJoin: true
@@ -140,7 +41,7 @@ index 0332d4bd..9f6ed4a5 100644
      users:
      - name: capv
        sshAuthorizedKeys:
-@@ -179,6 +180,7 @@ spec:
+@@ -188,6 +189,7 @@ spec:
          sshAuthorizedKeys:
          - '${VSPHERE_SSH_AUTHORIZED_KEY}'
          sudo: ALL=(ALL) NOPASSWD:ALL
@@ -149,5 +50,5 @@ index 0332d4bd..9f6ed4a5 100644
  apiVersion: cluster.x-k8s.io/v1alpha4
  kind: MachineDeployment
 -- 
-2.30.1
+2.35.1
 
