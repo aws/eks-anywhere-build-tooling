@@ -2,7 +2,7 @@ BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.17"
 
-REPO=hello-eks-anywhere
+REPO=packages/hello-eks-anywhere
 REPO_OWNER=jonahjon
 IMAGE_COMPONENT=hello-eks-anywhere
 IMAGE_BUILD_ARGS?=IMAGE_TAG

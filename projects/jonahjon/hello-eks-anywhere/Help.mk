@@ -5,6 +5,9 @@
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
 
+##@ GIT/Repo Targets
+clone-repo:  ## Clone upstream `eks-anywhere-packages`
+checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Image Targets
 local-images: ## Builds `hello-eks-anywhere/images/amd64 helm/build` as oci tars for presumbit validation
