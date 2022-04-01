@@ -58,6 +58,6 @@ from github during each build, and so we're sure nothing changes in the file eve
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
 1. Update the cert-manager.yaml manifest using `make update-cert-manager-manifest` from this directory
-1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=jetstack/cert-manager` from the root of the repo.
+1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
-1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
+1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

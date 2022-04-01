@@ -41,10 +41,10 @@ rsync -e 'docker exec -i' -rm --exclude='.git/***' \
 	--exclude="projects/$PROJECT/_output/***" --exclude="projects/$PROJECT/$(basename $PROJECT)/***" \
 	--include="projects/$PROJECT/***" --include="projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES" \
 	--include="release/SUPPORTED_RELEASE_BRANCHES" --include="projects/kubernetes-sigs/cri-tools/GIT_TAG" \
-	--include='*/' --exclude='projects/***' ./ eks-a-builder:/eks-anywhere-build-tooling
+	--include='*/' --exclude='projects/***' $MAKE_ROOT/ eks-a-builder:/eks-anywhere-build-tooling
 
 # Need so git properly finds the root of the repo
 docker exec -it eks-a-builder mkdir -p /eks-anywhere-build-tooling/.git/{refs,objects}
-docker cp ./.git/HEAD eks-a-builder:/eks-anywhere-build-tooling/.git
+docker cp $MAKE_ROOT/.git/HEAD eks-a-builder:/eks-anywhere-build-tooling/.git
 
 docker exec -it eks-a-builder make $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT RELEASE_BRANCH=$RELEASE_BRANCH IMAGE_REPO=$IMAGE_REPO ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET

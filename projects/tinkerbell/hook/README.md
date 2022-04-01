@@ -10,9 +10,9 @@
 1. Verify the golang version has not changed. Currently for `bootkit` and `tink-docker` the version mentioned in a [dockerfile](https://github.com/tinkerbell/hook/blob/5.10.57/tink-docker/Dockerfile#L3) of the respective projects is being used to build.
 1. Verify no changes have been made to the dockerfile for each image. Looking specifically for added runtime deps.
 1. `tink-docker` image has docker runtime. Hence, verify no new changes have been made with docker version updates.
-1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=tinkerbell/hook` from the root of the repo.
+1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
-1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
+1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
 
 ### Development
 1. The project consists of 3 images. `bootkit`, `tink-docker` and `kernel`.

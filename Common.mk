@@ -583,3 +583,25 @@ add-generated-help-block:
 		$(REPO) $(if $(PATCHES_DIR),true,false) "$(LOCAL_IMAGE_TARGETS)" "$(IMAGE_TARGETS)" "$(BUILD_TARGETS)" "$(RELEASE_TARGETS)" \
 		"$(HAS_S3_ARTIFACTS)" "$(HAS_LICENSES)" "$(REPO_NO_CLONE)" "$(call FULL_FETCH_BINARIES_TARGETS,$(FETCH_BINARIES_TARGETS))" \
 		"$(HAS_HELM_CHART)"
+
+
+## --------------------------------------
+## Update Helpers
+## --------------------------------------
+#@ Update Helpers
+
+.PHONY: run-target-in-docker
+run-target-in-docker: # Run `MAKE_TARGET` using builder base docker container
+	$(BUILD_LIB)/run_target_docker.sh $(COMPONENT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET)
+
+.PHONY: update-attribution-checksums-docker
+update-attribution-checksums-docker: # Update attribution and checksums using the builder base docker container
+	$(BUILD_LIB)/update_checksum_docker.sh $(COMPONENT) $(IMAGE_REPO) $(RELEASE_BRANCH)
+
+.PHONY: stop-docker-builder
+stop-docker-builder: # Clean up builder base docker container
+	docker rm -f -v eks-a-builder
+
+.PHONY: generate
+generate: # Update UPSTREAM_PROJECTS.yaml
+	$(BUILD_LIB)/generate_projects_list.sh $(BASE_DIRECTORY)
