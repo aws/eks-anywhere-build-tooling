@@ -36,6 +36,10 @@ cat helm/files.txt | while read SOURCE_FILE DESTINATION_FILE
 do
   TMPFILE=/tmp/$(basename ${SOURCE_FILE})
   cp ${SOURCE_FILE} ${TMPFILE}
+  echo "cat SEDFILE"
+  cat ${SEDFILE}
+  echo "cat TMPFILE"
+  cat ${TMPFILE}
   sed -f ${SEDFILE} ${TMPFILE} >${DEST_DIR}/${DESTINATION_FILE}
   rm -f ${TMPFILE}
 done
