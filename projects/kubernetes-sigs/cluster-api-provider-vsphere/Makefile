@@ -37,6 +37,7 @@ $(FIX_LICENSES_VM_OPERATOR_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 			$(REPO)/vendor/github.com/vmware-tanzu/vm-operator/external/$$package/api/v1alpha1/LICENSE.txt; \
 	done;
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
