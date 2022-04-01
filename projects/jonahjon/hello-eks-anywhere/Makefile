@@ -4,7 +4,7 @@ GOLANG_VERSION?="1.17"
 
 REPO=packages/hello-eks-anywhere
 REPO_OWNER=jonahjon
-IMAGE_COMPONENT=hello-eks-anywhere
+IMAGE_COMPONENT=packages/hello-eks-anywhere
 IMAGE_NAMES=$(IMAGE_COMPONENT)
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-nginx
