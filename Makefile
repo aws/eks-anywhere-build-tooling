@@ -5,10 +5,10 @@ AWS_REGION?=us-west-2
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 ECR_PUBLIC_URI?=$(shell aws ecr-public describe-registries --region us-east-1 --query 'registries[0].registryUri' --output text)
 
-PROJECTS?=aws_eks-anywhere aws_eks-anywhere-packages brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell tinkerbell_hegel cloudflare_cfssl tinkerbell_boots tinkerbell_hub tinkerbell_pbnj tinkerbell_hook aws_cluster-api-provider-aws-snow distribution_distribution goharbor_harbor cilium_cilium
+PROJECTS?=aws_eks-anywhere aws_eks-anywhere-packages brancz_kube-rbac-proxy kubernetes-sigs_cluster-api-provider-vsphere kubernetes-sigs_cri-tools kubernetes-sigs_vsphere-csi-driver jetstack_cert-manager kubernetes_cloud-provider-vsphere plunder-app_kube-vip kubernetes-sigs_etcdadm fluxcd_helm-controller fluxcd_kustomize-controller fluxcd_notification-controller fluxcd_source-controller rancher_local-path-provisioner mrajashree_etcdadm-bootstrap-provider mrajashree_etcdadm-controller tinkerbell_cluster-api-provider-tinkerbell tinkerbell_hegel cloudflare_cfssl tinkerbell_boots tinkerbell_hub tinkerbell_pbnj tinkerbell_hook aws_cluster-api-provider-aws-snow distribution_distribution goharbor_harbor cilium_cilium grpc-ecosystem_grpc-health-probe aws_cluster-api-provider-cloudstack
 BUILD_TARGETS=$(addprefix build-project-, $(PROJECTS))
 
-EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi replicatedhq_troubleshoot helm_helm tinkerbell_tink
+EKSA_TOOLS_PREREQS=kubernetes-sigs_cluster-api kubernetes-sigs_cluster-api-provider-aws kubernetes-sigs_kind fluxcd_flux2 vmware_govmomi replicatedhq_troubleshoot helm_helm tinkerbell_tink apache_cloudstack-cloudmonkey
 EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQS))
 
 ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling kubernetes-sigs_image-builder
