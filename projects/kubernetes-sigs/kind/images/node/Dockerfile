@@ -26,12 +26,6 @@ RUN set -x && \
 	rm /etc/kubeadm.config && \
 	# Update containerd config to have eks-d pause image tag
 	sed -i "s,$PAUSE_IMAGE_TAG,$PAUSE_IMAGE_TAG_OVERRIDE," /etc/containerd/config.toml && \
-	# AL2 doesn't setup the ip6tables alternative the same as ubuntu
-	# since kind's entrypoint assumes this adding the alternative
-	update-alternatives \
-		--install /usr/sbin/ip6tables ip6tables /usr/sbin/ip6tables-legacy 10 \
-		--slave /usr/sbin/ip6tables-restore ip6tables-restore /usr/sbin/ip6tables-restore-legacy \
-		--slave /usr/sbin/ip6tables-save ip6tables-save /usr/sbin/ip6tables-save-legacy && \
 	# During base image build using buildkit the /tmp directory's perms get changed from
 	# 1777 to 3777.  This probably isnt normally an issue however there is a 
 	# k8s conformance test that checks for 1777 specifically
