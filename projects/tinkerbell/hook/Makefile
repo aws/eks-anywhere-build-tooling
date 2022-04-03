@@ -55,7 +55,7 @@ s3-artifacts: $(CREATE_HOOK_FILES)
 $(CREATE_HOOK_FILES): tarballs
 # Modify the linuxkit config file hook/hook.yaml to point to IMAGE_REPO.
 # Upstream make target `dist-existing-images` is triggered to perform linuxkit build and generate OSIE files.
-	sed -i -E -e 's,quay.io/tinkerbell/hook-(bootkit|docker|kernel).*,$(IMAGE_REPO)/tinkerbell/hook-\1:latest,g' $(REPO)/hook.yaml
+	sed -i -E -e 's,quay.io/tinkerbell/hook-(bootkit|docker|kernel).*,$(IMAGE_REPO)/tinkerbell/hook-\1:$(LATEST_TAG),g' $(REPO)/hook.yaml
 	make dist-existing-images -C $(REPO)
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
 	cp $(REPO)/dist/* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
