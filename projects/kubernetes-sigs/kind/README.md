@@ -1,5 +1,5 @@
 ## **Kind**
-![Version](https://img.shields.io/badge/version-v0.11.1-blue)
+![Version](https://img.shields.io/badge/version-v0.12.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiVkgvQm93WHUvUWJ1U2ZhSG9JTUJNMFdjdGtwSkIyRCt1azM0THYxcWYweC8rM2lHRmNYMXI0QkVPUm4yZ0JZZ1c4RzdMeTJ3dGtpREdYeFpvTEhtc2FnPSIsIml2UGFyYW1ldGVyU3BlYyI6Im9GV2EzRGZQNVZ5c25kTmoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Kind](https://github.com/kubernetes-sigs/kind) is a tool for running local Kubernetes clusters using Docker container "nodes". kind bootstraps each "node" with `kubeadm`. kind consists of:
@@ -36,6 +36,31 @@ to build images.  Refer to [building locally](../../../docs/development/building
 
 `cd projects/rancher/local-path/provisioner && IMAGE_REPO=localhost:5000 make images`
 
-To build all images for all supported EKS-D versions and amd64 + arm64, run
+To build all images for all supported EKS-D versions and amd64 + arm64, run:
 
-`ARTIFACTS_BUCKET=<> IMAGE_REPO=localhost:5000 make release`
+`ARTIFACTS_BUCKET=<> IMAGE_REPO=localhost:5000 make images`
+
+For a specific `RELEASE_BRANCH`:
+
+`ARTIFACTS_BUCKET=<> IMAGE_REPO=localhost:5000 RELEASE_BRANCH=1-X make images`
+
+
+### Updating
+
+1. Review releases and changelogs in upstream [repo](https://github.com/kubernetes-sigs/kind) and decide on new version. 
+The maintainers are pretty good about calling breaking changes and other upgrade gotchas between release.  Please
+review carefully and if there are questions about changes necessary to eks-anywhere to support the new version
+and/or automatically update between eks-anywhere version reach out to @jaxesn.
+1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
+1. Compare the old tag to the new, looking specifically for Makefile changes. 
+ex: [0.11.1 compared to 0.12.0](https://github.com/kubernetes-sigs/kind/compare/v0.11.1...v0.12.0). Check the `kind` target for
+any build flag changes, tag changes, dependencies, etc in the `Makefile` in the root of the repo.  Pay close attention to
+`images/base/Dockerfile` for changes when updating the patch.  Update constants in [node-image-build-args.sh](./build/node-image-build-args.sh#48).
+If new yum packages are added to the base image, update the [minimal-base-kind](https://github.com/aws/eks-distro-build-tooling/blob/main/eks-distro-base/Dockerfile.minimal-base-kind)
+image to include it (this is not a blocker for updating).
+1. Verify the golang version has not changed. The version specified in `.go-version` should be the source of truth.
+1. Update checksums and attribution using `make update-attribution-checksums-docker` from the root of the repo.
+1. Validate images build locally (will take a while) using the steps above.
+1. Run `make create-kind-cluster-amd64 RELEASE_BRANCH=1-X` to ensure cluster creation works with the new image.
+1. Update the version at the top of this Readme.
+1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.

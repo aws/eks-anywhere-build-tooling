@@ -1,0 +1,73 @@
+From c01c8c33d1f3445be031ca7a453a08668f8dea42 Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Sat, 2 Apr 2022 22:01:04 -0500
+Subject: [PATCH 2/2] skip ctr pulling required images since the build removes
+ them anyway
+
+Signed-off-by: Jackson West <jgw@amazon.com>
+---
+ pkg/build/nodeimage/buildcontext.go | 48 +++++++++++++++--------------
+ 1 file changed, 25 insertions(+), 23 deletions(-)
+
+diff --git a/pkg/build/nodeimage/buildcontext.go b/pkg/build/nodeimage/buildcontext.go
+index e8ad6f6b..21a8ec42 100644
+--- a/pkg/build/nodeimage/buildcontext.go
++++ b/pkg/build/nodeimage/buildcontext.go
+@@ -290,29 +290,31 @@ func (c *buildContext) prePullImages(bits kube.Bits, dir, containerID string) ([
+ 		}
+ 	}()
+ 
+-	fns := []func() error{}
+-	for _, image := range requiredImages {
+-		image := image // https://golang.org/doc/faq#closures_and_goroutines
+-		fns = append(fns, func() error {
+-			if !builtImages.Has(image) {
+-				/*
+-					TODO: show errors when we have real errors. See comments in
+-					importer implementation
+-					err := importer.Pull(image, dockerBuildOsAndArch(c.arch))
+-					if err != nil {
+-						c.logger.Warnf("Failed to pull %s with error: %v", image, err)
+-						runE := exec.RunErrorForError(err)
+-						c.logger.Warn(string(runE.Output))
+-					}
+-				*/
+-				_ = importer.Pull(image, dockerBuildOsAndArch(c.arch))
+-			}
+-			return nil
+-		})
+-	}
+-	if err := errors.AggregateConcurrent(fns); err != nil {
+-		return nil, err
+-	}
++	// The eks-a build process ends up removing all of these pulled images anyway
++	// skip pulling requiredimages, only import the kube images which are already on disk as tarballs
++	// fns := []func() error{}
++	// for _, image := range requiredImages {
++	// 	image := image // https://golang.org/doc/faq#closures_and_goroutines
++	// 	fns = append(fns, func() error {
++	// 		if !builtImages.Has(image) {
++	// 			/*
++	// 				TODO: show errors when we have real errors. See comments in
++	// 				importer implementation
++	// 				err := importer.Pull(image, dockerBuildOsAndArch(c.arch))
++	// 				if err != nil {
++	// 					c.logger.Warnf("Failed to pull %s with error: %v", image, err)
++	// 					runE := exec.RunErrorForError(err)
++	// 					c.logger.Warn(string(runE.Output))
++	// 				}
++	// 			*/
++	// 			_ = importer.Pull(image, dockerBuildOsAndArch(c.arch))
++	// 		}
++	// 		return nil
++	// 	})
++	// }
++	// if err := errors.AggregateConcurrent(fns); err != nil {
++	// 	return nil, err
++	// }
+ 
+ 	// create a plan of image loading
+ 	loadFns := []func() error{}
+-- 
+2.35.1
+

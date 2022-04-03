@@ -92,25 +92,10 @@ function build::kind::load_images(){
     docker exec --privileged -i $CONTAINER_ID bash -c "nohup containerd > /dev/null 2>&1 & sleep 5"
     docker exec --privileged -i $CONTAINER_ID crictl images
 
-    # remove unneeded images
-    IMAGES=(
-        # kind default cni        
-        $KINDNETD_IMAGE_TAG 
-        # kind adds this for debugging purposes + local-path-provisoner, replaced with al2
-        $DEBIAN_BASE_IMAGE_TAG
-        # replaced with eks-a build
-        $LOCAL_PATH_PROVISONER_IMAGE_TAG
-        # replaced with pause image from eks-d
-        $PAUSE_IMAGE_TAG  
-    )
-    for image in "${IMAGES[@]}"; do
-        docker exec --privileged -i $CONTAINER_ID crictl rmi $image
-    done
-
     # pull local-path-provisioner + al2 helper image
     IMAGES_FOLDER=$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/images
     mkdir -p $IMAGES_FOLDER
-    IMAGES=("$AL2_HELPER_IMAGE" "$LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE" "$PAUSE_IMAGE_TAG_OVERRIDE" "$KIND_KINDNETD_IMAGE_OVERRIDE")
+    IMAGES=("$AL2_HELPER_IMAGE" "$LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE" "$PAUSE_IMAGE_TAG_OVERRIDE" "$KIND_KINDNETD_IMAGE_OVERRIDE" "$ETCD_IMAGE_TAG" "$COREDNS_IMAGE_TAG")
 
     declare -A release_image_overrides
     release_image_overrides["$LOCAL_PATH_PROVISONER_IMAGE_TAG_OVERRIDE"]=$LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE
@@ -132,12 +117,6 @@ function build::kind::load_images(){
         fi
         docker exec --privileged -i $CONTAINER_ID \
             ctr --namespace=k8s.io images import --all-platforms --no-unpack - < $IMAGES_FOLDER/$image_id.tar
-
-        if [[ $ARCH != $(docker exec --privileged -i $CONTAINER_ID \
-            crictl inspecti -o go-template --template={{.info.imageSpec.architecture}} $image_id) ]]; then
-            echo "saved image: $image is not the correct arch: $ARCH!"
-            exit 1
-        fi
     done
 
     docker exec --privileged -i $CONTAINER_ID crictl images
@@ -167,10 +146,20 @@ function build::kind::load_images(){
             echo "$image is not expected to be included in final image!"
             exit 1
         fi
+        if [[ $ARCH != $(docker exec --privileged -i $CONTAINER_ID \
+                crictl inspecti -o go-template --template={{.info.imageSpec.architecture}} $image) ]]; then
+            echo "saved image: $image is not the correct arch: $ARCH!"
+            exit 1
+        fi
     done
 
     if [[ "${#FOUND_EXPECTED_IMAGES[@]}" != "${#EXPECTED_FINAL_IMAGES[@]}" ]]; then
         echo "${EXPECTED_FINAL_IMAGES[*]} are expected to be included in the final image but only ${FOUND_EXPECTED_IMAGES[*]} exist!"
+        exit 1
+    fi
+
+    if [[ $(docker exec --privileged -i $CONTAINER_ID ctr -n k8s.io snapshots ls | wc -l) -gt 1 ]]; then
+        echo "Snapshots exists, all images should have been loaded but not unpacked!"
         exit 1
     fi
 
