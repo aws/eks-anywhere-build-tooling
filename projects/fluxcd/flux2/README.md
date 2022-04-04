@@ -23,7 +23,7 @@ from our Makefile.
 1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.  There is also
 a github release [action](https://github.com/fluxcd/flux2/blob/main/.github/workflows/release.yaml#L18) where the golang version
 is defined.
-1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=fluxcd/flux2` from the root of the repo.
+1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
-1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
+1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
 1. Updating flux2 usually comes with updates to the source/helm/notification/kustomize-controller, make sure and update as well.

@@ -17,6 +17,10 @@ if [ $CURRENT_YQ_MAJOR_VERSION -lt $LATEST_YQ_MAJOR_VERSION ]; then
     exit 1
 fi
 
+MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+
+cd $MAKE_ROOT
+
 declare -i org_count=0 # Counter variable for each org
 
 yq eval --null-input ".projects = []" > $UPSTREAM_PROJECTS_FILE # Creates an empty YAML array

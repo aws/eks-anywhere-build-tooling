@@ -23,12 +23,9 @@ The EKS-A diagnostic bundle functionality is built on top of troubleshoot.
 
 1. Verify the golang version has not changed. The version specified in `go.mod` and the `Makefile` is kept up-to-date.
    - if the Go version has changed, you'll need to bump the Go version set in the [project specific `Makefile`](https://github.com/aws/eks-anywhere-build-tooling/blob/main/projects/replicatedhq/troubleshoot/Makefile) to match. 
-1. Update checksums and attribution by running the following command from the root of the build tooling repo:
-```
-make update-attribution-checksums-docker PROJECT=replicatedhq/troubleshoot
-``` 
+1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
-1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
+1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
 
 
 ### Testing Troubleshoot Version Compatibility

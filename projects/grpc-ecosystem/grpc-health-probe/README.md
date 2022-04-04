@@ -14,6 +14,6 @@ That being said, artifact security is of utmost priority and so, whenever possib
 1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.  There is also
 a github release [action](https://github.com/grpc-ecosystem/grpc-health-probe/blob/master/.github/workflows/release.yml#L15) where the golang version
 is defined.
-1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=grpc-ecosystem/grpc-health-probe` from the root of the repo.
+1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
-1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
+1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
