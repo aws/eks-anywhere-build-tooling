@@ -29,5 +29,5 @@ fi
 for go in $GOPATH/go*/bin/go; do
     VERSION=$($go version | grep -o "go[0-9].* " | grep -o "[0-9\.]*")
     NOPATCH=$(cut -d. -f"1,2" <<< $VERSION)
-    sed -i "s,\${GOLANG${NOPATCH//./}_VERSION:.*},\${GOLANG${NOPATCH//./}_VERSION:-$VERSION}," ./build/lib/install_go_versions.sh 
+    sed -i "s,\${GOLANG${NOPATCH//./}_VERSION:-.*},\${GOLANG${NOPATCH//./}_VERSION:-$VERSION}," ./build/lib/install_go_versions.sh 
 done
