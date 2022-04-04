@@ -32,7 +32,7 @@ ECR_REPO=$(echo ${HELM_PATH} | sed "s/aws\///") # We sed to remove aws/ from ECR
 echo "ECR_REPO=${ECR_REPO}"
 GIT_TAG=$(cat ${BASE_DIRECTORY}/projects/${PROJECT_PATH}/GIT_TAG)
 
-export IMAGE_TAG=${GIT_TAG}_${GIT_HASH}
+export IMAGE_TAG=${GIT_TAG}+${GIT_HASH}
 echo "IMAGE_TAG=${IMAGE_TAG}"
 
 # Pull Helm chart from private ECR
