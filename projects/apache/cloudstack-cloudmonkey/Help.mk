@@ -15,10 +15,6 @@ binaries: ## Build all binaries: `cmk` for `linux/amd64 linux/arm64`
 _output/bin/cloudstack-cloudmonkey/linux-amd64/cmk: ## Build `_output/bin/cloudstack-cloudmonkey/linux-amd64/cmk`
 _output/bin/cloudstack-cloudmonkey/linux-arm64/cmk: ## Build `_output/bin/cloudstack-cloudmonkey/linux-arm64/cmk`
 
-##@ Image Targets
-local-images: ## Builds `` as oci tars for presumbit validation
-images: ## Pushes `` to IMAGE_REPO
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
@@ -36,14 +32,12 @@ attribution-pr: ## Generates PR to update attribution files for projects
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-repo: ## Removes source directory
-helm/build: ## Build helm chart
-helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Helpers
 help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums  attribution attribution-pr upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums  attribution upload-artifacts attribution-pr`
 release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
 ########### END GENERATED ###########################
