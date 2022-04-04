@@ -33,7 +33,7 @@ echo "****************************************************************"
 
 if ! docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
 	docker pull public.ecr.aws/eks-distro-build-tooling/builder-base:latest
-	docker run -d --name eks-a-builder --privileged -e GOPROXY=$GOPROXY --entrypoint sleep \
+	docker run -d --name eks-a-builder --privileged -e GOPROXY=$GOPROXY -v ${HOME}/.aws/credentials:/root/.aws/credentials:ro --entrypoint sleep \
 		public.ecr.aws/eks-distro-build-tooling/builder-base:latest  infinity 
 fi
 
@@ -41,7 +41,8 @@ rsync -e 'docker exec -i' -rm --exclude='.git/***' \
 	--exclude="projects/$PROJECT/_output/***" --exclude="projects/$PROJECT/$(basename $PROJECT)/***" \
 	--include="projects/$PROJECT/***" --include="projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES" \
 	--include="release/SUPPORTED_RELEASE_BRANCHES" --include="projects/kubernetes-sigs/cri-tools/GIT_TAG" \
-	--include='*/' --exclude='projects/***' ./ eks-a-builder:/eks-anywhere-build-tooling
+	--include='*/' --exclude='projects/***' ./ eks-a-builder:/eks-anywhere-build-tooling \
+	--include='config/docker-ecr-config.json'
 
 # Need so git properly finds the root of the repo
 docker exec -it eks-a-builder mkdir -p /eks-anywhere-build-tooling/.git/{refs,objects}

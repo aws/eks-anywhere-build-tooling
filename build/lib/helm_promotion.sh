@@ -19,6 +19,8 @@ set -o pipefail
 
 export LANG=C.UTF-8
 
+# This is temporary file, and will be replaced before Launch with better solution.
+
 BASE_DIRECTORY=$(git rev-parse --show-toplevel)
 ACCOUNT_ID="${1?Specify first argument - account id}"
 IMAGE_REGISTRY="${2?Specify second argument - image registry}"
@@ -30,12 +32,12 @@ ECR_REPO=$(echo ${HELM_PATH} | sed "s/aws\///") # We sed to remove aws/ from ECR
 echo "ECR_REPO=${ECR_REPO}"
 GIT_TAG=$(cat ${BASE_DIRECTORY}/projects/${PROJECT_PATH}/GIT_TAG)
 
-export IMAGE_TAG=${GIT_TAG}-${GIT_HASH}
+export IMAGE_TAG=${GIT_TAG}_${GIT_HASH}
 echo "IMAGE_TAG=${IMAGE_TAG}"
 
 # Pull Helm chart from private ECR
 aws ecr get-login-password --region us-west-2 | HELM_EXPERIMENTAL_OCI=1 helm registry login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com
-helm pull oci://${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/${ECR_REPO} --version ${IMAGE_TAG}-helm
+helm pull oci://${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/${ECR_REPO} --version ${IMAGE_TAG}
 
 # Push to public repo
 aws ecr-public get-login-password --region us-east-1 | HELM_EXPERIMENTAL_OCI=1 helm registry login --username AWS --password-stdin public.ecr.aws
