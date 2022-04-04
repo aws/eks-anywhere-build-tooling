@@ -42,5 +42,4 @@ helm pull oci://${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/${ECR_REPO} --vers
 
 # Push to public repo
 aws ecr-public get-login-password --region us-east-1 | HELM_EXPERIMENTAL_OCI=1 helm registry login --username AWS --password-stdin public.ecr.aws
-helm push ${ECR_REPO}-${SEMVER_TAG}-helm.tgz oci://${IMAGE_REGISTRY}
-
+helm push ${ECR_REPO}-${SEMVER_TAG}.tgz oci://${IMAGE_REGISTRY}
