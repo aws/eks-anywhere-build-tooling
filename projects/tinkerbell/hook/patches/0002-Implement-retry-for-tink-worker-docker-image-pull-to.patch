@@ -1,0 +1,47 @@
+From f5130587c14ba6f319c1435a132f0ca31d8aad0a Mon Sep 17 00:00:00 2001
+From: Pooja Trivedi <poojatrivedi@gmail.com>
+Date: Mon, 4 Apr 2022 22:21:23 +0000
+Subject: [PATCH] Implement retry for tink-worker docker image pull to allow
+ for races where linuxkit network or dns may not have been fully set up and
+ functional yet.
+
+---
+ bootkit/main.go | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/bootkit/main.go b/bootkit/main.go
+index bc8f3f5..742c115 100644
+--- a/bootkit/main.go
++++ b/bootkit/main.go
+@@ -137,9 +137,25 @@ func main() {
+ 
+ 	fmt.Printf("Pulling image [%s]", imageName)
+ 
+-	out, err := cli.ImagePull(ctx, imageName, pullOpts)
+-	if err != nil {
+-		panic(err)
++	// TODO: should remove all this hardcoding or move it to a const at some point
++	attempts := 10
++	sleepSeconds := 5
++
++	failedImagePull := true
++
++	var out io.ReadCloser
++	for i := 0; i < attempts; i++ {
++		out, err = cli.ImagePull(ctx, imageName, pullOpts)
++		if err == nil {
++			failedImagePull = false  
++			break; 
++		}
++		fmt.Printf("Error pulling image [%s] [%v]. Retrying after %d seconds...\n", imageName, err, sleepSeconds)
++		time.Sleep(time.Second * 5)
++	}
++
++	if failedImagePull {
++		panic(err)	
+ 	}
+ 
+ 	_, err = io.Copy(os.Stdout, out)
+-- 
+2.25.1
+
