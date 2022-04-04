@@ -77,6 +77,7 @@ checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
 
 .PHONY: update-attribution-files
 update-attribution-files: add-generated-help-block attribution-files checksum-files
+	build/lib/update_go_versions.sh
 	build/update-attribution-files/create_pr.sh
 
 .PHONY: run-target-in-docker
