@@ -33,13 +33,14 @@ echo "ECR_REPO=${ECR_REPO}"
 GIT_TAG=$(cat ${BASE_DIRECTORY}/projects/${PROJECT_PATH}/GIT_TAG)
 
 export IMAGE_TAG=${GIT_TAG}+${GIT_HASH}
+export SEMVER_TAG="${IMAGE_TAG#[^0-9]}"
 echo "IMAGE_TAG=${IMAGE_TAG}"
 
 # Pull Helm chart from private ECR
 aws ecr get-login-password --region us-west-2 | HELM_EXPERIMENTAL_OCI=1 helm registry login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com
-helm pull oci://${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/${ECR_REPO} --version ${IMAGE_TAG}
+helm pull oci://${ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/${ECR_REPO} --version ${SEMVER_TAG}
 
 # Push to public repo
 aws ecr-public get-login-password --region us-east-1 | HELM_EXPERIMENTAL_OCI=1 helm registry login --username AWS --password-stdin public.ecr.aws
-helm push ${ECR_REPO}-${IMAGE_TAG}-helm.tgz oci://${IMAGE_REGISTRY}
+helm push ${ECR_REPO}-${SEMVER_TAG}-helm.tgz oci://${IMAGE_REGISTRY}
 
