@@ -40,6 +40,9 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(eval $(foreach binary,$(BINARY_TARGET_FILES),$(call HUB_ACTION_TARGETS,$(binary),$(call TO_UPPER,$(binary)))))
 
+# reboot action image requires touch.
+# We are using eks-distro-minimal-base-glibc as the base to install touch
+reboot/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
