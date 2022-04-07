@@ -1,64 +1,89 @@
-From 39f2c93ae1e2cafeaa8e94911e570f1e86602c62 Mon Sep 17 00:00:00 2001
-From: Rajashree Mandaogane <mandaor@amazon.com>
-Date: Tue, 22 Mar 2022 13:16:04 -0700
-Subject: [PATCH] Insecure flag for oci push pull install
+From 6cb14781c4ff793aef0dcc58f511ab5e46f99641 Mon Sep 17 00:00:00 2001
+From: https://github.com/helm/helm/pull/10408 <lixin20101023@gmail.com>
+Date: Mon, 29 Nov 2021 16:53:43 +0800
+Subject: [PATCH 1/2] Push to insecure OCI registry
 
+Signed-off-by: acool@amazon.com
 ---
- cmd/helm/flags.go                        |  1 +
- cmd/helm/push.go                         |  4 +++
- internal/experimental/action/push.go     | 12 +++++++--
- internal/experimental/registry/client.go | 31 ++++++++++++++++++++++++
- pkg/action/install.go                    | 12 ++++++++-
- pkg/action/pull.go                       |  6 +++++
- 6 files changed, 63 insertions(+), 3 deletions(-)
+ cmd/helm/pull.go       |  1 +
+ cmd/helm/push.go       |  4 ++++
+ pkg/action/pull.go     |  7 +++++++
+ pkg/action/push.go     | 12 ++++++++++--
+ pkg/registry/client.go | 31 +++++++++++++++++++++++++++++++
+ 5 files changed, 53 insertions(+), 2 deletions(-)
 
-diff --git a/cmd/helm/flags.go b/cmd/helm/flags.go
-index aefa836c..13ad906f 100644
---- a/cmd/helm/flags.go
-+++ b/cmd/helm/flags.go
-@@ -58,6 +58,7 @@ func addChartPathOptionsFlags(f *pflag.FlagSet, c *action.ChartPathOptions) {
- 	f.BoolVar(&c.InsecureSkipTLSverify, "insecure-skip-tls-verify", false, "skip tls certificate checks for the chart download")
- 	f.StringVar(&c.CaFile, "ca-file", "", "verify certificates of HTTPS-enabled servers using this CA bundle")
- 	f.BoolVar(&c.PassCredentialsAll, "pass-credentials", false, "pass credentials to all domains")
-+	f.BoolVar(&c.PlainHTTP, "plain-http", false, "use plain http to connect oci registry")
- }
- 
- // bindOutputFlag will add the output flag to the given command and bind the
+diff --git a/cmd/helm/pull.go b/cmd/helm/pull.go
+index b1c04fe0abd..51d679ae6e7 100644
+--- a/cmd/helm/pull.go
++++ b/cmd/helm/pull.go
+@@ -81,6 +81,7 @@ func newPullCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
+ 	f.BoolVar(&client.VerifyLater, "prov", false, "fetch the provenance file, but don't perform verification")
+ 	f.StringVar(&client.UntarDir, "untardir", ".", "if untar is specified, this flag specifies the name of the directory into which the chart is expanded")
+ 	f.StringVarP(&client.DestDir, "destination", "d", ".", "location to write the chart. If this and tardir are specified, tardir is appended to this")
++	f.BoolVar(&client.PlainHTTP, "plain-http", false, "use plain http and not https to connect oci registry")
+ 	addChartPathOptionsFlags(f, &client.ChartPathOptions)
+
+ 	err := cmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 diff --git a/cmd/helm/push.go b/cmd/helm/push.go
-index 7daa6656..136e1c28 100644
+index ed5d1699ac7..e2add508833 100644
 --- a/cmd/helm/push.go
 +++ b/cmd/helm/push.go
-@@ -57,5 +57,9 @@ func newPushCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
+@@ -54,5 +54,9 @@ func newPushCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
  		},
  	}
- 
+
 +	f := cmd.Flags()
 +	f.BoolVar(&client.InsecureSkipTLSverify, "insecure-skip-tls-verify", false, "skip tls certificate checks for the chart upload")
 +	f.BoolVar(&client.PlainHTTP, "plain-http", false, "use plain http and not https to connect oci registry")
 +
  	return cmd
  }
-diff --git a/internal/experimental/action/push.go b/internal/experimental/action/push.go
-index b125ae1f..4e2cc35a 100644
---- a/internal/experimental/action/push.go
-+++ b/internal/experimental/action/push.go
-@@ -30,8 +30,10 @@ import (
+diff --git a/pkg/action/pull.go b/pkg/action/pull.go
+index b4018869ef7..d638527a483 100644
+--- a/pkg/action/pull.go
++++ b/pkg/action/pull.go
+@@ -46,6 +46,7 @@ type Pull struct {
+ 	VerifyLater bool
+ 	UntarDir    string
+ 	DestDir     string
++	PlainHTTP   bool
+ 	cfg         *Configuration
+ }
+
+@@ -76,6 +77,12 @@ func NewPullWithOpts(opts ...PullOpt) *Pull {
+ func (p *Pull) Run(chartRef string) (string, error) {
+ 	var out strings.Builder
+
++	if p.InsecureSkipTLSverify || p.PlainHTTP {
++		if err := p.cfg.RegistryClient.WithResolver(p.InsecureSkipTLSverify, p.PlainHTTP); err != nil {
++			return out.String(), err
++		}
++	}
++
+ 	c := downloader.ChartDownloader{
+ 		Out:     &out,
+ 		Keyring: p.Keyring,
+diff --git a/pkg/action/push.go b/pkg/action/push.go
+index 99d1beadc64..692b34041e7 100644
+--- a/pkg/action/push.go
++++ b/pkg/action/push.go
+@@ -29,8 +29,10 @@ import (
  //
  // It provides the implementation of 'helm push'.
  type Push struct {
 -	Settings *cli.EnvSettings
--	cfg      *action.Configuration
+-	cfg      *Configuration
 +	Settings              *cli.EnvSettings
-+	cfg                   *action.Configuration
++	cfg                   *Configuration
 +	InsecureSkipTLSverify bool
 +	PlainHTTP             bool
  }
- 
+
  // PushOpt is a type of function that sets options for a push action.
-@@ -57,6 +59,12 @@ func NewPushWithOpts(opts ...PushOpt) *Push {
+@@ -56,6 +58,12 @@ func NewPushWithOpts(opts ...PushOpt) *Push {
  func (p *Push) Run(chartRef string, remote string) (string, error) {
  	var out strings.Builder
- 
+
 +	if p.InsecureSkipTLSverify || p.PlainHTTP {
 +		if err := p.cfg.RegistryClient.WithResolver(p.InsecureSkipTLSverify, p.PlainHTTP); err != nil {
 +			return out.String(), err
@@ -68,22 +93,22 @@ index b125ae1f..4e2cc35a 100644
  	c := uploader.ChartUploader{
  		Out:     &out,
  		Pushers: pusher.All(p.Settings),
-diff --git a/internal/experimental/registry/client.go b/internal/experimental/registry/client.go
-index cc9e1fe7..4757f9bb 100644
---- a/internal/experimental/registry/client.go
-+++ b/internal/experimental/registry/client.go
-@@ -17,6 +17,7 @@ limitations under the License.
- package registry // import "helm.sh/helm/v3/internal/experimental/registry"
- 
+diff --git a/pkg/registry/client.go b/pkg/registry/client.go
+index 213a9dc49d5..fcde39de136 100644
+--- a/pkg/registry/client.go
++++ b/pkg/registry/client.go
+@@ -18,6 +18,7 @@ package registry // import "helm.sh/helm/v3/pkg/registry"
+
  import (
+ 	"context"
 +	"crypto/tls"
  	"encoding/json"
  	"fmt"
  	"io"
-@@ -105,6 +106,36 @@ func ClientOptCredentialsFile(credentialsFile string) ClientOption {
+@@ -145,6 +146,36 @@ func ClientOptCredentialsFile(credentialsFile string) ClientOption {
  	}
  }
- 
+
 +func (c *Client) newResolver(insecure, plainHTTP bool) (remotes.Resolver, error) {
 +	headers := http.Header{}
 +	headers.Set("User-Agent", version.GetUserAgent())
@@ -117,35 +142,61 @@ index cc9e1fe7..4757f9bb 100644
  type (
  	// LoginOption allows specifying various settings on login
  	LoginOption func(*loginOperation)
+
+From 2f861d4c1736526ab0400c0e7e5f3704347292dd Mon Sep 17 00:00:00 2001
+From: pytimer <lixin20101023@gmail.com>
+Date: Fri, 25 Feb 2022 17:34:53 +0800
+Subject: [PATCH 2/2] Install or upgrade supports OCI insecure registry
+
+Signed-off-by: pytimer <lixin20101023@gmail.com>
+---
+ cmd/helm/flags.go     | 1 +
+ cmd/helm/pull.go      | 1 -
+ pkg/action/install.go | 7 +++++++
+ 3 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/cmd/helm/flags.go b/cmd/helm/flags.go
+index 6a59101b7b9..31dd27d2f65 100644
+--- a/cmd/helm/flags.go
++++ b/cmd/helm/flags.go
+@@ -58,6 +58,7 @@ func addChartPathOptionsFlags(f *pflag.FlagSet, c *action.ChartPathOptions) {
+ 	f.BoolVar(&c.InsecureSkipTLSverify, "insecure-skip-tls-verify", false, "skip tls certificate checks for the chart download")
+ 	f.StringVar(&c.CaFile, "ca-file", "", "verify certificates of HTTPS-enabled servers using this CA bundle")
+ 	f.BoolVar(&c.PassCredentialsAll, "pass-credentials", false, "pass credentials to all domains")
++	f.BoolVar(&c.PlainHTTP, "plain-http", false, "use plain http to connect oci registry")
+ }
+
+ // bindOutputFlag will add the output flag to the given command and bind the
+diff --git a/cmd/helm/pull.go b/cmd/helm/pull.go
+index 51d679ae6e7..b1c04fe0abd 100644
+--- a/cmd/helm/pull.go
++++ b/cmd/helm/pull.go
+@@ -81,7 +81,6 @@ func newPullCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
+ 	f.BoolVar(&client.VerifyLater, "prov", false, "fetch the provenance file, but don't perform verification")
+ 	f.StringVar(&client.UntarDir, "untardir", ".", "if untar is specified, this flag specifies the name of the directory into which the chart is expanded")
+ 	f.StringVarP(&client.DestDir, "destination", "d", ".", "location to write the chart. If this and tardir are specified, tardir is appended to this")
+-	f.BoolVar(&client.PlainHTTP, "plain-http", false, "use plain http and not https to connect oci registry")
+ 	addChartPathOptionsFlags(f, &client.ChartPathOptions)
+
+ 	err := cmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 diff --git a/pkg/action/install.go b/pkg/action/install.go
-index b84a5727..a9fe6822 100644
+index 32be904b4a1..adf237db645 100644
 --- a/pkg/action/install.go
 +++ b/pkg/action/install.go
-@@ -124,13 +124,17 @@ type ChartPathOptions struct {
+@@ -117,6 +117,7 @@ type ChartPathOptions struct {
  	Username              string // --username
  	Verify                bool   // --verify
  	Version               string // --version
 +	PlainHTTP             bool   // --plain-http
-+	cfg                   *Configuration
- }
- 
- // NewInstall creates a new Install object with the given configuration.
- func NewInstall(cfg *Configuration) *Install {
--	return &Install{
-+	install := &Install{
- 		cfg: cfg,
- 	}
-+	install.ChartPathOptions.cfg = cfg
-+	return install
- }
- 
- func (i *Install) installCRDs(crds []chart.CRD) error {
-@@ -692,6 +696,12 @@ func (c *ChartPathOptions) LocateChart(name string, settings *cli.EnvSettings) (
+
+ 	// registryClient provides a registry client but is not added with
+ 	// options from a flag
+@@ -694,6 +695,12 @@ func (c *ChartPathOptions) LocateChart(name string, settings *cli.EnvSettings) (
  		return name, errors.Errorf("path %q not found", name)
  	}
- 
+
 +	if c.InsecureSkipTLSverify {
-+		if err := c.cfg.RegistryClient.WithResolver(c.InsecureSkipTLSverify, c.PlainHTTP); err != nil {
++		if err := c.registryClient.WithResolver(c.InsecureSkipTLSverify, c.PlainHTTP); err != nil {
 +			return "", err
 +		}
 +	}
@@ -153,23 +204,3 @@ index b84a5727..a9fe6822 100644
  	dl := downloader.ChartDownloader{
  		Out:     os.Stdout,
  		Keyring: c.Keyring,
-diff --git a/pkg/action/pull.go b/pkg/action/pull.go
-index 2f5127ea..87ec6532 100644
---- a/pkg/action/pull.go
-+++ b/pkg/action/pull.go
-@@ -76,6 +76,12 @@ func NewPullWithOpts(opts ...PullOpt) *Pull {
- func (p *Pull) Run(chartRef string) (string, error) {
- 	var out strings.Builder
- 
-+	if p.InsecureSkipTLSverify || p.PlainHTTP {
-+		if err := p.cfg.RegistryClient.WithResolver(p.InsecureSkipTLSverify, p.PlainHTTP); err != nil {
-+			return out.String(), err
-+		}
-+	}
-+
- 	c := downloader.ChartDownloader{
- 		Out:     &out,
- 		Keyring: p.Keyring,
--- 
-2.30.1
-
