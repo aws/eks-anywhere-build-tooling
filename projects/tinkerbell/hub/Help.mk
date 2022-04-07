@@ -24,18 +24,20 @@ _output/bin/hub/linux-arm64/oci2disk: ## Build `_output/bin/hub/linux-arm64/oci2
 _output/bin/hub/linux-arm64/writefile: ## Build `_output/bin/hub/linux-arm64/writefile`
 
 ##@ Image Targets
-local-images: ## Builds `cexec/images/amd64 kexec/images/amd64 image2disk/images/amd64 oci2disk/images/amd64 writefile/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `cexec/images/push kexec/images/push image2disk/images/push oci2disk/images/push writefile/images/push` to IMAGE_REPO
+local-images: ## Builds `cexec/images/amd64 kexec/images/amd64 image2disk/images/amd64 oci2disk/images/amd64 writefile/images/amd64 reboot/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `cexec/images/push kexec/images/push image2disk/images/push oci2disk/images/push writefile/images/push reboot/images/push` to IMAGE_REPO
 cexec/images/amd64: ## Builds/pushes `cexec/images/amd64`
 kexec/images/amd64: ## Builds/pushes `kexec/images/amd64`
 image2disk/images/amd64: ## Builds/pushes `image2disk/images/amd64`
 oci2disk/images/amd64: ## Builds/pushes `oci2disk/images/amd64`
 writefile/images/amd64: ## Builds/pushes `writefile/images/amd64`
+reboot/images/amd64: ## Builds/pushes `reboot/images/amd64`
 cexec/images/push: ## Builds/pushes `cexec/images/push`
 kexec/images/push: ## Builds/pushes `kexec/images/push`
 image2disk/images/push: ## Builds/pushes `image2disk/images/push`
 oci2disk/images/push: ## Builds/pushes `oci2disk/images/push`
 writefile/images/push: ## Builds/pushes `writefile/images/push`
+reboot/images/push: ## Builds/pushes `reboot/images/push`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
