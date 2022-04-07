@@ -10,6 +10,6 @@
 1. Update the `GIT_TAG` file to have the new desired release based on the upstream.
 1. Verify the golang version has not changed. Currently the version mentioned in a [go.mod](https://github.com/cloudflare/cfssl/blob/master/go.mod) is being used to build.
 1. Verify no changes have been made to the [Dockerfile](https://github.com/cloudflare/cfssl/blob/master/Dockerfile) looking specifically for added runtime/build deps.
-1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=cloudflare/cfssl` from the root of the repo.
+1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
-1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
+1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
