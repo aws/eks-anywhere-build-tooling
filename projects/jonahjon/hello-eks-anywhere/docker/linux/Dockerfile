@@ -4,6 +4,9 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
+RUN pwd
+RUN ls -la
+
 ADD conf/index.html /usr/share/nginx/index.template
 ADD conf/default.conf /etc/nginx/conf.d/
 
