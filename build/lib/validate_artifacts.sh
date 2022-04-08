@@ -29,6 +29,9 @@ EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts
 if [ -n "$IMAGE_FORMAT" ]; then
     EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_$IMAGE_FORMAT
 fi
+if [ "$IMAGE_OS" = "bottlerocket" ]; then
+	EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_ova_bottlerocket
+fi
 
 ACTUAL_FILES=$(mktemp)
 for file in $(find ${ARTIFACTS_FOLDER} -type f | sort); do

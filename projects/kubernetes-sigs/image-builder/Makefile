@@ -57,15 +57,15 @@ TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=build release clean help binaries checksu
 TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
 BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
-FINAL_OVA_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS).ova
-FINAL_RAW_IMAGE_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS).gz
-FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket.ova
+FINAL_OVA_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/$(IMAGE_OS).ova
+FINAL_RAW_IMAGE_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/$(IMAGE_OS).gz
+FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
 FAKE_UBUNTU_OVA_PATH=$(IMAGE_BUILDER_DIR)/output/fake-ubuntu.ova
 FAKE_UBUNTU_RAW_PATH=$(IMAGE_BUILDER_DIR)/output/fake-ubuntu.gz
 
 IMAGE_OS?=ubuntu
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
-BUILD_OVA_TARGETS=setup-packer-configs-ova download-ova-bottlerocket $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova
+BUILD_OVA_TARGETS=setup-packer-configs-ova download-ova-bottlerocket $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova upload-ova-bottlerocket
 BUILD_RAW_TARGETS=release-raw-ubuntu-2004-efi $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
 ifeq ($(IMAGE_FORMAT),ova)
@@ -75,7 +75,7 @@ ifeq ($(IMAGE_FORMAT),ova)
 		# to be uploaded to the same location to be picked up by the release process
 		# (TODO): Consider moving Bottlrocket to separate job to remove tight coupling
 		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
-		RELEASE_TARGETS=release-ova-ubuntu-2004 download-ova-bottlerocket upload-artifacts-ova
+		RELEASE_TARGETS=release-ova-ubuntu-2004 download-ova-bottlerocket upload-artifacts-ova upload-ova-bottlerocket
 	else ifeq ($(IMAGE_OS),rhel)
 		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH)
 		RELEASE_TARGETS=release-ova-rhel-8 upload-artifacts-ova
@@ -98,7 +98,7 @@ export GOVC_INSECURE?=true
 $(FAKE_UBUNTU_OVA_PATH):
 	@mkdir -p $(@D)
 	touch $@
-	touch $(ARTIFACTS_PATH)/ova/packer.log
+	touch $(ARTIFACTS_PATH)/ova/ubuntu/packer.log
 
 $(FAKE_UBUNTU_RAW_PATH):
 	@mkdir -p $(@D)
@@ -112,8 +112,9 @@ $(FINAL_RAW_IMAGE_PATH):
 	mv $(IMAGE_BUILDER_DIR)/output/*.gz $@
 	mv $(IMAGE_BUILDER_DIR)/output/packer.log $(@D)/packer.log
 
-$(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
+$(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/bottlerocket
 $(FINAL_BOTTLEROCKET_OVA_PATH):
+	@mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ova/*.ova $@
 
 .PHONY: setup-ami-share
@@ -134,7 +135,7 @@ $(TUFTOOL_TARGET):
 	$(CARGO_HOME)/bin/rustup default stable
 	CARGO_NET_GIT_FETCH_WITH_CLI=true $(CARGO_HOME)/bin/cargo install --force --root $(CARGO_HOME) tuftool
 
-$(BOTTLEROCKET_SETUP_TARGET): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
+$(BOTTLEROCKET_SETUP_TARGET): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/bottlerocket
 $(BOTTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
 $(BOTTLEROCKET_SETUP_TARGET):
 	@mkdir -p $(BOTTLEROCKET_DOWNLOAD_PATH)
@@ -153,7 +154,7 @@ deps-%: $(GIT_PATCH_TARGET)
 
 .PHONY: setup-packer-configs-%
 setup-packer-configs-%:
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$* $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST)
+	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST)
 
 .PHONY: build-ami-ubuntu-2004
 build-ami-ubuntu-2004: MAKEFLAGS=
@@ -177,7 +178,7 @@ release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 
 .PHONY: release-ova-%
 release-ova-%: MAKEFLAGS=
-release-ova-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
+release-ova-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
 release-ova-%: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
 release-ova-%: deps-ova setup-vsphere setup-packer-configs-ova
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
@@ -185,13 +186,21 @@ release-ova-%: deps-ova setup-vsphere setup-packer-configs-ova
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-$*
 
 .PHONY: download-ova-bottlerocket
-download-ova-bottlerocket: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova
+download-ova-bottlerocket: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/bottlerocket
 download-ova-bottlerocket: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
 	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) bottlerocket $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
+.PHONY: upload-ova-bottlerocket
+upload-ova-bottlerocket: IMAGE_OS=bottlerocket
+upload-ova-bottlerocket: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/ova/bottlerocket
+upload-ova-bottlerocket: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/ova/bottlerocket
+upload-ova-bottlerocket: s3-artifacts-ova
+	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=ova IMAGE_OS=bottlerocket
+
+
 .PHONY: release-raw-%
 release-raw-%: MAKEFLAGS=
-release-raw-%: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-user/$(shell basename $(BASE_DIRECTORY)),$(MAKE_ROOT)/$(OUTPUT_DIR))/raw
+release-raw-%: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-user/$(shell basename $(BASE_DIRECTORY)),$(MAKE_ROOT)/$(OUTPUT_DIR))/raw/$(IMAGE_OS)
 release-raw-%: deps-raw setup-packer-configs-raw
 	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
 
@@ -211,13 +220,13 @@ check-env-validation:
 	endif
 
 .PHONY: s3-artifacts-%
-s3-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*
+s3-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/$(IMAGE_OS)
 s3-artifacts-%: $(S3_TARGET_PREREQUISITES)
-	$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$*
+	$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$* IMAGE_OS=$(IMAGE_OS)
 
 .PHONY: upload-artifacts-%
-upload-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*
-upload-artifacts-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$*
+upload-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/$(IMAGE_OS)
+upload-artifacts-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$*/$(IMAGE_OS)
 upload-artifacts-%: s3-artifacts-%
 	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$*
 
