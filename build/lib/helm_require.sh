@@ -14,6 +14,7 @@
 # limitations under the License.
 
 set -x
+set -e
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -62,8 +63,17 @@ do
   IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${HELM_REGISTRY} ${IMAGE} ${TAG}) ||
   IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${IMAGE_REGISTRY} ${IMAGE} ${TAG})
   echo "s,{{${IMAGE}}},${IMAGE_SHASUM},g" >>${SEDFILE}
+  if [ "${TAG}" == "latest" ]
+  then
+    USE_TAG=$(aws --region us-east-1 ecr-public describe-images --repository-name ${IMAGE} --image-ids imageTag=latest --query 'imageDetails[0].imageTags' --output yaml | grep -v latest | head -1| sed -e 's/- //') ||
+    USE_TAG=$(aws ecr describe-images --repository-name ${IMAGE} --image-id imageTag=latest --query 'imageDetails[0].imageTags' --output yaml | grep -v latest | head -1| sed -e 's/- //') ||
+    USE_TAG="latest"
+  else
+    USE_TAG=$TAG
+  fi
   cat >>${REQUIRES_FILE} <<!
   - repository: ${IMAGE}
+    tag: ${USE_TAG}
     digest: ${IMAGE_SHASUM}
 !
 done
