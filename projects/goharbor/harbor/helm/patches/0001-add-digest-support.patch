@@ -44,7 +44,7 @@ index a57c385..4484331 100644
        containers:
        - name: chartmuseum
 -        image: {{ .Values.chartmuseum.image.repository }}:{{ .Values.chartmuseum.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.chartmuseum.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.chartmuseum.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            httpGet:
@@ -57,7 +57,7 @@ index c0b740a..eea41f3 100644
        containers:
        - name: core
 -        image: {{ .Values.core.image.repository }}:{{ .Values.core.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.core.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.core.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          {{- if .Values.core.startupProbe.enabled }}
          startupProbe:
@@ -70,7 +70,7 @@ index 80b90eb..373cb35 100644
        # we may remove it after several releases
        - name: "data-migrator"
 -        image: {{ .Values.database.internal.image.repository }}:{{ .Values.database.internal.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.database.internal.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.database.internal.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          command: ["/bin/sh"]
          args: ["-c", "[ -e /var/lib/postgresql/data/postgresql.conf ] && [ ! -d /var/lib/postgresql/data/pgdata ] && mkdir -m 0700 /var/lib/postgresql/data/pgdata && mv /var/lib/postgresql/data/* /var/lib/postgresql/data/pgdata/ || true"]
@@ -79,7 +79,7 @@ index 80b90eb..373cb35 100644
        # as "fsGroup" applied before the init container running, the container has enough permission to execute the command
        - name: "data-permissions-ensurer"
 -        image: {{ .Values.database.internal.image.repository }}:{{ .Values.database.internal.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.database.internal.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.database.internal.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          command: ["/bin/sh"]
          args: ["-c", "chmod -R 700 /var/lib/postgresql/data/pgdata || true"]
@@ -88,7 +88,7 @@ index 80b90eb..373cb35 100644
        containers:
        - name: database
 -        image: {{ .Values.database.internal.image.repository }}:{{ .Values.database.internal.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.database.internal.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.database.internal.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            exec:
@@ -101,7 +101,7 @@ index ddcc331..8c7f356 100644
        containers:
        - name: exporter
 -        image: {{ .Values.exporter.image.repository }}:{{ .Values.exporter.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.exporter.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.exporter.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            httpGet:
@@ -114,7 +114,7 @@ index bf854c9..a2003e4 100644
        containers:
        - name: jobservice
 -        image: {{ .Values.jobservice.image.repository }}:{{ .Values.jobservice.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.jobservice.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.jobservice.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            httpGet:
@@ -127,7 +127,7 @@ index a7c2633..4eecc2d 100644
        containers:
        - name: nginx
 -        image: "{{ .Values.nginx.image.repository }}:{{ .Values.nginx.image.tag }}"
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.nginx.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.nginx.image }}
          imagePullPolicy: "{{ .Values.imagePullPolicy }}"
          {{- $_ := set . "scheme" "HTTP" -}}
          {{- $_ := set . "port" "8080" -}}
@@ -140,7 +140,7 @@ index 753f2ec..ae17544 100644
        containers:
        - name: notary-server
 -        image: {{ .Values.notary.server.image.repository }}:{{ .Values.notary.server.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.notary.server.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.notary.server.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            httpGet:
@@ -153,7 +153,7 @@ index 15987b8..24363d5 100644
        containers:
        - name: notary-signer
 -        image: {{ .Values.notary.signer.image.repository }}:{{ .Values.notary.signer.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.notary.signer.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.notary.signer.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            httpGet:
@@ -166,7 +166,7 @@ index 66f00cc..f13fc08 100644
        containers:
        - name: portal
 -        image: {{ .Values.portal.image.repository }}:{{ .Values.portal.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.portal.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.portal.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
  {{- if .Values.portal.resources }}
          resources:
@@ -179,7 +179,7 @@ index ff04008..5a1b2dc 100644
        containers:
        - name: redis
 -        image: {{ .Values.redis.internal.image.repository }}:{{ .Values.redis.internal.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.redis.internal.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.redis.internal.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            tcpSocket:
@@ -192,7 +192,7 @@ index fd1f951..6fe7227 100644
        containers:
        - name: registry
 -        image: {{ .Values.registry.registry.image.repository }}:{{ .Values.registry.registry.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.registry.registry.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.registry.registry.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            httpGet:
@@ -201,7 +201,7 @@ index fd1f951..6fe7227 100644
          {{- end }}
        - name: registryctl
 -        image: {{ .Values.registry.controller.image.repository }}:{{ .Values.registry.controller.image.tag }}
-+        image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.registry.controller.image }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.registry.controller.image }}
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            httpGet:
@@ -214,7 +214,7 @@ index 69c00f8..9c7f57c 100644
        containers:
          - name: trivy
 -          image: {{ .Values.trivy.image.repository }}:{{ .Values.trivy.image.tag }}
-+          image: {{ .Values.imageRegistry }}/{{ include "harbor.image.repository.path" .Values.trivy.image }}
++          image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.trivy.image }}
            imagePullPolicy: {{ .Values.imagePullPolicy }}
            securityContext:
              privileged: false
@@ -269,7 +269,7 @@ index b2e57fc..9ec0f7d 100644
  # contains a base64 encoded CA Certificate named `ca.crt`.
  # uaaSecretName:
  
-+imageRegistry: "public.ecr.aws/eks-anywhere"
++sourceRegistry: "public.ecr.aws/eks-anywhere"
 +
  # If expose the service via "ingress", the Nginx will not be used
  nginx:
