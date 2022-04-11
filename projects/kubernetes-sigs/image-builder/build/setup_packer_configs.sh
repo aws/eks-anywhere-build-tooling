@@ -21,10 +21,11 @@ set -o pipefail
 
 RELEASE_BRANCH="${1?Specify first argument - release branch}"
 IMAGE_FORMAT="${2?Specify second argument - image format}"
-ARTIFACTS_BUCKET="${3?Specify third argument - artifact bucket}"
-OVA_PATH="${4? Specify fourth argument - ova output path}"
-ADDITIONAL_PAUSE_IMAGE_FROM="${5? Specify fifth argument - additional pause image}"
-LATEST_TAG="${6? Specify sixth argument - latest tag}"
+IMAGE_OS="${3?Specify third argument - image OS}"
+ARTIFACTS_BUCKET="${4?Specify fourth argument - artifact bucket}"
+OVA_PATH="${5? Specify fifth argument - ova output path}"
+ADDITIONAL_PAUSE_IMAGE_FROM="${6? Specify sixth argument - additional pause image}"
+LATEST_TAG="${7? Specify seventh argument - latest tag}"
 
 CI="${CI:-false}"
 
@@ -34,7 +35,7 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 # Preload release yaml
 build::eksd_releases::load_release_yaml $RELEASE_BRANCH
 
-OUTPUT_CONFIGS="$MAKE_ROOT/_output/$RELEASE_BRANCH/$IMAGE_FORMAT/config"
+OUTPUT_CONFIGS="$MAKE_ROOT/_output/$RELEASE_BRANCH/$IMAGE_FORMAT/$IMAGE_OS/config"
 mkdir -p $OUTPUT_CONFIGS
 
 export CNI_SHA="sha256:$(build::eksd_releases::get_eksd_component_sha 'cni-plugins' $RELEASE_BRANCH)"

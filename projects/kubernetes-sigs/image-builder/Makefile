@@ -154,22 +154,22 @@ deps-%: $(GIT_PATCH_TARGET)
 
 .PHONY: setup-packer-configs-%
 setup-packer-configs-%:
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST)
+	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST)
 
 .PHONY: build-ami-ubuntu-2004
 build-ami-ubuntu-2004: MAKEFLAGS=
-build-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami
+build-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
 build-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
 build-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) validate-ami-ubuntu-2004
 
 .PHONY: release-ami-ubuntu-2004
 release-ami-ubuntu-2004: MAKEFLAGS=
-release-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami
+release-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
 release-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
 release-ami-ubuntu-2004: export MANIFEST_OUTPUT=$(FULL_OUTPUT_DIR)/manifest.json
 release-ami-ubuntu-2004: EXPORT_AMI_BUCKET?=$(ARTIFACTS_BUCKET)
-release-ami-ubuntu-2004: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami
+release-ami-ubuntu-2004: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami/$(IMAGE_OS)
 release-ami-ubuntu-2004: EXPORT_AMI_DST=$(AMI_S3_DST)/$(GIT_HASH)
 release-ami-ubuntu-2004: LATEST_AMI_S3_URL=$(AMI_S3_DST)/$(LATEST)/ubuntu.raw
 release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
