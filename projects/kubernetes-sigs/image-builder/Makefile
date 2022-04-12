@@ -181,7 +181,7 @@ release-ova-%: MAKEFLAGS=
 release-ova-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
 release-ova-%: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
 release-ova-%: deps-ova setup-vsphere setup-packer-configs-ova
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-$*
 
