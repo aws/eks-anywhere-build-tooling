@@ -17,7 +17,6 @@ set -x
 set -o errexit
 set -o nounset
 set -o pipefail
-# HELM_REGISTRY
 # IMAGE_TAG
 # HELM_ADDITIONAL_KEY_VALUES
 
