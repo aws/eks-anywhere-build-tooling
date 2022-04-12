@@ -15,7 +15,6 @@ EXTRA_GO_LDFLAGS=-X main.VERSION=$(GIT_TAG:v%=%)
 
 FLUX_MANIFESTS_TARGET=$(REPO)/cmd/flux/manifests
 
-BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 FETCH_BINARIES_TARGETS=eksd/kubernetes/client
 
 HAS_S3_ARTIFACTS=true

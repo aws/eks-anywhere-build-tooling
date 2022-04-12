@@ -14,8 +14,6 @@ EXTRA_GO_LDFLAGS=-s -w -X github.com/cloudflare/cfssl/cli/version.version=$(GIT_
 
 HAS_S3_ARTIFACTS=true
 
-RICE_BINARY_PLATFORMS=$(BUILDER_PLATFORM)
-
 RICE_EMBED_TARGET=$(REPO)/cli/serve/rice-box.go
 
 GIT_CLONE_DEPENDENCY=$(GIT_DEPS_DIR)/cfssl_trust/LICENSE
@@ -24,19 +22,19 @@ STATIC_FILES=$(shell git -C cfssl ls-tree -r -t --name-only HEAD ./cli/serve/sta
 
 include $(BASE_DIRECTORY)/Common.mk
 
+
 $(OUTPUT_BIN_DIR)/linux-%/rice: EXTRA_GO_LDFLAGS=
 
 $(OUTPUT_BIN_DIR)/linux-amd64/cfssl $(OUTPUT_BIN_DIR)/linux-arm64/cfssl: $(RICE_EMBED_TARGET) $(GIT_CLONE_DEPENDENCY)
 
-# make sure we build rice for the current os/arch so we can actually run it
-$(eval $(foreach platform, $(RICE_BINARY_PLATFORMS), $(call BINARY_TARGET_BODY,$(platform),rice,./vendor/github.com/GeertJohan/go.rice/rice)))
-
-$(RICE_EMBED_TARGET): $(OUTPUT_BIN_DIR)/$(subst /,-,$(RICE_BINARY_PLATFORMS))/rice
+$(RICE_EMBED_TARGET): RICE=./$(OUTPUT_BIN_DIR)/$(subst /,-,$(BUILDER_PLATFORM))/rice
+$(RICE_EMBED_TARGET):
+	$(MAKE) $(RICE) BINARY_PLATFORMS=$(BUILDER_PLATFORM) BINARY_TARGET_FILES=rice SOURCE_PATTERNS=./vendor/github.com/GeertJohan/go.rice/rice
 # We need to set the timestamp of the static files cfssl/cli/serve/*
 # The timestamp is being used in the generated file from the embed-go command cfssl/cli/serve/rice-box.go
 # When running git clone the timestamp gets set initially and we need this to be a static value to prevent checksum issues.
 	$(foreach filename, $(STATIC_FILES), touch -a -m -t $(shell git -C $(REPO) log -1 --format="%cd" --date=format:%Y%m%d%H%M.%S -- $(filename)) ./$(REPO)/$(filename);)
-	$^ embed-go -i=./$(REPO)/cli/serve
+	$(RICE) embed-go -i=./$(REPO)/cli/serve
 
 $(GIT_CLONE_DEPENDENCY):
 	git clone https://github.com/cloudflare/cfssl_trust.git $(GIT_DEPS_DIR)/cfssl_trust

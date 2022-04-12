@@ -7,6 +7,8 @@ REPO_OWNER=kubernetes-sigs
 
 BINARY_TARGET_FILES=crictl critest
 SOURCE_PATTERNS=./cmd/crictl ./cmd/critest
+# critest is built with a different command
+BINARY_TARGET_FILES_BUILD_ALONE=critest
 EXTRA_GO_LDFLAGS=-X github.com/kubernetes-sigs/cri-tools/pkg/version.Version=$(GIT_TAG:v%=%)
 EXTRA_GOBUILD_FLAGS=-tags selinux
 
