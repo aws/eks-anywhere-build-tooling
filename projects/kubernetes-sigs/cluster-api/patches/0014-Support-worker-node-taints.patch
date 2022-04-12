@@ -1,7 +1,7 @@
-From 0c48d8f71d3af0d43f89e8cb3ffc0646255c9157 Mon Sep 17 00:00:00 2001
+From 25ee27775cb4bc63d592934d2b1077aed2ea3c8d Mon Sep 17 00:00:00 2001
 From: Daniel Budris <budris@amazon.com>
 Date: Fri, 17 Dec 2021 13:38:39 -0800
-Subject: [PATCH] Support worker node taints
+Subject: [PATCH 14/18] Support worker node taints
 
 seperate taints template into its own template
 
@@ -13,25 +13,11 @@ add template parsing to node userdata generation
 
 account for multiple value:effect mappings in each taint key
 ---
- .../controllers/kubeadmconfig_controller.go   |  3 ++
  .../internal/bottlerocket/bootstrap.go        | 11 ++++++
  .../internal/bottlerocket/bottlerocket.go     | 37 +++++++++++++++++++
+ .../controllers/kubeadmconfig_controller.go   |  3 ++
  3 files changed, 51 insertions(+)
 
-diff --git a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-index ee0dde9bb..dec94d8b1 100644
---- a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-@@ -601,6 +601,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
- 			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
- 		}
-+		if len(scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
-+			bottlerocketConfig.Taints = scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
-+		}
- 		cloudJoinData, err = bottlerocket.NewNode(cloudJoinInput, bottlerocketConfig)
- 		if err != nil {
- 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index 3ebb9240a..dd769a78d 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
@@ -150,6 +136,20 @@ index 0ba4318c5..36c3f67a7 100644
  func parseNodeLabels(nodeLabels string) string {
  	if nodeLabels == "" {
  		return ""
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 696ac1656..7596ff310 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -629,6 +629,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
+ 			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
+ 		}
++		if len(scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
++			bottlerocketConfig.Taints = scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
 -- 
-2.30.1 (Apple Git-130)
+2.30.1
 

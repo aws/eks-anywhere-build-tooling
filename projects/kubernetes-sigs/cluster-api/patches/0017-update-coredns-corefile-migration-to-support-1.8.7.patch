@@ -1,0 +1,57 @@
+From 2fa939f6acb0b903c839c530e9fa87d7eeaa79d1 Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Sat, 5 Mar 2022 18:16:29 -0600
+Subject: [PATCH 17/18] update coredns/corefile-migration to support 1.8.7
+
+EKS-D 1.22-1 ships with coredns 1.8.7.  The corefile-migration package
+does not currently have a release that supports 1.8.7 nor does cluster-api
+or kubeadm for that matter use a version which does.  Temporarily ovewriting the version
+to point to the comment upstream which added support.
+
+Without this change, capi's webhook will deny a cluster spec with coredns 1.8.7 with
+the following error:
+`invalid: spec.kubeadmConfigSpec.clusterConfiguration.dns.imageTag: Forbidden: cannot migrate
+CoreDNS up to '1.8.7' from '1.8.7': start version '1.8.7' not supported`
+
+Signed-off-by: Jackson West <jgw@amazon.com>
+---
+ go.mod | 3 ++-
+ go.sum | 4 ++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/go.mod b/go.mod
+index 3a3964d1c..6462bdc33 100644
+--- a/go.mod
++++ b/go.mod
+@@ -150,7 +150,6 @@ require (
+ 	gopkg.in/inf.v0 v0.9.1 // indirect
+ 	gopkg.in/ini.v1 v1.63.2 // indirect
+ 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+-	gopkg.in/yaml.v2 v2.4.0 // indirect
+ 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+ 	k8s.io/cli-runtime v0.23.0 // indirect
+ 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
+@@ -159,3 +158,5 @@ require (
+ 	sigs.k8s.io/kustomize/kyaml v0.13.0 // indirect
+ 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0 // indirect
+ )
++
++replace github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.15-0.20220217191920-333bf4008d5f
+diff --git a/go.sum b/go.sum
+index 7944b9a02..4cc923fe5 100644
+--- a/go.sum
++++ b/go.sum
+@@ -138,8 +138,8 @@ github.com/cockroachdb/errors v1.2.4/go.mod h1:rQD95gz6FARkaKkQXUksEje/d9a6wBJoC
+ github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f/go.mod h1:i/u985jwjWRlyHXQbwatDASoW0RMlZ/3i9yJHE2xLkI=
+ github.com/coredns/caddy v1.1.0 h1:ezvsPrT/tA/7pYDBZxu0cT0VmWk75AfIaf6GSYCNMf0=
+ github.com/coredns/caddy v1.1.0/go.mod h1:A6ntJQlAWuQfFlsd9hvigKbo2WS0VUs2l1e2F+BawD4=
+-github.com/coredns/corefile-migration v1.0.14 h1:Tz3WZhoj2NdP8drrQH86NgnCng+VrPjNeg2Oe1ALKag=
+-github.com/coredns/corefile-migration v1.0.14/go.mod h1:XnhgULOEouimnzgn0t4WPuFDN2/PJQcTxdWKC5eXNGE=
++github.com/coredns/corefile-migration v1.0.15-0.20220217191920-333bf4008d5f h1:jsmmoZbr74LRS+NyNNL2K67xMnS+8lhW5A8rFqwYs4I=
++github.com/coredns/corefile-migration v1.0.15-0.20220217191920-333bf4008d5f/go.mod h1:XnhgULOEouimnzgn0t4WPuFDN2/PJQcTxdWKC5eXNGE=
+ github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
+ github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
+ github.com/coreos/etcd v3.3.13+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
+-- 
+2.30.1
+

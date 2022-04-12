@@ -1,48 +1,14 @@
-From 2533368d8cb38a3b4604463e9c6268f49d60efd7 Mon Sep 17 00:00:00 2001
+From c8b8788a35635f0cdc422a8b94606f18147afb95 Mon Sep 17 00:00:00 2001
 From: Vivek Koppuru <koppv@amazon.com>
 Date: Mon, 24 Jan 2022 00:46:44 -0800
-Subject: [PATCH 42/42] Add node labels support for bottlerocket
+Subject: [PATCH 13/18] Add node labels support for bottlerocket
 
 ---
- .../controllers/kubeadmconfig_controller.go   |  9 ++++++++
  .../internal/bottlerocket/bootstrap.go        |  9 ++++++++
  .../internal/bottlerocket/bottlerocket.go     | 23 ++++++++++++++++++-
+ .../controllers/kubeadmconfig_controller.go   |  9 ++++++++
  3 files changed, 40 insertions(+), 1 deletion(-)
 
-diff --git a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-index 9648738f8..ee0dde9bb 100644
---- a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-@@ -444,6 +444,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
- 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
- 		}
-+		if scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs != nil {
-+			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs
-+		}
- 	}
- 
- 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
-@@ -595,6 +598,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 		if scope.Config.Spec.JoinConfiguration.RegistryMirror.Endpoint != "" {
- 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
- 		}
-+		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
-+			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
-+		}
- 		cloudJoinData, err = bottlerocket.NewNode(cloudJoinInput, bottlerocketConfig)
- 		if err != nil {
- 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -700,6 +706,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
- 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
- 		}
-+		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
-+			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
-+		}
- 		cloudJoinData, err = bottlerocket.NewJoinControlPlane(cloudJoinInput, bottlerocketConfig)
- 		if err != nil {
- 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index 4e1de77db..3ebb9240a 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
@@ -138,6 +104,40 @@ index 9e4f8d4a5..0ba4318c5 100644
  // Parses through all the users and return list of all user's authorized ssh keys
  func getAllAuthorizedKeys(users []bootstrapv1.User) string {
  	var sshAuthorizedKeys []string
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index cd23b38d3..696ac1656 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -459,6 +459,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
+ 		}
++		if scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
+@@ -623,6 +626,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		if scope.Config.Spec.JoinConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
+ 		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+@@ -735,6 +741,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
+ 		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 -- 
-2.27.0
+2.30.1
 
