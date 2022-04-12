@@ -18,9 +18,6 @@ endef
 
 export VERSIONS_FOR_PREPARE
 
-PRUNE_BUILDCTL=true
-export PRUNE_BUILDCTL
-
 REPO=harbor
 REPO_OWNER=goharbor
 REPO_SUBPATH=./src
