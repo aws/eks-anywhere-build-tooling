@@ -16,6 +16,8 @@ IMAGE_NAMES=bootkit tink-docker kernel
 
 BINARY_TARGET_FILES=bootkit tink-docker
 SOURCE_PATTERNS=./ ./
+# both binaries are built from different sub paths
+BINARY_TARGET_FILES_BUILD_ALONE=bootkit tink-docker
 
 GO_MOD_DOWNLOAD_TARGETS=$(REPO)/bootkit/eks-anywhere-go-mod-download $(REPO)/tink-docker/eks-anywhere-go-mod-download
 GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/bootkit/attribution/go-license.csv $(OUTPUT_DIR)/tink-docker/attribution/go-license.csv

@@ -18,6 +18,9 @@ endef
 
 export VERSIONS_FOR_PREPARE
 
+PRUNE_BUILDCTL=true
+export PRUNE_BUILDCTL
+
 REPO=harbor
 REPO_OWNER=goharbor
 REPO_SUBPATH=./src
@@ -43,6 +46,8 @@ IMAGE_NAMES=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-j
 
 BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migrate-patch harbor-migrate harbor-exporter
 SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/standalone-db-migrator ./cmd/exporter
+# harbor-core has additional ldflags
+BINARY_TARGET_FILES_BUILD_ALONE=harbor-core
 
 HARBOR_BASE_NAMESPACE=goharbor
 IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
@@ -58,6 +63,7 @@ HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
 HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-exporter harbor/harbor-jobservice harbor/harbor-nginx harbor/harbor-portal harbor/harbor-redis harbor/harbor-registry harbor/harbor-registryctl
 
 include $(BASE_DIRECTORY)/Common.mk
+
 
 harbor-nginx/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx
 harbor-portal/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx

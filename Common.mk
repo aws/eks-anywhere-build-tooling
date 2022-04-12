@@ -162,6 +162,10 @@ SIMPLE_CREATE_BINARIES?=true
 BINARY_TARGETS?=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS, $(BINARY_TARGET_FILES), $(BINARY_PLATFORMS))
 BINARY_TARGET_FILES?=
 SOURCE_PATTERNS?=.
+BINARY_TARGET_FILES_BUILD_ALONE?=
+SOURCE_PATTERNS_BUILD_ALONE=$(foreach alone,$(BINARY_TARGET_FILES_BUILD_ALONE),$(word $(call pos,$(alone),$(BINARY_TARGET_FILES)),$(SOURCE_PATTERNS)))
+BINARY_TARGET_FILES_BUILD_TOGETHER=$(filter-out $(BINARY_TARGET_FILES_BUILD_ALONE),$(BINARY_TARGET_FILES))
+SOURCE_PATTERNS_BUILD_TOGETHER=$(filter-out $(SOURCE_PATTERNS_BUILD_ALONE),$(SOURCE_PATTERNS))
 
 #### CGO ############
 CGO_CREATE_BINARIES?=false
@@ -195,6 +199,10 @@ list-rem = $(wordlist 2,$(words $1),$1)
 pairmap = $(and $(strip $2),$(strip $3),$(call \
     $1,$(firstword $2),$(firstword $3)) $(call \
     pairmap,$1,$(call list-rem,$2),$(call list-rem,$3)))
+
+_pos = $(if $(findstring $1,$2),$(call _pos,$1,\
+       $(call list-rem,$2),x $3),$3)
+pos = $(words $(call _pos,$1,$2))
 ######################
 
 ####################################################
@@ -265,21 +273,30 @@ define FULL_FETCH_BINARIES_TARGETS
 	$(addprefix $(BINARY_DEPS_DIR)/linux-amd64/, $(1)) $(addprefix $(BINARY_DEPS_DIR)/linux-arm64/, $(1))
 endef
 
+# $1 - targets
+# $2 - platforms
 define BINARY_TARGETS_FROM_FILES_PLATFORMS
 	$(foreach platform, $(2), $(foreach target, $(1), \
 		$(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/$(if $(findstring windows,$(platform)),$(target).exe,$(target))))
 endef
 
+# $1 - binary file name
+# $2 - source pattern
+# $3 - all target files if building multiple
 define BINARY_TARGET_BODY_ALL_PLATFORMS
 	$(eval $(foreach platform, $(BINARY_PLATFORMS), \
-		$(call $(if $(call needs-cgo-builder,$(platform)),CGO_BINARY_TARGET_BODY,BINARY_TARGET_BODY),$(platform),$(if $(findstring windows,$(platform)),$(1).exe,$(1)),$(2))))
+		$(call $(if $(call needs-cgo-builder,$(platform)),CGO_BINARY_TARGET_BODY,BINARY_TARGET_BODY),$(platform),$(if $(findstring windows,$(platform)),$(1).exe,$(1)),$(2),$(3))))
 endef
 
+# $1 - arch
+# $2 - binary file name
+# #3 - source pattern
+# $4 - all target files if building multiple
 define BINARY_TARGET_BODY
 	$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2): $(GO_MOD_DOWNLOAD_TARGETS)
 		$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $$(MAKE_ROOT) \
-			$$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(2) $$(REPO) $$(GOLANG_VERSION) $(1) $(3) \
-			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" $$(CGO_ENABLED) "$$(CGO_LDFLAGS)" $$(REPO_SUBPATH)
+			$$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$(subst /,-,$(1))/$(if $(filter true,$(call IS_ONE_WORD,$(3))),$(2),) $$(REPO) $$(GOLANG_VERSION) $(1) "$(3)" \
+			"$$(GOBUILD_COMMAND)" "$$(EXTRA_GOBUILD_FLAGS)" "$$(GO_LDFLAGS)" $$(CGO_ENABLED) "$$(CGO_LDFLAGS)" "$$(REPO_SUBPATH)" "$(4)"
 
 endef
 
@@ -321,6 +338,12 @@ define TO_UPPER
 $(shell echo '$(1)' | tr '[:lower:]' '[:upper:]')
 endef
 
+# check if pass variable has length of 1
+define IS_ONE_WORD
+$(if $(filter 1,$(words $(1))),true,false)
+endef
+
+
 #### Source repo + binary Targets
 ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
@@ -361,7 +384,8 @@ $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
 	@touch $@
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
-$(call pairmap,BINARY_TARGET_BODY_ALL_PLATFORMS,$(BINARY_TARGET_FILES),$(SOURCE_PATTERNS))
+$(call pairmap,BINARY_TARGET_BODY_ALL_PLATFORMS,$(BINARY_TARGET_FILES_BUILD_ALONE),$(SOURCE_PATTERNS_BUILD_ALONE))
+$(call BINARY_TARGET_BODY_ALL_PLATFORMS,$(firstword $(BINARY_TARGET_FILES_BUILD_TOGETHER)),$(SOURCE_PATTERNS_BUILD_TOGETHER),$(BINARY_TARGET_FILES_BUILD_TOGETHER))
 endif
 
 .PHONY: binaries
@@ -407,7 +431,7 @@ gather-licenses: $(GATHER_LICENSES_TARGETS)
 attribution: $(and $(filter true,$(HAS_LICENSES)),$(ATTRIBUTION_TARGETS))
 
 .PHONY: attribution-pr
-attribution-pr:
+attribution-pr: attribution
 	$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
 
 #### Tarball Targets

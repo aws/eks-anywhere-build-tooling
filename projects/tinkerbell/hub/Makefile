@@ -16,6 +16,9 @@ REBOOT_IMAGE_COMPONENT=tinkerbell/hub/reboot
 
 BINARY_TARGET_FILES=cexec kexec image2disk oci2disk writefile
 SOURCE_PATTERNS=. . . . .
+# binaries are built from different subpaths
+BINARY_TARGET_FILES_BUILD_ALONE=cexec kexec image2disk oci2disk writefile
+
 IMAGE_NAMES=$(BINARY_TARGET_FILES) reboot
 
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
