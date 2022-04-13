@@ -1,7 +1,7 @@
-From bce02c3505d1fbe02117c4591c6d9c6afcd9a0b9 Mon Sep 17 00:00:00 2001
+From 5cbb33986235a0a76fccccb1d3aafd7e4a9fb610 Mon Sep 17 00:00:00 2001
 From: Michael Chu <chumich@amazon.com>
 Date: Mon, 28 Feb 2022 09:51:25 -0800
-Subject: [PATCH] Support configuring bottlerocket control container uri
+Subject: [PATCH 16/18] Support configuring bottlerocket control container uri
 
 Signed-off-by: Michael Chu <chumich@amazon.com>
 ---
@@ -14,9 +14,9 @@ Signed-off-by: Michael Chu <chumich@amazon.com>
  .../api/v1beta1/zz_generated.deepcopy.go      | 18 ++++
  ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 90 +++++++++++++++++
  ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 96 +++++++++++++++++++
- .../controllers/kubeadmconfig_controller.go   |  3 +
  .../internal/bottlerocket/bootstrap.go        | 12 +++
  .../internal/bottlerocket/bottlerocket.go     |  8 ++
+ .../controllers/kubeadmconfig_controller.go   |  2 +
  .../kubeadm/types/upstreamv1beta1/types.go    | 17 ++++
  .../zz_generated.conversion.go                | 46 +++++++++
  .../upstreamv1beta1/zz_generated.deepcopy.go  | 18 ++++
@@ -28,18 +28,19 @@ Signed-off-by: Michael Chu <chumich@amazon.com>
  .../upstreamv1beta3/zz_generated.deepcopy.go  | 93 ++++++++++++++++++
  bootstrap/kubeadm/types/utils_test.go         | 51 +++++++++-
  cmd/clusterctl/client/cluster/mover_test.go   |  6 +-
+ .../config/manifest/clusterctl-api.yaml       | 17 +---
  ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 96 +++++++++++++++++++
  ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 68 +++++++++++++
  .../internal/workload_cluster_coredns_test.go |  5 +
  .../internal/workload_cluster_etcd_test.go    | 10 ++
  .../kubeadm/internal/workload_cluster_test.go | 25 +++++
- 28 files changed, 983 insertions(+), 6 deletions(-)
+ 29 files changed, 986 insertions(+), 19 deletions(-)
 
 diff --git a/api/v1alpha4/zz_generated.deepcopy.go b/api/v1alpha4/zz_generated.deepcopy.go
-index 3c9b6afb6..817427c48 100644
+index 125f9356b..90d8a612b 100644
 --- a/api/v1alpha4/zz_generated.deepcopy.go
 +++ b/api/v1alpha4/zz_generated.deepcopy.go
-@@ -247,6 +247,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+@@ -248,6 +248,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
  		*out = new(v1.ObjectReference)
  		**out = **in
  	}
@@ -52,10 +53,10 @@ index 3c9b6afb6..817427c48 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/api/v1beta1/zz_generated.deepcopy.go b/api/v1beta1/zz_generated.deepcopy.go
-index f8d0c1993..e63c384ec 100644
+index 958ed279f..56e696aef 100644
 --- a/api/v1beta1/zz_generated.deepcopy.go
 +++ b/api/v1beta1/zz_generated.deepcopy.go
-@@ -247,6 +247,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+@@ -306,6 +306,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
  		*out = new(v1.ObjectReference)
  		**out = **in
  	}
@@ -68,13 +69,13 @@ index f8d0c1993..e63c384ec 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
-index 8f8cb8be7..53a048e31 100644
+index b4db85ccd..c6c79b949 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
 @@ -71,6 +71,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -86,7 +87,7 @@ index 8f8cb8be7..53a048e31 100644
 @@ -162,6 +167,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
-
+ 
 +// BottlerocketControl holds the settings of control container for bottlerocket nodes
 +// This setting is ONLY for bottlerocket nodes.
 +type BottlerocketControl struct {
@@ -100,7 +101,7 @@ index 8f8cb8be7..53a048e31 100644
 @@ -399,6 +411,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -110,10 +111,10 @@ index 8f8cb8be7..53a048e31 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-index b45d61a22..340a7c24c 100644
+index d61da7590..07a398790 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-@@ -99,6 +99,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+@@ -100,6 +100,16 @@ func RegisterConversions(s *runtime.Scheme) error {
  	}); err != nil {
  		return err
  	}
@@ -130,10 +131,10 @@ index b45d61a22..340a7c24c 100644
  	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
  		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
  	}); err != nil {
-@@ -604,6 +614,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in
+@@ -605,6 +615,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in
  	return autoConvert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in, out, s)
  }
-
+ 
 +func autoConvert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
 +	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
 +		return err
@@ -161,7 +162,7 @@ index b45d61a22..340a7c24c 100644
  func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
  	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
  		return err
-@@ -611,6 +645,9 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(i
+@@ -612,6 +646,9 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(i
  	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -171,7 +172,7 @@ index b45d61a22..340a7c24c 100644
  	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -656,6 +693,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+@@ -657,6 +694,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -181,7 +182,7 @@ index b45d61a22..340a7c24c 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1051,6 +1091,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
+@@ -1048,6 +1088,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
  	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -191,7 +192,7 @@ index b45d61a22..340a7c24c 100644
  	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1080,6 +1123,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+@@ -1077,6 +1120,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -202,13 +203,13 @@ index b45d61a22..340a7c24c 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
-index 368cb7bf9..7792ef4a0 100644
+index 334d940ca..c5999accd 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
-@@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+@@ -159,12 +159,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
  	return out
  }
-
+ 
 +// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 +func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
 +	*out = *in
@@ -235,7 +236,7 @@ index 368cb7bf9..7792ef4a0 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
  	in.Etcd.DeepCopyInto(&out.Etcd)
-@@ -532,6 +549,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+@@ -533,6 +550,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  	out.TypeMeta = in.TypeMeta
  	out.Pause = in.Pause
  	out.BottlerocketBootstrap = in.BottlerocketBootstrap
@@ -244,13 +245,13 @@ index 368cb7bf9..7792ef4a0 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 2586adf75..094b8f802 100644
+index 16f240a05..a009e3748 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-@@ -71,6 +71,11 @@ type ClusterConfiguration struct {
+@@ -76,6 +76,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -259,10 +260,10 @@ index 2586adf75..094b8f802 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
-@@ -162,6 +167,13 @@ type BottlerocketBootstrap struct {
+@@ -167,6 +172,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
-
+ 
 +// BottlerocketControl holds the settings of control container for bottlerocket nodes
 +// This setting is ONLY for bottlerocket nodes.
 +type BottlerocketControl struct {
@@ -273,10 +274,10 @@ index 2586adf75..094b8f802 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -400,6 +412,11 @@ type JoinConfiguration struct {
+@@ -405,6 +417,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -286,13 +287,13 @@ index 2586adf75..094b8f802 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
-index 5a1df7e96..0ca0e31d3 100644
+index 0d4e4692d..341b00474 100644
 --- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
-@@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+@@ -159,12 +159,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
  	return out
  }
-
+ 
 +// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 +func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
 +	*out = *in
@@ -319,7 +320,7 @@ index 5a1df7e96..0ca0e31d3 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
  	in.Etcd.DeepCopyInto(&out.Etcd)
-@@ -532,6 +549,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+@@ -573,6 +590,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  	out.TypeMeta = in.TypeMeta
  	out.Pause = in.Pause
  	out.BottlerocketBootstrap = in.BottlerocketBootstrap
@@ -328,10 +329,10 @@ index 5a1df7e96..0ca0e31d3 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 3985aef6e..87f2304d4 100644
+index 5a6012568..f1a273b55 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -118,6 +118,21 @@ spec:
+@@ -117,6 +117,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -353,7 +354,7 @@ index 3985aef6e..87f2304d4 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -732,6 +747,21 @@ spec:
+@@ -731,6 +746,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -375,7 +376,7 @@ index 3985aef6e..87f2304d4 100644
                    caCertPath:
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
-@@ -1222,6 +1252,21 @@ spec:
+@@ -1221,6 +1251,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -397,7 +398,7 @@ index 3985aef6e..87f2304d4 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -1830,6 +1875,21 @@ spec:
+@@ -1829,6 +1874,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -419,7 +420,7 @@ index 3985aef6e..87f2304d4 100644
                    caCertPath:
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
-@@ -2320,6 +2380,21 @@ spec:
+@@ -2319,6 +2379,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -441,7 +442,7 @@ index 3985aef6e..87f2304d4 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -2929,6 +3004,21 @@ spec:
+@@ -2968,6 +3043,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -464,10 +465,10 @@ index 3985aef6e..87f2304d4 100644
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index c3f51a337..276797e5c 100644
+index f5a240665..17f1f8f46 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -128,6 +128,22 @@ spec:
+@@ -127,6 +127,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -490,7 +491,7 @@ index c3f51a337..276797e5c 100644
                            certificatesDir:
                              description: 'CertificatesDir specifies where to store
                                or look for all required certificates. NB: if not provided,
-@@ -780,6 +796,22 @@ spec:
+@@ -779,6 +795,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -513,7 +514,7 @@ index c3f51a337..276797e5c 100644
                            caCertPath:
                              description: 'CACertPath is the path to the SSL certificate
                                authority used to secure comunications between node
-@@ -1229,6 +1261,22 @@ spec:
+@@ -1228,6 +1260,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -536,7 +537,7 @@ index c3f51a337..276797e5c 100644
                            certificatesDir:
                              description: 'CertificatesDir specifies where to store
                                or look for all required certificates. NB: if not provided,
-@@ -1876,6 +1924,22 @@ spec:
+@@ -1875,6 +1923,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -559,7 +560,7 @@ index c3f51a337..276797e5c 100644
                            caCertPath:
                              description: 'CACertPath is the path to the SSL certificate
                                authority used to secure comunications between node
-@@ -2328,6 +2392,22 @@ spec:
+@@ -2327,6 +2391,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -582,7 +583,7 @@ index c3f51a337..276797e5c 100644
                            certificatesDir:
                              description: 'CertificatesDir specifies where to store
                                or look for all required certificates. NB: if not provided,
-@@ -2976,6 +3056,22 @@ spec:
+@@ -3021,6 +3101,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -605,34 +606,6 @@ index c3f51a337..276797e5c 100644
                            caCertPath:
                              description: 'CACertPath is the path to the SSL certificate
                                authority used to secure comunications between node
-diff --git a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-index 697ff2562..4f8852a09 100644
---- a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-@@ -437,6 +437,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
- 			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
- 		}
- 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -594,6 +595,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
- 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
- 		}
- 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -705,6 +707,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
- 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
- 		}
- 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index dd769a78d..f8f1b97cb 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
@@ -650,7 +623,7 @@ index dd769a78d..f8f1b97cb 100644
 +source = "{{.ControlContainerSource}}"
 +{{- end -}}
  `
-
+ 
  	bottlerocketNodeInitSettingsTemplate = `{{template "bootstrapHostContainerSettings" .}}
 @@ -80,5 +88,9 @@ trusted=true
  {{- if (ne .Taints "")}}
@@ -702,6 +675,26 @@ index 36c3f67a7..e635308ea 100644
  	if len(config.ProxyConfiguration.NoProxy) > 0 {
  		for _, noProxy := range config.ProxyConfiguration.NoProxy {
  			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 10bcaef8b..0b73deef5 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -452,6 +452,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+ 			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
+ 			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
+ 		}
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
+@@ -622,6 +623,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+ 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+ 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/types.go b/bootstrap/kubeadm/types/upstreamv1beta1/types.go
 index 408678fe6..cf8d70b03 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/types.go
@@ -709,7 +702,7 @@ index 408678fe6..cf8d70b03 100644
 @@ -65,6 +65,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -721,7 +714,7 @@ index 408678fe6..cf8d70b03 100644
 @@ -160,6 +165,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
-
+ 
 +// BottlerocketControl holds the settings of control container for bottlerocket nodes
 +// This setting is ONLY for bottlerocket nodes.
 +type BottlerocketControl struct {
@@ -735,7 +728,7 @@ index 408678fe6..cf8d70b03 100644
 @@ -389,6 +401,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -745,10 +738,10 @@ index 408678fe6..cf8d70b03 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
-index 0ad6f0445..ddc6ec59b 100644
+index a6be01007..97963846c 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
-@@ -97,6 +97,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+@@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
  	}); err != nil {
  		return err
  	}
@@ -765,10 +758,10 @@ index 0ad6f0445..ddc6ec59b 100644
  	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
  		return Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
  	}); err != nil {
-@@ -442,6 +452,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootst
+@@ -443,6 +453,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootst
  	return autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootstrap(in, out, s)
  }
-
+ 
 +func autoConvert_upstreamv1beta1_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
 +	if err := Convert_upstreamv1beta1_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
 +		return err
@@ -796,7 +789,7 @@ index 0ad6f0445..ddc6ec59b 100644
  func autoConvert_upstreamv1beta1_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
  	if err := Convert_upstreamv1beta1_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
  		return err
-@@ -449,6 +483,9 @@ func autoConvert_upstreamv1beta1_ClusterConfiguration_To_v1beta1_ClusterConfigur
+@@ -450,6 +484,9 @@ func autoConvert_upstreamv1beta1_ClusterConfiguration_To_v1beta1_ClusterConfigur
  	if err := Convert_upstreamv1beta1_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -806,7 +799,7 @@ index 0ad6f0445..ddc6ec59b 100644
  	if err := Convert_upstreamv1beta1_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -490,6 +527,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfigur
+@@ -491,6 +528,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfigur
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -816,7 +809,7 @@ index 0ad6f0445..ddc6ec59b 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -773,6 +813,9 @@ func autoConvert_upstreamv1beta1_JoinConfiguration_To_v1beta1_JoinConfiguration(
+@@ -770,6 +810,9 @@ func autoConvert_upstreamv1beta1_JoinConfiguration_To_v1beta1_JoinConfiguration(
  	if err := Convert_upstreamv1beta1_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -826,7 +819,7 @@ index 0ad6f0445..ddc6ec59b 100644
  	if err := Convert_upstreamv1beta1_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -802,6 +845,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
+@@ -799,6 +842,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -837,13 +830,13 @@ index 0ad6f0445..ddc6ec59b 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
-index aba4b741b..f8bffa7ce 100644
+index 71e769f0f..b910e24ee 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
-@@ -157,12 +157,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+@@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
  	return out
  }
-
+ 
 +// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 +func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
 +	*out = *in
@@ -870,7 +863,7 @@ index aba4b741b..f8bffa7ce 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
  	in.Etcd.DeepCopyInto(&out.Etcd)
-@@ -431,6 +448,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+@@ -432,6 +449,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  	out.TypeMeta = in.TypeMeta
  	out.Pause = in.Pause
  	out.BottlerocketBootstrap = in.BottlerocketBootstrap
@@ -885,7 +878,7 @@ index 4f782f95d..57c5787e2 100644
 @@ -74,6 +74,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -897,7 +890,7 @@ index 4f782f95d..57c5787e2 100644
 @@ -172,6 +177,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
-
+ 
 +// BottlerocketControl holds the settings of control container for bottlerocket nodes
 +// This setting is ONLY for bottlerocket nodes.
 +type BottlerocketControl struct {
@@ -911,7 +904,7 @@ index 4f782f95d..57c5787e2 100644
 @@ -411,6 +423,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -921,10 +914,10 @@ index 4f782f95d..57c5787e2 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-index f623a91c9..c83cb35d2 100644
+index 5d154d816..c1dc563ad 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-@@ -97,6 +97,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+@@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
  	}); err != nil {
  		return err
  	}
@@ -941,10 +934,10 @@ index f623a91c9..c83cb35d2 100644
  	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
  		return Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
  	}); err != nil {
-@@ -442,6 +452,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootst
+@@ -443,6 +453,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootst
  	return autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(in, out, s)
  }
-
+ 
 +func autoConvert_upstreamv1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
 +	if err := Convert_upstreamv1beta2_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
 +		return err
@@ -972,7 +965,7 @@ index f623a91c9..c83cb35d2 100644
  func autoConvert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
  	if err := Convert_upstreamv1beta2_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
  		return err
-@@ -449,6 +483,9 @@ func autoConvert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfigur
+@@ -450,6 +484,9 @@ func autoConvert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfigur
  	if err := Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -982,7 +975,7 @@ index f623a91c9..c83cb35d2 100644
  	if err := Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -490,6 +527,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfigur
+@@ -491,6 +528,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfigur
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -992,7 +985,7 @@ index f623a91c9..c83cb35d2 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -769,6 +809,9 @@ func autoConvert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(
+@@ -766,6 +806,9 @@ func autoConvert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(
  	if err := Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1002,7 +995,7 @@ index f623a91c9..c83cb35d2 100644
  	if err := Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -806,6 +849,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
+@@ -803,6 +846,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1013,13 +1006,13 @@ index f623a91c9..c83cb35d2 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
-index edc4c7b8c..175a518b0 100644
+index 52218880c..a83cdeb61 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
-@@ -141,10 +141,47 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+@@ -142,10 +142,47 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
  	return out
  }
-
+ 
 +// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 +func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
 +	*out = *in
@@ -1064,7 +1057,7 @@ index edc4c7b8c..175a518b0 100644
  	in.Etcd.DeepCopyInto(&out.Etcd)
  	out.Networking = in.Networking
  	in.APIServer.DeepCopyInto(&out.APIServer)
-@@ -409,6 +446,11 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+@@ -410,6 +447,11 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
  func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  	*out = *in
  	out.TypeMeta = in.TypeMeta
@@ -1076,7 +1069,7 @@ index edc4c7b8c..175a518b0 100644
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
  	in.Discovery.DeepCopyInto(&out.Discovery)
  	if in.ControlPlane != nil {
-@@ -533,3 +575,54 @@ func (in *NodeRegistrationOptions) DeepCopy() *NodeRegistrationOptions {
+@@ -534,3 +576,54 @@ func (in *NodeRegistrationOptions) DeepCopy() *NodeRegistrationOptions {
  	in.DeepCopyInto(out)
  	return out
  }
@@ -1132,13 +1125,13 @@ index edc4c7b8c..175a518b0 100644
 +	return out
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
-index c7d937315..bbef30248 100644
+index 1d426294c..ebcd8173c 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
-@@ -78,6 +78,11 @@ type ClusterConfiguration struct {
+@@ -83,6 +83,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -1147,10 +1140,10 @@ index c7d937315..bbef30248 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
-@@ -164,6 +169,13 @@ type BottlerocketBootstrap struct {
+@@ -169,6 +174,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
-
+ 
 +// BottlerocketControl holds the settings of control container for bottlerocket nodes
 +// This setting is ONLY for bottlerocket nodes.
 +type BottlerocketControl struct {
@@ -1161,10 +1154,10 @@ index c7d937315..bbef30248 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -385,6 +397,11 @@ type JoinConfiguration struct {
+@@ -390,6 +402,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-
+ 
 +	// BottlerocketControl holds the image source for control container
 +	// This is only for bottlerocket
 +	// +optional
@@ -1174,10 +1167,10 @@ index c7d937315..bbef30248 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index c6d94e3c3..f91dd0455 100644
+index cfcfb4a8e..d66122452 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-@@ -97,6 +97,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+@@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
  	}); err != nil {
  		return err
  	}
@@ -1194,10 +1187,10 @@ index c6d94e3c3..f91dd0455 100644
  	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
  		return Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
  	}); err != nil {
-@@ -432,6 +442,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootst
+@@ -443,6 +453,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootst
  	return autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(in, out, s)
  }
-
+ 
 +func autoConvert_upstreamv1beta3_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
 +	if err := Convert_upstreamv1beta3_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
 +		return err
@@ -1225,7 +1218,7 @@ index c6d94e3c3..f91dd0455 100644
  func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
  	if err := Convert_upstreamv1beta3_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
  		return err
-@@ -439,6 +473,9 @@ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfigur
+@@ -450,6 +484,9 @@ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfigur
  	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1235,7 +1228,7 @@ index c6d94e3c3..f91dd0455 100644
  	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -484,6 +521,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
+@@ -495,6 +532,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1245,7 +1238,7 @@ index c6d94e3c3..f91dd0455 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -748,6 +788,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
+@@ -761,6 +801,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
  	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1255,7 +1248,7 @@ index c6d94e3c3..f91dd0455 100644
  	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -781,6 +824,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+@@ -795,6 +838,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1266,13 +1259,13 @@ index c6d94e3c3..f91dd0455 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
-index 91c6de857..213261645 100644
+index 07902b44e..dd8200e36 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
-@@ -141,10 +141,47 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+@@ -142,10 +142,47 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
  	return out
  }
-
+ 
 +// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 +func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
 +	*out = *in
@@ -1317,7 +1310,7 @@ index 91c6de857..213261645 100644
  	in.Etcd.DeepCopyInto(&out.Etcd)
  	out.Networking = in.Networking
  	in.APIServer.DeepCopyInto(&out.APIServer)
-@@ -383,6 +420,11 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+@@ -389,6 +426,11 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
  func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  	*out = *in
  	out.TypeMeta = in.TypeMeta
@@ -1329,7 +1322,7 @@ index 91c6de857..213261645 100644
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
  	in.Discovery.DeepCopyInto(&out.Discovery)
  	if in.ControlPlane != nil {
-@@ -512,3 +554,54 @@ func (in *NodeRegistrationOptions) DeepCopy() *NodeRegistrationOptions {
+@@ -538,3 +580,54 @@ func (in *Patches) DeepCopy() *Patches {
  	in.DeepCopyInto(out)
  	return out
  }
@@ -1385,10 +1378,10 @@ index 91c6de857..213261645 100644
 +	return out
 +}
 diff --git a/bootstrap/kubeadm/types/utils_test.go b/bootstrap/kubeadm/types/utils_test.go
-index 98317d7b5..4de28884d 100644
+index ffce7f749..3ad183005 100644
 --- a/bootstrap/kubeadm/types/utils_test.go
 +++ b/bootstrap/kubeadm/types/utils_test.go
-@@ -138,11 +138,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+@@ -139,11 +139,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
  			},
  			want: "apiServer: {}\n" +
  				"apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
@@ -1405,7 +1398,7 @@ index 98317d7b5..4de28884d 100644
  				"scheduler: {}\n",
  			wantErr: false,
  		},
-@@ -154,11 +159,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+@@ -155,11 +160,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
  			},
  			want: "apiServer: {}\n" +
  				"apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
@@ -1422,7 +1415,7 @@ index 98317d7b5..4de28884d 100644
  				"scheduler: {}\n",
  			wantErr: false,
  		},
-@@ -170,11 +180,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+@@ -171,11 +181,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
  			},
  			want: "apiServer: {}\n" +
  				"apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
@@ -1439,7 +1432,7 @@ index 98317d7b5..4de28884d 100644
  				"scheduler: {}\n",
  			wantErr: false,
  		},
-@@ -347,9 +362,14 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+@@ -348,9 +363,14 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
  				version: semver.MustParse("1.14.9"),
  			},
  			want: "apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
@@ -1455,7 +1448,7 @@ index 98317d7b5..4de28884d 100644
  			wantErr: false,
  		},
  		{
-@@ -363,11 +383,16 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+@@ -364,11 +384,16 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
  				version: semver.MustParse("1.15.0"),
  			},
  			want: "apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
@@ -1473,7 +1466,7 @@ index 98317d7b5..4de28884d 100644
  			wantErr: false,
  		},
  		{
-@@ -381,12 +406,17 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+@@ -382,12 +407,17 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
  				version: semver.MustParse("1.22.0"),
  			},
  			want: "apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
@@ -1492,7 +1485,7 @@ index 98317d7b5..4de28884d 100644
  			wantErr: false,
  		},
  	}
-@@ -420,11 +450,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+@@ -421,11 +451,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
  			args: args{
  				yaml: "apiServer: {}\n" +
  					"apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
@@ -1509,7 +1502,7 @@ index 98317d7b5..4de28884d 100644
  					"scheduler: {}\n",
  			},
  			want:    &bootstrapv1.ClusterConfiguration{},
-@@ -435,11 +470,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+@@ -436,11 +471,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
  			args: args{
  				yaml: "apiServer: {}\n" +
  					"apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
@@ -1526,7 +1519,7 @@ index 98317d7b5..4de28884d 100644
  					"scheduler: {}\n",
  			},
  			want:    &bootstrapv1.ClusterConfiguration{},
-@@ -450,11 +490,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+@@ -451,11 +491,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
  			args: args{
  				yaml: "apiServer: {}\n" +
  					"apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
@@ -1544,10 +1537,10 @@ index 98317d7b5..4de28884d 100644
  			},
  			want:    &bootstrapv1.ClusterConfiguration{},
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index 67fced7d5..718a03e54 100644
+index 663c0d1b7..f080fb5b2 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
-@@ -498,7 +498,7 @@ var backupRestoreTests = []struct {
+@@ -614,7 +614,7 @@ var backupRestoreTests = []struct {
  			objs: test.NewFakeCluster("ns1", "foo").Objs(),
  		},
  		files: map[string]string{
@@ -1556,7 +1549,7 @@ index 67fced7d5..718a03e54 100644
  			"Secret_ns1_foo-kubeconfig.yaml":            `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"foo-kubeconfig","namespace":"ns1","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"foo","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"}],"resourceVersion":"999","uid":"/v1, Kind=Secret, ns1/foo-kubeconfig"}}` + "\n",
  			"Secret_ns1_foo-ca.yaml":                    `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"foo-ca","namespace":"ns1","resourceVersion":"999","uid":"/v1, Kind=Secret, ns1/foo-ca"}}` + "\n",
  			"GenericInfrastructureCluster_ns1_foo.yaml": `{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","metadata":{"creationTimestamp":null,"labels":{"cluster.x-k8s.io/cluster-name":"foo"},"name":"foo","namespace":"ns1","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"foo","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"}],"resourceVersion":"999","uid":"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns1/foo"}}` + "\n",
-@@ -516,11 +516,11 @@ var backupRestoreTests = []struct {
+@@ -632,11 +632,11 @@ var backupRestoreTests = []struct {
  			}(),
  		},
  		files: map[string]string{
@@ -1570,11 +1563,53 @@ index 67fced7d5..718a03e54 100644
  			"Secret_ns2_bar-kubeconfig.yaml":            `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"bar-kubeconfig","namespace":"ns2","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"bar","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"}],"resourceVersion":"999","uid":"/v1, Kind=Secret, ns2/bar-kubeconfig"}}` + "\n",
  			"Secret_ns2_bar-ca.yaml":                    `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"bar-ca","namespace":"ns2","resourceVersion":"999","uid":"/v1, Kind=Secret, ns2/bar-ca"}}` + "\n",
  			"GenericInfrastructureCluster_ns2_bar.yaml": `{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","metadata":{"creationTimestamp":null,"labels":{"cluster.x-k8s.io/cluster-name":"bar"},"name":"bar","namespace":"ns2","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"bar","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"}],"resourceVersion":"999","uid":"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns2/bar"}}` + "\n",
+diff --git a/cmd/clusterctl/config/manifest/clusterctl-api.yaml b/cmd/clusterctl/config/manifest/clusterctl-api.yaml
+index 88d383643..3be940664 100644
+--- a/cmd/clusterctl/config/manifest/clusterctl-api.yaml
++++ b/cmd/clusterctl/config/manifest/clusterctl-api.yaml
+@@ -36,14 +36,10 @@ spec:
+         description: Provider defines an entry in the provider inventory.
+         properties:
+           apiVersion:
+-            description: 'APIVersion defines the versioned schema of this representation
+-              of an object. Servers should convert recognized schemas to the latest
+-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+             type: string
+           kind:
+-            description: 'Kind is a string value representing the REST resource this
+-              object represents. Servers may infer this from the endpoint the client
+-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+             type: string
+           metadata:
+             type: object
+@@ -51,18 +47,13 @@ spec:
+             description: ProviderName indicates the name of the provider.
+             type: string
+           type:
+-            description: Type indicates the type of the provider. See ProviderType
+-              for a list of supported values
++            description: Type indicates the type of the provider. See ProviderType for a list of supported values
+             type: string
+           version:
+             description: Version indicates the component version.
+             type: string
+           watchedNamespace:
+-            description: 'WatchedNamespace indicates the namespace where the provider
+-              controller is is watching. if empty the provider controller is watching
+-              for objects in all namespaces. Deprecated: in clusterctl v1alpha4 all
+-              the providers watch all the namespaces; this field will be removed in
+-              a future version of this API'
++            description: 'WatchedNamespace indicates the namespace where the provider controller is is watching. if empty the provider controller is watching for objects in all namespaces. Deprecated: in clusterctl v1alpha4 all the providers watch all the namespaces; this field will be removed in a future version of this API'
+             type: string
+         type: object
+     served: true
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 0f3122feb..38185df5a 100644
+index 7c7cfde1d..0983729c8 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -194,6 +194,22 @@ spec:
+@@ -193,6 +193,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1597,7 +1632,7 @@ index 0f3122feb..38185df5a 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -831,6 +847,22 @@ spec:
+@@ -830,6 +846,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1620,7 +1655,7 @@ index 0f3122feb..38185df5a 100644
                        caCertPath:
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
-@@ -1452,6 +1484,22 @@ spec:
+@@ -1451,6 +1483,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1643,7 +1678,7 @@ index 0f3122feb..38185df5a 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -2084,6 +2132,22 @@ spec:
+@@ -2083,6 +2131,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1666,7 +1701,7 @@ index 0f3122feb..38185df5a 100644
                        caCertPath:
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
-@@ -2784,6 +2848,22 @@ spec:
+@@ -2783,6 +2847,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1689,7 +1724,7 @@ index 0f3122feb..38185df5a 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -3417,6 +3497,22 @@ spec:
+@@ -3458,6 +3538,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1713,10 +1748,10 @@ index 0f3122feb..38185df5a 100644
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index be8b7be2b..8d75dbdb6 100644
+index cc02d2f93..96a94b5a0 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -144,6 +144,23 @@ spec:
+@@ -143,6 +143,23 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1740,7 +1775,7 @@ index be8b7be2b..8d75dbdb6 100644
                                certificatesDir:
                                  description: 'CertificatesDir specifies where to store
                                    or look for all required certificates. NB: if not
-@@ -819,6 +836,23 @@ spec:
+@@ -818,6 +835,23 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1764,7 +1799,7 @@ index be8b7be2b..8d75dbdb6 100644
                                caCertPath:
                                  description: 'CACertPath is the path to the SSL certificate
                                    authority used to secure comunications between node
-@@ -1426,6 +1460,23 @@ spec:
+@@ -1429,6 +1463,23 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1788,7 +1823,7 @@ index be8b7be2b..8d75dbdb6 100644
                                certificatesDir:
                                  description: 'CertificatesDir specifies where to store
                                    or look for all required certificates. NB: if not
-@@ -2102,6 +2153,23 @@ spec:
+@@ -2152,6 +2203,23 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1813,10 +1848,10 @@ index be8b7be2b..8d75dbdb6 100644
                                  description: 'CACertPath is the path to the SSL certificate
                                    authority used to secure comunications between node
 diff --git a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
-index 42acb51b6..339fd4d6a 100644
+index 12e143a0d..4b32112dd 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
-@@ -1173,6 +1173,8 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+@@ -1177,6 +1177,8 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: yaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1825,7 +1860,7 @@ index 42acb51b6..339fd4d6a 100644
  				controllerManager: {}
  				dns:
  				  imageRepository: example.com/k8s
-@@ -1180,6 +1182,9 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+@@ -1184,6 +1186,9 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
  				etcd: {}
  				kind: ClusterConfiguration
  				networking: {}
@@ -1836,10 +1871,10 @@ index 42acb51b6..339fd4d6a 100644
  				`),
  		},
 diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
-index bae50da49..257ad26d0 100644
+index 9972cd283..966c503ca 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
-@@ -57,6 +57,8 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
+@@ -58,6 +58,8 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: yaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1848,7 +1883,7 @@ index bae50da49..257ad26d0 100644
  				controllerManager: {}
  				dns: {}
  				etcd:
-@@ -65,6 +67,9 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
+@@ -66,6 +68,9 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
  				    imageTag: v1.6.0
  				kind: ClusterConfiguration
  				networking: {}
@@ -1858,7 +1893,7 @@ index bae50da49..257ad26d0 100644
  				scheduler: {}
  				`),
  		},
-@@ -138,6 +143,8 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
+@@ -139,6 +144,8 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: yaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1867,7 +1902,7 @@ index bae50da49..257ad26d0 100644
  				controllerManager: {}
  				dns: {}
  				etcd:
-@@ -146,6 +153,9 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
+@@ -147,6 +154,9 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
  				      foo: bar
  				kind: ClusterConfiguration
  				networking: {}
@@ -1878,10 +1913,10 @@ index bae50da49..257ad26d0 100644
  				`),
  		},
 diff --git a/controlplane/kubeadm/internal/workload_cluster_test.go b/controlplane/kubeadm/internal/workload_cluster_test.go
-index 01958c151..1899121b0 100644
+index caa160533..f2e7f1109 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_test.go
-@@ -483,12 +483,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+@@ -605,12 +605,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
  					clusterConfigurationKey: yaml.Raw(`
  						apiServer: {}
  						apiVersion: kubeadm.k8s.io/v1beta2
@@ -1899,7 +1934,7 @@ index 01958c151..1899121b0 100644
  						scheduler: {}
  						`),
  				},
-@@ -522,12 +527,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+@@ -644,12 +649,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
  					clusterConfigurationKey: yaml.Raw(`
  						apiServer: {}
  						apiVersion: kubeadm.k8s.io/v1beta2
@@ -1917,7 +1952,7 @@ index 01958c151..1899121b0 100644
  						scheduler: {}
  						`),
  				},
-@@ -887,11 +897,16 @@ func TestUpdateApiServerInKubeadmConfigMap(t *testing.T) {
+@@ -1009,11 +1019,16 @@ func TestUpdateApiServerInKubeadmConfigMap(t *testing.T) {
  				    mountPath: /foo/bar
  				    name: mount2
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1934,7 +1969,7 @@ index 01958c151..1899121b0 100644
  				scheduler: {}
  				`),
  		},
-@@ -956,6 +971,8 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+@@ -1078,6 +1093,8 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: yaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1943,7 +1978,7 @@ index 01958c151..1899121b0 100644
  				controllerManager:
  				  extraArgs:
  				    bar: baz
-@@ -968,6 +985,9 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+@@ -1090,6 +1107,9 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
  				etcd: {}
  				kind: ClusterConfiguration
  				networking: {}
@@ -1953,7 +1988,7 @@ index 01958c151..1899121b0 100644
  				scheduler: {}
  				`),
  		},
-@@ -1032,11 +1052,16 @@ func TestUpdateSchedulerInKubeadmConfigMap(t *testing.T) {
+@@ -1154,11 +1174,16 @@ func TestUpdateSchedulerInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: yaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1970,6 +2005,6 @@ index 01958c151..1899121b0 100644
  				scheduler:
  				  extraArgs:
  				    bar: baz
---
-2.24.3 (Apple Git-128)
+-- 
+2.30.1
 

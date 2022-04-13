@@ -1,6 +1,6 @@
 BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.16"
+GOLANG_VERSION?="1.17"
 
 REPO=cluster-api
 REPO_OWNER=kubernetes-sigs
@@ -43,8 +43,11 @@ $(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager \
 $(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSE_PACKAGE_FILTER=.
 $(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/capd
 
+FIX_LICENSES_GO_JSON_TARGET=$(REPO)/vendor/github.com/github.com/ajeddeloh/go-json/LICENSE.txt
 
 s3-artifacts: create-manifests
+
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET)
 
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
 $(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
@@ -52,6 +55,14 @@ $(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): $(call FULL_FETCH
 .PHONY: create-manifests
 create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
+
+$(FIX_LICENSES_GO_JSON_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+# The ajeddeloh/go-json dependency github repo does not have a license, however it redirects to coreos/go-json repo
+# that does have its own license. Hence we need to manually download license from coreos/go-json repo
+# and place it in the ajeddeloh/go-json folder under vendor directory so that it is available for
+# go-licenses to pick up
+	wget -q https://raw.githubusercontent.com/coreos/go-json/main/LICENSE -O \
+			$(REPO)/vendor/github.com/ajeddeloh/go-json/LICENSE.txt;
 
 
 ########### DO NOT EDIT #############################

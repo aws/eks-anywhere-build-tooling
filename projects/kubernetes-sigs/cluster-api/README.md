@@ -33,8 +33,9 @@ You can find the latest versions of these images on ECR Public Gallery.
    for any changes.
    1. For instance, [the make targets for creating manifests in v1.0.1 use a different path for manager_image_patch.yaml as compared to v0.3.19](https://github.com/kubernetes-sigs/cluster-api/commit/280db9a796d5e1c2b3b75aa3036fcfe44f669909#diff-76ed074a9305c04054cdebb9e9aad2d818052b07091de1f20cad0bbac34ffb52L368-L375).
    Based on this we updated the manifest generation targets in create_manifests.sh to use the updated path same as upstream.
-1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
+1. Check the golang version by checking [this file](https://github.com/kubernetes-sigs/cluster-api/blob/main/.github/workflows/release.yml#L23) Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
+1. Check default CAPI [cert-manager version]((https://github.com/kubernetes-sigs/cluster-api/blob/main/cmd/clusterctl/client/config/cert_manager_client.go#L30)) for the CAPI tag, if it has changed then update cert-manager.
 1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

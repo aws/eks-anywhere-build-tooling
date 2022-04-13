@@ -1,17 +1,17 @@
-From 136783b24152c795b536e7de4eb3b2d155592d7d Mon Sep 17 00:00:00 2001
+From 8211075338ec8bac5e285de78f7bcb39a924e3a4 Mon Sep 17 00:00:00 2001
 From: danbudris <budris@amazon.com>
 Date: Fri, 18 Feb 2022 09:24:32 -0500
-Subject: [PATCH] support bottle rocket control plane taints
+Subject: [PATCH 15/18] support bottle rocket control plane taints
 
 ---
- bootstrap/kubeadm/controllers/kubeadmconfig_controller.go | 7 +++++++
- 1 file changed, 7 insertions(+)
+ .../internal/controllers/kubeadmconfig_controller.go        | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-index dec94d8b1..697ff2562 100644
---- a/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/controllers/kubeadmconfig_controller.go
-@@ -447,6 +447,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 7596ff310..10bcaef8b 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -462,6 +462,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		if scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs != nil {
  			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs
  		}
@@ -21,17 +21,16 @@ index dec94d8b1..697ff2562 100644
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
-@@ -712,6 +715,10 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -747,6 +750,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
  			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
  		}
 +		if len(scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
 +			bottlerocketConfig.Taints = scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
 +		}
-+
- 		cloudJoinData, err = bottlerocket.NewJoinControlPlane(cloudJoinInput, bottlerocketConfig)
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 -- 
-2.25.1
+2.30.1
 
