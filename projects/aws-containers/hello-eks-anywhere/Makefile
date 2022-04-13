@@ -6,6 +6,7 @@ REPO=hello-eks-anywhere
 REPO_OWNER=aws-containers
 IMAGE_COMPONENT=hello-eks-anywhere
 IMAGE_NAMES=$(IMAGE_COMPONENT)
+IMAGE_BUILD_ARGS?=IMAGE_TAG
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-nginx
 SIMPLE_CREATE_BINARIES=false
