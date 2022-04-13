@@ -11,11 +11,9 @@ clone-repo:  ## Clone upstream `flux2`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `flux` for `linux/amd64 linux/arm64 darwin/amd64 darwin/arm64`
+binaries: ## Build all binaries: `flux` for `linux/amd64 linux/arm64`
 _output/bin/flux2/linux-amd64/flux: ## Build `_output/bin/flux2/linux-amd64/flux`
 _output/bin/flux2/linux-arm64/flux: ## Build `_output/bin/flux2/linux-arm64/flux`
-_output/bin/flux2/darwin-amd64/flux: ## Build `_output/bin/flux2/darwin-amd64/flux`
-_output/bin/flux2/darwin-arm64/flux: ## Build `_output/bin/flux2/darwin-arm64/flux`
 
 ##@ Image Targets
 local-images: ## Builds `flux-cli/images/amd64` as oci tars for presumbit validation
