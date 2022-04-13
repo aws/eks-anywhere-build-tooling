@@ -1,4 +1,4 @@
-From 2d884cff2e4fc8e31a873f6745e47e9a91e2e8c7 Mon Sep 17 00:00:00 2001
+From 22faf5bfb146a34685f2de9e64c3c66f1fabf943 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Fri, 11 Jun 2021 10:43:09 -0700
 Subject: [PATCH 01/18] Adding capi support for Bottlerocket
@@ -32,9 +32,9 @@ Remove userdata logging for bottlerocket
  api/v1alpha3/zz_generated.deepcopy.go         |   5 +
  .../api/v1alpha3/kubeadmconfig_types.go       |   5 +-
  .../kubeadm/api/v1beta1/kubeadm_types.go      |  53 +++++
- .../api/v1beta1/kubeadmconfig_types.go        |   3 +
- ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 173 ++++++++++++++++
- ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 185 ++++++++++++++++++
+ .../api/v1beta1/kubeadmconfig_types.go        |   5 +-
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 174 ++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 186 ++++++++++++++++++
  .../internal/bottlerocket/bootstrap.go        |  45 +++++
  .../internal/bottlerocket/bottlerocket.go     | 179 +++++++++++++++++
  .../bottlerocket/controlplane_init.go         |  49 +++++
@@ -47,10 +47,10 @@ Remove userdata logging for bottlerocket
  .../controllers/kubeadmconfig_controller.go   |  73 +++++++
  .../kubeadm/types/upstreamv1beta1/types.go    |  55 +++++-
  .../upstreamv1beta1/zz_generated.deepcopy.go  |  58 ++++++
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 158 +++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  71 +++++++
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 159 +++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  72 +++++++
  go.mod                                        |   1 +
- 21 files changed, 1222 insertions(+), 3 deletions(-)
+ 21 files changed, 1227 insertions(+), 4 deletions(-)
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
@@ -176,9 +176,18 @@ index 354d777d5..5f525f692 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
-index 5ec772643..45b05ea43 100644
+index 5ec772643..737fec9a2 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
+@@ -23,7 +23,7 @@ import (
+ )
+ 
+ // Format specifies the output format of the bootstrap data
+-// +kubebuilder:validation:Enum=cloud-config;ignition
++// +kubebuilder:validation:Enum=cloud-config;ignition;bottlerocket
+ type Format string
+ 
+ const (
 @@ -32,6 +32,9 @@ const (
  
  	// Ignition make the bootstrap data to be of Ignition format.
@@ -190,7 +199,7 @@ index 5ec772643..45b05ea43 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 19f22af25..26b93edb0 100644
+index 19f22af25..2edad1c42 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -102,6 +102,21 @@ spec:
@@ -372,7 +381,15 @@ index 19f22af25..26b93edb0 100644
                    scheduler:
                      description: Scheduler contains extra settings for the scheduler
                        control plane component
-@@ -2677,6 +2807,21 @@ spec:
+@@ -2469,6 +2599,7 @@ spec:
+                 enum:
+                 - cloud-config
+                 - ignition
++                - bottlerocket
+                 type: string
+               ignition:
+                 description: Ignition contains Ignition specific configuration.
+@@ -2677,6 +2808,21 @@ spec:
                        schemas to the latest internal value, and may reject unrecognized
                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                      type: string
@@ -394,7 +411,7 @@ index 19f22af25..26b93edb0 100644
                    caCertPath:
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
-@@ -2869,6 +3014,34 @@ spec:
+@@ -2869,6 +3015,34 @@ spec:
                            content inline or by referencing a secret.
                          type: string
                      type: object
@@ -430,7 +447,7 @@ index 19f22af25..26b93edb0 100644
                mounts:
                  description: Mounts specifies a list of mount points to be setup.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index a8a05eb5b..ad0353ddb 100644
+index a8a05eb5b..76f6a2ee3 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -111,6 +111,22 @@ spec:
@@ -621,7 +638,15 @@ index a8a05eb5b..ad0353ddb 100644
                            scheduler:
                              description: Scheduler contains extra settings for the
                                scheduler control plane component
-@@ -2709,6 +2848,22 @@ spec:
+@@ -2484,6 +2623,7 @@ spec:
+                         enum:
+                         - cloud-config
+                         - ignition
++                        - bottlerocket
+                         type: string
+                       ignition:
+                         description: Ignition contains Ignition specific configuration.
+@@ -2709,6 +2849,22 @@ spec:
                                convert recognized schemas to the latest internal value,
                                and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                              type: string
@@ -644,7 +669,7 @@ index a8a05eb5b..ad0353ddb 100644
                            caCertPath:
                              description: 'CACertPath is the path to the SSL certificate
                                authority used to secure comunications between node
-@@ -2916,6 +3071,36 @@ spec:
+@@ -2916,6 +3072,36 @@ spec:
                                    content inline or by referencing a secret.
                                  type: string
                              type: object
@@ -1403,7 +1428,7 @@ index 2eebc2402..e924a4a4b 100644
 +	return out
 +}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index bdd6b0cef..e3ebcd8c3 100644
+index bdd6b0cef..8adfcd777 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -177,6 +177,22 @@ spec:
@@ -1611,7 +1636,15 @@ index bdd6b0cef..e3ebcd8c3 100644
                        scheduler:
                          description: Scheduler contains extra settings for the scheduler
                            control plane component
-@@ -3146,6 +3288,22 @@ spec:
+@@ -2929,6 +3071,7 @@ spec:
+                     enum:
+                     - cloud-config
+                     - ignition
++                    - bottlerocket
+                     type: string
+                   ignition:
+                     description: Ignition contains Ignition specific configuration.
+@@ -3146,6 +3289,22 @@ spec:
                            schemas to the latest internal value, and may reject unrecognized
                            values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                          type: string
@@ -1635,7 +1668,7 @@ index bdd6b0cef..e3ebcd8c3 100644
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index fabde6b0f..18ae007e8 100644
+index fabde6b0f..dbefec39a 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -549,6 +549,7 @@ spec:
@@ -1719,7 +1752,15 @@ index fabde6b0f..18ae007e8 100644
                                scheduler:
                                  description: Scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -1948,6 +2001,24 @@ spec:
+@@ -1713,6 +1766,7 @@ spec:
+                             enum:
+                             - cloud-config
+                             - ignition
++                            - bottlerocket
+                             type: string
+                           ignition:
+                             description: Ignition contains Ignition specific configuration.
+@@ -1948,6 +2002,24 @@ spec:
                                    value, and may reject unrecognized values. More
                                    info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                                  type: string
