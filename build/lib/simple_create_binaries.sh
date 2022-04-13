@@ -56,7 +56,7 @@ function build::simple::binaries(){
     fi
 
     CGO_ENABLED=$CGO_ENABLED GOOS=$OS GOARCH=$ARCH \
-      go $GOBUILD_COMMAND -trimpath -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -o $TARGET_FILE $SOURCE_PATTERN
+      go $GOBUILD_COMMAND -trimpath -a -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -o $TARGET_FILE $SOURCE_PATTERN
 
     if [[ "$TARGET_FILE" == */ ]]; then
       # in the case of outputing to a directory, the files will be named by the basename of the source pattern
