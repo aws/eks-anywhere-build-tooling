@@ -51,7 +51,7 @@ DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
     set +x
     echo
     echo
-    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST}"
+    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${DIGEST} --set sourceRegistry=${IMAGE_REGISTRY}"
     echo "  -- or --"
-    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${SEMVER}"
+    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${SEMVER} --set sourceRegistry=${IMAGE_REGISTRY}"
 }
