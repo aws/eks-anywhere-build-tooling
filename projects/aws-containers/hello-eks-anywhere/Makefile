@@ -4,7 +4,6 @@ GOLANG_VERSION?="1.17"
 
 REPO=hello-eks-anywhere
 REPO_OWNER=aws-containers
-IMAGE_COMPONENT=$(COMPONENT)
 IMAGE_BUILD_ARGS?=IMAGE_TAG
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-nginx
@@ -13,7 +12,6 @@ HAS_LICENSES=false
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/hello-eks-anywhere
-HELM_DESTINATION_REPOSITORY=$(COMPONENT)
 HELM_IMAGE_LIST=$(COMPONENT)
 
 include $(BASE_DIRECTORY)/Common.mk
