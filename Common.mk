@@ -6,7 +6,7 @@ SHELL=bash
 
 RELEASE_ENVIRONMENT?=development
 
-GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
+GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
 COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
@@ -51,7 +51,7 @@ else
 	ifeq ($(CI),true)
 		BUILD_IDENTIFIER=$(PROW_JOB_ID)
 	else
-		BUILD_IDENTIFIER=$(shell date "+%F-%s")
+		BUILD_IDENTIFIER:=$(shell date "+%F-%s")
 	endif
 endif
 ####################################################
@@ -67,7 +67,7 @@ PATCHES_DIR=$(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/pat
 #################### RELEASE BRANCHES ##############
 HAS_RELEASE_BRANCHES?=false
 RELEASE_BRANCH?=
-SUPPORTED_K8S_VERSIONS=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_BRANCHES)
+SUPPORTED_K8S_VERSIONS:=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_BRANCHES)
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
 IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums,$(MAKECMDGOALS)))
@@ -169,8 +169,8 @@ SOURCE_PATTERNS_BUILD_TOGETHER=$(filter-out $(SOURCE_PATTERNS_BUILD_ALONE),$(SOU
 #### CGO ############
 CGO_CREATE_BINARIES?=false
 CGO_SOURCE=$(OUTPUT_DIR)/source
-IS_ON_BUILDER_BASE=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
-BUILDER_PLATFORM=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
+IS_ON_BUILDER_BASE:=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
+BUILDER_PLATFORM:=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
 needs-cgo-builder=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter-out $(1),$(BUILDER_PLATFORM)),true,))
 ######################
 

@@ -1,7 +1,7 @@
-BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-GIT_TAG?=$(shell cat GIT_TAG)
+BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+GIT_TAG:=$(shell cat GIT_TAG)
 IPMITOOL_CLONE_URL=$(call GET_CLONE_URL,ipmitool,ipmitool)
-IPMITOOL_GIT_TAG=$(shell cat IPMITOOL_GIT_TAG)
+IPMITOOL_GIT_TAG:=$(shell cat IPMITOOL_GIT_TAG)
 GOLANG_VERSION?="1.16"
 
 REPO=pbnj

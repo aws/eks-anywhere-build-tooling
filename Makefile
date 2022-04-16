@@ -1,4 +1,4 @@
-BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2
@@ -14,7 +14,7 @@ EKSA_TOOLS_PREREQS_BUILD_TARGETS=$(addprefix build-project-, $(EKSA_TOOLS_PREREQ
 ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling kubernetes-sigs_image-builder
 
 RELEASE_BRANCH?=
-GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
+GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 
 .PHONY: build-all-projects
 build-all-projects: $(BUILD_TARGETS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling
