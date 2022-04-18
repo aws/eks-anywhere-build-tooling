@@ -1,5 +1,5 @@
-BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-GIT_TAG?=$(shell cat GIT_TAG)
+BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO=eks-anywhere-build-tooling
 REPO_OWNER=aws

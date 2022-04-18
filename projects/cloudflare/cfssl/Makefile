@@ -1,5 +1,5 @@
-BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-GIT_TAG?=$(shell cat GIT_TAG)
+BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+GIT_TAG:=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.14"
 
 REPO=cfssl
@@ -18,7 +18,7 @@ RICE_EMBED_TARGET=$(REPO)/cli/serve/rice-box.go
 
 GIT_CLONE_DEPENDENCY=$(GIT_DEPS_DIR)/cfssl_trust/LICENSE
 
-STATIC_FILES=$(shell git -C cfssl ls-tree -r -t --name-only HEAD ./cli/serve/static)
+STATIC_FILES=$(shell git -C $(REPO) ls-tree -r -t --name-only HEAD ./cli/serve/static)
 
 include $(BASE_DIRECTORY)/Common.mk
 

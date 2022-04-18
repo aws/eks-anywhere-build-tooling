@@ -1,5 +1,5 @@
-BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
-GIT_TAG?=$(shell cat GIT_TAG)
+BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO=image-builder
 REPO_OWNER=kubernetes-sigs
