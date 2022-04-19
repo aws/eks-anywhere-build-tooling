@@ -1,0 +1,54 @@
+#cloud-config
+
+# Ubuntu Server 20.04 LTS
+
+autoinstall:
+  version: 1
+  early-commands:
+    # Stop ssh for packer
+    - sudo systemctl stop ssh
+  apt:
+    geoip: true
+    preserve_sources_list: false
+    primary:
+      - arches: [amd64, i386]
+        uri: http://us.archive.ubuntu.com/ubuntu
+      - arches: [default]
+        uri: http://ports.ubuntu.com/ubuntu-ports
+  locale: en_US
+  keyboard:
+    layout: us
+  storage:
+    layout:
+      name: direct
+    config:
+      - type: disk
+        id: disk0
+        match:
+          size: largest
+      - type: partition
+        id: boot-partition
+        device: disk0
+        size: 500M
+      - type: partition
+        id: root-partition
+        device: disk0
+        size: -1
+  identity:
+    hostname: eks-a-admin
+    username: eksadmin # docker run -it --rm alpine mkpasswd -m sha512
+    password: $6$vEPZo73YkV/nRnfy$4zFxVKXQiffeXWFVg1rHr56n8Rs40oZf0FfGzRl1rnNdFoW6tbOKdrCQGjVqYvlCgc/JB8or6uQXclVtmZzVL1
+  ssh:
+    install-server: true
+    allow-pw: true
+  packages:
+    - openssh-server
+    - open-vm-tools
+    - cloud-init
+  user-data:
+    disable_root: false
+    timezone: UTC
+  late-commands:
+    - sed -i -e 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/g' /target/etc/ssh/sshd_config
+    - echo 'eksadmin ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/eksadmin
+    - curtin in-target --target=/target -- chmod 440 /etc/sudoers.d/eksadmin

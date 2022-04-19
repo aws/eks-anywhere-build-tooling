@@ -31,7 +31,7 @@ rm -rf eksctl_tmp
 
 # Install eksctl-anywhere
 mkdir eksa_tmp
-if [[ "$EKSA_VERSION" == "latest" ]]; then
+if [[ "$EKSA_VERSION" == "latest" || "$EKSA_VERSION" == "v0.0.0" ]]; then
 	EKSA_VERSION=$(curl -L --silent $EKSA_RELEASE_MANIFEST_URL |  yq e '.spec.latestVersion' -)
 fi
 EKSA_TAR_URL=$(curl -L --silent $EKSA_RELEASE_MANIFEST_URL | yq e '.spec.releases[] | select(.version == "'$EKSA_VERSION'") | .eksABinary.linux.uri')

@@ -1,4 +1,5 @@
 packer {
+  required_version = ">= 1.8.0"
   required_plugins {
     amazon = {
       version = ">= 1.0.0"
@@ -7,37 +8,8 @@ packer {
   }
 }
 
-variable "eks-a-version" {
-  type    = string
-  default = "latest"
-}
-
-variable "eks-a-release-manifest-url" {
-  type    = string
-  default = "https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml"
-}
-
-variable "kubectl-url" {
-  type    = string
-  default = "https://distro.eks.amazonaws.com/kubernetes-1-22/releases/4/artifacts/kubernetes/v1.22.6/bin/linux/amd64/kubectl"
-}
-
-variable "build-version" {
-  type    = string
-  default = "X"
-}
-
-variable "manifest-output" {
-  type    = string
-  default = "manifets.json"
-}
-
-locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-}
-
 source "amazon-ebs" "ubuntu" {
-  ami_name      = "snow-eks-a-admin-${var.eks-a-version}-${var.build-version}-${local.timestamp}"
+  ami_name      = "${local.image_name}"
   instance_type = "t3.xlarge"
   // with t3.micro 48 min
   // with t3.large 45 min
@@ -75,9 +47,9 @@ source "amazon-ebs" "ubuntu" {
 }
 
 build {
-  name = "snow-eks-a-admin-ami"
+  name = "eks-a-admin-snow-image"
   sources = [
-    "source.amazon-ebs.ubuntu"
+    "source.amazon-ebs.ubuntu",
   ]
 
   provisioner "shell" {
@@ -86,6 +58,9 @@ build {
   }
 
   provisioner "shell" {
+    environment_vars = [
+      "USER=${var.build-username}",
+    ]
     // wait for reboot before starting
     pause_before      = "10s"
     script            = "provisioners/install_docker.sh"
@@ -93,6 +68,9 @@ build {
   }
 
   provisioner "shell" {
+    environment_vars = [
+      "USER=${var.build-username}",
+    ]
     // wait for reboot before starting
     pause_before = "10s"
     script       = "provisioners/test/install_docker.sh"
@@ -104,6 +82,7 @@ build {
       "EKSA_VERSION=${var.eks-a-version}",
       "EKSA_RELEASE_MANIFEST_URL=${var.eks-a-release-manifest-url}",
     ]
+
     scripts = [
       "provisioners/install_kubectl.sh",
       "provisioners/test/install_kubectl.sh",
