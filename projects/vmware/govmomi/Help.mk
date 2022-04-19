@@ -44,6 +44,6 @@ stop-docker-builder: ## Clean up builder base docker container
 generate: ## Update UPSTREAM_PROJECTS.yaml
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums  attribution upload-artifacts attribution-pr`
+build: ## Called via prow presubmit, calls `validate-checksums attribution  upload-artifacts attribution-pr`
 release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
 ########### END GENERATED ###########################
