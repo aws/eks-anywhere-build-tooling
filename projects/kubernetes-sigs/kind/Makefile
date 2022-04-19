@@ -5,15 +5,11 @@ GOLANG_VERSION?="1.17"
 REPO=kind
 REPO_OWNER=kubernetes-sigs
 
-LICENSE_PACKAGE_FILTER?=./cmd/kind
+BINARY_TARGET_FILES=kind kindnetd
+SOURCE_PATTERNS=. ./cmd/kindnetd
+GO_MOD_PATHS=. ./images/kindnetd
 
-BINARY_PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
-BINARY_TARGETS=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS,kind,$(BINARY_PLATFORMS))
-
-BINARY_PLATFORMS_KINDNETD=linux/amd64 linux/arm64
-BINARY_TARGETS+=$(call BINARY_TARGETS_FROM_FILES_PLATFORMS,kindnetd,$(BINARY_PLATFORMS_KINDNETD))
-
-# force binarys to go to non-release branch bin folder
+# force binariess to go to non-release branch bin folder
 BINARIES_ARE_RELEASE_BRANCHED=false
 
 # do not look for checksums in release branch folder, instead use project root
@@ -22,10 +18,6 @@ PROJECT_ROOT=$(MAKE_ROOT)
 MINIMAL_BASE_IPTABLES_IMAGE_NAME?=eks-distro-minimal-base-iptables
 MINIMAL_BASE_HAPROXY_IMAGE_NAME?=eks-distro-minimal-base-haproxy
 MINIMAL_BASE_KIND_IMAGE_NAME?=eks-distro-minimal-base-kind
-
-GO_MOD_DOWNLOAD_TARGETS=$(REPO)/eks-anywhere-go-mod-download $(REPO)/images/kindnetd/eks-anywhere-go-mod-download
-GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/attribution/go-license.csv $(OUTPUT_DIR)/kindnetd/attribution/go-license.csv
-ATTRIBUTION_TARGETS=ATTRIBUTION.txt KINDNETD_ATTRIBUTION.txt
 
 KIND_BASE_IMAGE_COMPONENT=kubernetes-sigs/kind/base
 KIND_BASE_VERSIONED_IMAGE_COMPONENT=kubernetes-sigs/kind/base
@@ -56,9 +48,6 @@ KIND_NODE_BUILD_ARM64_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/io.containerd.
 
 HAPROXY_CFG=$(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg
 
-# Binary targets are added manually in this makefile instead of relying on simple_create logic
-SIMPLE_CREATE_BINARIES=false
-
 IMAGE_NAMES=haproxy kindnetd kind-base 
 
 include $(BASE_DIRECTORY)/Common.mk
@@ -75,19 +64,7 @@ s3-artifacts: $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml
 
 images: kind-base-versioned/images/push kind-node/images/push
 
-
-$(OUTPUT_BIN_DIR)/%/kindnetd $(REPO)/images/kindnetd/eks-anywhere-go-mod-download \
-	$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv: REPO_SUBPATH=images/kindnetd
-
 $(OUTPUT_BIN_DIR)/%/kind: EXTRA_GO_LDFLAGS=-X=sigs.k8s.io/kind/pkg/cmd/kind/version.GitCommit=$(shell git -C $(REPO) rev-list -n 1  "${GIT_TAG}")
-
-$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv KINDNETD_ATTRIBUTION.txt: LICENSE_PACKAGE_FILTER=./cmd/kindnetd
-$(OUTPUT_DIR)/kindnetd/attribution/go-license.csv KINDNETD_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/kindnetd
-
-# Since there are different platforms for the different binaries, calling helper from common.mk directly
-# instead of relying on it automatically
-$(eval $(foreach platform, $(BINARY_PLATFORMS), $(call BINARY_TARGET_BODY,$(platform),kind,.)))
-$(eval $(foreach platform, $(BINARY_PLATFORMS_KINDNETD), $(call BINARY_TARGET_BODY,$(platform),kindnetd,./cmd/kindnetd)))
 
 # haproxy
 haproxy/images/%: DOCKERFILE_FOLDER=./images/haproxy
@@ -152,7 +129,10 @@ $(KIND_BASE_KUBEADM_OVERRIDE):
 	cp ./images/base/kubeadm-override.sh $@
 
 # kind build node-image process, also extracts kindnetd manifest to push to s3
+# kind cli built for current host is needed to create the node image
+$(KIND_NODE_BUILD_AMD64_TARGET): KIND_CLI=./$(OUTPUT_BIN_DIR)/$(subst /,-,$(BUILDER_PLATFORM))/kind
 $(KIND_NODE_BUILD_AMD64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_AMD64_TARGET)
+	$(MAKE) $(KIND_CLI) BINARY_PLATFORMS=$(BUILDER_PLATFORM)
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) amd64
 	@mkdir -p $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)
 	cp $(BINARY_DEPS_DIR)/linux-amd64/files/rootfs/kind/manifests/default-cni.yaml $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml

@@ -7,7 +7,6 @@ REPO_OWNER=tinkerbell
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-nonroot
 
-LICENSE_PACKAGE_FILTER?=.
 
 BINARY_TARGET_FILES=manager
 SOURCE_PATTERNS=.

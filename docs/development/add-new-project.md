@@ -51,9 +51,6 @@ The key pieces to setup in the Makefile  are:
 	or Makefile.  The Makefile should get this from the GOLANG_VERSION file either in the project root or the release branch.
 * REPO - upstream repo name.
 * COMPONENT - upstream org/repo.
-* LICENSE_PACKAGE_FILTER - This should be the pattern used to gather dependencies for this
-	specific project.  Typically this will be `.` or `./cmd/<project-name>`. If not set, will default to `SOURCE_PATTERNS`.
-	For more refer to [attribution-files](attribution-files.md).
 * BINARY_TARGET_FILES - The binary file names to be built, automatically appended with $(OUTPUT_BIN_DIR) and generated for each
 	$(BINARY_PLATFORMS).  Passed to `go build -o`.
 * SOURCE_PATTERNS - The patterns to pass to `go build`.  Must follow the same ordering as $(BINARY_TARGET_FILES)

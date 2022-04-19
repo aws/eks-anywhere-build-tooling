@@ -9,10 +9,9 @@ LICENSE_PACKAGE_FILTER?=./cmd/clusterctl ./bootstrap/kubeadm ./controlplane/kube
 
 BINARY_TARGET_FILES=clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager
 SOURCE_PATTERNS=sigs.k8s.io/cluster-api/cmd/clusterctl sigs.k8s.io/cluster-api sigs.k8s.io/cluster-api/bootstrap/kubeadm sigs.k8s.io/cluster-api/controlplane/kubeadm sigs.k8s.io/cluster-api/test/infrastructure/docker
+GO_MOD_PATHS=. . . . test/infrastructure/docker
 EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/version)
-# capd is built from a different subpath with different ldflags
-# kubeadm-control-plane-manager since building both patterns which end in kubeadm together result in only one binary being produced
-BINARY_TARGET_FILES_BUILD_ALONE=cluster-api-provider-docker-manager kubeadm-control-plane-manager
+CLUSTER_API_PROVIDER_DOCKER_MANAGER_ATTRIBUTION_OVERRIDE=capd
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-nonroot
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
@@ -24,24 +23,14 @@ CLUSTER_API_DOCKER_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/capd-m
 
 IMAGE_NAMES=cluster-api-controller kubeadm-bootstrap-controller kubeadm-control-plane-controller cluster-api-docker-controller
 
-GO_MOD_DOWNLOAD_TARGETS=$(REPO)/eks-anywhere-go-mod-download $(REPO)/test/infrastructure/docker/eks-anywhere-go-mod-download
-GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/attribution/go-license.csv $(OUTPUT_DIR)/capd/attribution/go-license.csv
-ATTRIBUTION_TARGETS=ATTRIBUTION.txt CAPD_ATTRIBUTION.txt
-
 FETCH_BINARIES_TARGETS=eksd/kubernetes/client
 
 HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+
 $(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=
-
-$(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager \
-	$(REPO)/test/infrastructure/docker/eks-anywhere-go-mod-download \
-	$(OUTPUT_DIR)/capd/attribution/go-license.csv: REPO_SUBPATH=test/infrastructure/docker
-
-$(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSE_PACKAGE_FILTER=.
-$(OUTPUT_DIR)/capd/attribution/go-license.csv CAPD_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/capd
 
 FIX_LICENSES_GO_JSON_TARGET=$(REPO)/vendor/github.com/github.com/ajeddeloh/go-json/LICENSE.txt
 

@@ -9,8 +9,7 @@ BASE_IMAGE_NAME?=eks-distro-base
 IMAGE_COMPONENT=bottlerocket-bootstrap
 
 BINARY_TARGET_FILES=bottlerocket-bootstrap
-SOURCE_PATTERNS=.
-REPO_SUBPATH=..
+GO_MOD_PATHS=..
 
 GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".releases[] | select(.branch==\"${RELEASE_BRANCH}\").number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 
@@ -38,6 +37,9 @@ FETCH_BINARIES_TARGETS=eksd/kubernetes/client eksd/kubernetes/server eksa/kubern
 
 include $(BASE_DIRECTORY)/Common.mk
 
+
+build: unit-test
+
 $(REPO):
 	@mkdir $@
 
@@ -56,11 +58,9 @@ GIT_TAG:
 
 .PHONY: clean-extra
 clean-extra:
-	@rm -rf vendor .git GIT_TAG
+	@rm -rf vendor .git GIT_TAG $(GO_MOD_DOWNLOAD_TARGETS) $(REPO)
 
 clean: clean-extra
-
-build: unit-test
 
 unit-test:
 	go test ./...

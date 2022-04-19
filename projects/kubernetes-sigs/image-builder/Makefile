@@ -16,6 +16,8 @@ CARGO_HOME=$(MAKE_ROOT)/_output/cargo
 RUSTUP_HOME=$(MAKE_ROOT)/_output/rustup
 export BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 
+RHSM_USERNAME?=
+RHSM_PASSWORD?=
 export BUILDER_ROOT=$(MAKE_ROOT)
 export RHSM_USER=$(RHSM_USERNAME)
 export RHSM_PASS=$(RHSM_PASSWORD)
@@ -79,6 +81,8 @@ ifeq ($(IMAGE_FORMAT),ova)
 	else ifeq ($(IMAGE_OS),rhel)
 		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH)
 		RELEASE_TARGETS=release-ova-rhel-8 upload-artifacts-ova
+	else
+		S3_TARGET_PREREQUISITES?=
 	endif
 else ifeq ($(IMAGE_FORMAT),raw)
 	S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
@@ -87,9 +91,12 @@ else ifeq ($(IMAGE_FORMAT),raw)
 	else ifeq ($(IMAGE_OS),rhel)
 		RELEASE_TARGETS=release-raw-rhel-8 upload-artifacts-raw
 	endif
+else
+	S3_TARGET_PREREQUISITES?=
 endif
 
 include $(BASE_DIRECTORY)/Common.mk
+
 
 export PATH:=$(CARGO_HOME)/bin:$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
 export GOVC_INSECURE?=true

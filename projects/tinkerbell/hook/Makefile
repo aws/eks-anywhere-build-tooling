@@ -16,12 +16,10 @@ IMAGE_NAMES=bootkit tink-docker kernel
 
 BINARY_TARGET_FILES=bootkit tink-docker
 SOURCE_PATTERNS=./ ./
-# both binaries are built from different sub paths
-BINARY_TARGET_FILES_BUILD_ALONE=bootkit tink-docker
-
-GO_MOD_DOWNLOAD_TARGETS=$(REPO)/bootkit/eks-anywhere-go-mod-download $(REPO)/tink-docker/eks-anywhere-go-mod-download
-GATHER_LICENSES_TARGETS=$(OUTPUT_DIR)/bootkit/attribution/go-license.csv $(OUTPUT_DIR)/tink-docker/attribution/go-license.csv
-ATTRIBUTION_TARGETS=BOOTKIT_ATTRIBUTION.txt TINK_DOCKER_ATTRIBUTION.txt
+GO_MOD_PATHS=bootkit tink-docker
+# by default the first target is assumed to be the primary and will produce a attribution with no prefix
+# for this build we want to prefix all the files
+BOOTKIT_ATTRIBUTION_OVERRIDE=bootkit
 
 CREATE_HOOK_FILES=$(REPO)/dist/vmlinuz-x86_64
 
@@ -30,15 +28,6 @@ SIMPLE_CREATE_TARBALLS=false
 
 include $(BASE_DIRECTORY)/Common.mk
 
-$(OUTPUT_BIN_DIR)/%/bootkit $(REPO)/bootkit/eks-anywhere-go-mod-download \
-	$(OUTPUT_DIR)/bootkit/attribution/go-license.csv: REPO_SUBPATH=./bootkit
-
-$(OUTPUT_DIR)/bootkit/attribution/go-license.csv BOOTKIT_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/bootkit
-
-$(OUTPUT_BIN_DIR)/%/tink-docker $(REPO)/tink-docker/eks-anywhere-go-mod-download \
-	$(OUTPUT_DIR)/tink-docker/attribution/go-license.csv: REPO_SUBPATH=./tink-docker
-
-$(OUTPUT_DIR)/tink-docker/attribution/go-license.csv TINK_DOCKER_ATTRIBUTION.txt: LICENSES_OUTPUT_DIR=$(OUTPUT_DIR)/tink-docker
 
 # For local image builds we override to push to local registry.
 %/images/amd64: IMAGE_OUTPUT=push=true
