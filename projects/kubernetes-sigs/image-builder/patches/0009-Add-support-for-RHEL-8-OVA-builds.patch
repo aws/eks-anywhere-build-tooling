@@ -1,13 +1,15 @@
-From 920f8dc17bb7c710fe9744dfa880591deac8cd2f Mon Sep 17 00:00:00 2001
+From b9b1c4e543c048415c4ac8bb5da1f388ffa27566 Mon Sep 17 00:00:00 2001
 From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 Date: Thu, 14 Apr 2022 10:35:07 -0700
 Subject: [PATCH] Add support for RHEL 8 OVA builds
 
-Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 ---
- images/capi/Makefile               |  3 ++-
- images/capi/packer/ova/rhel-8.json | 19 +++++++++++++++++++
- 2 files changed, 21 insertions(+), 1 deletion(-)
+ images/capi/Makefile                          |  3 ++-
+ images/capi/hack/image-build-ova.py           |  1 +
+ images/capi/packer/goss/goss-vars.yaml        |  6 +++---
+ .../packer/ova/linux/centos/http/8/ks.cfg     |  1 +
+ images/capi/packer/ova/rhel-8.json            | 19 +++++++++++++++++++
+ 5 files changed, 26 insertions(+), 4 deletions(-)
  create mode 100644 images/capi/packer/ova/rhel-8.json
 
 diff --git a/images/capi/Makefile b/images/capi/Makefile
@@ -31,21 +33,73 @@ index f04f93021..114812beb 100644
  build-node-ova-vsphere-rockylinux-8: ## Builds RockyLinux 8 Node OVA and template on vSphere
  build-node-ova-vsphere-ubuntu-1804: ## Builds Ubuntu 18.04 Node OVA and template on vSphere
  build-node-ova-vsphere-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA and template on vSphere
+diff --git a/images/capi/hack/image-build-ova.py b/images/capi/hack/image-build-ova.py
+index 3bb0b2d88..85172f1ef 100755
+--- a/images/capi/hack/image-build-ova.py
++++ b/images/capi/hack/image-build-ova.py
+@@ -117,6 +117,7 @@ def main():
+                  "centos7-64": {"id": "107", "version": "7", "type": "centos7-64"},
+                  "centos8-64": {"id": "107", "version": "8", "type": "centos8-64"},
+                  "rhel7-64": {"id": "80", "version": "7", "type": "rhel7_64guest"},
++                 "rhel8-64": {"id": "80", "version": "8", "type": "rhel8_64guest"},
+                  "ubuntu-64": {"id": "94", "version": "", "type": "ubuntu64Guest"},
+                  "Windows2019Server-64": {"id": "112", "version": "", "type": "windows9srv-64"},
+                  "Windows2004Server-64": {"id": "112", "version": "", "type": "windows9srv-64"}}
+diff --git a/images/capi/packer/goss/goss-vars.yaml b/images/capi/packer/goss/goss-vars.yaml
+index 7f3576a7f..b813d63e2 100644
+--- a/images/capi/packer/goss/goss-vars.yaml
++++ b/images/capi/packer/goss/goss-vars.yaml
+@@ -205,20 +205,20 @@ rhel:
+     package:
+       python2-pip:
+       open-vm-tools:
+-      <<: *rh7_rpms
++      <<: *rh8_rpms
+   qemu:
+     package:
+       open-vm-tools:
+       cloud-init:
+       cloud-utils-growpart:
+       python2-pip:
+-      <<: *rh7_rpms
++      <<: *rh8_rpms
+   raw:
+     package:
+       cloud-init:
+       cloud-utils-growpart:
+       python2-pip:
+-      <<: *rh7_rpms
++      <<: *rh8_rpms
+ ubuntu:
+   common-kernel-param:
+     net.ipv4.conf.all.rp_filter:
+diff --git a/images/capi/packer/ova/linux/centos/http/8/ks.cfg b/images/capi/packer/ova/linux/centos/http/8/ks.cfg
+index d13f2df11..59700d72a 100644
+--- a/images/capi/packer/ova/linux/centos/http/8/ks.cfg
++++ b/images/capi/packer/ova/linux/centos/http/8/ks.cfg
+@@ -46,6 +46,7 @@ openssh-server
+ sed
+ sudo
+ python3
++open-vm-tools
+ 
+ # Exclude unnecessary firmwares
+ -iwl*firmware
 diff --git a/images/capi/packer/ova/rhel-8.json b/images/capi/packer/ova/rhel-8.json
 new file mode 100644
-index 000000000..e60d924fd
+index 000000000..5bcfe5cee
 --- /dev/null
 +++ b/images/capi/packer/ova/rhel-8.json
 @@ -0,0 +1,19 @@
 +{
-+  "boot_command_prefix": "<tab><wait><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs><bs>quiet text inst.ks=hd:fd0:",
++  "boot_command_prefix": "<up><tab> text inst.ks=",
 +  "boot_command_suffix": "/8/ks.cfg<enter><wait>",
-+  "boot_media_path": "/HTTP",
++  "boot_media_path": "http://$PACKER_HTTP_SERVER_IP:{{ .HTTPPort }}",
 +  "build_name": "rhel-8",
 +  "distro_arch": "amd64",
 +  "distro_name": "rhel",
 +  "distro_version": "8",
-+  "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
++  "http_directory": "./packer/ova/linux/{{user `distro_name`}}/http/",
 +  "guest_os_type": "rhel8-64",
 +  "iso_checksum": "48f955712454c32718dcde858dea5aca574376a1d7a4b0ed6908ac0b85597811",
 +  "iso_checksum_type": "sha256",
@@ -53,9 +107,10 @@ index 000000000..e60d924fd
 +  "os_display_name": "RHEL 8",
 +  "redhat_epel_rpm": "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm",
 +  "epel_rpm_gpg_key": "https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8",
-+  "shutdown_command": "sys-unconfig",
++  "shutdown_command": "shutdown -P now",
 +  "vsphere_guest_os_type": "rhel8_64Guest"
 +}
+\ No newline at end of file
 -- 
 2.34.1
 
