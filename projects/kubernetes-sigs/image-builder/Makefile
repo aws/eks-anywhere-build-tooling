@@ -112,8 +112,11 @@ $(FAKE_UBUNTU_RAW_PATH):
 	touch $@
 	touch $(@D)/packer.log
 
+# in the case of BR ova these targets are the same, guard against this to avoid the overwriting target warning
+ifneq ($(FINAL_BOTTLEROCKET_OVA_PATH),$(FINAL_OVA_PATH))
 $(FINAL_OVA_PATH):
 	mv $(IMAGE_BUILDER_DIR)/output/*.ova $@
+endif
 
 $(FINAL_RAW_IMAGE_PATH):
 	mv $(IMAGE_BUILDER_DIR)/output/*.gz $@

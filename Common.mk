@@ -1,5 +1,5 @@
 # Disable built-in rules and variables
-MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables -d
+MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
 SHELL=bash
 .SHELLFLAGS:=-eu -o pipefail -c
 .SUFFIXES:
@@ -113,7 +113,7 @@ BASE_IMAGE_TAG_FILE?=$(BASE_DIRECTORY)/$(shell echo $(BASE_IMAGE_NAME) | tr '[:l
 BASE_IMAGE_TAG?=$(shell cat $(BASE_IMAGE_TAG_FILE))
 BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
-EKS_DISTRO_BASE_IMAGE:=$(BASE_IMAGE_REPO)/eks-distro-base:$(shell cat $(BASE_DIRECTORY)/EKS_DISTRO_BASE_TAG_FILE)
+EKS_DISTRO_BASE_IMAGE=$(BASE_IMAGE_REPO)/eks-distro-base:$(shell cat $(BASE_DIRECTORY)/EKS_DISTRO_BASE_TAG_FILE)
 ####################################################
 
 #################### IMAGES ########################
@@ -282,7 +282,7 @@ setup_uniq_go_mod_license_filters = \
 			$(eval UNIQ_GO_MOD_PATHS+=$(3)) \
 			$(eval UNIQ_GO_MOD_TARGET_FILES+=$(1))) \
 			$(eval $(call GO_MOD_TARGET_FOR_BINARY_VAR_NAME,$(1))=$(3)) \
-	$(eval GO_MOD_$(subst /,_,$(3))_LICENSE_PACKAGE_FILTER+=$(2))
+	$(eval GO_MOD_$(subst /,_,$(3))_LICENSE_PACKAGE_FILTER+=$(call IF_OVERRIDE_VARIABLE,LICENSE_PACKAGE_FILTER,$(2)))
 
 BINARY_PLATFORMS?=linux/amd64 linux/arm64
 SIMPLE_CREATE_BINARIES?=true
@@ -305,8 +305,8 @@ GO_MOD_DOWNLOAD_TARGETS?=$(foreach path, $(UNIQ_GO_MOD_PATHS), $(call GO_MOD_DOW
 #### CGO ############
 CGO_CREATE_BINARIES?=false
 CGO_SOURCE=$(OUTPUT_DIR)/source
-IS_ON_BUILDER_BASE:=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
-BUILDER_PLATFORM:=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
+IS_ON_BUILDER_BASE?=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
+BUILDER_PLATFORM?=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
 needs-cgo-builder=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter-out $(1),$(BUILDER_PLATFORM)),true,))
 ######################
 
@@ -352,6 +352,7 @@ FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 #################### OTHER #########################
 KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
+SPECIAL_TARGET_SECONDARY=$(strip $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS)) $(GO_MOD_DOWNLOAD_TARGETS))
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
@@ -384,7 +385,9 @@ define WRITE_LOCAL_IMAGE_TAG
 endef
 
 # Do not binary deps + go mod download file as intermediate files
-.SECONDARY: $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS)) $(GO_MOD_DOWNLOAD_TARGETS)
+ifneq ($(SPECIAL_TARGET_SECONDARY),)
+.SECONDARY: $(SPECIAL_TARGET_SECONDARY)
+endif
 
 #### Source repo + binary Targets
 ifneq ($(REPO_NO_CLONE),true)
@@ -432,7 +435,7 @@ ifeq ($(SIMPLE_CREATE_BINARIES),true)
 # GO_MOD_TARGET_FOR_BINARY_<binary> variables are created earlier in the makefile when determining which binaries can be built together vs alone
 # if target is included in BINARY_TARGET_FILES_BUILD_TOGETHER list, use SOURCE_PATTERNS_BUILD_TOGETHER, otherewise use source pattern at the same index as binary_target in binary_target_files
 $(OUTPUT_BIN_DIR)/%: PLATFORM=$(subst -,/,$(*D))
-$(OUTPUT_BIN_DIR)/%: BINARY_TARGET=$(@F)
+$(OUTPUT_BIN_DIR)/%: BINARY_TARGET=$(@F:%.exe=%)
 $(OUTPUT_BIN_DIR)/%: SOURCE_PATTERN=$(if $(filter $(BINARY_TARGET),$(BINARY_TARGET_FILES_BUILD_TOGETHER)),$(SOURCE_PATTERNS_BUILD_TOGETHER),$(word $(call pos,$(BINARY_TARGET),$(BINARY_TARGET_FILES)),$(SOURCE_PATTERNS)))
 $(OUTPUT_BIN_DIR)/%: OUTPUT_PATH=$(if $(and $(if $(filter false,$(call IS_ONE_WORD,$(BINARY_TARGET_FILES_BUILD_TOGETHER))),$(filter $(BINARY_TARGET),$(BINARY_TARGET_FILES_BUILD_TOGETHER)))),$(@D)/,$@)
 $(OUTPUT_BIN_DIR)/%: GO_MOD_PATH=$($(call GO_MOD_TARGET_FOR_BINARY_VAR_NAME,$(BINARY_TARGET)))
@@ -518,7 +521,7 @@ s3-artifacts: tarballs
 
 
 ### Checksum Targets
-	
+
 .PHONY: checksums
 checksums: $(BINARY_TARGETS)
 ifneq ($(strip $(BINARY_TARGETS)),)
