@@ -7,8 +7,6 @@ REPO_OWNER=kubernetes-sigs
 
 BINARY_TARGET_FILES=manager eks-bootstrap-manager eks-controlplane-manager clusterawsadm
 SOURCE_PATTERNS=sigs.k8s.io/cluster-api-provider-aws sigs.k8s.io/cluster-api-provider-aws/bootstrap/eks sigs.k8s.io/cluster-api-provider-aws/controlplane/eks ./cmd/clusterawsadm
-# Build this seperately since building both patterns which end in eks together result in only one binary being produced
-BINARY_TARGET_FILES_BUILD_ALONE=eks-bootstrap-manager
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)

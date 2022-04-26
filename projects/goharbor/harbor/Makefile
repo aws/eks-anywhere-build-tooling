@@ -20,7 +20,6 @@ export VERSIONS_FOR_PREPARE
 
 REPO=harbor
 REPO_OWNER=goharbor
-REPO_SUBPATH=./src
 
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
@@ -45,6 +44,7 @@ BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migr
 SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/standalone-db-migrator ./cmd/exporter
 # harbor-core has additional ldflags
 BINARY_TARGET_FILES_BUILD_ALONE=harbor-core
+GO_MOD_PATHS=./src ./src ./src ./src ./src ./src
 
 HARBOR_BASE_NAMESPACE=goharbor
 IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
