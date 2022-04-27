@@ -12,12 +12,10 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `` for `linux/amd64 linux/arm64 darwin/amd64 darwin/arm64`
+binaries: ## Build all binaries: `kind kindnetd` for `linux/amd64 linux/arm64`
 _output/bin/kind/linux-amd64/kind: ## Build `_output/bin/kind/linux-amd64/kind`
-_output/bin/kind/linux-arm64/kind: ## Build `_output/bin/kind/linux-arm64/kind`
-_output/bin/kind/darwin-amd64/kind: ## Build `_output/bin/kind/darwin-amd64/kind`
-_output/bin/kind/darwin-arm64/kind: ## Build `_output/bin/kind/darwin-arm64/kind`
 _output/bin/kind/linux-amd64/kindnetd: ## Build `_output/bin/kind/linux-amd64/kindnetd`
+_output/bin/kind/linux-arm64/kind: ## Build `_output/bin/kind/linux-arm64/kind`
 _output/bin/kind/linux-arm64/kindnetd: ## Build `_output/bin/kind/linux-arm64/kindnetd`
 
 ##@ Image Targets
