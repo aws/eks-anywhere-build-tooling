@@ -160,7 +160,7 @@ func KillCmdAfterFilesGeneration(cmd *exec.Cmd, checkFiles []string) error {
 		}
 	}(ctx, okChan)
 
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(40 * time.Second)
 	select {
 	case <-okChan:
 		fmt.Println("All files were created, exiting kubeadm command")
