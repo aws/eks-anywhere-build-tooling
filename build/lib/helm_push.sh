@@ -23,8 +23,7 @@ HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
 OUTPUT_DIR="${4?Fourth arguement is output directory}"
 
-SEMVER_TMP="${IMAGE_TAG#[^0-9]}" # remove any leading non-digits
-SEMVER="${SEMVER_TMP/-/+}" # replace the - between the tag and the hash with a +
+SEMVER="${IMAGE_TAG#[^0-9]}" # remove any leading non-digits
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
