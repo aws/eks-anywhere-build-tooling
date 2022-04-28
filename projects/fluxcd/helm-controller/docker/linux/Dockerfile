@@ -4,11 +4,10 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/files/helm-controller /
 COPY _output/bin/helm-controller/$TARGETOS-$TARGETARCH/helm-controller /usr/local/bin/helm-controller
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
-USER controller
+USER 65534
 
 ENTRYPOINT ["helm-controller"]
