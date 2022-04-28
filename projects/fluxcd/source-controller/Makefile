@@ -15,6 +15,7 @@ IMAGE_USERADD_USER_NAME=controller
 
 CGO_DEPS_TARGET=$(CGO_SOURCE)/linux-%/lib64/libgit2.so
 CGO_CREATE_BINARIES=true
+EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -48,7 +49,7 @@ $(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 	cp $(REPO)/LICENSE $@
 
 $(LIBGIT2_LICENSES_TARGET):
-	$(BASE_DIRECTORY)/build/lib/gather_non_golang_licenses.sh libgit2/libgit2 v1.1.0 $(MAKE_ROOT)/$(OUTPUT_DIR)
+	$(BASE_DIRECTORY)/build/lib/gather_non_golang_licenses.sh libgit2/libgit2 v1.3.1 $(MAKE_ROOT)/$(OUTPUT_DIR)
 
 
 ########### DO NOT EDIT #############################
