@@ -105,10 +105,6 @@ stop-buildkit-and-registry:
 .PHONY: generate
 generate:
 	build/lib/generate_projects_list.sh $(BASE_DIRECTORY)
-
-.PHONY: helm/promotion
-helm/promotion:
-	$(BUILD_LIB)/helm_promotion.sh $(AWS_ACCOUNT_ID) $(ECR_PUBLIC_URI) $(GIT_HASH)
 	
 .PHONY: check-project-path-exists
 check-project-path-exists:
