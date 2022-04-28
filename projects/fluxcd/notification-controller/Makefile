@@ -11,14 +11,11 @@ FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/notification-co
 FIX_LICENSES_K0KUBUN_TARGET=$(REPO)/vendor/github.com/k0kubun/pp/LICENSE.txt
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
-IMAGE_USERADD_USER_NAME=controller
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_API_LICENSE_TARGET)
-
-$(call IMAGE_TARGETS_FOR_NAME, notification-controller): notification-controller-useradd/images/export
 
 $(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # Internal go.mod under /api directory
