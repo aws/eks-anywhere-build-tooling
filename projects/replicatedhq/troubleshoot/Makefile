@@ -20,7 +20,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_GO_SPIN_TARGET)
 
-$(FIX_LICENSES_GO_SPIN_TARGET):
+$(FIX_LICENSES_GO_SPIN_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The tj/go-spin dependency github repo has a license file however it does not have a go.mod file
 # checked in to the repo. Hence we need to manually download the license from Github and place
 # it in the respective folder under vendor directory so that they is available for go-licenses
