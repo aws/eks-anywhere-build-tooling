@@ -50,8 +50,6 @@ export HELM_REGISTRY=$(aws ecr-public describe-registries --region us-east-1  --
 envsubst <helm/sedfile.template >${SEDFILE}
 # Semver requires that our version begin with a digit, so strip the v.
 echo "s,version: v,version: ,g" >>${SEDFILE}
-# Semver requires that we use a + before the git hash to denote build info.
-echo "/^version:/s,-,+," >>${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
 do
   if [ "${IMAGE}" == "${HELM_DESTINATION_REPOSITORY}" ]

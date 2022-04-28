@@ -17,7 +17,6 @@ set -x
 set -o errexit
 set -o nounset
 set -o pipefail
-# IMAGE_TAG
 
 HELM_DESTINATION_REPOSITORY="${1?First argument is helm destination repository}"
 OUTPUT_DIR="${2?Second arguement is output directory}"
