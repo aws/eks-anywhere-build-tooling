@@ -97,7 +97,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@cp harbor/make/photon/log/logrotate $(OUTPUT_DIR)/harbor-log/etc/cron.hourly/
 	@cp harbor/make/photon/log/start.sh $(OUTPUT_DIR)/harbor-log/usr/local/bin/
 
-	@mkdir -p $(OUTPUT_DIR)/harbor-portal/build_dir/dist/images
+	@mkdir -p $(OUTPUT_DIR)/harbor-portal/build_dir/dist
 	@cp -r harbor/src/portal/* $(OUTPUT_DIR)/harbor-portal/build_dir/
 	@cp harbor/api/v2.0/legacy_swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger.yaml
 	@cp harbor/api/v2.0/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger2.yaml
