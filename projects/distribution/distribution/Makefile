@@ -12,7 +12,7 @@ VERSION=$(shell git -C $(REPO) describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION=$(shell git -C $(REPO) rev-parse HEAD)$(shell if ! git -C $(REPO) diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 PKG=github.com/docker/distribution
 
-EXTRA_GO_LDFLAGS=-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG)
+EXTRA_GO_LDFLAGS=-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG)
 EXTRA_GOBUILD_FLAGS=-tags include_oss,include_gcs
 
 HAS_S3_ARTIFACTS=true
