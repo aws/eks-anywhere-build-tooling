@@ -6,7 +6,7 @@ The [harbor project](https://github.com/goharbor/harbor) is an open source trust
 
 In EKS-A, harbor offers local cloud native registry service for Kubernetes clusters on vSphere infrastructure.
 
-You can find the latest version of its images [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/harbor/).
+You can find the latest version of its images [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/eks-anywhere-packages/harbor/).
 
 ### Updating
 
