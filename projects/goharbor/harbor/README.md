@@ -6,4 +6,15 @@ The [harbor project](https://github.com/goharbor/harbor) is an open source trust
 
 In EKS-A, harbor offers local cloud native registry service for Kubernetes clusters on vSphere infrastructure.
 
-You can find the latest version of its images [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/harbor/).
+You can find the latest version of its images [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/eks-anywhere-packages/harbor/).
+
+### Updating
+
+1. Review releases and changelogs in upstream [code repo](https://github.com/goharbor/harbor) and [chart repo](https://github.com/goharbor/harbor-helm), and decide on new version.
+1. Review the patches under `patches/` folder and remove any that are either merged upstream or no longer needed.
+1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags, and update the [`HELM_GIT_TAG`](https://github.com/aws/eks-anywhere-build-tooling/blob/main/projects/goharbor/harbor/Makefile#L57) in Makefile accordingly so the versions of referenced images in the chart match what is in `GIT_TAG`.
+1. Compare the old tag to the new, looking specifically for Makefile changes. Check the `build` target for any build flag changes, tag changes, dependencies, etc. Check that the manifest target has not changed, this is called from our Makefile.
+1. Check the `go.mod` file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in Makefile to match the version upstream.
+1. Update checksums and attribution using make `update-attribution-checksums-docker`.
+1. Update the version at the top of this `README`.
+1. Run `make generate` to update the `UPSTREAM_PROJECTS.yaml` file.

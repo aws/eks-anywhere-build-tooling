@@ -1,11 +1,11 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.17"
-REGISTRYVERSION=2.8.0-patch-2819-2553-redis
+REGISTRYVERSION=2.8.1-patch-redis
 NOTARYVERSION=v0.6.1
-TRIVYVERSION=v0.20.1
-TRIVYADAPTERVERSION=v0.24.0
-CHARTMUSEUM_SRC_TAG=v0.13.1
+TRIVYVERSION=v0.24.2
+TRIVYADAPTERVERSION=v0.26.0
+CHARTMUSEUM_SRC_TAG=v0.14.0
 CHARTMUSEUMVERSION=$(CHARTMUSEUM_SRC_TAG)-redis
 
 define VERSIONS_FOR_PREPARE
@@ -44,7 +44,7 @@ BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migr
 SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/standalone-db-migrator ./cmd/exporter
 # harbor-core has additional ldflags
 BINARY_TARGET_FILES_BUILD_ALONE=harbor-core
-GO_MOD_PATHS=./src ./src ./src ./src ./src ./src
+GO_MOD_PATHS=src src src src src src
 
 HARBOR_BASE_NAMESPACE=goharbor
 IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
@@ -54,7 +54,7 @@ FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICE
 
 HAS_HELM_CHART=true
 
-HELM_GIT_TAG=v1.8.1
+HELM_GIT_TAG=v1.9.0
 HELM_SOURCE_REPOSITORY=harbor-helm
 HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
 HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-exporter harbor/harbor-jobservice harbor/harbor-nginx harbor/harbor-portal harbor/harbor-redis harbor/harbor-registry harbor/harbor-registryctl
@@ -70,7 +70,8 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 
 $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@echo "$$VERSIONS_FOR_PREPARE" > $(PROJECT_ROOT)/$(REPO)/make/photon/prepare/versions
-	@mkdir -p $(OUTPUT_DIR)
+	@mkdir -p $@
+	@cp $(PROJECT_ROOT)/$(REPO)/LICENSE $(PROJECT_ROOT)/$(REPO)/src/
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor
 	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/core/entrypoint.sh harbor/make/photon/prepare/versions $(OUTPUT_DIR)/harbor-core/harbor/
@@ -116,6 +117,15 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 
 $(call IMAGE_TARGETS_FOR_NAME, harbor-registry): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 $(call IMAGE_TARGETS_FOR_NAME, harbor-registryctl): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+$(call IMAGE_TARGETS_FOR_NAME, harbor-portal): clean-go-cache
+
+# space is very limited in presubmit jobs, the image builds can push the total used space over the limit
+# after the binaries are built there are ~3GBs of go build/mod cache
+.PHONY: clean-go-cache
+clean-go-cache:
+	if [ "$(JOB_TYPE)" == "presubmit" ]; then \
+		source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) && go clean -modcache -cache; \
+	fi
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_XEIPUUV_TARGET)
 
