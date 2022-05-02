@@ -11,7 +11,6 @@ ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python-yaml \
     && npm install --unsafe-perm \ 
-    && mkdir -p /build_dir/dist/images \
     && npm run generate-build-timestamp \
     && node --max_old_space_size=2048 'node_modules/@angular/cli/bin/ng' build --configuration production \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json \
