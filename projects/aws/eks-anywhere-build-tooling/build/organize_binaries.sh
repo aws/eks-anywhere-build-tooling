@@ -33,7 +33,6 @@ mkdir -p $EKS_A_TOOL_LICENSE_DIR
 
 declare -A project_bin_licenses=(["eksa/fluxcd/flux2"]="flux FLUX2"
                                  ["eksa/kubernetes-sigs/cluster-api"]="clusterctl CAPI"
-                                 ["eksa/kubernetes-sigs/cluster-api-provider-aws"]="clusterawsadm CAPA"
                                  ["eksa/kubernetes-sigs/kind"]="kind KIND"
                                  ["eksd/kubernetes"]="client/bin/kubectl KUBERNETES"
                                  ["eksa/replicatedhq/troubleshoot"]="support-bundle TROUBLESHOOT"
