@@ -44,7 +44,7 @@ BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migr
 SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/standalone-db-migrator ./cmd/exporter
 # harbor-core has additional ldflags
 BINARY_TARGET_FILES_BUILD_ALONE=harbor-core
-GO_MOD_PATHS=./src ./src ./src ./src ./src ./src
+GO_MOD_PATHS=src src src src src src
 
 HARBOR_BASE_NAMESPACE=goharbor
 IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
@@ -70,7 +70,7 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 
 $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@echo "$$VERSIONS_FOR_PREPARE" > $(PROJECT_ROOT)/$(REPO)/make/photon/prepare/versions
-	@mkdir -p $(OUTPUT_DIR)
+	@mkdir -p $@
 	@cp $(PROJECT_ROOT)/$(REPO)/LICENSE $(PROJECT_ROOT)/$(REPO)/src/
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-core/harbor
