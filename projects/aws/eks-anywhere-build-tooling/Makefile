@@ -15,7 +15,7 @@ HAS_LICENSES=false
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
-FETCH_BINARIES_TARGETS=eksa/fluxcd/flux2 eksa/kubernetes-sigs/cluster-api eksa/kubernetes-sigs/cluster-api-provider-aws \
+FETCH_BINARIES_TARGETS=eksa/fluxcd/flux2 eksa/kubernetes-sigs/cluster-api \
 	eksa/kubernetes-sigs/kind eksa/replicatedhq/troubleshoot eksa/vmware/govmomi eksd/kubernetes/client eksa/helm/helm eksa/tinkerbell/tink \
 	eksa/apache/cloudstack-cloudmonkey
 
