@@ -1,0 +1,164 @@
+From 7d5f1db8ee2a49033fe77ed94bd1efde93869a32 Mon Sep 17 00:00:00 2001
+From: Pooja Trivedi <tripooja@amazon.com>
+Date: Mon, 2 May 2022 11:52:40 -0700
+Subject: [PATCH] Make hardware, template, workflow CRDs namespace-scoped
+
+---
+ config/crd/bases/tinkerbell.org_bmc.yaml       | 2 +-
+ config/crd/bases/tinkerbell.org_hardware.yaml  | 2 +-
+ config/crd/bases/tinkerbell.org_templates.yaml | 2 +-
+ config/crd/bases/tinkerbell.org_workflows.yaml | 2 +-
+ controllers/base.go                            | 2 ++
+ controllers/machine.go                         | 6 ++++++
+ tink/controllers/workflow/controller.go        | 4 ++--
+ 7 files changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/config/crd/bases/tinkerbell.org_bmc.yaml b/config/crd/bases/tinkerbell.org_bmc.yaml
+index 6ec60bc..1b00fc2 100644
+--- a/config/crd/bases/tinkerbell.org_bmc.yaml
++++ b/config/crd/bases/tinkerbell.org_bmc.yaml
+@@ -16,7 +16,7 @@ spec:
+     listKind: BMCList
+     plural: bmc
+     singular: bmc
+-  scope: Cluster
++  scope: Namespaced
+   versions:
+   - name: v1alpha1
+     schema:
+diff --git a/config/crd/bases/tinkerbell.org_hardware.yaml b/config/crd/bases/tinkerbell.org_hardware.yaml
+index 47f5edb..e0a52a1 100644
+--- a/config/crd/bases/tinkerbell.org_hardware.yaml
++++ b/config/crd/bases/tinkerbell.org_hardware.yaml
+@@ -16,7 +16,7 @@ spec:
+     listKind: HardwareList
+     plural: hardware
+     singular: hardware
+-  scope: Cluster
++  scope: Namespaced
+   versions:
+   - name: v1alpha1
+     schema:
+diff --git a/config/crd/bases/tinkerbell.org_templates.yaml b/config/crd/bases/tinkerbell.org_templates.yaml
+index 4e0a558..c364dab 100644
+--- a/config/crd/bases/tinkerbell.org_templates.yaml
++++ b/config/crd/bases/tinkerbell.org_templates.yaml
+@@ -16,7 +16,7 @@ spec:
+     listKind: TemplateList
+     plural: templates
+     singular: template
+-  scope: Cluster
++  scope: Namespaced
+   versions:
+   - name: v1alpha1
+     schema:
+diff --git a/config/crd/bases/tinkerbell.org_workflows.yaml b/config/crd/bases/tinkerbell.org_workflows.yaml
+index e9a4d5a..11f871d 100644
+--- a/config/crd/bases/tinkerbell.org_workflows.yaml
++++ b/config/crd/bases/tinkerbell.org_workflows.yaml
+@@ -16,7 +16,7 @@ spec:
+     listKind: WorkflowList
+     plural: workflows
+     singular: workflow
+-  scope: Cluster
++  scope: Namespaced
+   versions:
+   - name: v1alpha1
+     schema:
+diff --git a/controllers/base.go b/controllers/base.go
+index 4d33243..774725a 100644
+--- a/controllers/base.go
++++ b/controllers/base.go
+@@ -142,6 +142,7 @@ func (bmrc *baseMachineReconcileContext) releaseHardware() error {
+ 
+ 	namespacedName := types.NamespacedName{
+ 		Name: bmrc.tinkerbellMachine.Spec.HardwareName,
++		Namespace: bmrc.tinkerbellMachine.Namespace,
+ 	}
+ 
+ 	if err := bmrc.client.Get(bmrc.ctx, namespacedName, hardware); err != nil {
+@@ -176,6 +177,7 @@ func (bmrc *baseMachineReconcileContext) deprovisionHardware(hardware *tinkv1.Ha
+ 	bmc := &pbnjv1.BMC{}
+ 	namespacedName := types.NamespacedName{
+ 		Name: hardware.Spec.BmcRef,
++		Namespace: bmrc.tinkerbellMachine.Namespace,
+ 	}
+ 
+ 	if err := bmrc.client.Get(bmrc.ctx, namespacedName, bmc); err != nil {
+diff --git a/controllers/machine.go b/controllers/machine.go
+index 23d9728..4fab5e0 100644
+--- a/controllers/machine.go
++++ b/controllers/machine.go
+@@ -129,6 +129,7 @@ func (mrc *machineReconcileContext) Reconcile() error {
+ func (mrc *machineReconcileContext) templateExists() (bool, error) {
+ 	namespacedName := types.NamespacedName{
+ 		Name: mrc.tinkerbellMachine.Name,
++		Namespace: mrc.tinkerbellMachine.Namespace,
+ 	}
+ 
+ 	err := mrc.client.Get(mrc.ctx, namespacedName, &tinkv1.Template{})
+@@ -212,6 +213,7 @@ func (mrc *machineReconcileContext) createTemplate(hardware *tinkv1.Hardware) er
+ 	templateObject := &tinkv1.Template{
+ 		ObjectMeta: metav1.ObjectMeta{
+ 			Name: mrc.tinkerbellMachine.Name,
++			Namespace: mrc.tinkerbellMachine.Namespace,
+ 			OwnerReferences: []metav1.OwnerReference{
+ 				{
+ 					APIVersion: "infrastructure.cluster.x-k8s.io/v1beta1",
+@@ -290,6 +292,7 @@ func (mrc *machineReconcileContext) setStatus(hardware *tinkv1.Hardware) error {
+ 
+ 		namespacedName := types.NamespacedName{
+ 			Name: mrc.tinkerbellMachine.Spec.HardwareName,
++			Namespace: mrc.tinkerbellMachine.Namespace,
+ 		}
+ 
+ 		if err := mrc.client.Get(mrc.ctx, namespacedName, hardware); err != nil {
+@@ -394,6 +397,7 @@ func (mrc *machineReconcileContext) ensureHardwarePowerOn(hardware *tinkv1.Hardw
+ 	bmc := &pbnjv1.BMC{}
+ 	namespacedName := types.NamespacedName{
+ 		Name: hardware.Spec.BmcRef,
++		Namespace: mrc.tinkerbellMachine.Namespace,
+ 	}
+ 
+ 	if err := mrc.client.Get(mrc.ctx, namespacedName, bmc); err != nil {
+@@ -421,6 +425,7 @@ func (mrc *machineReconcileContext) ensureHardwarePowerOn(hardware *tinkv1.Hardw
+ func (mrc *machineReconcileContext) workflowExists() (bool, error) {
+ 	namespacedName := types.NamespacedName{
+ 		Name: mrc.tinkerbellMachine.Name,
++		Namespace: mrc.tinkerbellMachine.Namespace,
+ 	}
+ 
+ 	err := mrc.client.Get(mrc.ctx, namespacedName, &tinkv1.Workflow{})
+@@ -439,6 +444,7 @@ func (mrc *machineReconcileContext) createWorkflow() error {
+ 	workflow := &tinkv1.Workflow{
+ 		ObjectMeta: metav1.ObjectMeta{
+ 			Name: mrc.tinkerbellMachine.Name,
++			Namespace: mrc.tinkerbellMachine.Namespace,
+ 			OwnerReferences: []metav1.OwnerReference{
+ 				{
+ 					APIVersion: "infrastructure.cluster.x-k8s.io/v1beta1",
+diff --git a/tink/controllers/workflow/controller.go b/tink/controllers/workflow/controller.go
+index 2533076..b54c593 100644
+--- a/tink/controllers/workflow/controller.go
++++ b/tink/controllers/workflow/controller.go
+@@ -247,7 +247,7 @@ func (r *Reconciler) createWorkflow(ctx context.Context, w *tinkv1alpha1.Workflo
+ 	logger := ctrl.LoggerFrom(ctx).WithValues("workflow", w.Name)
+ 
+ 	hw := &tinkv1alpha1.Hardware{}
+-	hwKey := client.ObjectKey{Name: w.Spec.HardwareRef}
++	hwKey := client.ObjectKey{Namespace: w.Namespace, Name: w.Spec.HardwareRef}
+ 
+ 	if err := r.Client.Get(ctx, hwKey, hw); err != nil {
+ 		logger.Error(err, "Failed to get hardware")
+@@ -256,7 +256,7 @@ func (r *Reconciler) createWorkflow(ctx context.Context, w *tinkv1alpha1.Workflo
+ 	}
+ 
+ 	t := &tinkv1alpha1.Template{}
+-	tKey := client.ObjectKey{Name: w.Spec.TemplateRef}
++	tKey := client.ObjectKey{Namespace: w.Namespace, Name: w.Spec.TemplateRef}
+ 
+ 	if err := r.Client.Get(ctx, tKey, t); err != nil {
+ 		logger.Error(err, "Failed to get template")
+-- 
+2.33.0
+
