@@ -38,6 +38,10 @@ ARCH="$(cut -d '-' -f2 <<< ${OS_ARCH})"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
 S3_ARTIFACTS_FOLDER=${S3_ARTIFACTS_FOLDER_OVERRIDE:-$LATEST_TAG}
+GIT_COMMIT_OVERRIDE=false
+if [ -n "$S3_ARTIFACTS_FOLDER_OVERRIDE" ]; then
+    GIT_COMMIT_OVERRIDE=true
+fi
 
 OUTPUT_DIR_FILE=$BINARY_DEPS_DIR/linux-$ARCH/$PRODUCT/$REPO_OWNER/$REPO
 if [[ $REPO == *.tar.gz ]]; then
@@ -57,7 +61,7 @@ if [[ $PRODUCT = 'eksd' ]]; then
     fi
 else
     TARBALL="$REPO-linux-$ARCH.tar.gz"
-    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $S3_ARTIFACTS_FOLDER)
+    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $S3_ARTIFACTS_FOLDER $GIT_COMMIT_OVERRIDE)
 fi
 
 if [ "$CODEBUILD_CI" = "true" ]; then

@@ -262,10 +262,18 @@ function build::common::get_latest_eksa_asset_url() {
   local -r artifact_bucket=$1
   local -r project=$2
   local -r arch=${3-amd64}
-  local -r latesttag=${4-latest}
+  local -r s3downloadpath=${4-latest}
+  local -r gitcommitoverride=${5-false}
 
-  local -r git_tag=$(cat $BUILD_ROOT/../../projects/${project}/GIT_TAG)
-  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$latesttag/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+  s3artifactfolder=$s3downloadpath
+  git_tag=$(cat $BUILD_ROOT/../../projects/${project}/GIT_TAG)
+  if [ "$gitcommitoverride" = "true" ]; then
+    commit_hash=$(echo $s3downloadpath | cut -d- -f2)
+    git_tag=$(git show $commit_hash:projects/${project}/GIT_TAG)
+    s3artifactfolder=$s3downloadpath/artifacts
+  fi
+  
+  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$s3artifactfolder/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
 
   local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $url)
   if [[ "$http_code" == "200" ]]; then 
