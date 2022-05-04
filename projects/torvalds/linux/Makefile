@@ -17,7 +17,7 @@ include $(BASE_DIRECTORY)/Common.mk
 $(BINARY_TARGETS): create-binaries
 
 .PHONY: create-binaries
-create-binaries:
+create-binaries: $(GIT_CHECKOUT_TARGET)
 	build/create_binaries.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH)
 
 .PHONY: tarballs
