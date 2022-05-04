@@ -19,7 +19,6 @@ else
 	exit 1
 fi
 
-USER='ubuntu'
 GROUP='docker'
 if groups $USER | grep &>/dev/null "$GROUP"; then
 	echo "The '$USER' is a member of the '$GROUP' group. Pass."
