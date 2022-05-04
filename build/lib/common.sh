@@ -189,7 +189,7 @@ function build::non-golang::copy_licenses(){
   do
     license_dest=$destination_dir/$(dirname $file)
     mkdir -p $license_dest
-    cp "${source_dir}/${file}" $license_dest/$(basename $file)
+    cp -r "${source_dir}/${file}" $license_dest/$(basename $file)
   done
 }
 
