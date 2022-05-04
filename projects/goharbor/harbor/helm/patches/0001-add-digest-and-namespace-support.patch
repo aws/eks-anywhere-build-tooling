@@ -1,6 +1,6 @@
-From 89fd562adc2970fd939e95bc2a6975e05bf72a48 Mon Sep 17 00:00:00 2001
+From 0bbdd23301796256abc48205610144068bb0a917 Mon Sep 17 00:00:00 2001
 From: Vincent Ni <kangqini@amazon.com>
-Date: Tue, 3 May 2022 15:08:08 -0700
+Date: Wed, 4 May 2022 08:40:47 -0700
 Subject: [PATCH] add digest and namespace support
 
 ---
@@ -62,8 +62,8 @@ Subject: [PATCH] add digest and namespace support
  templates/trivy/trivy-sts.yaml                |  5 +-
  templates/trivy/trivy-svc.yaml                |  1 +
  templates/trivy/trivy-tls.yaml                |  1 +
- values.yaml                                   | 74 ++++++++++---------
- 59 files changed, 138 insertions(+), 52 deletions(-)
+ values.yaml                                   | 76 ++++++++++---------
+ 59 files changed, 139 insertions(+), 53 deletions(-)
 
 diff --git a/templates/_helpers.tpl b/templates/_helpers.tpl
 index 5eb9910..5706b1f 100644
@@ -1082,7 +1082,7 @@ index a9c8330..58bce4e 100644
  {{ include "harbor.labels" . | indent 4 }}
  type: kubernetes.io/tls
 diff --git a/values.yaml b/values.yaml
-index a7ca73d..af1cd17 100644
+index a7ca73d..4dea706 100644
 --- a/values.yaml
 +++ b/values.yaml
 @@ -1,7 +1,9 @@
@@ -1130,6 +1130,15 @@ index a7ca73d..af1cd17 100644
    # There are three ways to provide tls
    # 1) "auto" will generate cert automatically
    # 2) "manual" need provide cert file manually in following value
+@@ -355,7 +357,7 @@ imagePullSecrets:
+ # and chartmuseum): "RollingUpdate" or "Recreate"
+ # Set it as "Recreate" when "RWM" for volumes isn't supported
+ updateStrategy:
+-  type: RollingUpdate
++  type: Recreate
+ 
+ # debug, info, warning, error or fatal
+ logLevel: info
 @@ -369,7 +371,7 @@ harborAdminPassword: "Harbor12345"
  caSecretName: ""
  
