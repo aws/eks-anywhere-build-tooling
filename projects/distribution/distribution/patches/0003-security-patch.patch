@@ -1,13 +1,12 @@
-From 153467c2386cddc6ff5e192f7168002187a44676 Mon Sep 17 00:00:00 2001
+From 2e59f23f957c126e745cb1370600ac7f2b24d6ad Mon Sep 17 00:00:00 2001
 From: Vincent Ni <kangqini@amazon.com>
-Date: Thu, 28 Apr 2022 10:15:41 -0700
-Subject: [PATCH 3/3] security patch for satori/go.uuid dgrijalva/jwt-go
- x/crypto
+Date: Tue, 3 May 2022 10:21:15 -0700
+Subject: [PATCH 3/3] security patch
 
 ---
- go.mod                                        |   17 +-
- go.sum                                        |   37 +-
- vendor.conf                                   |    4 -
+ go.mod                                        |   20 +-
+ go.sum                                        |   44 +-
+ vendor.conf                                   |    3 -
  .../azure-sdk-for-go}/LICENSE.txt             |    6 +-
  .../github.com/Azure/azure-sdk-for-go/NOTICE  |    5 -
  .../Azure/azure-sdk-for-go/NOTICE.txt         |   29 +
@@ -91,6 +90,15 @@ Subject: [PATCH 3/3] security patch for satori/go.uuid dgrijalva/jwt-go
  vendor/github.com/dgrijalva/jwt-go/claims.go  |  134 ---
  .../github.com/dgrijalva/jwt-go/map_claims.go |   94 --
  vendor/github.com/dgrijalva/jwt-go/token.go   |  108 --
+ .../github.com/felixge/httpsnoop/.gitignore   |    0
+ .../github.com/felixge/httpsnoop/.travis.yml  |    6 +
+ .../github.com/felixge/httpsnoop/LICENSE.txt  |   19 +
+ vendor/github.com/felixge/httpsnoop/Makefile  |   10 +
+ vendor/github.com/felixge/httpsnoop/README.md |   95 ++
+ .../felixge/httpsnoop/capture_metrics.go      |   79 ++
+ vendor/github.com/felixge/httpsnoop/docs.go   |   10 +
+ .../httpsnoop/wrap_generated_gteq_1.8.go      |  436 +++++++
+ .../httpsnoop/wrap_generated_lt_1.8.go        |  278 +++++
  vendor/github.com/gofrs/uuid/.gitignore       |   15 +
  .../{satori/go.uuid => gofrs/uuid}/LICENSE    |    0
  vendor/github.com/gofrs/uuid/README.md        |  109 ++
@@ -123,6 +131,15 @@ Subject: [PATCH 3/3] security patch for satori/go.uuid dgrijalva/jwt-go
  .../golang-jwt/jwt/v4/staticcheck.conf        |    1 +
  vendor/github.com/golang-jwt/jwt/v4/token.go  |  131 ++
  vendor/github.com/golang-jwt/jwt/v4/types.go  |  127 ++
+ .../github.com/gorilla/handlers/.travis.yml   |    8 -
+ vendor/github.com/gorilla/handlers/README.md  |   22 +-
+ .../github.com/gorilla/handlers/canonical.go  |    5 +-
+ .../github.com/gorilla/handlers/compress.go   |  157 ++-
+ vendor/github.com/gorilla/handlers/cors.go    |  355 ++++++
+ .../github.com/gorilla/handlers/handlers.go   |  287 +----
+ vendor/github.com/gorilla/handlers/logging.go |  244 ++++
+ .../gorilla/handlers/proxy_headers.go         |   23 +-
+ .../github.com/gorilla/handlers/recovery.go   |   96 ++
  vendor/github.com/marstr/guid/.travis.yml     |   18 -
  vendor/github.com/marstr/guid/README.md       |   27 -
  vendor/github.com/marstr/guid/guid.go         |  301 -----
@@ -138,8 +155,8 @@ Subject: [PATCH 3/3] security patch for satori/go.uuid dgrijalva/jwt-go
  vendor/golang.org/x/crypto/pkcs12/pbkdf.go    |  170 +++
  vendor/golang.org/x/crypto/pkcs12/pkcs12.go   |  360 ++++++
  vendor/golang.org/x/crypto/pkcs12/safebags.go |   57 +
- vendor/modules.txt                            |   41 +-
- 134 files changed, 9605 insertions(+), 2682 deletions(-)
+ vendor/modules.txt                            |   48 +-
+ 152 files changed, 11413 insertions(+), 3020 deletions(-)
  rename vendor/github.com/{marstr/guid => Azure/azure-sdk-for-go}/LICENSE.txt (93%)
  delete mode 100644 vendor/github.com/Azure/azure-sdk-for-go/NOTICE
  create mode 100644 vendor/github.com/Azure/azure-sdk-for-go/NOTICE.txt
@@ -173,6 +190,15 @@ Subject: [PATCH 3/3] security patch for satori/go.uuid dgrijalva/jwt-go
  delete mode 100644 vendor/github.com/dgrijalva/jwt-go/claims.go
  delete mode 100644 vendor/github.com/dgrijalva/jwt-go/map_claims.go
  delete mode 100644 vendor/github.com/dgrijalva/jwt-go/token.go
+ create mode 100644 vendor/github.com/felixge/httpsnoop/.gitignore
+ create mode 100644 vendor/github.com/felixge/httpsnoop/.travis.yml
+ create mode 100644 vendor/github.com/felixge/httpsnoop/LICENSE.txt
+ create mode 100644 vendor/github.com/felixge/httpsnoop/Makefile
+ create mode 100644 vendor/github.com/felixge/httpsnoop/README.md
+ create mode 100644 vendor/github.com/felixge/httpsnoop/capture_metrics.go
+ create mode 100644 vendor/github.com/felixge/httpsnoop/docs.go
+ create mode 100644 vendor/github.com/felixge/httpsnoop/wrap_generated_gteq_1.8.go
+ create mode 100644 vendor/github.com/felixge/httpsnoop/wrap_generated_lt_1.8.go
  create mode 100644 vendor/github.com/gofrs/uuid/.gitignore
  rename vendor/github.com/{satori/go.uuid => gofrs/uuid}/LICENSE (100%)
  create mode 100644 vendor/github.com/gofrs/uuid/README.md
@@ -205,6 +231,10 @@ Subject: [PATCH 3/3] security patch for satori/go.uuid dgrijalva/jwt-go
  create mode 100644 vendor/github.com/golang-jwt/jwt/v4/staticcheck.conf
  create mode 100644 vendor/github.com/golang-jwt/jwt/v4/token.go
  create mode 100644 vendor/github.com/golang-jwt/jwt/v4/types.go
+ delete mode 100644 vendor/github.com/gorilla/handlers/.travis.yml
+ create mode 100644 vendor/github.com/gorilla/handlers/cors.go
+ create mode 100644 vendor/github.com/gorilla/handlers/logging.go
+ create mode 100644 vendor/github.com/gorilla/handlers/recovery.go
  delete mode 100644 vendor/github.com/marstr/guid/.travis.yml
  delete mode 100644 vendor/github.com/marstr/guid/README.md
  delete mode 100644 vendor/github.com/marstr/guid/guid.go
@@ -222,7 +252,7 @@ Subject: [PATCH 3/3] security patch for satori/go.uuid dgrijalva/jwt-go
  create mode 100644 vendor/golang.org/x/crypto/pkcs12/safebags.go
 
 diff --git a/go.mod b/go.mod
-index 40f0b6b0..568681c0 100644
+index 40f0b6b0..a014823c 100644
 --- a/go.mod
 +++ b/go.mod
 @@ -3,7 +3,7 @@ module github.com/docker/distribution
@@ -234,7 +264,16 @@ index 40f0b6b0..568681c0 100644
  	github.com/FZambia/sentinel v1.1.0
  	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d
  	github.com/aws/aws-sdk-go v1.15.11
-@@ -32,26 +32,31 @@ require (
+@@ -14,7 +14,7 @@ require (
+ 	github.com/docker/libtrust v0.0.0-20150114040149-fa567046d9b1
+ 	github.com/garyburd/redigo v0.0.0-20150301180006-535138d7bcd7
+ 	github.com/gomodule/redigo v1.8.8
+-	github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33
++	github.com/gorilla/handlers v1.5.1
+ 	github.com/gorilla/mux v1.3.1-0.20170228224354-599cba5e7b61
+ 	github.com/mitchellh/mapstructure v0.0.0-20150528213339-482a9fd5fa83
+ 	github.com/ncw/swift v1.0.40
+@@ -32,26 +32,32 @@ require (
  )
  
  require (
@@ -252,6 +291,7 @@ index 40f0b6b0..568681c0 100644
  	github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0 // indirect
 -	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
  	github.com/dnaeon/go-vcr v1.2.0 // indirect
++	github.com/felixge/httpsnoop v1.0.2 // indirect
  	github.com/go-ini/ini v1.25.4 // indirect
 +	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 +	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
@@ -270,14 +310,14 @@ index 40f0b6b0..568681c0 100644
  	github.com/smartystreets/goconvey v1.7.2 // indirect
  	github.com/spf13/pflag v0.0.0-20150601220040-564482062245 // indirect
  	github.com/stretchr/testify v1.7.1 // indirect
-@@ -63,3 +68,5 @@ require (
+@@ -63,3 +69,5 @@ require (
  	google.golang.org/appengine v0.0.0-20160301025000-12d5545dc1cf // indirect
  	google.golang.org/grpc v0.0.0-20160317175043-d3ddb4469d5a // indirect
  )
 +
 +replace golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220427172511-eb4f295cb31f
 diff --git a/go.sum b/go.sum
-index 184bf9e7..eee8fd87 100644
+index 184bf9e7..0daac1f2 100644
 --- a/go.sum
 +++ b/go.sum
 @@ -1,7 +1,23 @@
@@ -308,7 +348,7 @@ index 184bf9e7..eee8fd87 100644
  github.com/FZambia/sentinel v1.1.0 h1:qrCBfxc8SvJihYNjBWgwUI93ZCvFe/PJIPTHKmlp8a8=
  github.com/FZambia/sentinel v1.1.0/go.mod h1:ytL1Am/RLlAoAXG6Kj5LNuw/TRRQrv2rt2FT26vP5gI=
  github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d h1:UrqY+r/OJnIp5u0s1SbQ8dVfLCZJsnvazdBP5hS4iRs=
-@@ -24,8 +40,6 @@ github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8
+@@ -24,18 +40,24 @@ github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8
  github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
  github.com/denverdino/aliyungo v0.0.0-20161108032828-afedced274aa h1:N8oSEUbmmrgAOD25rsz6nzIpbqUcB54jsZQvRmpUdBI=
  github.com/denverdino/aliyungo v0.0.0-20161108032828-afedced274aa/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
@@ -317,7 +357,13 @@ index 184bf9e7..eee8fd87 100644
  github.com/dnaeon/go-vcr v1.2.0 h1:zHCHvJYTMh1N7xnV7zf1m1GPBF9Ad0Jk/whtQ1663qI=
  github.com/dnaeon/go-vcr v1.2.0/go.mod h1:R4UdLID7HZT3taECzJs4YgbbH6PIGXB6W/sc5OLb6RQ=
  github.com/docker/go-metrics v0.0.0-20180209012529-399ea8c73916 h1:yWHOI+vFjEsAakUTSrtqc/SAHrhSkmn48pqjidZX3QA=
-@@ -36,6 +50,11 @@ github.com/garyburd/redigo v0.0.0-20150301180006-535138d7bcd7 h1:LofdAjjjqCSXMwL
+ github.com/docker/go-metrics v0.0.0-20180209012529-399ea8c73916/go.mod h1:/u0gXw0Gay3ceNrsHubL3BtdOL2fHf93USgMTe0W5dI=
+ github.com/docker/libtrust v0.0.0-20150114040149-fa567046d9b1 h1:ZClxb8laGDf5arXfYcAtECDFgAgHklGI8CxgjHnXKJ4=
+ github.com/docker/libtrust v0.0.0-20150114040149-fa567046d9b1/go.mod h1:cyGadeNEkKy96OOhEzfZl+yxihPEzKnqJwvfuSUqbZE=
++github.com/felixge/httpsnoop v1.0.1/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
++github.com/felixge/httpsnoop v1.0.2 h1:+nS9g82KMXccJ/wp0zyRW9ZBHFETmMGtkk+2CTTrW4o=
++github.com/felixge/httpsnoop v1.0.2/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
+ github.com/garyburd/redigo v0.0.0-20150301180006-535138d7bcd7 h1:LofdAjjjqCSXMwLGgOgnE+rdPuvX9DxCqaHwKy7i/ko=
  github.com/garyburd/redigo v0.0.0-20150301180006-535138d7bcd7/go.mod h1:NR3MbYisc3/PwhQ00EMzDiPmrwpPxAn5GI05/YaO1SY=
  github.com/go-ini/ini v1.25.4 h1:Mujh4R/dH6YL8bxuISne3xX2+qcQ9p0IxKAP6ExWoUo=
  github.com/go-ini/ini v1.25.4/go.mod h1:ByCAeIL28uOIIG0E3PJtZPDL8WnHpFKFOtgjp+3Ies8=
@@ -329,7 +375,18 @@ index 184bf9e7..eee8fd87 100644
  github.com/golang/protobuf v0.0.0-20160321223353-8d92cf5fc15a h1:vvuznlPYGGYdJ9yHfkMb3l9wSHugsXmSH/XN08b9XoI=
  github.com/golang/protobuf v0.0.0-20160321223353-8d92cf5fc15a/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
  github.com/gomodule/redigo v1.8.8 h1:f6cXq6RRfiyrOJEV7p3JhLDlmawGBVBBP1MggY8Mo4E=
-@@ -55,8 +74,6 @@ github.com/jmespath/go-jmespath v0.0.0-20160803190731-bd40a432e4c7 h1:SMvOWPJCES
+@@ -44,8 +66,8 @@ github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 h1:EGx4pi6eqNxGa
+ github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
+ github.com/gorilla/context v1.1.1 h1:AWwleXJkX/nhcU9bZSnZoi3h/qGYqQAGhq6zZe/aQW8=
+ github.com/gorilla/context v1.1.1/go.mod h1:kBGZzfjB9CEq2AlWe17Uuf7NDRt0dE0s8S51q0aT7Yg=
+-github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33 h1:893HsJqtxp9z1SF76gg6hY70hRY1wVlTSnC/h1yUDCo=
+-github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33/go.mod h1:Qkdc/uu4tH4g6mTK6auzZ766c4CA0Ng8+o/OAirnOIQ=
++github.com/gorilla/handlers v1.5.1 h1:9lRY6j8DEeeBT10CvO9hGW0gmky0BprnvDI5vfhUHH4=
++github.com/gorilla/handlers v1.5.1/go.mod h1:t8XrUpc4KVXb7HGyJ4/cEnwQiaxrX/hz1Zv/4g96P1Q=
+ github.com/gorilla/mux v1.3.1-0.20170228224354-599cba5e7b61 h1:fgQcA2gW8X1dLTYeaO8N6d1UMxsHczPYRjITrFNjxhk=
+ github.com/gorilla/mux v1.3.1-0.20170228224354-599cba5e7b61/go.mod h1:1lud6UwP+6orDFRuTfBEV8e9/aOM/c4fVVCaMa2zaAs=
+ github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
+@@ -55,8 +77,6 @@ github.com/jmespath/go-jmespath v0.0.0-20160803190731-bd40a432e4c7 h1:SMvOWPJCES
  github.com/jmespath/go-jmespath v0.0.0-20160803190731-bd40a432e4c7/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=
  github.com/jtolds/gls v4.20.0+incompatible h1:xdiiI2gbIgH/gLH7ADydsJ1uDOEzR8yvV7C0MuV77Wo=
  github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVYBRgL+9YlvaHOwJU=
@@ -338,7 +395,7 @@ index 184bf9e7..eee8fd87 100644
  github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
  github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
  github.com/mitchellh/mapstructure v0.0.0-20150528213339-482a9fd5fa83 h1:DpXlMpJom9Cw/wuNxVv3e92kcCpGydKp2Rz6O5SrwkI=
-@@ -80,8 +97,6 @@ github.com/prometheus/common v0.0.0-20180110214958-89604d197083 h1:BVsJT8+ZbyuL3
+@@ -80,8 +100,6 @@ github.com/prometheus/common v0.0.0-20180110214958-89604d197083 h1:BVsJT8+ZbyuL3
  github.com/prometheus/common v0.0.0-20180110214958-89604d197083/go.mod h1:daVV7qP5qjZbuso7PdcryaAu0sAZbrN9i7WWcTMWvro=
  github.com/prometheus/procfs v0.0.0-20180125133057-cb4147076ac7 h1:hhvfGDVThBnd4kYisSFmYuHYeUhglxcwag7FhVPH9zM=
  github.com/prometheus/procfs v0.0.0-20180125133057-cb4147076ac7/go.mod h1:c3At6R/oaqEKCNdg8wHV1ftS6bRYblBhIjjI8uT2IGk=
@@ -347,7 +404,7 @@ index 184bf9e7..eee8fd87 100644
  github.com/sirupsen/logrus v1.0.1-0.20170620144510-3d4380f53a34 h1:VvwrlTrXEdxP6xqoGUj07zcOnJK767KcoX5kE4KnZ2w=
  github.com/sirupsen/logrus v1.0.1-0.20170620144510-3d4380f53a34/go.mod h1:pMByvHTf9Beacp5x1UXfOR9xyW/9antXMhjMPG0dEzc=
  github.com/smartystreets/assertions v1.2.0 h1:42S6lae5dvLc7BrLu/0ugRtcFVjoJNMC/N3yZFZkDFs=
-@@ -102,7 +117,6 @@ github.com/yvasiyarov/gorelic v0.0.7-0.20141212073537-a9bba5b9ab50 h1:qlQPkaUt5i
+@@ -102,7 +120,6 @@ github.com/yvasiyarov/gorelic v0.0.7-0.20141212073537-a9bba5b9ab50 h1:qlQPkaUt5i
  github.com/yvasiyarov/gorelic v0.0.7-0.20141212073537-a9bba5b9ab50/go.mod h1:NUSPSUX/bi6SeDMUh6brw0nXpxHnc96TguQh0+r/ssA=
  github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f h1:ERexzlUfuTvpE74urLSbIQW0Z/6hF9t8U4NsJLaioAY=
  github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f/go.mod h1:GlGEuHIJweS1mbCqG+7vt2nvWLzLLnRHbXz5JKd/Qbg=
@@ -355,7 +412,7 @@ index 184bf9e7..eee8fd87 100644
  golang.org/x/crypto v0.0.0-20220427172511-eb4f295cb31f h1:OeJjE6G4dgCY4PIXvIRQbE8+RX+uXZyGhUy/ksMGJoc=
  golang.org/x/crypto v0.0.0-20220427172511-eb4f295cb31f/go.mod h1:IxCIyHEi3zRg3s0A5j5BB6A9Jmi73HwBIUl50j+osU4=
  golang.org/x/net v0.0.0-20190311183353-d8887717615a/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
-@@ -110,7 +124,6 @@ golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 h1:CIJ76btIcR3eFI5EgSo6k1qKw
+@@ -110,7 +127,6 @@ golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 h1:CIJ76btIcR3eFI5EgSo6k1qKw
  golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
  golang.org/x/oauth2 v0.0.0-20160304213135-045497edb623 h1:Ogcb1ofcvg+TPJ3U3BmnCFQxTzh9qidyMt5XgDWTrvw=
  golang.org/x/oauth2 v0.0.0-20160304213135-045497edb623/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
@@ -364,7 +421,7 @@ index 184bf9e7..eee8fd87 100644
  golang.org/x/sys v0.0.0-20210423082822-04245dca01da/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
  golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 diff --git a/vendor.conf b/vendor.conf
-index 77456402..2380bf18 100644
+index 77456402..20bb9a2b 100644
 --- a/vendor.conf
 +++ b/vendor.conf
 @@ -8,7 +8,6 @@ github.com/bugsnag/bugsnag-go b1d153021fcd90ca3f080db36bec96dc690fb274
@@ -391,14 +448,6 @@ index 77456402..2380bf18 100644
  golang.org/x/net 4876518f9e71663000c348837735820161a42df7
  golang.org/x/oauth2 045497edb6234273d67dbc25da3f2ddbc4c4cacf
  golang.org/x/time a4bde12657593d5e90d0533a3e4fd95e635124cb
-@@ -45,7 +42,6 @@ google.golang.org/cloud 975617b05ea8a58727e6c1a06b6161ff4185a9f2
- google.golang.org/grpc d3ddb4469d5a1b949fc7a7da7c1d6a0d1b6de994
- gopkg.in/check.v1 64131543e7896d5bcc6bd5a76287eb75ea96c673
- gopkg.in/square/go-jose.v1 40d457b439244b546f023d056628e5184136899b
--gopkg.in/yaml.v2 v2.2.1
- rsc.io/letsencrypt e770c10b0f1a64775ae91d240407ce00d1a5bdeb https://github.com/dmcgowan/letsencrypt.git
- github.com/opencontainers/go-digest a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb
- github.com/opencontainers/image-spec 67d2d5658fe0476ab9bf414cec164077ebff3920 # v1.0.2
 diff --git a/vendor/github.com/marstr/guid/LICENSE.txt b/vendor/github.com/Azure/azure-sdk-for-go/LICENSE.txt
 similarity index 93%
 rename from vendor/github.com/marstr/guid/LICENSE.txt
@@ -10462,6 +10511,990 @@ index d637e086..00000000
 -
 -	return base64.URLEncoding.DecodeString(seg)
 -}
+diff --git a/vendor/github.com/felixge/httpsnoop/.gitignore b/vendor/github.com/felixge/httpsnoop/.gitignore
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/vendor/github.com/felixge/httpsnoop/.travis.yml b/vendor/github.com/felixge/httpsnoop/.travis.yml
+new file mode 100644
+index 00000000..bfc42120
+--- /dev/null
++++ b/vendor/github.com/felixge/httpsnoop/.travis.yml
+@@ -0,0 +1,6 @@
++language: go
++
++go:
++  - 1.6
++  - 1.7
++  - 1.8
+diff --git a/vendor/github.com/felixge/httpsnoop/LICENSE.txt b/vendor/github.com/felixge/httpsnoop/LICENSE.txt
+new file mode 100644
+index 00000000..e028b46a
+--- /dev/null
++++ b/vendor/github.com/felixge/httpsnoop/LICENSE.txt
+@@ -0,0 +1,19 @@
++Copyright (c) 2016 Felix Geisendörfer (felix@debuggable.com)
++
++ Permission is hereby granted, free of charge, to any person obtaining a copy
++ of this software and associated documentation files (the "Software"), to deal
++ in the Software without restriction, including without limitation the rights
++ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ copies of the Software, and to permit persons to whom the Software is
++ furnished to do so, subject to the following conditions:
++
++ The above copyright notice and this permission notice shall be included in
++ all copies or substantial portions of the Software.
++
++ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ THE SOFTWARE.
+diff --git a/vendor/github.com/felixge/httpsnoop/Makefile b/vendor/github.com/felixge/httpsnoop/Makefile
+new file mode 100644
+index 00000000..2d84889a
+--- /dev/null
++++ b/vendor/github.com/felixge/httpsnoop/Makefile
+@@ -0,0 +1,10 @@
++.PHONY: ci generate clean
++
++ci: clean generate
++	go test -v ./...
++
++generate:
++	go generate .
++
++clean:
++	rm -rf *_generated*.go
+diff --git a/vendor/github.com/felixge/httpsnoop/README.md b/vendor/github.com/felixge/httpsnoop/README.md
+new file mode 100644
+index 00000000..ddcecd13
+--- /dev/null
++++ b/vendor/github.com/felixge/httpsnoop/README.md
+@@ -0,0 +1,95 @@
++# httpsnoop
++
++Package httpsnoop provides an easy way to capture http related metrics (i.e.
++response time, bytes written, and http status code) from your application's
++http.Handlers.
++
++Doing this requires non-trivial wrapping of the http.ResponseWriter interface,
++which is also exposed for users interested in a more low-level API.
++
++[![GoDoc](https://godoc.org/github.com/felixge/httpsnoop?status.svg)](https://godoc.org/github.com/felixge/httpsnoop)
++[![Build Status](https://travis-ci.org/felixge/httpsnoop.svg?branch=master)](https://travis-ci.org/felixge/httpsnoop)
++
++## Usage Example
++
++```go
++// myH is your app's http handler, perhaps a http.ServeMux or similar.
++var myH http.Handler
++// wrappedH wraps myH in order to log every request.
++wrappedH := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++	m := httpsnoop.CaptureMetrics(myH, w, r)
++	log.Printf(
++		"%s %s (code=%d dt=%s written=%d)",
++		r.Method,
++		r.URL,
++		m.Code,
++		m.Duration,
++		m.Written,
++	)
++})
++http.ListenAndServe(":8080", wrappedH)
++```
++
++## Why this package exists
++
++Instrumenting an application's http.Handler is surprisingly difficult.
++
++However if you google for e.g. "capture ResponseWriter status code" you'll find
++lots of advise and code examples that suggest it to be a fairly trivial
++undertaking. Unfortunately everything I've seen so far has a high chance of
++breaking your application.
++
++The main problem is that a `http.ResponseWriter` often implements additional
++interfaces such as `http.Flusher`, `http.CloseNotifier`, `http.Hijacker`, `http.Pusher`, and
++`io.ReaderFrom`. So the naive approach of just wrapping `http.ResponseWriter`
++in your own struct that also implements the `http.ResponseWriter` interface
++will hide the additional interfaces mentioned above. This has a high change of
++introducing subtle bugs into any non-trivial application.
++
++Another approach I've seen people take is to return a struct that implements
++all of the interfaces above. However, that's also problematic, because it's
++difficult to fake some of these interfaces behaviors when the underlying
++`http.ResponseWriter` doesn't have an implementation. It's also dangerous,
++because an application may choose to operate differently, merely because it
++detects the presence of these additional interfaces.
++
++This package solves this problem by checking which additional interfaces a
++`http.ResponseWriter` implements, returning a wrapped version implementing the
++exact same set of interfaces.
++
++Additionally this package properly handles edge cases such as `WriteHeader` not
++being called, or called more than once, as well as concurrent calls to
++`http.ResponseWriter` methods, and even calls happening after the wrapped
++`ServeHTTP` has already returned.
++
++Unfortunately this package is not perfect either. It's possible that it is
++still missing some interfaces provided by the go core (let me know if you find
++one), and it won't work for applications adding their own interfaces into the
++mix. You can however use `httpsnoop.Unwrap(w)` to access the underlying
++`http.ResponseWriter` and type-assert the result to its other interfaces.
++
++However, hopefully the explanation above has sufficiently scared you of rolling
++your own solution to this problem. httpsnoop may still break your application,
++but at least it tries to avoid it as much as possible.
++
++Anyway, the real problem here is that smuggling additional interfaces inside
++`http.ResponseWriter` is a problematic design choice, but it probably goes as
++deep as the Go language specification itself. But that's okay, I still prefer
++Go over the alternatives ;).
++
++## Performance
++
++```
++BenchmarkBaseline-8      	   20000	     94912 ns/op
++BenchmarkCaptureMetrics-8	   20000	     95461 ns/op
++```
++
++As you can see, using `CaptureMetrics` on a vanilla http.Handler introduces an
++overhead of ~500 ns per http request on my machine. However, the margin of
++error appears to be larger than that, therefor it should be reasonable to
++assume that the overhead introduced by `CaptureMetrics` is absolutely
++negligible.
++
++## License
++
++MIT
+diff --git a/vendor/github.com/felixge/httpsnoop/capture_metrics.go b/vendor/github.com/felixge/httpsnoop/capture_metrics.go
+new file mode 100644
+index 00000000..c1d1b380
+--- /dev/null
++++ b/vendor/github.com/felixge/httpsnoop/capture_metrics.go
+@@ -0,0 +1,79 @@
++package httpsnoop
++
++import (
++	"io"
++	"net/http"
++	"time"
++)
++
++// Metrics holds metrics captured from CaptureMetrics.
++type Metrics struct {
++	// Code is the first http response code passed to the WriteHeader func of
++	// the ResponseWriter. If no such call is made, a default code of 200 is
++	// assumed instead.
++	Code int
++	// Duration is the time it took to execute the handler.
++	Duration time.Duration
++	// Written is the number of bytes successfully written by the Write or
++	// ReadFrom function of the ResponseWriter. ResponseWriters may also write
++	// data to their underlaying connection directly (e.g. headers), but those
++	// are not tracked. Therefor the number of Written bytes will usually match
++	// the size of the response body.
++	Written int64
++}
++
++// CaptureMetrics wraps the given hnd, executes it with the given w and r, and
++// returns the metrics it captured from it.
++func CaptureMetrics(hnd http.Handler, w http.ResponseWriter, r *http.Request) Metrics {
++	return CaptureMetricsFn(w, func(ww http.ResponseWriter) {
++		hnd.ServeHTTP(ww, r)
++	})
++}
++
++// CaptureMetricsFn wraps w and calls fn with the wrapped w and returns the
++// resulting metrics. This is very similar to CaptureMetrics (which is just
++// sugar on top of this func), but is a more usable interface if your
++// application doesn't use the Go http.Handler interface.
++func CaptureMetricsFn(w http.ResponseWriter, fn func(http.ResponseWriter)) Metrics {
++	var (
++		start         = time.Now()
++		m             = Metrics{Code: http.StatusOK}
++		headerWritten bool
++		hooks         = Hooks{
++			WriteHeader: func(next WriteHeaderFunc) WriteHeaderFunc {
++				return func(code int) {
++					next(code)
++
++					if !headerWritten {
++						m.Code = code
++						headerWritten = true
++					}
++				}
++			},
++
++			Write: func(next WriteFunc) WriteFunc {
++				return func(p []byte) (int, error) {
++					n, err := next(p)
++
++					m.Written += int64(n)
++					headerWritten = true
++					return n, err
++				}
++			},
++
++			ReadFrom: func(next ReadFromFunc) ReadFromFunc {
++				return func(src io.Reader) (int64, error) {
++					n, err := next(src)
++
++					headerWritten = true
++					m.Written += n
++					return n, err
++				}
++			},
++		}
++	)
++
++	fn(Wrap(w, hooks))
++	m.Duration = time.Since(start)
++	return m
++}
+diff --git a/vendor/github.com/felixge/httpsnoop/docs.go b/vendor/github.com/felixge/httpsnoop/docs.go
+new file mode 100644
+index 00000000..203c35b3
+--- /dev/null
++++ b/vendor/github.com/felixge/httpsnoop/docs.go
+@@ -0,0 +1,10 @@
++// Package httpsnoop provides an easy way to capture http related metrics (i.e.
++// response time, bytes written, and http status code) from your application's
++// http.Handlers.
++//
++// Doing this requires non-trivial wrapping of the http.ResponseWriter
++// interface, which is also exposed for users interested in a more low-level
++// API.
++package httpsnoop
++
++//go:generate go run codegen/main.go
+diff --git a/vendor/github.com/felixge/httpsnoop/wrap_generated_gteq_1.8.go b/vendor/github.com/felixge/httpsnoop/wrap_generated_gteq_1.8.go
+new file mode 100644
+index 00000000..31cbdfb8
+--- /dev/null
++++ b/vendor/github.com/felixge/httpsnoop/wrap_generated_gteq_1.8.go
+@@ -0,0 +1,436 @@
++// +build go1.8
++// Code generated by "httpsnoop/codegen"; DO NOT EDIT
++
++package httpsnoop
++
++import (
++	"bufio"
++	"io"
++	"net"
++	"net/http"
++)
++
++// HeaderFunc is part of the http.ResponseWriter interface.
++type HeaderFunc func() http.Header
++
++// WriteHeaderFunc is part of the http.ResponseWriter interface.
++type WriteHeaderFunc func(code int)
++
++// WriteFunc is part of the http.ResponseWriter interface.
++type WriteFunc func(b []byte) (int, error)
++
++// FlushFunc is part of the http.Flusher interface.
++type FlushFunc func()
++
++// CloseNotifyFunc is part of the http.CloseNotifier interface.
++type CloseNotifyFunc func() <-chan bool
++
++// HijackFunc is part of the http.Hijacker interface.
++type HijackFunc func() (net.Conn, *bufio.ReadWriter, error)
++
++// ReadFromFunc is part of the io.ReaderFrom interface.
++type ReadFromFunc func(src io.Reader) (int64, error)
++
++// PushFunc is part of the http.Pusher interface.
++type PushFunc func(target string, opts *http.PushOptions) error
++
++// Hooks defines a set of method interceptors for methods included in
++// http.ResponseWriter as well as some others. You can think of them as
++// middleware for the function calls they target. See Wrap for more details.
++type Hooks struct {
++	Header      func(HeaderFunc) HeaderFunc
++	WriteHeader func(WriteHeaderFunc) WriteHeaderFunc
++	Write       func(WriteFunc) WriteFunc
++	Flush       func(FlushFunc) FlushFunc
++	CloseNotify func(CloseNotifyFunc) CloseNotifyFunc
++	Hijack      func(HijackFunc) HijackFunc
++	ReadFrom    func(ReadFromFunc) ReadFromFunc
++	Push        func(PushFunc) PushFunc
++}
++
++// Wrap returns a wrapped version of w that provides the exact same interface
++// as w. Specifically if w implements any combination of:
++//
++// - http.Flusher
++// - http.CloseNotifier
++// - http.Hijacker
++// - io.ReaderFrom
++// - http.Pusher
++//
++// The wrapped version will implement the exact same combination. If no hooks
++// are set, the wrapped version also behaves exactly as w. Hooks targeting
++// methods not supported by w are ignored. Any other hooks will intercept the
++// method they target and may modify the call's arguments and/or return values.
++// The CaptureMetrics implementation serves as a working example for how the
++// hooks can be used.
++func Wrap(w http.ResponseWriter, hooks Hooks) http.ResponseWriter {
++	rw := &rw{w: w, h: hooks}
++	_, i0 := w.(http.Flusher)
++	_, i1 := w.(http.CloseNotifier)
++	_, i2 := w.(http.Hijacker)
++	_, i3 := w.(io.ReaderFrom)
++	_, i4 := w.(http.Pusher)
++	switch {
++	// combination 1/32
++	case !i0 && !i1 && !i2 && !i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++		}{rw, rw}
++	// combination 2/32
++	case !i0 && !i1 && !i2 && !i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Pusher
++		}{rw, rw, rw}
++	// combination 3/32
++	case !i0 && !i1 && !i2 && i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			io.ReaderFrom
++		}{rw, rw, rw}
++	// combination 4/32
++	case !i0 && !i1 && !i2 && i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			io.ReaderFrom
++			http.Pusher
++		}{rw, rw, rw, rw}
++	// combination 5/32
++	case !i0 && !i1 && i2 && !i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Hijacker
++		}{rw, rw, rw}
++	// combination 6/32
++	case !i0 && !i1 && i2 && !i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Hijacker
++			http.Pusher
++		}{rw, rw, rw, rw}
++	// combination 7/32
++	case !i0 && !i1 && i2 && i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Hijacker
++			io.ReaderFrom
++		}{rw, rw, rw, rw}
++	// combination 8/32
++	case !i0 && !i1 && i2 && i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Hijacker
++			io.ReaderFrom
++			http.Pusher
++		}{rw, rw, rw, rw, rw}
++	// combination 9/32
++	case !i0 && i1 && !i2 && !i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++		}{rw, rw, rw}
++	// combination 10/32
++	case !i0 && i1 && !i2 && !i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			http.Pusher
++		}{rw, rw, rw, rw}
++	// combination 11/32
++	case !i0 && i1 && !i2 && i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			io.ReaderFrom
++		}{rw, rw, rw, rw}
++	// combination 12/32
++	case !i0 && i1 && !i2 && i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			io.ReaderFrom
++			http.Pusher
++		}{rw, rw, rw, rw, rw}
++	// combination 13/32
++	case !i0 && i1 && i2 && !i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			http.Hijacker
++		}{rw, rw, rw, rw}
++	// combination 14/32
++	case !i0 && i1 && i2 && !i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			http.Hijacker
++			http.Pusher
++		}{rw, rw, rw, rw, rw}
++	// combination 15/32
++	case !i0 && i1 && i2 && i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			http.Hijacker
++			io.ReaderFrom
++		}{rw, rw, rw, rw, rw}
++	// combination 16/32
++	case !i0 && i1 && i2 && i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			http.Hijacker
++			io.ReaderFrom
++			http.Pusher
++		}{rw, rw, rw, rw, rw, rw}
++	// combination 17/32
++	case i0 && !i1 && !i2 && !i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++		}{rw, rw, rw}
++	// combination 18/32
++	case i0 && !i1 && !i2 && !i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.Pusher
++		}{rw, rw, rw, rw}
++	// combination 19/32
++	case i0 && !i1 && !i2 && i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			io.ReaderFrom
++		}{rw, rw, rw, rw}
++	// combination 20/32
++	case i0 && !i1 && !i2 && i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			io.ReaderFrom
++			http.Pusher
++		}{rw, rw, rw, rw, rw}
++	// combination 21/32
++	case i0 && !i1 && i2 && !i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.Hijacker
++		}{rw, rw, rw, rw}
++	// combination 22/32
++	case i0 && !i1 && i2 && !i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.Hijacker
++			http.Pusher
++		}{rw, rw, rw, rw, rw}
++	// combination 23/32
++	case i0 && !i1 && i2 && i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.Hijacker
++			io.ReaderFrom
++		}{rw, rw, rw, rw, rw}
++	// combination 24/32
++	case i0 && !i1 && i2 && i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.Hijacker
++			io.ReaderFrom
++			http.Pusher
++		}{rw, rw, rw, rw, rw, rw}
++	// combination 25/32
++	case i0 && i1 && !i2 && !i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++		}{rw, rw, rw, rw}
++	// combination 26/32
++	case i0 && i1 && !i2 && !i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			http.Pusher
++		}{rw, rw, rw, rw, rw}
++	// combination 27/32
++	case i0 && i1 && !i2 && i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			io.ReaderFrom
++		}{rw, rw, rw, rw, rw}
++	// combination 28/32
++	case i0 && i1 && !i2 && i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			io.ReaderFrom
++			http.Pusher
++		}{rw, rw, rw, rw, rw, rw}
++	// combination 29/32
++	case i0 && i1 && i2 && !i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			http.Hijacker
++		}{rw, rw, rw, rw, rw}
++	// combination 30/32
++	case i0 && i1 && i2 && !i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			http.Hijacker
++			http.Pusher
++		}{rw, rw, rw, rw, rw, rw}
++	// combination 31/32
++	case i0 && i1 && i2 && i3 && !i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			http.Hijacker
++			io.ReaderFrom
++		}{rw, rw, rw, rw, rw, rw}
++	// combination 32/32
++	case i0 && i1 && i2 && i3 && i4:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			http.Hijacker
++			io.ReaderFrom
++			http.Pusher
++		}{rw, rw, rw, rw, rw, rw, rw}
++	}
++	panic("unreachable")
++}
++
++type rw struct {
++	w http.ResponseWriter
++	h Hooks
++}
++
++func (w *rw) Unwrap() http.ResponseWriter {
++	return w.w
++}
++
++func (w *rw) Header() http.Header {
++	f := w.w.(http.ResponseWriter).Header
++	if w.h.Header != nil {
++		f = w.h.Header(f)
++	}
++	return f()
++}
++
++func (w *rw) WriteHeader(code int) {
++	f := w.w.(http.ResponseWriter).WriteHeader
++	if w.h.WriteHeader != nil {
++		f = w.h.WriteHeader(f)
++	}
++	f(code)
++}
++
++func (w *rw) Write(b []byte) (int, error) {
++	f := w.w.(http.ResponseWriter).Write
++	if w.h.Write != nil {
++		f = w.h.Write(f)
++	}
++	return f(b)
++}
++
++func (w *rw) Flush() {
++	f := w.w.(http.Flusher).Flush
++	if w.h.Flush != nil {
++		f = w.h.Flush(f)
++	}
++	f()
++}
++
++func (w *rw) CloseNotify() <-chan bool {
++	f := w.w.(http.CloseNotifier).CloseNotify
++	if w.h.CloseNotify != nil {
++		f = w.h.CloseNotify(f)
++	}
++	return f()
++}
++
++func (w *rw) Hijack() (net.Conn, *bufio.ReadWriter, error) {
++	f := w.w.(http.Hijacker).Hijack
++	if w.h.Hijack != nil {
++		f = w.h.Hijack(f)
++	}
++	return f()
++}
++
++func (w *rw) ReadFrom(src io.Reader) (int64, error) {
++	f := w.w.(io.ReaderFrom).ReadFrom
++	if w.h.ReadFrom != nil {
++		f = w.h.ReadFrom(f)
++	}
++	return f(src)
++}
++
++func (w *rw) Push(target string, opts *http.PushOptions) error {
++	f := w.w.(http.Pusher).Push
++	if w.h.Push != nil {
++		f = w.h.Push(f)
++	}
++	return f(target, opts)
++}
++
++type Unwrapper interface {
++	Unwrap() http.ResponseWriter
++}
++
++// Unwrap returns the underlying http.ResponseWriter from within zero or more
++// layers of httpsnoop wrappers.
++func Unwrap(w http.ResponseWriter) http.ResponseWriter {
++	if rw, ok := w.(Unwrapper); ok {
++		// recurse until rw.Unwrap() returns a non-Unwrapper
++		return Unwrap(rw.Unwrap())
++	} else {
++		return w
++	}
++}
+diff --git a/vendor/github.com/felixge/httpsnoop/wrap_generated_lt_1.8.go b/vendor/github.com/felixge/httpsnoop/wrap_generated_lt_1.8.go
+new file mode 100644
+index 00000000..ab99c07c
+--- /dev/null
++++ b/vendor/github.com/felixge/httpsnoop/wrap_generated_lt_1.8.go
+@@ -0,0 +1,278 @@
++// +build !go1.8
++// Code generated by "httpsnoop/codegen"; DO NOT EDIT
++
++package httpsnoop
++
++import (
++	"bufio"
++	"io"
++	"net"
++	"net/http"
++)
++
++// HeaderFunc is part of the http.ResponseWriter interface.
++type HeaderFunc func() http.Header
++
++// WriteHeaderFunc is part of the http.ResponseWriter interface.
++type WriteHeaderFunc func(code int)
++
++// WriteFunc is part of the http.ResponseWriter interface.
++type WriteFunc func(b []byte) (int, error)
++
++// FlushFunc is part of the http.Flusher interface.
++type FlushFunc func()
++
++// CloseNotifyFunc is part of the http.CloseNotifier interface.
++type CloseNotifyFunc func() <-chan bool
++
++// HijackFunc is part of the http.Hijacker interface.
++type HijackFunc func() (net.Conn, *bufio.ReadWriter, error)
++
++// ReadFromFunc is part of the io.ReaderFrom interface.
++type ReadFromFunc func(src io.Reader) (int64, error)
++
++// Hooks defines a set of method interceptors for methods included in
++// http.ResponseWriter as well as some others. You can think of them as
++// middleware for the function calls they target. See Wrap for more details.
++type Hooks struct {
++	Header      func(HeaderFunc) HeaderFunc
++	WriteHeader func(WriteHeaderFunc) WriteHeaderFunc
++	Write       func(WriteFunc) WriteFunc
++	Flush       func(FlushFunc) FlushFunc
++	CloseNotify func(CloseNotifyFunc) CloseNotifyFunc
++	Hijack      func(HijackFunc) HijackFunc
++	ReadFrom    func(ReadFromFunc) ReadFromFunc
++}
++
++// Wrap returns a wrapped version of w that provides the exact same interface
++// as w. Specifically if w implements any combination of:
++//
++// - http.Flusher
++// - http.CloseNotifier
++// - http.Hijacker
++// - io.ReaderFrom
++//
++// The wrapped version will implement the exact same combination. If no hooks
++// are set, the wrapped version also behaves exactly as w. Hooks targeting
++// methods not supported by w are ignored. Any other hooks will intercept the
++// method they target and may modify the call's arguments and/or return values.
++// The CaptureMetrics implementation serves as a working example for how the
++// hooks can be used.
++func Wrap(w http.ResponseWriter, hooks Hooks) http.ResponseWriter {
++	rw := &rw{w: w, h: hooks}
++	_, i0 := w.(http.Flusher)
++	_, i1 := w.(http.CloseNotifier)
++	_, i2 := w.(http.Hijacker)
++	_, i3 := w.(io.ReaderFrom)
++	switch {
++	// combination 1/16
++	case !i0 && !i1 && !i2 && !i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++		}{rw, rw}
++	// combination 2/16
++	case !i0 && !i1 && !i2 && i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			io.ReaderFrom
++		}{rw, rw, rw}
++	// combination 3/16
++	case !i0 && !i1 && i2 && !i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Hijacker
++		}{rw, rw, rw}
++	// combination 4/16
++	case !i0 && !i1 && i2 && i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Hijacker
++			io.ReaderFrom
++		}{rw, rw, rw, rw}
++	// combination 5/16
++	case !i0 && i1 && !i2 && !i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++		}{rw, rw, rw}
++	// combination 6/16
++	case !i0 && i1 && !i2 && i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			io.ReaderFrom
++		}{rw, rw, rw, rw}
++	// combination 7/16
++	case !i0 && i1 && i2 && !i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			http.Hijacker
++		}{rw, rw, rw, rw}
++	// combination 8/16
++	case !i0 && i1 && i2 && i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.CloseNotifier
++			http.Hijacker
++			io.ReaderFrom
++		}{rw, rw, rw, rw, rw}
++	// combination 9/16
++	case i0 && !i1 && !i2 && !i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++		}{rw, rw, rw}
++	// combination 10/16
++	case i0 && !i1 && !i2 && i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			io.ReaderFrom
++		}{rw, rw, rw, rw}
++	// combination 11/16
++	case i0 && !i1 && i2 && !i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.Hijacker
++		}{rw, rw, rw, rw}
++	// combination 12/16
++	case i0 && !i1 && i2 && i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.Hijacker
++			io.ReaderFrom
++		}{rw, rw, rw, rw, rw}
++	// combination 13/16
++	case i0 && i1 && !i2 && !i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++		}{rw, rw, rw, rw}
++	// combination 14/16
++	case i0 && i1 && !i2 && i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			io.ReaderFrom
++		}{rw, rw, rw, rw, rw}
++	// combination 15/16
++	case i0 && i1 && i2 && !i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			http.Hijacker
++		}{rw, rw, rw, rw, rw}
++	// combination 16/16
++	case i0 && i1 && i2 && i3:
++		return struct {
++			Unwrapper
++			http.ResponseWriter
++			http.Flusher
++			http.CloseNotifier
++			http.Hijacker
++			io.ReaderFrom
++		}{rw, rw, rw, rw, rw, rw}
++	}
++	panic("unreachable")
++}
++
++type rw struct {
++	w http.ResponseWriter
++	h Hooks
++}
++
++func (w *rw) Unwrap() http.ResponseWriter {
++	return w.w
++}
++
++func (w *rw) Header() http.Header {
++	f := w.w.(http.ResponseWriter).Header
++	if w.h.Header != nil {
++		f = w.h.Header(f)
++	}
++	return f()
++}
++
++func (w *rw) WriteHeader(code int) {
++	f := w.w.(http.ResponseWriter).WriteHeader
++	if w.h.WriteHeader != nil {
++		f = w.h.WriteHeader(f)
++	}
++	f(code)
++}
++
++func (w *rw) Write(b []byte) (int, error) {
++	f := w.w.(http.ResponseWriter).Write
++	if w.h.Write != nil {
++		f = w.h.Write(f)
++	}
++	return f(b)
++}
++
++func (w *rw) Flush() {
++	f := w.w.(http.Flusher).Flush
++	if w.h.Flush != nil {
++		f = w.h.Flush(f)
++	}
++	f()
++}
++
++func (w *rw) CloseNotify() <-chan bool {
++	f := w.w.(http.CloseNotifier).CloseNotify
++	if w.h.CloseNotify != nil {
++		f = w.h.CloseNotify(f)
++	}
++	return f()
++}
++
++func (w *rw) Hijack() (net.Conn, *bufio.ReadWriter, error) {
++	f := w.w.(http.Hijacker).Hijack
++	if w.h.Hijack != nil {
++		f = w.h.Hijack(f)
++	}
++	return f()
++}
++
++func (w *rw) ReadFrom(src io.Reader) (int64, error) {
++	f := w.w.(io.ReaderFrom).ReadFrom
++	if w.h.ReadFrom != nil {
++		f = w.h.ReadFrom(f)
++	}
++	return f(src)
++}
++
++type Unwrapper interface {
++	Unwrap() http.ResponseWriter
++}
++
++// Unwrap returns the underlying http.ResponseWriter from within zero or more
++// layers of httpsnoop wrappers.
++func Unwrap(w http.ResponseWriter) http.ResponseWriter {
++	if rw, ok := w.(Unwrapper); ok {
++		// recurse until rw.Unwrap() returns a non-Unwrapper
++		return Unwrap(rw.Unwrap())
++	} else {
++		return w
++	}
++}
 diff --git a/vendor/github.com/gofrs/uuid/.gitignore b/vendor/github.com/gofrs/uuid/.gitignore
 new file mode 100644
 index 00000000..666dbbb5
@@ -13506,6 +14539,1392 @@ index 00000000..80b1b969
 +
 +	return json.Marshal([]string(s))
 +}
+diff --git a/vendor/github.com/gorilla/handlers/.travis.yml b/vendor/github.com/gorilla/handlers/.travis.yml
+deleted file mode 100644
+index 354b7f8b..00000000
+--- a/vendor/github.com/gorilla/handlers/.travis.yml
++++ /dev/null
+@@ -1,8 +0,0 @@
+-language: go
+-
+-go:
+-  - 1.1
+-  - 1.2
+-  - 1.3
+-  - 1.4
+-  - tip
+diff --git a/vendor/github.com/gorilla/handlers/README.md b/vendor/github.com/gorilla/handlers/README.md
+index a340abe0..6eba66bf 100644
+--- a/vendor/github.com/gorilla/handlers/README.md
++++ b/vendor/github.com/gorilla/handlers/README.md
+@@ -1,28 +1,32 @@
+ gorilla/handlers
+ ================
+-[![GoDoc](https://godoc.org/github.com/gorilla/handlers?status.svg)](https://godoc.org/github.com/gorilla/handlers) [![Build Status](https://travis-ci.org/gorilla/handlers.svg?branch=master)](https://travis-ci.org/gorilla/handlers)
++[![GoDoc](https://godoc.org/github.com/gorilla/handlers?status.svg)](https://godoc.org/github.com/gorilla/handlers)
++[![CircleCI](https://circleci.com/gh/gorilla/handlers.svg?style=svg)](https://circleci.com/gh/gorilla/handlers)
++[![Sourcegraph](https://sourcegraph.com/github.com/gorilla/handlers/-/badge.svg)](https://sourcegraph.com/github.com/gorilla/handlers?badge)
++
+ 
+ Package handlers is a collection of handlers (aka "HTTP middleware") for use
+ with Go's `net/http` package (or any framework supporting `http.Handler`), including:
+ 
+-* `LoggingHandler` for logging HTTP requests in the Apache [Common Log
++* [**LoggingHandler**](https://godoc.org/github.com/gorilla/handlers#LoggingHandler) for logging HTTP requests in the Apache [Common Log
+   Format](http://httpd.apache.org/docs/2.2/logs.html#common).
+-* `CombinedLoggingHandler` for logging HTTP requests in the Apache [Combined Log
++* [**CombinedLoggingHandler**](https://godoc.org/github.com/gorilla/handlers#CombinedLoggingHandler) for logging HTTP requests in the Apache [Combined Log
+   Format](http://httpd.apache.org/docs/2.2/logs.html#combined) commonly used by
+   both Apache and nginx.
+-* `CompressHandler` for gzipping responses.
+-* `ContentTypeHandler` for validating requests against a list of accepted
++* [**CompressHandler**](https://godoc.org/github.com/gorilla/handlers#CompressHandler) for gzipping responses.
++* [**ContentTypeHandler**](https://godoc.org/github.com/gorilla/handlers#ContentTypeHandler) for validating requests against a list of accepted
+   content types.
+-* `MethodHandler` for matching HTTP methods against handlers in a
++* [**MethodHandler**](https://godoc.org/github.com/gorilla/handlers#MethodHandler) for matching HTTP methods against handlers in a
+   `map[string]http.Handler`
+-* `ProxyHeaders` for populating `r.RemoteAddr` and `r.URL.Scheme` based on the
++* [**ProxyHeaders**](https://godoc.org/github.com/gorilla/handlers#ProxyHeaders) for populating `r.RemoteAddr` and `r.URL.Scheme` based on the
+   `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Proto` and RFC7239 `Forwarded`
+   headers when running a Go server behind a HTTP reverse proxy.
+-* `CanonicalHost` for re-directing to the preferred host when handling multiple 
++* [**CanonicalHost**](https://godoc.org/github.com/gorilla/handlers#CanonicalHost) for re-directing to the preferred host when handling multiple 
+   domains (i.e. multiple CNAME aliases).
++* [**RecoveryHandler**](https://godoc.org/github.com/gorilla/handlers#RecoveryHandler) for recovering from unexpected panics.
+ 
+ Other handlers are documented [on the Gorilla
+-website](http://www.gorillatoolkit.org/pkg/handlers).
++website](https://www.gorillatoolkit.org/pkg/handlers).
+ 
+ ## Example
+ 
+diff --git a/vendor/github.com/gorilla/handlers/canonical.go b/vendor/github.com/gorilla/handlers/canonical.go
+index 3961695c..8437fefc 100644
+--- a/vendor/github.com/gorilla/handlers/canonical.go
++++ b/vendor/github.com/gorilla/handlers/canonical.go
+@@ -18,7 +18,6 @@ type canonical struct {
+ //
+ // Note: If the provided domain is considered invalid by url.Parse or otherwise
+ // returns an empty scheme or host, clients are not re-directed.
+-// not re-directed.
+ //
+ // Example:
+ //
+@@ -54,7 +53,11 @@ func (c canonical) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+ 	if !strings.EqualFold(cleanHost(r.Host), dest.Host) {
+ 		// Re-build the destination URL
+ 		dest := dest.Scheme + "://" + dest.Host + r.URL.Path
++		if r.URL.RawQuery != "" {
++			dest += "?" + r.URL.RawQuery
++		}
+ 		http.Redirect(w, r, dest, c.code)
++		return
+ 	}
+ 
+ 	c.h.ServeHTTP(w, r)
+diff --git a/vendor/github.com/gorilla/handlers/compress.go b/vendor/github.com/gorilla/handlers/compress.go
+index 3d90e191..1e95f1cc 100644
+--- a/vendor/github.com/gorilla/handlers/compress.go
++++ b/vendor/github.com/gorilla/handlers/compress.go
+@@ -10,75 +10,134 @@ import (
+ 	"io"
+ 	"net/http"
+ 	"strings"
++
++	"github.com/felixge/httpsnoop"
+ )
+ 
++const acceptEncoding string = "Accept-Encoding"
++
+ type compressResponseWriter struct {
+-	io.Writer
+-	http.ResponseWriter
+-	http.Hijacker
++	compressor io.Writer
++	w          http.ResponseWriter
+ }
+ 
+-func (w *compressResponseWriter) Header() http.Header {
+-	return w.ResponseWriter.Header()
++func (cw *compressResponseWriter) WriteHeader(c int) {
++	cw.w.Header().Del("Content-Length")
++	cw.w.WriteHeader(c)
+ }
+ 
+-func (w *compressResponseWriter) Write(b []byte) (int, error) {
+-	h := w.ResponseWriter.Header()
++func (cw *compressResponseWriter) Write(b []byte) (int, error) {
++	h := cw.w.Header()
+ 	if h.Get("Content-Type") == "" {
+ 		h.Set("Content-Type", http.DetectContentType(b))
+ 	}
++	h.Del("Content-Length")
++
++	return cw.compressor.Write(b)
++}
+ 
+-	return w.Writer.Write(b)
++func (cw *compressResponseWriter) ReadFrom(r io.Reader) (int64, error) {
++	return io.Copy(cw.compressor, r)
++}
++
++type flusher interface {
++	Flush() error
++}
++
++func (w *compressResponseWriter) Flush() {
++	// Flush compressed data if compressor supports it.
++	if f, ok := w.compressor.(flusher); ok {
++		f.Flush()
++	}
++	// Flush HTTP response.
++	if f, ok := w.w.(http.Flusher); ok {
++		f.Flush()
++	}
+ }
+ 
+ // CompressHandler gzip compresses HTTP responses for clients that support it
+ // via the 'Accept-Encoding' header.
++//
++// Compressing TLS traffic may leak the page contents to an attacker if the
++// page contains user input: http://security.stackexchange.com/a/102015/12208
+ func CompressHandler(h http.Handler) http.Handler {
++	return CompressHandlerLevel(h, gzip.DefaultCompression)
++}
++
++// CompressHandlerLevel gzip compresses HTTP responses with specified compression level
++// for clients that support it via the 'Accept-Encoding' header.
++//
++// The compression level should be gzip.DefaultCompression, gzip.NoCompression,
++// or any integer value between gzip.BestSpeed and gzip.BestCompression inclusive.
++// gzip.DefaultCompression is used in case of invalid compression level.
++func CompressHandlerLevel(h http.Handler, level int) http.Handler {
++	if level < gzip.DefaultCompression || level > gzip.BestCompression {
++		level = gzip.DefaultCompression
++	}
++
++	const (
++		gzipEncoding  = "gzip"
++		flateEncoding = "deflate"
++	)
++
+ 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+-	L:
+-		for _, enc := range strings.Split(r.Header.Get("Accept-Encoding"), ",") {
+-			switch strings.TrimSpace(enc) {
+-			case "gzip":
+-				w.Header().Set("Content-Encoding", "gzip")
+-				w.Header().Add("Vary", "Accept-Encoding")
+-
+-				gw := gzip.NewWriter(w)
+-				defer gw.Close()
+-
+-				h, hok := w.(http.Hijacker)
+-				if !hok { /* w is not Hijacker... oh well... */
+-					h = nil
+-				}
+-
+-				w = &compressResponseWriter{
+-					Writer:         gw,
+-					ResponseWriter: w,
+-					Hijacker:       h,
+-				}
+-
+-				break L
+-			case "deflate":
+-				w.Header().Set("Content-Encoding", "deflate")
+-				w.Header().Add("Vary", "Accept-Encoding")
+-
+-				fw, _ := flate.NewWriter(w, flate.DefaultCompression)
+-				defer fw.Close()
+-
+-				h, hok := w.(http.Hijacker)
+-				if !hok { /* w is not Hijacker... oh well... */
+-					h = nil
+-				}
+-
+-				w = &compressResponseWriter{
+-					Writer:         fw,
+-					ResponseWriter: w,
+-					Hijacker:       h,
+-				}
+-
+-				break L
++		// detect what encoding to use
++		var encoding string
++		for _, curEnc := range strings.Split(r.Header.Get(acceptEncoding), ",") {
++			curEnc = strings.TrimSpace(curEnc)
++			if curEnc == gzipEncoding || curEnc == flateEncoding {
++				encoding = curEnc
++				break
+ 			}
+ 		}
+ 
++		// always add Accept-Encoding to Vary to prevent intermediate caches corruption
++		w.Header().Add("Vary", acceptEncoding)
++
++		// if we weren't able to identify an encoding we're familiar with, pass on the
++		// request to the handler and return
++		if encoding == "" {
++			h.ServeHTTP(w, r)
++			return
++		}
++
++		if r.Header.Get("Upgrade") != "" {
++			h.ServeHTTP(w, r)
++			return
++		}
++
++		// wrap the ResponseWriter with the writer for the chosen encoding
++		var encWriter io.WriteCloser
++		if encoding == gzipEncoding {
++			encWriter, _ = gzip.NewWriterLevel(w, level)
++		} else if encoding == flateEncoding {
++			encWriter, _ = flate.NewWriter(w, level)
++		}
++		defer encWriter.Close()
++
++		w.Header().Set("Content-Encoding", encoding)
++		r.Header.Del(acceptEncoding)
++
++		cw := &compressResponseWriter{
++			w:          w,
++			compressor: encWriter,
++		}
++
++		w = httpsnoop.Wrap(w, httpsnoop.Hooks{
++			Write: func(httpsnoop.WriteFunc) httpsnoop.WriteFunc {
++				return cw.Write
++			},
++			WriteHeader: func(httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
++				return cw.WriteHeader
++			},
++			Flush: func(httpsnoop.FlushFunc) httpsnoop.FlushFunc {
++				return cw.Flush
++			},
++			ReadFrom: func(rff httpsnoop.ReadFromFunc) httpsnoop.ReadFromFunc {
++				return cw.ReadFrom
++			},
++		})
++
+ 		h.ServeHTTP(w, r)
+ 	})
+ }
+diff --git a/vendor/github.com/gorilla/handlers/cors.go b/vendor/github.com/gorilla/handlers/cors.go
+new file mode 100644
+index 00000000..0dcdffb3
+--- /dev/null
++++ b/vendor/github.com/gorilla/handlers/cors.go
+@@ -0,0 +1,355 @@
++package handlers
++
++import (
++	"net/http"
++	"strconv"
++	"strings"
++)
++
++// CORSOption represents a functional option for configuring the CORS middleware.
++type CORSOption func(*cors) error
++
++type cors struct {
++	h                      http.Handler
++	allowedHeaders         []string
++	allowedMethods         []string
++	allowedOrigins         []string
++	allowedOriginValidator OriginValidator
++	exposedHeaders         []string
++	maxAge                 int
++	ignoreOptions          bool
++	allowCredentials       bool
++	optionStatusCode       int
++}
++
++// OriginValidator takes an origin string and returns whether or not that origin is allowed.
++type OriginValidator func(string) bool
++
++var (
++	defaultCorsOptionStatusCode = 200
++	defaultCorsMethods          = []string{"GET", "HEAD", "POST"}
++	defaultCorsHeaders          = []string{"Accept", "Accept-Language", "Content-Language", "Origin"}
++	// (WebKit/Safari v9 sends the Origin header by default in AJAX requests)
++)
++
++const (
++	corsOptionMethod           string = "OPTIONS"
++	corsAllowOriginHeader      string = "Access-Control-Allow-Origin"
++	corsExposeHeadersHeader    string = "Access-Control-Expose-Headers"
++	corsMaxAgeHeader           string = "Access-Control-Max-Age"
++	corsAllowMethodsHeader     string = "Access-Control-Allow-Methods"
++	corsAllowHeadersHeader     string = "Access-Control-Allow-Headers"
++	corsAllowCredentialsHeader string = "Access-Control-Allow-Credentials"
++	corsRequestMethodHeader    string = "Access-Control-Request-Method"
++	corsRequestHeadersHeader   string = "Access-Control-Request-Headers"
++	corsOriginHeader           string = "Origin"
++	corsVaryHeader             string = "Vary"
++	corsOriginMatchAll         string = "*"
++)
++
++func (ch *cors) ServeHTTP(w http.ResponseWriter, r *http.Request) {
++	origin := r.Header.Get(corsOriginHeader)
++	if !ch.isOriginAllowed(origin) {
++		if r.Method != corsOptionMethod || ch.ignoreOptions {
++			ch.h.ServeHTTP(w, r)
++		}
++
++		return
++	}
++
++	if r.Method == corsOptionMethod {
++		if ch.ignoreOptions {
++			ch.h.ServeHTTP(w, r)
++			return
++		}
++
++		if _, ok := r.Header[corsRequestMethodHeader]; !ok {
++			w.WriteHeader(http.StatusBadRequest)
++			return
++		}
++
++		method := r.Header.Get(corsRequestMethodHeader)
++		if !ch.isMatch(method, ch.allowedMethods) {
++			w.WriteHeader(http.StatusMethodNotAllowed)
++			return
++		}
++
++		requestHeaders := strings.Split(r.Header.Get(corsRequestHeadersHeader), ",")
++		allowedHeaders := []string{}
++		for _, v := range requestHeaders {
++			canonicalHeader := http.CanonicalHeaderKey(strings.TrimSpace(v))
++			if canonicalHeader == "" || ch.isMatch(canonicalHeader, defaultCorsHeaders) {
++				continue
++			}
++
++			if !ch.isMatch(canonicalHeader, ch.allowedHeaders) {
++				w.WriteHeader(http.StatusForbidden)
++				return
++			}
++
++			allowedHeaders = append(allowedHeaders, canonicalHeader)
++		}
++
++		if len(allowedHeaders) > 0 {
++			w.Header().Set(corsAllowHeadersHeader, strings.Join(allowedHeaders, ","))
++		}
++
++		if ch.maxAge > 0 {
++			w.Header().Set(corsMaxAgeHeader, strconv.Itoa(ch.maxAge))
++		}
++
++		if !ch.isMatch(method, defaultCorsMethods) {
++			w.Header().Set(corsAllowMethodsHeader, method)
++		}
++	} else {
++		if len(ch.exposedHeaders) > 0 {
++			w.Header().Set(corsExposeHeadersHeader, strings.Join(ch.exposedHeaders, ","))
++		}
++	}
++
++	if ch.allowCredentials {
++		w.Header().Set(corsAllowCredentialsHeader, "true")
++	}
++
++	if len(ch.allowedOrigins) > 1 {
++		w.Header().Set(corsVaryHeader, corsOriginHeader)
++	}
++
++	returnOrigin := origin
++	if ch.allowedOriginValidator == nil && len(ch.allowedOrigins) == 0 {
++		returnOrigin = "*"
++	} else {
++		for _, o := range ch.allowedOrigins {
++			// A configuration of * is different than explicitly setting an allowed
++			// origin. Returning arbitrary origin headers in an access control allow
++			// origin header is unsafe and is not required by any use case.
++			if o == corsOriginMatchAll {
++				returnOrigin = "*"
++				break
++			}
++		}
++	}
++	w.Header().Set(corsAllowOriginHeader, returnOrigin)
++
++	if r.Method == corsOptionMethod {
++		w.WriteHeader(ch.optionStatusCode)
++		return
++	}
++	ch.h.ServeHTTP(w, r)
++}
++
++// CORS provides Cross-Origin Resource Sharing middleware.
++// Example:
++//
++//  import (
++//      "net/http"
++//
++//      "github.com/gorilla/handlers"
++//      "github.com/gorilla/mux"
++//  )
++//
++//  func main() {
++//      r := mux.NewRouter()
++//      r.HandleFunc("/users", UserEndpoint)
++//      r.HandleFunc("/projects", ProjectEndpoint)
++//
++//      // Apply the CORS middleware to our top-level router, with the defaults.
++//      http.ListenAndServe(":8000", handlers.CORS()(r))
++//  }
++//
++func CORS(opts ...CORSOption) func(http.Handler) http.Handler {
++	return func(h http.Handler) http.Handler {
++		ch := parseCORSOptions(opts...)
++		ch.h = h
++		return ch
++	}
++}
++
++func parseCORSOptions(opts ...CORSOption) *cors {
++	ch := &cors{
++		allowedMethods:   defaultCorsMethods,
++		allowedHeaders:   defaultCorsHeaders,
++		allowedOrigins:   []string{},
++		optionStatusCode: defaultCorsOptionStatusCode,
++	}
++
++	for _, option := range opts {
++		option(ch)
++	}
++
++	return ch
++}
++
++//
++// Functional options for configuring CORS.
++//
++
++// AllowedHeaders adds the provided headers to the list of allowed headers in a
++// CORS request.
++// This is an append operation so the headers Accept, Accept-Language,
++// and Content-Language are always allowed.
++// Content-Type must be explicitly declared if accepting Content-Types other than
++// application/x-www-form-urlencoded, multipart/form-data, or text/plain.
++func AllowedHeaders(headers []string) CORSOption {
++	return func(ch *cors) error {
++		for _, v := range headers {
++			normalizedHeader := http.CanonicalHeaderKey(strings.TrimSpace(v))
++			if normalizedHeader == "" {
++				continue
++			}
++
++			if !ch.isMatch(normalizedHeader, ch.allowedHeaders) {
++				ch.allowedHeaders = append(ch.allowedHeaders, normalizedHeader)
++			}
++		}
++
++		return nil
++	}
++}
++
++// AllowedMethods can be used to explicitly allow methods in the
++// Access-Control-Allow-Methods header.
++// This is a replacement operation so you must also
++// pass GET, HEAD, and POST if you wish to support those methods.
++func AllowedMethods(methods []string) CORSOption {
++	return func(ch *cors) error {
++		ch.allowedMethods = []string{}
++		for _, v := range methods {
++			normalizedMethod := strings.ToUpper(strings.TrimSpace(v))
++			if normalizedMethod == "" {
++				continue
++			}
++
++			if !ch.isMatch(normalizedMethod, ch.allowedMethods) {
++				ch.allowedMethods = append(ch.allowedMethods, normalizedMethod)
++			}
++		}
++
++		return nil
++	}
++}
++
++// AllowedOrigins sets the allowed origins for CORS requests, as used in the
++// 'Allow-Access-Control-Origin' HTTP header.
++// Note: Passing in a []string{"*"} will allow any domain.
++func AllowedOrigins(origins []string) CORSOption {
++	return func(ch *cors) error {
++		for _, v := range origins {
++			if v == corsOriginMatchAll {
++				ch.allowedOrigins = []string{corsOriginMatchAll}
++				return nil
++			}
++		}
++
++		ch.allowedOrigins = origins
++		return nil
++	}
++}
++
++// AllowedOriginValidator sets a function for evaluating allowed origins in CORS requests, represented by the
++// 'Allow-Access-Control-Origin' HTTP header.
++func AllowedOriginValidator(fn OriginValidator) CORSOption {
++	return func(ch *cors) error {
++		ch.allowedOriginValidator = fn
++		return nil
++	}
++}
++
++// OptionStatusCode sets a custom status code on the OPTIONS requests.
++// Default behaviour sets it to 200 to reflect best practices. This is option is not mandatory
++// and can be used if you need a custom status code (i.e 204).
++//
++// More informations on the spec:
++// https://fetch.spec.whatwg.org/#cors-preflight-fetch
++func OptionStatusCode(code int) CORSOption {
++	return func(ch *cors) error {
++		ch.optionStatusCode = code
++		return nil
++	}
++}
++
++// ExposedHeaders can be used to specify headers that are available
++// and will not be stripped out by the user-agent.
++func ExposedHeaders(headers []string) CORSOption {
++	return func(ch *cors) error {
++		ch.exposedHeaders = []string{}
++		for _, v := range headers {
++			normalizedHeader := http.CanonicalHeaderKey(strings.TrimSpace(v))
++			if normalizedHeader == "" {
++				continue
++			}
++
++			if !ch.isMatch(normalizedHeader, ch.exposedHeaders) {
++				ch.exposedHeaders = append(ch.exposedHeaders, normalizedHeader)
++			}
++		}
++
++		return nil
++	}
++}
++
++// MaxAge determines the maximum age (in seconds) between preflight requests. A
++// maximum of 10 minutes is allowed. An age above this value will default to 10
++// minutes.
++func MaxAge(age int) CORSOption {
++	return func(ch *cors) error {
++		// Maximum of 10 minutes.
++		if age > 600 {
++			age = 600
++		}
++
++		ch.maxAge = age
++		return nil
++	}
++}
++
++// IgnoreOptions causes the CORS middleware to ignore OPTIONS requests, instead
++// passing them through to the next handler. This is useful when your application
++// or framework has a pre-existing mechanism for responding to OPTIONS requests.
++func IgnoreOptions() CORSOption {
++	return func(ch *cors) error {
++		ch.ignoreOptions = true
++		return nil
++	}
++}
++
++// AllowCredentials can be used to specify that the user agent may pass
++// authentication details along with the request.
++func AllowCredentials() CORSOption {
++	return func(ch *cors) error {
++		ch.allowCredentials = true
++		return nil
++	}
++}
++
++func (ch *cors) isOriginAllowed(origin string) bool {
++	if origin == "" {
++		return false
++	}
++
++	if ch.allowedOriginValidator != nil {
++		return ch.allowedOriginValidator(origin)
++	}
++
++	if len(ch.allowedOrigins) == 0 {
++		return true
++	}
++
++	for _, allowedOrigin := range ch.allowedOrigins {
++		if allowedOrigin == origin || allowedOrigin == corsOriginMatchAll {
++			return true
++		}
++	}
++
++	return false
++}
++
++func (ch *cors) isMatch(needle string, haystack []string) bool {
++	for _, v := range haystack {
++		if v == needle {
++			return true
++		}
++	}
++
++	return false
++}
+diff --git a/vendor/github.com/gorilla/handlers/handlers.go b/vendor/github.com/gorilla/handlers/handlers.go
+index c3c20e5b..0509482a 100644
+--- a/vendor/github.com/gorilla/handlers/handlers.go
++++ b/vendor/github.com/gorilla/handlers/handlers.go
+@@ -7,27 +7,22 @@ package handlers
+ import (
+ 	"bufio"
+ 	"fmt"
+-	"io"
+ 	"net"
+ 	"net/http"
+-	"net/url"
+ 	"sort"
+-	"strconv"
+ 	"strings"
+-	"time"
+-	"unicode/utf8"
+ )
+ 
+-// MethodHandler is an http.Handler that dispatches to a handler whose key in the MethodHandler's
+-// map matches the name of the HTTP request's method, eg: GET
++// MethodHandler is an http.Handler that dispatches to a handler whose key in the
++// MethodHandler's map matches the name of the HTTP request's method, eg: GET
+ //
+-// If the request's method is OPTIONS and OPTIONS is not a key in the map then the handler
+-// responds with a status of 200 and sets the Allow header to a comma-separated list of
+-// available methods.
++// If the request's method is OPTIONS and OPTIONS is not a key in the map then
++// the handler responds with a status of 200 and sets the Allow header to a
++// comma-separated list of available methods.
+ //
+-// If the request's method doesn't match any of its keys the handler responds with
+-// a status of 405, Method not allowed and sets the Allow header to a comma-separated list
+-// of available methods.
++// If the request's method doesn't match any of its keys the handler responds
++// with a status of HTTP 405 "Method Not Allowed" and sets the Allow header to a
++// comma-separated list of available methods.
+ type MethodHandler map[string]http.Handler
+ 
+ func (h MethodHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+@@ -48,74 +43,15 @@ func (h MethodHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+ 	}
+ }
+ 
+-// loggingHandler is the http.Handler implementation for LoggingHandlerTo and its friends
+-type loggingHandler struct {
+-	writer  io.Writer
+-	handler http.Handler
+-}
+-
+-// combinedLoggingHandler is the http.Handler implementation for LoggingHandlerTo and its friends
+-type combinedLoggingHandler struct {
+-	writer  io.Writer
+-	handler http.Handler
+-}
+-
+-func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+-	t := time.Now()
+-	logger := makeLogger(w)
+-	url := *req.URL
+-	h.handler.ServeHTTP(logger, req)
+-	writeLog(h.writer, req, url, t, logger.Status(), logger.Size())
+-}
+-
+-func (h combinedLoggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+-	t := time.Now()
+-	logger := makeLogger(w)
+-	url := *req.URL
+-	h.handler.ServeHTTP(logger, req)
+-	writeCombinedLog(h.writer, req, url, t, logger.Status(), logger.Size())
+-}
+-
+-func makeLogger(w http.ResponseWriter) loggingResponseWriter {
+-	var logger loggingResponseWriter = &responseLogger{w: w}
+-	if _, ok := w.(http.Hijacker); ok {
+-		logger = &hijackLogger{responseLogger{w: w}}
+-	}
+-	h, ok1 := logger.(http.Hijacker)
+-	c, ok2 := w.(http.CloseNotifier)
+-	if ok1 && ok2 {
+-		return hijackCloseNotifier{logger, h, c}
+-	}
+-	if ok2 {
+-		return &closeNotifyWriter{logger, c}
+-	}
+-	return logger
+-}
+-
+-type loggingResponseWriter interface {
+-	http.ResponseWriter
+-	http.Flusher
+-	Status() int
+-	Size() int
+-}
+-
+-// responseLogger is wrapper of http.ResponseWriter that keeps track of its HTTP status
+-// code and body size
++// responseLogger is wrapper of http.ResponseWriter that keeps track of its HTTP
++// status code and body size
+ type responseLogger struct {
+ 	w      http.ResponseWriter
+ 	status int
+ 	size   int
+ }
+ 
+-func (l *responseLogger) Header() http.Header {
+-	return l.w.Header()
+-}
+-
+ func (l *responseLogger) Write(b []byte) (int, error) {
+-	if l.status == 0 {
+-		// The status will be StatusOK if WriteHeader has not been called yet
+-		l.status = http.StatusOK
+-	}
+ 	size, err := l.w.Write(b)
+ 	l.size += size
+ 	return size, err
+@@ -134,187 +70,18 @@ func (l *responseLogger) Size() int {
+ 	return l.size
+ }
+ 
+-func (l *responseLogger) Flush() {
+-	f, ok := l.w.(http.Flusher)
+-	if ok {
+-		f.Flush()
+-	}
+-}
+-
+-type hijackLogger struct {
+-	responseLogger
+-}
+-
+-func (l *hijackLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+-	h := l.responseLogger.w.(http.Hijacker)
+-	conn, rw, err := h.Hijack()
+-	if err == nil && l.responseLogger.status == 0 {
+-		// The status will be StatusSwitchingProtocols if there was no error and WriteHeader has not been called yet
+-		l.responseLogger.status = http.StatusSwitchingProtocols
++func (l *responseLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
++	conn, rw, err := l.w.(http.Hijacker).Hijack()
++	if err == nil && l.status == 0 {
++		// The status will be StatusSwitchingProtocols if there was no error and
++		// WriteHeader has not been called yet
++		l.status = http.StatusSwitchingProtocols
+ 	}
+ 	return conn, rw, err
+ }
+ 
+-type closeNotifyWriter struct {
+-	loggingResponseWriter
+-	http.CloseNotifier
+-}
+-
+-type hijackCloseNotifier struct {
+-	loggingResponseWriter
+-	http.Hijacker
+-	http.CloseNotifier
+-}
+-
+-const lowerhex = "0123456789abcdef"
+-
+-func appendQuoted(buf []byte, s string) []byte {
+-	var runeTmp [utf8.UTFMax]byte
+-	for width := 0; len(s) > 0; s = s[width:] {
+-		r := rune(s[0])
+-		width = 1
+-		if r >= utf8.RuneSelf {
+-			r, width = utf8.DecodeRuneInString(s)
+-		}
+-		if width == 1 && r == utf8.RuneError {
+-			buf = append(buf, `\x`...)
+-			buf = append(buf, lowerhex[s[0]>>4])
+-			buf = append(buf, lowerhex[s[0]&0xF])
+-			continue
+-		}
+-		if r == rune('"') || r == '\\' { // always backslashed
+-			buf = append(buf, '\\')
+-			buf = append(buf, byte(r))
+-			continue
+-		}
+-		if strconv.IsPrint(r) {
+-			n := utf8.EncodeRune(runeTmp[:], r)
+-			buf = append(buf, runeTmp[:n]...)
+-			continue
+-		}
+-		switch r {
+-		case '\a':
+-			buf = append(buf, `\a`...)
+-		case '\b':
+-			buf = append(buf, `\b`...)
+-		case '\f':
+-			buf = append(buf, `\f`...)
+-		case '\n':
+-			buf = append(buf, `\n`...)
+-		case '\r':
+-			buf = append(buf, `\r`...)
+-		case '\t':
+-			buf = append(buf, `\t`...)
+-		case '\v':
+-			buf = append(buf, `\v`...)
+-		default:
+-			switch {
+-			case r < ' ':
+-				buf = append(buf, `\x`...)
+-				buf = append(buf, lowerhex[s[0]>>4])
+-				buf = append(buf, lowerhex[s[0]&0xF])
+-			case r > utf8.MaxRune:
+-				r = 0xFFFD
+-				fallthrough
+-			case r < 0x10000:
+-				buf = append(buf, `\u`...)
+-				for s := 12; s >= 0; s -= 4 {
+-					buf = append(buf, lowerhex[r>>uint(s)&0xF])
+-				}
+-			default:
+-				buf = append(buf, `\U`...)
+-				for s := 28; s >= 0; s -= 4 {
+-					buf = append(buf, lowerhex[r>>uint(s)&0xF])
+-				}
+-			}
+-		}
+-	}
+-	return buf
+-
+-}
+-
+-// buildCommonLogLine builds a log entry for req in Apache Common Log Format.
+-// ts is the timestamp with which the entry should be logged.
+-// status and size are used to provide the response HTTP status and size.
+-func buildCommonLogLine(req *http.Request, url url.URL, ts time.Time, status int, size int) []byte {
+-	username := "-"
+-	if url.User != nil {
+-		if name := url.User.Username(); name != "" {
+-			username = name
+-		}
+-	}
+-
+-	host, _, err := net.SplitHostPort(req.RemoteAddr)
+-
+-	if err != nil {
+-		host = req.RemoteAddr
+-	}
+-
+-	uri := url.RequestURI()
+-
+-	buf := make([]byte, 0, 3*(len(host)+len(username)+len(req.Method)+len(uri)+len(req.Proto)+50)/2)
+-	buf = append(buf, host...)
+-	buf = append(buf, " - "...)
+-	buf = append(buf, username...)
+-	buf = append(buf, " ["...)
+-	buf = append(buf, ts.Format("02/Jan/2006:15:04:05 -0700")...)
+-	buf = append(buf, `] "`...)
+-	buf = append(buf, req.Method...)
+-	buf = append(buf, " "...)
+-	buf = appendQuoted(buf, uri)
+-	buf = append(buf, " "...)
+-	buf = append(buf, req.Proto...)
+-	buf = append(buf, `" `...)
+-	buf = append(buf, strconv.Itoa(status)...)
+-	buf = append(buf, " "...)
+-	buf = append(buf, strconv.Itoa(size)...)
+-	return buf
+-}
+-
+-// writeLog writes a log entry for req to w in Apache Common Log Format.
+-// ts is the timestamp with which the entry should be logged.
+-// status and size are used to provide the response HTTP status and size.
+-func writeLog(w io.Writer, req *http.Request, url url.URL, ts time.Time, status, size int) {
+-	buf := buildCommonLogLine(req, url, ts, status, size)
+-	buf = append(buf, '\n')
+-	w.Write(buf)
+-}
+-
+-// writeCombinedLog writes a log entry for req to w in Apache Combined Log Format.
+-// ts is the timestamp with which the entry should be logged.
+-// status and size are used to provide the response HTTP status and size.
+-func writeCombinedLog(w io.Writer, req *http.Request, url url.URL, ts time.Time, status, size int) {
+-	buf := buildCommonLogLine(req, url, ts, status, size)
+-	buf = append(buf, ` "`...)
+-	buf = appendQuoted(buf, req.Referer())
+-	buf = append(buf, `" "`...)
+-	buf = appendQuoted(buf, req.UserAgent())
+-	buf = append(buf, '"', '\n')
+-	w.Write(buf)
+-}
+-
+-// CombinedLoggingHandler return a http.Handler that wraps h and logs requests to out in
+-// Apache Combined Log Format.
+-//
+-// See http://httpd.apache.org/docs/2.2/logs.html#combined for a description of this format.
+-//
+-// LoggingHandler always sets the ident field of the log to -
+-func CombinedLoggingHandler(out io.Writer, h http.Handler) http.Handler {
+-	return combinedLoggingHandler{out, h}
+-}
+-
+-// LoggingHandler return a http.Handler that wraps h and logs requests to out in
+-// Apache Common Log Format (CLF).
+-//
+-// See http://httpd.apache.org/docs/2.2/logs.html#common for a description of this format.
+-//
+-// LoggingHandler always sets the ident field of the log to -
+-func LoggingHandler(out io.Writer, h http.Handler) http.Handler {
+-	return loggingHandler{out, h}
+-}
+-
+-// isContentType validates the Content-Type header
+-// is contentType. That is, its type and subtype match.
++// isContentType validates the Content-Type header matches the supplied
++// contentType. That is, its type and subtype match.
+ func isContentType(h http.Header, contentType string) bool {
+ 	ct := h.Get("Content-Type")
+ 	if i := strings.IndexRune(ct, ';'); i != -1 {
+@@ -323,9 +90,9 @@ func isContentType(h http.Header, contentType string) bool {
+ 	return ct == contentType
+ }
+ 
+-// ContentTypeHandler wraps and returns a http.Handler, validating the request content type
+-// is acompatible with the contentTypes list.
+-// It writes a HTTP 415 error if that fails.
++// ContentTypeHandler wraps and returns a http.Handler, validating the request
++// content type is compatible with the contentTypes list. It writes a HTTP 415
++// error if that fails.
+ //
+ // Only PUT, POST, and PATCH requests are considered.
+ func ContentTypeHandler(h http.Handler, contentTypes ...string) http.Handler {
+@@ -354,12 +121,14 @@ const (
+ 	HTTPMethodOverrideFormKey = "_method"
+ )
+ 
+-// HTTPMethodOverrideHandler wraps and returns a http.Handler which checks for the X-HTTP-Method-Override header
+-// or the _method form key, and overrides (if valid) request.Method with its value.
++// HTTPMethodOverrideHandler wraps and returns a http.Handler which checks for
++// the X-HTTP-Method-Override header or the _method form key, and overrides (if
++// valid) request.Method with its value.
+ //
+-// This is especially useful for http clients that don't support many http verbs.
+-// It isn't secure to override e.g a GET to a POST, so only POST requests are considered.
+-// Likewise, the override method can only be a "write" method: PUT, PATCH or DELETE.
++// This is especially useful for HTTP clients that don't support many http verbs.
++// It isn't secure to override e.g a GET to a POST, so only POST requests are
++// considered.  Likewise, the override method can only be a "write" method: PUT,
++// PATCH or DELETE.
+ //
+ // Form method takes precedence over header method.
+ func HTTPMethodOverrideHandler(h http.Handler) http.Handler {
+diff --git a/vendor/github.com/gorilla/handlers/logging.go b/vendor/github.com/gorilla/handlers/logging.go
+new file mode 100644
+index 00000000..228465eb
+--- /dev/null
++++ b/vendor/github.com/gorilla/handlers/logging.go
+@@ -0,0 +1,244 @@
++// Copyright 2013 The Gorilla Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package handlers
++
++import (
++	"io"
++	"net"
++	"net/http"
++	"net/url"
++	"strconv"
++	"time"
++	"unicode/utf8"
++
++	"github.com/felixge/httpsnoop"
++)
++
++// Logging
++
++// LogFormatterParams is the structure any formatter will be handed when time to log comes
++type LogFormatterParams struct {
++	Request    *http.Request
++	URL        url.URL
++	TimeStamp  time.Time
++	StatusCode int
++	Size       int
++}
++
++// LogFormatter gives the signature of the formatter function passed to CustomLoggingHandler
++type LogFormatter func(writer io.Writer, params LogFormatterParams)
++
++// loggingHandler is the http.Handler implementation for LoggingHandlerTo and its
++// friends
++
++type loggingHandler struct {
++	writer    io.Writer
++	handler   http.Handler
++	formatter LogFormatter
++}
++
++func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
++	t := time.Now()
++	logger, w := makeLogger(w)
++	url := *req.URL
++
++	h.handler.ServeHTTP(w, req)
++	if req.MultipartForm != nil {
++		req.MultipartForm.RemoveAll()
++	}
++
++	params := LogFormatterParams{
++		Request:    req,
++		URL:        url,
++		TimeStamp:  t,
++		StatusCode: logger.Status(),
++		Size:       logger.Size(),
++	}
++
++	h.formatter(h.writer, params)
++}
++
++func makeLogger(w http.ResponseWriter) (*responseLogger, http.ResponseWriter) {
++	logger := &responseLogger{w: w, status: http.StatusOK}
++	return logger, httpsnoop.Wrap(w, httpsnoop.Hooks{
++		Write: func(httpsnoop.WriteFunc) httpsnoop.WriteFunc {
++			return logger.Write
++		},
++		WriteHeader: func(httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
++			return logger.WriteHeader
++		},
++	})
++}
++
++const lowerhex = "0123456789abcdef"
++
++func appendQuoted(buf []byte, s string) []byte {
++	var runeTmp [utf8.UTFMax]byte
++	for width := 0; len(s) > 0; s = s[width:] {
++		r := rune(s[0])
++		width = 1
++		if r >= utf8.RuneSelf {
++			r, width = utf8.DecodeRuneInString(s)
++		}
++		if width == 1 && r == utf8.RuneError {
++			buf = append(buf, `\x`...)
++			buf = append(buf, lowerhex[s[0]>>4])
++			buf = append(buf, lowerhex[s[0]&0xF])
++			continue
++		}
++		if r == rune('"') || r == '\\' { // always backslashed
++			buf = append(buf, '\\')
++			buf = append(buf, byte(r))
++			continue
++		}
++		if strconv.IsPrint(r) {
++			n := utf8.EncodeRune(runeTmp[:], r)
++			buf = append(buf, runeTmp[:n]...)
++			continue
++		}
++		switch r {
++		case '\a':
++			buf = append(buf, `\a`...)
++		case '\b':
++			buf = append(buf, `\b`...)
++		case '\f':
++			buf = append(buf, `\f`...)
++		case '\n':
++			buf = append(buf, `\n`...)
++		case '\r':
++			buf = append(buf, `\r`...)
++		case '\t':
++			buf = append(buf, `\t`...)
++		case '\v':
++			buf = append(buf, `\v`...)
++		default:
++			switch {
++			case r < ' ':
++				buf = append(buf, `\x`...)
++				buf = append(buf, lowerhex[s[0]>>4])
++				buf = append(buf, lowerhex[s[0]&0xF])
++			case r > utf8.MaxRune:
++				r = 0xFFFD
++				fallthrough
++			case r < 0x10000:
++				buf = append(buf, `\u`...)
++				for s := 12; s >= 0; s -= 4 {
++					buf = append(buf, lowerhex[r>>uint(s)&0xF])
++				}
++			default:
++				buf = append(buf, `\U`...)
++				for s := 28; s >= 0; s -= 4 {
++					buf = append(buf, lowerhex[r>>uint(s)&0xF])
++				}
++			}
++		}
++	}
++	return buf
++}
++
++// buildCommonLogLine builds a log entry for req in Apache Common Log Format.
++// ts is the timestamp with which the entry should be logged.
++// status and size are used to provide the response HTTP status and size.
++func buildCommonLogLine(req *http.Request, url url.URL, ts time.Time, status int, size int) []byte {
++	username := "-"
++	if url.User != nil {
++		if name := url.User.Username(); name != "" {
++			username = name
++		}
++	}
++
++	host, _, err := net.SplitHostPort(req.RemoteAddr)
++	if err != nil {
++		host = req.RemoteAddr
++	}
++
++	uri := req.RequestURI
++
++	// Requests using the CONNECT method over HTTP/2.0 must use
++	// the authority field (aka r.Host) to identify the target.
++	// Refer: https://httpwg.github.io/specs/rfc7540.html#CONNECT
++	if req.ProtoMajor == 2 && req.Method == "CONNECT" {
++		uri = req.Host
++	}
++	if uri == "" {
++		uri = url.RequestURI()
++	}
++
++	buf := make([]byte, 0, 3*(len(host)+len(username)+len(req.Method)+len(uri)+len(req.Proto)+50)/2)
++	buf = append(buf, host...)
++	buf = append(buf, " - "...)
++	buf = append(buf, username...)
++	buf = append(buf, " ["...)
++	buf = append(buf, ts.Format("02/Jan/2006:15:04:05 -0700")...)
++	buf = append(buf, `] "`...)
++	buf = append(buf, req.Method...)
++	buf = append(buf, " "...)
++	buf = appendQuoted(buf, uri)
++	buf = append(buf, " "...)
++	buf = append(buf, req.Proto...)
++	buf = append(buf, `" `...)
++	buf = append(buf, strconv.Itoa(status)...)
++	buf = append(buf, " "...)
++	buf = append(buf, strconv.Itoa(size)...)
++	return buf
++}
++
++// writeLog writes a log entry for req to w in Apache Common Log Format.
++// ts is the timestamp with which the entry should be logged.
++// status and size are used to provide the response HTTP status and size.
++func writeLog(writer io.Writer, params LogFormatterParams) {
++	buf := buildCommonLogLine(params.Request, params.URL, params.TimeStamp, params.StatusCode, params.Size)
++	buf = append(buf, '\n')
++	writer.Write(buf)
++}
++
++// writeCombinedLog writes a log entry for req to w in Apache Combined Log Format.
++// ts is the timestamp with which the entry should be logged.
++// status and size are used to provide the response HTTP status and size.
++func writeCombinedLog(writer io.Writer, params LogFormatterParams) {
++	buf := buildCommonLogLine(params.Request, params.URL, params.TimeStamp, params.StatusCode, params.Size)
++	buf = append(buf, ` "`...)
++	buf = appendQuoted(buf, params.Request.Referer())
++	buf = append(buf, `" "`...)
++	buf = appendQuoted(buf, params.Request.UserAgent())
++	buf = append(buf, '"', '\n')
++	writer.Write(buf)
++}
++
++// CombinedLoggingHandler return a http.Handler that wraps h and logs requests to out in
++// Apache Combined Log Format.
++//
++// See http://httpd.apache.org/docs/2.2/logs.html#combined for a description of this format.
++//
++// LoggingHandler always sets the ident field of the log to -
++func CombinedLoggingHandler(out io.Writer, h http.Handler) http.Handler {
++	return loggingHandler{out, h, writeCombinedLog}
++}
++
++// LoggingHandler return a http.Handler that wraps h and logs requests to out in
++// Apache Common Log Format (CLF).
++//
++// See http://httpd.apache.org/docs/2.2/logs.html#common for a description of this format.
++//
++// LoggingHandler always sets the ident field of the log to -
++//
++// Example:
++//
++//  r := mux.NewRouter()
++//  r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
++//  	w.Write([]byte("This is a catch-all route"))
++//  })
++//  loggedRouter := handlers.LoggingHandler(os.Stdout, r)
++//  http.ListenAndServe(":1123", loggedRouter)
++//
++func LoggingHandler(out io.Writer, h http.Handler) http.Handler {
++	return loggingHandler{out, h, writeLog}
++}
++
++// CustomLoggingHandler provides a way to supply a custom log formatter
++// while taking advantage of the mechanisms in this package
++func CustomLoggingHandler(out io.Writer, h http.Handler, f LogFormatter) http.Handler {
++	return loggingHandler{out, h, f}
++}
+diff --git a/vendor/github.com/gorilla/handlers/proxy_headers.go b/vendor/github.com/gorilla/handlers/proxy_headers.go
+index 268de9c6..ed939dce 100644
+--- a/vendor/github.com/gorilla/handlers/proxy_headers.go
++++ b/vendor/github.com/gorilla/handlers/proxy_headers.go
+@@ -8,9 +8,11 @@ import (
+ 
+ var (
+ 	// De-facto standard header keys.
+-	xForwardedFor   = http.CanonicalHeaderKey("X-Forwarded-For")
+-	xRealIP         = http.CanonicalHeaderKey("X-Real-IP")
+-	xForwardedProto = http.CanonicalHeaderKey("X-Forwarded-Scheme")
++	xForwardedFor    = http.CanonicalHeaderKey("X-Forwarded-For")
++	xForwardedHost   = http.CanonicalHeaderKey("X-Forwarded-Host")
++	xForwardedProto  = http.CanonicalHeaderKey("X-Forwarded-Proto")
++	xForwardedScheme = http.CanonicalHeaderKey("X-Forwarded-Scheme")
++	xRealIP          = http.CanonicalHeaderKey("X-Real-IP")
+ )
+ 
+ var (
+@@ -28,9 +30,9 @@ var (
+ 
+ // ProxyHeaders inspects common reverse proxy headers and sets the corresponding
+ // fields in the HTTP request struct. These are X-Forwarded-For and X-Real-IP
+-// for the remote (client) IP address, X-Forwarded-Proto for the scheme
+-// (http|https) and the RFC7239 Forwarded header, which may include both client
+-// IPs and schemes.
++// for the remote (client) IP address, X-Forwarded-Proto or X-Forwarded-Scheme
++// for the scheme (http|https), X-Forwarded-Host for the host and the RFC7239
++// Forwarded header, which may include both client IPs and schemes.
+ //
+ // NOTE: This middleware should only be used when behind a reverse
+ // proxy like nginx, HAProxy or Apache. Reverse proxies that don't (or are
+@@ -49,7 +51,10 @@ func ProxyHeaders(h http.Handler) http.Handler {
+ 		if scheme := getScheme(r); scheme != "" {
+ 			r.URL.Scheme = scheme
+ 		}
+-
++		// Set the host with the value passed by the proxy
++		if r.Header.Get(xForwardedHost) != "" {
++			r.Host = r.Header.Get(xForwardedHost)
++		}
+ 		// Call the next handler in the chain.
+ 		h.ServeHTTP(w, r)
+ 	}
+@@ -99,7 +104,9 @@ func getScheme(r *http.Request) string {
+ 	// Retrieve the scheme from X-Forwarded-Proto.
+ 	if proto := r.Header.Get(xForwardedProto); proto != "" {
+ 		scheme = strings.ToLower(proto)
+-	} else if proto := r.Header.Get(forwarded); proto != "" {
++	} else if proto = r.Header.Get(xForwardedScheme); proto != "" {
++		scheme = strings.ToLower(proto)
++	} else if proto = r.Header.Get(forwarded); proto != "" {
+ 		// match should contain at least two elements if the protocol was
+ 		// specified in the Forwarded header. The first element will always be
+ 		// the 'proto=' capture, which we ignore. In the case of multiple proto
+diff --git a/vendor/github.com/gorilla/handlers/recovery.go b/vendor/github.com/gorilla/handlers/recovery.go
+new file mode 100644
+index 00000000..4c4c1d9c
+--- /dev/null
++++ b/vendor/github.com/gorilla/handlers/recovery.go
+@@ -0,0 +1,96 @@
++package handlers
++
++import (
++	"log"
++	"net/http"
++	"runtime/debug"
++)
++
++// RecoveryHandlerLogger is an interface used by the recovering handler to print logs.
++type RecoveryHandlerLogger interface {
++	Println(...interface{})
++}
++
++type recoveryHandler struct {
++	handler    http.Handler
++	logger     RecoveryHandlerLogger
++	printStack bool
++}
++
++// RecoveryOption provides a functional approach to define
++// configuration for a handler; such as setting the logging
++// whether or not to print stack traces on panic.
++type RecoveryOption func(http.Handler)
++
++func parseRecoveryOptions(h http.Handler, opts ...RecoveryOption) http.Handler {
++	for _, option := range opts {
++		option(h)
++	}
++
++	return h
++}
++
++// RecoveryHandler is HTTP middleware that recovers from a panic,
++// logs the panic, writes http.StatusInternalServerError, and
++// continues to the next handler.
++//
++// Example:
++//
++//  r := mux.NewRouter()
++//  r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
++//  	panic("Unexpected error!")
++//  })
++//
++//  http.ListenAndServe(":1123", handlers.RecoveryHandler()(r))
++func RecoveryHandler(opts ...RecoveryOption) func(h http.Handler) http.Handler {
++	return func(h http.Handler) http.Handler {
++		r := &recoveryHandler{handler: h}
++		return parseRecoveryOptions(r, opts...)
++	}
++}
++
++// RecoveryLogger is a functional option to override
++// the default logger
++func RecoveryLogger(logger RecoveryHandlerLogger) RecoveryOption {
++	return func(h http.Handler) {
++		r := h.(*recoveryHandler)
++		r.logger = logger
++	}
++}
++
++// PrintRecoveryStack is a functional option to enable
++// or disable printing stack traces on panic.
++func PrintRecoveryStack(print bool) RecoveryOption {
++	return func(h http.Handler) {
++		r := h.(*recoveryHandler)
++		r.printStack = print
++	}
++}
++
++func (h recoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
++	defer func() {
++		if err := recover(); err != nil {
++			w.WriteHeader(http.StatusInternalServerError)
++			h.log(err)
++		}
++	}()
++
++	h.handler.ServeHTTP(w, req)
++}
++
++func (h recoveryHandler) log(v ...interface{}) {
++	if h.logger != nil {
++		h.logger.Println(v...)
++	} else {
++		log.Println(v...)
++	}
++
++	if h.printStack {
++		stack := string(debug.Stack())
++		if h.logger != nil {
++			h.logger.Println(stack)
++		} else {
++			log.Println(stack)
++		}
++	}
++}
 diff --git a/vendor/github.com/marstr/guid/.travis.yml b/vendor/github.com/marstr/guid/.travis.yml
 deleted file mode 100644
 index 35158ec5..00000000
@@ -15539,7 +17958,7 @@ index 00000000..def1f7b9
 +	return bag.Data, nil
 +}
 diff --git a/vendor/modules.txt b/vendor/modules.txt
-index 4551c425..fbaff2c0 100644
+index 4551c425..e8d70d1b 100644
 --- a/vendor/modules.txt
 +++ b/vendor/modules.txt
 @@ -1,13 +1,28 @@
@@ -15584,7 +18003,17 @@ index 4551c425..fbaff2c0 100644
  # github.com/dnaeon/go-vcr v1.2.0
  ## explicit; go 1.15
  # github.com/docker/go-metrics v0.0.0-20180209012529-399ea8c73916
-@@ -89,6 +101,12 @@ github.com/garyburd/redigo/redis
+@@ -82,6 +94,9 @@ github.com/docker/go-metrics
+ # github.com/docker/libtrust v0.0.0-20150114040149-fa567046d9b1
+ ## explicit
+ github.com/docker/libtrust
++# github.com/felixge/httpsnoop v1.0.2
++## explicit; go 1.13
++github.com/felixge/httpsnoop
+ # github.com/garyburd/redigo v0.0.0-20150301180006-535138d7bcd7
+ ## explicit
+ github.com/garyburd/redigo/internal
+@@ -89,6 +104,12 @@ github.com/garyburd/redigo/redis
  # github.com/go-ini/ini v1.25.4
  ## explicit
  github.com/go-ini/ini
@@ -15597,7 +18026,18 @@ index 4551c425..fbaff2c0 100644
  # github.com/golang/protobuf v0.0.0-20160321223353-8d92cf5fc15a
  ## explicit
  github.com/golang/protobuf/proto
-@@ -110,9 +128,6 @@ github.com/inconshreveable/mousetrap
+@@ -98,8 +119,8 @@ github.com/gomodule/redigo/redis
+ # github.com/gorilla/context v1.1.1
+ ## explicit
+ github.com/gorilla/context
+-# github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33
+-## explicit
++# github.com/gorilla/handlers v1.5.1
++## explicit; go 1.14
+ github.com/gorilla/handlers
+ # github.com/gorilla/mux v1.3.1-0.20170228224354-599cba5e7b61
+ ## explicit
+@@ -110,9 +131,6 @@ github.com/inconshreveable/mousetrap
  # github.com/jmespath/go-jmespath v0.0.0-20160803190731-bd40a432e4c7
  ## explicit
  github.com/jmespath/go-jmespath
@@ -15607,7 +18047,7 @@ index 4551c425..fbaff2c0 100644
  # github.com/matttproud/golang_protobuf_extensions v1.0.1
  ## explicit
  github.com/matttproud/golang_protobuf_extensions/pbutil
-@@ -150,9 +165,6 @@ github.com/prometheus/procfs
+@@ -150,9 +168,6 @@ github.com/prometheus/procfs
  github.com/prometheus/procfs/internal/util
  github.com/prometheus/procfs/nfs
  github.com/prometheus/procfs/xfs
@@ -15617,7 +18057,7 @@ index 4551c425..fbaff2c0 100644
  # github.com/sirupsen/logrus v1.0.1-0.20170620144510-3d4380f53a34
  ## explicit
  github.com/sirupsen/logrus
-@@ -175,12 +187,14 @@ github.com/yvasiyarov/gorelic
+@@ -175,12 +190,14 @@ github.com/yvasiyarov/gorelic
  # github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f
  ## explicit
  github.com/yvasiyarov/newrelic_platform_go
@@ -15633,7 +18073,7 @@ index 4551c425..fbaff2c0 100644
  # golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
  ## explicit; go 1.17
  golang.org/x/net/context
-@@ -250,3 +264,4 @@ gopkg.in/check.v1
+@@ -250,3 +267,4 @@ gopkg.in/check.v1
  # gopkg.in/yaml.v2 v2.2.8
  ## explicit
  gopkg.in/yaml.v2
