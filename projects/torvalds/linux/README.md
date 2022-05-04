@@ -14,3 +14,4 @@ This tool is used by Bottlerocket metal variant to help parse the user input of 
 1. Compare the old tag to the new, looking specifically for Makefile changes. If any of the make targets used in projects/torvalds/linux/Makefile to call upstream make changed, make those appropriate changes.
 1. Update the version at the top of this Readme.
 1. Monitor node image builds and e2e tests as updates to this project can potentially break cluster create and update process.
+1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
