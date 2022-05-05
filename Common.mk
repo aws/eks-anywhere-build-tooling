@@ -395,6 +395,7 @@ endif
 #### Source repo + binary Targets
 ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
+	$(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(CLONE_URL) $(GIT_TAG)
 ifneq ($(REPO_SPARSE_CHECKOUT),)
 	git clone --depth 1 --filter=blob:none --sparse -b $(GIT_TAG) $(CLONE_URL) $(REPO)
 	git -C $(REPO) sparse-checkout set $(REPO_SPARSE_CHECKOUT) --cone
@@ -405,7 +406,6 @@ endif
 
 $(GIT_CHECKOUT_TARGET): | $(REPO)
 	@rm -f $(REPO)/eks-anywhere-*
-	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
 	git -C $(REPO) checkout -f $(GIT_TAG)
 	touch $@
 
