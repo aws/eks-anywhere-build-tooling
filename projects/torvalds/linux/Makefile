@@ -3,26 +3,35 @@ GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO=linux
 REPO_OWNER=torvalds
+REPO_SPARSE_CHECKOUT=tools lib/bootconfig.c include/linux/bootconfig.h
 
 SIMPLE_CREATE_BINARIES=false
-SIMPLE_CREATE_TARBALLS=false
+BINARY_TARGETS=$(OUTPUT_BIN_DIR)/linux-amd64/tools/bootconfig
+BINARY_PLATFORMS=linux/amd64
+
 HAS_LICENSES=false
+
 TAR_FILE_PREFIX=bootconfig
 HAS_S3_ARTIFACTS=true
 
 IMAGE_NAMES=
 
+# this project never builds arm, dont fake it in presubmits
+FAKE_ARM_BINARIES_FOR_VALIDATION=false
+
 include $(BASE_DIRECTORY)/Common.mk
 
-$(BINARY_TARGETS): create-binaries
 
-.PHONY: create-binaries
-create-binaries: $(GIT_CHECKOUT_TARGET)
-	build/create_binaries.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH)
+tarballs: gather-non-golang-licenses $(OUTPUT_DIR)/ATTRIBUTION.txt
 
-.PHONY: tarballs
-tarballs: create-binaries
-	build/create_tarballs.sh $(REPO) $(REPO_OWNER) $(GIT_TAG) $(TAR_FILE_PREFIX) $(OUTPUT_DIR) $(OUTPUT_DIR)/bin/linux $(ARTIFACTS_PATH) $(GIT_HASH)
+$(BINARY_TARGETS): MAKEFLAGS=
+$(BINARY_TARGETS): $(GIT_CHECKOUT_TARGET)	
+	mkdir -p $(MAKE_ROOT)/$(@D)
+	$(MAKE) -C $(REPO)/tools/bootconfig OUTPUT=$(MAKE_ROOT)/$(@D)/
+
+.PHONY: gather-non-golang-licenses
+gather-non-golang-licenses: $(GIT_CHECKOUT_TARGET)
+	source $(BUILD_LIB)/common.sh && build::non-golang::copy_licenses $(REPO) $(OUTPUT_DIR)/LICENSES/github.com/$(REPO_OWNER)/$(REPO)
 
 
 ########### DO NOT EDIT #############################

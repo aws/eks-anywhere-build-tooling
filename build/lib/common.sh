@@ -284,12 +284,12 @@ function build::common::get_latest_eksa_asset_url() {
 }
 
 function build::common::wait_for_tag() {
-  local -r tag=$1
+  local -r clone_url=$1
+  local -r tag=$2
   sleep_interval=20
   for i in {1..60}; do
     echo "Checking for tag ${tag}..."
-    git fetch --tags > /dev/null 2>&1
-    git rev-parse --verify --quiet "${tag}" && echo "Tag ${tag} exists!" && break
+    git ls-remote --tags --exit-code $clone_url "refs/tags/$tag" && echo "Tag ${tag} exists!" && break
     echo "Tag ${tag} does not exist!"
     echo "Waiting for tag ${tag}..."
     sleep $sleep_interval
