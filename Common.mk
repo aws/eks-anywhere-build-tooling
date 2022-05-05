@@ -477,8 +477,9 @@ patch-repo: $(GIT_PATCH_TARGET)
 $(OUTPUT_DIR)/images/%:
 	@mkdir -p $(@D)
 
-$(OUTPUT_DIR)/%TTRIBUTION.txt: SOURCE_FILE=$(@:$(OUTPUT_DIR)/%=%)
+$(OUTPUT_DIR)/%TTRIBUTION.txt: SOURCE_FILE=$(@:_output/%=%) # we want to keep the release branch part which is in the OUTPUT var, hardcoding _output
 $(OUTPUT_DIR)/%TTRIBUTION.txt:
+	$(info $(@) $(SOURCE_FILE))
 	@mkdir -p $(OUTPUT_DIR)
 	@cp $(SOURCE_FILE) $(OUTPUT_DIR)
 
