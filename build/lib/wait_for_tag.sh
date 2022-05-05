@@ -18,10 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-CLONE_URL="$1"
-TAG="$2"
+TAG="$1"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
-build::common::wait_for_tag $CLONE_URL $TAG
+build::common::wait_for_tag $TAG
