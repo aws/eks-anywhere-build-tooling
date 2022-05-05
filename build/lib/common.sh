@@ -288,8 +288,8 @@ function build::common::wait_for_tag() {
   sleep_interval=20
   for i in {1..60}; do
     echo "Checking for tag ${tag}..."
-    git fetch --tags > /dev/null 2>&1
     git rev-parse --verify --quiet "${tag}" && echo "Tag ${tag} exists!" && break
+    git fetch --tags > /dev/null 2>&1
     echo "Tag ${tag} does not exist!"
     echo "Waiting for tag ${tag}..."
     sleep $sleep_interval
