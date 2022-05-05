@@ -21,8 +21,10 @@ set -o pipefail
 REPO="$1"
 ARTIFACTS_PATH="$2"
 IMAGE_REPO="$3"
-IMAGE_TAG="$4"
-GOLANG_VERSION="$5"
+TINK_SERVER_IMAGE_COMPONENT="$4"
+TINK_CONTROLLER_IMAGE_COMPONENT="$5"
+IMAGE_TAG="$6"
+GOLANG_VERSION="$7"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
@@ -34,8 +36,8 @@ cd $REPO
 npm install prettier --global
 
 make release-manifests \
-  TINK_SERVER_IMAGE=${IMAGE_REPO}/tink-server \
-  TINK_CONTROLLER_IMAGE=${IMAGE_REPO}/tink-controller \
+  TINK_SERVER_IMAGE=${IMAGE_REPO}/${TINK_SERVER_IMAGE_COMPONENT} \
+  TINK_CONTROLLER_IMAGE=${IMAGE_REPO}/${TINK_CONTROLLER_IMAGE_COMPONENT} \
   TINK_SERVER_TAG=${IMAGE_TAG} \
   TINK_CONTROLLER_TAG=${IMAGE_TAG}
 
