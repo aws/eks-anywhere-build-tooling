@@ -77,9 +77,19 @@ if [ "$CODEBUILD_CI" = "true" ]; then
     RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address --iam-instance-profile Name=eksa-imagebuilder-instance-profile"
 fi
 
-# Create a single EC2 instance with provided instance type and AMI
-# Query the instance ID for use in future commands
-INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text)
+MAX_RETRIES=15
+for i in $(seq 1 $MAX_RETRIES); do
+    echo "Attempt $(($i))"
+
+    # Create a single EC2 instance with provided instance type and AMI
+    # Query the instance ID for use in future commands
+    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text) && break
+
+    if [ "$i" = "$MAX_RETRIES" ]; then
+        exit 1
+    fi
+    sleep 10
+done
 
 # Wait in loop until instance is running
 aws ec2 wait instance-running --instance-ids $INSTANCE_ID
@@ -87,8 +97,6 @@ aws ec2 wait instance-running --instance-ids $INSTANCE_ID
 # Get the public DNS of the instance to use as SSH hostname
 PUBLIC_DNS_NAME=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[].Instances[].PublicDnsName" --output text)
 REMOTE_HOST=ec2-user@$PUBLIC_DNS_NAME
-
-MAX_RETRIES=15
 
 # rsync might sometimes fail with flaky connection issues, so
 # implementing retry logic will make it more robust to flakes
