@@ -129,7 +129,8 @@ IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
 # For projects with multiple containers this is defined to override the default
 # ex: CLUSTER_API_CONTROLLER_IMAGE_COMPONENT
 IMAGE_COMPONENT_VARIABLE=$(call TO_UPPER,$(IMAGE_NAME))_IMAGE_COMPONENT
-IMAGE=$(IMAGE_REPO)/$(call IF_OVERRIDE_VARIABLE,$(IMAGE_COMPONENT_VARIABLE),$(IMAGE_COMPONENT)):$(IMAGE_TAG)
+IMAGE_REPO_COMPONENT=$(call IF_OVERRIDE_VARIABLE,$(IMAGE_COMPONENT_VARIABLE),$(IMAGE_COMPONENT))
+IMAGE=$(IMAGE_REPO)/$(IMAGE_REPO_COMPONENT):$(IMAGE_TAG)
 LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))
 
 IMAGE_USERADD_USER_ID?=1000
@@ -702,3 +703,14 @@ stop-docker-builder: # Clean up builder base docker container
 .PHONY: generate
 generate: # Update UPSTREAM_PROJECTS.yaml
 	$(BUILD_LIB)/generate_projects_list.sh $(BASE_DIRECTORY)
+
+.PHONY: %/create-ecr-repo
+%/create-ecr-repo: IMAGE_NAME=$*
+%/create-ecr-repo:
+	if ! aws ecr describe-repositories --repository-name $(IMAGE_REPO_COMPONENT) > /dev/null 2>&1; then \
+		aws ecr create-repository --repository-name $(IMAGE_REPO_COMPONENT); \
+	fi
+
+.PHONY: create-ecr-repos
+create-ecr-repos: # Create repos in ECR for project images for local testing
+create-ecr-repos: $(foreach image,$(IMAGE_NAMES),$(image)/create-ecr-repo)
