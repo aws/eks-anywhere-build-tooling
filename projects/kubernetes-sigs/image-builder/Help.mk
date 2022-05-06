@@ -30,6 +30,7 @@ run-target-in-docker: ## Run `MAKE_TARGET` using builder base docker container
 update-attribution-checksums-docker: ## Update attribution and checksums using the builder base docker container
 stop-docker-builder: ## Clean up builder base docker container
 generate: ## Update UPSTREAM_PROJECTS.yaml
+create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
 build: ## Called via prow presubmit, calls `release-raw-ubuntu-2004-efi image-builder/images/capi/output/fake-ubuntu.gz /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/raw/ubuntu/ubuntu.gz upload-artifacts-raw build-ami-ubuntu-2004 setup-packer-configs-ova download-ova-bottlerocket image-builder/images/capi/output/fake-ubuntu.ova /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/ova/ubuntu/ubuntu.ova /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/ova/bottlerocket/bottlerocket.ova upload-artifacts-ova upload-ova-bottlerocket`
