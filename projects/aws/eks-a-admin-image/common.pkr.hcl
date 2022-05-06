@@ -1,7 +1,7 @@
 
 locals {
   timestamp  = regex_replace(timestamp(), "[- TZ:]", "")
-  image_name = "eks-a-admin-${var.eks-a-version}-${var.build-version}-${local.timestamp}"
+  image_name = "eks-a-admin-${replace(var.eks-a-version, "+", "-")}-${var.build-version}-${local.timestamp}"
 }
 
 variable "build-username" {
