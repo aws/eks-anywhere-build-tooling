@@ -63,6 +63,7 @@ GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
 REPO_NO_CLONE?=false
 PATCHES_DIR=$(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches))
+REPO_SPARSE_CHECKOUT?=
 ####################################################
 
 #################### RELEASE BRANCHES ##############
@@ -348,6 +349,8 @@ SIMPLE_CREATE_TARBALLS?=true
 TAR_FILE_PREFIX?=$(REPO)
 FAKE_ARM_BINARIES_FOR_VALIDATION?=$(if $(filter linux/arm64,$(BINARY_PLATFORMS)),false,true)
 FAKE_ARM_IMAGES_FOR_VALIDATION?=false
+IMAGE_FORMAT?=
+IMAGE_OS?=
 ####################################################
 
 #################### OTHER #########################
@@ -393,7 +396,12 @@ endif
 #### Source repo + binary Targets
 ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
+ifneq ($(REPO_SPARSE_CHECKOUT),)
+	git clone --depth 1 --filter=blob:none --sparse -b $(GIT_TAG) $(CLONE_URL) $(REPO)
+	git -C $(REPO) sparse-checkout set $(REPO_SPARSE_CHECKOUT) --cone
+else
 	git clone $(CLONE_URL) $(REPO)
+endif
 endif
 
 $(GIT_CHECKOUT_TARGET): | $(REPO)
@@ -470,9 +478,11 @@ patch-repo: $(GIT_PATCH_TARGET)
 $(OUTPUT_DIR)/images/%:
 	@mkdir -p $(@D)
 
+$(OUTPUT_DIR)/%TTRIBUTION.txt: SOURCE_FILE=$(@:_output/%=%) # we want to keep the release branch part which is in the OUTPUT var, hardcoding _output
 $(OUTPUT_DIR)/%TTRIBUTION.txt:
+	$(info $(@) $(SOURCE_FILE))
 	@mkdir -p $(OUTPUT_DIR)
-	@cp $(ATTRIBUTION_TARGETS) $(OUTPUT_DIR)
+	@cp $(SOURCE_FILE) $(OUTPUT_DIR)
 
 
 ## License Targets
@@ -690,7 +700,7 @@ add-generated-help-block:
 
 .PHONY: run-target-in-docker
 run-target-in-docker: # Run `MAKE_TARGET` using builder base docker container
-	$(BUILD_LIB)/run_target_docker.sh $(COMPONENT) $(MAKE_TARGET) $(IMAGE_REPO) $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET)
+	$(BUILD_LIB)/run_target_docker.sh $(COMPONENT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" $(ARTIFACTS_BUCKET)
 
 .PHONY: update-attribution-checksums-docker
 update-attribution-checksums-docker: # Update attribution and checksums using the builder base docker container
