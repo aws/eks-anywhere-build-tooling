@@ -46,6 +46,7 @@ run-target-in-docker: ## Run `MAKE_TARGET` using builder base docker container
 update-attribution-checksums-docker: ## Update attribution and checksums using the builder base docker container
 stop-docker-builder: ## Clean up builder base docker container
 generate: ## Update UPSTREAM_PROJECTS.yaml
+create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
 build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
