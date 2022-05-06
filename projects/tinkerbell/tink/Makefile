@@ -39,6 +39,7 @@ s3-artifacts: create-manifests
 create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(ARTIFACTS_PATH) $(IMAGE_REPO) $(TINK_SERVER_IMAGE_COMPONENT) ${TINK_CONTROLLER_IMAGE_COMPONENT} $(IMAGE_TAG) $(GOLANG_VERSION)
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
