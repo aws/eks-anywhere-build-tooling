@@ -81,9 +81,14 @@ MAX_RETRIES=15
 for i in $(seq 1 $MAX_RETRIES); do
     echo "Attempt $(($i))"
 
+    AZ_LIST="us-west-2a,us-west-2b,us-west-2c,us-west-2d"
+    AZ_COUNT=$(echo $AZ_LIST | awk -F\, '{print NF}')
+    INDEX=$((($RANDOM % $AZ_COUNT) + 1))
+    AZ=$(cut -d',' -f${INDEX} <<< $AZ_LIST)
+
     # Create a single EC2 instance with provided instance type and AMI
     # Query the instance ID for use in future commands
-    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text) && break
+    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME --placement "AvailabilityZone=$AZ" $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text) && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
