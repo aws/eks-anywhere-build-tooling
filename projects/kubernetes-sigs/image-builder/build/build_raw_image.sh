@@ -72,28 +72,26 @@ if [ "$CODEBUILD_CI" = "true" ]; then
     INDEX=$((($RANDOM % $SUBNET_COUNT) + 1))
     SUBNET_ID=$(cut -d',' -f${INDEX} <<< $SUBNET_ID_LIST)
 
+    # Query the availability zone that this subnet exists in
+    SUBNET_AZ=$(aws ec2 describe-subnets --subnet-ids $SUBNET_ID --query "Subnets[].AvailabilityZone" --output text)
+
     # Define extra args to run the instance in the same subnet and use
     # the same security group as Codebuild
-    RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address --iam-instance-profile Name=eksa-imagebuilder-instance-profile"
+    RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --placement AvailabilityZone=$SUBNET_AZ --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address --iam-instance-profile Name=eksa-imagebuilder-instance-profile"
 fi
 
-MAX_RETRIES=15
+MAX_RETRIES=20
 for i in $(seq 1 $MAX_RETRIES); do
-    echo "Attempt $(($i))"
-
-    AZ_LIST="us-west-2a,us-west-2b,us-west-2c,us-west-2d"
-    AZ_COUNT=$(echo $AZ_LIST | awk -F\, '{print NF}')
-    INDEX=$((($RANDOM % $AZ_COUNT) + 1))
-    AZ=$(cut -d',' -f${INDEX} <<< $AZ_LIST)
+    echo "Attempt $(($i)) of instance launch"
 
     # Create a single EC2 instance with provided instance type and AMI
     # Query the instance ID for use in future commands
-    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME --placement "AvailabilityZone=$AZ" $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text) && break
+    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text) && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
     fi
-    sleep 10
+    sleep 30
 done
 
 # Wait in loop until instance is running
