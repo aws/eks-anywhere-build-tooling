@@ -54,3 +54,7 @@ It may be easier to ensure building matches that in prow to use the builder-base
 * Attribution and Checksum generation may be easier to run in docker to avoid needing specific golang versions locally.  A specific make target exists for these:
 	* `make update-attribution-checksums-docker PROJECT=<project>`
 	* This will build, generate attribution and checksums and then copy the resulting files out of the container to host project location.
+
+## Docker and AWS credentials
+
+See [docker-auth.md](./docker-auth.md) for helpful tips for configuring, securing, and using your AWS credentials with the targets in this project.
