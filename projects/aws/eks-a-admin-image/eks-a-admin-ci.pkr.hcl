@@ -105,8 +105,14 @@ build {
     script       = "provisioners/test/install_docker.sh"
   }
 
+  provisioner "file" {
+    source      = "./provisioners/files/activate_ssm.sh"
+    destination = "/home/${var.build-username}/activate_ssm.sh"
+  }
+
   provisioner "shell" {
     environment_vars = [
+      "USER=${var.build-username}",
       "KUBECTL_URL=${var.kubectl-url}",
       "KIND_URL=${var.kind-url}",
       "EKSA_VERSION=${var.eks-a-version}",
@@ -115,6 +121,7 @@ build {
     ]
 
     scripts = [
+      "provisioners/configure_ci.sh",
       "provisioners/install_kubectl.sh",
       "provisioners/test/install_kubectl.sh",
       "provisioners/install_eksa.sh",
