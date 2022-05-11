@@ -34,5 +34,5 @@ source "${SCRIPT_ROOT}/common.sh"
 # Copy
 #
 mkdir -p ${DEST_DIR}
-cp -r ${SOURCE_DIR} ${DEST_DIR}
+rsync -a --exclude .git "${SOURCE_DIR}" "${DEST_DIR}"
 build::non-golang::copy_licenses ${HELM_SOURCE_REPOSITORY} $DEST_DIR/LICENSES/github.com/${HELM_SOURCE_REPOSITORY}
