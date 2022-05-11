@@ -717,8 +717,12 @@ generate: # Update UPSTREAM_PROJECTS.yaml
 .PHONY: %/create-ecr-repo
 %/create-ecr-repo: IMAGE_NAME=$*
 %/create-ecr-repo:
-	if ! aws ecr describe-repositories --repository-name $(IMAGE_REPO_COMPONENT) > /dev/null 2>&1; then \
-		aws ecr create-repository --repository-name $(IMAGE_REPO_COMPONENT); \
+	cmd=( ecr ); \
+	if [[ "${IMAGE_REPO}" =~ ^public\.ecr\.aws/ ]]; then \
+	    cmd=( ecr-public --region us-east-1 ); \
+	fi; \
+	if ! aws $${cmd[*]} describe-repositories --repository-name $(IMAGE_REPO_COMPONENT) > /dev/null 2>&1; then \
+		aws $${cmd[*]} create-repository --repository-name $(IMAGE_REPO_COMPONENT); \
 	fi
 
 .PHONY: create-ecr-repos
