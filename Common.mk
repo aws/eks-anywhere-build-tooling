@@ -719,12 +719,16 @@ generate: # Update UPSTREAM_PROJECTS.yaml
 %/create-ecr-repo:
 	cmd=( ecr ); \
 	if [[ "${IMAGE_REPO}" =~ ^public\.ecr\.aws/ ]]; then \
-	    cmd=( ecr-public --region us-east-1 ); \
+		cmd=( ecr-public --region us-east-1 ); \
 	fi; \
-	if ! aws $${cmd[*]} describe-repositories --repository-name $(IMAGE_REPO_COMPONENT) > /dev/null 2>&1; then \
-		aws $${cmd[*]} create-repository --repository-name $(IMAGE_REPO_COMPONENT); \
-	fi
+	repo=$(IMAGE_REPO_COMPONENT); \
+	if [ "$(IMAGE_NAME)" = "__helm__" ]; then \
+		repo="$(HELM_DESTINATION_REPOSITORY)"; \
+	fi; \
+	if ! aws $${cmd[*]} describe-repositories --repository-name "$$repo" > /dev/null 2>&1; then \
+		aws $${cmd[*]} create-repository --repository-name "$$repo"; \
+	fi;
 
 .PHONY: create-ecr-repos
 create-ecr-repos: # Create repos in ECR for project images for local testing
-create-ecr-repos: $(foreach image,$(IMAGE_NAMES),$(image)/create-ecr-repo)
+create-ecr-repos: $(foreach image,$(IMAGE_NAMES),$(image)/create-ecr-repo) $(if $(filter true,$(HAS_HELM_CHART)),__helm__/create-ecr-repo,)
