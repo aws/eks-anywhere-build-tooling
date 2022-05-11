@@ -78,7 +78,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@cp -r harbor/src/core/views $(OUTPUT_DIR)/harbor-core/harbor
 	@cp -r harbor/make/migrations $(OUTPUT_DIR)/harbor-core/harbor
 	@cp -r harbor/icons $(OUTPUT_DIR)/harbor-core/harbor
-	
+
 	@mkdir -p $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d
 	@cp harbor/make/photon/db/docker-entrypoint.sh harbor/make/photon/db/initdb.sh harbor/make/photon/db/upgrade.sh harbor/make/photon/db/docker-healthcheck.sh $(OUTPUT_DIR)/harbor-db/
 	@cp harbor/make/photon/db/initial-notaryserver.sql harbor/make/photon/db/initial-notarysigner.sql harbor/make/photon/db/initial-registry.sql $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d/
@@ -88,7 +88,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-jobservice/harbor
 	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/jobservice/entrypoint.sh $(OUTPUT_DIR)/harbor-jobservice/harbor/
-	
+
 	@mkdir -p $(OUTPUT_DIR)/harbor-log/etc/rsyslog.d
 	@mkdir -p $(OUTPUT_DIR)/harbor-log/etc/cron.hourly
 	@mkdir -p $(OUTPUT_DIR)/harbor-log/usr/local/bin
