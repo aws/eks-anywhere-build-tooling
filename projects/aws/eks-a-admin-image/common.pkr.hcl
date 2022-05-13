@@ -41,7 +41,7 @@ variable "kubectl-url" {
 
 variable "kind-url" {
   type    = string
-  default = null
+  default = "https://github.com/kubernetes-sigs/kind/releases/download/v0.13.0/kind-linux-amd64"
 }
 
 variable "build-version" {
