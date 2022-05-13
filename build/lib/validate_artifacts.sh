@@ -30,31 +30,32 @@ if [ -n "$IMAGE_FORMAT" ]; then
     EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_$IMAGE_FORMAT
 fi
 if [ "$IMAGE_OS" = "bottlerocket" ]; then
-	EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_ova_bottlerocket
+    EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_ova_bottlerocket
 fi
 
 ACTUAL_FILES=$(mktemp)
-for file in $(find ${ARTIFACTS_FOLDER} -type f | sort); do
-    filepath=$(realpath --relative-base=$ARTIFACTS_FOLDER $file)
-	echo $filepath >> $ACTUAL_FILES
-done
+find "$ARTIFACTS_FOLDER" \
+     -type f \
+     -exec realpath --relative-base="$ARTIFACTS_FOLDER" {} \; \
+     > "$ACTUAL_FILES"
 
 EXPECTED_FILES=$(mktemp)
 export GIT_TAG=$GIT_TAG
 export IMAGE_OS=$IMAGE_OS
-envsubst '$GIT_TAG:$IMAGE_OS' \
-	< $EXPECTED_FILES_PATH \
-	> $EXPECTED_FILES
+envsubst "\$GIT_TAG:\$IMAGE_OS" \
+         < "$EXPECTED_FILES_PATH" \
+         > "$EXPECTED_FILES"
 
 if $FAKE_ARM_ARTIFACTS_FOR_VALIDATION; then
-	sed -i '/arm64/d' $EXPECTED_FILES
+    sed -i '/arm64/d' "$EXPECTED_FILES"
 fi
 
-if ! diff $EXPECTED_FILES $ACTUAL_FILES; then
-	echo "Artifacts directory does not matched expected!"
-	echo "******************* Actual ******************"
-	cat $ACTUAL_FILES
-	echo "*********************************************"
-	exit 1
+# The versions of sort found on macOS and Linux can behave
+# differently. That's why we sort each file here and now, to ensure
+# that whatever version is in use, it's consistent.
+if ! diff -q <(sort "$EXPECTED_FILES") <(sort "$ACTUAL_FILES"); then
+    echo "Artifacts directory does not matched expected!"
+    diff -y <(sort "$EXPECTED_FILES") <(sort "$ACTUAL_FILES")
+    exit 1
 fi
 
