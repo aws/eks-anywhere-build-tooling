@@ -12,7 +12,6 @@ The Cilium operator image includes the generic cilium-operator binary and the `g
 
 ### Updating
 1. Update GIT_TAG file with new Cilium version.
-2. Update the HELM_REPO_VERSION with the correct version for the new GIT_TAG
 2. Install `skopeo` if you don't have it ([instructions](https://github.com/containers/skopeo/blob/main/install.md)).
 3. Run `make update-digests` in this folder.
 4. Update the version at the top of this Readme.
