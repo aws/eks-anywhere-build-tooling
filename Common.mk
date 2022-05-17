@@ -357,6 +357,7 @@ IMAGE_OS?=
 KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 SPECIAL_TARGET_SECONDARY=$(strip $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS)) $(GO_MOD_DOWNLOAD_TARGETS))
+SKIP_CHECKSUM_VALIDATION?=false
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
@@ -541,7 +542,7 @@ endif
 
 .PHONY: validate-checksums
 validate-checksums: $(BINARY_TARGETS)
-ifneq ($(strip $(BINARY_TARGETS)),)
+ifneq ($(and $(strip $(BINARY_TARGETS)), $(filter false, $(SKIP_CHECKSUM_VALIDATION))),)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
 endif
 
