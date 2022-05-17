@@ -21,7 +21,7 @@ $(REPO)/eks-anywhere-go-mod-download: $(CAPC_MANIFESTS_TARGET)
 
 $(CAPC_MANIFESTS_TARGET): $(GIT_CHECKOUT_TARGET)
 	echo "Running generate-mocks for capc"
-	make -C $(REPO) generate-mocks
+	source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) && make -C $(REPO) generate-mocks
 
 s3-artifacts: create-manifests
 
