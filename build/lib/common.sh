@@ -332,6 +332,8 @@ function build::common::get_clone_url() {
   fi
 }
 
+# Joins input with delimiter
+# helper::text::join , a b c returns a,b,c
 function helper::text::join() {
   local IFS="$1"
   shift
