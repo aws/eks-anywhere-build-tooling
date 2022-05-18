@@ -6,6 +6,8 @@ REPO=hub
 REPO_OWNER=tinkerbell
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
+BINARY_PLATFORMS=linux/amd64
+IMAGE_PLATFORMS=linux/amd64
 
 CEXEC_IMAGE_COMPONENT=tinkerbell/hub/cexec
 KEXEC_IMAGE_COMPONENT=tinkerbell/hub/kexec
@@ -27,9 +29,11 @@ DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 IMAGE_BUILD_ARGS=ATTRIBUTION_FILE
 ATTRIBUTION_FILE=$(call TO_UPPER,$(IMAGE_NAME))_ATTRIBUTION.txt
 
+FETCH_BINARIES_TARGETS=eksa/torvalds/linux
 
 include $(BASE_DIRECTORY)/Common.mk
 
+$(call IMAGE_TARGETS_FOR_NAME, writefile): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 # reboot action image requires touch.
 # We are using eks-distro-minimal-base-glibc as the base to install touch

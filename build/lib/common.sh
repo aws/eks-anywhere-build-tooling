@@ -331,3 +331,9 @@ function build::common::get_clone_url() {
     echo "https://github.com/${org}/${repo}.git"
   fi
 }
+
+function helper::text::join() {
+  local IFS="$1"
+  shift
+  echo "$*"
+}

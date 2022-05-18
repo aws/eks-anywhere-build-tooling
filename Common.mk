@@ -142,6 +142,7 @@ IMAGE_USERADD_USER_NAME?=
 IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(subst $(LATEST),latest,$(LATEST_IMAGE))
 
 BUILD_OCI_TARS?=false
+IMAGE_PLATFORMS?=linux/amd64 linux/arm64
 
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
@@ -197,7 +198,7 @@ TO_LOWER = $(subst A,a,$(subst B,b,$(subst C,c,$(subst D,d,$(subst E,e,$(subst \
 IF_OVERRIDE_VARIABLE=$(if $(filter undefined,$(origin $1)),$(2),$(value $(1)))
 
 # $1 - image name
-IMAGE_TARGETS_FOR_NAME=$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64, $(1)) $(addsuffix /images/arm64, $(1))
+IMAGE_TARGETS_FOR_NAME=$(foreach platform,$(subst linux/,,$(IMAGE_PLATFORMS)),$(addsuffix /images/$(platform), $(1))) $(addsuffix /images/push, $(1))
 
 # $1 - binary file name
 FULL_FETCH_BINARIES_TARGETS=$(foreach platform,$(BINARY_PLATFORMS),$(addprefix $(BINARY_DEPS_DIR)/$(subst /,-,$(platform))/, $(1)))
@@ -369,7 +370,7 @@ define BUILDCTL
 	$(BUILD_LIB)/buildkit.sh \
 		build \
 		--frontend dockerfile.v0 \
-		--opt platform=$(IMAGE_PLATFORMS) \
+		--opt platform=$(BUILDKIT_IMAGE_PLATFORMS) \
 		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
 		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
 		--opt build-arg:RELEASE_BRANCH=$(RELEASE_BRANCH) \
@@ -561,15 +562,15 @@ endif
 %/images/push %/images/amd64 %/images/arm64: IMAGE_BUILD_ARGS?=
 
 # Build image using buildkit for all platforms, by default pushes to registry defined in IMAGE_REPO.
-%/images/push: IMAGE_PLATFORMS?=linux/amd64,linux/arm64
+%/images/push: BUILDKIT_IMAGE_PLATFORMS=$(shell source $(BUILD_LIB)/common.sh && helper::text::join , $(IMAGE_PLATFORMS))
 %/images/push: IMAGE_OUTPUT_TYPE?=image
 %/images/push: IMAGE_OUTPUT?=push=true
 
 # Build image using buildkit only builds linux/amd64 oci and saves to local tar.
-%/images/amd64: IMAGE_PLATFORMS?=linux/amd64
+%/images/amd64: BUILDKIT_IMAGE_PLATFORMS=linux/amd64
 
 # Build image using buildkit only builds linux/arm64 oci and saves to local tar.
-%/images/arm64: IMAGE_PLATFORMS?=linux/arm64
+%/images/arm64: BUILDKIT_IMAGE_PLATFORMS=linux/arm64
 
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE?=oci
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).tar
@@ -608,8 +609,8 @@ prepare-cgo-folder:
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
 %/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(BASE_IMAGE_REPO)/builder-base:latest
 
-%/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
-%/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
+%/cgo/amd64: BUILDKIT_IMAGE_PLATFORMS=linux/amd64
+%/cgo/arm64: BUILDKIT_IMAGE_PLATFORMS=linux/arm64
 
 %/cgo/amd64: prepare-cgo-folder
 	$(BUILDCTL)
@@ -623,7 +624,7 @@ prepare-cgo-folder:
 %-useradd/images/export: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)
 %-useradd/images/export: IMAGE_BUILD_ARGS=IMAGE_USERADD_USER_ID IMAGE_USERADD_USER_NAME
 %-useradd/images/export: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/useradd
-%-useradd/images/export: IMAGE_PLATFORMS=linux/amd64
+%-useradd/images/export: BUILDKIT_IMAGE_PLATFORMS=linux/amd64
 %-useradd/images/export:
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
