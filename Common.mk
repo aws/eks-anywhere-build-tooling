@@ -200,7 +200,7 @@ IF_OVERRIDE_VARIABLE=$(if $(filter undefined,$(origin $1)),$(2),$(value $(1)))
 IMAGE_TARGETS_FOR_NAME=$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64, $(1)) $(addsuffix /images/arm64, $(1))
 
 # $1 - binary file name
-FULL_FETCH_BINARIES_TARGETS=$(addprefix $(BINARY_DEPS_DIR)/linux-amd64/, $(1)) $(addprefix $(BINARY_DEPS_DIR)/linux-arm64/, $(1))
+FULL_FETCH_BINARIES_TARGETS=$(foreach platform,$(BINARY_PLATFORMS),$(addprefix $(BINARY_DEPS_DIR)/$(subst /,-,$(platform))/, $(1)))
 
 # $1 - targets
 # $2 - platforms
@@ -733,3 +733,7 @@ generate: # Update UPSTREAM_PROJECTS.yaml
 .PHONY: create-ecr-repos
 create-ecr-repos: # Create repos in ECR for project images for local testing
 create-ecr-repos: $(foreach image,$(IMAGE_NAMES),$(image)/create-ecr-repo) $(if $(filter true,$(HAS_HELM_CHART)),__helm__/create-ecr-repo,)
+
+.PHONY: var-value-%
+var-value-%:
+	@echo $($*)

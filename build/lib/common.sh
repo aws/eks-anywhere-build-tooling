@@ -272,8 +272,10 @@ function build::common::get_latest_eksa_asset_url() {
     git_tag=$(git show $commit_hash:projects/${project}/GIT_TAG)
     s3artifactfolder=$s3downloadpath/artifacts
   fi
-  
-  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$s3artifactfolder/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+
+  local -r tar_file_prefix=$(make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
+ 
+  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
 
   local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $url)
   if [[ "$http_code" == "200" ]]; then 

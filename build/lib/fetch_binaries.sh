@@ -60,7 +60,6 @@ if [[ $PRODUCT = 'eksd' ]]; then
         URL=$(build::eksd_releases::get_eksd_component_url $REPO_OWNER $RELEASE_BRANCH $ARCH)
     fi
 else
-    TARBALL="$REPO-linux-$ARCH.tar.gz"
     URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $S3_ARTIFACTS_FOLDER $GIT_COMMIT_OVERRIDE)
 fi
 
