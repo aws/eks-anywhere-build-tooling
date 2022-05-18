@@ -160,21 +160,21 @@ build {
 variable "vsphere_endpoint" {
   type        = string
   description = "The fully qualified domain name or IP address of the vCenter Server instance. (e.g. 'sfo-w01-vc01.sfo.rainpole.io')"
-  default     = null
+  default     = "http://vcenter"
 }
 
 variable "vsphere_username" {
   type        = string
   description = "The username to login to the vCenter Server instance. (e.g. 'svc-packer-vsphere@rainpole.io')"
   sensitive   = true
-  default     = null
+  default     = "vsphere_username"
 }
 
 variable "vsphere_password" {
   type        = string
   description = "The password for the login to the vCenter Server instance."
   sensitive   = true
-  default     = null
+  default     = "vsphere_password"
 }
 
 variable "vsphere_insecure_connection" {
@@ -193,7 +193,7 @@ variable "vsphere_datacenter" {
 variable "vsphere_cluster" {
   type        = string
   description = "The name of the target vSphere cluster. (e.g. 'sfo-w01-cl01')"
-  default     = null
+  default     = "vsphere_cluster"
 }
 
 variable "vsphere_datastore" {
@@ -339,7 +339,7 @@ variable "iso_checksum_type" {
 variable "iso_checksum_value" {
   type        = string
   description = "The checksum value provided by the vendor."
-  default     = null
+  default     = ""
 }
 
 // Boot Settings
