@@ -22,4 +22,7 @@ git config ${GIT_CONFIG_SCOPE} credential.UseHttpPath true
 
 start::dockerd
 wait::for::dockerd
+
+for i in {1..5}; do docker pull public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v6.1.0 && break || sleep 15; done
+
 docker run --privileged --rm public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v6.1.0 --install aarch64
