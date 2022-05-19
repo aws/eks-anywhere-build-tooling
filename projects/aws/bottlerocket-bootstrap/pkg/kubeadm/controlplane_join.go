@@ -1,6 +1,7 @@
 package kubeadm
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"time"
@@ -69,7 +70,7 @@ func controlPlaneJoin() error {
 	} else if !isEtcdExternal {
 		if err := joinLocalEtcd(); err != nil {
 			return err
-		}	
+		}
 	}
 
 	// Migrate all static pods from this host-container to the bottlerocket host using the apiclient
@@ -85,8 +86,16 @@ func controlPlaneJoin() error {
 		return errors.Wrapf(err, "Error waiting for static pods to be up")
 	}
 
+	// Get port number from apiServer host string
+	port, err := getLocalApiBindPortFromJoinConfig(kubeadmJoinFile)
+	if err != nil {
+		// if we hit an error when extrating the port number, we always fallback to 6443
+		fmt.Printf("Unable to get local apiserver port, falling back to 6443")
+		port = 6443
+	}
+
 	// Wait for Kubernetes API server to come up.
-	err = utils.WaitFor200("https://localhost:6443/healthz", 30*time.Second)
+	err = utils.WaitFor200(fmt.Sprintf("https://localhost:%d/healthz", port), 30*time.Second)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,8 @@
 package kubeadm
 
-import "testing"
+import (
+	"testing"
+)
 
 const localEtcdClusterConf = `'apiServer:
   certSANs:
@@ -111,4 +113,79 @@ func TestIsExternalEtcd(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetLocalApiBindPortFromInitConfigYaml(t *testing.T) {
+
+	const yamlWithoutInitConfigurationKind = `
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: '10.0.20.132'
+  bindPort: 443
+`
+	t.Run("yamlWithMultipleDoc", func(t *testing.T) {
+		const yamlWithMultipleDoc = `
+---
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: ClusterConfiguration
+apiServer:
+  certSANs:
+  - 127.0.0.1
+  - '78cb78ba469f0d86d443ead9b58ab978.b5005t.rv3.jnpan.people.aws.dev'
+apiVersion: kubeadm.k8s.io/v1beta2
+---
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: '10.0.20.132'
+  bindPort: 443
+`
+		port, _ := getLocalApiBindPortFromInitConfigYaml(yamlWithMultipleDoc)
+		if port != 443 {
+			t.Errorf("Returned unexpected port, expected: %d, actual: %d", 443, port)
+		}
+	})
+
+	t.Run("yamlWithSingleDoc", func(t *testing.T) {
+		const yamlWithSingleDoc = `
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: '10.0.20.132'
+  bindPort: 443
+`
+		port, _ := getLocalApiBindPortFromInitConfigYaml(yamlWithSingleDoc)
+		if port != 443 {
+			t.Errorf("Returned unexpected port, expected: %d, actual: %d", 443, port)
+		}
+	})
+
+	t.Run("yamlWithoutInitConfigurationKind", func(t *testing.T) {
+		const yamlWithoutInitConfigurationKind = `
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: OtherConfiguration
+localAPIEndpoint:
+  advertiseAddress: '10.0.20.132'
+  bindPort: 443
+`
+		_, err := getLocalApiBindPortFromInitConfigYaml(yamlWithoutInitConfigurationKind)
+		if err == nil {
+			t.Errorf("Should return error for invalid yaml")
+		}
+	})
+
+	t.Run("emptyYaml", func(t *testing.T) {
+		_, err := getLocalApiBindPortFromInitConfigYaml("")
+		if err == nil {
+			t.Errorf("Should return error for empty yaml")
+		}
+	})
+
+	t.Run("invalidYaml", func(t *testing.T) {
+		_, err := getLocalApiBindPortFromInitConfigYaml("SomeRandomText")
+		if err == nil {
+			t.Errorf("Should return error for invalid yaml")
+		}
+	})
 }

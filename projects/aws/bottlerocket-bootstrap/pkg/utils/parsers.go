@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -45,6 +46,20 @@ func GetApiServerFromKubeConfig(path string) (string, error) {
 		break
 	}
 	return server, nil
+}
+
+func UnmarshalYamlIntoMaps(yamlString string) ([]map[string]interface{}, error) {
+	yamlDocs := strings.Split(yamlString, "---")
+	var yamlTrees []map[string]interface{}
+	for _, yamlDoc := range yamlDocs {
+		yamlTree := make(map[string]interface{})
+		err := yaml.Unmarshal([]byte(yamlDoc), &yamlTree)
+		if err != nil {
+			return nil, err
+		}
+		yamlTrees = append(yamlTrees, yamlTree)
+	}
+	return yamlTrees, nil
 }
 
 func UnmarshalPodDefinition(podDef []byte) (*v1.Pod, error) {
