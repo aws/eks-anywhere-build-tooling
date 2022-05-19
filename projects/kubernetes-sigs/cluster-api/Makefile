@@ -50,7 +50,7 @@ $(FIX_LICENSES_GO_JSON_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # that does have its own license. Hence we need to manually download license from coreos/go-json repo
 # and place it in the ajeddeloh/go-json folder under vendor directory so that it is available for
 # go-licenses to pick up
-	wget -q https://raw.githubusercontent.com/coreos/go-json/main/LICENSE -O \
+	wget --retry-connrefused -q https://raw.githubusercontent.com/coreos/go-json/main/LICENSE -O \
 			$(REPO)/vendor/github.com/ajeddeloh/go-json/LICENSE.txt;
 
 $(FIX_LICENSES_TEST_CONTAINER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)

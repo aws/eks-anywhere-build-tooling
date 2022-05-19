@@ -33,7 +33,7 @@ $(FIX_LICENSES_VM_OPERATOR_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # and place it in the respective folders under vendor directory so that they is available for 
 # go-licenses to pick up	
 	for package in tanzu-topology ncp ; do \
-		wget -q https://raw.githubusercontent.com/vmware-tanzu/vm-operator/main/LICENSE.txt -O \
+		wget --retry-connrefused -q https://raw.githubusercontent.com/vmware-tanzu/vm-operator/main/LICENSE.txt -O \
 			$(REPO)/vendor/github.com/vmware-tanzu/vm-operator/external/$$package/api/v1alpha1/LICENSE.txt; \
 	done;
 
