@@ -25,7 +25,7 @@ $(FIX_LICENSES_GO_SPIN_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # checked in to the repo. Hence we need to manually download the license from Github and place
 # it in the respective folder under vendor directory so that they is available for go-licenses
 # to pick up
-	wget https://raw.githubusercontent.com/tj/go-spin/master/LICENSE -O $@
+	wget --retry-connrefused https://raw.githubusercontent.com/tj/go-spin/master/LICENSE -O $@
 
 
 ########### DO NOT EDIT #############################

@@ -23,7 +23,7 @@ $(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # and place them in the respective folders under vendor directory so that they is available for 
 # go-licenses to pick up	
 	for package in gojsonpointer gojsonreference gojsonschema ; do \
-		wget -q https://raw.githubusercontent.com/xeipuuv/$$package/master/LICENSE-APACHE-2.0.txt -O \
+		wget -q --retry-connrefused https://raw.githubusercontent.com/xeipuuv/$$package/master/LICENSE-APACHE-2.0.txt -O \
 			$(REPO)/vendor/github.com/xeipuuv/$$package/LICENSE.txt; \
 	done;
 
