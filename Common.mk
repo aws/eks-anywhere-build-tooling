@@ -147,7 +147,8 @@ LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
 
 # If running in the builder base on prow or codebuild, grab the current tag to be used when building with cgo
-CURRENT_BUILDER_BASE_TAG=$(or $(CODEBUILD_BUILD_IMAGE),$(and $(wildcard /config/BUILDER_BASE_TAG_FILE),$(shell cat /config/BUILDER_BASE_TAG_FILE)),latest)
+CURRENT_BUILDER_BASE_TAG=$(or $(and $(wildcard /config/BUILDER_BASE_TAG_FILE),$(shell cat /config/BUILDER_BASE_TAG_FILE)),latest)
+CURRENT_BUILDER_BASE_IMAGE=$(if $(CODEBUILD_BUILD_IMAGE),$(CODEBUILD_BUILD_IMAGE),$(BASE_IMAGE_REPO)/builder-base:$(CURRENT_BUILDER_BASE_TAG))
 ####################################################
 
 #################### HELM ##########################
@@ -609,7 +610,7 @@ prepare-cgo-folder:
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY COMPONENT
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
-%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(BASE_IMAGE_REPO)/builder-base:$(CURRENT_BUILDER_BASE_TAG)
+%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(CURRENT_BUILDER_BASE_IMAGE)
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
