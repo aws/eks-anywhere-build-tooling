@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -euxo pipefail
+
 source /etc/eks/logging.sh
 
 SCRIPT_LOG=/var/log/eks-bootstrap.log
@@ -12,7 +15,7 @@ exec 3>&1 4>&2 >>$SCRIPT_LOG 2>&1
 KUBE_VIP_IMAGE=$1
 VIP=$2
 
-DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
+DNI=$(ip -br link | grep -Ev 'lo|ens3|docker0' | awk '{print $1}')
 log::info "Generating kube-vip manifest"
 log::info "Using DNI: $DNI"
 log::info "Using kube-vip: $VIP"

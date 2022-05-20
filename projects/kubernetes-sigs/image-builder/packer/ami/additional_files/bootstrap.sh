@@ -1,5 +1,8 @@
 #!/bin/bash
 source /etc/eks/logging.sh
+
+set -euxo pipefail
+
 SCRIPT_LOG=/var/log/eks-bootstrap.log
 touch $SCRIPT_LOG
 
@@ -8,12 +11,16 @@ touch $SCRIPT_LOG
 # restore stdout and stderr at bottom of script
 exec 3>&1 4>&2 >>$SCRIPT_LOG 2>&1
 
-KUBE_VIP_IMAGE=$1
-VIP=$2
+# Check number of variables, given worker nodes don't need kube-vip
+if [ $# -eq 2 ]
+then
+    KUBE_VIP_IMAGE=$1
+    VIP=$2
+fi
 
 # Using instance id as a unique hostname before we implement hostname in capas
 INSTANCE_ID=$(curl 169.254.169.254/latest/meta-data/instance-id | sed -r 's/[.]+/-/g')
-hostnamectl set-hostname $INSTANCE_ID
+hostnamectl set-hostname "$INSTANCE_ID"
 log::info "Using hostname: $INSTANCE_ID"
 log::info "preserve_hostname: true" > /etc/cloud/cloud.cfg.d/99_hostname.cfg
 
@@ -24,17 +31,17 @@ cat <<EOF > /etc/hosts
 EOF
 
 # configure DNI
-DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
-while [ -z $DNI ]
+DNI=$(ip -br link | grep -Ev 'lo|ens3|docker0' | awk '{print $1}')
+while [ -z "$DNI" ]
 do
   # creating DNI is a separate api call, which has some delays
   log::info "DNI is not ready, retry after 5 s"
   sleep 5
-  DNI=$(ip -br link | egrep -v 'lo|ens3|docker0' | awk '{print $1}')
+  DNI=$(ip -br link | grep -Ev 'lo|ens3|docker0' | awk '{print $1}')
 done
 log::info "Using DNI: $DNI"
 
-MAC=$(ip -br link | egrep -v 'lo|ens3|docker0' |  awk '{print $3}')
+MAC=$(ip -br link | grep -Ev 'lo|ens3|docker0' |  awk '{print $3}')
 DEFAULT_GATEWAY=$(ip r | grep default | awk '{print $3}')
 
 log::info "Using MAC: $MAC"
@@ -64,14 +71,14 @@ netplan --debug apply
 
 # wait ip leasing via DHCP for 10 s
 sleep 10
-MY_IP=$(ip route show | grep default | grep $DNI | awk '{print $9}')
-while [ -z $MY_IP ]
+MY_IP=$(ip route show | grep default | grep "$DNI" | awk '{print $9}')
+while [ -z "$MY_IP" ]
 do
     # if ip is not ready in 10 s, need to retry netplan apply
     log::info "IP is not ready, retrying"
     netplan --debug apply
     sleep 10
-    MY_IP=$(ip route show | grep default | grep $DNI | awk '{print $9}')
+    MY_IP=$(ip route show | grep default | grep "$DNI" | awk '{print $9}')
 done
 log::info "IP leased from DHCP: $MY_IP"
 log::info "netplan applied successfully"
@@ -87,17 +94,19 @@ sysctl --system
 
 swapoff -a
 
+log::info "network configuration finished"
+
 # if vip is not provided, it's a worker node, we don't need kube-vip manifest
 # if `kubeadm init` command doesn't exist in the user-data, it's not the first control plane node, we should generate the kube-vip manifest after the `kubeadm join` command finishes
-if [ -z $VIP ]
+if [ $# -eq 2 ]
 then
-  log::info "No VIP provided, this is worker node"
-else
-  if grep -q "kubeadm init --config /run/kubeadm/kubeadm.yaml" /var/lib/cloud/instance/user-data.txt
+    if zgrep -q "kubeadm init --config /run/kubeadm/kubeadm.yaml" /var/lib/cloud/instance/user-data.txt
   then
     log::info "This is first control plane node, generating kube-vip manifest"
-    /etc/eks/generate-kube-vip-manifest.sh $KUBE_VIP_IMAGE $VIP
+    /etc/eks/generate-kube-vip-manifest.sh "$KUBE_VIP_IMAGE" "$VIP"
   fi
+else
+  log::info "No VIP provided, this is worker node"
 fi
 
 # restore stdout and stderr
