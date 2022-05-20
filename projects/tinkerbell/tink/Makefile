@@ -25,13 +25,12 @@ EXTRA_GO_LDFLAGS=-X main.version=$(VERSION)
 
 HAS_S3_ARTIFACTS=true
 
-FETCH_BINARIES_TARGETS=eksa/cloudflare/cfssl
+PROJECT_DEPENDENCIES=eksa/cloudflare/cfssl
 
 include $(BASE_DIRECTORY)/Common.mk
 
-tink-cli/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
-$(call IMAGE_TARGETS_FOR_NAME, tink-server): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+tink-cli/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
 s3-artifacts: create-manifests
 

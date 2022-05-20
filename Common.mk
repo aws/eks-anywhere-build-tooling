@@ -56,6 +56,8 @@ else
 		BUILD_IDENTIFIER:=$(shell date "+%F-%s")
 	endif
 endif
+EXCLUDE_FROM_STAGING_BUILDSPEC?=false
+BUILDSPECS?=buildspec.yml
 ####################################################
 
 #################### GIT ###########################
@@ -74,6 +76,7 @@ BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
 IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums,$(MAKECMDGOALS)))
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=build release clean help
+MAKECMDGOALS_WITHOUT_VAR_VALUE=$(foreach t,$(MAKECMDGOALS),$(if $(findstring var-value-,$(t)),,$(t)))
 ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BRANCH_TARGET))),)
 	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
 
@@ -87,9 +90,9 @@ ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BR
 
 	# include release branch info in latest tag
 	LATEST_TAG?=$(GIT_TAG)-$(LATEST)
-else ifneq ($(and $(IS_RELEASE_BRANCH_BUILD), $(filter-out $(TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH),$(MAKECMDGOALS))),)
+else ifneq ($(and $(IS_RELEASE_BRANCH_BUILD), $(filter-out $(TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH),$(MAKECMDGOALS_WITHOUT_VAR_VALUE))),)
 	# if project has release branches and not calling one of the above targets
-$(error When running targets for this project other than `build` or `release` a `RELEASE_BRANCH` is required)
+$(error When running targets for this project other than `$(TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH)` a `RELEASE_BRANCH` is required)
 else ifneq ($(IS_RELEASE_BRANCH_BUILD),)
 	# project has release branches and one was not specified, trigger target for all
 	BUILD_TARGETS=build/release-branches/all
@@ -205,6 +208,16 @@ IMAGE_TARGETS_FOR_NAME=$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64
 
 # $1 - binary file name
 FULL_FETCH_BINARIES_TARGETS=$(foreach platform,$(BINARY_PLATFORMS),$(addprefix $(BINARY_DEPS_DIR)/$(subst /,-,$(platform))/, $(1)))
+
+# Based on PROJECT_DEPENDENCIES, generate fetch binaries targets, only projects with s3 artifacts will be fetched
+PROJECT_DEPENDENCIES_TARGETS=$(foreach dep,$(PROJECT_DEPENDENCIES), \
+	$(eval project_path_parts:=$(subst /, ,$(dep))) \
+	$(eval project_path:=$(BASE_DIRECTORY)/projects/$(word 2,$(project_path_parts))/$(word 3,$(project_path_parts))) \
+	$(if $(or $(findstring eksd,$(dep)), \
+		$(and \
+			$(if $(wildcard $(project_path)),true,$(error Non-existent dependency: $(dep))), \
+			$(filter true,$(shell $(MAKE) -C $(project_path) var-value-HAS_S3_ARTIFACTS)) \
+		)),$(call FULL_FETCH_BINARIES_TARGETS,$(dep)),))
 
 # $1 - targets
 # $2 - platforms
@@ -335,6 +348,8 @@ GOBUILD_COMMAND?=build
 ############### BINARIES DEPS ######################
 BINARY_DEPS_DIR?=$(OUTPUT_DIR)/dependencies
 FETCH_BINARIES_TARGETS?=
+PROJECT_DEPENDENCIES?=
+HANDLE_DEPENDENCIES_TARGET=handle-dependencies
 ####################################################
 
 #################### LICENSES ######################
@@ -365,8 +380,8 @@ SKIP_CHECKSUM_VALIDATION?=false
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
-RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=$(HANDLE_DEPENDENCIES_TARGET) validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
+RELEASE_TARGETS?=$(HANDLE_DEPENDENCIES_TARGET) validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
 define BUILDCTL
@@ -650,6 +665,9 @@ helm/push: helm/build
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 ## Fetch Binary Targets
+.PHONY: handle-dependencies 
+handle-dependencies: $(call PROJECT_DEPENDENCIES_TARGETS)
+
 $(BINARY_DEPS_DIR)/linux-%:
 	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(LATEST) $(RELEASE_BRANCH)
 

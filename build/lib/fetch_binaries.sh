@@ -67,8 +67,14 @@ if [ "$CODEBUILD_CI" = "true" ]; then
     build::common::wait_for_tarball $URL
 fi
 
+DOWNLOAD_DIR=$(mktemp -d)
+trap "rm -rf $DOWNLOAD_DIR" EXIT
+
+wget -q --retry-connrefused $URL $URL.sha256 -P $DOWNLOAD_DIR
+(cd $DOWNLOAD_DIR && sha256sum -c *.sha256)
+
 if [[ $REPO == *.tar.gz ]]; then
-    curl -sSL $URL -o $OUTPUT_DIR_FILE
+    mv $DOWNLOAD_DIR/*.tar.gz $OUTPUT_DIR_FILE
 else
-    curl -sSL $URL | tar xz -C $OUTPUT_DIR_FILE
+    tar xzf $DOWNLOAD_DIR/*.tar.gz -C $OUTPUT_DIR_FILE
 fi
