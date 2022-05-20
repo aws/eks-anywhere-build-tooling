@@ -39,6 +39,9 @@ $(call IMAGE_TARGETS_FOR_NAME, writefile): $(call FULL_FETCH_BINARIES_TARGETS, $
 # We are using eks-distro-minimal-base-glibc as the base to install touch
 reboot/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
+# bootconfig is dependency included in the writefile image, and bootconfig
+# is not a static binary. It requires libs on the glibc image
+writefile/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
