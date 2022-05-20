@@ -1,0 +1,84 @@
+From 1f2ccd07073f2109fb057e8de8b8f0b37baf187b Mon Sep 17 00:00:00 2001
+From: Abhinav Pandey <abhinavmpandey08@gmail.com>
+Date: Fri, 3 Jun 2022 09:06:43 -0400
+Subject: [PATCH] Download registry cert only if tinkerbell_tls is true
+
+---
+ tink-docker/main.go | 40 +++++++++++++++++++++++++---------------
+ 1 file changed, 25 insertions(+), 15 deletions(-)
+
+diff --git a/tink-docker/main.go b/tink-docker/main.go
+index 5dc28cd..987b7ce 100644
+--- a/tink-docker/main.go
++++ b/tink-docker/main.go
+@@ -8,15 +8,17 @@ import (
+ 	"net/http"
+ 	"os"
+ 	"os/exec"
++	"strconv"
+ 	"strings"
+ 	"time"
+ )
+ 
+ type tinkConfig struct {
+-	registry   string
+-	baseURL    string
+-	tinkerbell string
+-	syslogHost string
++	registry      string
++	baseURL       string
++	tinkerbell    string
++	syslogHost    string
++	tinkServerTLS bool
+ 
+ 	// TODO add others
+ }
+@@ -39,19 +41,21 @@ func main() {
+ 	cmdLines := strings.Split(string(content), " ")
+ 	cfg := parseCmdLine(cmdLines)
+ 
+-	path := fmt.Sprintf("/etc/docker/certs.d/%s/", cfg.registry)
++	if cfg.tinkServerTLS {
++		path := fmt.Sprintf("/etc/docker/certs.d/%s/", cfg.registry)
+ 
+-	// Create the directory
+-	err = os.MkdirAll(path, os.ModeDir)
+-	if err != nil {
+-		panic(err)
+-	}
+-	// Download the configuration
+-	err = downloadFile(path+"ca.crt", cfg.baseURL+"/ca.pem")
+-	if err != nil {
+-		panic(err)
++		// Create the directory
++		err = os.MkdirAll(path, os.ModeDir)
++		if err != nil {
++			panic(err)
++		}
++		// Download the configuration
++		err = downloadFile(path+"ca.crt", cfg.baseURL+"/ca.pem")
++		if err != nil {
++			panic(err)
++		}
++		fmt.Println("Downloaded the repository certificates, starting the Docker Engine")
+ 	}
+-	fmt.Println("Downloaded the repository certificates, starting the Docker Engine")
+ 
+ 	d := dockerConfig{
+ 		Debug:     true,
+@@ -105,6 +109,12 @@ func parseCmdLine(cmdLines []string) (cfg tinkConfig) {
+ 			cfg.tinkerbell = cmdLine[1]
+ 		case "syslog_host":
+ 			cfg.syslogHost = cmdLine[1]
++		case "tinkerbell_tls":
++			var err error
++			if cfg.tinkServerTLS, err = strconv.ParseBool(cmdLine[1]); err != nil {
++				fmt.Println("tinkerbell_tls is not set to a valid boolean value, defaulting to true")
++				cfg.tinkServerTLS = true
++			}
+ 		}
+ 	}
+ 	return cfg
+-- 
+2.30.1 (Apple Git-130)
+

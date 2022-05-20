@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -euxo pipefail
+
 source /etc/eks/logging.sh
 
 SCRIPT_LOG=/var/log/eks-bootstrap.log
@@ -13,9 +16,9 @@ KUBE_VIP_IMAGE=$1
 VIP=$2
 
 # if it's control plane node to join, generate the manifest after `kubeadm join` command complete successfully
-if grep -q "kubeadm join --config /run/kubeadm/kubeadm-join-config.yaml" /var/lib/cloud/instance/user-data.txt && grep -q success /run/cluster-api/bootstrap-success.complete ; then
+if zgrep -q "kubeadm join --config /run/kubeadm/kubeadm-join-config.yaml" /var/lib/cloud/instance/user-data.txt && grep -q success /run/cluster-api/bootstrap-success.complete ; then
   log::info "Joining as control plane node, not the first control plane node to join"
-  /etc/eks/generate-kube-vip-manifest.sh $KUBE_VIP_IMAGE $VIP
+  /etc/eks/generate-kube-vip-manifest.sh "$KUBE_VIP_IMAGE" "$VIP"
 fi
 
 # restore stdout and stderr

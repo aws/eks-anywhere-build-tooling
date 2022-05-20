@@ -32,7 +32,7 @@ $(FIX_LICENSES_REDIS_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 	for package in redis internal ; do \
 		dest=$(REPO)/vendor/github.com/garyburd/redigo/$$package/LICENSE.txt; \
 		mkdir -p $$(dirname $$dest); \
-		wget -q https://raw.githubusercontent.com/garyburd/redigo/master/LICENSE -O \
+		wget -q --retry-connrefused https://raw.githubusercontent.com/garyburd/redigo/master/LICENSE -O \
 				$$dest; \
 	done;
 

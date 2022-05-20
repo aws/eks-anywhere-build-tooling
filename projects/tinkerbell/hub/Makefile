@@ -31,7 +31,12 @@ ATTRIBUTION_FILE=$(call TO_UPPER,$(IMAGE_NAME))_ATTRIBUTION.txt
 
 FETCH_BINARIES_TARGETS=eksa/torvalds/linux
 
+FIX_LICENSES=$(foreach path,$(GO_MOD_PATHS),$(REPO)/$(path)/LICENSE)
+
 include $(BASE_DIRECTORY)/Common.mk
+
+
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
 
 $(call IMAGE_TARGETS_FOR_NAME, writefile): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
@@ -39,6 +44,13 @@ $(call IMAGE_TARGETS_FOR_NAME, writefile): $(call FULL_FETCH_BINARIES_TARGETS, $
 # We are using eks-distro-minimal-base-glibc as the base to install touch
 reboot/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
+# bootconfig is dependency included in the writefile image, and bootconfig
+# is not a static binary. It requires libs on the glibc image
+writefile/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
+
+$(REPO)/actions/%/LICENSE: | $(GO_MOD_DOWNLOAD_TARGETS)
+#go-licenses requires a LICENSE file in each folder with the go.mod
+	cp $(REPO)/LICENSE $@
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

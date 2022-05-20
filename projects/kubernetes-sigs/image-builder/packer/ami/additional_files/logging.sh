@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euxo pipefail
+
 log::error() {
   local message="${1}"
   timestamp=$(date --iso-8601=seconds)
