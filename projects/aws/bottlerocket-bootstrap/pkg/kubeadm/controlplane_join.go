@@ -89,8 +89,8 @@ func controlPlaneJoin() error {
 	// Get port number from apiServer host string
 	port, err := getLocalApiBindPortFromJoinConfig(kubeadmJoinFile)
 	if err != nil {
-		// if we hit an error when extrating the port number, we always fallback to 6443
-		fmt.Printf("Unable to get local apiserver port, falling back to 6443")
+		// if we hit an error when extracting the port number, we always fallback to 6443
+		fmt.Printf("unable to get local apiserver port, falling back to 6443. caused by: %s", err.Error())
 		port = 6443
 	}
 

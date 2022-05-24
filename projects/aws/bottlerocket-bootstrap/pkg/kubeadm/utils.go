@@ -108,7 +108,7 @@ func getBootstrapFromJoinConfig(path string) (string, string, error) {
 func getLocalApiServerBindPortFromInitConfig(path string) (int, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return 0, errors.Wrap(err, "Error reading kubeadm init config file")
+		return 0, errors.Wrap(err, "failed to read kubeadm init config file")
 	}
 	return getLocalApiBindPortFromInitConfigYaml(string(data))
 }
@@ -124,10 +124,11 @@ func getLocalApiBindPortFromInitConfigYaml(yamlString string) (int, error) {
 		kind, ok := yamlTree["kind"]
 		if ok && kind == "InitConfiguration" {
 			kubeadmInitData = yamlTree
+			break
 		}
 	}
 	if kubeadmInitData == nil {
-		return 0, errors.New("Cannot find InitConfiguration")
+		return 0, errors.New("cannot find InitConfiguration")
 	}
 
 	localAPIEndpoint := kubeadmInitData["localAPIEndpoint"].(map[string]interface{})
@@ -139,7 +140,7 @@ func getLocalApiBindPortFromInitConfigYaml(yamlString string) (int, error) {
 func getLocalApiBindPortFromJoinConfig(path string) (int, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return 0, errors.Wrap(err, "Error reading kubeadm join config file")
+		return 0, errors.Wrap(err, "failed to read kubeadm join config file")
 	}
 	return getLocalApiBindPortFromJoinConfigYaml(string(data))
 }
@@ -154,13 +155,12 @@ func getLocalApiBindPortFromJoinConfigYaml(yamlString string) (int, error) {
 	for _, yamlTree := range yamlTrees {
 		kind, ok := yamlTree["kind"]
 		if ok && kind == "JoinConfiguration" {
-			continue
+			kubeadmJoinData = yamlTree
+			break
 		}
-		kubeadmJoinData = yamlTree
-		break
 	}
 	if kubeadmJoinData == nil {
-		return 0, errors.New("Cannot find JoinConfiguration")
+		return 0, errors.New("cannot find JoinConfiguration")
 	}
 
 	controlPlane := kubeadmJoinData["controlPlane"].(map[string]interface{})
