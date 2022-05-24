@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 )
@@ -102,6 +103,71 @@ func getBootstrapFromJoinConfig(path string) (string, string, error) {
 	token := bootstrapToken["token"].(string)
 
 	return "https://" + serverEndpoint, token, nil
+}
+
+func getLocalApiServerBindPortFromInitConfig(path string) (int, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return 0, errors.Wrap(err, "read kubeadm init config file")
+	}
+	return getLocalApiBindPortFromInitConfigYaml(string(data))
+}
+
+func getLocalApiBindPortFromInitConfigYaml(yamlString string) (int, error) {
+	yamlTrees, err := utils.UnmarshalYamlIntoMaps(yamlString)
+	if err != nil {
+		return 0, err
+	}
+
+	var kubeadmInitData map[string]interface{}
+	for _, yamlTree := range yamlTrees {
+		kind, ok := yamlTree["kind"]
+		if ok && kind == "InitConfiguration" {
+			kubeadmInitData = yamlTree
+			break
+		}
+	}
+	if kubeadmInitData == nil {
+		return 0, errors.New("cannot find InitConfiguration")
+	}
+
+	localAPIEndpoint := kubeadmInitData["localAPIEndpoint"].(map[string]interface{})
+	bindPort := int(localAPIEndpoint["bindPort"].(float64))
+
+	return bindPort, nil
+}
+
+func getLocalApiBindPortFromJoinConfig(path string) (int, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return 0, errors.Wrap(err, "read kubeadm join config file")
+	}
+	return getLocalApiBindPortFromJoinConfigYaml(string(data))
+}
+
+func getLocalApiBindPortFromJoinConfigYaml(yamlString string) (int, error) {
+	yamlTrees, err := utils.UnmarshalYamlIntoMaps(yamlString)
+	if err != nil {
+		return 0, err
+	}
+
+	var kubeadmJoinData map[string]interface{}
+	for _, yamlTree := range yamlTrees {
+		kind, ok := yamlTree["kind"]
+		if ok && kind == "JoinConfiguration" {
+			kubeadmJoinData = yamlTree
+			break
+		}
+	}
+	if kubeadmJoinData == nil {
+		return 0, errors.New("cannot find JoinConfiguration")
+	}
+
+	controlPlane := kubeadmJoinData["controlPlane"].(map[string]interface{})
+	localAPIEndpoint := controlPlane["localAPIEndpoint"].(map[string]interface{})
+	bindPort := int(localAPIEndpoint["bindPort"].(float64))
+
+	return bindPort, nil
 }
 
 func isClusterWithExternalEtcd(kubeconfigPath string) (bool, error) {
