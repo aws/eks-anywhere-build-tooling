@@ -43,6 +43,7 @@ reboot/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 # is not a static binary. It requires libs on the glibc image
 writefile/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
