@@ -108,7 +108,7 @@ func getBootstrapFromJoinConfig(path string) (string, string, error) {
 func getLocalApiServerBindPortFromInitConfig(path string) (int, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to read kubeadm init config file")
+		return 0, errors.Wrap(err, "read kubeadm init config file")
 	}
 	return getLocalApiBindPortFromInitConfigYaml(string(data))
 }
@@ -140,7 +140,7 @@ func getLocalApiBindPortFromInitConfigYaml(yamlString string) (int, error) {
 func getLocalApiBindPortFromJoinConfig(path string) (int, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to read kubeadm join config file")
+		return 0, errors.Wrap(err, "read kubeadm join config file")
 	}
 	return getLocalApiBindPortFromJoinConfigYaml(string(data))
 }
