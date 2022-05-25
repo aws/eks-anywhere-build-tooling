@@ -3,34 +3,11 @@ ARG BUILDER_IMAGE
 
 FROM $BUILDER_IMAGE as ipmitool-builder
 
-WORKDIR /
-
-RUN yum install -y \
-    autoconf \
-    automake \
-    git \
-    libtool \
-    make \
-    readline-devel \
-    openssl-devel
-
-COPY ipmitool /ipmitool
-RUN cd ipmitool && \
-    ./bootstrap && \
-    ./configure \
-        --prefix=/usr/local \
-        --enable-ipmievd \
-        --enable-ipmishell \
-        --enable-intf-lan \
-        --enable-intf-lanplus \
-        --enable-intf-open && \
-    make && \
-    make DESTDIR=/newroot install
-
 WORKDIR /newroot
 
 RUN set -x && \
-    clean_install "openssl-libs ncurses-libs readline" && \
+    clean_install "ipmitool openssl-libs ncurses-libs readline" && \
+    remove_package "bash coreutils gawk info grep" && \
     cleanup "glibc"
 
 FROM $BASE_IMAGE
