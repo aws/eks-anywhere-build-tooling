@@ -6,8 +6,10 @@ FROM $BUILDER_IMAGE as ipmitool-builder
 WORKDIR /newroot
 
 RUN set -x && \
+    clean_install "systemd" true true && \
     clean_install "ipmitool openssl-libs ncurses-libs readline" && \
-    remove_package "bash coreutils gawk info grep" && \
+    remove_package "bash coreutils gawk info grep sed shadow-utils systemd-sysv" && \
+    remove_package "systemd" true && \
     cleanup "glibc"
 
 FROM $BASE_IMAGE
