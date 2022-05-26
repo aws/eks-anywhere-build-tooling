@@ -73,16 +73,8 @@ func controlPlaneInit() error {
 		return errors.Wrap(err, "Error reading the ca data")
 	}
 
-	// Get local ApiServer port number from apiServer host string
-	port, err := getLocalApiServerBindPortFromInitConfig(kubeadmFile)
-	if err != nil {
-		// if we hit an error when extracting the port number, we always fallback to 6443
-		fmt.Printf("unable to get local apiserver port, falling back to 6443. caused by: %s", err.Error())
-		port = 6443
-	}
-
 	// Wait for Kubernetes API server to come up.
-	err = utils.WaitFor200(fmt.Sprintf("https://localhost:%d/healthz", port), 30*time.Second)
+	err = utils.WaitFor200("https://localhost:6443/healthz", 30*time.Second)
 	if err != nil {
 		return err
 	}
