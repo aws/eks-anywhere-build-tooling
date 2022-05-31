@@ -1,6 +1,7 @@
 package kubeadm
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"time"
@@ -69,7 +70,7 @@ func controlPlaneJoin() error {
 	} else if !isEtcdExternal {
 		if err := joinLocalEtcd(); err != nil {
 			return err
-		}	
+		}
 	}
 
 	// Migrate all static pods from this host-container to the bottlerocket host using the apiclient
@@ -86,7 +87,13 @@ func controlPlaneJoin() error {
 	}
 
 	// Wait for Kubernetes API server to come up.
-	err = utils.WaitFor200("https://localhost:6443/healthz", 30*time.Second)
+	localApiServerReadinessEndpoint, err := getLocalApiServerReadinessEndpoint()
+	if err != nil {
+		fmt.Printf("unable to get local apiserver readiness endpoint, falling back to localhost:6443. caused by: %s", err.Error())
+		localApiServerReadinessEndpoint = "https://localhost:6443/healthz"
+	}
+
+	err = utils.WaitFor200(localApiServerReadinessEndpoint, 30*time.Second)
 	if err != nil {
 		return err
 	}
