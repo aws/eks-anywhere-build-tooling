@@ -6,7 +6,7 @@ This [distribution project](https://github.com/distribution/distribution)'s main
 
 ### Updating
 
-1. Update distribution tag when updating harbor tag if harbor is using a newer tag. Use the same tag that harbor uses by default. For instance [harbor v2.5.0 uses distribution v2.8.0 by default](https://github.com/goharbor/harbor/blob/main/src/go.mod#L17) so when updating to harbor tag v2.5.0, update distribution tag to v2.8.0 or higher if security patching requires.
+1. Update distribution tag when updating harbor tag if harbor is using a newer tag. Use the same tag that harbor uses by default. For instance [harbor v2.5.0 uses distribution v2.8.0 by default](https://github.com/goharbor/harbor/blob/main/Makefile#L124) so when updating to harbor tag v2.5.0, update distribution tag to v2.8.0 or higher if security patching requires.
 1. Review releases and changelogs in upstream [repo](https://github.com/distribution/distribution) and decide on new version.
 1. Review the patches under `patches/` folder and remove any that are either merged upstream or no longer needed.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
