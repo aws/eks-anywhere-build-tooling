@@ -1,12 +1,12 @@
 ## **trivy**
-![Version](https://img.shields.io/badge/version-v2.8.1-blue)
-![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoieGduSTVGQXp1STQ1b2VjY0tiZnJOVStJa1pja2pjbDJYQTdMS2V5R0lyWFJ0R1lya1lYREhuYy9xRE5sMlc2SmZVWXlNRGRJdGhwZXl5V0cwMXB2ck5nPSIsIml2UGFyYW1ldGVyU3BlYyI6IlQwNHZleTBzMzZQMjZ1VCsiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
+![Version](https://img.shields.io/badge/version-v0.24.2-blue)
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiMVBvZE5FTEtYaVpuWUJ3eGd2Tis1dHAxT0ZKcXBuWkNVUmpjL0pRVnduRUl2Qm1XZ29xbHBENU5wVGM3TzVTTXhFTS83VUtrWGdCVU9lVkVxSmFhUnBFPSIsIml2UGFyYW1ldGVyU3BlYyI6IkQzTU9tSEd0YWZDc0NVYkIiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Trivy](https://github.com/aquasecurity/trivy/) is a simple and comprehensive scanner for vulnerabilities in container images, file systems, and Git repositories, as well as for configuration issues. Trivy detects vulnerabilities of OS packages (Alpine, RHEL, CentOS, etc.) and language-specific packages (Bundler, Composer, npm, yarn, etc.). In addition, Trivy scans Infrastructure as Code (IaC) files such as Terraform, Dockerfile and Kubernetes, to detect potential configuration issues that expose your deployments to the risk of attack. Trivy also scans hardcoded secrets like passwords, API keys and tokens.
 
 ### Updating
 
-1. Update trivy tag when updating harbor tag if harbor is using a newer tag. Use the same tag that harbor uses by default. For instance [harbor v2.5.0 uses distribution v0.24.2 by default](https://github.com/goharbor/harbor/blob/main/Makefile#L114) so when updating to harbor tag v2.5.0, update distribution tag to v0.24.2 or higher if security patching requires.
+1. Update trivy tag when updating harbor tag if harbor is using a newer tag. Use the same tag that harbor uses by default. For instance [harbor v2.5.0 uses trivy v0.24.2 by default](https://github.com/goharbor/harbor/blob/v2.5.0/Makefile#L114) so when updating to harbor tag v2.5.0, update trivy tag to v0.24.2 or higher if security patching requires.
 1. Review releases and changelogs in upstream [repo](https://github.com/aquasecurity/trivy) and decide on new version.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes. Check the `build` target for any build flag changes, tag changes, dependencies, etc. Check that the manifest target has not changed, this is called from our Makefile.
