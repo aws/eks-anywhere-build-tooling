@@ -1,6 +1,6 @@
 ## **harbor-scanner-trivy**
 ![Version](https://img.shields.io/badge/version-v0.26.0-blue)
-![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoieGduSTVGQXp1STQ1b2VjY0tiZnJOVStJa1pja2pjbDJYQTdMS2V5R0lyWFJ0R1lya1lYREhuYy9xRE5sMlc2SmZVWXlNRGRJdGhwZXl5V0cwMXB2ck5nPSIsIml2UGFyYW1ldGVyU3BlYyI6IlQwNHZleTBzMzZQMjZ1VCsiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoieEpzUzBranRhT3NMMGdLU0lSVmh1S2RteDcyd1AwRU5LbVZFc2pnNlcvcWpaZHR4blQ3RktjbzllUmhwMmhma0pnZ2RWVEY0UEIzZ2NPc3pYQ2l1RFZvPSIsIml2UGFyYW1ldGVyU3BlYyI6IitiOTg2c2dOVW55cnVQREoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [Harbor Scanner Adapter for Trivy](https://github.com/aquasecurity/harbor-scanner-trivy) is a service that translates the Harbor scanning API into Trivy commands and allows Harbor to use Trivy for providing vulnerability reports on images stored in Harbor registry as part of its vulnerability scan feature.
 
