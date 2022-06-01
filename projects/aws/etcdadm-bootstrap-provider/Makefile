@@ -3,7 +3,7 @@ GIT_TAG:=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.17"
 
 REPO=etcdadm-bootstrap-provider
-REPO_OWNER=mrajashree
+REPO_OWNER=aws
 
 BINARY_TARGET_FILES=manager
 
