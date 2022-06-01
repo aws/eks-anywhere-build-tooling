@@ -29,14 +29,15 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 cd $REPO
 
-MANIFEST_IMAGE_OVERRIDE="${IMAGE_REPO}/mrajashree/etcdadm-bootstrap-provider:${IMAGE_TAG}"
+MANIFEST_IMAGE_OVERRIDE="${IMAGE_REPO}/aws/etcdadm-controller:${IMAGE_TAG}"
 
-sed -i "s,\${ETCDADM_BOOTSTRAP_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ./config/manager/manager.yaml
+sed -i "s,\${ETCDADM_CONTROLLER_IMAGE},${MANIFEST_IMAGE_OVERRIDE}," ./config/manager/manager.yaml
 yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" config/manager/manager.yaml
 
-mkdir -p $OUTPUT_DIR/manifests/bootstrap-etcdadm-bootstrap/${TAG}
+mkdir -p $OUTPUT_DIR/manifests/bootstrap-etcdadm-controller/${TAG}
 kustomize build config/default > bootstrap-components.yaml
-cp bootstrap-components.yaml "$OUTPUT_DIR/manifests/bootstrap-etcdadm-bootstrap/${TAG}"
-cp ../manifests/metadata.yaml "$OUTPUT_DIR/manifests/bootstrap-etcdadm-bootstrap/${TAG}"
+
+cp bootstrap-components.yaml "$OUTPUT_DIR/manifests/bootstrap-etcdadm-controller/${TAG}"
+cp ../manifests/metadata.yaml "$OUTPUT_DIR/manifests/bootstrap-etcdadm-controller/${TAG}"
 
 cp -rf $OUTPUT_DIR/manifests $ARTIFACTS_PATH

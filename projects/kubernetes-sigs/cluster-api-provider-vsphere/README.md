@@ -18,12 +18,12 @@ You can find the latest version of this image [on ECR Public Gallery](https://ga
 
 1. Review releases and changelogs in upstream [repo](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere) and decide on the new version.
    Please review carefully and if there are questions about changes necessary to eks-anywhere to support the new version
-   and/or automatically update between eks-anywhere version reach out to @jaxesn, @vignesh-goutham, @g-gaston or @mrajashree.
+   and/or automatically update between eks-anywhere version reach out to @jaxesn, @vignesh-goutham or @g-gaston.
 1. Follow these steps for changes to the patches/ folder:
    1. Fork and clone CAPV repo, and checkout the desired tag. For instance if in step 1 we decided to upgrade to v1.1.1 CAPV version, do `git checkout v1.1.1`
    on your fork.
    1. Review the patches under patches/ folder in this repo. Apply the required patches to your fork. Remove any patches that are either
-   merged upstream or no longer needed. Please reach out to @jaxesn, @vignesh-goutham, @g-gaston or @mrajashree for any questions regarding which patches to keep.
+   merged upstream or no longer needed. Please reach out to @jaxesn, @vignesh-goutham or @g-gaston for any questions regarding which patches to keep.
    1. Run `git format-patch <commit>`, where `<commit>` is the last upstream commit on that tag. Move the generated patches under the patches/ folder in this repo.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
