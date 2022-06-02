@@ -73,8 +73,14 @@ func controlPlaneInit() error {
 		return errors.Wrap(err, "Error reading the ca data")
 	}
 
+	localApiServerReadinessEndpoint, err := getLocalApiServerReadinessEndpoint()
+	if err != nil {
+		fmt.Printf("unable to get local apiserver readiness endpoint, falling back to localhost:6443. caused by: %s", err.Error())
+		localApiServerReadinessEndpoint = "https://localhost:6443/healthz"
+	}
+
 	// Wait for Kubernetes API server to come up.
-	err = utils.WaitFor200("https://localhost:6443/healthz", 30*time.Second)
+	err = utils.WaitFor200(localApiServerReadinessEndpoint, 30*time.Second)
 	if err != nil {
 		return err
 	}

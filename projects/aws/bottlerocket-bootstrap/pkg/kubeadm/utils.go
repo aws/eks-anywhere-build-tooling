@@ -8,8 +8,13 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
+)
+
+const (
+	apiServerManifestPath = "/.bottlerocket/rootfs/etc/kubernetes/manifests/kube-apiserver"
 )
 
 func getBootstrapToken() (string, error) {
@@ -102,6 +107,28 @@ func getBootstrapFromJoinConfig(path string) (string, string, error) {
 	token := bootstrapToken["token"].(string)
 
 	return "https://" + serverEndpoint, token, nil
+}
+
+func getLocalApiServerReadinessEndpoint() (string, error) {
+	data, err := ioutil.ReadFile(apiServerManifestPath)
+	if err != nil {
+		return "", errors.Wrap(err, "Error reading ApiServer manifest file")
+	}
+
+	podDef, err := utils.UnmarshalPodDefinition(data)
+	if err != nil {
+		return "", errors.Wrap(err, "Error parsing pod def from manifest")
+	}
+
+	for _, container := range podDef.Spec.Containers {
+		// Validate if readiness probe exists on the definition
+		if container.ReadinessProbe != nil {
+			readinessProbeHandler := container.ReadinessProbe.HTTPGet
+			url := fmt.Sprintf("%s://%s:%d%s", readinessProbeHandler.Scheme, readinessProbeHandler.Host, readinessProbeHandler.Port.IntVal, readinessProbeHandler.Path)
+			return url, nil
+		}
+	}
+	return "", errors.New("Cannot find readiness probe exists on pod definition")
 }
 
 func isClusterWithExternalEtcd(kubeconfigPath string) (bool, error) {
