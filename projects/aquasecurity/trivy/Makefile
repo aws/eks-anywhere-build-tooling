@@ -25,7 +25,7 @@ $(FIX_LICENSES_MATHUTIL_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 	for package in mathutil ; do \
 		dest=$(REPO)/vendor/modernc.org/$$package/LICENSE.txt; \
 		mkdir -p $$(dirname $$dest); \
-		wget -q https://gitlab.com/cznic/mathutil/-/blob/master/LICENSE -O \
+		wget -q https://gitlab.com/cznic/mathutil/-/raw/master/LICENSE -O \
 				$$dest; \
 	done;
 
