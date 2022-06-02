@@ -50,6 +50,8 @@ HAPROXY_CFG=$(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg
 
 IMAGE_NAMES=haproxy kindnetd kind-base 
 
+FIX_LICENSES_KINDNETD_TARGET=$(REPO)/images/kindnetd/LICENSE
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
@@ -57,6 +59,8 @@ ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS))),)
 -include $(KIND_BASE_IMAGE_BUILD_ARGS)
 -include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
+
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_KINDNETD_TARGET)
 
 # During build the node image is never built so we can extract this file
 # instead fake it to keep s3-artifacts happy
@@ -153,6 +157,10 @@ $(ARM_ENV_CONF_TARGET):
 $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml:
 	@mkdir -p $(@D)
 	@touch $@
+
+$(FIX_LICENSES_KINDNETD_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+#go-licenses requires a LICENSE file in each folder with the go.mod
+	cp $(REPO)/LICENSE $@
 
 .PHONY: create-kind-cluster-%
 create-kind-cluster-%:
