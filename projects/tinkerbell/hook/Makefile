@@ -26,8 +26,13 @@ CREATE_HOOK_FILES=$(REPO)/dist/vmlinuz-x86_64
 HAS_S3_ARTIFACTS=true
 SIMPLE_CREATE_TARBALLS=false
 
+FIX_LICENSES_BOOTKIT_TARGET=$(REPO)/bootkit/LICENSE
+FIX_LICENSES_TINK_DOCKER_TARGET=$(REPO)/tink-docker/LICENSE
+
 include $(BASE_DIRECTORY)/Common.mk
 
+
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_BOOTKIT_TARGET) $(FIX_LICENSES_TINK_DOCKER_TARGET)
 
 # For local image builds we override to push to local registry.
 %/images/amd64: IMAGE_OUTPUT=push=true
@@ -52,6 +57,11 @@ $(CREATE_HOOK_FILES): tarballs
 	cp $(REPO)/dist/* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
 	mkdir -p $(ARTIFACTS_PATH)
 	cp -rf $(OUTPUT_DIR)/hook/* $(ARTIFACTS_PATH)
+
+$(REPO)/%/LICENSE: | $(GO_MOD_DOWNLOAD_TARGETS)
+#go-licenses requires a LICENSE file in each folder with the go.mod
+	cp $(REPO)/LICENSE $@
+
 
 
 ########### DO NOT EDIT #############################
