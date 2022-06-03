@@ -330,3 +330,24 @@ function build::common::get_clone_url() {
     echo "https://github.com/${org}/${repo}.git"
   fi
 }
+
+function retry() {
+  local n=1
+  local max=120
+  local delay=5
+  while true; do
+    "$@" && break || {
+      if [[ $n -lt $max ]]; then
+        ((n++))
+        echo "Command failed. Attempt $n/$max:"
+        sleep $delay;
+      else
+        fail "The command has failed after $n attempts."
+      fi
+    }
+  done
+}
+
+function build::docker::retry_pull() {
+  retry docker pull "$@"
+}

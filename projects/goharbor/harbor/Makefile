@@ -137,7 +137,7 @@ $(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 	for package in gojsonpointer gojsonreference gojsonschema ; do \
 		dest=$(REPO)/vendor/github.com/xeipuuv/$$package/LICENSE.txt; \
 		mkdir -p $$(dirname $$dest); \
-		wget -q https://raw.githubusercontent.com/xeipuuv/$$package/master/LICENSE-APACHE-2.0.txt -O \
+		wget --retry-connrefused -q https://raw.githubusercontent.com/xeipuuv/$$package/master/LICENSE-APACHE-2.0.txt -O \
 			$$dest; \
 	done;
 

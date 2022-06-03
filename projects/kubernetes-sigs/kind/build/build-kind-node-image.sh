@@ -104,7 +104,7 @@ function build::kind::load_images(){
     for image in "${IMAGES[@]}"; do
         # docker pull when passing a platform will pull the image for the given platform
         # and that new image id will "take over" the tag which we can use to trigger the save
-        docker pull --platform linux/$ARCH $image
+        build::docker::retry_pull --platform linux/$ARCH $image
         image_id=$(docker images $image --format "{{.ID}}")
 
         if [ ! -f $IMAGES_FOLDER/$image_id.tar ]; then
