@@ -29,10 +29,7 @@ DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 #
 TEMPLATE_DIR=helm/templates
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
-cat helm/files.txt | while read SOURCE_FILE DESTINATION_FILE
+for file in Chart.yaml values.yaml
 do
-  TMPFILE=/tmp/$(basename ${SOURCE_FILE})
-  cp ${SOURCE_FILE} ${TMPFILE}
-  sed -f ${SEDFILE} ${TMPFILE} >${DEST_DIR}/${DESTINATION_FILE}
-  rm -f ${TMPFILE}
+  sed -f ${SEDFILE} -i ${DEST_DIR}/${file}
 done
