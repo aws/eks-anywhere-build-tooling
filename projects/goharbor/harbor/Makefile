@@ -38,7 +38,7 @@ PKG_PATH=github.com/goharbor/harbor/src/pkg
 GITCOMMIT=$(shell git -C $(REPO) rev-parse --short=8 HEAD)
 RELEASEVERSION=$(shell cat $(REPO)/VERSION)
 
-IMAGE_NAMES=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-jobservice harbor-registry harbor-registryctl harbor-redis harbor-exporter
+IMAGE_NAMES=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-jobservice harbor-registry harbor-registryctl harbor-redis harbor-exporter harbor-trivy
 
 BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migrate-patch harbor-migrate harbor-exporter
 SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/standalone-db-migrator ./cmd/exporter
@@ -49,7 +49,7 @@ GO_MOD_PATHS=src src src src src src
 HARBOR_BASE_NAMESPACE=goharbor
 IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
 
-FETCH_BINARIES_TARGETS=eksa/distribution/distribution
+FETCH_BINARIES_TARGETS=eksa/distribution/distribution eksa/aquasecurity/trivy eksa/aquasecurity/harbor-scanner-trivy
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 
 HAS_HELM_CHART=true
@@ -57,7 +57,7 @@ HAS_HELM_CHART=true
 HELM_GIT_TAG=v1.9.0
 HELM_SOURCE_REPOSITORY=harbor-helm
 HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
-HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-exporter harbor/harbor-jobservice harbor/harbor-nginx harbor/harbor-portal harbor/harbor-redis harbor/harbor-registry harbor/harbor-registryctl
+HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-exporter harbor/harbor-jobservice harbor/harbor-nginx harbor/harbor-portal harbor/harbor-redis harbor/harbor-registry harbor/harbor-registryctl harbor/harbor-trivy
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -113,10 +113,14 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@mkdir -p $(OUTPUT_DIR)/harbor-registryctl/home/harbor
 	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/registryctl/start.sh $(OUTPUT_DIR)/harbor-registryctl/home/harbor/
 
+	@mkdir -p $(OUTPUT_DIR)/harbor-trivy/home/scanner/bin
+	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/trivy-adapter/entrypoint.sh $(OUTPUT_DIR)/harbor-trivy/home/scanner/
+
 %/harbor-core: EXTRA_GO_LDFLAGS=-X $(PKG_PATH)/version.GitCommit=$(GITCOMMIT) -X $(PKG_PATH)/version.ReleaseVersion=$(RELEASEVERSION)
 
 $(call IMAGE_TARGETS_FOR_NAME, harbor-registry): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 $(call IMAGE_TARGETS_FOR_NAME, harbor-registryctl): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+$(call IMAGE_TARGETS_FOR_NAME, harbor-trivy): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 $(call IMAGE_TARGETS_FOR_NAME, harbor-portal): clean-go-cache
 
 # space is very limited in presubmit jobs, the image builds can push the total used space over the limit
