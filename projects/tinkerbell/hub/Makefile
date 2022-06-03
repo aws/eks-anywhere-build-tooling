@@ -28,13 +28,21 @@ IMAGE_BUILD_ARGS=ATTRIBUTION_FILE
 ATTRIBUTION_FILE=$(call TO_UPPER,$(IMAGE_NAME))_ATTRIBUTION.txt
 
 
+FIX_LICENSES=$(foreach path,$(GO_MOD_PATHS),$(REPO)/$(path)/LICENSE)
+
 include $(BASE_DIRECTORY)/Common.mk
+
+
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
 
 
 # reboot action image requires touch.
 # We are using eks-distro-minimal-base-glibc as the base to install touch
 reboot/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
+$(REPO)/actions/%/LICENSE: | $(GO_MOD_DOWNLOAD_TARGETS)
+#go-licenses requires a LICENSE file in each folder with the go.mod
+	cp $(REPO)/LICENSE $@
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

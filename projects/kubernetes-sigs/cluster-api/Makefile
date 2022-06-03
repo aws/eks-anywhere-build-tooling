@@ -7,7 +7,7 @@ REPO_OWNER=kubernetes-sigs
 
 BINARY_TARGET_FILES=clusterctl manager kubeadm-bootstrap-manager kubeadm-control-plane-manager cluster-api-provider-docker-manager
 SOURCE_PATTERNS=sigs.k8s.io/cluster-api/cmd/clusterctl sigs.k8s.io/cluster-api sigs.k8s.io/cluster-api/bootstrap/kubeadm sigs.k8s.io/cluster-api/controlplane/kubeadm sigs.k8s.io/cluster-api/test/infrastructure/docker
-GO_MOD_PATHS=. . . . test/infrastructure/docker
+GO_MOD_PATHS=. . . . test
 EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api/version)
 CLUSTER_API_PROVIDER_DOCKER_MANAGER_ATTRIBUTION_OVERRIDE=capd
 
@@ -25,16 +25,18 @@ FETCH_BINARIES_TARGETS=eksd/kubernetes/client
 
 HAS_S3_ARTIFACTS=true
 
+
+FIX_LICENSES_GO_JSON_TARGET=$(REPO)/vendor/github.com/github.com/ajeddeloh/go-json/LICENSE.txt
+FIX_LICENSES_TEST_CONTAINER_TARGET=$(REPO)/test/infrastructure/container/LICENSE 
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
 $(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=
 
-FIX_LICENSES_GO_JSON_TARGET=$(REPO)/vendor/github.com/github.com/ajeddeloh/go-json/LICENSE.txt
-
 s3-artifacts: create-manifests
 
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET) $(FIX_LICENSES_TEST_CONTAINER_TARGET)
 
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
 $(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
@@ -50,6 +52,10 @@ $(FIX_LICENSES_GO_JSON_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # go-licenses to pick up
 	wget -q https://raw.githubusercontent.com/coreos/go-json/main/LICENSE -O \
 			$(REPO)/vendor/github.com/ajeddeloh/go-json/LICENSE.txt;
+
+$(FIX_LICENSES_TEST_CONTAINER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+#capd pulls in a dep in test/infra/container which does not have a LICENSE file and go-licenses does look up
+	cp $(REPO)/test/infrastructure/docker/LICENSE $@
 
 
 ########### DO NOT EDIT #############################
