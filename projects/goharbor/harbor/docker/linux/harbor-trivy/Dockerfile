@@ -6,7 +6,7 @@ ARG TARGETARCH
 ARG TARGETOS
 ARG TRIVY_VERSION
 
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/harbor-scanner-trivy/scanner-trivy _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/trivy/trivy _output/LICENSES ATTRIBUTION.txt /
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/harbor-scanner-trivy/scanner-trivy _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/trivy/trivy _output/harbor-trivy _output/LICENSES ATTRIBUTION.txt /
 
 RUN yum install -y shadow-utils >> /dev/null \
     && yum clean all \
