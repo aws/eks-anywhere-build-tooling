@@ -96,6 +96,9 @@ else
 	S3_TARGET_PREREQUISITES?=
 endif
 
+BUILDSPECS=$(foreach ver,$(SUPPORTED_K8S_VERSIONS),projects/$(COMPONENT)/buildspecs/build-$(ver)-ubuntu-ova.yml)
+PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm eksa/kubernetes-sigs/cri-tools
+
 include $(BASE_DIRECTORY)/Common.mk
 
 

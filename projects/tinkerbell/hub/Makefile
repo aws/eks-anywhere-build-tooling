@@ -29,7 +29,7 @@ DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 IMAGE_BUILD_ARGS=ATTRIBUTION_FILE
 ATTRIBUTION_FILE=$(call TO_UPPER,$(IMAGE_NAME))_ATTRIBUTION.txt
 
-FETCH_BINARIES_TARGETS=eksa/torvalds/linux
+PROJECT_DEPENDENCIES=eksa/torvalds/linux
 
 FIX_LICENSES=$(foreach path,$(GO_MOD_PATHS),$(REPO)/$(path)/LICENSE)
 
@@ -37,8 +37,6 @@ include $(BASE_DIRECTORY)/Common.mk
 
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
-
-$(call IMAGE_TARGETS_FOR_NAME, writefile): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 # reboot action image requires touch.
 # We are using eks-distro-minimal-base-glibc as the base to install touch

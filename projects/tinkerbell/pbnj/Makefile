@@ -17,11 +17,12 @@ SOURCE_PATTERNS=.
 IMAGE_USERADD_USER_ID=10001
 IMAGE_USERADD_USER_NAME=pbnj
 
+PROJECT_DEPENDENCIES=eksa/grpc-ecosystem/grpc-health-probe
+
 include $(BASE_DIRECTORY)/Common.mk
 
-FETCH_BINARIES_TARGETS=eksa/grpc-ecosystem/grpc-health-probe
 
-$(call IMAGE_TARGETS_FOR_NAME, pbnj): $(IPMITOOL_CLONE_TARGETS) $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS)) pbnj-useradd/images/export
+$(call IMAGE_TARGETS_FOR_NAME, pbnj): $(IPMITOOL_CLONE_TARGETS) pbnj-useradd/images/export
 
 $(IPMITOOL_CLONE_TARGETS):
 	git clone $(IPMITOOL_CLONE_URL) $(@D)

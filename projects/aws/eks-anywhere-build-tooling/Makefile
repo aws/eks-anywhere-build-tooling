@@ -15,7 +15,7 @@ HAS_LICENSES=false
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
-FETCH_BINARIES_TARGETS=eksa/fluxcd/flux2 eksa/kubernetes-sigs/cluster-api \
+PROJECT_DEPENDENCIES=eksa/fluxcd/flux2 eksa/kubernetes-sigs/cluster-api \
 	eksa/kubernetes-sigs/kind eksa/replicatedhq/troubleshoot eksa/vmware/govmomi eksd/kubernetes/client eksa/helm/helm eksa/tinkerbell/tink/94-2b1eddcdf90082499b7663ca3c47e77dc12ad34c \
 	eksa/apache/cloudstack-cloudmonkey
 
@@ -28,7 +28,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(call IMAGE_TARGETS_FOR_NAME, eks-anywhere-cli-tools): $(ORGANIZE_BINARIES_TARGETS)
 
-$(ORGANIZE_BINARIES_TARGETS): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+$(ORGANIZE_BINARIES_TARGETS): $(HANDLE_DEPENDENCIES_TARGET)
 	build/organize_binaries.sh $(lastword $(subst -, ,$(@D)))
 
 

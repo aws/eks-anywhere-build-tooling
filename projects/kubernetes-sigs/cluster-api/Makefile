@@ -21,7 +21,7 @@ CLUSTER_API_DOCKER_CONTROLLER_IMAGE_COMPONENT=kubernetes-sigs/cluster-api/capd-m
 
 IMAGE_NAMES=cluster-api-controller kubeadm-bootstrap-controller kubeadm-control-plane-controller cluster-api-docker-controller
 
-FETCH_BINARIES_TARGETS=eksd/kubernetes/client
+PROJECT_DEPENDENCIES=eksd/kubernetes/client
 
 HAS_S3_ARTIFACTS=true
 
@@ -39,7 +39,6 @@ s3-artifacts: create-manifests
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET) $(FIX_LICENSES_TEST_CONTAINER_TARGET)
 
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
-$(call IMAGE_TARGETS_FOR_NAME, cluster-api-docker-controller): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 .PHONY: create-manifests
 create-manifests: tarballs

@@ -36,6 +36,7 @@ EXPORT_OVA_BUCKET?=$(ARTIFACTS_BUCKET)
 EKSA_ADMIN_PROJECT_PATH?=projects/aws/eks-a-admin-image
 OVA_PROJECT_PATH?=$(EKSA_ADMIN_PROJECT_PATH)/ova
 
+EXCLUDE_FROM_STAGING_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -45,7 +46,7 @@ PACKER=$(BINARY_DEPS_DIR)/packer
 build-%: export PKR_VAR_eks-a-version=$(EKSA_VERSION)
 build-%: export PKR_VAR_eks-a-release-manifest-url=$(EKSA_RELEASE_MANIFEST_URL)
 build-%: export PKR_VAR_build-version=$(shell echo $(GIT_HASH) | cut -c1-7)
-build-%: KUBECTL_URL:=$(shell ./build/get_kubectl_url.sh)
+build-%: KUBECTL_URL?=$(shell ./build/get_kubectl_url.sh)
 build-%: export PKR_VAR_kubectl-url=$(KUBECTL_URL)
 
 
@@ -66,7 +67,7 @@ $(OVA_OUTPUT_DIR): $(FULL_OUTPUT_DIR)
 	mkdir -p $@
 
 .PHONY: latest-snow-raw-image
-latest-snow-raw-image: EKSA_VERSION:=$(shell EKSA_RELEASE_MANIFEST_URL=$(EKSA_RELEASE_MANIFEST_URL) ./build/get_latest_eksa_version_by_date.sh)
+latest-snow-raw-image: EKSA_VERSION?=$(shell EKSA_RELEASE_MANIFEST_URL=$(EKSA_RELEASE_MANIFEST_URL) ./build/get_latest_eksa_version_by_date.sh)
 latest-snow-raw-image: snow-raw-image
 
 .PHONY: snow-raw-image
@@ -92,7 +93,7 @@ build-ova: export PKR_VAR_vsphere_cluster = $(VSPHERE_CLUSTER)
 build-ova: export PKR_VAR_vsphere_network = $(VSPHERE_NETWORK)
 build-ova: export PKR_VAR_build-password = $(BUILD_PASSWORD)
 build-ova: export PKR_VAR_build-output = $(OVA_OUTPUT_DIR)
-build-ova: KIND_URL:=$(shell ./build/get_kind_url.sh $(ARTIFACTS_BUCKET) )
+build-ova: KIND_URL?=$(shell ./build/get_kind_url.sh $(ARTIFACTS_BUCKET) )
 build-ova: export PKR_VAR_kind-url=$(KIND_URL)
 build-ova: $(PACKER) init clean-ova $(OVA_OUTPUT_DIR)
 	$(PACKER) build -only='*.vsphere-iso.*' -var-file=ova/linux/ubuntu/vsphere.ubuntu.pkrvars.hcl .
@@ -102,13 +103,12 @@ release-ova: build-ova publish-ova-to-s3
 
 .PHONY: clean-ova
 clean-ova:
-	rm -rf $(OVA_OUTPUT_DIR)
+	@rm -rf $(OVA_OUTPUT_DIR)
 
 .PHONY: clean-ami
 clean-ami:
-	rm -rf $(AMI_OUTPUT_DIR)
+	@rm -rf $(AMI_OUTPUT_DIR)
 
-.PHONY: clean
 clean: clean-ova clean-ami
 
 .PHONY: publish-ova-to-s3

@@ -33,7 +33,7 @@ REPO_NO_CLONE=true
 GIT_CHECKOUT_TARGET=main.go
 FAKE_GIT_REPO_TARGET=.git
 
-FETCH_BINARIES_TARGETS=eksd/kubernetes/client eksd/kubernetes/server eksa/kubernetes-sigs/etcdadm
+PROJECT_DEPENDENCIES=eksd/kubernetes/client eksd/kubernetes/server eksa/kubernetes-sigs/etcdadm
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -42,8 +42,6 @@ build: unit-test
 
 $(REPO):
 	@mkdir $@
-
-$(call IMAGE_TARGETS_FOR_NAME, bottlerocket-bootstrap): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
 
 $(GATHER_LICENSES_TARGETS): | $(FAKE_GIT_REPO_TARGET)
 

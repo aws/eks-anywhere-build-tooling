@@ -15,29 +15,7 @@ ALL_PROJECTS=$(PROJECTS) $(EKSA_TOOLS_PREREQS) aws_bottlerocket-bootstrap aws_ek
 
 RELEASE_BRANCH?=
 GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
-
-.PHONY: build-all-projects
-build-all-projects: $(BUILD_TARGETS) aws_bottlerocket-bootstrap aws_eks-anywhere-build-tooling
-
-.PHONY: aws_bottlerocket-bootstrap
-aws_bottlerocket-bootstrap:
-	$(MAKE) release -C projects/aws/bottlerocket-bootstrap
-
-.PHONY: aws_eks-anywhere-build-tooling
-aws_eks-anywhere-build-tooling: $(EKSA_TOOLS_PREREQS_BUILD_TARGETS)
-	$(MAKE) release -C projects/aws/eks-anywhere-build-tooling
-
-.PHONY: build-project-%
-build-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
-	$(MAKE) release -C $(PROJECT_PATH) PROJECT_PATH=$(PROJECT_PATH)
-
-.PHONY: release-binaries-images
-release-binaries-images: build-all-projects
-
-.PHONY: release-ovas
-release-ovas:
-	$(MAKE) release IMAGE_FORMAT=ova -C projects/kubernetes-sigs/image-builder
+ALL_PROJECTS=$(shell $(BUILD_LIB)/all_projects.sh $(BASE_DIRECTORY))
 
 .PHONY: clean-project-%
 clean-project-%:
@@ -102,10 +80,25 @@ stop-buildkit-and-registry:
 	docker rm -v --force buildkitd
 	docker rm -v --force registry
 
-.PHONY: generate
-generate:
+.PHONY: generate-project-list
+generate-project-list:
 	build/lib/generate_projects_list.sh $(BASE_DIRECTORY)
+
+.PHONY: generate-staging-buildspec
+generate-staging-buildspec:
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)"
 	
+.PHONY: generate
+generate: generate-project-list generate-staging-buildspec
+
+.PHONY: validate-generated
+validate-generated: generate
+	@if [ "$$(git status --porcelain -- UPSTREAM_PROJECTS.yaml release/staging-build.yml | wc -l)" -gt 0 ]; then \
+		echo "Error: Generated files, UPSTREAM_PROJECTS.yaml release/staging-build.yml, do not match expected. Please run `make generate` to update"; \
+		git diff -- UPSTREAM_PROJECTS.yaml release/staging-build.yml; \
+		exit 1; \
+	fi
+
 .PHONY: check-project-path-exists
 check-project-path-exists:
 	@if ! stat $(PROJECT_PATH) &> /dev/null; then \

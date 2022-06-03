@@ -39,7 +39,7 @@ VERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(EKSD_KUBE_VERS
 HAS_S3_ARTIFACTS=true
 HAS_RELEASE_BRANCHES=true
 
-FETCH_BINARIES_TARGETS=eksd/kubernetes/client eksa/kubernetes-sigs/etcdadm eksd/cni-plugins eksa/kubernetes-sigs/cri-tools eksd/etcd/etcd.tar.gz
+PROJECT_DEPENDENCIES=eksd/kubernetes/client eksa/kubernetes-sigs/etcdadm eksd/cni-plugins eksa/kubernetes-sigs/cri-tools eksd/etcd/etcd.tar.gz
 ORGANIZE_BINARIES_AMD64_TARGET=$(BINARY_DEPS_DIR)/linux-amd64/files/rootfs/LICENSES
 ORGANIZE_BINARIES_ARM64_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/LICENSES
 ARM_ENV_CONF_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/etc
@@ -54,8 +54,8 @@ FIX_LICENSES_KINDNETD_TARGET=$(REPO)/images/kindnetd/LICENSE
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
-ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS))),)
+# Do not need to import if running clean or any var-value-% targets
+ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS_WITHOUT_VAR_VALUE))),)
 -include $(KIND_BASE_IMAGE_BUILD_ARGS)
 -include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
@@ -145,10 +145,10 @@ $(KIND_NODE_BUILD_AMD64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARI
 $(KIND_NODE_BUILD_ARM64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_ARM64_TARGET)
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) arm64
 
-$(ORGANIZE_BINARIES_AMD64_TARGET): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+$(ORGANIZE_BINARIES_AMD64_TARGET): $(HANDLE_DEPENDENCIES_TARGET)
 	build/organize_binaries.sh $(RELEASE_BRANCH) amd64
 
-$(ORGANIZE_BINARIES_ARM64_TARGET): $(call FULL_FETCH_BINARIES_TARGETS, $(FETCH_BINARIES_TARGETS))
+$(ORGANIZE_BINARIES_ARM64_TARGET): $(HANDLE_DEPENDENCIES_TARGET)
 	build/organize_binaries.sh $(RELEASE_BRANCH) arm64
 
 $(ARM_ENV_CONF_TARGET):
