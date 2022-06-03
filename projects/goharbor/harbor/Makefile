@@ -113,7 +113,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@mkdir -p $(OUTPUT_DIR)/harbor-registryctl/home/harbor
 	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/registryctl/start.sh $(OUTPUT_DIR)/harbor-registryctl/home/harbor/
 
-	@mkdir -p $(OUTPUT_DIR)/harbor-trivy/home/scanner
+	@mkdir -p $(OUTPUT_DIR)/harbor-trivy/home/scanner/bin
 	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/trivy-adapter/entrypoint.sh $(OUTPUT_DIR)/harbor-trivy/home/scanner/
 
 %/harbor-core: EXTRA_GO_LDFLAGS=-X $(PKG_PATH)/version.GitCommit=$(GITCOMMIT) -X $(PKG_PATH)/version.ReleaseVersion=$(RELEASEVERSION)
