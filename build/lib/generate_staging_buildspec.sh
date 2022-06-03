@@ -47,7 +47,7 @@ for project in "${PROJECTS[@]}"; do
     PROJECT_PATH=$MAKE_ROOT/projects/$org/$repo
 
     # TODO: refactor use of release_branch to get git_tag and golang_version in makefile, we should be able to push this to common.mk and avoid needing to pass it here
-    if [[ "true" == "$(make -C $PROJECT_PATH var-value-EXCLUDE_FROM_STAGING_BUILDSPEC RELEASE_BRANCH=1-20)" ]]; then
+    if [[ "true" == "$(make --no-print-directory -C $PROJECT_PATH var-value-EXCLUDE_FROM_STAGING_BUILDSPEC RELEASE_BRANCH=1-20)" ]]; then
         continue
     fi
 
@@ -55,35 +55,37 @@ for project in "${PROJECTS[@]}"; do
 
     echo "Adding: $IDENTIFIER"
 
-    PROJECT_DEPENDENCIES=$(make -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=1-20)
     DEPEND_ON=""
-    DEPS=(${PROJECT_DEPENDENCIES// / })
-    for dep in "${DEPS[@]}"; do
-        DEP_PRODUCT="$(cut -d/ -f1 <<< $dep)"
-        DEP_ORG="$(cut -d/ -f2 <<< $dep)"
-        DEP_REPO="$(cut -d/ -f3 <<< $dep)"
-        if [[ "$DEP_PRODUCT" == "eksd" ]]; then
-            continue
-        fi
-        DEPEND_ON+="\"${DEP_ORG//-/_}_${DEP_REPO//-/_}\","
+    PROJECT_DEPENDENCIES=$(make --no-print-directory -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=1-20)
+    if [ -n "$PROJECT_DEPENDENCIES" ]; then
+        DEPS=(${PROJECT_DEPENDENCIES// / })
+        for dep in "${DEPS[@]}"; do
+            DEP_PRODUCT="$(cut -d/ -f1 <<< $dep)"
+            DEP_ORG="$(cut -d/ -f2 <<< $dep)"
+            DEP_REPO="$(cut -d/ -f3 <<< $dep)"
+            if [[ "$DEP_PRODUCT" == "eksd" ]]; then
+                continue
+            fi
+            DEPEND_ON+="\"${DEP_ORG//-/_}_${DEP_REPO//-/_}\","
 
-        if [ ! -d $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO ]; then
-            echo "Non-existent project dependency: $dep!!!"
-            exit 1
-        fi
-    done
+            if [ ! -d $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO ]; then
+                echo "Non-existent project dependency: $dep!!!"
+                exit 1
+            fi
+        done
+    fi
 
     if [ -n "$DEPEND_ON" ]; then
         DEPEND_ON="\"depend-on\":[${DEPEND_ON%?}],"
     fi
 
     CLONE_URL=""
-    if [[ "true" != "$(make -C $PROJECT_PATH var-value-REPO_NO_CLONE RELEASE_BRANCH=1-20)" ]]; then
-        REPO=$(make -C $PROJECT_PATH var-value-CLONE_URL AWS_REGION=us-west-2 CODEBUILD_CI=true RELEASE_BRANCH=1-20)
+    if [[ "true" != "$(make --no-print-directory -C $PROJECT_PATH var-value-REPO_NO_CLONE RELEASE_BRANCH=1-20)" ]]; then
+        REPO=$(make --no-print-directory -C $PROJECT_PATH var-value-CLONE_URL AWS_REGION=us-west-2 CODEBUILD_CI=true RELEASE_BRANCH=1-20)
         CLONE_URL=",\"CLONE_URL\":\"$REPO\""
     fi
 
-    BUILDSPECS=$(make -C $PROJECT_PATH var-value-BUILDSPECS RELEASE_BRANCH=1-20)
+    BUILDSPECS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPECS RELEASE_BRANCH=1-20)
     SPECS=(${BUILDSPECS// / })
     for buildspec in "${SPECS[@]}"; do
         if [[ "${#SPECS[@]}" != "1" ]]; then
@@ -98,6 +100,3 @@ done
 
 HEAD_COMMENT=$(cat $BASE_DIRECTORY/hack/boilerplate.yq.txt)
 yq eval -i ". headComment=\"$HEAD_COMMENT\"" $STAGING_BUILDSPEC_FILE # Add a header comment with license verbiage and no-edit warning
-yq eval $STAGING_BUILDSPEC_FILE # Print generated YAML
-
-echo "Contents written to $STAGING_BUILDSPEC_FILE"

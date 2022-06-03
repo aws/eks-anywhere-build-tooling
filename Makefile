@@ -88,8 +88,16 @@ generate-project-list:
 generate-staging-buildspec:
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)"
 	
-.PHONY: generate generate-staging-buildspec
-generate: generate-project-list
+.PHONY: generate
+generate: generate-project-list generate-staging-buildspec
+
+.PHONY: validate-generated
+validate-generated: generate
+	@if [ "$$(git status --porcelain -- UPSTREAM_PROJECTS.yaml release/staging-build.yml | wc -l)" -gt 0 ]; then \
+		echo "Error: Generated files, UPSTREAM_PROJECTS.yaml release/staging-build.yml, do not match expected. Please run `make generate` to update"; \
+		git diff -- UPSTREAM_PROJECTS.yaml release/staging-build.yml; \
+		exit 1; \
+	fi
 
 .PHONY: check-project-path-exists
 check-project-path-exists:
