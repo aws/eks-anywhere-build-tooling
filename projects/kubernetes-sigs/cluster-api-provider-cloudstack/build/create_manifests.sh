@@ -34,7 +34,7 @@ build::common::use_go_version ${GOLANG_VERSION}
 cd $REPO
 make release-manifests \
   RELEASE_DIR="out" \
-  IMG="${IMAGE_REPO}/aws/cluster-api-provider-cloudstack/release/manager:$IMAGE_TAG"
+  IMG="${IMAGE_REPO}/kubernetes-sigs/cluster-api-provider-cloudstack/release/manager:$IMAGE_TAG"
 
 mkdir -p $OUTPUT_DIR/manifests/infrastructure-cloudstack/$TAG
 cp templates/cluster-template.yaml "$OUTPUT_DIR/manifests/infrastructure-cloudstack/$TAG"
