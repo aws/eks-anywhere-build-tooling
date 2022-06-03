@@ -47,7 +47,7 @@ create-manifests:
 
 .PHONY: update-cert-manager-manifest
 update-cert-manager-manifest:
-	wget -q https://github.com/jetstack/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O build/cert-manager.yaml
+	wget --retry-connrefused -q https://github.com/jetstack/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O build/cert-manager.yaml
 
 
 ########### DO NOT EDIT #############################

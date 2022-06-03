@@ -37,7 +37,7 @@ ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_REL
 EKSD_IMAGE_REPO=$(build::eksd_releases::get_eksd_image_repo $EKSD_RELEASE_BRANCH)
 
 # Make sure the correct arch image is pulled and tagged
-docker pull --platform linux/$ARCH $IMAGE
+build::docker::retry_pull --platform linux/$ARCH $IMAGE
 
 KIND_PATH="$MAKE_ROOT/_output/bin/kind/$(uname | tr '[:upper:]' '[:lower:]')-$(go env GOHOSTARCH)/kind"
 cat << EOF \

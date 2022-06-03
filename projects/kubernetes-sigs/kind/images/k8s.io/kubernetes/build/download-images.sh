@@ -58,6 +58,10 @@ SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # symlink to project root _output to make sure files are properly cleaned up
 # when running make clean
 PROJECT_ROOT="$(cd "$SOURCE_ROOT/../../.." && pwd -P)"
+
+source "${PROJECT_ROOT}/../../../build/lib/common.sh"
+
+
 rm -f $SOURCE_ROOT/_output
 ln -s $PROJECT_ROOT/_output/$EKSD_RELEASE_BRANCH $SOURCE_ROOT/_output
 
@@ -80,7 +84,7 @@ for container in "kube-apiserver" "kube-controller-manager" "kube-scheduler" "ku
     IMAGE_TAG="$EKSD_IMAGE_REPO/kubernetes/$container:$EKSD_TAG"
     FILE="$SOURCE_ROOT/_output/release-images/$KUBE_ARCH/$container.tar"
     if [ ! -f $FILE ]; then
-        docker pull --platform linux/$KUBE_ARCH $IMAGE_TAG
+        build::docker::retry_pull --platform linux/$KUBE_ARCH $IMAGE_TAG
         docker save $IMAGE_TAG -o $FILE
     fi
 done
