@@ -3,14 +3,14 @@ GIT_TAG:=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.17"
 
 REPO=cluster-api-provider-cloudstack
-REPO_OWNER=aws
+REPO_OWNER=kubernetes-sigs
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-nonroot
 
 BINARY_TARGET_FILES=manager
-EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) aws/cluster-api-provider-cloudstack/pkg/version)
+EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) kubernetes-sigs/cluster-api-provider-cloudstack/pkg/version)
 
-IMAGE_COMPONENT=aws/cluster-api-provider-cloudstack/release/manager
+IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-cloudstack/release/manager
 CAPC_MANIFESTS_TARGET=$(REPO)/pkg/mocks/mock_client.go
 
 HAS_S3_ARTIFACTS=true
