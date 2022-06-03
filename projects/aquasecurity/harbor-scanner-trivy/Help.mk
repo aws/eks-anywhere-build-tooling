@@ -7,14 +7,13 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `distribution`
+clone-repo:  ## Clone upstream `harbor-scanner-trivy`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
-patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `registry` for `linux/amd64 linux/arm64`
-_output/bin/distribution/linux-amd64/registry: ## Build `_output/bin/distribution/linux-amd64/registry`
-_output/bin/distribution/linux-arm64/registry: ## Build `_output/bin/distribution/linux-arm64/registry`
+binaries: ## Build all binaries: `scanner-trivy` for `linux/amd64 linux/arm64`
+_output/bin/harbor-scanner-trivy/linux-amd64/scanner-trivy: ## Build `_output/bin/harbor-scanner-trivy/linux-amd64/scanner-trivy`
+_output/bin/harbor-scanner-trivy/linux-arm64/scanner-trivy: ## Build `_output/bin/harbor-scanner-trivy/linux-arm64/scanner-trivy`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.

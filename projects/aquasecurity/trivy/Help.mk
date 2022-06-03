@@ -7,14 +7,13 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `distribution`
+clone-repo:  ## Clone upstream `trivy`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
-patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `registry` for `linux/amd64 linux/arm64`
-_output/bin/distribution/linux-amd64/registry: ## Build `_output/bin/distribution/linux-amd64/registry`
-_output/bin/distribution/linux-arm64/registry: ## Build `_output/bin/distribution/linux-arm64/registry`
+binaries: ## Build all binaries: `trivy` for `linux/amd64 linux/arm64`
+_output/bin/trivy/linux-amd64/trivy: ## Build `_output/bin/trivy/linux-amd64/trivy`
+_output/bin/trivy/linux-arm64/trivy: ## Build `_output/bin/trivy/linux-arm64/trivy`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
