@@ -33,6 +33,7 @@ HARBOR_REGISTRY_IMAGE_COMPONENT=harbor/harbor-registry
 HARBOR_REGISTRYCTL_IMAGE_COMPONENT=harbor/harbor-registryctl
 HARBOR_REDIS_IMAGE_COMPONENT=harbor/harbor-redis
 HARBOR_EXPORTER_IMAGE_COMPONENT=harbor/harbor-exporter
+HARBOR_TRIVY_IMAGE_COMPONENT=harbor/harbor-trivy
 
 PKG_PATH=github.com/goharbor/harbor/src/pkg
 GITCOMMIT=$(shell git -C $(REPO) rev-parse --short=8 HEAD)
