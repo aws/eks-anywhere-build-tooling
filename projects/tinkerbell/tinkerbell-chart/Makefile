@@ -1,5 +1,5 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
-GIT_TAG:=$(shell yq eval '.version' chart/Chart.yaml)
+GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO_OWNER=tinkerbell
 REPO=tinkerbell-chart
@@ -17,8 +17,12 @@ RELEASE_TARGETS=publish-chart
 
 include $(BASE_DIRECTORY)/Common.mk
 
+.PHONY: verify
+verify:
+	scripts/verify.sh $(HELM_DIRECTORY) $(GIT_TAG)
+
 .PHONY: build-chart
-build-chart:
+build-chart: verify
 	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
 
