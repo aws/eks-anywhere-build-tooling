@@ -12,7 +12,7 @@ BASE_IMAGE_NAME=eks-distro-minimal-base
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/eks-anywhere-packages
-HELM_IMAGE_LIST=eks-anywhere-packages brancz/kube-rbac-proxy
+HELM_IMAGE_LIST=eks-anywhere-packages
 
 # Needed to be built first for final helm/bundle builds
 PROJECT_DEPENDENCIES=eksa/goharbor/harbor eksa/aws-containers/hello-eks-anywhere
