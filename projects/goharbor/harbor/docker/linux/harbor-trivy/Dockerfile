@@ -14,7 +14,7 @@ RUN yum install -y shadow-utils >> /dev/null \
     && yum erase -y shadow-utils \
     && mv /trivy /usr/local/bin/trivy \
     && mv /scanner-trivy /home/scanner/bin/scanner-trivy \
-    && chown -R scanner:scanner /etc/pki/tls/certs /home/scanner/entrypoint.sh /usr/local/bin/trivy /home/scanner/bin/scanner-trivy /home/scanner/install_cert.sh \
+    && chown -R scanner:scanner /etc/pki/tls/certs /home/scanner /home/scanner/entrypoint.sh /usr/local/bin/trivy /home/scanner/bin/scanner-trivy /home/scanner/install_cert.sh \
     && chmod u+x /home/scanner/entrypoint.sh \
     && chmod u+x /usr/local/bin/trivy \
     && chmod u+x /home/scanner/bin/scanner-trivy \
