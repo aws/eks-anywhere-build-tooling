@@ -122,6 +122,7 @@ build {
 
     scripts = [
       "provisioners/configure_ci.sh",
+      "provisioners/install_ipmitool.sh",
       "provisioners/install_kubectl.sh",
       "provisioners/test/install_kubectl.sh",
       "provisioners/install_eksa.sh",
