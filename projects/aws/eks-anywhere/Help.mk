@@ -12,10 +12,6 @@ images: ## Pushes `eks-anywhere-diagnostic-collector/images/push` to IMAGE_REPO
 eks-anywhere-diagnostic-collector/images/amd64: ## Builds/pushes `eks-anywhere-diagnostic-collector/images/amd64`
 eks-anywhere-diagnostic-collector/images/push: ## Builds/pushes `eks-anywhere-diagnostic-collector/images/push`
 
-##@ Fetch Binary Targets
-_output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
-
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 
@@ -31,6 +27,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `local-images`
-release: ## Called via prow postsubmit + release jobs, calls `images`
+build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
 ########### END GENERATED ###########################

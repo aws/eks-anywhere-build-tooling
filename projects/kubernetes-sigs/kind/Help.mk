@@ -28,18 +28,6 @@ haproxy/images/push: ## Builds/pushes `haproxy/images/push`
 kindnetd/images/push: ## Builds/pushes `kindnetd/images/push`
 kind-base/images/push: ## Builds/pushes `kind-base/images/push`
 
-##@ Fetch Binary Targets
-_output/1-21/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
-_output/1-21/dependencies/linux-amd64/eksd/cni-plugins: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/cni-plugins`
-_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
-_output/1-21/dependencies/linux-amd64/eksd/etcd/etcd.tar.gz: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/etcd/etcd.tar.gz`
-_output/1-21/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/kubernetes/client`
-_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
-_output/1-21/dependencies/linux-arm64/eksd/cni-plugins: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/cni-plugins`
-_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
-_output/1-21/dependencies/linux-arm64/eksd/etcd/etcd.tar.gz: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/etcd/etcd.tar.gz`
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
@@ -72,6 +60,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images upload-artifacts attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
+build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images upload-artifacts`
 ########### END GENERATED ###########################

@@ -12,26 +12,6 @@ images: ## Pushes `eks-anywhere-cli-tools/images/push` to IMAGE_REPO
 eks-anywhere-cli-tools/images/amd64: ## Builds/pushes `eks-anywhere-cli-tools/images/amd64`
 eks-anywhere-cli-tools/images/push: ## Builds/pushes `eks-anywhere-cli-tools/images/push`
 
-##@ Fetch Binary Targets
-_output/dependencies/linux-amd64/eksa/fluxcd/flux2: ## Fetch `_output/dependencies/linux-amd64/eksa/fluxcd/flux2`
-_output/dependencies/linux-amd64/eksa/kubernetes-sigs/cluster-api: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes-sigs/cluster-api`
-_output/dependencies/linux-amd64/eksa/kubernetes-sigs/kind: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes-sigs/kind`
-_output/dependencies/linux-amd64/eksa/replicatedhq/troubleshoot: ## Fetch `_output/dependencies/linux-amd64/eksa/replicatedhq/troubleshoot`
-_output/dependencies/linux-amd64/eksa/vmware/govmomi: ## Fetch `_output/dependencies/linux-amd64/eksa/vmware/govmomi`
-_output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/dependencies/linux-amd64/eksa/helm/helm: ## Fetch `_output/dependencies/linux-amd64/eksa/helm/helm`
-_output/dependencies/linux-amd64/eksa/tinkerbell/tink/94-2b1eddcdf90082499b7663ca3c47e77dc12ad34c: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/tink/94-2b1eddcdf90082499b7663ca3c47e77dc12ad34c`
-_output/dependencies/linux-amd64/eksa/apache/cloudstack-cloudmonkey: ## Fetch `_output/dependencies/linux-amd64/eksa/apache/cloudstack-cloudmonkey`
-_output/dependencies/linux-arm64/eksa/fluxcd/flux2: ## Fetch `_output/dependencies/linux-arm64/eksa/fluxcd/flux2`
-_output/dependencies/linux-arm64/eksa/kubernetes-sigs/cluster-api: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes-sigs/cluster-api`
-_output/dependencies/linux-arm64/eksa/kubernetes-sigs/kind: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes-sigs/kind`
-_output/dependencies/linux-arm64/eksa/replicatedhq/troubleshoot: ## Fetch `_output/dependencies/linux-arm64/eksa/replicatedhq/troubleshoot`
-_output/dependencies/linux-arm64/eksa/vmware/govmomi: ## Fetch `_output/dependencies/linux-arm64/eksa/vmware/govmomi`
-_output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
-_output/dependencies/linux-arm64/eksa/helm/helm: ## Fetch `_output/dependencies/linux-arm64/eksa/helm/helm`
-_output/dependencies/linux-arm64/eksa/tinkerbell/tink/94-2b1eddcdf90082499b7663ca3c47e77dc12ad34c: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/tink/94-2b1eddcdf90082499b7663ca3c47e77dc12ad34c`
-_output/dependencies/linux-arm64/eksa/apache/cloudstack-cloudmonkey: ## Fetch `_output/dependencies/linux-arm64/eksa/apache/cloudstack-cloudmonkey`
-
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 

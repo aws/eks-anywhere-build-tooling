@@ -21,10 +21,6 @@ images: ## Pushes `flux-cli/images/push` to IMAGE_REPO
 flux-cli/images/amd64: ## Builds/pushes `flux-cli/images/amd64`
 flux-cli/images/push: ## Builds/pushes `flux-cli/images/push`
 
-##@ Fetch Binary Targets
-_output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
@@ -55,6 +51,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images upload-artifacts attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
+build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images upload-artifacts`
 ########### END GENERATED ###########################

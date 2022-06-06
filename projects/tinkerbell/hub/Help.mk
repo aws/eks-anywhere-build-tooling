@@ -35,9 +35,6 @@ oci2disk/images/push: ## Builds/pushes `oci2disk/images/push`
 writefile/images/push: ## Builds/pushes `writefile/images/push`
 reboot/images/push: ## Builds/pushes `reboot/images/push`
 
-##@ Fetch Binary Targets
-_output/dependencies/linux-amd64/eksa/torvalds/linux: ## Fetch `_output/dependencies/linux-amd64/eksa/torvalds/linux`
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
@@ -63,6 +60,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
 ########### END GENERATED ###########################
