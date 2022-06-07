@@ -120,9 +120,24 @@ EOF
     pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
 }
 
+function pr::file:add() {
+    local -r file="$1"
+
+    if git check-ignore -q $FILE; then
+        continue
+    fi
+
+    local -r diff="$(git diff --ignore-blank-lines --ignore-all-space $FILE)"
+    if [[ -z $diff ]]; then
+        continue
+    fi
+
+    git add $file
+}
+
 # Add checksum files
-for FILE in $(find . -type f -name CHECKSUMS); do    
-    git check-ignore -q $FILE || git add $FILE
+for FILE in $(find . -type f -name CHECKSUMS); do
+    pr::file:add $FILE
 done
 
 git add ./build/lib/install_go_versions.sh
@@ -140,7 +155,7 @@ fi
 
 # Add attribution files
 for FILE in $(find . -type f \( -name "*ATTRIBUTION.txt" ! -path "*/_output/*" \)); do    
-    git check-ignore -q $FILE || git add $FILE
+    pr::file:add $FILE
 done
 
 # stash help.mk files
@@ -155,7 +170,7 @@ if [ "$(git stash list)" != "" ]; then
 fi
 # Add help.mk/Makefile files
 for FILE in $(find . -type f \( -name Help.mk -o -name Makefile \)); do    
-    git check-ignore -q $FILE || git add $FILE
+    pr::file:add $FILE
 done
 
 pr::create::help
