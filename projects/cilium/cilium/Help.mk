@@ -31,6 +31,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `upload-artifacts`
+build: ## Called via prow presubmit, calls `upload-artifacts" `
 release: ## Called via prow postsubmit + release jobs, calls `upload-artifacts`
 ########### END GENERATED ###########################

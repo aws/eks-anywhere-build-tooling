@@ -21,6 +21,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate`
+build: ## Called via prow presubmit, calls `validate" `
 release: ## Called via prow postsubmit + release jobs, calls `build-raw-image`
 ########### END GENERATED ###########################
