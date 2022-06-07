@@ -48,7 +48,7 @@ look out for.
 
 If trying to generate these files outside of CI and have them match what CI produces, you will need the following:
 
-1. `go get github.com/google/go-licenses`
+1. `go install github.com/google/go-licenses@latest`
 1. The `golang` version is included in the attribution file so the different golang versions used to build
    the various projects are required.  Follow the [steps](https://github.com/aws/eks-distro-build-tooling/blob/main/builder-base/install.sh)
    from `builder-base` in the `setupgo()` function to setup the golang versions.
