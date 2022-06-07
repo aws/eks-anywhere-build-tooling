@@ -38,6 +38,8 @@ git config remote.upstream.url >&- || git remote add upstream https://github.com
 # Files have already changed, stash to perform rebase
 git stash
 git fetch upstream
+
+git checkout $MAIN_BRANCH
 # there will be conflicts before we are on the bots fork at this point
 # -Xtheirs instructs git to favor the changes from the current branch
 git rebase -Xtheirs upstream/$MAIN_BRANCH

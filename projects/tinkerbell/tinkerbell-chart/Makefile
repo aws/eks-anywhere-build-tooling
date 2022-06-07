@@ -29,3 +29,11 @@ build-chart: verify
 .PHONY: publish-chart
 publish-chart: build-chart
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(OUTPUT_DIR)
+
+
+########### DO NOT EDIT #############################
+# To update call: make add-generated-help-block
+# This is added to help document dynamic targets and support shell autocompletion
+# Run make help for a formatted help block with all targets
+include Help.mk
+########### END GENERATED ###########################
