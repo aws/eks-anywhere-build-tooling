@@ -6,6 +6,17 @@
 # This is added to help document dynamic targets and support shell autocompletion
 
 
+##@ Image Targets
+local-images: ## Builds `tinkerbell-chart/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `tinkerbell-chart/images/push` to IMAGE_REPO
+tinkerbell-chart/images/amd64: ## Builds/pushes `tinkerbell-chart/images/amd64`
+tinkerbell-chart/images/push: ## Builds/pushes `tinkerbell-chart/images/push`
+
+##@ License Targets
+gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
+attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
+attribution-pr: ## Generates PR to update attribution files for projects
+
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 
@@ -21,6 +32,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate`
-release: ## Called via prow postsubmit + release jobs, calls `build-raw-image`
+build: ## Called via prow presubmit, calls `build-chart`
+release: ## Called via prow postsubmit + release jobs, calls `publish-chart`
 ########### END GENERATED ###########################
