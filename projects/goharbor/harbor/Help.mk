@@ -60,10 +60,10 @@ helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Fetch Binary Targets
 _output/dependencies/linux-amd64/eksa/distribution/distribution: ## Fetch `_output/dependencies/linux-amd64/eksa/distribution/distribution`
-_output/dependencies/linux-amd64/eksa/aquasecurity/trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/aquasecurity/trivy`
-_output/dependencies/linux-amd64/eksa/aquasecurity/harbor-scanner-trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/aquasecurity/harbor-scanner-trivy`
 _output/dependencies/linux-arm64/eksa/distribution/distribution: ## Fetch `_output/dependencies/linux-arm64/eksa/distribution/distribution`
+_output/dependencies/linux-amd64/eksa/aquasecurity/trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/aquasecurity/trivy`
 _output/dependencies/linux-arm64/eksa/aquasecurity/trivy: ## Fetch `_output/dependencies/linux-arm64/eksa/aquasecurity/trivy`
+_output/dependencies/linux-amd64/eksa/aquasecurity/harbor-scanner-trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/aquasecurity/harbor-scanner-trivy`
 _output/dependencies/linux-arm64/eksa/aquasecurity/harbor-scanner-trivy: ## Fetch `_output/dependencies/linux-arm64/eksa/aquasecurity/harbor-scanner-trivy`
 
 ##@ Checksum Targets
@@ -91,6 +91,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
 ########### END GENERATED ###########################
