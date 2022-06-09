@@ -1,6 +1,6 @@
-From 2ccb45fbadbecdf5c0903d7d007473825b75dbfa Mon Sep 17 00:00:00 2001
+From a79c136b5d0c9d880e6ae37461bd6f5ee5c5b585 Mon Sep 17 00:00:00 2001
 From: Jacob Weinstock <jakobweinstock@gmail.com>
-Date: Fri, 3 Jun 2022 09:38:50 -0600
+Date: Thu, 9 Jun 2022 10:15:06 -0600
 Subject: [PATCH] Write DHCP offer to static Netplan file:
 
 This is useful when the host being provisioned
@@ -15,9 +15,9 @@ permanent management cluster.
 Signed-off-by: Jacob Weinstock <jakobweinstock@gmail.com>
 ---
  actions/writefile/v1/go.mod  |   3 +-
- actions/writefile/v1/go.sum  |  68 +++++++++++++++-
- actions/writefile/v1/main.go | 147 ++++++++++++++++++++++++++++++++++-
- 3 files changed, 213 insertions(+), 5 deletions(-)
+ actions/writefile/v1/go.sum  |  68 ++++++++++++-
+ actions/writefile/v1/main.go | 189 ++++++++++++++++++++++++++++++++++-
+ 3 files changed, 255 insertions(+), 5 deletions(-)
 
 diff --git a/actions/writefile/v1/go.mod b/actions/writefile/v1/go.mod
 index 58febf6..374846c 100644
@@ -131,7 +131,7 @@ index 67a36b2..3909e4b 100644
  gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
  gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
 diff --git a/actions/writefile/v1/main.go b/actions/writefile/v1/main.go
-index 7ea1235..d29feb9 100644
+index 7ea1235..23ca768 100644
 --- a/actions/writefile/v1/main.go
 +++ b/actions/writefile/v1/main.go
 @@ -1,28 +1,44 @@
@@ -186,7 +186,7 @@ index 7ea1235..d29feb9 100644
  	dirMode := os.Getenv("DIRMODE")
  
 +	if os.Getenv("STATIC_NETPLAN") == "true" {
-+		ifname := "eth0"
++		ifname := determineNetIF()
 +		if f := os.Getenv("IFNAME"); f != "" {
 +			ifname = f
 +		}
@@ -207,7 +207,56 @@ index 7ea1235..d29feb9 100644
  	// Validate inputs
  	if blockDevice == "" {
  		log.Fatalf("No Block Device speified with Environment Variable [DEST_DISK]")
-@@ -229,3 +264,111 @@ func ensureDir(mountPath, path string, mode os.FileMode, uid, gid int) error {
+@@ -157,6 +192,48 @@ func main() {
+ 	log.Infof("Successfully wrote file [%s] to device [%s]", filePath, blockDevice)
+ }
+ 
++func determineNetIF() string {
++	runtime.LockOSThread()
++	defer runtime.UnlockOSThread()
++
++	// Change to PID 1 network namespace for working with the host's interfaces.
++	ns1, err := netns.GetFromPid(1)
++	if err != nil {
++		return ""
++	}
++	defer ns1.Close()
++	err = netns.Set(ns1)
++	if err != nil {
++		return ""
++	}
++
++	ifs, err := net.Interfaces()
++	if err != nil {
++		return ""
++	}
++
++	for _, ifi := range ifs {
++		addrs, err := ifi.Addrs()
++		if err != nil {
++			break
++		}
++		for _, addr := range addrs {
++			ip, ok := addr.(*net.IPNet)
++			if !ok {
++				continue
++			}
++			v4 := ip.IP.To4()
++			if v4 == nil || !v4.IsGlobalUnicast() {
++				continue
++			}
++
++			return ifi.Name
++		}
++	}
++
++	return ""
++}
++
+ func dirExists(mountPath, path string) (bool, error) {
+ 	fqPath := filepath.Join(mountPath, path)
+ 	info, err := os.Stat(fqPath)
+@@ -229,3 +306,111 @@ func ensureDir(mountPath, path string, mode os.FileMode, uid, gid int) error {
  
  	return nil
  }
@@ -216,7 +265,7 @@ index 7ea1235..d29feb9 100644
 +	// After locking a goroutine to its current OS thread with runtime.LockOSThread()
 +	// and changing its network namespace, any new subsequent goroutine won't be scheduled
 +	// on that thread while it's locked. Therefore, the new goroutine will run in a
-+	// different namespace leading to unexpected results.	
++	// different namespace leading to unexpected results.
 +	// See these links for more details:
 +	// https://www.weave.works/blog/linux-namespaces-golang-followup
 +	// https://github.com/vishvananda/netns
