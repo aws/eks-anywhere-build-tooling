@@ -107,7 +107,7 @@ function build::gather_licenses() {
   # by default we use 1.16, but due to changes in 1.17, there are some changes that require using 1.17
   if [ "$golang_version" == "1.18" ]; then
     build::common::use_go_version 1.18
-  else if [ "$golang_version" == "1.17" ]; then
+  elif [ "$golang_version" == "1.17" ]; then
     build::common::use_go_version 1.17
   else
     build::common::use_go_version 1.16
