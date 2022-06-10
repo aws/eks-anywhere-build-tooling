@@ -56,7 +56,7 @@ FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICE
 
 HAS_HELM_CHART=true
 
-HELM_GIT_TAG=v1.9.0
+HELM_GIT_TAG?=$(shell cat HELM_GIT_TAG)
 HELM_SOURCE_REPOSITORY=harbor-helm
 HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
 HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-exporter harbor/harbor-jobservice harbor/harbor-nginx harbor/harbor-portal harbor/harbor-redis harbor/harbor-registry harbor/harbor-registryctl harbor/harbor-trivy
