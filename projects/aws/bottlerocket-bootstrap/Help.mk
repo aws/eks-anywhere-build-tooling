@@ -19,10 +19,10 @@ bottlerocket-bootstrap/images/push: ## Builds/pushes `bottlerocket-bootstrap/ima
 
 ##@ Fetch Binary Targets
 _output/1-21/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/1-21/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/kubernetes/server`
-_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
 _output/1-21/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/1-21/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/kubernetes/server`
 _output/1-21/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/kubernetes/server`
+_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
 _output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
 
 ##@ Checksum Targets
@@ -49,6 +49,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
 ########### END GENERATED ###########################

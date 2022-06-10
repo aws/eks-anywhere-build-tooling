@@ -17,6 +17,12 @@ images: ## Pushes `image-builder/images/push` to IMAGE_REPO
 image-builder/images/amd64: ## Builds/pushes `image-builder/images/amd64`
 image-builder/images/push: ## Builds/pushes `image-builder/images/push`
 
+##@ Fetch Binary Targets
+_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
+_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
+_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
+_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
+
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-repo: ## Removes source directory
@@ -33,6 +39,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `release-raw-ubuntu-2004-efi image-builder/images/capi/output/fake-ubuntu.gz /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/raw/ubuntu/ubuntu.gz upload-artifacts-raw build-ami-ubuntu-2004 setup-packer-configs-ova download-ova-bottlerocket image-builder/images/capi/output/fake-ubuntu.ova /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/ova/ubuntu/ubuntu.ova /home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/image-builder/_output/tar/1-21/ova/bottlerocket/bottlerocket.ova upload-artifacts-ova upload-ova-bottlerocket`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `release-raw-ubuntu-2004-efi image-builder/images/capi/output/fake-ubuntu.gz _output/tar/1-21/raw/ubuntu/ubuntu.gz upload-artifacts-raw build-ami-ubuntu-2004 setup-packer-configs-ova download-ova-bottlerocket image-builder/images/capi/output/fake-ubuntu.ova _output/tar/1-21/ova/ubuntu/ubuntu.ova _output/tar/1-21/ova/bottlerocket/bottlerocket.ova upload-artifacts-ova upload-ova-bottlerocket`
+release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
 ########### END GENERATED ###########################
