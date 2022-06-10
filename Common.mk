@@ -58,6 +58,8 @@ else
 endif
 EXCLUDE_FROM_STAGING_BUILDSPEC?=false
 BUILDSPECS?=buildspec.yml
+BUILDSPEC_VARS_KEYS?=
+BUILDSPEC_VARS_VALUES?=
 ####################################################
 
 #################### GIT ###########################
