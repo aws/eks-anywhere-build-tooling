@@ -1,17 +1,17 @@
-From 27f6e1d50d1b8262a4376a9fff6693f14cd6b13f Mon Sep 17 00:00:00 2001
+From e710dfb93c87eeea5d7a6ef043ad988f81cc2d60 Mon Sep 17 00:00:00 2001
 From: Vincent Ni <kangqini@amazon.com>
-Date: Tue, 3 May 2022 10:18:39 -0700
+Date: Sat, 11 Jun 2022 00:07:03 -0700
 Subject: [PATCH 1/3] harbor patch
 
 ---
  configuration/configuration.go                |   3 +
- registry/handlers/app.go                      |  62 ++-
+ registry/handlers/app.go                      |  63 ++-
  registry/handlers/app_test.go                 |  55 ++-
  vendor.conf                                   |   1 +
  vendor/github.com/FZambia/sentinel/LICENSE    | 201 +++++++++
  vendor/github.com/FZambia/sentinel/README.md  |  39 ++
- .../github.com/FZambia/sentinel/sentinel.go   | 421 ++++++++++++++++++
- 7 files changed, 769 insertions(+), 13 deletions(-)
+ .../github.com/FZambia/sentinel/sentinel.go   | 426 ++++++++++++++++++
+ 7 files changed, 775 insertions(+), 13 deletions(-)
  create mode 100644 vendor/github.com/FZambia/sentinel/LICENSE
  create mode 100644 vendor/github.com/FZambia/sentinel/README.md
  create mode 100644 vendor/github.com/FZambia/sentinel/sentinel.go
@@ -31,7 +31,7 @@ index dd315485..a3e0818e 100644
  		Password string `yaml:"password,omitempty"`
  
 diff --git a/registry/handlers/app.go b/registry/handlers/app.go
-index 8a30bd4d..cb883c8e 100644
+index 8a30bd4d..4e9cec34 100644
 --- a/registry/handlers/app.go
 +++ b/registry/handlers/app.go
 @@ -3,6 +3,7 @@ package handlers
@@ -51,7 +51,7 @@ index 8a30bd4d..cb883c8e 100644
  	"github.com/docker/distribution"
  	"github.com/docker/distribution/configuration"
  	dcontext "github.com/docker/distribution/context"
-@@ -499,6 +502,43 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
+@@ -499,6 +502,44 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
  		return
  	}
  
@@ -63,9 +63,9 @@ index 8a30bd4d..cb883c8e 100644
 +			MasterName: configuration.Redis.SentinelMasterSet,
 +			Dial: func(addr string) (redis.Conn, error) {
 +				c, err := redis.DialTimeout("tcp", addr,
-+						configuration.Redis.DialTimeout,
-+						configuration.Redis.ReadTimeout,
-+						configuration.Redis.WriteTimeout)
++					configuration.Redis.DialTimeout,
++					configuration.Redis.ReadTimeout,
++					configuration.Redis.WriteTimeout)
 +				if err != nil {
 +					return nil, err
 +				}
@@ -81,6 +81,7 @@ index 8a30bd4d..cb883c8e 100644
 +			}
 +			return nil
 +		}
++
 +	} else {
 +		getRedisAddr = func() (string, error) {
 +			return configuration.Redis.Addr, nil
@@ -95,7 +96,7 @@ index 8a30bd4d..cb883c8e 100644
  	pool := &redis.Pool{
  		Dial: func() (redis.Conn, error) {
  			// TODO(stevvooe): Yet another use case for contextual timing.
-@@ -514,8 +554,11 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
+@@ -514,8 +555,11 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
  				}
  			}
  
@@ -109,7 +110,7 @@ index 8a30bd4d..cb883c8e 100644
  				configuration.Redis.DialTimeout,
  				configuration.Redis.ReadTimeout,
  				configuration.Redis.WriteTimeout)
-@@ -547,16 +590,11 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
+@@ -547,16 +591,11 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
  			done(nil)
  			return conn, nil
  		},
@@ -127,7 +128,7 @@ index 8a30bd4d..cb883c8e 100644
 +		MaxActive:    configuration.Redis.Pool.MaxActive,
 +		IdleTimeout:  configuration.Redis.Pool.IdleTimeout,
 +		TestOnBorrow: testOnBorrow,
-+		Wait: 		  false, // if a connection is not available, proceed without cache.
++		Wait:         false, // if a connection is not available, proceed without cache.
  	}
  
  	app.redis = pool
@@ -206,7 +207,7 @@ index 60a57e6c..8a644d83 100644
  	// ensuring that NewApp doesn't panic. We might want to tweak this
  	// behavior.
 diff --git a/vendor.conf b/vendor.conf
-index bd1b4bff..77456402 100644
+index bd1b4bff..a45ac137 100644
 --- a/vendor.conf
 +++ b/vendor.conf
 @@ -49,3 +49,4 @@ gopkg.in/yaml.v2 v2.2.1
@@ -214,9 +215,10 @@ index bd1b4bff..77456402 100644
  github.com/opencontainers/go-digest a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb
  github.com/opencontainers/image-spec 67d2d5658fe0476ab9bf414cec164077ebff3920 # v1.0.2
 +github.com/FZambia/sentinel 5585739eb4b6478aa30161866ccf9ce0ef5847c7 https://github.com/jeremyxu2010/sentinel.git
+\ No newline at end of file
 diff --git a/vendor/github.com/FZambia/sentinel/LICENSE b/vendor/github.com/FZambia/sentinel/LICENSE
 new file mode 100644
-index 00000000..8dada3ed
+index 00000000..9c8f3ea0
 --- /dev/null
 +++ b/vendor/github.com/FZambia/sentinel/LICENSE
 @@ -0,0 +1,201 @@
@@ -421,9 +423,10 @@ index 00000000..8dada3ed
 +   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 +   See the License for the specific language governing permissions and
 +   limitations under the License.
+\ No newline at end of file
 diff --git a/vendor/github.com/FZambia/sentinel/README.md b/vendor/github.com/FZambia/sentinel/README.md
 new file mode 100644
-index 00000000..f7353702
+index 00000000..fc810435
 --- /dev/null
 +++ b/vendor/github.com/FZambia/sentinel/README.md
 @@ -0,0 +1,39 @@
@@ -444,7 +447,7 @@ index 00000000..f7353702
 +
 +```
 +listen redis
-+    server redis-01 127.0.0.1:6380 check port 6380 check inter 2s weight 1 inter 2s downinter 5s rise 10 fall 2 on-marked-down shutdown-sessions on-marked-up shutdown-backup-sessions
++    server redis-01 127.0.0.1:6380 check port 6380 check inter 2s weight 1 inter 2s downinter 5s rise 10 fall 2
 +    server redis-02 127.0.0.1:6381 check port 6381 check inter 2s weight 1 inter 2s downinter 5s rise 10 fall 2 backup
 +    bind *:6379
 +    mode tcp
@@ -466,12 +469,13 @@ index 00000000..f7353702
 +-------
 +
 +Library is available under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+\ No newline at end of file
 diff --git a/vendor/github.com/FZambia/sentinel/sentinel.go b/vendor/github.com/FZambia/sentinel/sentinel.go
 new file mode 100644
-index 00000000..8dd35a3c
+index 00000000..79209e9f
 --- /dev/null
 +++ b/vendor/github.com/FZambia/sentinel/sentinel.go
-@@ -0,0 +1,421 @@
+@@ -0,0 +1,426 @@
 +package sentinel
 +
 +import (
@@ -482,7 +486,7 @@ index 00000000..8dd35a3c
 +	"sync"
 +	"time"
 +
-+	"github.com/gomodule/redigo/redis"
++	"github.com/garyburd/redigo/redis"
 +)
 +
 +// Sentinel provides a way to add high availability (HA) to Redis Pool using
@@ -696,6 +700,11 @@ index 00000000..8dd35a3c
 +		if err != nil {
 +			lastErr = err
 +			s.mu.Lock()
++			pool, ok := s.pools[addr]
++			if ok {
++				pool.Close()
++				delete(s.pools, addr)
++			}
 +			s.putToBottom(addr)
 +			s.mu.Unlock()
 +			continue
