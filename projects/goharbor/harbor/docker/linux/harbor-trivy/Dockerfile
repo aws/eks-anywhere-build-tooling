@@ -4,6 +4,7 @@ FROM $BASE_IMAGE
 ARG RELEASE_BRANCH
 ARG TARGETARCH
 ARG TARGETOS
+ARG TRIVY_VERSION
 
 COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/harbor-scanner-trivy/scanner-trivy _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/trivy/trivy _output/harbor-trivy _output/LICENSES ATTRIBUTION.txt /
 
@@ -21,7 +22,7 @@ RUN yum install -y shadow-utils >> /dev/null \
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl --fail -s http://localhost:8080/probe/healthy || curl -k --fail -s https://localhost:8443/probe/healthy || exit 1
 
-ENV TRIVY_VERSION=v0.28.1
+ENV TRIVY_VERSION=${TRIVY_VERSION}
 
 USER scanner
 
