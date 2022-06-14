@@ -4,7 +4,6 @@ FROM $BASE_IMAGE
 ARG RELEASE_BRANCH
 ARG TARGETARCH
 ARG TARGETOS
-ARG TRIVY_VERSION
 
 COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/harbor-scanner-trivy/scanner-trivy _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/trivy/trivy _output/harbor-trivy _output/LICENSES ATTRIBUTION.txt /
 
