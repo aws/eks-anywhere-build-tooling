@@ -1,4 +1,4 @@
-From 7e8dcd24ce1b922f1ff1094b7c54945663cff6fa Mon Sep 17 00:00:00 2001
+From bae6614ac9212043592e69151dad8155b05cf5cb Mon Sep 17 00:00:00 2001
 From: Vincent Ni <kangqini@amazon.com>
 Date: Tue, 14 Jun 2022 15:15:41 -0700
 Subject: [PATCH] add digest and namespace support
@@ -62,8 +62,8 @@ Subject: [PATCH] add digest and namespace support
  templates/trivy/trivy-sts.yaml                |  5 +-
  templates/trivy/trivy-svc.yaml                |  1 +
  templates/trivy/trivy-tls.yaml                |  1 +
- values.yaml                                   | 71 +++++++++----------
- 59 files changed, 138 insertions(+), 53 deletions(-)
+ values.yaml                                   | 72 +++++++++----------
+ 59 files changed, 139 insertions(+), 53 deletions(-)
 
 diff --git a/templates/_helpers.tpl b/templates/_helpers.tpl
 index 5eb9910..5706b1f 100644
@@ -1107,10 +1107,11 @@ index a9c8330..58bce4e 100644
  {{ include "harbor.labels" . | indent 4 }}
  type: kubernetes.io/tls
 diff --git a/values.yaml b/values.yaml
-index a5550b8..d491ceb 100644
+index a5550b8..cf886c3 100644
 --- a/values.yaml
 +++ b/values.yaml
-@@ -1,7 +1,7 @@
+@@ -1,7 +1,8 @@
++sourceRegistry: "public.ecr.aws/eks-anywhere"
  expose:
    # Set how to expose the service. Set the type as "ingress", "clusterIP", "nodePort" or "loadBalancer"
    # and fill the information in the corresponding section
@@ -1119,7 +1120,7 @@ index a5550b8..d491ceb 100644
    tls:
      # Enable TLS or not.
      # Delete the "ssl-redirect" annotations in "expose.ingress.annotations" when TLS is disabled and "expose.type" is "ingress"
-@@ -16,7 +16,7 @@ expose:
+@@ -16,7 +17,7 @@ expose:
      # The tls certificate can be generated manually or by cert manager
      # 3) none: configure no tls certificate for the ingress. If the default
      # tls certificate is configured in the ingress controller, choose this option
@@ -1128,7 +1129,7 @@ index a5550b8..d491ceb 100644
      auto:
        # The common name used to generate the certificate, it's necessary
        # when the type isn't "ingress"
-@@ -25,7 +25,7 @@ expose:
+@@ -25,7 +26,7 @@ expose:
        # The name of secret which contains keys named:
        # "tls.crt" - the certificate
        # "tls.key" - the private key
@@ -1137,7 +1138,7 @@ index a5550b8..d491ceb 100644
        # The name of secret which contains keys named:
        # "tls.crt" - the certificate
        # "tls.key" - the private key
-@@ -122,13 +122,13 @@ expose:
+@@ -122,13 +123,13 @@ expose:
  # the IP address of k8s node
  #
  # If Harbor is deployed behind the proxy, set it as the URL of proxy
@@ -1153,7 +1154,7 @@ index a5550b8..d491ceb 100644
    # There are three ways to provide tls
    # 1) "auto" will generate cert automatically
    # 2) "manual" need provide cert file manually in following value
-@@ -355,7 +355,7 @@ imagePullSecrets:
+@@ -355,7 +356,7 @@ imagePullSecrets:
  # and chartmuseum): "RollingUpdate" or "Recreate"
  # Set it as "Recreate" when "RWM" for volumes isn't supported
  updateStrategy:
@@ -1162,7 +1163,7 @@ index a5550b8..d491ceb 100644
  
  # debug, info, warning, error or fatal
  logLevel: info
-@@ -369,7 +369,7 @@ harborAdminPassword: "Harbor12345"
+@@ -369,7 +370,7 @@ harborAdminPassword: "Harbor12345"
  caSecretName: ""
  
  # The secret key used for encryption. Must be a string of 16 chars.
@@ -1171,7 +1172,7 @@ index a5550b8..d491ceb 100644
  
  # The proxy settings for updating trivy vulnerabilities from the Internet and replicating
  # artifacts from/to the registries that cannot be reached directly
-@@ -399,8 +399,8 @@ enableMigrateHelmHook: false
+@@ -399,8 +400,8 @@ enableMigrateHelmHook: false
  # If service exposed via "ingress", the Nginx will not be used
  nginx:
    image:
@@ -1182,7 +1183,7 @@ index a5550b8..d491ceb 100644
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -421,8 +421,8 @@ nginx:
+@@ -421,8 +422,8 @@ nginx:
  
  portal:
    image:
@@ -1193,7 +1194,7 @@ index a5550b8..d491ceb 100644
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -443,8 +443,8 @@ portal:
+@@ -443,8 +444,8 @@ portal:
  
  core:
    image:
@@ -1204,7 +1205,7 @@ index a5550b8..d491ceb 100644
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -486,8 +486,8 @@ core:
+@@ -486,8 +487,8 @@ core:
  
  jobservice:
    image:
@@ -1215,7 +1216,7 @@ index a5550b8..d491ceb 100644
    replicas: 1
    revisionHistoryLimit: 10
    # set the service account to be used, default if left empty
-@@ -526,16 +526,16 @@ registry:
+@@ -526,16 +527,16 @@ registry:
    automountServiceAccountToken: false
    registry:
      image:
@@ -1236,7 +1237,7 @@ index a5550b8..d491ceb 100644
  
      # resources:
      #  requests:
-@@ -584,7 +584,7 @@ registry:
+@@ -584,7 +585,7 @@ registry:
      dryrun: false
  
  chartmuseum:
@@ -1245,7 +1246,7 @@ index a5550b8..d491ceb 100644
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -592,8 +592,8 @@ chartmuseum:
+@@ -592,8 +593,8 @@ chartmuseum:
    # Harbor defaults ChartMuseum to returning relative urls, if you want using absolute url you should enable it by change the following value to 'true'
    absoluteUrl: false
    image:
@@ -1256,7 +1257,7 @@ index a5550b8..d491ceb 100644
    replicas: 1
    revisionHistoryLimit: 10
    # resources:
-@@ -615,9 +615,8 @@ trivy:
+@@ -615,9 +616,8 @@ trivy:
    enabled: true
    image:
      # repository the repository for Trivy adapter image
@@ -1268,7 +1269,7 @@ index a5550b8..d491ceb 100644
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -682,15 +681,15 @@ trivy:
+@@ -682,15 +682,15 @@ trivy:
    priorityClassName:
  
  notary:
@@ -1287,7 +1288,7 @@ index a5550b8..d491ceb 100644
      replicas: 1
      # resources:
      #  requests:
-@@ -709,8 +708,8 @@ notary:
+@@ -709,8 +709,8 @@ notary:
      # mount the service account token
      automountServiceAccountToken: false
      image:
@@ -1298,7 +1299,7 @@ index a5550b8..d491ceb 100644
      replicas: 1
      # resources:
      #  requests:
-@@ -741,8 +740,8 @@ database:
+@@ -741,8 +741,8 @@ database:
      # mount the service account token
      automountServiceAccountToken: false
      image:
@@ -1309,7 +1310,7 @@ index a5550b8..d491ceb 100644
      # The initial superuser password for internal database
      password: "changeit"
      # The size limit for Shared memory, pgSQL use it for shared_buffer
-@@ -805,8 +804,8 @@ redis:
+@@ -805,8 +805,8 @@ redis:
      # mount the service account token
      automountServiceAccountToken: false
      image:
@@ -1320,7 +1321,7 @@ index a5550b8..d491ceb 100644
      # resources:
      #  requests:
      #    memory: 256Mi
-@@ -846,8 +845,8 @@ exporter:
+@@ -846,8 +846,8 @@ exporter:
    # mount the service account token
    automountServiceAccountToken: false
    image:
