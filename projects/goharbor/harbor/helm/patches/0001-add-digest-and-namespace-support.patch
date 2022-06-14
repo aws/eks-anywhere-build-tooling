@@ -1,6 +1,6 @@
-From dad44943a9c8472c8d6173b219ed427ccc2cc7df Mon Sep 17 00:00:00 2001
+From 7e8dcd24ce1b922f1ff1094b7c54945663cff6fa Mon Sep 17 00:00:00 2001
 From: Vincent Ni <kangqini@amazon.com>
-Date: Thu, 5 May 2022 19:05:49 -0700
+Date: Tue, 14 Jun 2022 15:15:41 -0700
 Subject: [PATCH] add digest and namespace support
 
 ---
@@ -13,12 +13,12 @@ Subject: [PATCH] add digest and namespace support
  templates/chartmuseum/chartmuseum-tls.yaml    |  1 +
  templates/core/core-cm.yaml                   |  1 +
  templates/core/core-dpl.yaml                  |  4 +-
- templates/core/core-pre-upgrade-job.yaml      |  2 +
+ templates/core/core-pre-upgrade-job.yaml      |  4 +-
  templates/core/core-secret.yaml               |  3 +-
  templates/core/core-svc.yaml                  |  1 +
  templates/core/core-tls.yaml                  |  1 +
  templates/database/database-secret.yaml       |  1 +
- templates/database/database-ss.yaml           |  8 +-
+ templates/database/database-ss.yaml           |  9 ++-
  templates/database/database-svc.yaml          |  1 +
  templates/exporter/exporter-cm-env.yaml       |  1 +
  templates/exporter/exporter-dpl.yaml          |  4 +-
@@ -49,7 +49,7 @@ Subject: [PATCH] add digest and namespace support
  templates/portal/service.yaml                 |  1 +
  templates/portal/tls.yaml                     |  1 +
  templates/redis/service.yaml                  |  1 +
- templates/redis/statefulset.yaml              |  4 +-
+ templates/redis/statefulset.yaml              |  5 +-
  templates/registry/registry-cm.yaml           |  1 +
  templates/registry/registry-dpl.yaml          |  6 +-
  templates/registry/registry-pvc.yaml          |  1 +
@@ -62,8 +62,8 @@ Subject: [PATCH] add digest and namespace support
  templates/trivy/trivy-sts.yaml                |  5 +-
  templates/trivy/trivy-svc.yaml                |  1 +
  templates/trivy/trivy-tls.yaml                |  1 +
- values.yaml                                   | 76 ++++++++++---------
- 59 files changed, 139 insertions(+), 53 deletions(-)
+ values.yaml                                   | 71 +++++++++----------
+ 59 files changed, 138 insertions(+), 53 deletions(-)
 
 diff --git a/templates/_helpers.tpl b/templates/_helpers.tpl
 index 5eb9910..5706b1f 100644
@@ -211,7 +211,7 @@ index b94b789..2ef7556 100644
          {{- if .Values.core.startupProbe.enabled }}
          startupProbe:
 diff --git a/templates/core/core-pre-upgrade-job.yaml b/templates/core/core-pre-upgrade-job.yaml
-index 9681965..9049ad4 100644
+index 9681965..6c8e895 100644
 --- a/templates/core/core-pre-upgrade-job.yaml
 +++ b/templates/core/core-pre-upgrade-job.yaml
 @@ -3,6 +3,7 @@ apiVersion: batch/v1
@@ -230,8 +230,17 @@ index 9681965..9049ad4 100644
        labels:
  {{ include "harbor.matchLabels" . | indent 8 }}
          component: migrator
+@@ -32,7 +34,7 @@ spec:
+       terminationGracePeriodSeconds: 120
+       containers:
+       - name: core-job
+-        image: {{ .Values.core.image.repository }}:{{ .Values.core.image.tag }}
++        image: {{ .Values.sourceRegistry }}/{{ include "harbor.image.repository.path" .Values.core.image }}
+         imagePullPolicy: {{ .Values.imagePullPolicy }}
+         command: ["/harbor/harbor_core", "-mode=migrate"]
+         envFrom:
 diff --git a/templates/core/core-secret.yaml b/templates/core/core-secret.yaml
-index 6e3e446..4ba2594 100644
+index 6e3e446..e8fd07c 100644
 --- a/templates/core/core-secret.yaml
 +++ b/templates/core/core-secret.yaml
 @@ -2,11 +2,12 @@ apiVersion: v1
@@ -244,7 +253,7 @@ index 6e3e446..4ba2594 100644
  type: Opaque
  data:
 -  secretKey: {{ .Values.secretKey | b64enc | quote }}
-+  secretKey: {{ required ".Values.secretKey should be set!" .Values.secretKey | b64enc | quote }}
++  secretKey: {{ required ".Values.secretKey must be set!" .Values.secretKey | b64enc | quote }}
    secret: {{ .Values.core.secret | default (randAlphaNum 16) | b64enc | quote }}
  {{- if not .Values.core.secretName }}
    tls.crt: {{ .Files.Get "cert/tls.crt" | b64enc }}
@@ -285,7 +294,7 @@ index 864aff4..0d07ec2 100644
  {{ include "harbor.labels" . | indent 4 }}
  type: Opaque
 diff --git a/templates/database/database-ss.yaml b/templates/database/database-ss.yaml
-index c476c35..f07e25f 100644
+index c476c35..5962b87 100644
 --- a/templates/database/database-ss.yaml
 +++ b/templates/database/database-ss.yaml
 @@ -4,6 +4,7 @@ apiVersion: apps/v1
@@ -331,6 +340,14 @@ index c476c35..f07e25f 100644
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            exec:
+@@ -138,6 +140,7 @@ spec:
+   volumeClaimTemplates:
+   - metadata:
+       name: "database-data"
++      namespace: {{ .Release.Namespace | quote }}
+       labels:
+ {{ include "harbor.labels" . | indent 8 }}
+       annotations:
 diff --git a/templates/database/database-svc.yaml b/templates/database/database-svc.yaml
 index 6475048..84623d2 100644
 --- a/templates/database/database-svc.yaml
@@ -850,7 +867,7 @@ index 79c95c3..d774706 100644
  {{ include "harbor.labels" . | indent 4 }}
  spec:
 diff --git a/templates/redis/statefulset.yaml b/templates/redis/statefulset.yaml
-index 74b7581..a706af9 100644
+index 74b7581..40070dd 100644
 --- a/templates/redis/statefulset.yaml
 +++ b/templates/redis/statefulset.yaml
 @@ -4,6 +4,7 @@ apiVersion: apps/v1
@@ -878,6 +895,14 @@ index 74b7581..a706af9 100644
          imagePullPolicy: {{ .Values.imagePullPolicy }}
          livenessProbe:
            tcpSocket:
+@@ -87,6 +89,7 @@ spec:
+   volumeClaimTemplates:
+   - metadata:
+       name: data
++      namespace: {{ .Release.Namespace | quote }}
+       labels:
+ {{ include "harbor.labels" . | indent 8 }}
+       annotations:
 diff --git a/templates/registry/registry-cm.yaml b/templates/registry/registry-cm.yaml
 index 8af7969..df5932c 100644
 --- a/templates/registry/registry-cm.yaml
@@ -1021,7 +1046,7 @@ index 84652c7..b13f880 100644
  {{ include "harbor.labels" . | indent 4 }}
  type: Opaque
 diff --git a/templates/trivy/trivy-sts.yaml b/templates/trivy/trivy-sts.yaml
-index 78d915e..3b9d7ef 100644
+index 78d915e..48b327d 100644
 --- a/templates/trivy/trivy-sts.yaml
 +++ b/templates/trivy/trivy-sts.yaml
 @@ -4,6 +4,7 @@ apiVersion: apps/v1
@@ -1049,14 +1074,14 @@ index 78d915e..3b9d7ef 100644
            imagePullPolicy: {{ .Values.imagePullPolicy }}
            securityContext:
              privileged: false
-@@ -181,6 +183,7 @@ spec:
- {{- if and .Values.persistence.enabled (not $trivy.existingClaim) }}
+@@ -182,6 +184,7 @@ spec:
    volumeClaimTemplates:
    - metadata:
-+      namespace: {{ .Release.Namespace | quote }}
        name: data
++      namespace: {{ .Release.Namespace | quote }}
        labels:
  {{ include "harbor.labels" . | indent 8 }}
+       annotations:
 diff --git a/templates/trivy/trivy-svc.yaml b/templates/trivy/trivy-svc.yaml
 index 24daf09..e0ae320 100644
 --- a/templates/trivy/trivy-svc.yaml
@@ -1082,12 +1107,10 @@ index a9c8330..58bce4e 100644
  {{ include "harbor.labels" . | indent 4 }}
  type: kubernetes.io/tls
 diff --git a/values.yaml b/values.yaml
-index a7ca73d..4dea706 100644
+index a5550b8..d491ceb 100644
 --- a/values.yaml
 +++ b/values.yaml
-@@ -1,7 +1,9 @@
-+sourceRegistry: "public.ecr.aws/eks-anywhere"
-+
+@@ -1,7 +1,7 @@
  expose:
    # Set how to expose the service. Set the type as "ingress", "clusterIP", "nodePort" or "loadBalancer"
    # and fill the information in the corresponding section
@@ -1096,7 +1119,7 @@ index a7ca73d..4dea706 100644
    tls:
      # Enable TLS or not.
      # Delete the "ssl-redirect" annotations in "expose.ingress.annotations" when TLS is disabled and "expose.type" is "ingress"
-@@ -16,7 +18,7 @@ expose:
+@@ -16,7 +16,7 @@ expose:
      # The tls certificate can be generated manually or by cert manager
      # 3) none: configure no tls certificate for the ingress. If the default
      # tls certificate is configured in the ingress controller, choose this option
@@ -1105,7 +1128,7 @@ index a7ca73d..4dea706 100644
      auto:
        # The common name used to generate the certificate, it's necessary
        # when the type isn't "ingress"
-@@ -25,7 +27,7 @@ expose:
+@@ -25,7 +25,7 @@ expose:
        # The name of secret which contains keys named:
        # "tls.crt" - the certificate
        # "tls.key" - the private key
@@ -1114,7 +1137,7 @@ index a7ca73d..4dea706 100644
        # The name of secret which contains keys named:
        # "tls.crt" - the certificate
        # "tls.key" - the private key
-@@ -122,13 +124,13 @@ expose:
+@@ -122,13 +122,13 @@ expose:
  # the IP address of k8s node
  #
  # If Harbor is deployed behind the proxy, set it as the URL of proxy
@@ -1130,7 +1153,7 @@ index a7ca73d..4dea706 100644
    # There are three ways to provide tls
    # 1) "auto" will generate cert automatically
    # 2) "manual" need provide cert file manually in following value
-@@ -355,7 +357,7 @@ imagePullSecrets:
+@@ -355,7 +355,7 @@ imagePullSecrets:
  # and chartmuseum): "RollingUpdate" or "Recreate"
  # Set it as "Recreate" when "RWM" for volumes isn't supported
  updateStrategy:
@@ -1139,7 +1162,7 @@ index a7ca73d..4dea706 100644
  
  # debug, info, warning, error or fatal
  logLevel: info
-@@ -369,7 +371,7 @@ harborAdminPassword: "Harbor12345"
+@@ -369,7 +369,7 @@ harborAdminPassword: "Harbor12345"
  caSecretName: ""
  
  # The secret key used for encryption. Must be a string of 16 chars.
@@ -1148,56 +1171,56 @@ index a7ca73d..4dea706 100644
  
  # The proxy settings for updating trivy vulnerabilities from the Internet and replicating
  # artifacts from/to the registries that cannot be reached directly
-@@ -399,8 +401,8 @@ enableMigrateHelmHook: false
+@@ -399,8 +399,8 @@ enableMigrateHelmHook: false
  # If service exposed via "ingress", the Nginx will not be used
  nginx:
    image:
 -    repository: goharbor/nginx-photon
--    tag: v2.5.0
+-    tag: v2.5.1
 +    repository: harbor/harbor-nginx
 +    digest: {{harbor/harbor-nginx}}
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -421,8 +423,8 @@ nginx:
+@@ -421,8 +421,8 @@ nginx:
  
  portal:
    image:
 -    repository: goharbor/harbor-portal
--    tag: v2.5.0
+-    tag: v2.5.1
 +    repository: harbor/harbor-portal
 +    digest: {{harbor/harbor-portal}}
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -443,8 +445,8 @@ portal:
+@@ -443,8 +443,8 @@ portal:
  
  core:
    image:
 -    repository: goharbor/harbor-core
--    tag: v2.5.0
+-    tag: v2.5.1
 +    repository: harbor/harbor-core
 +    digest: {{harbor/harbor-core}}
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -486,8 +488,8 @@ core:
+@@ -486,8 +486,8 @@ core:
  
  jobservice:
    image:
 -    repository: goharbor/harbor-jobservice
--    tag: v2.5.0
+-    tag: v2.5.1
 +    repository: harbor/harbor-jobservice
 +    digest: {{harbor/harbor-jobservice}}
    replicas: 1
    revisionHistoryLimit: 10
    # set the service account to be used, default if left empty
-@@ -526,16 +528,16 @@ registry:
+@@ -526,16 +526,16 @@ registry:
    automountServiceAccountToken: false
    registry:
      image:
 -      repository: goharbor/registry-photon
--      tag: v2.5.0
+-      tag: v2.5.1
 +      repository: harbor/harbor-registry
 +      digest: {{harbor/harbor-registry}}
      # resources:
@@ -1207,13 +1230,13 @@ index a7ca73d..4dea706 100644
    controller:
      image:
 -      repository: goharbor/harbor-registryctl
--      tag: v2.5.0
+-      tag: v2.5.1
 +      repository: harbor/harbor-registryctl
 +      digest: {{harbor/harbor-registryctl}}
  
      # resources:
      #  requests:
-@@ -584,7 +586,7 @@ registry:
+@@ -584,7 +584,7 @@ registry:
      dryrun: false
  
  chartmuseum:
@@ -1222,35 +1245,30 @@ index a7ca73d..4dea706 100644
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -592,8 +594,8 @@ chartmuseum:
+@@ -592,8 +592,8 @@ chartmuseum:
    # Harbor defaults ChartMuseum to returning relative urls, if you want using absolute url you should enable it by change the following value to 'true'
    absoluteUrl: false
    image:
 -    repository: goharbor/chartmuseum-photon
--    tag: v2.5.0
+-    tag: v2.5.1
 +    repository: harbor/harbor-chartmuseum
 +    digest: {{harbor/harbor-chartmuseum}}
    replicas: 1
    revisionHistoryLimit: 10
    # resources:
-@@ -612,12 +614,12 @@ chartmuseum:
- 
- trivy:
-   # enabled the flag to enable Trivy scanner
--  enabled: true
-+  enabled: true
+@@ -615,9 +615,8 @@ trivy:
+   enabled: true
    image:
      # repository the repository for Trivy adapter image
 -    repository: goharbor/trivy-adapter-photon
 -    # tag the tag for Trivy adapter image
--    tag: v2.5.0
+-    tag: v2.5.1
 +    repository: harbor/harbor-trivy
-+    # digest for Trivy adapter image
 +    digest: {{harbor/harbor-trivy}}
    # set the service account to be used, default if left empty
    serviceAccountName: ""
    # mount the service account token
-@@ -682,15 +684,15 @@ trivy:
+@@ -682,15 +681,15 @@ trivy:
    priorityClassName:
  
  notary:
@@ -1263,51 +1281,51 @@ index a7ca73d..4dea706 100644
      automountServiceAccountToken: false
      image:
 -      repository: goharbor/notary-server-photon
--      tag: v2.5.0
+-      tag: v2.5.1
 +      repository: harbor/harbor-notary-server
 +      digest: {{harbor/harbor-notary-server}}
      replicas: 1
      # resources:
      #  requests:
-@@ -709,8 +711,8 @@ notary:
+@@ -709,8 +708,8 @@ notary:
      # mount the service account token
      automountServiceAccountToken: false
      image:
 -      repository: goharbor/notary-signer-photon
--      tag: v2.5.0
+-      tag: v2.5.1
 +      repository: harbor/harbor-notary-signer
 +      digest: {{harbor/harbor-notary-signer}}
      replicas: 1
      # resources:
      #  requests:
-@@ -741,8 +743,8 @@ database:
+@@ -741,8 +740,8 @@ database:
      # mount the service account token
      automountServiceAccountToken: false
      image:
 -      repository: goharbor/harbor-db
--      tag: v2.5.0
+-      tag: v2.5.1
 +      repository: harbor/harbor-db
 +      digest: {{harbor/harbor-db}}
      # The initial superuser password for internal database
      password: "changeit"
      # The size limit for Shared memory, pgSQL use it for shared_buffer
-@@ -805,8 +807,8 @@ redis:
+@@ -805,8 +804,8 @@ redis:
      # mount the service account token
      automountServiceAccountToken: false
      image:
 -      repository: goharbor/redis-photon
--      tag: v2.5.0
+-      tag: v2.5.1
 +      repository: harbor/harbor-redis
 +      digest: {{harbor/harbor-redis}}
      # resources:
      #  requests:
      #    memory: 256Mi
-@@ -846,8 +848,8 @@ exporter:
+@@ -846,8 +845,8 @@ exporter:
    # mount the service account token
    automountServiceAccountToken: false
    image:
 -    repository: goharbor/harbor-exporter
--    tag: v2.5.0
+-    tag: v2.5.1
 +    repository: harbor/harbor-exporter
 +    digest: {{harbor/harbor-exporter}}
    nodeSelector: {}
