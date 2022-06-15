@@ -71,7 +71,10 @@ IMAGE_OS?=ubuntu
 IMAGE_FORMAT?=
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
 BUILD_OVA_TARGETS=setup-packer-configs-ova download-bottlerocket-ova $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova upload-bottlerocket-ova
-BUILD_RAW_TARGETS=release-raw-ubuntu-2004-efi download-bottlerocket-raw $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) $(FINAL_BOTTLEROCKET_RAW_PATH) upload-artifacts-raw upload-bottlerocket-raw
+BUILD_RAW_TARGETS=release-raw-ubuntu-2004-efi $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
+ifneq ($(RELEASE_BRANCH),1-20)
+	BUILD_RAW_TARGETS+= download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
+endif
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
 ifeq ($(IMAGE_FORMAT),ova)
 	ifeq ($(IMAGE_OS),ubuntu)
