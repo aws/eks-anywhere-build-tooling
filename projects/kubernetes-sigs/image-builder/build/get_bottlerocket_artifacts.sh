@@ -37,7 +37,7 @@ if [[ $FORMAT == "raw" ]]; then
 fi
 KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
 BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.${FORMAT}-release-version" $MAKE_ROOT/BOTTLEROCKET_RELEASES)
-if [[ BOTTLEROCKET_RELEASE_VERSION == "null" ]] ; then
+if [[ $BOTTLEROCKET_RELEASE_VERSION == "null" ]] ; then
   echo "Bottlerocket build for ${RELEASE_CHANNEL} is not enabled. Terminating silently."
   exit 0
 fi
