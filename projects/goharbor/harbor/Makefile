@@ -47,8 +47,8 @@ SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/stan
 BINARY_TARGET_FILES_BUILD_ALONE=harbor-core
 GO_MOD_PATHS=src src src src src src
 
-HARBOR_BASE_NAMESPACE=goharbor
-IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
+TRIVY_VERSION=$(TRIVYVERSION)
+IMAGE_BUILD_ARGS=TRIVY_VERSION
 
 PROJECT_DEPENDENCIES=eksa/distribution/distribution eksa/aquasecurity/trivy eksa/aquasecurity/harbor-scanner-trivy
 
