@@ -223,9 +223,8 @@ download-bottlerocket-%: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
 upload-bottlerocket-%: IMAGE_OS=bottlerocket
 upload-bottlerocket-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/bottlerocket
 upload-bottlerocket-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$*/bottlerocket
-upload-bottlerocket-%: s3-artifacts-%
-	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$* IMAGE_OS=bottlerocket
-
+upload-bottlerocket-%:
+	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT)
 
 .PHONY: release-raw-%
 release-raw-%: MAKEFLAGS=

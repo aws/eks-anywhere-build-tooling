@@ -36,27 +36,21 @@ if [[ $FORMAT == "raw" ]]; then
   VARIANT="metal"
 fi
 KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
-VSPHERE_BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.vsphereReleaseVersion" $MAKE_ROOT/BOTTLEROCKET_RELEASES)
-METAL_BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.metalReleaseVersion" $MAKE_ROOT/BOTTLEROCKET_RELEASES)
-if [[ $VSPHERE_BOTTLEROCKET_RELEASE_VERSION == "null" ]] && [[ $VARIANT == "vmware" ]]; then
-  echo "Bottlerocket build for ${RELEASE_CHANNEL} is not enabled. Terminating silently."
-  exit 0
-fi
-if [[ $METAL_BOTTLEROCKET_RELEASE_VERSION == "null" ]] && [[ $VARIANT == "metal" ]]; then
+BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.${FORMAT}-release-version" $MAKE_ROOT/BOTTLEROCKET_RELEASES)
+if [[ BOTTLEROCKET_RELEASE_VERSION == "null" ]] ; then
   echo "Bottlerocket build for ${RELEASE_CHANNEL} is not enabled. Terminating silently."
   exit 0
 fi
 
 BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/${VARIANT}-k8s-${KUBEVERSION}/x86_64/"
 BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
+OS_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/${FORMAT}
 TARGET=
 if [[ $VARIANT == "vmware" ]]; then
-  OS_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/ova
-  TARGET="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${VSPHERE_BOTTLEROCKET_RELEASE_VERSION}.ova"
+  TARGET="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
 fi
 if [[ $VARIANT == "metal" ]]; then
-  OS_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/raw
-  TARGET="bottlerocket-metal-k8s-${KUBEVERSION}-x86_64-${METAL_BOTTLEROCKET_RELEASE_VERSION}.img.lz4"
+  TARGET="bottlerocket-metal-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.img.lz4"
 fi
 rm -rf $OS_DOWNLOAD_PATH
 # Downloading the TARGET from the Bottlerocket target location using Tuftool
