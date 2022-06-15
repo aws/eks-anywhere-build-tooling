@@ -6,7 +6,7 @@
 
 ### Updating
 
-1. Update trivy tag when updating harbor tag if harbor is using a newer tag. Use the same tag that harbor uses by default. For instance [harbor v2.5.0 uses trivy v0.24.2 by default](https://github.com/goharbor/harbor/blob/v2.5.0/Makefile#L114) so when updating to harbor tag v2.5.0, update trivy tag to v0.24.2 or higher if security patching requires.
+1. Update trivy tag when updating harbor tag if harbor is using a newer tag. Use the same tag that harbor uses by default. For instance [harbor v2.5.1 uses trivy v0.26.0 by default](https://github.com/goharbor/harbor/blob/v2.5.1/Makefile#L114) so when updating to harbor tag v2.5.1, update trivy tag to v0.26.0 or higher if security patching requires.
 1. Review releases and changelogs in upstream [repo](https://github.com/aquasecurity/trivy) and decide on new version.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes. Check the `build` target for any build flag changes, tag changes, dependencies, etc. Check that the manifest target has not changed, this is called from our Makefile.
