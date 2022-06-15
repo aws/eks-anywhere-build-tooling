@@ -62,7 +62,8 @@ $CARGO_HOME/bin/tuftool download "${OS_DOWNLOAD_PATH}" \
 
 # Post processing for metal
 if [[ $VARIANT == "metal" ]]; then
-  lz4 -d ${OS_DOWNLOAD_PATH}/${TARGET}
-  gzip ${OS_DOWNLOAD_PATH}/"bottlerocket-metal-k8s-${KUBEVERSION}-x86_64-${METAL_BOTTLEROCKET_RELEASE_VERSION}.img"
+  BOTTLEROCKET_METAL_IMG="bottlerocket-metal-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.img"
+  lz4 --decompress ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_METAL_IMG}
+  gzip ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_METAL_IMG}
   rm -f ${OS_DOWNLOAD_PATH}/${TARGET}
 fi
