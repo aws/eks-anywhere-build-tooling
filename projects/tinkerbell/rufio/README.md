@@ -1,5 +1,5 @@
 ## **Rufio**
-![Version](https://img.shields.io/badge/version-4dc2085adc8eec03b73e51515515fa8966beba04-blue)
+![Version](https://img.shields.io/badge/version-599b7401b5ccda2cfacf004668006562cb3e541a-blue)
 
 [Rufio](https://github.com/tinkerbell/rufio) is a Kubernetes controller for managing baseboard management state and actions.
 
