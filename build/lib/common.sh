@@ -355,3 +355,15 @@ function retry() {
 function build::docker::retry_pull() {
   retry docker pull "$@"
 }
+
+function build::bottlerocket::check_release_availablilty() {
+  local release_file=$1
+  local release_channel=$2
+  local format=$3
+  retval=0
+  release_version=$(yq e ".${release_channel}.${format}-release-version" $release_file)
+  if [ $release_version == "null" ]; then
+    retval=1
+  fi
+  echo $retval
+}

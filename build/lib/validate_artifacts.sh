@@ -27,10 +27,11 @@ IMAGE_OS="${6:-}"
 
 EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts
 if [ -n "$IMAGE_FORMAT" ]; then
-    EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_$IMAGE_FORMAT
-fi
-if [ "$IMAGE_OS" = "bottlerocket" ]; then
-    EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts_ova_bottlerocket
+  if [ "$IMAGE_OS" = "bottlerocket" ]; then
+    EXPECTED_FILES_PATH=${PROJECT_ROOT}/expected-artifacts/expected_artifacts_${IMAGE_FORMAT}_bottlerocket
+  else
+    EXPECTED_FILES_PATH=${PROJECT_ROOT}/expected-artifacts/expected_artifacts_${IMAGE_FORMAT}
+  fi
 fi
 
 ACTUAL_FILES=$(mktemp)
@@ -58,4 +59,3 @@ if ! diff -q <(sort "$EXPECTED_FILES") <(sort "$ACTUAL_FILES"); then
     diff -y <(sort "$EXPECTED_FILES") <(sort "$ACTUAL_FILES")
     exit 1
 fi
-
