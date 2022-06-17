@@ -7,7 +7,8 @@
 
 1. Review commits upstream [repo](https://github.com/tinkerbell/hook) and decide on new release tag or commit to track.
 1. Update the `GIT_TAG` file to have the new desired tag or commit based on upstream.
-1. Verify the golang version has not changed. Currently for `bootkit` and `tink-docker` the version mentioned in a [dockerfile](https://github.com/tinkerbell/hook/blob/5.10.57/tink-docker/Dockerfile#L3) of the respective projects is being used to build.
+1. Update the 'LINUX_KERNEL_VERSION' file to the kernel version tracked in [hook.yaml](https://github.com/tinkerbell/hook/blob/029ef8f0711579717bfd14ac5eb63cdc3e658b1d/hook.yaml#L2)
+1. Verify the golang version has not changed. Currently for `bootkit` and `tink-docker` the version mentioned in a [dockerfile](https://github.com/tinkerbell/hook/blob/029ef8f0711579717bfd14ac5eb63cdc3e658b1d/tink-docker/Dockerfile#L3) of the respective projects is being used to build.
 1. Verify no changes have been made to the dockerfile for each image. Looking specifically for added runtime deps.
 1. `tink-docker` image has docker runtime. Hence, verify no new changes have been made with docker version updates.
 1. Update checksums and attribution using `make update-attribution-checksums-docker`.
@@ -16,6 +17,6 @@
 
 ### Development
 1. The project consists of 3 images. `bootkit`, `tink-docker` and `kernel`.
-1. For `kernel`, the image builds off upstream. The `hook` project uses the kernel.org [linux 5.10.57 kernel](https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.10.57.tar.xz) to build an image.
+1. For `kernel`, the image builds off upstream. The `hook` project uses the kernel.org [linux 5.10.85 kernel](https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.10.85.tar.xz) to build an image.
 1. For building the in-memory OSIE files, `hook` uses [linuxkit](https://github.com/linuxkit/linuxkit). `Linuxkit build` expects the project images to be present in the repository represented by `IMAGE_REPO` variable.
 1. To build locally, we suggest using a local registry and setting `IMAGE_REPO` variable.

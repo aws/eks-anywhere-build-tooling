@@ -1,6 +1,7 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.15"
+LINUX_KERNEL_VERSION:=$(shell cat LINUX_KERNEL_VERSION)
+GOLANG_VERSION?="1.17"
 
 REPO=hook
 REPO_OWNER=tinkerbell
@@ -44,7 +45,7 @@ tink-docker/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
 
 # Currently the kernel image is being built off upstream.
 # TODO: Setup a build environment to build the linux kernel.
-kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:5.10.57
+kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:$(LINUX_KERNEL_VERSION)
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
