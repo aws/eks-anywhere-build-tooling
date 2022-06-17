@@ -1,0 +1,21 @@
+{{- if .Values.hegel.deploy }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ .Values.hegel.name }}
+  name: {{ .Values.hegel.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  ports:
+  - port: {{ .Values.hegel.port.hostPort }}
+    protocol: TCP
+    targetPort: {{ .Values.hegel.port.hostPort }}
+  selector:
+    app: {{ .Values.hegel.name }}
+  {{- if .Values.loadBalancer.enabled }}
+  type: LoadBalancer
+  loadBalancerIP: {{ .Values.loadBalancer.ip }}
+  externalTrafficPolicy: Local
+  {{- end }}
+{{- end }}
