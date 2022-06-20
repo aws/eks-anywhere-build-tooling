@@ -19,9 +19,14 @@ set -o nounset
 set -o pipefail
 
 RETURN=0
+SED=sed
+if [ "$(uname -s)" = "Darwin" ]; then
+    SED=gsed
+fi
+
 for GIT_TAG_FILE in projects/*/*/GIT_TAG
 do
-    VERSION="$(cat $GIT_TAG_FILE)"
+    VERSION="$(cat $GIT_TAG_FILE | $SED "s,-,--,g")"
     README="$(dirname $GIT_TAG_FILE)/README.md"
     if [ ! -f $README ]
     then
@@ -39,7 +44,7 @@ do
         continue
     fi
     RETURN=-1
-    ACTUAL_VERSION=$(grep "img.shields.io/badge/version" ${README} | sed -e 's,.*img.shields.io/badge/version-,,' -e 's/-blue).*$//')
+    ACTUAL_VERSION=$(grep "img.shields.io/badge/version" ${README} | $SED -e 's,.*img.shields.io/badge/version-,,' -e 's/-blue).*$//')
     echo "Version mismatch $README expected $VERSION actual $ACTUAL_VERSION"
-    sed -i -e "s/$ACTUAL_VERSION/$VERSION/" $README
+    $SED -i -e "s/$ACTUAL_VERSION/$VERSION/" $README
 done
