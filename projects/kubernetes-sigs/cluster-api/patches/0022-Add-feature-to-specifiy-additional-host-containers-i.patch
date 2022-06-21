@@ -1,0 +1,738 @@
+From bb98c3529a3a4e9c0e979cad3b49fbdef4843c0c Mon Sep 17 00:00:00 2001
+From: Victor Pineda <vgonzla@amazon.com>
+Date: Tue, 21 Jun 2022 07:50:19 -0700
+Subject: [PATCH 22/22] Add feature to specifiy additional host containers in
+ BR
+
+Host containers are a feature within BR that allows us to pull images
+without the need of having to bootstrap kuberentes. Such containers can
+be superpowered and user-data can be attached to each one of them. As
+such, this commit creates the `BottlerocketHostContainer` struct to allow
+the user to customize the those fields. Users can specify an arbitrary
+number of host containers in the `AdditionalHostContainers` field.
+
+This commit also does some refactoring around the templating system BR
+has to generate the TOML files. It generifies the host-container
+template to be reused as much as a user wants to.
+
+SIM: https://i.amazon.com/P66557529
+cr: https://code.amazon.com/reviews/CR-71408825
+---
+ .../kubeadm/api/v1beta1/kubeadm_types.go      | 25 ++++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 84 +++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 86 ++++++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        | 36 ++++----
+ .../internal/bottlerocket/bottlerocket.go     | 88 ++++++++++++------
+ .../controllers/kubeadmconfig_controller.go   | 21 +++--
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 86 ++++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 90 +++++++++++++++++++
+ 8 files changed, 460 insertions(+), 56 deletions(-)
+
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+index a009e3748..a1967d022 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+@@ -156,6 +156,11 @@ type ClusterConfiguration struct {
+ 	// The cluster name
+ 	// +optional
+ 	ClusterName string `json:"clusterName,omitempty"`
++
++	// AdditionalHostContainers contains the information of any additional images
++	// that we will deploy as host images in the CPIs
++	// +optional
++	AdditionalHostContainers []BottlerocketHostContainer `json:"additionalHostContainers,omitempty"`
+ }
+ 
+ // Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
+@@ -459,6 +464,26 @@ type JoinConfiguration struct {
+ 	// "kubeadm join". The minimum kubernetes version needed to support Patches is v1.22
+ 	// +optional
+ 	Patches *Patches `json:"patches,omitempty"`
++
++	// AdditionalHostContainers contains the information of any additional images
++	// that we will deploy as host images in the CPIs
++	// +optional
++	AdditionalHostContainers []BottlerocketHostContainer `json:"additionalHostContainers,omitempty"`
++}
++
++// BottlerocketHostContainer describes a host image for Bottlerocket
++type BottlerocketHostContainer struct {
++	// Name is the host container name that will be given to the container in BR's `apiserver`
++	// +kubebuilder:validation:Required
++	Name string `json:"name"`
++	// Superpowered indicates if the container will be superpowered
++	// +kubebuilder:validation:Required
++	Superpowered bool `json:"superpowered"`
++	// ImageMeta is the actual location of the container image
++	ImageMeta `json:"source"`
++	// UserData is the userdata that will be attached to the image.
++	// +optional
++	UserData string `json:"userData,omitempty"`
+ }
+ 
+ // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index 67abfc66d..44cd81205 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -2305,6 +2305,48 @@ spec:
+                 description: ClusterConfiguration along with InitConfiguration are
+                   the configurations necessary for the init command
+                 properties:
++                  additionalHostContainers:
++                    description: AdditionalHostContainers contains the information
++                      of any additional images that we will deploy as host images
++                      in the CPIs
++                    items:
++                      description: BottlerocketHostContainer describes a host image
++                        for Bottlerocket
++                      properties:
++                        name:
++                          description: Name is the host container name that will be
++                            given to the container in BR's `apiserver`
++                          type: string
++                        source:
++                          description: ImageMeta is the actual location of the container
++                            image
++                          properties:
++                            imageRepository:
++                              description: ImageRepository sets the container registry
++                                to pull images from. if not set, the ImageRepository
++                                defined in ClusterConfiguration will be used instead.
++                              type: string
++                            imageTag:
++                              description: ImageTag allows to specify a tag for the
++                                image. In case this value is set, kubeadm does not
++                                change automatically the version of the above components
++                                during upgrades.
++                              type: string
++                          type: object
++                        superpowered:
++                          description: Superpowered indicates if the container will
++                            be superpowered
++                          type: boolean
++                        userData:
++                          description: UserData is the userdata that will be attached
++                            to the image.
++                          type: string
++                      required:
++                      - name
++                      - source
++                      - superpowered
++                      type: object
++                    type: array
+                   apiServer:
+                     description: APIServer contains extra settings for the API server
+                       control plane component
+@@ -3023,6 +3065,48 @@ spec:
+                 description: JoinConfiguration is the kubeadm configuration for the
+                   join command
+                 properties:
++                  additionalHostContainers:
++                    description: AdditionalHostContainers contains the information
++                      of any additional images that we will deploy as host images
++                      in the CPIs
++                    items:
++                      description: BottlerocketHostContainer describes a host image
++                        for Bottlerocket
++                      properties:
++                        name:
++                          description: Name is the host container name that will be
++                            given to the container in BR's `apiserver`
++                          type: string
++                        source:
++                          description: ImageMeta is the actual location of the container
++                            image
++                          properties:
++                            imageRepository:
++                              description: ImageRepository sets the container registry
++                                to pull images from. if not set, the ImageRepository
++                                defined in ClusterConfiguration will be used instead.
++                              type: string
++                            imageTag:
++                              description: ImageTag allows to specify a tag for the
++                                image. In case this value is set, kubeadm does not
++                                change automatically the version of the above components
++                                during upgrades.
++                              type: string
++                          type: object
++                        superpowered:
++                          description: Superpowered indicates if the container will
++                            be superpowered
++                          type: boolean
++                        userData:
++                          description: UserData is the userdata that will be attached
++                            to the image.
++                          type: string
++                      required:
++                      - name
++                      - source
++                      - superpowered
++                      type: object
++                    type: array
+                   apiVersion:
+                     description: 'APIVersion defines the versioned schema of this
+                       representation of an object. Servers should convert recognized
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 15d4c5aa9..ce89181d0 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -2314,6 +2314,49 @@ spec:
+                         description: ClusterConfiguration along with InitConfiguration
+                           are the configurations necessary for the init command
+                         properties:
++                          additionalHostContainers:
++                            description: AdditionalHostContainers contains the information
++                              of any additional images that we will deploy as host
++                              images in the CPIs
++                            items:
++                              description: BottlerocketHostContainer describes a host
++                                image for Bottlerocket
++                              properties:
++                                name:
++                                  description: Name is the host container name that
++                                    will be given to the container in BR's `apiserver`
++                                  type: string
++                                source:
++                                  description: ImageMeta is the actual location of
++                                    the container image
++                                  properties:
++                                    imageRepository:
++                                      description: ImageRepository sets the container
++                                        registry to pull images from. if not set,
++                                        the ImageRepository defined in ClusterConfiguration
++                                        will be used instead.
++                                      type: string
++                                    imageTag:
++                                      description: ImageTag allows to specify a tag
++                                        for the image. In case this value is set,
++                                        kubeadm does not change automatically the
++                                        version of the above components during upgrades.
++                                      type: string
++                                  type: object
++                                superpowered:
++                                  description: Superpowered indicates if the container
++                                    will be superpowered
++                                  type: boolean
++                                userData:
++                                  description: UserData is the userdata that will
++                                    be attached to the image.
++                                  type: string
++                              required:
++                              - name
++                              - source
++                              - superpowered
++                              type: object
++                            type: array
+                           apiServer:
+                             description: APIServer contains extra settings for the
+                               API server control plane component
+@@ -3080,6 +3123,49 @@ spec:
+                         description: JoinConfiguration is the kubeadm configuration
+                           for the join command
+                         properties:
++                          additionalHostContainers:
++                            description: AdditionalHostContainers contains the information
++                              of any additional images that we will deploy as host
++                              images in the CPIs
++                            items:
++                              description: BottlerocketHostContainer describes a host
++                                image for Bottlerocket
++                              properties:
++                                name:
++                                  description: Name is the host container name that
++                                    will be given to the container in BR's `apiserver`
++                                  type: string
++                                source:
++                                  description: ImageMeta is the actual location of
++                                    the container image
++                                  properties:
++                                    imageRepository:
++                                      description: ImageRepository sets the container
++                                        registry to pull images from. if not set,
++                                        the ImageRepository defined in ClusterConfiguration
++                                        will be used instead.
++                                      type: string
++                                    imageTag:
++                                      description: ImageTag allows to specify a tag
++                                        for the image. In case this value is set,
++                                        kubeadm does not change automatically the
++                                        version of the above components during upgrades.
++                                      type: string
++                                  type: object
++                                superpowered:
++                                  description: Superpowered indicates if the container
++                                    will be superpowered
++                                  type: boolean
++                                userData:
++                                  description: UserData is the userdata that will
++                                    be attached to the image.
++                                  type: string
++                              required:
++                              - name
++                              - source
++                              - superpowered
++                              type: object
++                            type: array
+                           apiVersion:
+                             description: 'APIVersion defines the versioned schema
+                               of this representation of an object. Servers should
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index efdb51fef..ad1ba9e03 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -3,12 +3,6 @@
+ package bottlerocket
+ 
+ const (
+-	adminContainerInitTemplate = `{{ define "adminContainerInitSettings" -}}
+-[settings.host-containers.admin]
+-enabled = true
+-user-data = "{{.AdminContainerUserData}}"
+-{{- end -}}
+-`
+ 	kubernetesInitTemplate = `{{ define "kubernetesInitSettings" -}}
+ [settings.kubernetes]
+ cluster-domain = "cluster.local"
+@@ -22,14 +16,26 @@ provider-id = "{{.ProviderId}}"
+ {{- end -}}
+ `
+ 
+-	bootstrapHostContainerTemplate = `{{define "bootstrapHostContainerSettings" -}}
+-[settings.host-containers.kubeadm-bootstrap]
++	hostContainerTemplate = `{{define "hostContainerSettings" -}}
++[settings.host-containers.{{.Name}}]
+ enabled = true
+-superpowered = true
+-source = "{{.BootstrapContainerSource}}"
+-user-data = "{{.BootstrapContainerUserData}}"
++superpowered = {{.Superpowered}}
++{{- if (ne (imageUrl .ImageMeta) "")}}
++source = "{{imageUrl .ImageMeta}}"
++{{- end -}}
++{{- if (ne .UserData "")}}
++user-data = "{{.UserData}}"
++{{- end -}}
+ {{- end -}}
+ `
++
++	hostContainerSliceTemplate = `{{define "hostContainerSlice" -}}
++{{- range $hContainer := .HostContainers }}
++{{template "hostContainerSettings" $hContainer }}
++{{- end -}}
++{{- end -}}
++`
++
+ 	networkInitTemplate = `{{ define "networkInitSettings" -}}
+ [settings.network]
+ https-proxy = "{{.HTTPSProxyEndpoint}}"
+@@ -66,9 +72,7 @@ source = "{{.ControlContainerSource}}"
+ {{- end -}}
+ `
+ 
+-	bottlerocketNodeInitSettingsTemplate = `{{template "bootstrapHostContainerSettings" .}}
+-
+-{{template "adminContainerInitSettings" .}}
++	bottlerocketNodeInitSettingsTemplate = `{{template "hostContainerSlice" .}}
+ 
+ {{template "kubernetesInitSettings" .}}
+ 
+@@ -91,9 +95,5 @@ source = "{{.ControlContainerSource}}"
+ {{- if (ne .Taints "")}}
+ {{template "taintsTemplate" .}}
+ {{- end -}}
+-
+-{{- if (ne .ControlContainerSource "")}}
+-{{template "controlContainerSettings" .}}
+-{{- end -}}
+ `
+ )
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 3a760d51a..ee5d3bc0a 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -30,21 +30,19 @@ type BottlerocketConfig struct {
+ 	RegistryMirrorConfiguration bootstrapv1.RegistryMirrorConfiguration
+ 	KubeletExtraArgs            map[string]string
+ 	Taints                      []corev1.Taint
++	AdditionalHostContainers    []bootstrapv1.BottlerocketHostContainer
+ }
+ 
+ type BottlerocketSettingsInput struct {
+-	BootstrapContainerUserData string
+-	AdminContainerUserData     string
+-	BootstrapContainerSource   string
+-	ControlContainerSource     string
+-	PauseContainerSource       string
+-	HTTPSProxyEndpoint         string
+-	NoProxyEndpoints           []string
+-	RegistryMirrorEndpoint     string
+-	RegistryMirrorCACert       string
+-	NodeLabels                 string
+-	Taints                     string
+-	ProviderId                 string
++	PauseContainerSource   string
++	HTTPSProxyEndpoint     string
++	NoProxyEndpoints       []string
++	RegistryMirrorEndpoint string
++	RegistryMirrorCACert   string
++	NodeLabels             string
++	Taints                 string
++	ProviderId             string
++	HostContainers         []bootstrapv1.BottlerocketHostContainer
+ }
+ 
+ type HostPath struct {
+@@ -87,13 +85,23 @@ func generateAdminContainerUserData(kind string, tpl string, data interface{}) (
+ 	return out.Bytes(), nil
+ }
+ 
++func imageUrl(containerLocation bootstrapv1.ImageMeta) string {
++	if containerLocation.ImageRepository != "" && containerLocation.ImageTag != "" {
++		return fmt.Sprintf("%s:%s", containerLocation.ImageRepository, containerLocation.ImageTag)
++	}
++	return ""
++}
++
+ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, error) {
+-	tm := template.New(kind).Funcs(template.FuncMap{"stringsJoin": strings.Join})
+-	if _, err := tm.Parse(bootstrapHostContainerTemplate); err != nil {
+-		return nil, errors.Wrapf(err, "failed to parse hostContainer %s template", kind)
++	tm := template.New(kind).Funcs(template.FuncMap{
++		"stringsJoin": strings.Join,
++		"imageUrl":    imageUrl,
++	})
++	if _, err := tm.Parse(hostContainerTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse hostContainerSettings %s template", kind)
+ 	}
+-	if _, err := tm.Parse(adminContainerInitTemplate); err != nil {
+-		return nil, errors.Wrapf(err, "failed to parse adminContainer %s template", kind)
++	if _, err := tm.Parse(hostContainerSliceTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse hostContainerSettingsSlice %s template", kind)
+ 	}
+ 	if _, err := tm.Parse(controlContainerTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse controlContainer %s template", kind)
+@@ -143,20 +151,42 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 	}
+ 	b64AdminContainerUserData := base64.StdEncoding.EncodeToString(adminContainerUserData)
+ 
+-	bottlerocketInput := &BottlerocketSettingsInput{
+-		BootstrapContainerUserData: b64BootstrapContainerUserData,
+-		AdminContainerUserData:     b64AdminContainerUserData,
+-		BootstrapContainerSource:   fmt.Sprintf("%s:%s", config.BottlerocketBootstrap.ImageRepository, config.BottlerocketBootstrap.ImageTag),
+-		PauseContainerSource:       fmt.Sprintf("%s:%s", config.Pause.ImageRepository, config.Pause.ImageTag),
+-		HTTPSProxyEndpoint:         config.ProxyConfiguration.HTTPSProxy,
+-		RegistryMirrorEndpoint:     config.RegistryMirrorConfiguration.Endpoint,
+-		NodeLabels:                 parseNodeLabels(config.KubeletExtraArgs["node-labels"]), // empty string if it does not exist
+-		Taints:                     parseTaints(config.Taints), //empty string if it does not exist
+-		ProviderId:                 config.KubeletExtraArgs["provider-id"],
++	hostContainers := []bootstrapv1.BottlerocketHostContainer{
++		{
++			Name:         "admin",
++			Superpowered: true,
++			UserData:     b64AdminContainerUserData,
++		},
++		{
++			Name:         "kubeadm-bootstrap",
++			Superpowered: true,
++			ImageMeta:    config.BottlerocketBootstrap.ImageMeta,
++			UserData:     b64BootstrapContainerUserData,
++		},
+ 	}
++
+ 	if config.BottlerocketControl.ImageRepository != "" && config.BottlerocketControl.ImageTag != "" {
+-		bottlerocketInput.ControlContainerSource = fmt.Sprintf("%s:%s", config.BottlerocketControl.ImageRepository, config.BottlerocketControl.ImageTag)
++		hostContainers = append(hostContainers, bootstrapv1.BottlerocketHostContainer{
++			Name:         "control",
++			Superpowered: false,
++			ImageMeta:    config.BottlerocketControl.ImageMeta,
++		})
+ 	}
++
++	if len(config.AdditionalHostContainers) != 0 {
++		hostContainers = append(hostContainers, config.AdditionalHostContainers...)
++	}
++
++	bottlerocketInput := &BottlerocketSettingsInput{
++		PauseContainerSource:   fmt.Sprintf("%s:%s", config.Pause.ImageRepository, config.Pause.ImageTag),
++		HTTPSProxyEndpoint:     config.ProxyConfiguration.HTTPSProxy,
++		RegistryMirrorEndpoint: config.RegistryMirrorConfiguration.Endpoint,
++		NodeLabels:             parseNodeLabels(config.KubeletExtraArgs["node-labels"]), // empty string if it does not exist
++		Taints:                 parseTaints(config.Taints),                              //empty string if it does not exist
++		ProviderId:             config.KubeletExtraArgs["provider-id"],
++		HostContainers:         hostContainers,
++	}
++
+ 	if len(config.ProxyConfiguration.NoProxy) > 0 {
+ 		for _, noProxy := range config.ProxyConfiguration.NoProxy {
+ 			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
+@@ -183,7 +213,7 @@ func parseTaints(taints []corev1.Taint) string {
+ 	taintsMap := make(map[string][]string)
+ 	for _, taint := range taints {
+ 		valueEffectString := fmt.Sprintf(taintValueEffectTemplate, taint.Value, taint.Effect)
+-		taintsMap[taint.Key]= append(taintsMap[taint.Key], valueEffectString)
++		taintsMap[taint.Key] = append(taintsMap[taint.Key], valueEffectString)
+ 	}
+ 
+ 	var taintsToml strings.Builder
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index c2ab43421..de2d389fd 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -450,9 +450,10 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		}
+ 
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
++			Pause:                    scope.Config.Spec.ClusterConfiguration.Pause,
++			BottlerocketBootstrap:    scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:      scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
++			AdditionalHostContainers: scope.Config.Spec.ClusterConfiguration.AdditionalHostContainers,
+ 		}
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
+@@ -621,9 +622,10 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		})
+ 	case bootstrapv1.Bottlerocket:
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			Pause:                    scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap:    scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:      scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			AdditionalHostContainers: scope.Config.Spec.JoinConfiguration.AdditionalHostContainers,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+@@ -740,9 +742,10 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		})
+ 	case bootstrapv1.Bottlerocket:
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			Pause:                    scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap:    scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:      scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			AdditionalHostContainers: scope.Config.Spec.JoinConfiguration.AdditionalHostContainers,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index a71635141..e9aac0a1c 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -2771,6 +2771,49 @@ spec:
+                     description: ClusterConfiguration along with InitConfiguration
+                       are the configurations necessary for the init command
+                     properties:
++                      additionalHostContainers:
++                        description: AdditionalHostContainers contains the information
++                          of any additional images that we will deploy as host images
++                          in the CPIs
++                        items:
++                          description: BottlerocketHostContainer describes a host
++                            image for Bottlerocket
++                          properties:
++                            name:
++                              description: Name is the host container name that will
++                                be given to the container in BR's `apiserver`
++                              type: string
++                            source:
++                              description: ImageMeta is the actual location of the
++                                container image
++                              properties:
++                                imageRepository:
++                                  description: ImageRepository sets the container
++                                    registry to pull images from. if not set, the
++                                    ImageRepository defined in ClusterConfiguration
++                                    will be used instead.
++                                  type: string
++                                imageTag:
++                                  description: ImageTag allows to specify a tag for
++                                    the image. In case this value is set, kubeadm
++                                    does not change automatically the version of the
++                                    above components during upgrades.
++                                  type: string
++                              type: object
++                            superpowered:
++                              description: Superpowered indicates if the container
++                                will be superpowered
++                              type: boolean
++                            userData:
++                              description: UserData is the userdata that will be attached
++                                to the image.
++                              type: string
++                          required:
++                          - name
++                          - source
++                          - superpowered
++                          type: object
++                        type: array
+                       apiServer:
+                         description: APIServer contains extra settings for the API
+                           server control plane component
+@@ -3517,6 +3560,49 @@ spec:
+                     description: JoinConfiguration is the kubeadm configuration for
+                       the join command
+                     properties:
++                      additionalHostContainers:
++                        description: AdditionalHostContainers contains the information
++                          of any additional images that we will deploy as host images
++                          in the CPIs
++                        items:
++                          description: BottlerocketHostContainer describes a host
++                            image for Bottlerocket
++                          properties:
++                            name:
++                              description: Name is the host container name that will
++                                be given to the container in BR's `apiserver`
++                              type: string
++                            source:
++                              description: ImageMeta is the actual location of the
++                                container image
++                              properties:
++                                imageRepository:
++                                  description: ImageRepository sets the container
++                                    registry to pull images from. if not set, the
++                                    ImageRepository defined in ClusterConfiguration
++                                    will be used instead.
++                                  type: string
++                                imageTag:
++                                  description: ImageTag allows to specify a tag for
++                                    the image. In case this value is set, kubeadm
++                                    does not change automatically the version of the
++                                    above components during upgrades.
++                                  type: string
++                              type: object
++                            superpowered:
++                              description: Superpowered indicates if the container
++                                will be superpowered
++                              type: boolean
++                            userData:
++                              description: UserData is the userdata that will be attached
++                                to the image.
++                              type: string
++                          required:
++                          - name
++                          - source
++                          - superpowered
++                          type: object
++                        type: array
+                       apiVersion:
+                         description: 'APIVersion defines the versioned schema of this
+                           representation of an object. Servers should convert recognized
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index b60dcae96..cde7dfa0a 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -1380,6 +1380,51 @@ spec:
+                             description: ClusterConfiguration along with InitConfiguration
+                               are the configurations necessary for the init command
+                             properties:
++                              additionalHostContainers:
++                                description: AdditionalHostContainers contains the
++                                  information of any additional images that we will
++                                  deploy as host images in the CPIs
++                                items:
++                                  description: BottlerocketHostContainer describes
++                                    a host image for Bottlerocket
++                                  properties:
++                                    name:
++                                      description: Name is the host container name
++                                        that will be given to the container in BR's
++                                        `apiserver`
++                                      type: string
++                                    source:
++                                      description: ImageMeta is the actual location
++                                        of the container image
++                                      properties:
++                                        imageRepository:
++                                          description: ImageRepository sets the container
++                                            registry to pull images from. if not set,
++                                            the ImageRepository defined in ClusterConfiguration
++                                            will be used instead.
++                                          type: string
++                                        imageTag:
++                                          description: ImageTag allows to specify
++                                            a tag for the image. In case this value
++                                            is set, kubeadm does not change automatically
++                                            the version of the above components during
++                                            upgrades.
++                                          type: string
++                                      type: object
++                                    superpowered:
++                                      description: Superpowered indicates if the container
++                                        will be superpowered
++                                      type: boolean
++                                    userData:
++                                      description: UserData is the userdata that will
++                                        be attached to the image.
++                                      type: string
++                                  required:
++                                  - name
++                                  - source
++                                  - superpowered
++                                  type: object
++                                type: array
+                               apiServer:
+                                 description: APIServer contains extra settings for
+                                   the API server control plane component
+@@ -2179,6 +2224,51 @@ spec:
+                             description: JoinConfiguration is the kubeadm configuration
+                               for the join command
+                             properties:
++                              additionalHostContainers:
++                                description: AdditionalHostContainers contains the
++                                  information of any additional images that we will
++                                  deploy as host images in the CPIs
++                                items:
++                                  description: BottlerocketHostContainer describes
++                                    a host image for Bottlerocket
++                                  properties:
++                                    name:
++                                      description: Name is the host container name
++                                        that will be given to the container in BR's
++                                        `apiserver`
++                                      type: string
++                                    source:
++                                      description: ImageMeta is the actual location
++                                        of the container image
++                                      properties:
++                                        imageRepository:
++                                          description: ImageRepository sets the container
++                                            registry to pull images from. if not set,
++                                            the ImageRepository defined in ClusterConfiguration
++                                            will be used instead.
++                                          type: string
++                                        imageTag:
++                                          description: ImageTag allows to specify
++                                            a tag for the image. In case this value
++                                            is set, kubeadm does not change automatically
++                                            the version of the above components during
++                                            upgrades.
++                                          type: string
++                                      type: object
++                                    superpowered:
++                                      description: Superpowered indicates if the container
++                                        will be superpowered
++                                      type: boolean
++                                    userData:
++                                      description: UserData is the userdata that will
++                                        be attached to the image.
++                                      type: string
++                                  required:
++                                  - name
++                                  - source
++                                  - superpowered
++                                  type: object
++                                type: array
+                               apiVersion:
+                                 description: 'APIVersion defines the versioned schema
+                                   of this representation of an object. Servers should
+-- 
+2.32.0
+
