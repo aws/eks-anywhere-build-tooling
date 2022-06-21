@@ -16,6 +16,10 @@ IMAGE_NAMES=controller speaker
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 
+HAS_HELM_CHART=true
+HELM_DIRECTORY=charts/metallb
+HELM_DESTINATION_REPOSITORY=metallb/metallb
+HELM_IMAGE_LIST=metallb/controller metallb/speaker
 
 include $(BASE_DIRECTORY)/Common.mk
 
