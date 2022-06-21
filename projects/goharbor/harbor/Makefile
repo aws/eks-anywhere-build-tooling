@@ -3,8 +3,8 @@ GIT_TAG:=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.17"
 REGISTRYVERSION=2.8.1-patch-redis
 NOTARYVERSION=v0.6.1
-TRIVYVERSION=v0.24.2
-TRIVYADAPTERVERSION=v0.26.0
+TRIVYVERSION=v0.28.1
+TRIVYADAPTERVERSION=v0.29.0
 CHARTMUSEUM_SRC_TAG=v0.14.0
 CHARTMUSEUMVERSION=$(CHARTMUSEUM_SRC_TAG)-redis
 
@@ -47,8 +47,8 @@ SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/stan
 BINARY_TARGET_FILES_BUILD_ALONE=harbor-core
 GO_MOD_PATHS=src src src src src src
 
-HARBOR_BASE_NAMESPACE=goharbor
-IMAGE_BUILD_ARGS=HARBOR_BASE_NAMESPACE
+TRIVY_VERSION=$(TRIVYVERSION)
+IMAGE_BUILD_ARGS=TRIVY_VERSION
 
 PROJECT_DEPENDENCIES=eksa/distribution/distribution eksa/aquasecurity/trivy eksa/aquasecurity/harbor-scanner-trivy
 
@@ -56,7 +56,7 @@ FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICE
 
 HAS_HELM_CHART=true
 
-HELM_GIT_TAG=v1.9.0
+HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
 HELM_SOURCE_REPOSITORY=harbor-helm
 HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
 HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-exporter harbor/harbor-jobservice harbor/harbor-nginx harbor/harbor-portal harbor/harbor-redis harbor/harbor-registry harbor/harbor-registryctl harbor/harbor-trivy

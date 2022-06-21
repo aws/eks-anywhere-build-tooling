@@ -90,6 +90,7 @@ validate-generated: generate
 		git diff -- UPSTREAM_PROJECTS.yaml release/staging-build.yml; \
 		exit 1; \
 	fi
+	build/lib/readme_check.sh
 
 .PHONY: check-project-path-exists
 check-project-path-exists:

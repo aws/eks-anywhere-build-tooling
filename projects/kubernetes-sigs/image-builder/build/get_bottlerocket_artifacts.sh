@@ -20,7 +20,7 @@ set -o pipefail
 
 
 RELEASE_CHANNEL="${1?Specify first argument - EKS-D release channel}"
-OS="${2?Specify second argument - base os of ova built}"
+FORMAT="${2?Specify second argument - Image format}"
 BOTTLEROCKET_DOWNLOAD_PATH="${3?Specify third argument - Download path for Bottlerocket-related files}"
 CARGO_HOME="${4?Specify fourth argument - Root directory for Cargo installation}"
 PROJECT_PATH="${5?Specify fifth argument - Project path}"
@@ -30,23 +30,40 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
 # Setting version and URL parameters for downloading the OVA
-OVA_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/ova
+OS_DOWNLOAD_PATH=
+VARIANT="vmware"
+if [[ $FORMAT == "raw" ]]; then
+  VARIANT="metal"
+fi
 KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
-BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.releaseVersion" $MAKE_ROOT/BOTTLEROCKET_OVA_RELEASES)
-if [[ $BOTTLEROCKET_RELEASE_VERSION == "null" ]]; then
+BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.${FORMAT}-release-version" $MAKE_ROOT/BOTTLEROCKET_RELEASES)
+if [[ $BOTTLEROCKET_RELEASE_VERSION == "null" ]] ; then
   echo "Bottlerocket build for ${RELEASE_CHANNEL} is not enabled. Terminating silently."
-  mkdir -p $OVA_DOWNLOAD_PATH
-  touch $OVA_DOWNLOAD_PATH/temp_fake.ova
   exit 0
 fi
-OVA="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
-BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/vmware-k8s-${KUBEVERSION}/x86_64/"
-BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
 
-rm -rf $OVA_DOWNLOAD_PATH
-# Downloading the OVA from the Bottlerocket target location using Tuftool
-$CARGO_HOME/bin/tuftool download "${OVA_DOWNLOAD_PATH}" \
-    --target-name "${OVA}" \
+BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/${VARIANT}-k8s-${KUBEVERSION}/x86_64/"
+BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
+OS_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/${FORMAT}
+TARGET=
+if [[ $VARIANT == "vmware" ]]; then
+  TARGET="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
+fi
+if [[ $VARIANT == "metal" ]]; then
+  TARGET="bottlerocket-metal-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.img.lz4"
+fi
+rm -rf $OS_DOWNLOAD_PATH
+# Downloading the TARGET from the Bottlerocket target location using Tuftool
+$CARGO_HOME/bin/tuftool download "${OS_DOWNLOAD_PATH}" \
+    --target-name "${TARGET}" \
     --root "${BOTTLEROCKET_DOWNLOAD_PATH}/root.json" \
     --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
     --targets-url "${BOTTLEROCKET_TARGETS_URL}"
+
+# Post processing for metal
+if [[ $VARIANT == "metal" ]]; then
+  BOTTLEROCKET_METAL_IMG="bottlerocket-metal-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.img"
+  lz4 --decompress ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_METAL_IMG}
+  gzip ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_METAL_IMG}
+  rm -f ${OS_DOWNLOAD_PATH}/${TARGET}
+fi
