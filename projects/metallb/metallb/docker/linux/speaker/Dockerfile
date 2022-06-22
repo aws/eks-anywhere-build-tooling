@@ -9,6 +9,5 @@ COPY _output/bin/metallb/$TARGETOS-$TARGETARCH/speaker /opt/metallb/speaker
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
-USER 1000
 
 ENTRYPOINT ["/opt/metallb/speaker"]
