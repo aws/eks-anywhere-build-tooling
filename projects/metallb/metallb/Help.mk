@@ -18,12 +18,18 @@ _output/bin/metallb/linux-arm64/controller: ## Build `_output/bin/metallb/linux-
 _output/bin/metallb/linux-arm64/speaker: ## Build `_output/bin/metallb/linux-arm64/speaker`
 
 ##@ Image Targets
-local-images: ## Builds `controller/images/amd64 speaker/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `controller/images/push speaker/images/push` to IMAGE_REPO
+local-images: ## Builds `controller/images/amd64 speaker/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `controller/images/push speaker/images/push helm/push` to IMAGE_REPO
 controller/images/amd64: ## Builds/pushes `controller/images/amd64`
 speaker/images/amd64: ## Builds/pushes `speaker/images/amd64`
+helm/build: ## Builds/pushes `helm/build`
 controller/images/push: ## Builds/pushes `controller/images/push`
 speaker/images/push: ## Builds/pushes `speaker/images/push`
+helm/push: ## Builds/pushes `helm/push`
+
+##@ Helm Targets
+helm/build: ## Build helm chart
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
