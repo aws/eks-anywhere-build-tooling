@@ -18,6 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+SED=sed
+if [ "$(uname -s)" = "Darwin" ]; then
+    SED=gsed
+fi
+
 HELM_DESTINATION_REPOSITORY="${1?First argument is helm destination repository}"
 OUTPUT_DIR="${2?Second arguement is output directory}"
 
@@ -31,5 +36,5 @@ TEMPLATE_DIR=helm/templates
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 for file in Chart.yaml values.yaml
 do
-  sed -f ${SEDFILE} -i ${DEST_DIR}/${file}
+  $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
 done

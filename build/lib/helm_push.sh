@@ -18,6 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+SED=sed
+if [ "$(uname -s)" = "Darwin" ]; then
+    SED=gsed
+fi
+
 IMAGE_REGISTRY="${1?First argument is image registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
@@ -45,7 +50,7 @@ function cleanup() {
 trap cleanup err
 trap "rm -f $TMPFILE" exit
 helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
-DIGEST=$(grep Digest $TMPFILE | sed -e 's/Digest: //')
+DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 {
     set +x
     echo
