@@ -1,4 +1,4 @@
-From b6845c291d933280f6d4d645ac045da9e12c1371 Mon Sep 17 00:00:00 2001
+From 3290c0fe8e49c32e94fb89fb38b9d55c07d275f0 Mon Sep 17 00:00:00 2001
 From: Victor Pineda <vgonzla@amazon.com>
 Date: Tue, 21 Jun 2022 07:50:19 -0700
 Subject: [PATCH 22/22] Add feature to specifiy additional host containers in
@@ -14,25 +14,28 @@ number of host containers in the `AdditionalHostContainers` field.
 This commit also does some refactoring around the templating system BR
 has to generate the TOML files. It generifies the host-container
 template to be reused as much as a user wants to.
+
+SIM: https://i.amazon.com/P66557529
+cr: https://code.amazon.com/reviews/CR-71408825
 ---
- bootstrap/kubeadm/api/v1alpha4/conversion.go  |  5 ++
+ bootstrap/kubeadm/api/v1alpha4/conversion.go  |  5 +
  .../api/v1alpha4/zz_generated.conversion.go   | 37 +++++---
- .../kubeadm/api/v1beta1/kubeadm_types.go      | 25 ++++++
+ .../kubeadm/api/v1beta1/kubeadm_types.go      | 25 +++++
  .../api/v1beta1/zz_generated.deepcopy.go      | 26 ++++++
  ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 84 +++++++++++++++++
  ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 86 ++++++++++++++++++
- .../internal/bottlerocket/bootstrap.go        | 36 ++++----
- .../internal/bottlerocket/bottlerocket.go     | 88 ++++++++++++------
+ .../internal/bottlerocket/bootstrap.go        | 44 ++++-----
+ .../internal/bottlerocket/bottlerocket.go     | 91 ++++++++++++-------
  .../controllers/kubeadmconfig_controller.go   |  3 +
- .../types/upstreamv1beta1/conversion.go       |  5 ++
+ .../types/upstreamv1beta1/conversion.go       |  5 +
  .../zz_generated.conversion.go                | 17 ++--
- .../types/upstreamv1beta2/conversion.go       |  5 ++
+ .../types/upstreamv1beta2/conversion.go       |  5 +
  .../zz_generated.conversion.go                | 17 ++--
- .../types/upstreamv1beta3/conversion.go       | 10 +++
+ .../types/upstreamv1beta3/conversion.go       | 10 ++
  .../zz_generated.conversion.go                | 32 +++----
  ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 86 ++++++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 90 +++++++++++++++++++
- 17 files changed, 553 insertions(+), 99 deletions(-)
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 90 ++++++++++++++++++
+ 17 files changed, 553 insertions(+), 110 deletions(-)
 
 diff --git a/bootstrap/kubeadm/api/v1alpha4/conversion.go b/bootstrap/kubeadm/api/v1alpha4/conversion.go
 index 75ee00286..9fec74d4d 100644
@@ -434,7 +437,7 @@ index 15d4c5aa9..0ee36f058 100644
                              description: 'Discovery specifies the options for the
                                kubelet to use during the TLS Bootstrap process TODO:
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index efdb51fef..ad1ba9e03 100644
+index efdb51fef..bc5094eb1 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -3,12 +3,6 @@
@@ -469,23 +472,31 @@ index efdb51fef..ad1ba9e03 100644
 +{{- if (ne .UserData "")}}
 +user-data = "{{.UserData}}"
 +{{- end -}}
- {{- end -}}
- `
++{{- end -}}
++`
 +
 +	hostContainerSliceTemplate = `{{define "hostContainerSlice" -}}
 +{{- range $hContainer := .HostContainers }}
 +{{template "hostContainerSettings" $hContainer }}
 +{{- end -}}
-+{{- end -}}
-+`
+ {{- end -}}
+ `
 +
  	networkInitTemplate = `{{ define "networkInitSettings" -}}
  [settings.network]
  https-proxy = "{{.HTTPSProxyEndpoint}}"
-@@ -66,9 +72,7 @@ source = "{{.ControlContainerSource}}"
+@@ -58,17 +64,7 @@ trusted=true
  {{- end -}}
  `
  
+-	controlContainerTemplate = `{{ define "controlContainerSettings" -}}
+-[settings.host-containers.control]
+-enabled = true
+-superpowered = false
+-source = "{{.ControlContainerSource}}"
+-{{- end -}}
+-`
+-
 -	bottlerocketNodeInitSettingsTemplate = `{{template "bootstrapHostContainerSettings" .}}
 -
 -{{template "adminContainerInitSettings" .}}
@@ -493,7 +504,7 @@ index efdb51fef..ad1ba9e03 100644
  
  {{template "kubernetesInitSettings" .}}
  
-@@ -91,9 +95,5 @@ source = "{{.ControlContainerSource}}"
+@@ -91,9 +87,5 @@ source = "{{.ControlContainerSource}}"
  {{- if (ne .Taints "")}}
  {{template "taintsTemplate" .}}
  {{- end -}}
@@ -504,7 +515,7 @@ index efdb51fef..ad1ba9e03 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 3a760d51a..c0b046134 100644
+index 3a760d51a..4b8f79bd7 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -30,21 +30,19 @@ type BottlerocketConfig struct {
@@ -539,21 +550,24 @@ index 3a760d51a..c0b046134 100644
  }
  
  type HostPath struct {
-@@ -87,13 +85,23 @@ func generateAdminContainerUserData(kind string, tpl string, data interface{}) (
+@@ -87,16 +85,23 @@ func generateAdminContainerUserData(kind string, tpl string, data interface{}) (
  	return out.Bytes(), nil
  }
  
-+func imageUrl(containerLocation bootstrapv1.ImageMeta) string {
-+	if containerLocation.ImageRepository != "" && containerLocation.ImageTag != "" {
-+		return fmt.Sprintf("%s:%s", containerLocation.ImageRepository, containerLocation.ImageTag)
-+	}
-+	return ""
-+}
-+
- func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, error) {
+-func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, error) {
 -	tm := template.New(kind).Funcs(template.FuncMap{"stringsJoin": strings.Join})
 -	if _, err := tm.Parse(bootstrapHostContainerTemplate); err != nil {
 -		return nil, errors.Wrapf(err, "failed to parse hostContainer %s template", kind)
++func imageUrl(containerLocation bootstrapv1.ImageMeta) string {
++	if containerLocation.ImageRepository != "" && containerLocation.ImageTag != "" {
++		return fmt.Sprintf("%s:%s", containerLocation.ImageRepository, containerLocation.ImageTag)
+ 	}
+-	if _, err := tm.Parse(adminContainerInitTemplate); err != nil {
+-		return nil, errors.Wrapf(err, "failed to parse adminContainer %s template", kind)
++	return ""
++}
++
++func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, error) {
 +	tm := template.New(kind).Funcs(template.FuncMap{
 +		"stringsJoin": strings.Join,
 +		"imageUrl":    imageUrl,
@@ -561,14 +575,14 @@ index 3a760d51a..c0b046134 100644
 +	if _, err := tm.Parse(hostContainerTemplate); err != nil {
 +		return nil, errors.Wrapf(err, "failed to parse hostContainerSettings %s template", kind)
  	}
--	if _, err := tm.Parse(adminContainerInitTemplate); err != nil {
--		return nil, errors.Wrapf(err, "failed to parse adminContainer %s template", kind)
+-	if _, err := tm.Parse(controlContainerTemplate); err != nil {
+-		return nil, errors.Wrapf(err, "failed to parse controlContainer %s template", kind)
 +	if _, err := tm.Parse(hostContainerSliceTemplate); err != nil {
 +		return nil, errors.Wrapf(err, "failed to parse hostContainerSettingsSlice %s template", kind)
  	}
- 	if _, err := tm.Parse(controlContainerTemplate); err != nil {
- 		return nil, errors.Wrapf(err, "failed to parse controlContainer %s template", kind)
-@@ -143,20 +151,42 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 	if _, err := tm.Parse(kubernetesInitTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse kubernetes %s template", kind)
+@@ -143,20 +148,42 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
  	}
  	b64AdminContainerUserData := base64.StdEncoding.EncodeToString(adminContainerUserData)
  
@@ -622,7 +636,7 @@ index 3a760d51a..c0b046134 100644
  	if len(config.ProxyConfiguration.NoProxy) > 0 {
  		for _, noProxy := range config.ProxyConfiguration.NoProxy {
  			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
-@@ -183,7 +213,7 @@ func parseTaints(taints []corev1.Taint) string {
+@@ -183,7 +210,7 @@ func parseTaints(taints []corev1.Taint) string {
  	taintsMap := make(map[string][]string)
  	for _, taint := range taints {
  		valueEffectString := fmt.Sprintf(taintValueEffectTemplate, taint.Value, taint.Effect)
