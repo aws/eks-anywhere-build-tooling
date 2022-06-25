@@ -284,7 +284,7 @@ function build::common::get_latest_eksa_asset_url() {
   if [[ "$http_code" == "200" ]]; then 
     echo "$url"
   else
-    echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$(basename $project)-linux-$arch-${git_tag}.tar.gz"
+    echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
   fi
 }
 

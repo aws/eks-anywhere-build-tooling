@@ -8,7 +8,7 @@ ARG TRIVY_VERSION
 
 COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/harbor-scanner-trivy/scanner-trivy _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/trivy/trivy _output/harbor-trivy _output/LICENSES ATTRIBUTION.txt /
 
-RUN yum install -y shadow-utils >> /dev/null \
+RUN yum install -y shadow-utils tar gzip >> /dev/null \
     && yum clean all \
     && groupadd -f -r -g 10000 scanner && useradd --no-log-init -m -g 10000 -u 10000 scanner \
     && yum erase -y shadow-utils \
