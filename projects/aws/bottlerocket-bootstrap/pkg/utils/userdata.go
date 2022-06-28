@@ -59,10 +59,10 @@ func ResolveUserData() (*UserData, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Error reading user data file")
 	}
-	return processUserData(data, service.NewSecretsManagerService())
+	return processUserData(data)
 }
 
-func processUserData(data []byte, secretsManagerService service.SecretsManagerService) (*UserData, error) {
+func processUserData(data []byte) (*UserData, error) {
 	userData := &UserData{}
 	err := yaml.Unmarshal(data, userData)
 	if err != nil {
@@ -70,23 +70,31 @@ func processUserData(data []byte, secretsManagerService service.SecretsManagerSe
 	}
 	fmt.Printf("\n%+v\n", userData)
 	if userData.UserDataType == awsSecretsManager {
-		// If this is a AWSSecretsManager typped UserData, parse it as AWSSecretsManagerUserData
-		fmt.Println("The loaded userdata is referecing an external userdata, loading it...")
-		awsSecretsManagerUserData := &AWSSecretsManagerUserData{}
-		err = yaml.Unmarshal(data, awsSecretsManagerUserData)
+		secretsManagerService, err := service.NewSecretsManagerService()
 		if err != nil {
-			return nil, errors.Wrap(err, "Error unmarshalling user data")
+			return nil, errors.Wrap(err, "Error creating secrets manager service")
 		}
-		bootstrapUserData, err := loadUserDataFromSecretsManager(awsSecretsManagerUserData, secretsManagerService)
-		if err != nil {
-			fmt.Printf("Error loading userdata from SecretsManager: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println("Successfully loaded userdata from SecretsManager")
-		return bootstrapUserData, nil
+		return processAWSSecretsManagerUserData(data, secretsManagerService)
 	} else {
 		return userData, nil
 	}
+}
+func processAWSSecretsManagerUserData(data []byte, secretsManagerService service.SecretsManagerService) (*UserData, error) {
+	// If this is a AWSSecretsManager typped UserData, parse it as AWSSecretsManagerUserData
+	fmt.Println("The loaded userdata is referecing an external userdata, loading it...")
+	awsSecretsManagerUserData := &AWSSecretsManagerUserData{}
+	err := yaml.Unmarshal(data, awsSecretsManagerUserData)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error unmarshalling user data")
+	}
+
+	bootstrapUserData, err := loadUserDataFromSecretsManager(awsSecretsManagerUserData, secretsManagerService)
+	if err != nil {
+		fmt.Printf("Error loading userdata from SecretsManager: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Successfully loaded userdata from SecretsManager")
+	return bootstrapUserData, nil
 }
 
 func loadUserDataFromSecretsManager(awsSecretsManagerUserData *AWSSecretsManagerUserData, secretManagerService service.SecretsManagerService) (*UserData, error) {

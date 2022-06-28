@@ -36,7 +36,7 @@ secrets_manager_data:
 `
 
 func TestNormalUserData(t *testing.T) {
-	processedUserData, err := processUserData([]byte(UserDataString), nil)
+	processedUserData, err := processUserData([]byte(UserDataString))
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 	}
@@ -58,7 +58,7 @@ func TestWithAWSSecretsManagerUserData(t *testing.T) {
 	mockSecretsManagerService.EXPECT().GetSecretValue(gomock.Any(), "some-prefix-0").Return(&getSecretValueOutput, nil)
 	mockSecretsManagerService.EXPECT().DeleteSecret(gomock.Any(), "some-prefix-0").Return(&secretsmanager.DeleteSecretOutput{}, nil)
 
-	processedUserData, err := processUserData([]byte(AWSSecrentsManagerDataString), mockSecretsManagerService)
+	processedUserData, err := processAWSSecretsManagerUserData([]byte(AWSSecrentsManagerDataString), mockSecretsManagerService)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 	}
