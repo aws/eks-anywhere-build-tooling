@@ -18,12 +18,6 @@ You can find the latest versions of these images on ECR Public Gallery.
 [CA injector](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-cainjector) | 
 [cert-manager Webhook Server](https://gallery.ecr.aws/eks-anywhere/jetstack/cert-manager-webhook)
 
-### Helm Chart
-
-The helm chart is a modified version of the source helm chart located in the jetstck/cert-manager repo at `deploy/charts/cert-manager/`.
-
-If there are any patches to the make file, use `git format-patch $(cat ../GIT_TAG)` and add them to the `helm/patches` directory.
-
 ### Cert manager manifest
 
 The cert-manager.yaml manifest is currently stored in the build/ repo. This is the cert-manager.yaml from the assets of the current GIT_TAG(v1.5.3)
