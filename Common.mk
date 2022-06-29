@@ -381,8 +381,8 @@ SKIP_CHECKSUM_VALIDATION?=false
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=$(HANDLE_DEPENDENCIES_TARGET) validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
-RELEASE_TARGETS?=$(HANDLE_DEPENDENCIES_TARGET) validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
+RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
 define BUILDCTL
@@ -594,15 +594,15 @@ endif
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE?=oci
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).tar
 
-%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ)
+%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
 	$(BUILDCTL)
 
-%/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ)
+%/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
 
-%/images/arm64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ)
+%/images/arm64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
