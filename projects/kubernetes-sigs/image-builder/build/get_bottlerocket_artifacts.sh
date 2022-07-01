@@ -22,9 +22,8 @@ set -o pipefail
 RELEASE_CHANNEL="${1?Specify first argument - EKS-D release channel}"
 FORMAT="${2?Specify second argument - Image format}"
 BOTTLEROCKET_DOWNLOAD_PATH="${3?Specify third argument - Download path for Bottlerocket-related files}"
-CARGO_HOME="${4?Specify fourth argument - Root directory for Cargo installation}"
-PROJECT_PATH="${5?Specify fifth argument - Project path}"
-LATEST_TAG="${6?Specify sixth argument - S3 destination folder for latest artifact upload}"
+PROJECT_PATH="${4?Specify fourth argument - Project path}"
+LATEST_TAG="${5?Specify fifth argument - S3 destination folder for latest artifact upload}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
@@ -54,7 +53,7 @@ if [[ $VARIANT == "metal" ]]; then
 fi
 rm -rf $OS_DOWNLOAD_PATH
 # Downloading the TARGET from the Bottlerocket target location using Tuftool
-$CARGO_HOME/bin/tuftool download "${OS_DOWNLOAD_PATH}" \
+tuftool download "${OS_DOWNLOAD_PATH}" \
     --target-name "${TARGET}" \
     --root "${BOTTLEROCKET_DOWNLOAD_PATH}/root.json" \
     --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
