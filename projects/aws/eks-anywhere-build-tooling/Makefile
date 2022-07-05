@@ -16,7 +16,7 @@ BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
 PROJECT_DEPENDENCIES=eksa/fluxcd/flux2 eksa/kubernetes-sigs/cluster-api \
-	eksa/kubernetes-sigs/kind eksa/replicatedhq/troubleshoot eksa/vmware/govmomi eksd/kubernetes/client eksa/helm/helm eksa/tinkerbell/tink/94-2b1eddcdf90082499b7663ca3c47e77dc12ad34c \
+	eksa/kubernetes-sigs/kind eksa/replicatedhq/troubleshoot eksa/vmware/govmomi eksd/kubernetes/client eksa/helm/helm \
 	eksa/apache/cloudstack-cloudmonkey
 
 ORGANIZE_BINARIES_TARGETS=$(addsuffix /eks-a-tools,$(addprefix $(BINARY_DEPS_DIR)/linux-,amd64 arm64))
