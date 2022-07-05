@@ -1,4 +1,4 @@
-From 3290c0fe8e49c32e94fb89fb38b9d55c07d275f0 Mon Sep 17 00:00:00 2001
+From 785ec91c98bf00625c1443f92c87266aa4dd5744 Mon Sep 17 00:00:00 2001
 From: Victor Pineda <vgonzla@amazon.com>
 Date: Tue, 21 Jun 2022 07:50:19 -0700
 Subject: [PATCH 22/22] Add feature to specifiy additional host containers in
@@ -18,27 +18,27 @@ template to be reused as much as a user wants to.
 SIM: https://i.amazon.com/P66557529
 cr: https://code.amazon.com/reviews/CR-71408825
 ---
- bootstrap/kubeadm/api/v1alpha4/conversion.go  |  5 +
- .../api/v1alpha4/zz_generated.conversion.go   | 37 +++++---
- .../kubeadm/api/v1beta1/kubeadm_types.go      | 25 +++++
- .../api/v1beta1/zz_generated.deepcopy.go      | 26 ++++++
- ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 84 +++++++++++++++++
- ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 86 ++++++++++++++++++
- .../internal/bottlerocket/bootstrap.go        | 44 ++++-----
- .../internal/bottlerocket/bottlerocket.go     | 91 ++++++++++++-------
- .../controllers/kubeadmconfig_controller.go   |  3 +
- .../types/upstreamv1beta1/conversion.go       |  5 +
- .../zz_generated.conversion.go                | 17 ++--
- .../types/upstreamv1beta2/conversion.go       |  5 +
- .../zz_generated.conversion.go                | 17 ++--
- .../types/upstreamv1beta3/conversion.go       | 10 ++
- .../zz_generated.conversion.go                | 32 +++----
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 86 ++++++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 90 ++++++++++++++++++
- 17 files changed, 553 insertions(+), 110 deletions(-)
+ bootstrap/kubeadm/api/v1alpha4/conversion.go  |   5 +
+ .../api/v1alpha4/zz_generated.conversion.go   |  37 ++++--
+ .../kubeadm/api/v1beta1/kubeadm_types.go      |  25 +++++
+ .../api/v1beta1/zz_generated.deepcopy.go      |  26 +++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  84 ++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  86 ++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        |  44 +++-----
+ .../internal/bottlerocket/bottlerocket.go     | 105 +++++++++++-------
+ .../controllers/kubeadmconfig_controller.go   |  21 ++--
+ .../types/upstreamv1beta1/conversion.go       |   5 +
+ .../zz_generated.conversion.go                |  17 ++-
+ .../types/upstreamv1beta2/conversion.go       |   5 +
+ .../zz_generated.conversion.go                |  17 ++-
+ .../types/upstreamv1beta3/conversion.go       |  10 ++
+ .../zz_generated.conversion.go                |  32 ++----
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  86 ++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  90 +++++++++++++++
+ 17 files changed, 569 insertions(+), 126 deletions(-)
 
 diff --git a/bootstrap/kubeadm/api/v1alpha4/conversion.go b/bootstrap/kubeadm/api/v1alpha4/conversion.go
-index 75ee00286..9fec74d4d 100644
+index 75ee00286..149c77989 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/conversion.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/conversion.go
 @@ -143,3 +143,8 @@ func Convert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *bootstr
@@ -47,11 +47,11 @@ index 75ee00286..9fec74d4d 100644
  }
 +
 +func Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in *bootstrapv1.ClusterConfiguration, out *ClusterConfiguration, s apiconversion.Scope) error {
-+	// ClusterConfiguration.CustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in v1alpha4
++	// ClusterConfiguration.BottlerocketCustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in v1alpha4
 +	return autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in, out, s)
 +}
 diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-index 07a398790..e4f725cc5 100644
+index 07a398790..b64c6b1f7 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 @@ -115,11 +115,6 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -82,7 +82,7 @@ index 07a398790..e4f725cc5 100644
  	out.ImageRepository = in.ImageRepository
  	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
  	out.ClusterName = in.ClusterName
-+	// WARNING: in.CustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
@@ -98,7 +98,7 @@ index 07a398790..e4f725cc5 100644
  	}
  	out.ControlPlane = (*JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
  	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
-+	// WARNING: in.CustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
@@ -137,7 +137,7 @@ index 07a398790..e4f725cc5 100644
  		in, out := &in.InitConfiguration, &out.InitConfiguration
  		*out = new(InitConfiguration)
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index a009e3748..7d3578bf9 100644
+index a009e3748..a239db756 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -156,6 +156,11 @@ type ClusterConfiguration struct {
@@ -145,10 +145,10 @@ index a009e3748..7d3578bf9 100644
  	// +optional
  	ClusterName string `json:"clusterName,omitempty"`
 +
-+	// CustomHostContainers contains the information of any additional images
++	// BottlerocketHostContainers contains the information of any additional images
 +	// that we will deploy as host containers in the CPIs
 +	// +optional
-+	CustomHostContainers []BottlerocketHostContainer `json:"customHostContainers,omitempty"`
++	BottlerocketHostContainers []BottlerocketHostContainer `json:"bottlerocketCustomHostContainers,omitempty"`
  }
  
  // Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
@@ -157,10 +157,10 @@ index a009e3748..7d3578bf9 100644
  	// +optional
  	Patches *Patches `json:"patches,omitempty"`
 +
-+	// CustomHostContainers contains the information of any additional images
++	// BottlerocketCustomHostContainers contains the information of any additional images
 +	// that we will deploy as host containers in the CPIs
 +	// +optional
-+	CustomHostContainers []BottlerocketHostContainer `json:"customHostContainers,omitempty"`
++	BottlerocketCustomHostContainers []BottlerocketHostContainer `json:"bottlerocketCustomHostContainers,omitempty"`
 +}
 +
 +// BottlerocketHostContainer describes a host image for Bottlerocket
@@ -180,7 +180,7 @@ index a009e3748..7d3578bf9 100644
  
  // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
 diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
-index 341b00474..e358c64e0 100644
+index 341b00474..e681b8fb0 100644
 --- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 @@ -175,6 +175,22 @@ func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
@@ -210,8 +210,8 @@ index 341b00474..e358c64e0 100644
  			(*out)[key] = val
  		}
  	}
-+	if in.CustomHostContainers != nil {
-+		in, out := &in.CustomHostContainers, &out.CustomHostContainers
++	if in.BottlerocketHostContainers != nil {
++		in, out := &in.BottlerocketHostContainers, &out.BottlerocketHostContainers
 +		*out = make([]BottlerocketHostContainer, len(*in))
 +		copy(*out, *in)
 +	}
@@ -222,8 +222,8 @@ index 341b00474..e358c64e0 100644
  		*out = new(Patches)
  		**out = **in
  	}
-+	if in.CustomHostContainers != nil {
-+		in, out := &in.CustomHostContainers, &out.CustomHostContainers
++	if in.BottlerocketCustomHostContainers != nil {
++		in, out := &in.BottlerocketCustomHostContainers, &out.BottlerocketCustomHostContainers
 +		*out = make([]BottlerocketHostContainer, len(*in))
 +		copy(*out, *in)
 +	}
@@ -231,16 +231,16 @@ index 341b00474..e358c64e0 100644
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 67abfc66d..649f6f7f1 100644
+index 67abfc66d..191b513b4 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -2460,6 +2460,48 @@ spec:
-                           type: object
-                         type: array
+@@ -2394,6 +2394,48 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
                      type: object
-+                  customHostContainers:
-+                    description: CustomHostContainers contains the information of
-+                      any additional images that we will deploy as host containers
++                  bottlerocketCustomHostContainers:
++                    description: BottlerocketHostContainers contains the information
++                      of any additional images that we will deploy as host containers
 +                      in the CPIs
 +                    items:
 +                      description: BottlerocketHostContainer describes a host image
@@ -280,16 +280,16 @@ index 67abfc66d..649f6f7f1 100644
 +                      - superpowered
 +                      type: object
 +                    type: array
-                   dns:
-                     description: DNS defines the options for the DNS add-on installed
-                       in the cluster.
-@@ -3085,6 +3127,48 @@ spec:
-                             type: integer
-                         type: object
+                   certificatesDir:
+                     description: 'CertificatesDir specifies where to store or look
+                       for all required certificates. NB: if not provided, this will
+@@ -3059,6 +3101,48 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
                      type: object
-+                  customHostContainers:
-+                    description: CustomHostContainers contains the information of
-+                      any additional images that we will deploy as host containers
++                  bottlerocketCustomHostContainers:
++                    description: BottlerocketCustomHostContainers contains the information
++                      of any additional images that we will deploy as host containers
 +                      in the CPIs
 +                    items:
 +                      description: BottlerocketHostContainer describes a host image
@@ -329,19 +329,19 @@ index 67abfc66d..649f6f7f1 100644
 +                      - superpowered
 +                      type: object
 +                    type: array
-                   discovery:
-                     description: 'Discovery specifies the options for the kubelet
-                       to use during the TLS Bootstrap process TODO: revisit when there
+                   caCertPath:
+                     description: 'CACertPath is the path to the SSL certificate authority
+                       used to secure comunications between node and control-plane.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 15d4c5aa9..0ee36f058 100644
+index 15d4c5aa9..45bb76646 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -2477,6 +2477,49 @@ spec:
-                                   type: object
-                                 type: array
+@@ -2407,6 +2407,49 @@ spec:
+                                   components during upgrades.
+                                 type: string
                              type: object
-+                          customHostContainers:
-+                            description: CustomHostContainers contains the information
++                          bottlerocketCustomHostContainers:
++                            description: BottlerocketHostContainers contains the information
 +                              of any additional images that we will deploy as host
 +                              containers in the CPIs
 +                            items:
@@ -383,17 +383,17 @@ index 15d4c5aa9..0ee36f058 100644
 +                              - superpowered
 +                              type: object
 +                            type: array
-                           dns:
-                             description: DNS defines the options for the DNS add-on
-                               installed in the cluster.
-@@ -3145,6 +3188,49 @@ spec:
-                                     type: integer
-                                 type: object
+                           certificatesDir:
+                             description: 'CertificatesDir specifies where to store
+                               or look for all required certificates. NB: if not provided,
+@@ -3118,6 +3161,49 @@ spec:
+                                   components during upgrades.
+                                 type: string
                              type: object
-+                          customHostContainers:
-+                            description: CustomHostContainers contains the information
-+                              of any additional images that we will deploy as host
-+                              containers in the CPIs
++                          bottlerocketCustomHostContainers:
++                            description: BottlerocketCustomHostContainers contains
++                              the information of any additional images that we will
++                              deploy as host containers in the CPIs
 +                            items:
 +                              description: BottlerocketHostContainer describes a host
 +                                image for Bottlerocket
@@ -433,9 +433,9 @@ index 15d4c5aa9..0ee36f058 100644
 +                              - superpowered
 +                              type: object
 +                            type: array
-                           discovery:
-                             description: 'Discovery specifies the options for the
-                               kubelet to use during the TLS Bootstrap process TODO:
+                           caCertPath:
+                             description: 'CACertPath is the path to the SSL certificate
+                               authority used to secure comunications between node
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index efdb51fef..bc5094eb1 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
@@ -515,14 +515,28 @@ index efdb51fef..bc5094eb1 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 3a760d51a..4b8f79bd7 100644
+index 3a760d51a..73d35963e 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-@@ -30,21 +30,19 @@ type BottlerocketConfig struct {
- 	RegistryMirrorConfiguration bootstrapv1.RegistryMirrorConfiguration
- 	KubeletExtraArgs            map[string]string
- 	Taints                      []corev1.Taint
-+	CustomHostContainers        []bootstrapv1.BottlerocketHostContainer
+@@ -23,28 +23,26 @@ const (
+ )
+ 
+ type BottlerocketConfig struct {
+-	Pause                       bootstrapv1.Pause
+-	BottlerocketBootstrap       bootstrapv1.BottlerocketBootstrap
+-	BottlerocketControl         bootstrapv1.BottlerocketControl
+-	ProxyConfiguration          bootstrapv1.ProxyConfiguration
+-	RegistryMirrorConfiguration bootstrapv1.RegistryMirrorConfiguration
+-	KubeletExtraArgs            map[string]string
+-	Taints                      []corev1.Taint
++	Pause                            bootstrapv1.Pause
++	BottlerocketBootstrap            bootstrapv1.BottlerocketBootstrap
++	BottlerocketControl              bootstrapv1.BottlerocketControl
++	ProxyConfiguration               bootstrapv1.ProxyConfiguration
++	RegistryMirrorConfiguration      bootstrapv1.RegistryMirrorConfiguration
++	KubeletExtraArgs                 map[string]string
++	Taints                           []corev1.Taint
++	BottlerocketCustomHostContainers []bootstrapv1.BottlerocketHostContainer
  }
  
  type BottlerocketSettingsInput struct {
@@ -619,8 +633,8 @@ index 3a760d51a..4b8f79bd7 100644
 +		})
  	}
 +
-+	if len(config.CustomHostContainers) != 0 {
-+		hostContainers = append(hostContainers, config.CustomHostContainers...)
++	if len(config.BottlerocketCustomHostContainers) != 0 {
++		hostContainers = append(hostContainers, config.BottlerocketCustomHostContainers...)
 +	}
 +
 +	bottlerocketInput := &BottlerocketSettingsInput{
@@ -646,35 +660,53 @@ index 3a760d51a..4b8f79bd7 100644
  
  	var taintsToml strings.Builder
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index c2ab43421..646f8b412 100644
+index c2ab43421..07b0afcd4 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -453,6 +453,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
- 			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
-+			CustomHostContainers:  scope.Config.Spec.ClusterConfiguration.CustomHostContainers,
+@@ -450,9 +450,10 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		}
+ 
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
++			Pause:                            scope.Config.Spec.ClusterConfiguration.Pause,
++			BottlerocketBootstrap:            scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:              scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
  		}
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -624,6 +625,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
- 			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
-+			CustomHostContainers:  scope.Config.Spec.JoinConfiguration.CustomHostContainers,
+@@ -621,9 +622,10 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		})
+ 	case bootstrapv1.Bottlerocket:
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			Pause:                            scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap:            scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:              scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
  		}
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -743,6 +745,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
- 			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
-+			CustomHostContainers:  scope.Config.Spec.JoinConfiguration.CustomHostContainers,
+@@ -740,9 +742,10 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		})
+ 	case bootstrapv1.Bottlerocket:
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			Pause:                            scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap:            scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:              scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
  		}
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/conversion.go
-index e893686d5..d15be0ed1 100644
+index e893686d5..6cfa9628b 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/conversion.go
 @@ -95,3 +95,8 @@ func Convert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(in *
@@ -683,11 +715,11 @@ index e893686d5..d15be0ed1 100644
  }
 +
 +func Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfiguration(src *bootstrapv1.ClusterConfiguration, dst *ClusterConfiguration, s apimachineryconversion.Scope) error {
-+	// ClusterConfiguration.CustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in upstreamv1beta1
++	// ClusterConfiguration.BottlerocketCustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in upstreamv1beta1
 +	return autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfiguration(src, dst, s)
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
-index 97963846c..059adb11b 100644
+index 97963846c..c244d9bc7 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 @@ -108,11 +108,6 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -718,7 +750,7 @@ index 97963846c..059adb11b 100644
  	out.ImageRepository = in.ImageRepository
  	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
  	out.ClusterName = in.ClusterName
-+	// WARNING: in.CustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
@@ -734,12 +766,12 @@ index 97963846c..059adb11b 100644
  	}
  	out.ControlPlane = (*JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
  	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
-+	// WARNING: in.CustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/conversion.go
-index efbb99b7e..11174f8ba 100644
+index efbb99b7e..e9e70d882 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/conversion.go
 @@ -92,3 +92,8 @@ func Convert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(in *
@@ -748,11 +780,11 @@ index efbb99b7e..11174f8ba 100644
  }
 +
 +func Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfiguration(src *bootstrapv1.ClusterConfiguration, dst *ClusterConfiguration, s apimachineryconversion.Scope) error {
-+	// ClusterConfiguration.CustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in upstreamv1beta2
++	// ClusterConfiguration.BottlerocketCustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in upstreamv1beta2
 +	return autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfiguration(src, dst, s)
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-index c1dc563ad..d0af5c0a1 100644
+index c1dc563ad..535f38c34 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 @@ -108,11 +108,6 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -783,7 +815,7 @@ index c1dc563ad..d0af5c0a1 100644
  	out.ImageRepository = in.ImageRepository
  	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
  	out.ClusterName = in.ClusterName
-+	// WARNING: in.CustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
@@ -799,12 +831,12 @@ index c1dc563ad..d0af5c0a1 100644
  		out.ControlPlane = nil
  	}
  	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
-+	// WARNING: in.CustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
-index bcf9e1ef1..dbe8b365f 100644
+index bcf9e1ef1..1a96971e5 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
 @@ -78,3 +78,13 @@ func Convert_upstreamv1beta3_JoinControlPlane_To_v1beta1_JoinControlPlane(in *Jo
@@ -813,16 +845,16 @@ index bcf9e1ef1..dbe8b365f 100644
  }
 +
 +func Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(src *bootstrapv1.ClusterConfiguration, dst *ClusterConfiguration, s apimachineryconversion.Scope) error {
-+	// ClusterConfiguration.CustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in upstreamv1beta3
++	// ClusterConfiguration.BottlerocketCustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in upstreamv1beta3
 +	return autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(src, dst, s)
 +}
 +
 +func Convert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(src *bootstrapv1.JoinConfiguration, dst *JoinConfiguration, s apimachineryconversion.Scope) error {
-+	// JoinConfiguration.CustomHostContainers exists in bootstrapv1.JoinControlPlane but not in upstreamv1beta3
++	// JoinConfiguration.BottlerocketCustomHostContainers exists in bootstrapv1.JoinControlPlane but not in upstreamv1beta3
 +	return autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(src, dst, s)
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index d66122452..a40705895 100644
+index d66122452..0d47fabe8 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -113,11 +113,6 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -870,7 +902,7 @@ index d66122452..a40705895 100644
  	out.ImageRepository = in.ImageRepository
  	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
  	out.ClusterName = in.ClusterName
-+	// WARNING: in.CustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
@@ -886,7 +918,7 @@ index d66122452..a40705895 100644
  		out.ControlPlane = nil
  	}
  	out.Patches = (*Patches)(unsafe.Pointer(in.Patches))
-+	// WARNING: in.CustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
@@ -899,15 +931,15 @@ index d66122452..a40705895 100644
  	if err := Convert_upstreamv1beta3_APIEndpoint_To_v1beta1_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
  		return err
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index a71635141..574e5f478 100644
+index a71635141..835d5c325 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -2931,6 +2931,49 @@ spec:
-                               type: object
-                             type: array
+@@ -2863,6 +2863,49 @@ spec:
+                               upgrades.
+                             type: string
                          type: object
-+                      customHostContainers:
-+                        description: CustomHostContainers contains the information
++                      bottlerocketCustomHostContainers:
++                        description: BottlerocketHostContainers contains the information
 +                          of any additional images that we will deploy as host containers
 +                          in the CPIs
 +                        items:
@@ -949,17 +981,17 @@ index a71635141..574e5f478 100644
 +                          - superpowered
 +                          type: object
 +                        type: array
-                       dns:
-                         description: DNS defines the options for the DNS add-on installed
-                           in the cluster.
-@@ -3581,6 +3624,49 @@ spec:
-                                 type: integer
-                             type: object
+                       certificatesDir:
+                         description: 'CertificatesDir specifies where to store or
+                           look for all required certificates. NB: if not provided,
+@@ -3555,6 +3598,49 @@ spec:
+                               upgrades.
+                             type: string
                          type: object
-+                      customHostContainers:
-+                        description: CustomHostContainers contains the information
-+                          of any additional images that we will deploy as host containers
-+                          in the CPIs
++                      bottlerocketCustomHostContainers:
++                        description: BottlerocketCustomHostContainers contains the
++                          information of any additional images that we will deploy
++                          as host containers in the CPIs
 +                        items:
 +                          description: BottlerocketHostContainer describes a host
 +                            image for Bottlerocket
@@ -999,21 +1031,21 @@ index a71635141..574e5f478 100644
 +                          - superpowered
 +                          type: object
 +                        type: array
-                       discovery:
-                         description: 'Discovery specifies the options for the kubelet
-                           to use during the TLS Bootstrap process TODO: revisit when
+                       caCertPath:
+                         description: 'CACertPath is the path to the SSL certificate
+                           authority used to secure comunications between node and
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index b60dcae96..d1cdc4020 100644
+index b60dcae96..561c1076a 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -1554,6 +1554,51 @@ spec:
-                                       type: object
-                                     type: array
+@@ -1480,6 +1480,51 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
                                  type: object
-+                              customHostContainers:
-+                                description: CustomHostContainers contains the information
-+                                  of any additional images that we will deploy as
-+                                  host containers in the CPIs
++                              bottlerocketCustomHostContainers:
++                                description: BottlerocketHostContainers contains the
++                                  information of any additional images that we will
++                                  deploy as host containers in the CPIs
 +                                items:
 +                                  description: BottlerocketHostContainer describes
 +                                    a host image for Bottlerocket
@@ -1055,17 +1087,17 @@ index b60dcae96..d1cdc4020 100644
 +                                  - superpowered
 +                                  type: object
 +                                type: array
-                               dns:
-                                 description: DNS defines the options for the DNS add-on
-                                   installed in the cluster.
-@@ -2250,6 +2295,51 @@ spec:
-                                         type: integer
-                                     type: object
+                               certificatesDir:
+                                 description: 'CertificatesDir specifies where to store
+                                   or look for all required certificates. NB: if not
+@@ -2221,6 +2266,51 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
                                  type: object
-+                              customHostContainers:
-+                                description: CustomHostContainers contains the information
-+                                  of any additional images that we will deploy as
-+                                  host containers in the CPIs
++                              bottlerocketCustomHostContainers:
++                                description: BottlerocketCustomHostContainers contains
++                                  the information of any additional images that we
++                                  will deploy as host containers in the CPIs
 +                                items:
 +                                  description: BottlerocketHostContainer describes
 +                                    a host image for Bottlerocket
@@ -1107,9 +1139,9 @@ index b60dcae96..d1cdc4020 100644
 +                                  - superpowered
 +                                  type: object
 +                                type: array
-                               discovery:
-                                 description: 'Discovery specifies the options for
-                                   the kubelet to use during the TLS Bootstrap process
+                               caCertPath:
+                                 description: 'CACertPath is the path to the SSL certificate
+                                   authority used to secure comunications between node
 -- 
 2.32.0
 
