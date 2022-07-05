@@ -113,7 +113,7 @@ PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm eksa/kubernetes-sigs/cri-tools
 include $(BASE_DIRECTORY)/Common.mk
 
 
-export PATH:=$(HOME)/.cargo/bin:$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
+export PATH:=/root/.cargo/bin:$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
 export GOVC_INSECURE?=true
 
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
