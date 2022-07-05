@@ -73,7 +73,7 @@ BUILD_AMI_TARGETS=build-ami-ubuntu-2004
 BUILD_OVA_TARGETS=setup-packer-configs-ova download-bottlerocket-ova $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova upload-bottlerocket-ova
 BUILD_RAW_TARGETS=release-raw-ubuntu-2004-efi $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
 ifneq ($(RELEASE_BRANCH),1-20)
-	BUILD_RAW_TARGETS+= download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
+	BUILD_RAW_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
 endif
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
 ifeq ($(IMAGE_FORMAT),ova)
@@ -95,8 +95,11 @@ else ifeq ($(IMAGE_FORMAT),raw)
 		# When building Ubuntu OVA for release, we also want to fetch Bottlerocket OVA in the
 		# same job because they are usually tied together with an EKS-A release so we want them
 		# to be uploaded to the same location to be picked up by the release process
-		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH) $(FINAL_BOTTLEROCKET_RAW_PATH)
-		RELEASE_TARGETS=release-raw-ubuntu-2004-efi download-bottlerocket-raw upload-artifacts-raw upload-bottlerocket-raw
+		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
+		RELEASE_TARGETS=release-raw-ubuntu-2004-efi upload-artifacts-raw
+		ifneq ($(RELEASE_BRANCH),1-20)
+			RELEASE_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
+		endif
 	else ifeq ($(IMAGE_OS),rhel)
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
 		RELEASE_TARGETS=release-raw-rhel-8 upload-artifacts-raw
@@ -105,7 +108,7 @@ else
 	S3_TARGET_PREREQUISITES?=
 endif
 
-BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml
+BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml
 BUILDSPEC_VARS_KEYS=IMAGE_OS RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_OS_DISTROS SUPPORTED_K8S_VERSIONS
 SUPPORTED_OS_DISTROS=ubuntu
