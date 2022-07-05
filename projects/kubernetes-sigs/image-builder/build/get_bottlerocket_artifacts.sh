@@ -53,7 +53,7 @@ if [[ $VARIANT == "metal" ]]; then
 fi
 rm -rf $OS_DOWNLOAD_PATH
 # Downloading the TARGET from the Bottlerocket target location using Tuftool
-tuftool download "${OS_DOWNLOAD_PATH}" \
+/root/.cargo/bin/tuftool download "${OS_DOWNLOAD_PATH}" \
     --target-name "${TARGET}" \
     --root "${BOTTLEROCKET_DOWNLOAD_PATH}/root.json" \
     --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
