@@ -58,13 +58,13 @@ $(PACKER):
 	rm packer.zip
 
 $(FULL_OUTPUT_DIR):
-	mkdir -p $@
+	mkdir -p $(@D)
 
 $(AMI_OUTPUT_DIR): $(FULL_OUTPUT_DIR)
-	mkdir -p $@
+	mkdir -p $(@D)
 
 $(OVA_OUTPUT_DIR): $(FULL_OUTPUT_DIR)
-	mkdir -p $@
+	mkdir -p $(@D)
 
 .PHONY: latest-snow-raw-image
 latest-snow-raw-image: EKSA_VERSION?=$(shell EKSA_RELEASE_MANIFEST_URL=$(EKSA_RELEASE_MANIFEST_URL) ./build/get_latest_eksa_version_by_date.sh)
@@ -84,18 +84,19 @@ export-to-raw:
 
 .PHONY: build-ova
 build-ova: export PKR_VAR_manifest-output=$(OVA_MANIFEST_PATH)
-build-ova: export PKR_VAR_vsphere_password = $(VSPHERE_PASSWORD)
-build-ova: export PKR_VAR_vsphere_username = $(VSPHERE_USERNAME)
-build-ova: export PKR_VAR_vsphere_endpoint = $(VSPHERE_ENDPOINT)
-build-ova: export PKR_VAR_vsphere_datacenter = $(VSPHERE_DATACENTER)
-build-ova: export PKR_VAR_vsphere_datastore = $(VSPHERE_DATASTORE)
-build-ova: export PKR_VAR_vsphere_cluster = $(VSPHERE_CLUSTER)
-build-ova: export PKR_VAR_vsphere_network = $(VSPHERE_NETWORK)
-build-ova: export PKR_VAR_build-password = $(BUILD_PASSWORD)
-build-ova: export PKR_VAR_build-output = $(OVA_OUTPUT_DIR)
+build-ova: export PKR_VAR_vsphere_password=$(VSPHERE_PASSWORD)
+build-ova: export PKR_VAR_vsphere_username=$(VSPHERE_USERNAME)
+build-ova: export PKR_VAR_vsphere_endpoint=$(VSPHERE_ENDPOINT)
+build-ova: export PKR_VAR_vsphere_datacenter=$(VSPHERE_DATACENTER)
+build-ova: export PKR_VAR_vsphere_datastore=$(VSPHERE_DATASTORE)
+build-ova: export PKR_VAR_vsphere_cluster=$(VSPHERE_CLUSTER)
+build-ova: export PKR_VAR_vsphere_network=$(VSPHERE_NETWORK)
+build-ova: export PKR_VAR_build-password=$(BUILD_PASSWORD)
+build-ova: export PKR_VAR_build-output=$(OVA_OUTPUT_DIR)
 build-ova: KIND_URL?=$(shell ./build/get_kind_url.sh $(ARTIFACTS_BUCKET) )
 build-ova: export PKR_VAR_kind-url=$(KIND_URL)
 build-ova: $(PACKER) init clean-ova $(OVA_OUTPUT_DIR)
+	echo $(VSPHERE_PASSWORD) $(VSPHERE_USERNAME)
 	$(PACKER) build -only='*.vsphere-iso.*' -var-file=ova/linux/ubuntu/vsphere.ubuntu.pkrvars.hcl .
 
 .PHONY: release-ova
