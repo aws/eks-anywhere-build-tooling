@@ -104,10 +104,26 @@ envsubst '$EKSD_NAME' \
     < "$MAKE_ROOT/packer/config/ovf_custom_properties.json.tmpl" \
     > "$OUTPUT_CONFIGS/ovf_custom_properties.json"
 
-# This is the IP address that Packer will create the server on to serve the local
+# This is the IP address that Packer will create the server on to host the local
 # directory containing the kickstart config
-if [ "$IMAGE_FORMAT" = "ova" ] & [ "$IMAGE_OS" = "rhel" ]; then
-    ACTIVE_INTERFACE=$(ip a show | awk '/inet.*brd/{print $NF}')
+if [ "$IMAGE_FORMAT" = "ova" ] && [ "$IMAGE_OS" = "rhel" ]; then
+    ACTIVE_INTERFACE=""
+    if [ "$(uname -s)" = "Linux" ]; then
+        INTERFACES=($(ls /sys/class/net))
+        for interface in "${INTERFACES[@]}"; do
+            if [ "$interface" = "eth0" ] || [ "$interface" = "en0" ]; then
+                ACTIVE_INTERFACE=$interface
+                break
+            fi
+        done
+    elif [ "$(uname -s)" = "Darwin" ]; then
+        ACTIVE_INTERFACE="en0"
+    fi
+    if [ -z $ACTIVE_INTERFACE ]; then
+        echo "ACTIVE_INTERFACE cannot be an empty string. Please check your network configuration
+        and set an appropriate value for ACTIVE_INTERFACE"
+        exit 1
+    fi
     export PACKER_HTTP_SERVER_IP=$(ip a l $ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
     envsubst '$PACKER_HTTP_SERVER_IP' \
         < "$MAKE_ROOT/$IMAGE_BUILDER_DIR/packer/ova/rhel-8.json" |
