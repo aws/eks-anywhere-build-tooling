@@ -224,7 +224,7 @@ release-raw-%: deps-raw setup-packer-configs-raw
 	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
 
 .PHONY: build-qemu-rhel-local
-build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu
+build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
 build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
 	build/build_qemu_rhel_local.sh $(MAKE_ROOT) $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
 
