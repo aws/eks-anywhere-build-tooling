@@ -106,7 +106,10 @@ envsubst '$EKSD_NAME' \
 
 # This is the IP address that Packer will create the server on to serve the local
 # directory containing the kickstart config
-export PACKER_HTTP_SERVER_IP=$(ip a l eth0 | awk '/inet / {print $2}' | cut -d/ -f1)
-envsubst '$PACKER_HTTP_SERVER_IP' \
-    < "$MAKE_ROOT/$IMAGE_BUILDER_DIR/packer/ova/rhel-8.json" |
-    tee "$MAKE_ROOT/$IMAGE_BUILDER_DIR/packer/ova/rhel-8.json"
+if [ "$IMAGE_FORMAT" = "ova" ] & [ "$IMAGE_OS" = "rhel" ]; then
+    ACTIVE_INTERFACE=$(ip a show | awk '/inet.*brd/{print $NF}')
+    export PACKER_HTTP_SERVER_IP=$(ip a l $ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
+    envsubst '$PACKER_HTTP_SERVER_IP' \
+        < "$MAKE_ROOT/$IMAGE_BUILDER_DIR/packer/ova/rhel-8.json" |
+        tee "$MAKE_ROOT/$IMAGE_BUILDER_DIR/packer/ova/rhel-8.json"
+fi
