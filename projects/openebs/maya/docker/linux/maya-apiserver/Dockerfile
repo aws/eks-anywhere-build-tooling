@@ -1,0 +1,14 @@
+ARG BASE_IMAGE
+FROM $BASE_IMAGE
+
+ARG TARGETARCH
+ARG TARGETOS
+
+COPY _output/bin/maya/$TARGETOS-$TARGETARCH/maya-apiserver /opt/maya/maya-apiserver
+
+COPY _output/LICENSES /LICENSES
+COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+
+USER 1000
+
+ENTRYPOINT ["/opt/maya/maya-apiserver"]
