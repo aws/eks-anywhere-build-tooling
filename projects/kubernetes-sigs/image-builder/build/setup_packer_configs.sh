@@ -59,7 +59,7 @@ envsubst '$CNI_SHA:$PLUGINS_ASSET_BASE_URL:$CNI_VERSION:$CNI_HOST_DEVICE_SHA256'
     > "$OUTPUT_CONFIGS/cni.json"
 
 export PAUSE_IMAGE=$(build::eksd_releases::get_eksd_kubernetes_image_url 'pause-image' $RELEASE_BRANCH)
-envsubst '$PAUSE_IMAGE' \
+envsubst '$PAUSE_IMAGE:$HTTP_PROXY:$HTTPS_PROXY:$NO_PROXY' \
     < "$MAKE_ROOT/packer/config/common.json.tmpl" \
     > "$OUTPUT_CONFIGS/common.json"
 

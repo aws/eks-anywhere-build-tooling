@@ -64,6 +64,10 @@ Currently this process only supports building RHEL images for KVM hypervisor.
   * export RHSM_PASSWORD=&lt;RedHat password&gt;
   * export IMAGE_OS=&lt;ubuntu or rhel&gt;
   * export ARTIFACTS_BUCKET=s3://projectbuildpipeline-857-pipelineoutputartifactsb-10ajmk30khe3f
+- Setup exports for proxy configuration (optional)
+  * export HTTP_PROXY=&lt;HTTP proxy URL e.g. http://proxy.corp.com:80&gt;
+  * export HTTPS_PROXY=&lt;HTTPS proxy URL e.g. http://proxy.corp.com:443&gt;
+  * export NO_PROXY=&lt;No proxy&gt;
 - Run the local build make command. This command will verify required build dependencies and run the image building process.
     ```
     make build-qemu-rhel-local
