@@ -129,6 +129,7 @@ clean-go-cache:
 	if [ "$(JOB_TYPE)" == "presubmit" ]; then \
 		source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) && go clean -modcache -cache; \
 		rm -rf /tests /root/.rustup; \
+		sleep infinity; \
 	fi
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_XEIPUUV_TARGET)
