@@ -4,8 +4,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-RUN yum install tar -y && \
-    yum install -y nmap iputils tar && \
+RUN yum install -y nmap iputils tar && \
     yum clean all && \
     rm -rf /var/cache/yum
 
