@@ -5,8 +5,7 @@ ARG TARGETARCH
 ARG TARGETOS
 
 RUN yum install tar -y && \
-    yum install nmap -y && \
-    yum install iputils -y && \
+    yum install -y nmap iputils && \
     yum clean all && \
     rm -rf /var/cache/yum
 
