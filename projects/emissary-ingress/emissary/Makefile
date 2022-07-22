@@ -29,8 +29,8 @@ COPY_CRDS=$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/helm/crds
 include $(BASE_DIRECTORY)/Common.mk
 
 # This will be replaced once the new eks-distro python images are pushed.
-BASE_IMAGE_NAME?=public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-python:3.9-2022-07-21-1658430881.2
-emissary/images/%: public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-python:3.9-2022-07-21-1658430881.2
+# BASE_IMAGE_NAME?=public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-python:3.9-2022-07-21-1658430881.2
+# emissary/images/%: BASE_IMAGE_NAME=public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-python:3.9-2022-07-21-1658430881.2
 
 $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 

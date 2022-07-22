@@ -1,11 +1,11 @@
 ARG BASE_IMAGE
 
-FROM public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-python-builder:3.9-2022-07-21-1658430881.2 as emissary-builder
+FROM public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-python-builder:3.9-latest.2 as emissary-builder
 
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot/bin
 
-RUN install_rpm libcap htop coreutils && \
-    install_binary /usr/bin/curl && \
+RUN install_rpm libcap htop && \
+    install_binary /usr/bin/curl /usr/bin/chgrp /usr/bin/chmod && \
     cleanup "emissary"
 
 WORKDIR /buildroot
@@ -32,7 +32,7 @@ RUN ln -s /buildroot/bin/busyambassador /buildroot/bin/kubestatus && \
     ln -s /buildroot/bin/* /usr/local/bin/
 
 FROM public.ecr.aws/appmesh/aws-appmesh-envoy:v1.22.2.0-prod as envoy
-FROM public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-python:3.9-2022-07-21-1658430881.2
+FROM public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-python:3.9-latest.2
 
 ARG TARGETARCH
 ARG TARGETOS
