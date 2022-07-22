@@ -53,7 +53,7 @@ review carefully and if there are questions about changes necessary to eks-anywh
 and/or automatically update between eks-anywhere version reach out to @jaxesn.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes. 
-ex: [0.11.1 compared to 0.12.0](https://github.com/kubernetes-sigs/kind/compare/v0.11.1...v0.12.0). Check the `kind` target for
+ex: [0.12.0 compared to 0.14.0](https://github.com/kubernetes-sigs/kind/compare/v0.12.0...v0.14.0). Check the `kind` target for
 any build flag changes, tag changes, dependencies, etc in the `Makefile` in the root of the repo.  Pay close attention to
 `images/base/Dockerfile` for changes when updating the patch.  Update constants in [node-image-build-args.sh](./build/node-image-build-args.sh#48).
 If new yum packages are added to the base image, update the [minimal-base-kind](https://github.com/aws/eks-distro-build-tooling/blob/main/eks-distro-base/Dockerfile.minimal-base-kind)
