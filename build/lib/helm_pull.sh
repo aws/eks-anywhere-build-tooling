@@ -44,11 +44,8 @@ function cleanup-chart() {
 
 function copy-crds() {
   if [ -d "${COPY_CRDS}" ]; then
-    if [ -d "${REPO}/${HELM_DIRECTORY}/crds" ]; then
-      continue
-    else
-      mkdir ${REPO}/${HELM_DIRECTORY}/crds
-    fi
+    rm -rf  ${REPO}/${HELM_DIRECTORY}/crds/*
+    mkdir ${REPO}/${HELM_DIRECTORY}/crds || true
     cp ${COPY_CRDS}/* ${REPO}/${HELM_DIRECTORY}/crds
   fi
 }

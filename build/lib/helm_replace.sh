@@ -34,7 +34,7 @@ DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 #
 TEMPLATE_DIR=helm/templates
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
-for file in Chart.yaml values.yaml
+for file in Chart.yaml values.yaml crds/*.yaml
 do
   $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
 done
