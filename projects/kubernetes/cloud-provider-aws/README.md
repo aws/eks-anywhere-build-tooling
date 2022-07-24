@@ -1,7 +1,7 @@
 ## **cloud-provider-aws**
 ![Version](https://img.shields.io/badge/version-v1.22.3-blue)
 
-The [AWS cloud provider](https://github.com/kubernetes/cloud-provider-aws) provides the interface between a Kubernetes cluster and AWS service APIs. This project allows a Kubernetes cluster to provision, monitor and remove AWS resources necessary for operation of the cluster.
+The AWS credential provider is a binary that is executed by kubelet to provide credentials for images in ECR. Refer to the [credential provider extraction Kubernetes Enhancement Proposals (KEP)](https://github.com/kubernetes/enhancements/tree/master/keps/sig-cloud-provider/2133-out-of-tree-credential-provider) for more details.
 
 ### Updating
 1. Review [releases](https://github.com/kubernetes/cloud-provider-aws/releases) and changelogs in upstream repo and decide on new version. Please review carefully and if there are questions about changes necessary to eks-anywhere to support the new version reach out to @acool or @tlhowe.
