@@ -5,16 +5,14 @@ GOLANG_VERSION?="1.17"
 REPO=cstor-operators
 REPO_OWNER=openebs
 
-BINARY_TARGET_FILES=pool-manager cvc-operator volume-manager cspc-operator webhook
-SOURCE_PATTERNS=./cmd/pool-manager ./cmd/cvc-operator ./cmd/volume-manager ./cmd/cspc-operator ./cmd/webhook
+BINARY_TARGET_FILES=pool-manager cvc-operator volume-manager
+SOURCE_PATTERNS=./cmd/pool-manager ./cmd/cvc-operator ./cmd/volume-manager
 
 CVC_OPERATOR_IMAGE_COMPONENT=cstor-operators/cvc-operator
 POOL_MANAGER_IMAGE_COMPONENT=cstor-operators/pool-manager
 VOLUME_MANAGER_IMAGE_COMPONENT=cstor-operators/volume-manager
-CSPC_OPERATOR_IMAGE_COMPONENT=cstor-operators/cspc-operator
-WEBHOOK_IMAGE_COMPONENT=cstor-operators/webhook
 
-IMAGE_NAMES=pool-manager cvc-operator volume-manager cspc-operator webhook
+IMAGE_NAMES=pool-manager cvc-operator volume-manager
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 include $(BASE_DIRECTORY)/Common.mk

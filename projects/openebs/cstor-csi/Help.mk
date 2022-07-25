@@ -12,32 +12,15 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `controller speaker` for `linux/amd64 linux/arm64`
-_output/bin/cstor-operator/linux-amd64/pool-manager: ## Build `_output/bin/metallb/linux-amd64/controller`
-_output/bin/cstor-operator/linux-amd64/cvc-operator: ## Build `_output/bin/metallb/linux-amd64/speaker`
-_output/bin/cstor-operator/linux-arm64/pool-manager: ## Build `_output/bin/metallb/linux-arm64/controller`
-_output/bin/cstor-operator/linux-arm64/cvc-operator: ## Build `_output/bin/metallb/linux-arm64/speaker`
-_output/bin/cstor-operator/linux-amd64/volume-manager:
-_output/bin/cstor-operator/linux-arm64/volume-manager: 
-_output/bin/cstor-operator/linux-amd64/cspc-operator:
-_output/bin/cstor-operator/linux-arm64/cspc-operator: 
-_output/bin/cstor-operator/linux-amd64/webhook:
-_output/bin/cstor-operator/linux-arm64/webhook: 
-
+_output/bin/cstor-csi/linux-amd64/cstor-csi: ## Build `_output/bin/metallb/linux-amd64/controller`
+_output/bin/cstor-csi/linux-arm64/cstor-csi: ## Build `_output/bin/metallb/linux-arm64/controller`
 
 ##@ Image Targets
 local-images: ## Builds `controller/images/amd64 speaker/images/amd64 helm/build` as oci tars for presumbit validation
 images: ## Pushes `controller/images/push speaker/images/push helm/push` to IMAGE_REPO
-pool-manager/images/amd64: ## Builds/pushes `controller/images/amd64`
-cvc-operator/images/amd64: ## Builds/pushes `speaker/images/amd64`
-volume-manager/images/amd64:
-cspc-operator/images/amd64:
-webhook/images/amd64:
+cstor-csi/images/amd64: ## Builds/pushes `controller/images/amd64`
 helm/build: ## Builds/pushes `helm/build`
-pool-manager/images/push: ## Builds/pushes `controller/images/push`
-cvc-operator/images/push: ## Builds/pushes `speaker/images/push`
-volume-manager/images/push:
-cspc-operator/images/push:
-webhook/images/push:
+cstor-csi/images/push: ## Builds/pushes `controller/images/push`
 helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets
