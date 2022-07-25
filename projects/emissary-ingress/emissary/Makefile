@@ -2,9 +2,13 @@ BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.17"
 
+APPMESH_VERSION:=$(shell cat APPMESH_VERSION)
+IMAGE_BUILD_ARGS=APPMESH_VERSION
+
 REPO=emissary
 REPO_OWNER=emissary-ingress
 
+EXCLUDE_FROM_STAGING_BUILDSPEC=true
 BINARY_TARGET_FILES=busyambassador capabilities_wrapper example-envoy-metrics-sink k8sregistryctl kat-client kat-server
 SOURCE_PATTERNS=./cmd/busyambassador ./cmd/capabilities_wrapper ./cmd/example-envoy-metrics-sink ./cmd/k8sregistryctl ./cmd/kat-client ./cmd/kat-server
 GO_MOD_PATHS=.
@@ -14,13 +18,9 @@ EMISSARY_IMAGE_COMPONENT=emissary-ingress/emissary
 IMAGE_NAMES=emissary
 DOCKERFILE_FOLDER=./docker/linux/emissary-image
 
-SIMPLE_CREATE_BINARIES?=false
-
+# This will registry be changed once the eks-distro-minimal-base-python PR is merged.
 BASE_IMAGE_REPO?=public.ecr.aws/k1e6s8o8
 BASE_IMAGE_NAME?=eks-distro-minimal-base-python
-
-APPMESH_VERSION:=$(shell cat APPMESH_VERSION)
-IMAGE_BUILD_ARGS=APPMESH_VERSION
 
 CHART_VERSION=$(shell cat CHART_VERSION)
 
@@ -33,6 +33,7 @@ HELM_DIRECTORY=charts/emissary-ingress
 HELM_DESTINATION_REPOSITORY=emissary-ingress/emissary
 HELM_IMAGE_LIST=emissary-ingress/emissary
 COPY_CRDS=$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/helm/crds
+
 
 include $(BASE_DIRECTORY)/Common.mk
 

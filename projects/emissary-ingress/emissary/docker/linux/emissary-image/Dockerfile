@@ -12,7 +12,6 @@ WORKDIR /buildroot
 
 RUN install_rpm libcap htop && \
     install_binary /usr/bin/curl /usr/bin/chgrp /usr/bin/chmod && \
-    cleanup "emissary"  && \
     time pip3 install --no-deps -e python && \
     pip3 install pip-tools==6.3.1 && \
     pip3 install PyYAML==5.4.1 && \
@@ -25,7 +24,8 @@ RUN install_rpm libcap htop && \
     ln -s /buildroot/bin/busyambassador /buildroot/bin/watt && \
     ln -s /buildroot/bin/busyambassador /buildroot/bin/agent && \
     ln -s /buildroot/bin/busyambassador /buildroot/bin/apiext && \
-    ln -s /buildroot/bin/* /usr/local/bin/
+    ln -s /buildroot/bin/* /usr/local/bin/ && \
+    cleanup "emissary"
 
 FROM public.ecr.aws/appmesh/aws-appmesh-envoy:$APPMESH_VERSION as envoy
 FROM $BASE_IMAGE
