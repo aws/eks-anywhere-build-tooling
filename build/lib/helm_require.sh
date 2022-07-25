@@ -43,6 +43,7 @@ metadata:
 spec:
   images:
 !
+REQUIRES_CONFIG_FILE=helm/requires-config.yaml
 JSON_SCHEMA_FILE=helm/schema.json
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 export IMAGE_TAG
@@ -75,10 +76,16 @@ do
     digest: ${IMAGE_SHASUM}
 !
 done
+
 if [ -f ${JSON_SCHEMA_FILE} ]
 then
   JSON_SCHEMA=$(cat ${JSON_SCHEMA_FILE} | gzip | base64)
   cat >>${REQUIRES_FILE} <<!
-    schema: ${JSON_SCHEMA}
+  schema: ${JSON_SCHEMA}
 !
+fi
+
+if [ -f ${REQUIRES_CONFIG_FILE} ]
+then
+  cat ${REQUIRES_CONFIG_FILE} >>${REQUIRES_FILE}
 fi
