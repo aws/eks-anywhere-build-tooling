@@ -19,7 +19,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-IMAGE_REGISTRY="${1?First argument is registry}"
+if [ $# -lt 6 ]; then
+    >&2 echo "ERROR: expected 6+ arguments, got $#"
+    exit 1
+fi
+IMAGE_OUTPUT=${1?First argument is image output}
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
 OUTPUT_DIR="${3?Third argument is output directory}"
 IMAGE_TAG="${4?Fourth argument is image tag}"
@@ -58,8 +62,11 @@ do
   else
     TAG="${LATEST}"
   fi
-  IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${HELM_REGISTRY} ${IMAGE} ${TAG}) ||
-  IMAGE_SHASUM=$(${SCRIPT_ROOT}/image_shasum.sh ${IMAGE_REGISTRY} ${IMAGE} ${TAG})
+  # The skopeo tool isn't programmed to read the image digest on stdin (fie!)
+  # However, bash process substitution will fit the bill (yay!) See
+  # https://www.gnu.org/software/bash/manual/bash.html#Process-Substitution
+  # for more info.
+  IMAGE_SHASUM=$(skopeo manifest-digest <(skopeo inspect --raw -n "docker-archive:$IMAGE_OUTPUT"))
   echo "s,{{${IMAGE}}},${IMAGE_SHASUM},g" >>${SEDFILE}
   if [ "${TAG}" == "latest" ]
   then
