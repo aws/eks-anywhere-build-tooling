@@ -651,7 +651,7 @@ prepare-cgo-folder:
 ## Helm Targets
 .PHONY: helm/pull 
 helm/pull: 
-	$(BUILD_LIB)/helm_pull.sh $(HELM_PULL_LOCATION) $(HELM_PULL_NAME) $(REPO) $(HELM_DIRECTORY) $(CHART_VERSION) $(COPY_CRDS)
+	$(BUILD_LIB)/helm_pull.sh $(HELM_PULL_LOCATION) $(HELM_REPO_URL) $(HELM_PULL_NAME) $(REPO) $(HELM_DIRECTORY) $(CHART_VERSION) $(COPY_CRDS)
 
 # Build helm chart
 .PHONY: helm/build

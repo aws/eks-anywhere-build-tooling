@@ -26,7 +26,8 @@ CHART_VERSION=$(shell cat CHART_VERSION)
 
 HELM_PULL=true
 HELM_PULL_NAME=emissary-ingress
-HELM_PULL_LOCATION=datawire/emissary-ingress
+HELM_PULL_LOCATION=datawire
+HELM_REPO_URL=https://app.getambassador.io
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/emissary-ingress

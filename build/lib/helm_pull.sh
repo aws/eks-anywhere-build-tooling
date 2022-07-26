@@ -24,11 +24,12 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 IMAGE_REGISTRY="${1?First argument is image registry}"
-HELM_PULL_NAME="${2?Second arguement is name of helm chart}"
-REPO="${3?Third argument is helm source repository}"
-HELM_DIRECTORY="${4?Fourth argument is helm directory name}"
-CHART_VERSION="${5?Fifth argument is the version of helm chart we need to pull}"
-COPY_CRDS="${6?Sixth argument is whether we need add crds to the helm chart}"
+HELM_REPO_URL="${2?Second arguement is update repo url}"
+HELM_PULL_NAME="${3?Third argument is name of helm chart}"
+REPO="${4?Fourth argument is helm source repository}"
+HELM_DIRECTORY="${5?Fifth argument is helm directory name}"
+CHART_VERSION="${6?Sixth argument is the version of helm chart we need to pull}"
+COPY_CRDS="${7?Seventh argument is whether we need add crds to the helm chart}"
 
 function cleanup() {
   if [ -d "$HELM_PULL_NAME" ]; then
@@ -52,7 +53,9 @@ function copy-crds() {
 
 trap cleanup err
 
-helm pull ${IMAGE_REGISTRY}  --version ${CHART_VERSION} --untar
+helm repo add ${IMAGE_REGISTRY} ${HELM_REPO_URL}
+helm repo update
+helm pull ${IMAGE_REGISTRY}/${HELM_PULL_NAME} --version ${CHART_VERSION} --untar
 
 cleanup-chart
 
