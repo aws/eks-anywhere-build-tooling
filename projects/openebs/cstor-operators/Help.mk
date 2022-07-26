@@ -7,42 +7,35 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `metallb`
+clone-repo:  ## Clone upstream `cstor-operators`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `controller speaker` for `linux/amd64 linux/arm64`
-_output/bin/cstor-operator/linux-amd64/pool-manager: ## Build `_output/bin/metallb/linux-amd64/controller`
-_output/bin/cstor-operator/linux-amd64/cvc-operator: ## Build `_output/bin/metallb/linux-amd64/speaker`
-_output/bin/cstor-operator/linux-arm64/pool-manager: ## Build `_output/bin/metallb/linux-arm64/controller`
-_output/bin/cstor-operator/linux-arm64/cvc-operator: ## Build `_output/bin/metallb/linux-arm64/speaker`
-_output/bin/cstor-operator/linux-amd64/volume-manager:
-_output/bin/cstor-operator/linux-arm64/volume-manager: 
-_output/bin/cstor-operator/linux-amd64/cspc-operator:
-_output/bin/cstor-operator/linux-arm64/cspc-operator: 
-_output/bin/cstor-operator/linux-amd64/webhook:
-_output/bin/cstor-operator/linux-arm64/webhook: 
-
+binaries: ## Build all binaries: `pool-manager cvc-operator volume-manager cspc-operator webhook` for `linux/amd64 linux/arm64`
+_output/bin/cstor-operators/linux-amd64/pool-manager: ## Build `_output/bin/cstor-operators/linux-amd64/pool-manager`
+_output/bin/cstor-operators/linux-amd64/cvc-operator: ## Build `_output/bin/cstor-operators/linux-amd64/cvc-operator`
+_output/bin/cstor-operators/linux-amd64/volume-manager: ## Build `_output/bin/cstor-operators/linux-amd64/volume-manager`
+_output/bin/cstor-operators/linux-amd64/cspc-operator: ## Build `_output/bin/cstor-operators/linux-amd64/cspc-operator`
+_output/bin/cstor-operators/linux-amd64/webhook: ## Build `_output/bin/cstor-operators/linux-amd64/webhook`
+_output/bin/cstor-operators/linux-arm64/pool-manager: ## Build `_output/bin/cstor-operators/linux-arm64/pool-manager`
+_output/bin/cstor-operators/linux-arm64/cvc-operator: ## Build `_output/bin/cstor-operators/linux-arm64/cvc-operator`
+_output/bin/cstor-operators/linux-arm64/volume-manager: ## Build `_output/bin/cstor-operators/linux-arm64/volume-manager`
+_output/bin/cstor-operators/linux-arm64/cspc-operator: ## Build `_output/bin/cstor-operators/linux-arm64/cspc-operator`
+_output/bin/cstor-operators/linux-arm64/webhook: ## Build `_output/bin/cstor-operators/linux-arm64/webhook`
 
 ##@ Image Targets
-local-images: ## Builds `controller/images/amd64 speaker/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `controller/images/push speaker/images/push helm/push` to IMAGE_REPO
-pool-manager/images/amd64: ## Builds/pushes `controller/images/amd64`
-cvc-operator/images/amd64: ## Builds/pushes `speaker/images/amd64`
-volume-manager/images/amd64:
-cspc-operator/images/amd64:
-webhook/images/amd64:
-helm/build: ## Builds/pushes `helm/build`
-pool-manager/images/push: ## Builds/pushes `controller/images/push`
-cvc-operator/images/push: ## Builds/pushes `speaker/images/push`
-volume-manager/images/push:
-cspc-operator/images/push:
-webhook/images/push:
-helm/push: ## Builds/pushes `helm/push`
-
-##@ Helm Targets
-helm/build: ## Build helm chart
-helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
+local-images: ## Builds `pool-manager/images/amd64 cvc-operator/images/amd64 volume-manager/images/amd64 cspc-operator/images/amd64 webhook/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `pool-manager/images/push cvc-operator/images/push volume-manager/images/push cspc-operator/images/push webhook/images/push` to IMAGE_REPO
+pool-manager/images/amd64: ## Builds/pushes `pool-manager/images/amd64`
+cvc-operator/images/amd64: ## Builds/pushes `cvc-operator/images/amd64`
+volume-manager/images/amd64: ## Builds/pushes `volume-manager/images/amd64`
+cspc-operator/images/amd64: ## Builds/pushes `cspc-operator/images/amd64`
+webhook/images/amd64: ## Builds/pushes `webhook/images/amd64`
+pool-manager/images/push: ## Builds/pushes `pool-manager/images/push`
+cvc-operator/images/push: ## Builds/pushes `cvc-operator/images/push`
+volume-manager/images/push: ## Builds/pushes `volume-manager/images/push`
+cspc-operator/images/push: ## Builds/pushes `cspc-operator/images/push`
+webhook/images/push: ## Builds/pushes `webhook/images/push`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
@@ -69,6 +62,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
 ########### END GENERATED ###########################
