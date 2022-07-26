@@ -58,11 +58,11 @@ yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-sys
 make release-manifests
 
 ## Build the development manifests
-make -C test/infrastructure/docker set-manifest-image \
-MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/capd-manager MANIFEST_TAG=$IMAGE_TAG
-make -C test/infrastructure/docker set-manifest-pull-policy PULL_POLICY=IfNotPresent
-PATH="$(pwd)/hack/tools/bin:$PATH" make -C test/infrastructure/docker release-manifests
-
+make set-manifest-image \
+    MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/capd-manager MANIFEST_TAG=$IMAGE_TAG \
+    TARGET_RESOURCE="./test/infrastructure/docker/config/default/manager_image_patch.yaml"
+make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./test/infrastructure/docker/config/default/manager_pull_policy.yaml"
+make release-manifests-dev
 
 mkdir -p $OUTPUT_DIR/manifests/{bootstrap-kubeadm,cluster-api,control-plane-kubeadm,infrastructure-docker}/$TAG
 cp out/bootstrap-components.yaml "$OUTPUT_DIR/manifests/bootstrap-kubeadm/$TAG"
@@ -74,7 +74,7 @@ cp out/metadata.yaml "$OUTPUT_DIR/manifests/control-plane-kubeadm/$TAG"
 cp out/core-components.yaml "$OUTPUT_DIR/manifests/cluster-api/$TAG"
 cp out/metadata.yaml "$OUTPUT_DIR/manifests/cluster-api/$TAG"
 
-cp test/infrastructure/docker/out/infrastructure-components.yaml "$OUTPUT_DIR/manifests/infrastructure-docker/$TAG/infrastructure-components-development.yaml"
+cp out/infrastructure-components-development.yaml "$OUTPUT_DIR/manifests/infrastructure-docker/$TAG/infrastructure-components-development.yaml"
 cp test/infrastructure/docker/templates/cluster-template-development.yaml "$OUTPUT_DIR/manifests/infrastructure-docker/$TAG"
 cp out/metadata.yaml "$OUTPUT_DIR/manifests/infrastructure-docker/$TAG"
 
