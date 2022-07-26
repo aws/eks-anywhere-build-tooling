@@ -1,61 +1,59 @@
 ARG BASE_IMAGE 
 ARG BUILDER_IMAGE
 ARG APPMESH_VERSION
+ARG TARGETARCH
+ARG TARGETOS
+FROM public.ecr.aws/appmesh/aws-appmesh-envoy:$APPMESH_VERSION as envoy
+
 FROM $BUILDER_IMAGE as emissary-builder
 
-COPY emissary/python /buildroot/python
-COPY _output/bin/emissary/linux-amd64 /buildroot/bin
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot/bin:/newroot/buildroot
 
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot/bin
+COPY emissary/python _output/bin/emissary/linux-amd64 emissary/manifests/emissary/emissary-crds.yaml.in /newroot/buildroot
+COPY --from=envoy /usr/bin/envoy /THIRD-PARTY-LICENSES.txt /
 
-WORKDIR /buildroot
+WORKDIR /newroot/buildroot
 
 RUN install_rpm libcap htop && \
     install_binary /usr/bin/curl /usr/bin/chgrp /usr/bin/chmod && \
-    time pip3 install --no-deps -e python && \
+    time pip3 install --no-deps -e . && \
     pip3 install pip-tools==6.3.1 && \
     pip3 install PyYAML==5.4.1 && \
     pip3 install orjson==3.6.6 && \
-    mkdir -p /ambassador/sidecars && \
-    ln -s /buildroot/python/post_update.py /ambassador/post_update.py && \
-    ln -s /buildroot/python/watch_hook.py /ambassador/watch_hook.py && \
-    ln -s /buildroot/python/kubewatch.py /ambassador/kubewatch.py && \
-    ln -s /buildroot/bin/busyambassador /buildroot/bin/kubestatus && \
-    ln -s /buildroot/bin/busyambassador /buildroot/bin/watt && \
-    ln -s /buildroot/bin/busyambassador /buildroot/bin/agent && \
-    ln -s /buildroot/bin/busyambassador /buildroot/bin/apiext && \
-    ln -s /buildroot/bin/* /usr/local/bin/ && \
+    mkdir -p /newroot/ambassador/sidecars /newroot//usr/lib/python3.9/site-packages /newroot/usr/local/bin /ambassador /buildroot && \
+    mv /envoy /newroot/usr/local/bin/envoy && \
+    mv /THIRD-PARTY-LICENSES.txt /newroot/ENVOY_LICENSES.txt && \
+    cp -r /usr/lib/python3.9/site-packages /newroot/usr/lib/python3.9 && \
+    mkdir -p /newroot/buildroot/manifests/emissary && \
+    mv emissary-crds.yaml.in /newroot/buildroot/manifests/emissary/emissary-crds.yaml && \
+    ln -sf /newroot/buildroot/post_update.py /ambassador/post_update.py && \
+    ln -sf /newroot/buildroot/watch_hook.py /ambassador/watch_hook.py && \
+    ln -sf /newroot/buildroot/kubewatch.py /ambassador/kubewatch.py && \
+    ln -sf /buildroot/busyambassador /newroot/buildroot/kubestatus && \
+    ln -sf /buildroot/busyambassador /newroot/buildroot/watt && \
+    ln -sf /buildroot/busyambassador /newroot/buildroot/agent && \
+    ln -sf /buildroot/busyambassador /newroot/buildroot/apiext && \
+    ln -sf /newroot/buildroot/* /usr/local/bin/ && \
     cleanup "emissary"
 
-FROM public.ecr.aws/appmesh/aws-appmesh-envoy:$APPMESH_VERSION as envoy
 FROM $BASE_IMAGE
 
-ARG TARGETARCH
-ARG TARGETOS
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot HOME=/tmp/ambassador
 
-COPY emissary/manifests/emissary/emissary-crds.yaml.in manifests/emissary/emissary-crds.yaml
-COPY --from=emissary-builder /buildroot  /buildroot
 COPY --from=emissary-builder /newroot /
-COPY --from=envoy /usr/bin/envoy /usr/local/bin/envoy
-COPY --from=envoy /THIRD-PARTY-LICENSES.txt  /ENVOY_LICENSES.txt
-COPY --from=emissary-builder /ambassador /ambassador
-COPY --from=emissary-builder /usr/lib/python3.9/site-packages /usr/lib/python3.9/site-packages
-COPY _output/LICENSES /LICENSES
-COPY ATTRIBUTION.txt /ATTRIBUTION.txt
-
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot:/buildroot/bin
-ENV HOME=/tmp/ambassador
 
 WORKDIR /buildroot
 
-RUN cd /buildroot/python && python3 setup.py install && \
+RUN cd /buildroot && python3 setup.py install && \
     python3 -m pip uninstall -y pip && \
     setcap cap_net_bind_service=ei /usr/local/bin/envoy && \
-    setcap cap_net_bind_service=p /buildroot/bin//capabilities_wrapper && \
+    setcap cap_net_bind_service=p /buildroot/capabilities_wrapper && \
     chgrp -R 0 /ambassador && \
     chmod -R u+x /ambassador && \
     chmod -R g=u /ambassador /etc/passwd
 
 WORKDIR /ambassador
 
-ENTRYPOINT [ "bash", "/buildroot/python/entrypoint.sh" ]
+COPY ATTRIBUTION.txt _output/LICENSES /
+
+ENTRYPOINT [ "bash", "/buildroot/entrypoint.sh" ]
