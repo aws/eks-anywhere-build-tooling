@@ -16,10 +16,8 @@ RUN apt-get update \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger2.yaml > dist/swagger2.json \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger3.yaml > dist/swagger3.json \
-    && cp swagger.yaml dist
-
-RUN set -x && \
-    mkdir -p /newroot/var/log/nginx /newroot/usr/share/nginx/html \
+    && cp swagger.yaml dist \
+    && mkdir -p /newroot/var/log/nginx /newroot/usr/share/nginx/html \
     && chmod 755 /newroot/var/log/nginx \
     && ln -sf /dev/stdout /newroot/var/log/nginx/access.log \
     && ln -sf /dev/stderr /newroot/var/log/nginx/error.log \
