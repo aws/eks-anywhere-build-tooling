@@ -20,15 +20,15 @@ RUN install_rpm libcap htop && \
     pip3 install pip-tools==6.3.1 && \
     pip3 install PyYAML==5.4.1 && \
     pip3 install orjson==3.6.6 && \
-    mkdir -p /newroot/ambassador/sidecars /newroot//usr/lib/python3.9/site-packages /newroot/usr/local/bin /ambassador /buildroot && \
+    mkdir -p /newroot/ambassador/sidecars /newroot/usr/lib/python3.9/site-packages /newroot/usr/local/bin /ambassador /buildroot && \
     mv /envoy /newroot/usr/local/bin/envoy && \
     mv /THIRD-PARTY-LICENSES.txt /newroot/ENVOY_LICENSES.txt && \
     cp -r /usr/lib/python3.9/site-packages /newroot/usr/lib/python3.9 && \
     mkdir -p /newroot/buildroot/manifests/emissary && \
     mv emissary-crds.yaml.in /newroot/buildroot/manifests/emissary/emissary-crds.yaml && \
-    ln -sf /newroot/buildroot/post_update.py /ambassador/post_update.py && \
-    ln -sf /newroot/buildroot/watch_hook.py /ambassador/watch_hook.py && \
-    ln -sf /newroot/buildroot/kubewatch.py /ambassador/kubewatch.py && \
+    ln -sf /buildroot/post_update.py /ambassador/post_update.py && \
+    ln -sf /buildroot/watch_hook.py /ambassador/watch_hook.py && \
+    ln -sf /buildroot/kubewatch.py /ambassador/kubewatch.py && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/kubestatus && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/watt && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/agent && \

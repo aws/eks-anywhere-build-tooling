@@ -22,19 +22,17 @@ DOCKERFILE_FOLDER=./docker/linux/emissary-image
 BASE_IMAGE_REPO?=public.ecr.aws/k1e6s8o8
 BASE_IMAGE_NAME?=eks-distro-minimal-base-python
 
-CHART_VERSION=$(shell cat CHART_VERSION)
-
-HELM_PULL=true
-HELM_PULL_NAME=emissary-ingress
-HELM_PULL_LOCATION=datawire
-HELM_REPO_URL=https://app.getambassador.io
+# CHART_VERSION=$(shell cat CHART_VERSION)
+# HELM_PULL=true
+# HELM_PULL_NAME=emissary-ingress
+# HELM_PULL_LOCATION=datawire
+# HELM_REPO_URL=https://app.getambassador.io
+# COPY_CRDS=$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/helm/crds
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/emissary-ingress
 HELM_DESTINATION_REPOSITORY=emissary-ingress/emissary
 HELM_IMAGE_LIST=emissary-ingress/emissary
-COPY_CRDS=$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/helm/crds
-
 
 include $(BASE_DIRECTORY)/Common.mk
 

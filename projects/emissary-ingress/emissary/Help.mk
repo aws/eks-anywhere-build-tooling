@@ -22,7 +22,6 @@ emissary/images/amd64: ## Builds/pushes `emissary/images/amd64`
 emissary/images/push: ## Builds/pushes `emissary/images/push`
 
 ##@ Helm Targets
-helm/pull: ## Pulls the upstream helm chart
 helm/build: ## Build helm chart
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
