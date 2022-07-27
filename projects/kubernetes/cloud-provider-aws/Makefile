@@ -7,8 +7,7 @@ REPO_OWNER=kubernetes
 
 BINARY_TARGET_FILES=ecr-credential-provider
 SOURCE_PATTERNS=./cmd/ecr-credential-provider
-# EXTRA_GO_LDFLAGS="-w -s -X k8s.io/component-base/version.gitVersion=$(GIT_TAG)"
-EXTRA_GO_LDFLAGS=-X k8s.io/component-base/version.gitVersion=v.22.3
+EXTRA_GO_LDFLAGS=-X k8s.io/component-base/version.gitVersion=$(GIT_TAG)
 
 HAS_S3_ARTIFACTS=true
 
