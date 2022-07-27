@@ -1,12 +1,13 @@
 {{- if .Values.hegel.deploy }}
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   labels:
     app: {{ .Values.hegel.name }}
   name:  {{ .Values.hegel.name }}
   namespace: {{ .Values.namespace }}
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: {{ .Values.hegel.name }}
@@ -21,6 +22,9 @@ spec:
           {{- range .Values.hegel.args }}
           - {{ . }}
           {{- end }}
+          env:
+          - name: TRUSTED_PROXIES
+            value: 192.168.0.0/16
           image: {{ .Values.hegel.image }}
           imagePullPolicy: {{ .Values.hegel.imagePullPolicy }}
           name: {{ .Values.hegel.name }}
