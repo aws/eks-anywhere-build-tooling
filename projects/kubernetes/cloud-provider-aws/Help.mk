@@ -9,12 +9,11 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `cloud-provider-aws`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
-patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `billy` for `linux/amd64 linux/arm64`
-_output/bin/cloud-provider-aws/linux-amd64/billy: ## Build `_output/bin/cloud-provider-aws/linux-amd64/billy`
-_output/bin/cloud-provider-aws/linux-arm64/billy: ## Build `_output/bin/cloud-provider-aws/linux-arm64/billy`
+binaries: ## Build all binaries: `ecr-credential-provider` for `linux/amd64 linux/arm64`
+_output/bin/cloud-provider-aws/linux-amd64/ecr-credential-provider: ## Build `_output/bin/cloud-provider-aws/linux-amd64/ecr-credential-provider`
+_output/bin/cloud-provider-aws/linux-arm64/ecr-credential-provider: ## Build `_output/bin/cloud-provider-aws/linux-arm64/ecr-credential-provider`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
