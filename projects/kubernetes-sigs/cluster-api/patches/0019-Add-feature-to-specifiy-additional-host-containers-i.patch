@@ -1,8 +1,7 @@
-From 785ec91c98bf00625c1443f92c87266aa4dd5744 Mon Sep 17 00:00:00 2001
+From c1598ac0f6bf766ce808a3b9e3ced598867cc097 Mon Sep 17 00:00:00 2001
 From: Victor Pineda <vgonzla@amazon.com>
 Date: Tue, 21 Jun 2022 07:50:19 -0700
-Subject: [PATCH 22/22] Add feature to specifiy additional host containers in
- BR
+Subject: [PATCH 19/19] Add feature to specifiy additional host containers in BR
 
 Host containers are a feature within BR that allows us to pull images
 without the need of having to bootstrap kuberentes. Such containers can
@@ -38,12 +37,12 @@ cr: https://code.amazon.com/reviews/CR-71408825
  17 files changed, 569 insertions(+), 126 deletions(-)
 
 diff --git a/bootstrap/kubeadm/api/v1alpha4/conversion.go b/bootstrap/kubeadm/api/v1alpha4/conversion.go
-index 75ee00286..149c77989 100644
+index 58ec2acb9..bce8664fc 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/conversion.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/conversion.go
-@@ -143,3 +143,8 @@ func Convert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *bootstr
- 	// InitConfiguration.Patches does not exist in kubeadm v1alpha4 API.
- 	return autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in, out, s)
+@@ -179,3 +179,8 @@ func Convert_v1beta1_User_To_v1alpha4_User(in *bootstrapv1.User, out *User, s ap
+ 	// User.PasswdFrom does not exist in kubeadm v1alpha4 API.
+ 	return autoConvert_v1beta1_User_To_v1alpha4_User(in, out, s)
  }
 +
 +func Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in *bootstrapv1.ClusterConfiguration, out *ClusterConfiguration, s apiconversion.Scope) error {
@@ -51,7 +50,7 @@ index 75ee00286..149c77989 100644
 +	return autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in, out, s)
 +}
 diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-index 07a398790..b64c6b1f7 100644
+index 8df88b740..5e8de563f 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 @@ -115,11 +115,6 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -66,7 +65,7 @@ index 07a398790..b64c6b1f7 100644
  	if err := s.AddGeneratedConversionFunc((*ClusterStatus)(nil), (*v1beta1.ClusterStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
  		return Convert_v1alpha4_ClusterStatus_To_v1beta1_ClusterStatus(a.(*ClusterStatus), b.(*v1beta1.ClusterStatus), scope)
  	}); err != nil {
-@@ -445,6 +440,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+@@ -440,6 +435,11 @@ func RegisterConversions(s *runtime.Scheme) error {
  	}); err != nil {
  		return err
  	}
@@ -94,15 +93,15 @@ index 07a398790..b64c6b1f7 100644
  func autoConvert_v1alpha4_ClusterStatus_To_v1beta1_ClusterStatus(in *ClusterStatus, out *v1beta1.ClusterStatus, s conversion.Scope) error {
  	out.APIEndpoints = *(*map[string]v1beta1.APIEndpoint)(unsafe.Pointer(&in.APIEndpoints))
  	return nil
-@@ -1138,6 +1134,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
- 	}
+@@ -1136,6 +1132,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
  	out.ControlPlane = (*JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
+ 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
  	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
 +	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	return nil
  }
  
-@@ -1240,7 +1237,15 @@ func Convert_v1beta1_KubeadmConfigList_To_v1alpha4_KubeadmConfigList(in *v1beta1
+@@ -1238,7 +1235,15 @@ func Convert_v1beta1_KubeadmConfigList_To_v1alpha4_KubeadmConfigList(in *v1beta1
  }
  
  func autoConvert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *KubeadmConfigSpec, out *v1beta1.KubeadmConfigSpec, s conversion.Scope) error {
@@ -119,7 +118,7 @@ index 07a398790..b64c6b1f7 100644
  	if in.InitConfiguration != nil {
  		in, out := &in.InitConfiguration, &out.InitConfiguration
  		*out = new(v1beta1.InitConfiguration)
-@@ -1278,7 +1283,15 @@ func Convert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *Kubeadm
+@@ -1296,7 +1301,15 @@ func Convert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *Kubeadm
  }
  
  func autoConvert_v1beta1_KubeadmConfigSpec_To_v1alpha4_KubeadmConfigSpec(in *v1beta1.KubeadmConfigSpec, out *KubeadmConfigSpec, s conversion.Scope) error {
@@ -137,10 +136,10 @@ index 07a398790..b64c6b1f7 100644
  		in, out := &in.InitConfiguration, &out.InitConfiguration
  		*out = new(InitConfiguration)
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index a009e3748..a239db756 100644
+index 096b1f360..11ae4ae25 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-@@ -156,6 +156,11 @@ type ClusterConfiguration struct {
+@@ -162,6 +162,11 @@ type ClusterConfiguration struct {
  	// The cluster name
  	// +optional
  	ClusterName string `json:"clusterName,omitempty"`
@@ -152,7 +151,7 @@ index a009e3748..a239db756 100644
  }
  
  // Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
-@@ -459,6 +464,26 @@ type JoinConfiguration struct {
+@@ -471,6 +476,26 @@ type JoinConfiguration struct {
  	// "kubeadm join". The minimum kubernetes version needed to support Patches is v1.22
  	// +optional
  	Patches *Patches `json:"patches,omitempty"`
@@ -180,7 +179,7 @@ index a009e3748..a239db756 100644
  
  // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
 diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
-index 341b00474..e681b8fb0 100644
+index 7ac786487..402f18846 100644
 --- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 @@ -175,6 +175,22 @@ func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
@@ -218,7 +217,7 @@ index 341b00474..e681b8fb0 100644
  }
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterConfiguration.
-@@ -605,6 +626,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+@@ -615,6 +636,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  		*out = new(Patches)
  		**out = **in
  	}
@@ -231,7 +230,7 @@ index 341b00474..e681b8fb0 100644
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 67abfc66d..191b513b4 100644
+index 4ecc2b94e..a23cdb398 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -2394,6 +2394,48 @@ spec:
@@ -283,7 +282,7 @@ index 67abfc66d..191b513b4 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -3059,6 +3101,48 @@ spec:
+@@ -3070,6 +3112,48 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -333,7 +332,7 @@ index 67abfc66d..191b513b4 100644
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 15d4c5aa9..45bb76646 100644
+index 250493633..4c9133719 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -2407,6 +2407,49 @@ spec:
@@ -386,7 +385,7 @@ index 15d4c5aa9..45bb76646 100644
                            certificatesDir:
                              description: 'CertificatesDir specifies where to store
                                or look for all required certificates. NB: if not provided,
-@@ -3118,6 +3161,49 @@ spec:
+@@ -3129,6 +3172,49 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -660,10 +659,10 @@ index 3a760d51a..73d35963e 100644
  
  	var taintsToml strings.Builder
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index c2ab43421..07b0afcd4 100644
+index 45cadd661..8aa6b818a 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -450,9 +450,10 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -451,9 +451,10 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		}
  
  		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
@@ -677,7 +676,7 @@ index c2ab43421..07b0afcd4 100644
  		}
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -621,9 +622,10 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -634,9 +635,10 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		})
  	case bootstrapv1.Bottlerocket:
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
@@ -691,7 +690,7 @@ index c2ab43421..07b0afcd4 100644
  		}
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -740,9 +742,10 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -759,9 +761,10 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		})
  	case bootstrapv1.Bottlerocket:
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
@@ -719,7 +718,7 @@ index e893686d5..6cfa9628b 100644
 +	return autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfiguration(src, dst, s)
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
-index 97963846c..c244d9bc7 100644
+index 8c8c14ce3..12426ac4e 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 @@ -108,11 +108,6 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -762,9 +761,9 @@ index 97963846c..c244d9bc7 100644
  func autoConvert_upstreamv1beta1_ClusterStatus_To_v1beta1_ClusterStatus(in *ClusterStatus, out *v1beta1.ClusterStatus, s conversion.Scope) error {
  	out.APIEndpoints = *(*map[string]v1beta1.APIEndpoint)(unsafe.Pointer(&in.APIEndpoints))
  	return nil
-@@ -860,6 +856,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
- 	}
+@@ -862,6 +858,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
  	out.ControlPlane = (*JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
+ 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
  	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
 +	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	return nil
@@ -784,7 +783,7 @@ index efbb99b7e..e9e70d882 100644
 +	return autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfiguration(src, dst, s)
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-index c1dc563ad..535f38c34 100644
+index 5e8ec2b5c..11d0f089f 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 @@ -108,11 +108,6 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -827,9 +826,9 @@ index c1dc563ad..535f38c34 100644
  func autoConvert_upstreamv1beta2_ClusterStatus_To_v1beta1_ClusterStatus(in *ClusterStatus, out *v1beta1.ClusterStatus, s conversion.Scope) error {
  	out.APIEndpoints = *(*map[string]v1beta1.APIEndpoint)(unsafe.Pointer(&in.APIEndpoints))
  	return nil
-@@ -872,6 +868,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
- 		out.ControlPlane = nil
+@@ -874,6 +870,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
  	}
+ 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
  	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
 +	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	return nil
@@ -854,7 +853,7 @@ index bcf9e1ef1..1a96971e5 100644
 +	return autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(src, dst, s)
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index d66122452..0d47fabe8 100644
+index a0bebee87..e6b1ad60e 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -113,11 +113,6 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -914,9 +913,9 @@ index d66122452..0d47fabe8 100644
  func autoConvert_upstreamv1beta3_ControlPlaneComponent_To_v1beta1_ControlPlaneComponent(in *ControlPlaneComponent, out *v1beta1.ControlPlaneComponent, s conversion.Scope) error {
  	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
  	out.ExtraVolumes = *(*[]v1beta1.HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
-@@ -864,14 +860,10 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
- 		out.ControlPlane = nil
+@@ -866,14 +862,10 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
  	}
+ 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
  	out.Patches = (*Patches)(unsafe.Pointer(in.Patches))
 +	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	return nil
@@ -931,10 +930,10 @@ index d66122452..0d47fabe8 100644
  	if err := Convert_upstreamv1beta3_APIEndpoint_To_v1beta1_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
  		return err
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index a71635141..835d5c325 100644
+index 7f7f8a9d3..9991cbf61 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -2863,6 +2863,49 @@ spec:
+@@ -2870,6 +2870,49 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -984,7 +983,7 @@ index a71635141..835d5c325 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -3555,6 +3598,49 @@ spec:
+@@ -3573,6 +3616,49 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1035,10 +1034,10 @@ index a71635141..835d5c325 100644
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index b60dcae96..561c1076a 100644
+index c81e8f16f..352127a36 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -1480,6 +1480,51 @@ spec:
+@@ -1481,6 +1481,51 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1090,7 +1089,7 @@ index b60dcae96..561c1076a 100644
                                certificatesDir:
                                  description: 'CertificatesDir specifies where to store
                                    or look for all required certificates. NB: if not
-@@ -2221,6 +2266,51 @@ spec:
+@@ -2233,6 +2278,51 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1143,5 +1142,5 @@ index b60dcae96..561c1076a 100644
                                  description: 'CACertPath is the path to the SSL certificate
                                    authority used to secure comunications between node
 -- 
-2.32.0
+2.37.0
 

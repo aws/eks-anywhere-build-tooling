@@ -1,7 +1,7 @@
-From d516be3ee3a132f55d2597f60280f1af89893ede Mon Sep 17 00:00:00 2001
+From 1a08c390a95fad1a448f41f4cb2d5187daa16ac3 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Fri, 11 Jun 2021 10:43:09 -0700
-Subject: [PATCH 01/22] Adding capi support for Bottlerocket
+Subject: [PATCH 01/19] Adding capi support for Bottlerocket
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 
@@ -47,10 +47,10 @@ Remove userdata logging for bottlerocket
  .../controllers/kubeadmconfig_controller.go   |  73 +++++++
  .../kubeadm/types/upstreamv1beta1/types.go    |  55 +++++-
  .../upstreamv1beta1/zz_generated.deepcopy.go  |  58 ++++++
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 159 +++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  72 +++++++
- go.mod                                        |   1 +
- 21 files changed, 1227 insertions(+), 4 deletions(-)
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 186 ++++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  99 ++++++++++
+ go.mod                                        |   2 +-
+ 21 files changed, 1281 insertions(+), 5 deletions(-)
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
@@ -98,10 +98,10 @@ index ea29c2945..fea80179b 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 354d777d5..5f525f692 100644
+index 75b85dd6a..7e99cbbeb 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-@@ -66,6 +66,21 @@ type InitConfiguration struct {
+@@ -72,6 +72,21 @@ type InitConfiguration struct {
  type ClusterConfiguration struct {
  	metav1.TypeMeta `json:",inline"`
  
@@ -123,7 +123,7 @@ index 354d777d5..5f525f692 100644
  	// Etcd holds configuration for etcd.
  	// NB: This value defaults to a Local (stacked) etcd
  	// +optional
-@@ -133,6 +148,29 @@ type ClusterConfiguration struct {
+@@ -139,6 +154,29 @@ type ClusterConfiguration struct {
  	ClusterName string `json:"clusterName,omitempty"`
  }
  
@@ -153,7 +153,7 @@ index 354d777d5..5f525f692 100644
  // ControlPlaneComponent holds settings common to control plane component of the cluster.
  type ControlPlaneComponent struct {
  	// ExtraArgs is an extra set of flags to pass to the control plane component.
-@@ -343,6 +381,21 @@ type ExternalEtcd struct {
+@@ -349,6 +387,21 @@ type ExternalEtcd struct {
  type JoinConfiguration struct {
  	metav1.TypeMeta `json:",inline"`
  
@@ -176,7 +176,7 @@ index 354d777d5..5f525f692 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
-index 5ec772643..737fec9a2 100644
+index 8b42d99cb..813591bb4 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
 @@ -23,7 +23,7 @@ import (
@@ -199,7 +199,7 @@ index 5ec772643..737fec9a2 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 19f22af25..2edad1c42 100644
+index ed600a1bd..5e322b44b 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -102,6 +102,21 @@ spec:
@@ -381,7 +381,7 @@ index 19f22af25..2edad1c42 100644
                    scheduler:
                      description: Scheduler contains extra settings for the scheduler
                        control plane component
-@@ -2469,6 +2599,7 @@ spec:
+@@ -2472,6 +2602,7 @@ spec:
                  enum:
                  - cloud-config
                  - ignition
@@ -389,7 +389,7 @@ index 19f22af25..2edad1c42 100644
                  type: string
                ignition:
                  description: Ignition contains Ignition specific configuration.
-@@ -2677,6 +2808,21 @@ spec:
+@@ -2688,6 +2819,21 @@ spec:
                        schemas to the latest internal value, and may reject unrecognized
                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                      type: string
@@ -411,7 +411,7 @@ index 19f22af25..2edad1c42 100644
                    caCertPath:
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
-@@ -2869,6 +3015,34 @@ spec:
+@@ -2880,6 +3026,34 @@ spec:
                            content inline or by referencing a secret.
                          type: string
                      type: object
@@ -443,11 +443,11 @@ index 19f22af25..2edad1c42 100644
 +                          type: string
 +                        type: array
 +                    type: object
-                 type: object
-               mounts:
-                 description: Mounts specifies a list of mount points to be setup.
+                   skipPhases:
+                     description: SkipPhases is a list of phases to skip during command
+                       execution. The list of phases can be obtained with the "kubeadm
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index a8a05eb5b..76f6a2ee3 100644
+index fd2430fb7..31d43c2bf 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -111,6 +111,22 @@ spec:
@@ -638,7 +638,7 @@ index a8a05eb5b..76f6a2ee3 100644
                            scheduler:
                              description: Scheduler contains extra settings for the
                                scheduler control plane component
-@@ -2484,6 +2623,7 @@ spec:
+@@ -2487,6 +2626,7 @@ spec:
                          enum:
                          - cloud-config
                          - ignition
@@ -646,7 +646,7 @@ index a8a05eb5b..76f6a2ee3 100644
                          type: string
                        ignition:
                          description: Ignition contains Ignition specific configuration.
-@@ -2709,6 +2849,22 @@ spec:
+@@ -2720,6 +2860,22 @@ spec:
                                convert recognized schemas to the latest internal value,
                                and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                              type: string
@@ -669,7 +669,7 @@ index a8a05eb5b..76f6a2ee3 100644
                            caCertPath:
                              description: 'CACertPath is the path to the SSL certificate
                                authority used to secure comunications between node
-@@ -2916,6 +3072,36 @@ spec:
+@@ -2927,6 +3083,36 @@ spec:
                                    content inline or by referencing a secret.
                                  type: string
                              type: object
@@ -703,9 +703,9 @@ index a8a05eb5b..76f6a2ee3 100644
 +                                  type: string
 +                                type: array
 +                            type: object
-                         type: object
-                       mounts:
-                         description: Mounts specifies a list of mount points to be
+                           skipPhases:
+                             description: SkipPhases is a list of phases to skip during
+                               command execution. The list of phases can be obtained
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 new file mode 100644
 index 000000000..e4be8d945
@@ -1152,7 +1152,7 @@ index c2f158f7c..aaf8c5dc0 100644
  	if input.UseExperimentalRetry {
  		input.KubeadmCommand = retriableJoinScriptName
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index a7be733a6..8f387c2cd 100644
+index 0a5fd52b2..65bc7f197 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 @@ -40,6 +40,7 @@ import (
@@ -1163,7 +1163,7 @@ index a7be733a6..8f387c2cd 100644
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/ignition"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/locking"
-@@ -417,6 +418,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -418,6 +419,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  	// injects into config.ClusterConfiguration values from top level object
  	r.reconcileTopLevelObjectSettings(ctx, scope.Cluster, machine, scope.Config)
  
@@ -1210,7 +1210,7 @@ index a7be733a6..8f387c2cd 100644
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
  	if err != nil {
  		scope.Error(err, "Failed to marshal cluster configuration")
-@@ -470,6 +511,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -477,6 +518,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  			ControlPlaneInput: controlPlaneInput,
  			Ignition:          scope.Config.Spec.Ignition,
  		})
@@ -1223,7 +1223,7 @@ index a7be733a6..8f387c2cd 100644
  	default:
  		bootstrapInitData, err = cloudinit.NewInitControlPlane(controlPlaneInput)
  	}
-@@ -562,6 +609,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -575,6 +622,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  			NodeInput: nodeInput,
  			Ignition:  scope.Config.Spec.Ignition,
  		})
@@ -1243,7 +1243,7 @@ index a7be733a6..8f387c2cd 100644
  	default:
  		bootstrapJoinData, err = cloudinit.NewNode(nodeInput)
  	}
-@@ -658,6 +718,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -677,6 +737,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  			ControlPlaneJoinInput: controlPlaneJoinInput,
  			Ignition:              scope.Config.Spec.Ignition,
  		})
@@ -1428,10 +1428,10 @@ index 2eebc2402..e924a4a4b 100644
 +	return out
 +}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index bdd6b0cef..8adfcd777 100644
+index 8cd228166..e012f2d0d 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -177,6 +177,22 @@ spec:
+@@ -178,6 +178,22 @@ spec:
                            schemas to the latest internal value, and may reject unrecognized
                            values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                          type: string
@@ -1454,7 +1454,7 @@ index bdd6b0cef..8adfcd777 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -386,6 +402,36 @@ spec:
+@@ -387,6 +403,36 @@ spec:
                                "10.96.0.0/12" if that's unset.
                              type: string
                          type: object
@@ -1491,7 +1491,7 @@ index bdd6b0cef..8adfcd777 100644
                        scheduler:
                          description: Scheduler contains extra settings for the scheduler
                            control plane component
-@@ -582,6 +628,7 @@ spec:
+@@ -583,6 +629,7 @@ spec:
                        data
                      enum:
                      - cloud-config
@@ -1499,7 +1499,7 @@ index bdd6b0cef..8adfcd777 100644
                      type: string
                    initConfiguration:
                      description: InitConfiguration along with ClusterConfiguration
-@@ -754,6 +801,22 @@ spec:
+@@ -755,6 +802,22 @@ spec:
                            schemas to the latest internal value, and may reject unrecognized
                            values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                          type: string
@@ -1522,7 +1522,7 @@ index bdd6b0cef..8adfcd777 100644
                        caCertPath:
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
-@@ -930,6 +993,36 @@ spec:
+@@ -931,6 +994,36 @@ spec:
                                type: object
                              type: array
                          type: object
@@ -1559,38 +1559,7 @@ index bdd6b0cef..8adfcd777 100644
                      type: object
                    mounts:
                      description: Mounts specifies a list of mount points to be setup.
-@@ -1713,6 +1806,7 @@ spec:
-                       data
-                     enum:
-                     - cloud-config
-+                    - bottlerocket
-                     type: string
-                   initConfiguration:
-                     description: InitConfiguration along with ClusterConfiguration
-@@ -2067,6 +2161,22 @@ spec:
-                               type: object
-                             type: array
-                         type: object
-+                      pause:
-+                        description: Pause holds the image source for pause container
-+                          This is only for bottlerocket
-+                        properties:
-+                          imageRepository:
-+                            description: ImageRepository sets the container registry
-+                              to pull images from. if not set, the ImageRepository
-+                              defined in ClusterConfiguration will be used instead.
-+                            type: string
-+                          imageTag:
-+                            description: ImageTag allows to specify a tag for the
-+                              image. In case this value is set, kubeadm does not change
-+                              automatically the version of the above components during
-+                              upgrades.
-+                            type: string
-+                        type: object
-                     type: object
-                   mounts:
-                     description: Mounts specifies a list of mount points to be setup.
-@@ -2530,6 +2640,22 @@ spec:
+@@ -2537,6 +2630,22 @@ spec:
                            schemas to the latest internal value, and may reject unrecognized
                            values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                          type: string
@@ -1613,7 +1582,7 @@ index bdd6b0cef..8adfcd777 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -2736,6 +2862,22 @@ spec:
+@@ -2743,6 +2852,36 @@ spec:
                                "10.96.0.0/12" if that's unset.
                              type: string
                          type: object
@@ -1633,10 +1602,24 @@ index bdd6b0cef..8adfcd777 100644
 +                              upgrades.
 +                            type: string
 +                        type: object
++                      proxy:
++                        description: Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
                        scheduler:
                          description: Scheduler contains extra settings for the scheduler
                            control plane component
-@@ -2929,6 +3071,7 @@ spec:
+@@ -2939,6 +3078,7 @@ spec:
                      enum:
                      - cloud-config
                      - ignition
@@ -1644,7 +1627,7 @@ index bdd6b0cef..8adfcd777 100644
                      type: string
                    ignition:
                      description: Ignition contains Ignition specific configuration.
-@@ -3146,6 +3289,22 @@ spec:
+@@ -3164,6 +3304,22 @@ spec:
                            schemas to the latest internal value, and may reject unrecognized
                            values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                          type: string
@@ -1667,43 +1650,48 @@ index bdd6b0cef..8adfcd777 100644
                        caCertPath:
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
+@@ -3365,6 +3521,36 @@ spec:
+                               or by referencing a secret.
+                             type: string
+                         type: object
++                      pause:
++                        description: Pause holds the image source for pause container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
++                      proxy:
++                        description: Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
+                       skipPhases:
+                         description: SkipPhases is a list of phases to skip during
+                           command execution. The list of phases can be obtained with
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index fabde6b0f..dbefec39a 100644
+index 87b20f6da..3ccec8d16 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -549,6 +549,7 @@ spec:
-                               bootstrap data
-                             enum:
-                             - cloud-config
-+                            - bottlerocket
-                             type: string
-                           initConfiguration:
-                             description: InitConfiguration along with ClusterConfiguration
-@@ -929,6 +930,23 @@ spec:
-                                       type: object
-                                     type: array
-                                 type: object
-+                              pause:
-+                                description: Pause holds the image source for pause
-+                                  container This is only for bottlerocket
-+                                properties:
-+                                  imageRepository:
-+                                    description: ImageRepository sets the container
-+                                      registry to pull images from. if not set, the
-+                                      ImageRepository defined in ClusterConfiguration
-+                                      will be used instead.
-+                                    type: string
-+                                  imageTag:
-+                                    description: ImageTag allows to specify a tag
-+                                      for the image. In case this value is set, kubeadm
-+                                      does not change automatically the version of
-+                                      the above components during upgrades.
-+                                    type: string
-+                                type: object
-                             type: object
-                           mounts:
-                             description: Mounts specifies a list of mount points to
-@@ -1287,6 +1305,24 @@ spec:
+@@ -1288,6 +1288,24 @@ spec:
                                    value, and may reject unrecognized values. More
                                    info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                                  type: string
@@ -1728,7 +1716,7 @@ index fabde6b0f..dbefec39a 100644
                                certificatesDir:
                                  description: 'CertificatesDir specifies where to store
                                    or look for all required certificates. NB: if not
-@@ -1509,6 +1545,23 @@ spec:
+@@ -1510,6 +1528,37 @@ spec:
                                        or to "10.96.0.0/12" if that's unset.
                                      type: string
                                  type: object
@@ -1749,10 +1737,24 @@ index fabde6b0f..dbefec39a 100644
 +                                      the above components during upgrades.
 +                                    type: string
 +                                type: object
++                              proxy:
++                                description: Proxy holds the https and no proxy information
++                                  This is only for bottlerocket
++                                properties:
++                                  httpsProxy:
++                                    description: HTTPS proxy
++                                    type: string
++                                  noProxy:
++                                    description: No proxy, list of ips that should
++                                      not use proxy
++                                    items:
++                                      type: string
++                                    type: array
++                                type: object
                                scheduler:
                                  description: Scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -1713,6 +1766,7 @@ spec:
+@@ -1717,6 +1766,7 @@ spec:
                              enum:
                              - cloud-config
                              - ignition
@@ -1760,7 +1762,7 @@ index fabde6b0f..dbefec39a 100644
                              type: string
                            ignition:
                              description: Ignition contains Ignition specific configuration.
-@@ -1948,6 +2002,24 @@ spec:
+@@ -1960,6 +2010,24 @@ spec:
                                    value, and may reject unrecognized values. More
                                    info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                                  type: string
@@ -1785,18 +1787,57 @@ index fabde6b0f..dbefec39a 100644
                                caCertPath:
                                  description: 'CACertPath is the path to the SSL certificate
                                    authority used to secure comunications between node
+@@ -2176,6 +2244,37 @@ spec:
+                                       by referencing a secret.
+                                     type: string
+                                 type: object
++                              pause:
++                                description: Pause holds the image source for pause
++                                  container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
++                              proxy:
++                                description: Proxy holds the https and no proxy information
++                                  This is only for bottlerocket
++                                properties:
++                                  httpsProxy:
++                                    description: HTTPS proxy
++                                    type: string
++                                  noProxy:
++                                    description: No proxy, list of ips that should
++                                      not use proxy
++                                    items:
++                                      type: string
++                                    type: array
++                                type: object
+                               skipPhases:
+                                 description: SkipPhases is a list of phases to skip
+                                   during command execution. The list of phases can
 diff --git a/go.mod b/go.mod
-index d456abf0e..3a3964d1c 100644
+index ce3a6bd5f..be6abb096 100644
 --- a/go.mod
 +++ b/go.mod
-@@ -32,6 +32,7 @@ require (
- 	golang.org/x/net v0.0.0-20210825183410-e898025ed96a
- 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
- 	google.golang.org/grpc v1.42.0
+@@ -148,7 +148,7 @@ require (
+ 	gopkg.in/inf.v0 v0.9.1 // indirect
+ 	gopkg.in/ini.v1 v1.66.4 // indirect
+ 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+-	gopkg.in/yaml.v2 v2.4.0 // indirect
 +	gopkg.in/yaml.v2 v2.4.0
- 	k8s.io/api v0.23.0
- 	k8s.io/apiextensions-apiserver v0.23.0
- 	k8s.io/apimachinery v0.23.0
+ 	gopkg.in/yaml.v3 v3.0.0 // indirect
+ 	k8s.io/cli-runtime v0.24.0 // indirect
+ 	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
 -- 
-2.32.0
+2.37.0
 

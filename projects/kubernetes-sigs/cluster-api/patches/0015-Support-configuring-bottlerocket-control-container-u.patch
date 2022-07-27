@@ -1,7 +1,7 @@
-From fa4a5aad462e2e218eeaa6e63101e01eb62ae13a Mon Sep 17 00:00:00 2001
+From ba26584621701cf0f134501224abe6d20f63391a Mon Sep 17 00:00:00 2001
 From: Michael Chu <chumich@amazon.com>
 Date: Mon, 28 Feb 2022 09:51:25 -0800
-Subject: [PATCH 16/22] Support configuring bottlerocket control container uri
+Subject: [PATCH 15/19] Support configuring bottlerocket control container uri
 
 Signed-off-by: Michael Chu <chumich@amazon.com>
 ---
@@ -28,13 +28,12 @@ Signed-off-by: Michael Chu <chumich@amazon.com>
  .../upstreamv1beta3/zz_generated.deepcopy.go  | 93 ++++++++++++++++++
  bootstrap/kubeadm/types/utils_test.go         | 51 +++++++++-
  cmd/clusterctl/client/cluster/mover_test.go   |  6 +-
- .../config/manifest/clusterctl-api.yaml       | 17 +---
  ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 96 +++++++++++++++++++
  ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 68 +++++++++++++
  .../internal/workload_cluster_coredns_test.go |  5 +
  .../internal/workload_cluster_etcd_test.go    | 10 ++
  .../kubeadm/internal/workload_cluster_test.go | 25 +++++
- 29 files changed, 986 insertions(+), 19 deletions(-)
+ 28 files changed, 982 insertions(+), 6 deletions(-)
 
 diff --git a/api/v1alpha4/zz_generated.deepcopy.go b/api/v1alpha4/zz_generated.deepcopy.go
 index 125f9356b..90d8a612b 100644
@@ -53,10 +52,10 @@ index 125f9356b..90d8a612b 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/api/v1beta1/zz_generated.deepcopy.go b/api/v1beta1/zz_generated.deepcopy.go
-index 958ed279f..56e696aef 100644
+index db145ed1c..9f2a97906 100644
 --- a/api/v1beta1/zz_generated.deepcopy.go
 +++ b/api/v1beta1/zz_generated.deepcopy.go
-@@ -306,6 +306,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+@@ -311,6 +311,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
  		*out = new(v1.ObjectReference)
  		**out = **in
  	}
@@ -111,7 +110,7 @@ index b4db85ccd..c6c79b949 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-index d61da7590..07a398790 100644
+index 2709b853f..8df88b740 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 @@ -100,6 +100,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -182,7 +181,7 @@ index d61da7590..07a398790 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1048,6 +1088,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
+@@ -1045,6 +1085,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
  	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -192,7 +191,7 @@ index d61da7590..07a398790 100644
  	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1077,6 +1120,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+@@ -1074,6 +1117,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -245,10 +244,10 @@ index 334d940ca..c5999accd 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 16f240a05..a009e3748 100644
+index 9c9766252..096b1f360 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-@@ -76,6 +76,11 @@ type ClusterConfiguration struct {
+@@ -82,6 +82,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -260,7 +259,7 @@ index 16f240a05..a009e3748 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
-@@ -167,6 +172,13 @@ type BottlerocketBootstrap struct {
+@@ -173,6 +178,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
  
@@ -274,7 +273,7 @@ index 16f240a05..a009e3748 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -405,6 +417,11 @@ type JoinConfiguration struct {
+@@ -411,6 +423,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -287,7 +286,7 @@ index 16f240a05..a009e3748 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
-index 0d4e4692d..341b00474 100644
+index 66ed326bf..7ac786487 100644
 --- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 @@ -159,12 +159,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -320,7 +319,7 @@ index 0d4e4692d..341b00474 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
  	in.Etcd.DeepCopyInto(&out.Etcd)
-@@ -573,6 +590,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+@@ -578,6 +595,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  	out.TypeMeta = in.TypeMeta
  	out.Pause = in.Pause
  	out.BottlerocketBootstrap = in.BottlerocketBootstrap
@@ -329,7 +328,7 @@ index 0d4e4692d..341b00474 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 39884d271..67abfc66d 100644
+index 336da3e7f..4ecc2b94e 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -117,6 +117,21 @@ spec:
@@ -442,7 +441,7 @@ index 39884d271..67abfc66d 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -2969,6 +3044,21 @@ spec:
+@@ -2980,6 +3055,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -465,7 +464,7 @@ index 39884d271..67abfc66d 100644
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index bb61caf43..15d4c5aa9 100644
+index 7ec8b890f..250493633 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -127,6 +127,22 @@ spec:
@@ -583,7 +582,7 @@ index bb61caf43..15d4c5aa9 100644
                            certificatesDir:
                              description: 'CertificatesDir specifies where to store
                                or look for all required certificates. NB: if not provided,
-@@ -3022,6 +3102,22 @@ spec:
+@@ -3033,6 +3113,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -676,10 +675,10 @@ index 36c3f67a7..e635308ea 100644
  		for _, noProxy := range config.ProxyConfiguration.NoProxy {
  			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 10bcaef8b..0b73deef5 100644
+index 7683ccb99..3a5ed47cc 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -452,6 +452,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -453,6 +453,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
  			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
  			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
@@ -687,7 +686,7 @@ index 10bcaef8b..0b73deef5 100644
  		}
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -622,6 +623,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -635,6 +636,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
  			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
  			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
@@ -738,7 +737,7 @@ index 408678fe6..cf8d70b03 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
-index a6be01007..97963846c 100644
+index 6c54a7c8d..8c8c14ce3 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 @@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -809,7 +808,7 @@ index a6be01007..97963846c 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -770,6 +810,9 @@ func autoConvert_upstreamv1beta1_JoinConfiguration_To_v1beta1_JoinConfiguration(
+@@ -771,6 +811,9 @@ func autoConvert_upstreamv1beta1_JoinConfiguration_To_v1beta1_JoinConfiguration(
  	if err := Convert_upstreamv1beta1_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -819,7 +818,7 @@ index a6be01007..97963846c 100644
  	if err := Convert_upstreamv1beta1_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -799,6 +842,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
+@@ -800,6 +843,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -914,7 +913,7 @@ index 4f782f95d..57c5787e2 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-index 5d154d816..c1dc563ad 100644
+index 899217b91..5e8ec2b5c 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 @@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -985,7 +984,7 @@ index 5d154d816..c1dc563ad 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -766,6 +806,9 @@ func autoConvert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(
+@@ -767,6 +807,9 @@ func autoConvert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(
  	if err := Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -995,7 +994,7 @@ index 5d154d816..c1dc563ad 100644
  	if err := Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -803,6 +846,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
+@@ -804,6 +847,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1167,7 +1166,7 @@ index 1d426294c..ebcd8173c 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index cfcfb4a8e..d66122452 100644
+index 7b66d673e..a0bebee87 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -1238,7 +1237,7 @@ index cfcfb4a8e..d66122452 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -761,6 +801,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
+@@ -762,6 +802,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
  	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1248,7 +1247,7 @@ index cfcfb4a8e..d66122452 100644
  	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -795,6 +838,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+@@ -796,6 +839,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1378,10 +1377,10 @@ index 07902b44e..dd8200e36 100644
 +	return out
 +}
 diff --git a/bootstrap/kubeadm/types/utils_test.go b/bootstrap/kubeadm/types/utils_test.go
-index ffce7f749..3ad183005 100644
+index 96a245420..73c297c82 100644
 --- a/bootstrap/kubeadm/types/utils_test.go
 +++ b/bootstrap/kubeadm/types/utils_test.go
-@@ -139,11 +139,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+@@ -163,11 +163,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
  			},
  			want: "apiServer: {}\n" +
  				"apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
@@ -1398,7 +1397,7 @@ index ffce7f749..3ad183005 100644
  				"scheduler: {}\n",
  			wantErr: false,
  		},
-@@ -155,11 +160,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+@@ -179,11 +184,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
  			},
  			want: "apiServer: {}\n" +
  				"apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
@@ -1415,7 +1414,7 @@ index ffce7f749..3ad183005 100644
  				"scheduler: {}\n",
  			wantErr: false,
  		},
-@@ -171,11 +181,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+@@ -195,11 +205,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
  			},
  			want: "apiServer: {}\n" +
  				"apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
@@ -1432,7 +1431,7 @@ index ffce7f749..3ad183005 100644
  				"scheduler: {}\n",
  			wantErr: false,
  		},
-@@ -348,9 +363,14 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+@@ -372,9 +387,14 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
  				version: semver.MustParse("1.14.9"),
  			},
  			want: "apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
@@ -1448,7 +1447,7 @@ index ffce7f749..3ad183005 100644
  			wantErr: false,
  		},
  		{
-@@ -364,11 +384,16 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+@@ -388,11 +408,16 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
  				version: semver.MustParse("1.15.0"),
  			},
  			want: "apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
@@ -1466,7 +1465,7 @@ index ffce7f749..3ad183005 100644
  			wantErr: false,
  		},
  		{
-@@ -382,12 +407,17 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+@@ -406,12 +431,17 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
  				version: semver.MustParse("1.22.0"),
  			},
  			want: "apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
@@ -1485,7 +1484,7 @@ index ffce7f749..3ad183005 100644
  			wantErr: false,
  		},
  	}
-@@ -421,11 +451,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+@@ -445,11 +475,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
  			args: args{
  				yaml: "apiServer: {}\n" +
  					"apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
@@ -1502,7 +1501,7 @@ index ffce7f749..3ad183005 100644
  					"scheduler: {}\n",
  			},
  			want:    &bootstrapv1.ClusterConfiguration{},
-@@ -436,11 +471,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+@@ -460,11 +495,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
  			args: args{
  				yaml: "apiServer: {}\n" +
  					"apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
@@ -1519,7 +1518,7 @@ index ffce7f749..3ad183005 100644
  					"scheduler: {}\n",
  			},
  			want:    &bootstrapv1.ClusterConfiguration{},
-@@ -451,11 +491,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+@@ -475,11 +515,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
  			args: args{
  				yaml: "apiServer: {}\n" +
  					"apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
@@ -1537,7 +1536,7 @@ index ffce7f749..3ad183005 100644
  			},
  			want:    &bootstrapv1.ClusterConfiguration{},
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index 663c0d1b7..f080fb5b2 100644
+index 8d7154fda..076ac8e91 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
 @@ -614,7 +614,7 @@ var backupRestoreTests = []struct {
@@ -1563,53 +1562,11 @@ index 663c0d1b7..f080fb5b2 100644
  			"Secret_ns2_bar-kubeconfig.yaml":            `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"bar-kubeconfig","namespace":"ns2","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"bar","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"}],"resourceVersion":"999","uid":"/v1, Kind=Secret, ns2/bar-kubeconfig"}}` + "\n",
  			"Secret_ns2_bar-ca.yaml":                    `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"bar-ca","namespace":"ns2","resourceVersion":"999","uid":"/v1, Kind=Secret, ns2/bar-ca"}}` + "\n",
  			"GenericInfrastructureCluster_ns2_bar.yaml": `{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","metadata":{"creationTimestamp":null,"labels":{"cluster.x-k8s.io/cluster-name":"bar"},"name":"bar","namespace":"ns2","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"bar","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"}],"resourceVersion":"999","uid":"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns2/bar"}}` + "\n",
-diff --git a/cmd/clusterctl/config/manifest/clusterctl-api.yaml b/cmd/clusterctl/config/manifest/clusterctl-api.yaml
-index 88d383643..3be940664 100644
---- a/cmd/clusterctl/config/manifest/clusterctl-api.yaml
-+++ b/cmd/clusterctl/config/manifest/clusterctl-api.yaml
-@@ -36,14 +36,10 @@ spec:
-         description: Provider defines an entry in the provider inventory.
-         properties:
-           apiVersion:
--            description: 'APIVersion defines the versioned schema of this representation
--              of an object. Servers should convert recognized schemas to the latest
--              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-             type: string
-           kind:
--            description: 'Kind is a string value representing the REST resource this
--              object represents. Servers may infer this from the endpoint the client
--              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-             type: string
-           metadata:
-             type: object
-@@ -51,18 +47,13 @@ spec:
-             description: ProviderName indicates the name of the provider.
-             type: string
-           type:
--            description: Type indicates the type of the provider. See ProviderType
--              for a list of supported values
-+            description: Type indicates the type of the provider. See ProviderType for a list of supported values
-             type: string
-           version:
-             description: Version indicates the component version.
-             type: string
-           watchedNamespace:
--            description: 'WatchedNamespace indicates the namespace where the provider
--              controller is is watching. if empty the provider controller is watching
--              for objects in all namespaces. Deprecated: in clusterctl v1alpha4 all
--              the providers watch all the namespaces; this field will be removed in
--              a future version of this API'
-+            description: 'WatchedNamespace indicates the namespace where the provider controller is is watching. if empty the provider controller is watching for objects in all namespaces. Deprecated: in clusterctl v1alpha4 all the providers watch all the namespaces; this field will be removed in a future version of this API'
-             type: string
-         type: object
-     served: true
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index d62aae8d3..a71635141 100644
+index f3b5db40f..7f7f8a9d3 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -193,6 +193,22 @@ spec:
+@@ -194,6 +194,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1632,7 +1589,7 @@ index d62aae8d3..a71635141 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -830,6 +846,22 @@ spec:
+@@ -831,6 +847,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1655,7 +1612,7 @@ index d62aae8d3..a71635141 100644
                        caCertPath:
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
-@@ -1451,6 +1483,22 @@ spec:
+@@ -1452,6 +1484,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1678,7 +1635,7 @@ index d62aae8d3..a71635141 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -2083,6 +2131,22 @@ spec:
+@@ -2084,6 +2132,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1701,7 +1658,7 @@ index d62aae8d3..a71635141 100644
                        caCertPath:
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
-@@ -2783,6 +2847,22 @@ spec:
+@@ -2790,6 +2854,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1724,7 +1681,7 @@ index d62aae8d3..a71635141 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -3459,6 +3539,22 @@ spec:
+@@ -3477,6 +3557,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1748,7 +1705,7 @@ index d62aae8d3..a71635141 100644
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 10df1a7ae..b60dcae96 100644
+index aa26de448..c81e8f16f 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -143,6 +143,23 @@ spec:
@@ -1799,7 +1756,7 @@ index 10df1a7ae..b60dcae96 100644
                                caCertPath:
                                  description: 'CACertPath is the path to the SSL certificate
                                    authority used to secure comunications between node
-@@ -1429,6 +1463,23 @@ spec:
+@@ -1430,6 +1464,23 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1823,7 +1780,7 @@ index 10df1a7ae..b60dcae96 100644
                                certificatesDir:
                                  description: 'CertificatesDir specifies where to store
                                    or look for all required certificates. NB: if not
-@@ -2153,6 +2204,23 @@ spec:
+@@ -2165,6 +2216,23 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1848,10 +1805,10 @@ index 10df1a7ae..b60dcae96 100644
                                  description: 'CACertPath is the path to the SSL certificate
                                    authority used to secure comunications between node
 diff --git a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
-index 12e143a0d..4b32112dd 100644
+index bf24a15a2..d337ca173 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
-@@ -1177,6 +1177,8 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+@@ -1312,6 +1312,8 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: yaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1860,7 +1817,7 @@ index 12e143a0d..4b32112dd 100644
  				controllerManager: {}
  				dns:
  				  imageRepository: example.com/k8s
-@@ -1184,6 +1186,9 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+@@ -1319,6 +1321,9 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
  				etcd: {}
  				kind: ClusterConfiguration
  				networking: {}
@@ -1913,10 +1870,10 @@ index 9972cd283..966c503ca 100644
  				`),
  		},
 diff --git a/controlplane/kubeadm/internal/workload_cluster_test.go b/controlplane/kubeadm/internal/workload_cluster_test.go
-index caa160533..f2e7f1109 100644
+index 7f43d4439..7d5d0c32a 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_test.go
-@@ -605,12 +605,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+@@ -612,12 +612,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
  					clusterConfigurationKey: yaml.Raw(`
  						apiServer: {}
  						apiVersion: kubeadm.k8s.io/v1beta2
@@ -1934,7 +1891,7 @@ index caa160533..f2e7f1109 100644
  						scheduler: {}
  						`),
  				},
-@@ -644,12 +649,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+@@ -651,12 +656,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
  					clusterConfigurationKey: yaml.Raw(`
  						apiServer: {}
  						apiVersion: kubeadm.k8s.io/v1beta2
@@ -1952,7 +1909,7 @@ index caa160533..f2e7f1109 100644
  						scheduler: {}
  						`),
  				},
-@@ -1009,11 +1019,16 @@ func TestUpdateApiServerInKubeadmConfigMap(t *testing.T) {
+@@ -1016,11 +1026,16 @@ func TestUpdateApiServerInKubeadmConfigMap(t *testing.T) {
  				    mountPath: /foo/bar
  				    name: mount2
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1969,7 +1926,7 @@ index caa160533..f2e7f1109 100644
  				scheduler: {}
  				`),
  		},
-@@ -1078,6 +1093,8 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+@@ -1085,6 +1100,8 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: yaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -1978,7 +1935,7 @@ index caa160533..f2e7f1109 100644
  				controllerManager:
  				  extraArgs:
  				    bar: baz
-@@ -1090,6 +1107,9 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+@@ -1097,6 +1114,9 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
  				etcd: {}
  				kind: ClusterConfiguration
  				networking: {}
@@ -1988,7 +1945,7 @@ index caa160533..f2e7f1109 100644
  				scheduler: {}
  				`),
  		},
-@@ -1154,11 +1174,16 @@ func TestUpdateSchedulerInKubeadmConfigMap(t *testing.T) {
+@@ -1161,11 +1181,16 @@ func TestUpdateSchedulerInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: yaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta2
@@ -2006,5 +1963,5 @@ index caa160533..f2e7f1109 100644
  				  extraArgs:
  				    bar: baz
 -- 
-2.32.0
+2.37.0
 
