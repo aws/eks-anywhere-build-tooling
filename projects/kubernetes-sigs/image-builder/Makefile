@@ -27,8 +27,8 @@ PACKER_AMI_SHARE_FILE=$(MAKE_ROOT)/packer/ami/share-ami.json
 PACKER_AMI_VAR_FILES+=$(PACKER_AMI_SHARE_FILE)
 
 PACKER_OVA_CONF_FILE=$(MAKE_ROOT)/packer/ova/vsphere.json
-PACKER_OVA_VAR_FILES=$(PACKER_OVA_CONF_FILE)
-PACKER_OVA_VAR_FILES+=$(MAKE_ROOT)/packer/ova/vsphere-library.json
+PACKER_OVA_VAR_FILES=$(MAKE_ROOT)/packer/ova/vsphere-library.json
+PACKER_OVA_VAR_FILES+=$(PACKER_OVA_CONF_FILE)
 
 PACKER_TYPE_VAR_FILES?=
 PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(PACKER_TYPE_VAR_FILES) $(FULL_OUTPUT_DIR)/config/common.json $(FULL_OUTPUT_DIR)/config/cni.json $(FULL_OUTPUT_DIR)/config/additional_components.json
@@ -205,6 +205,15 @@ release-ova-%: deps-ova setup-vsphere setup-packer-configs-ova
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-$*
 
+.PHONY: local-build-ova-ubuntu-2004
+local-build-ova-ubuntu-2004: MAKEFLAGS=
+local-build-ova-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
+local-build-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
+local-build-ova-ubuntu-2004: deps-ova setup-packer-configs-ova
+	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
+
 .PHONY: download-bottlerocket-%
 download-bottlerocket-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 download-bottlerocket-%: $(BOTTLEROCKET_SETUP_TARGET)
@@ -227,6 +236,12 @@ release-raw-%: deps-raw setup-packer-configs-raw
 build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
 build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
 	build/build_qemu_rhel_local.sh $(MAKE_ROOT) $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
+
+.PHONY: local-build-raw-ubuntu-2004-efi
+local-build-raw-ubuntu-2004-efi: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/raw/$(IMAGE_OS)
+local-build-raw-ubuntu-2004-efi: deps-raw setup-packer-configs-raw
+	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-raw-ubuntu-2004-efi
 
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
