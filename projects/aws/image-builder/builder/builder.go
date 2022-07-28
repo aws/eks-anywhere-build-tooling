@@ -1,7 +1,6 @@
 package builder
 
 import (
-	_ "embed"
 	"fmt"
 	"io/ioutil"
 	"log"
