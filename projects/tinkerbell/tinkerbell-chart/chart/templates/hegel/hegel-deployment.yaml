@@ -7,7 +7,7 @@ metadata:
   name:  {{ .Values.hegel.name }}
   namespace: {{ .Values.namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.hegel.replicas }}
   selector:
     matchLabels:
       app: {{ .Values.hegel.name }}
@@ -23,8 +23,10 @@ spec:
           - {{ . }}
           {{- end }}
           env:
-          - name: TRUSTED_PROXIES
-            value: 192.168.0.0/16
+            {{- range $i, $env := .Values.hegel.env }}
+            - name: {{ $env.name | quote }}
+              value: {{ $env.value | quote }}
+            {{- end }}
           image: {{ .Values.hegel.image }}
           imagePullPolicy: {{ .Values.hegel.imagePullPolicy }}
           name: {{ .Values.hegel.name }}
