@@ -22,5 +22,6 @@ ADD conf/hello.sh /hello.sh
 RUN echo $IMAGE_TAG >/IMAGE_TAG
 
 STOPSIGNAL SIGQUIT
+USER root
 ENTRYPOINT ["/hello.sh"]
 CMD ["nginx", "-g", "daemon off;"]
