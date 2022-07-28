@@ -78,7 +78,7 @@ can be overridden in a project Makefile via `BINARY_PLATFORMS`.
 
 For projects building container images, docker/linux/Dockerfile is required. `DOCKERFILE_FOLDER` can be used to override
 the directory containing the Dockerfile when necessary. This may be necessary if building multiple container images
-in the same project.  Refer to [cert-manager](../../projects/jetstack/cert-manager/Makefile) as
+in the same project.  Refer to [cert-manager](../../projects/cert-manager/cert-manager/Makefile) as
 an example of this.
 
 By default the base image will be `eks-distro-base`, but this can be overridden by setting `BASE_IMAGE_NAME` in
@@ -127,7 +127,7 @@ Projects with this requirement need to supply the `expected_artifacts_<repo>` fi
 ### multiple containers
 
 For projects which build multiple containers, DOCKERFILE_FOLDER generally needs overridden and additional <IMAGE_NAME>_NAME variables need to be set
-in the Makefile, one per container image to be built. Refer to [cert-manager](../../projects/jetstack/cert-manager/Makefile) as
+in the Makefile, one per container image to be built. Refer to [cert-manager](../../projects/cert-manager/cert-manager/Makefile) as
 an example of this.
 
 ### additional pre-reqs for image builds

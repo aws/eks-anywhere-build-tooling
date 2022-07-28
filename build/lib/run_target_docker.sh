@@ -16,7 +16,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -x
+
 PROJECT="$1"
 TARGET="$2"
 IMAGE_REPO="${3:-}"
@@ -54,9 +54,9 @@ if [ -n "$PROJECT_DEPENDENCIES" ]; then
 	done
 fi
 
-rsync -e 'docker exec -i' -rm --exclude='.git/***' \
+rsync -e 'docker exec -i' -t -rm --exclude='.git/***' \
 	--exclude="projects/$PROJECT/_output/***" --exclude="projects/$PROJECT/$(basename $PROJECT)/***" \
-	--include="projects/$PROJECT/***" --include="projects/kubernetes-sigs/image-builder/BOTTLEROCKET_OVA_RELEASES" \
+	--include="projects/$PROJECT/***" --include="projects/kubernetes-sigs/image-builder/BOTTLEROCKET_RELEASES" \
 	--include="release/SUPPORTED_RELEASE_BRANCHES" --include="projects/kubernetes-sigs/cri-tools/GIT_TAG" $EXTRA_INCLUDES \
 	--include='*/' --exclude='projects/***' $MAKE_ROOT/ eks-a-builder:/eks-anywhere-build-tooling
 

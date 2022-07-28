@@ -38,3 +38,10 @@ for file in Chart.yaml values.yaml
 do
   $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
 done
+
+if [ -d ${OUTPUT_DIR}/helm/${CHART_NAME}/crds ]; then
+  for file in crds/*.yaml 
+  do
+    $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
+  done
+fi

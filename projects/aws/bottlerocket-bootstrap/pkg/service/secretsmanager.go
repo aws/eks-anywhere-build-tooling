@@ -5,7 +5,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/pkg/errors"
 )
 
 type SecretsManagerService interface {
@@ -17,12 +19,17 @@ type SecretsManagerImpl struct {
 	BaseClient *secretsmanager.Client
 }
 
-func NewSecretsManagerService() SecretsManagerService {
+func NewSecretsManagerService() (SecretsManagerService, error) {
 	clientImpl := new(SecretsManagerImpl)
 	cfg, _ := config.LoadDefaultConfig(context.TODO())
-	cfg.Region = "us-west-2"
+	imdsClient := imds.NewFromConfig(cfg)
+	getRegionOutput, err := imdsClient.GetRegion(context.TODO(), &imds.GetRegionInput{})
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to retrieve the region from the EC2 instance")
+	}
+	cfg.Region = getRegionOutput.Region
 	clientImpl.BaseClient = secretsmanager.NewFromConfig(cfg)
-	return clientImpl
+	return clientImpl, nil
 }
 
 func (client SecretsManagerImpl) GetSecretValue(ctx context.Context, secretName string) (*secretsmanager.GetSecretValueOutput, error) {

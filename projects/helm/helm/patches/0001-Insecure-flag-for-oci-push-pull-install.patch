@@ -5,25 +5,12 @@ Subject: [PATCH 1/2] Push to insecure OCI registry
 
 Signed-off-by: acool@amazon.com
 ---
- cmd/helm/pull.go       |  1 +
  cmd/helm/push.go       |  4 ++++
  pkg/action/pull.go     |  7 +++++++
  pkg/action/push.go     | 12 ++++++++++--
  pkg/registry/client.go | 31 +++++++++++++++++++++++++++++++
- 5 files changed, 53 insertions(+), 2 deletions(-)
+ 4 files changed, 52 insertions(+), 2 deletions(-)
 
-diff --git a/cmd/helm/pull.go b/cmd/helm/pull.go
-index b1c04fe0abd..51d679ae6e7 100644
---- a/cmd/helm/pull.go
-+++ b/cmd/helm/pull.go
-@@ -81,6 +81,7 @@ func newPullCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
- 	f.BoolVar(&client.VerifyLater, "prov", false, "fetch the provenance file, but don't perform verification")
- 	f.StringVar(&client.UntarDir, "untardir", ".", "if untar is specified, this flag specifies the name of the directory into which the chart is expanded")
- 	f.StringVarP(&client.DestDir, "destination", "d", ".", "location to write the chart. If this and tardir are specified, tardir is appended to this")
-+	f.BoolVar(&client.PlainHTTP, "plain-http", false, "use plain http and not https to connect oci registry")
- 	addChartPathOptionsFlags(f, &client.ChartPathOptions)
-
- 	err := cmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 diff --git a/cmd/helm/push.go b/cmd/helm/push.go
 index ed5d1699ac7..e2add508833 100644
 --- a/cmd/helm/push.go
@@ -151,9 +138,8 @@ Subject: [PATCH 2/2] Install or upgrade supports OCI insecure registry
 Signed-off-by: pytimer <lixin20101023@gmail.com>
 ---
  cmd/helm/flags.go     | 1 +
- cmd/helm/pull.go      | 1 -
  pkg/action/install.go | 7 +++++++
- 3 files changed, 8 insertions(+), 1 deletion(-)
+ 2 files changed, 8 insertions(+)
 
 diff --git a/cmd/helm/flags.go b/cmd/helm/flags.go
 index 6a59101b7b9..31dd27d2f65 100644
@@ -167,18 +153,6 @@ index 6a59101b7b9..31dd27d2f65 100644
  }
 
  // bindOutputFlag will add the output flag to the given command and bind the
-diff --git a/cmd/helm/pull.go b/cmd/helm/pull.go
-index 51d679ae6e7..b1c04fe0abd 100644
---- a/cmd/helm/pull.go
-+++ b/cmd/helm/pull.go
-@@ -81,7 +81,6 @@ func newPullCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
- 	f.BoolVar(&client.VerifyLater, "prov", false, "fetch the provenance file, but don't perform verification")
- 	f.StringVar(&client.UntarDir, "untardir", ".", "if untar is specified, this flag specifies the name of the directory into which the chart is expanded")
- 	f.StringVarP(&client.DestDir, "destination", "d", ".", "location to write the chart. If this and tardir are specified, tardir is appended to this")
--	f.BoolVar(&client.PlainHTTP, "plain-http", false, "use plain http and not https to connect oci registry")
- 	addChartPathOptionsFlags(f, &client.ChartPathOptions)
-
- 	err := cmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 diff --git a/pkg/action/install.go b/pkg/action/install.go
 index 32be904b4a1..adf237db645 100644
 --- a/pkg/action/install.go

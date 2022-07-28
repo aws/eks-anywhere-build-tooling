@@ -10,10 +10,6 @@ RAW_IMAGE_BUILD_INSTANCE_TYPE?=t1.micro
 RAW_IMAGE_BUILD_KEY_NAME?=raw-image-build
 
 FULL_OUTPUT_DIR=
-
-# Force non release-branched
-CARGO_HOME=$(MAKE_ROOT)/_output/cargo
-RUSTUP_HOME=$(MAKE_ROOT)/_output/rustup
 export BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 
 RHSM_USERNAME?=
@@ -57,7 +53,6 @@ SIMPLE_CREATE_TARBALLS=false
 
 # to support a no op attribution target
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=build release clean help binaries checksums attribution release-ami-ubuntu-2004
-TUFTOOL_TARGET=$(CARGO_HOME)/bin/tuftool
 BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
 FINAL_OVA_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/$(IMAGE_OS).ova
@@ -118,7 +113,7 @@ PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm eksa/kubernetes-sigs/cri-tools
 include $(BASE_DIRECTORY)/Common.mk
 
 
-export PATH:=$(CARGO_HOME)/bin:$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
+export PATH:=$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
 export GOVC_INSECURE?=true
 
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
@@ -159,16 +154,6 @@ setup-ami-share:
 .PHONY: setup-vsphere
 setup-vsphere:
 	echo $(VSPHERE_CONNECTION_DATA) > $(PACKER_OVA_CONF_FILE)
-
-$(TUFTOOL_TARGET):
-	# This code installs the Rust toolchain manager called rustup along
-	# with other Rust binaries such as rustc, rustfmt. It also installs Cargo,
-	# the Rust package manager which is then used to install Tuftool.
-	@mkdir -p $(CARGO_HOME)
-	@mkdir -p $(RUSTUP_HOME)
-	curl https://sh.rustup.rs -sSf | CARGO_HOME=$(CARGO_HOME) RUSTUP_HOME=$(RUSTUP_HOME) sh -s -- -y
-	$(CARGO_HOME)/bin/rustup default stable
-	CARGO_NET_GIT_FETCH_WITH_CLI=true $(CARGO_HOME)/bin/cargo install --force --root $(CARGO_HOME) tuftool
 
 $(BOTTLEROCKET_SETUP_TARGET): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(BOTTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
@@ -222,8 +207,8 @@ release-ova-%: deps-ova setup-vsphere setup-packer-configs-ova
 
 .PHONY: download-bottlerocket-%
 download-bottlerocket-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
-download-bottlerocket-%: $(TUFTOOL_TARGET) $(BOTTLEROCKET_SETUP_TARGET)
-	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(BOTTLEROCKET_DOWNLOAD_PATH) $(CARGO_HOME) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
+download-bottlerocket-%: $(BOTTLEROCKET_SETUP_TARGET)
+	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(BOTTLEROCKET_DOWNLOAD_PATH) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
 .PHONY: upload-bottlerocket-%
 upload-bottlerocket-%: IMAGE_OS=bottlerocket
@@ -239,7 +224,7 @@ release-raw-%: deps-raw setup-packer-configs-raw
 	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
 
 .PHONY: build-qemu-rhel-local
-build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu
+build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
 build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
 	build/build_qemu_rhel_local.sh $(MAKE_ROOT) $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
 

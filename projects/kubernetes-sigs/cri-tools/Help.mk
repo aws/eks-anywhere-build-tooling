@@ -9,6 +9,7 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `cri-tools`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `crictl critest` for `linux/amd64 linux/arm64`
@@ -47,6 +48,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution  upload-artifacts attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums  upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums attribution  upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
 ########### END GENERATED ###########################

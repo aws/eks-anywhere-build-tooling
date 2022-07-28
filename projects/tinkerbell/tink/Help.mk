@@ -12,24 +12,20 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `tink tink-controller tink-server tink-worker` for `linux/amd64 linux/arm64`
-_output/bin/tink/linux-amd64/tink: ## Build `_output/bin/tink/linux-amd64/tink`
+binaries: ## Build all binaries: `tink-controller tink-server tink-worker` for `linux/amd64 linux/arm64`
 _output/bin/tink/linux-amd64/tink-controller: ## Build `_output/bin/tink/linux-amd64/tink-controller`
 _output/bin/tink/linux-amd64/tink-server: ## Build `_output/bin/tink/linux-amd64/tink-server`
 _output/bin/tink/linux-amd64/tink-worker: ## Build `_output/bin/tink/linux-amd64/tink-worker`
-_output/bin/tink/linux-arm64/tink: ## Build `_output/bin/tink/linux-arm64/tink`
 _output/bin/tink/linux-arm64/tink-controller: ## Build `_output/bin/tink/linux-arm64/tink-controller`
 _output/bin/tink/linux-arm64/tink-server: ## Build `_output/bin/tink/linux-arm64/tink-server`
 _output/bin/tink/linux-arm64/tink-worker: ## Build `_output/bin/tink/linux-arm64/tink-worker`
 
 ##@ Image Targets
-local-images: ## Builds `tink-cli/images/amd64 tink-controller/images/amd64 tink-server/images/amd64 tink-worker/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `tink-cli/images/push tink-controller/images/push tink-server/images/push tink-worker/images/push` to IMAGE_REPO
-tink-cli/images/amd64: ## Builds/pushes `tink-cli/images/amd64`
+local-images: ## Builds `tink-controller/images/amd64 tink-server/images/amd64 tink-worker/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `tink-controller/images/push tink-server/images/push tink-worker/images/push` to IMAGE_REPO
 tink-controller/images/amd64: ## Builds/pushes `tink-controller/images/amd64`
 tink-server/images/amd64: ## Builds/pushes `tink-server/images/amd64`
 tink-worker/images/amd64: ## Builds/pushes `tink-worker/images/amd64`
-tink-cli/images/push: ## Builds/pushes `tink-cli/images/push`
 tink-controller/images/push: ## Builds/pushes `tink-controller/images/push`
 tink-server/images/push: ## Builds/pushes `tink-server/images/push`
 tink-worker/images/push: ## Builds/pushes `tink-worker/images/push`
@@ -68,6 +64,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images upload-artifacts attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
 ########### END GENERATED ###########################

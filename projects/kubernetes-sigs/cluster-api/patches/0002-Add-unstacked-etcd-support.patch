@@ -1,7 +1,7 @@
-From 6cc142548c8c833476ec0bebf8a6147d54c7c364 Mon Sep 17 00:00:00 2001
+From 5170dcae1c8b2d9e14420334d7e1ea4056f42152 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 02/21] Add unstacked etcd support
+Subject: [PATCH 02/19] Add unstacked etcd support
 
 Unstacked etcd: API and config changes
 
@@ -75,17 +75,15 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  api/v1beta1/machine_types.go                  |   3 +
  .../bottlerocket/controlplane_init.go         |   2 -
  cmd/clusterctl/client/cluster/mover.go        |   3 +-
- .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 141 ++++++++++++++++++
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 144 ++++++++++++++++++
  config/rbac/role.yaml                         |  15 ++
  controllers/external/util.go                  |  10 ++
  .../v1beta1/kubeadm_control_plane_webhook.go  |   1 +
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  28 ++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  28 ++++
  controlplane/kubeadm/config/rbac/role.yaml    |   9 ++
  .../internal/controllers/controller.go        |  40 +++++
  .../controllers/cluster/cluster_controller.go |  89 ++++++++++-
- .../cluster/cluster_controller_phases.go      | 108 ++++++++++++++
- .../cluster/cluster_controller_test.go        | 134 +++++++++++++++++
+ .../cluster/cluster_controller_phases.go      | 108 +++++++++++++
+ .../cluster/cluster_controller_test.go        | 134 ++++++++++++++++
  .../machine/machine_controller_noderef.go     |   5 +
  .../machine/machine_controller_phases.go      | 115 ++++++++++++++
  .../controllers/dockermachine_controller.go   |  14 +-
@@ -93,7 +91,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 27 files changed, 850 insertions(+), 12 deletions(-)
+ 25 files changed, 797 insertions(+), 12 deletions(-)
 
 diff --git a/api/v1alpha3/cluster_types.go b/api/v1alpha3/cluster_types.go
 index ae74d7b07..8cc776936 100644
@@ -208,7 +206,7 @@ index 794363ab6..39f092710 100644
  
  // ANCHOR_END: ClusterStatus
 diff --git a/api/v1beta1/cluster_types.go b/api/v1beta1/cluster_types.go
-index 930aa96d5..52004888b 100644
+index d7971b85c..537faffe9 100644
 --- a/api/v1beta1/cluster_types.go
 +++ b/api/v1beta1/cluster_types.go
 @@ -57,6 +57,11 @@ type ClusterSpec struct {
@@ -223,7 +221,7 @@ index 930aa96d5..52004888b 100644
  	// InfrastructureRef is a reference to a provider-specific resource that holds the details
  	// for provisioning infrastructure for a cluster in said provider.
  	// +optional
-@@ -266,6 +271,15 @@ type ClusterStatus struct {
+@@ -278,6 +283,15 @@ type ClusterStatus struct {
  	// ObservedGeneration is the latest generation observed by the controller.
  	// +optional
  	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -240,7 +238,7 @@ index 930aa96d5..52004888b 100644
  
  // ANCHOR_END: ClusterStatus
 diff --git a/api/v1beta1/condition_consts.go b/api/v1beta1/condition_consts.go
-index 57fd2b379..fab3a9a9f 100644
+index d404f0e52..c4189d9b1 100644
 --- a/api/v1beta1/condition_consts.go
 +++ b/api/v1beta1/condition_consts.go
 @@ -257,6 +257,22 @@ const (
@@ -267,7 +265,7 @@ index 57fd2b379..fab3a9a9f 100644
  const (
  	// TopologyReconciledCondition provides evidence about the reconciliation of a Cluster topology into
 diff --git a/api/v1beta1/machine_types.go b/api/v1beta1/machine_types.go
-index b50ce9fba..30ab0caf6 100644
+index 073610fa0..15d162568 100644
 --- a/api/v1beta1/machine_types.go
 +++ b/api/v1beta1/machine_types.go
 @@ -30,6 +30,9 @@ const (
@@ -308,13 +306,13 @@ index 84d582dda..5c8ca0e30 100644
  		}
  	}
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 267efa88d..726d6d798 100644
+index 15086f0b3..825f65c14 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -167,6 +167,44 @@ spec:
-                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+@@ -169,6 +169,45 @@ spec:
                      type: string
                  type: object
+                 x-kubernetes-map-type: atomic
 +              managedExternalEtcdRef:
 +                description: ManagedExternalEtcdRef is an optional reference to an
 +                  etcd provider resource that holds details for provisioning an external
@@ -353,10 +351,11 @@ index 267efa88d..726d6d798 100644
 +                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
 +                    type: string
 +                type: object
++                x-kubernetes-map-type: atomic
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -259,6 +297,15 @@ spec:
+@@ -261,6 +300,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -372,10 +371,10 @@ index 267efa88d..726d6d798 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -426,6 +473,44 @@ spec:
-                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+@@ -430,6 +478,45 @@ spec:
                      type: string
                  type: object
+                 x-kubernetes-map-type: atomic
 +              managedExternalEtcdRef:
 +                description: ManagedExternalEtcdRef is an optional reference to an
 +                  etcd provider resource that holds details for provisioning an external
@@ -414,10 +413,11 @@ index 267efa88d..726d6d798 100644
 +                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
 +                    type: string
 +                type: object
++                x-kubernetes-map-type: atomic
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -643,6 +728,15 @@ spec:
+@@ -647,6 +734,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -433,10 +433,10 @@ index 267efa88d..726d6d798 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -814,6 +908,44 @@ spec:
-                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+@@ -820,6 +916,45 @@ spec:
                      type: string
                  type: object
+                 x-kubernetes-map-type: atomic
 +              managedExternalEtcdRef:
 +                description: ManagedExternalEtcdRef is an optional reference to an
 +                  etcd provider resource that holds details for provisioning an external
@@ -475,10 +475,11 @@ index 267efa88d..726d6d798 100644
 +                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
 +                    type: string
 +                type: object
++                x-kubernetes-map-type: atomic
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -1097,6 +1229,15 @@ spec:
+@@ -1118,6 +1253,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -495,10 +496,10 @@ index 267efa88d..726d6d798 100644
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
 diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
-index bb34cfe15..91dba303a 100644
+index 9a2a8ca3b..98696a582 100644
 --- a/config/rbac/role.yaml
 +++ b/config/rbac/role.yaml
-@@ -34,6 +34,21 @@ rules:
+@@ -42,6 +42,21 @@ rules:
    - get
    - list
    - watch
@@ -521,7 +522,7 @@ index bb34cfe15..91dba303a 100644
    - bootstrap.cluster.x-k8s.io
    - controlplane.cluster.x-k8s.io
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index fde450016..943898620 100644
+index e43cc2ae7..0a2dc2b53 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
 @@ -244,3 +244,13 @@ func IsInitialized(obj *unstructured.Unstructured) (bool, error) {
@@ -539,10 +540,10 @@ index fde450016..943898620 100644
 +	return endpoints, found, nil
 +}
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index 896ef5d0e..9d5e58664 100644
+index c20d90e1d..424139bc3 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-@@ -133,6 +133,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+@@ -137,6 +137,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs", "*"},
@@ -550,98 +551,6 @@ index 896ef5d0e..9d5e58664 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageTag"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "imageRepository"},
-diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 8adfcd777..03da30b18 100644
---- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-+++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -2177,6 +2177,20 @@ spec:
-                               upgrades.
-                             type: string
-                         type: object
-+                      proxy:
-+                        description: Proxy holds the https and no proxy information
-+                          This is only for bottlerocket
-+                        properties:
-+                          httpsProxy:
-+                            description: HTTPS proxy
-+                            type: string
-+                          noProxy:
-+                            description: No proxy, list of ips that should not use
-+                              proxy
-+                            items:
-+                              type: string
-+                            type: array
-+                        type: object
-                     type: object
-                   mounts:
-                     description: Mounts specifies a list of mount points to be setup.
-@@ -2878,6 +2892,20 @@ spec:
-                               upgrades.
-                             type: string
-                         type: object
-+                      proxy:
-+                        description: Proxy holds the https and no proxy information
-+                          This is only for bottlerocket
-+                        properties:
-+                          httpsProxy:
-+                            description: HTTPS proxy
-+                            type: string
-+                          noProxy:
-+                            description: No proxy, list of ips that should not use
-+                              proxy
-+                            items:
-+                              type: string
-+                            type: array
-+                        type: object
-                       scheduler:
-                         description: Scheduler contains extra settings for the scheduler
-                           control plane component
-diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index dbefec39a..7cba0aa10 100644
---- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-+++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -947,6 +947,20 @@ spec:
-                                       the above components during upgrades.
-                                     type: string
-                                 type: object
-+                              proxy:
-+                                description: Proxy holds the https and no proxy information
-+                                  This is only for bottlerocket
-+                                properties:
-+                                  httpsProxy:
-+                                    description: HTTPS proxy
-+                                    type: string
-+                                  noProxy:
-+                                    description: No proxy, list of ips that should
-+                                      not use proxy
-+                                    items:
-+                                      type: string
-+                                    type: array
-+                                type: object
-                             type: object
-                           mounts:
-                             description: Mounts specifies a list of mount points to
-@@ -1562,6 +1576,20 @@ spec:
-                                       the above components during upgrades.
-                                     type: string
-                                 type: object
-+                              proxy:
-+                                description: Proxy holds the https and no proxy information
-+                                  This is only for bottlerocket
-+                                properties:
-+                                  httpsProxy:
-+                                    description: HTTPS proxy
-+                                    type: string
-+                                  noProxy:
-+                                    description: No proxy, list of ips that should
-+                                      not use proxy
-+                                    items:
-+                                      type: string
-+                                    type: array
-+                                type: object
-                               scheduler:
-                                 description: Scheduler contains extra settings for
-                                   the scheduler control plane component
 diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
 index edf8324f3..657fc1c90 100644
 --- a/controlplane/kubeadm/config/rbac/role.yaml
@@ -660,7 +569,7 @@ index edf8324f3..657fc1c90 100644
 +  - update
 +  - watch
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index fd9b5ad93..f0ded9fe2 100644
+index 081c57de3..4e0a545a4 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -19,6 +19,9 @@ package controllers
@@ -689,7 +598,7 @@ index fd9b5ad93..f0ded9fe2 100644
  
  // KubeadmControlPlaneReconciler reconciles a KubeadmControlPlane object.
  type KubeadmControlPlaneReconciler struct {
-@@ -162,6 +167,32 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -156,6 +161,32 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  		return ctrl.Result{Requeue: true}, nil
  	}
  
@@ -739,10 +648,10 @@ index fd9b5ad93..f0ded9fe2 100644
  	if len(ownedMachines) == 0 {
  		controllerutil.RemoveFinalizer(kcp, controlplanev1.KubeadmControlPlaneFinalizer)
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index f987e7606..6550520c7 100644
+index 856a63b71..d449b7716 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
-@@ -58,7 +58,7 @@ const (
+@@ -59,7 +59,7 @@ const (
  // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
  // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;patch
  // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
@@ -751,7 +660,7 @@ index f987e7606..6550520c7 100644
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status;clusters/finalizers,verbs=get;list;watch;create;update;patch;delete
  // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
  
-@@ -89,6 +89,15 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
+@@ -90,6 +90,15 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
  		return errors.Wrap(err, "failed setting up with a controller manager")
  	}
  
@@ -767,7 +676,7 @@ index f987e7606..6550520c7 100644
  	r.recorder = mgr.GetEventRecorderFor("cluster-controller")
  	r.externalTracker = external.ObjectTracker{
  		Controller: controller,
-@@ -160,6 +169,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+@@ -161,6 +170,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
  		conditions.WithConditions(
  			clusterv1.ControlPlaneReadyCondition,
  			clusterv1.InfrastructureReadyCondition,
@@ -775,7 +684,7 @@ index f987e7606..6550520c7 100644
  		),
  	)
  
-@@ -171,6 +181,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+@@ -172,6 +182,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
  			clusterv1.ReadyCondition,
  			clusterv1.ControlPlaneReadyCondition,
  			clusterv1.InfrastructureReadyCondition,
@@ -783,7 +692,7 @@ index f987e7606..6550520c7 100644
  		}},
  	)
  	return patchHelper.Patch(ctx, cluster, options...)
-@@ -193,6 +204,7 @@ func (r *Reconciler) reconcile(ctx context.Context, cluster *clusterv1.Cluster)
+@@ -194,6 +205,7 @@ func (r *Reconciler) reconcile(ctx context.Context, cluster *clusterv1.Cluster)
  		r.reconcileControlPlane,
  		r.reconcileKubeconfig,
  		r.reconcileControlPlaneInitialized,
@@ -791,7 +700,7 @@ index f987e7606..6550520c7 100644
  	}
  
  	res := ctrl.Result{}
-@@ -290,6 +302,37 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, cluster *clusterv1.Clu
+@@ -299,6 +311,37 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, cluster *clusterv1.Clu
  		}
  	}
  
@@ -829,7 +738,7 @@ index f987e7606..6550520c7 100644
  	if cluster.Spec.InfrastructureRef != nil {
  		obj, err := external.Get(ctx, r.Client, cluster.Spec.InfrastructureRef, cluster.Namespace)
  		switch {
-@@ -331,6 +374,7 @@ type clusterDescendants struct {
+@@ -340,6 +383,7 @@ type clusterDescendants struct {
  	controlPlaneMachines clusterv1.MachineList
  	workerMachines       clusterv1.MachineList
  	machinePools         expv1.MachinePoolList
@@ -837,7 +746,7 @@ index f987e7606..6550520c7 100644
  }
  
  // length returns the number of descendants.
-@@ -351,6 +395,13 @@ func (c *clusterDescendants) descendantNames() string {
+@@ -360,6 +404,13 @@ func (c *clusterDescendants) descendantNames() string {
  	if len(controlPlaneMachineNames) > 0 {
  		descendants = append(descendants, "Control plane machines: "+strings.Join(controlPlaneMachineNames, ","))
  	}
@@ -851,7 +760,7 @@ index f987e7606..6550520c7 100644
  	machineDeploymentNames := make([]string, len(c.machineDeployments.Items))
  	for i, machineDeployment := range c.machineDeployments.Items {
  		machineDeploymentNames[i] = machineDeployment.Name
-@@ -414,7 +465,8 @@ func (r *Reconciler) listDescendants(ctx context.Context, cluster *clusterv1.Clu
+@@ -423,7 +474,8 @@ func (r *Reconciler) listDescendants(ctx context.Context, cluster *clusterv1.Clu
  	// Split machines into control plane and worker machines so we make sure we delete control plane machines last
  	machineCollection := collections.FromMachineList(&machines)
  	controlPlaneMachines := machineCollection.Filter(collections.ControlPlaneMachines(cluster.Name))
@@ -861,7 +770,7 @@ index f987e7606..6550520c7 100644
  	descendants.workerMachines = collections.ToMachineList(workerMachines)
  	// Only count control plane machines as descendants if there is no control plane provider.
  	if cluster.Spec.ControlPlaneRef == nil {
-@@ -448,6 +500,9 @@ func (c clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster) (
+@@ -457,6 +509,9 @@ func (c clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster) (
  		&c.workerMachines,
  		&c.controlPlaneMachines,
  	}
@@ -871,7 +780,7 @@ index f987e7606..6550520c7 100644
  	if feature.Gates.Enabled(feature.MachinePool) {
  		lists = append([]client.ObjectList{&c.machinePools}, lists...)
  	}
-@@ -523,3 +578,33 @@ func (r *Reconciler) controlPlaneMachineToCluster(o client.Object) []ctrl.Reques
+@@ -532,3 +587,33 @@ func (r *Reconciler) controlPlaneMachineToCluster(o client.Object) []ctrl.Reques
  		NamespacedName: util.ObjectKey(cluster),
  	}}
  }
@@ -1039,10 +948,10 @@ index 589c8a0a9..a213fd973 100644
  	log := ctrl.LoggerFrom(ctx)
  
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 721ef6af4..33facf2cd 100644
+index e6e01a774..6bdf574f3 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
-@@ -483,6 +483,125 @@ func TestClusterReconcilerNodeRef(t *testing.T) {
+@@ -534,6 +534,125 @@ func TestClusterReconcilerNodeRef(t *testing.T) {
  	})
  }
  
@@ -1168,7 +1077,7 @@ index 721ef6af4..33facf2cd 100644
  type machineDeploymentBuilder struct {
  	md clusterv1.MachineDeployment
  }
-@@ -562,6 +681,11 @@ func (b *machineBuilder) controlPlane() *machineBuilder {
+@@ -613,6 +732,11 @@ func (b *machineBuilder) controlPlane() *machineBuilder {
  	return b
  }
  
@@ -1180,7 +1089,7 @@ index 721ef6af4..33facf2cd 100644
  func (b *machineBuilder) build() clusterv1.Machine {
  	return b.m
  }
-@@ -628,6 +752,9 @@ func TestFilterOwnedDescendants(t *testing.T) {
+@@ -679,6 +803,9 @@ func TestFilterOwnedDescendants(t *testing.T) {
  	mp3NotOwnedByCluster := newMachinePoolBuilder().named("mp3").build()
  	mp4OwnedByCluster := newMachinePoolBuilder().named("mp4").ownedBy(&c).build()
  
@@ -1190,7 +1099,7 @@ index 721ef6af4..33facf2cd 100644
  	d := clusterDescendants{
  		machineDeployments: clusterv1.MachineDeploymentList{
  			Items: []clusterv1.MachineDeployment{
-@@ -667,6 +794,12 @@ func TestFilterOwnedDescendants(t *testing.T) {
+@@ -718,6 +845,12 @@ func TestFilterOwnedDescendants(t *testing.T) {
  				mp4OwnedByCluster,
  			},
  		},
@@ -1203,7 +1112,7 @@ index 721ef6af4..33facf2cd 100644
  	}
  
  	actual, err := d.filterOwnedDescendants(&c)
-@@ -683,6 +816,7 @@ func TestFilterOwnedDescendants(t *testing.T) {
+@@ -734,6 +867,7 @@ func TestFilterOwnedDescendants(t *testing.T) {
  		&m5OwnedByCluster,
  		&m3ControlPlaneOwnedByCluster,
  		&m6ControlPlaneOwnedByCluster,
@@ -1368,10 +1277,10 @@ index 8ffe77e9a..0b66cf65b 100644
  	var failureDomain string
  	err = util.UnstructuredUnmarshalField(infraConfig, &failureDomain, "spec", "failureDomain")
 diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-index c09b38cce..6ee0d7430 100644
+index fd0204b55..c5afaf550 100644
 --- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 +++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-@@ -308,13 +308,17 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -310,13 +310,17 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
  	// Usually a cloud provider will do this, but there is no docker-cloud provider.
  	// Requeue if there is an error, as this is likely momentary load balancer
  	// state changes during control plane provisioning.
@@ -1466,10 +1375,10 @@ index ccfe02ba2..17d51669e 100644
  
  var (
 diff --git a/util/util.go b/util/util.go
-index 837c3fc7c..4193e04cf 100644
+index b33af56a6..f79242561 100644
 --- a/util/util.go
 +++ b/util/util.go
-@@ -145,6 +145,12 @@ func IsNodeReady(node *corev1.Node) bool {
+@@ -146,6 +146,12 @@ func IsNodeReady(node *corev1.Node) bool {
  	return false
  }
  
@@ -1483,5 +1392,5 @@ index 837c3fc7c..4193e04cf 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterLabelName] == "" {
 -- 
-2.32.0
+2.37.0
 

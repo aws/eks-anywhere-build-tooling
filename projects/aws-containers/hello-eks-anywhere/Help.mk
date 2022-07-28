@@ -38,6 +38,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
 ########### END GENERATED ###########################

@@ -9,7 +9,6 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `helm-controller`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
-patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `helm-controller` for `linux/amd64 linux/arm64`
@@ -47,6 +46,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
 ########### END GENERATED ###########################

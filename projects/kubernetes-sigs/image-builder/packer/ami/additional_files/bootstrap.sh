@@ -1,7 +1,7 @@
 #!/bin/bash
 source /etc/eks/logging.sh
 
-set -euxo pipefail
+set -uxo pipefail
 
 SCRIPT_LOG=/var/log/eks-bootstrap.log
 touch $SCRIPT_LOG
