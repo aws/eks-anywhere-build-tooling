@@ -27,8 +27,6 @@ RUN set -x && \
     mkdir -p /newroot/usr/share/nginx/txt/ && \
     chown -R 999:999 /newroot/usr/share/nginx /newroot/var/log/nginx && \
     chmod 777 /newroot/run && \
-    # container runs as nginx(999) user, no need for nginx user config
-    sed -i '/^user nginx;$/d' /newroot/etc/nginx/nginx.conf && \
     ln -sf /dev/stdout /newroot/var/log/nginx/access.log && \
     ln -sf /dev/stderr /newroot/var/log/nginx/error.log
 
@@ -36,7 +34,10 @@ FROM $BASE_IMAGE
 
 COPY --from=builder /newroot /
 
-VOLUME /var/cache/nginx /var/log/nginx /run
+# Ideally we should run as nginx, but the chart which is pulled from upstream
+# is configured to bind to port 80
+# if/when we get that changed we can remove this
+USER root
 
 STOPSIGNAL SIGQUIT
 ENTRYPOINT ["/hello.sh"]
