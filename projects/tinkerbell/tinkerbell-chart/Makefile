@@ -5,30 +5,15 @@ REPO_OWNER=tinkerbell
 REPO=tinkerbell-chart
 
 REPO_NO_CLONE=true
+BUILD_TARGETS=helm/build
+RELEASE_TARGETS=helm/push
 
+HAS_HELM_CHART=true
 HELM_DIRECTORY=chart
 HELM_SOURCE_REPOSITORY=.
 HELM_DESTINATION_REPOSITORY=$(REPO_OWNER)/$(REPO)
-IMAGE_TAG=$(GIT_TAG)
-REQUIRES_CONFIG_FILE=false
-
-BUILD_TARGETS=build-chart
-RELEASE_TARGETS=publish-chart
 
 include $(BASE_DIRECTORY)/Common.mk
-
-.PHONY: verify
-verify:
-	scripts/verify.sh $(HELM_DIRECTORY) $(GIT_TAG)
-
-.PHONY: build-chart
-build-chart: verify
-	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
-
-.PHONY: publish-chart
-publish-chart: build-chart
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(OUTPUT_DIR)
 
 
 ########### DO NOT EDIT #############################
