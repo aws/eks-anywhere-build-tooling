@@ -34,9 +34,10 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 $(OUTPUT_DIR)/$(REPO):
 	@export VERSION="v3.0.0" && export CHART_VERSION=$(CHART_VERSION) && cd emissary && GOPATH=/var && make python/ambassador.version
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
 # Run make help for a formatted help block with all targets
 include Help.mk
-##########emissary-builder# END GENERATED ###########################
+########### END GENERATED ###########################
