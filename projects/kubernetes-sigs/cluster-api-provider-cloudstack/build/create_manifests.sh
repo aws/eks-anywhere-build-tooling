@@ -32,7 +32,7 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 build::common::use_go_version ${GOLANG_VERSION}
 
 cd $REPO
-make release-manifests \
+make release-manifests-metrics-port \
   RELEASE_DIR="out" \
   IMG="${IMAGE_REPO}/kubernetes-sigs/cluster-api-provider-cloudstack/release/manager:$IMAGE_TAG"
 
