@@ -1,0 +1,338 @@
+From 2c4ee9e05865ee4f7310d268d4f4a8690defa0a4 Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin@amazon.com>
+Date: Mon, 25 Jul 2022 08:31:12 -0500
+Subject: [PATCH] Update OTel helm charts
+
+---
+ .../templates/_pod.tpl                        |  2 +-
+ .../templates/configmap-agent.yaml            |  1 +
+ .../templates/configmap.yaml                  |  1 +
+ .../templates/daemonset.yaml                  |  1 +
+ .../templates/deployment.yaml                 |  1 +
+ .../templates/hpa.yaml                        |  1 +
+ .../templates/ingress.yaml                    |  1 +
+ .../templates/pdb.yaml                        |  1 +
+ .../templates/podmonitor.yaml                 |  1 +
+ .../templates/prometheusrule.yaml             |  1 +
+ .../templates/service.yaml                    |  1 +
+ .../templates/serviceaccount.yaml             |  1 +
+ .../templates/servicemonitor.yaml             |  1 +
+ .../values.schema.json                        |  7 ++
+ charts/opentelemetry-collector/values.yaml    | 66 ++-----------------
+ 15 files changed, 27 insertions(+), 60 deletions(-)
+
+diff --git a/charts/opentelemetry-collector/templates/_pod.tpl b/charts/opentelemetry-collector/templates/_pod.tpl
+index 235e32f..623a66e 100644
+--- a/charts/opentelemetry-collector/templates/_pod.tpl
++++ b/charts/opentelemetry-collector/templates/_pod.tpl
+@@ -18,7 +18,7 @@ containers:
+       {{- end }}
+     securityContext:
+       {{- toYaml .Values.securityContext | nindent 6 }}
+-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
++    image: "{{ .Values.sourceRegistry }}/{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+     imagePullPolicy: {{ .Values.image.pullPolicy }}
+     ports:
+       {{- range $key, $port := .Values.ports }}
+diff --git a/charts/opentelemetry-collector/templates/configmap-agent.yaml b/charts/opentelemetry-collector/templates/configmap-agent.yaml
+index e267336..d673a40 100644
+--- a/charts/opentelemetry-collector/templates/configmap-agent.yaml
++++ b/charts/opentelemetry-collector/templates/configmap-agent.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: ConfigMap
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}-agent
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ data:
+diff --git a/charts/opentelemetry-collector/templates/configmap.yaml b/charts/opentelemetry-collector/templates/configmap.yaml
+index 42ed59a..fe36e35 100644
+--- a/charts/opentelemetry-collector/templates/configmap.yaml
++++ b/charts/opentelemetry-collector/templates/configmap.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: ConfigMap
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ data:
+diff --git a/charts/opentelemetry-collector/templates/daemonset.yaml b/charts/opentelemetry-collector/templates/daemonset.yaml
+index e16c82f..ec52db3 100644
+--- a/charts/opentelemetry-collector/templates/daemonset.yaml
++++ b/charts/opentelemetry-collector/templates/daemonset.yaml
+@@ -3,6 +3,7 @@ apiVersion: apps/v1
+ kind: DaemonSet
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}-agent
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ spec:
+diff --git a/charts/opentelemetry-collector/templates/deployment.yaml b/charts/opentelemetry-collector/templates/deployment.yaml
+index 7149fdc..aa0c0ac 100644
+--- a/charts/opentelemetry-collector/templates/deployment.yaml
++++ b/charts/opentelemetry-collector/templates/deployment.yaml
+@@ -3,6 +3,7 @@ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+   {{- include "opentelemetry-collector.annotations" . | nindent 2 }}
+diff --git a/charts/opentelemetry-collector/templates/hpa.yaml b/charts/opentelemetry-collector/templates/hpa.yaml
+index 51f2c84..b24b932 100644
+--- a/charts/opentelemetry-collector/templates/hpa.yaml
++++ b/charts/opentelemetry-collector/templates/hpa.yaml
+@@ -3,6 +3,7 @@ apiVersion: autoscaling/v2beta1
+ kind: HorizontalPodAutoscaler
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ spec:
+diff --git a/charts/opentelemetry-collector/templates/ingress.yaml b/charts/opentelemetry-collector/templates/ingress.yaml
+index 47f06eb..eafe574 100644
+--- a/charts/opentelemetry-collector/templates/ingress.yaml
++++ b/charts/opentelemetry-collector/templates/ingress.yaml
+@@ -5,6 +5,7 @@ apiVersion: {{ include "ingress.apiVersion" . }}
+ kind: Ingress
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     component: standalone-collector
+diff --git a/charts/opentelemetry-collector/templates/pdb.yaml b/charts/opentelemetry-collector/templates/pdb.yaml
+index d6761e8..a930276 100644
+--- a/charts/opentelemetry-collector/templates/pdb.yaml
++++ b/charts/opentelemetry-collector/templates/pdb.yaml
+@@ -3,6 +3,7 @@ apiVersion: {{ include "podDisruptionBudget.apiVersion" . }}
+ kind: PodDisruptionBudget
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ spec:
+diff --git a/charts/opentelemetry-collector/templates/podmonitor.yaml b/charts/opentelemetry-collector/templates/podmonitor.yaml
+index 703abe7..4060d24 100644
+--- a/charts/opentelemetry-collector/templates/podmonitor.yaml
++++ b/charts/opentelemetry-collector/templates/podmonitor.yaml
+@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
+ kind: PodMonitor
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}-agent
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     {{- range $key, $value := .Values.podMonitor.extraLabels }}
+diff --git a/charts/opentelemetry-collector/templates/prometheusrule.yaml b/charts/opentelemetry-collector/templates/prometheusrule.yaml
+index 2f2ffe7..e8de6e6 100644
+--- a/charts/opentelemetry-collector/templates/prometheusrule.yaml
++++ b/charts/opentelemetry-collector/templates/prometheusrule.yaml
+@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
+ kind: PrometheusRule
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     {{- range $key, $value := .Values.prometheusRule.extraLabels }}
+diff --git a/charts/opentelemetry-collector/templates/service.yaml b/charts/opentelemetry-collector/templates/service.yaml
+index 66b53df..7883455 100644
+--- a/charts/opentelemetry-collector/templates/service.yaml
++++ b/charts/opentelemetry-collector/templates/service.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: Service
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     component: standalone-collector
+diff --git a/charts/opentelemetry-collector/templates/serviceaccount.yaml b/charts/opentelemetry-collector/templates/serviceaccount.yaml
+index 5daa658..00cd049 100644
+--- a/charts/opentelemetry-collector/templates/serviceaccount.yaml
++++ b/charts/opentelemetry-collector/templates/serviceaccount.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+   name: {{ include "opentelemetry-collector.serviceAccountName" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+   {{- with .Values.serviceAccount.annotations }}
+diff --git a/charts/opentelemetry-collector/templates/servicemonitor.yaml b/charts/opentelemetry-collector/templates/servicemonitor.yaml
+index 31fed7e..410700b 100644
+--- a/charts/opentelemetry-collector/templates/servicemonitor.yaml
++++ b/charts/opentelemetry-collector/templates/servicemonitor.yaml
+@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
+ kind: ServiceMonitor
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     {{- range $key, $value := .Values.serviceMonitor.extraLabels }}
+diff --git a/charts/opentelemetry-collector/values.schema.json b/charts/opentelemetry-collector/values.schema.json
+index 64ff484..a9235a5 100644
+--- a/charts/opentelemetry-collector/values.schema.json
++++ b/charts/opentelemetry-collector/values.schema.json
+@@ -11,6 +11,10 @@
+     "global": {
+       "type": "object"
+     },
++    "sourceRegistry": {
++      "description": "Override source registry of the helm chart.",
++      "type": "string"
++    },
+     "nameOverride": {
+       "description": "Override name of the chart used in Kubernetes object names.",
+       "type": "string"
+@@ -51,6 +55,9 @@
+         "tag": {
+           "type": "string"
+         },
++        "digest": {
++          "type": "string"
++        },
+         "pullPolicy": {
+           "type": "string",
+           "enum": [
+diff --git a/charts/opentelemetry-collector/values.yaml b/charts/opentelemetry-collector/values.yaml
+index bd3b9ca..b016d2c 100644
+--- a/charts/opentelemetry-collector/values.yaml
++++ b/charts/opentelemetry-collector/values.yaml
+@@ -2,11 +2,12 @@
+ # This is a YAML-formatted file.
+ # Declare variables to be passed into your templates.
+ 
++sourceRegistry: "public.ecr.aws/eks-anywhere"
+ nameOverride: ""
+ fullnameOverride: ""
+ 
+ # Valid values are "daemonset" and "deployment".
+-mode: ""
++mode: "deployment"
+ 
+ configMap:
+   # Specifies whether a configMap should be created (true by default)
+@@ -14,7 +15,8 @@ configMap:
+ 
+ config:
+   exporters:
+-    logging: {}
++    logging:
++      logLevel: debug
+   extensions:
+     health_check: {}
+     memory_ballast: {}
+@@ -23,14 +25,6 @@ config:
+     # If set to null, will be overridden with values based on k8s resource limits
+     memory_limiter: null
+   receivers:
+-    jaeger:
+-      protocols:
+-        grpc:
+-          endpoint: 0.0.0.0:14250
+-        thrift_http:
+-          endpoint: 0.0.0.0:14268
+-        thrift_compact:
+-          endpoint: 0.0.0.0:6831
+     otlp:
+       protocols:
+         grpc:
+@@ -45,8 +39,6 @@ config:
+             static_configs:
+               - targets:
+                   - ${MY_POD_IP}:8888
+-    zipkin:
+-      endpoint: 0.0.0.0:9411
+   service:
+     telemetry:
+       metrics:
+@@ -55,14 +47,6 @@ config:
+       - health_check
+       - memory_ballast
+     pipelines:
+-      logs:
+-        exporters:
+-          - logging
+-        processors:
+-          - memory_limiter
+-          - batch
+-        receivers:
+-          - otlp
+       metrics:
+         exporters:
+           - logging
+@@ -72,28 +56,16 @@ config:
+         receivers:
+           - otlp
+           - prometheus
+-      traces:
+-        exporters:
+-          - logging
+-        processors:
+-          - memory_limiter
+-          - batch
+-        receivers:
+-          - otlp
+-          - jaeger
+-          - zipkin
+ 
+ image:
+-  # If you want to use the core image `otel/opentelemetry-collector`, you also need to change `command.name` value to `otelcol`.
+-  repository: otel/opentelemetry-collector-contrib
++  repository: aws-observability/aws-otel-collector
++  digest: {{aws-observability/aws-otel-collector}}
+   pullPolicy: IfNotPresent
+-  # Overrides the image tag whose default is the chart appVersion.
+-  tag: ""
+ imagePullSecrets: []
+ 
+ # OpenTelemetry Collector executable
+ command:
+-  name: otelcol-contrib
++  name: awscollector
+   extraArgs: []
+ 
+ serviceAccount:
+@@ -160,30 +132,6 @@ ports:
+     servicePort: 4318
+     hostPort: 4318
+     protocol: TCP
+-  jaeger-compact:
+-    enabled: true
+-    containerPort: 6831
+-    servicePort: 6831
+-    hostPort: 6831
+-    protocol: UDP
+-  jaeger-thrift:
+-    enabled: true
+-    containerPort: 14268
+-    servicePort: 14268
+-    hostPort: 14268
+-    protocol: TCP
+-  jaeger-grpc:
+-    enabled: true
+-    containerPort: 14250
+-    servicePort: 14250
+-    hostPort: 14250
+-    protocol: TCP
+-  zipkin:
+-    enabled: true
+-    containerPort: 9411
+-    servicePort: 9411
+-    hostPort: 9411
+-    protocol: TCP
+   metrics:
+     # The metrics port is disabled by default. However you need to enable the port
+     # in order to use the ServiceMonitor (serviceMonitor.enabled) or PodMonitor (podMonitor.enabled).
+-- 
+2.31.0
+
