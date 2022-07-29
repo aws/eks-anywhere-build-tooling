@@ -15,9 +15,10 @@ REPO_NO_CLONE=true
 GIT_CHECKOUT_TARGET=main.go
 FAKE_GIT_REPO_TARGET=.git
 
-include $(BASE_DIRECTORY)/Common.mk
+EXTRA_GO_LDFLAGS=-X github.com/aws/eks-anywhere-build-tooling/image-builder/cmd.version=${GIT_TAG} \
+	-X github.com/aws/eks-anywhere-build-tooling/image-builder/builder.buildToolingTag=${BUILD_TOOLING_GIT_TAG}
 
-EXTRA_GO_LDFLAGS=-X github.com/aws/eks-anywhere-build-tooling/image-builder/cmd.version=${GIT_TAG} -X github.com/aws/eks-anywhere-build-tooling/image-builder/builder.buildToolingTag=${BUILD_TOOLING_GIT_TAG}
+include $(BASE_DIRECTORY)/Common.mk
 
 $(REPO):
 	@mkdir $@
