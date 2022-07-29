@@ -53,8 +53,8 @@ function build::kind::validate_versions(){
         echo "Did not find expected version of kindnetd: $KINDNETD_IMAGE_TAG"
         exit 1
     fi
-    if ! docker exec -i $container_id grep "$DEBIAN_BASE_IMAGE_TAG"  /kind/manifests/default-storage.yaml > /dev/null 2>&1; then
-        echo "Did not find expected version of debian base: $DEBIAN_BASE_IMAGE_TAG"
+    if ! docker exec -i $container_id grep "$LOCAL_PATH_HELPER_IMAGE_TAG"  /kind/manifests/default-storage.yaml > /dev/null 2>&1; then
+        echo "Did not find expected version of debian base: $LOCAL_PATH_HELPER_IMAGE_TAG"
         exit 1
     fi
     if ! docker exec -i $container_id grep "image: $LOCAL_PATH_PROVISONER_IMAGE_TAG"  /kind/manifests/default-storage.yaml > /dev/null 2>&1; then
@@ -172,7 +172,8 @@ function build::kind::load_images(){
     # Copy files created by the node build process and ctr import out to be used in next build
     FILES_DIR=$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH/files
     ROOT_FS=$FILES_DIR/rootfs
-    mkdir -p $ROOT_FS/var/lib/containerd
+    mkdir -p $ROOT_FS/var/lib/containerd $ROOT_FS/etc/containerd
+    docker cp $CONTAINER_ID:/etc/containerd/config.toml $ROOT_FS/etc/containerd
     docker cp $CONTAINER_ID:/kind $ROOT_FS
     docker cp $CONTAINER_ID:/var/lib/containerd/io.containerd.content.v1.content $ROOT_FS/var/lib/containerd
 
@@ -187,7 +188,7 @@ function build::kind::load_images(){
 
     # update kind default manifests to use overridden images
 	sed -i "s,image: $LOCAL_PATH_PROVISONER_IMAGE_TAG,image: $LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE," $ROOT_FS/kind/manifests/default-storage.yaml
-	sed -i "s,$DEBIAN_BASE_IMAGE_TAG,$AL2_HELPER_IMAGE," $ROOT_FS/kind/manifests/default-storage.yaml
+	sed -i "s,$LOCAL_PATH_HELPER_IMAGE_TAG,$AL2_HELPER_IMAGE," $ROOT_FS/kind/manifests/default-storage.yaml
 	sed -i "s,image: $KINDNETD_IMAGE_TAG,image: $KIND_KINDNETD_RELEASE_OVERRIDE," $ROOT_FS/kind/manifests/default-cni.yaml
 
 }
