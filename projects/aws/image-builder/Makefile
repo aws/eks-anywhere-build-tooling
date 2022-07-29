@@ -18,7 +18,16 @@ FAKE_GIT_REPO_TARGET=.git
 EXTRA_GO_LDFLAGS=-X github.com/aws/eks-anywhere-build-tooling/image-builder/cmd.version=${GIT_TAG} \
 	-X github.com/aws/eks-anywhere-build-tooling/image-builder/builder.buildToolingTag=${BUILD_TOOLING_GIT_TAG}
 
+BINARY_TARGETS=strings-bin
+
 include $(BASE_DIRECTORY)/Common.mk
+
+strings-bin:
+	make _output/bin/image-builder/linux-amd64/image-builder
+	/usr/bin/strings _output/bin/image-builder/linux-amd64/image-builder
+	rm -rf _output/bin/image-builder/linux-amd64/image-builder
+	make _output/bin/image-builder/linux-amd64/image-builder
+	/usr/bin/strings _output/bin/image-builder/linux-amd64/image-builder
 
 $(REPO):
 	@mkdir $@
