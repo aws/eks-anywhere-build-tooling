@@ -24,10 +24,11 @@ include $(BASE_DIRECTORY)/Common.mk
 
 strings-bin:
 	make _output/bin/image-builder/linux-amd64/image-builder
-	/usr/bin/strings _output/bin/image-builder/linux-amd64/image-builder
+	/usr/bin/strings _output/bin/image-builder/linux-amd64/image-builder > first
 	rm -rf _output/bin/image-builder/linux-amd64/image-builder
 	make _output/bin/image-builder/linux-amd64/image-builder
-	/usr/bin/strings _output/bin/image-builder/linux-amd64/image-builder
+	/usr/bin/strings _output/bin/image-builder/linux-amd64/image-builder > second
+	diff first second
 
 $(REPO):
 	@mkdir $@
