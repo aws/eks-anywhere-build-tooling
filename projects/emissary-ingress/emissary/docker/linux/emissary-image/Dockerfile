@@ -1,15 +1,16 @@
 ARG BASE_IMAGE 
 ARG BUILDER_IMAGE
 ARG APPMESH_VERSION
-ARG TARGETARCH
-ARG TARGETOS
 FROM public.ecr.aws/appmesh/aws-appmesh-envoy:$APPMESH_VERSION as envoy
 
 FROM $BUILDER_IMAGE as emissary-builder
 
+ARG TARGETARCH
+ARG TARGETOS
+
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot/bin:/newroot/buildroot
 
-COPY emissary/python _output/bin/emissary/linux-amd64 emissary/manifests/emissary/emissary-crds.yaml.in /newroot/buildroot
+COPY emissary/python _output/bin/emissary/${TARGETOS}-${TARGETARCH} emissary/manifests/emissary/emissary-crds.yaml.in /newroot/buildroot
 COPY --from=envoy /usr/bin/envoy /THIRD-PARTY-LICENSES.txt /
 
 WORKDIR /newroot/buildroot
