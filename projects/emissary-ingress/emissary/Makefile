@@ -11,15 +11,12 @@ REPO_OWNER=emissary-ingress
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
 BINARY_TARGET_FILES=busyambassador capabilities_wrapper example-envoy-metrics-sink k8sregistryctl kat-client kat-server
 SOURCE_PATTERNS=./cmd/busyambassador ./cmd/capabilities_wrapper ./cmd/example-envoy-metrics-sink ./cmd/k8sregistryctl ./cmd/kat-client ./cmd/kat-server
-GO_MOD_PATHS=.
 
 EMISSARY_IMAGE_COMPONENT=emissary-ingress/emissary
 
 IMAGE_NAMES=emissary
 DOCKERFILE_FOLDER=./docker/linux/emissary-image
 
-# This will registry be changed once the eks-distro-minimal-base-python PR is merged.
-BASE_IMAGE_REPO?=public.ecr.aws/k1e6s8o8
 BASE_IMAGE_NAME?=eks-distro-minimal-base-python
 
 HAS_HELM_CHART=true
@@ -27,11 +24,16 @@ HELM_DIRECTORY=charts/emissary-ingress
 HELM_DESTINATION_REPOSITORY=emissary-ingress/emissary
 HELM_IMAGE_LIST=emissary-ingress/emissary
 
+AMBASSADOR_VERSION_TARGET=$(REPO)/python/ambassador.version
+
 include $(BASE_DIRECTORY)/Common.mk
 
-$(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 
-$(OUTPUT_DIR)/$(REPO):
+$(GO_MOD_DOWNLOAD_TARGETS): $(AMBASSADOR_VERSION_TARGET)
+
+# do not pass our makeflags down to emissary make since there will be unncessary warnings
+$(AMBASSADOR_VERSION_TARGET): MAKEFLAGS=
+$(AMBASSADOR_VERSION_TARGET):
 	@export VERSION="v3.0.0" && export CHART_VERSION=$(CHART_VERSION) && cd emissary && GOPATH=/var && make python/ambassador.version
 
 
