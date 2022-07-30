@@ -25,10 +25,12 @@ include $(BASE_DIRECTORY)/Common.mk
 strings-bin:
 	make _output/bin/image-builder/linux-amd64/image-builder
 	/usr/bin/strings _output/bin/image-builder/linux-amd64/image-builder > first
+	sha256sum _output/bin/image-builder/linux-amd64/image-builder
 	rm -rf _output/bin/image-builder/linux-amd64/image-builder
 	make _output/bin/image-builder/linux-amd64/image-builder
-	/usr/bin/strings _output/bin/image-builder/linux-amd64/image-builder > second
+	/usr/bin/strings  _output/bin/image-builder/linux-amd64/image-builder > second
 	diff first second
+	sha256sum _output/bin/image-builder/linux-amd64/image-builder
 
 $(REPO):
 	@mkdir $@
