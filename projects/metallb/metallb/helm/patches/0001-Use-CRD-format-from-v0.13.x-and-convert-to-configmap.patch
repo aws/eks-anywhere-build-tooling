@@ -1,11 +1,11 @@
-From 5f9b19b3d0ec45614bb38b0fb327eab3498be8ee Mon Sep 17 00:00:00 2001
+From 293a0c8f38d32ce6730fd891565760921c3d61a6 Mon Sep 17 00:00:00 2001
 From: Lewis Diamond <git@lewisdiamond.com>
 Date: Thu, 16 Jun 2022 11:42:22 -0400
-Subject: [PATCH] Clean up unnecessary chart features
+Subject: [PATCH] Use CRD format from v0.13.x and convert to configmap
 
 Remove PSP, FRR, non-inline config
 ---
- charts/metallb/templates/config.yaml          |  17 +-
+ charts/metallb/templates/config.yaml          |  83 ++++++-
  charts/metallb/templates/controller.yaml      |   3 +-
  charts/metallb/templates/psp.yaml             |  92 -------
  charts/metallb/templates/rbac.yaml            |  24 +-
@@ -13,15 +13,32 @@ Remove PSP, FRR, non-inline config
  charts/metallb/templates/speaker.yaml         | 228 +-----------------
  charts/metallb/values.schema.json             |  47 ++--
  charts/metallb/values.yaml                    |  23 +-
- 8 files changed, 57 insertions(+), 379 deletions(-)
+ 8 files changed, 123 insertions(+), 379 deletions(-)
  delete mode 100644 charts/metallb/templates/psp.yaml
 
 diff --git a/charts/metallb/templates/config.yaml b/charts/metallb/templates/config.yaml
-index 3ff3137a..7612e5dc 100644
+index 3ff3137a..e0c6143d 100644
 --- a/charts/metallb/templates/config.yaml
 +++ b/charts/metallb/templates/config.yaml
-@@ -1,11 +1,22 @@
+@@ -1,11 +1,88 @@
 -{{- if .Values.configInline }}
++{{ $proto := dict }}
++{{- range .Values.L2Advertisements }}
++  {{- $advertisement := . -}}
++  {{- range .IPAddressPools }}
++  {{ $_ := set $advertisement "type" "layer2" }}
++  {{ $_ := set $proto . $advertisement }}
++  {{- end }}
++{{- end }}
++
++{{- range .Values.BGPAdvertisements }}
++  {{- $advertisement := . -}}
++  {{- range .IPAddressPools }}
++  {{ $_ := set $advertisement "type" "bgp" }}
++  {{ $_ := set $proto . $advertisement }}
++  {{- end }}
++{{- end }}
++
  apiVersion: v1
  kind: ConfigMap
  metadata:
@@ -33,19 +50,68 @@ index 3ff3137a..7612e5dc 100644
    config: |
 -{{- toYaml .Values.configInline | nindent 4 }}
 -{{- end }}
-+    {{- with .Values.peers }}
-+    peers:
-+      {{- toYaml . | nindent 4 }}
-+    {{- end }}
-+    {{- with (index .Values "bgp-communities") }}
-+    bgp-communities:
-+      {{- toYaml . | nindent 4 }}
-+    {{- end }}
-+    {{- with (index .Values "address-pools") }}
++    {{- with .Values.IPAddressPools }}
 +    address-pools:
-+      {{- toYaml . | nindent 4 }}
++    {{- range . }}
++      - name: {{ .name }}
++        addresses:{{ toYaml .addresses | nindent 10 }}
++        protocol: {{ (get $proto .name).type }}
++        {{- if eq .autoAssign false }}
++        auto-assign: {{ .autoAssign }}
++        {{- end }}
++        {{- if eq .autoAssign true }}
++        auto-assign: {{ .autoAssign }}
++        {{- end }}
++        {{- if eq (get $proto .name).type "bgp" }}
++        {{- with (get $proto .name) }}
++        {{- if not (and (empty .aggregationLength) (empty .aggregationLengthV6) (empty .localPref) (empty .communities)) }}
++        bgp-advertisements:
++            {{- if not (empty .aggregationLength) }}
++          - aggregation-length: {{ .aggregationLength }}
++            {{- end }}
++            {{- if not (empty .aggregationLengthV6) }}
++            aggregation-length-v6: {{ .aggregationLengthV6 }}
++            {{- end }}
++            {{- if not (empty .localPref) }}
++            localpref: {{ .localPref }}
++            {{- end }}
++            {{- if not (empty .communities) }}
++            communities:{{ toYaml .communities | nindent 14 }}
++            {{- end }}
++        {{- end }}
++        {{- end }}
++        {{- end }}
 +    {{- end }}
-+
++    {{- end }}
++    {{- with .Values.BGPPeers }}
++    peers:
++      {{- range . }}
++      - peer-address: {{ .peerAddress }}
++        peer-asn: {{ .peerASN }}
++        my-asn: {{ .myASN }}
++        {{- if not (empty .peerPort) }}
++        peer-port: {{ .peerPort }}
++        {{- end }}
++        {{- if not (empty .sourceAddress) }}
++        source-address: {{ .sourceAddress }}
++        {{- end }}
++        {{- if not (empty .holdTime) }}
++        hold-time: {{ .holdTime }}
++        {{- end }}
++        {{- if not (empty .keepaliveTime) }}
++        keepalive-time: {{ .keepaliveTime }}
++        {{- end }}
++        {{- if not (empty .routerID) }}
++        router-id: {{ .routerID }}
++        {{- end }}
++        {{- if not (empty .password) }}
++        password: {{ .password }}
++        {{- end }}
++        {{- if not (empty .nodeSelectors) }}
++        node-selectors:{{ toYaml .nodeSelectors | nindent 10 }}
++        {{- end }}
++      {{- end }}
++    {{- end }}
 diff --git a/charts/metallb/templates/controller.yaml b/charts/metallb/templates/controller.yaml
 index 0a7f817f..37cb9750 100644
 --- a/charts/metallb/templates/controller.yaml
