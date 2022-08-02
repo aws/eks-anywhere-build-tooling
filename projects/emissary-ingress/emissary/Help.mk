@@ -11,15 +11,27 @@ clone-repo:  ## Clone upstream `emissary`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `emissary` for `linux/amd64 linux/arm64`
-_output/bin/emissary/linux-amd64/emissary: ## Build `_output/bin/emissary/linux-amd64/emissary`
-_output/bin/emissary/linux-arm64/emissary: ## Build `_output/bin/emissary/linux-arm64/emissary`
+binaries: ## Build all binaries: `busyambassador capabilities_wrapper example-envoy-metrics-sink k8sregistryctl kat-client kat-server` for `linux/amd64 linux/arm64`
+_output/bin/emissary/linux-amd64/busyambassador: ## Build `_output/bin/emissary/linux-amd64/busyambassador`
+_output/bin/emissary/linux-amd64/capabilities_wrapper: ## Build `_output/bin/emissary/linux-amd64/capabilities_wrapper`
+_output/bin/emissary/linux-amd64/example-envoy-metrics-sink: ## Build `_output/bin/emissary/linux-amd64/example-envoy-metrics-sink`
+_output/bin/emissary/linux-amd64/k8sregistryctl: ## Build `_output/bin/emissary/linux-amd64/k8sregistryctl`
+_output/bin/emissary/linux-amd64/kat-client: ## Build `_output/bin/emissary/linux-amd64/kat-client`
+_output/bin/emissary/linux-amd64/kat-server: ## Build `_output/bin/emissary/linux-amd64/kat-server`
+_output/bin/emissary/linux-arm64/busyambassador: ## Build `_output/bin/emissary/linux-arm64/busyambassador`
+_output/bin/emissary/linux-arm64/capabilities_wrapper: ## Build `_output/bin/emissary/linux-arm64/capabilities_wrapper`
+_output/bin/emissary/linux-arm64/example-envoy-metrics-sink: ## Build `_output/bin/emissary/linux-arm64/example-envoy-metrics-sink`
+_output/bin/emissary/linux-arm64/k8sregistryctl: ## Build `_output/bin/emissary/linux-arm64/k8sregistryctl`
+_output/bin/emissary/linux-arm64/kat-client: ## Build `_output/bin/emissary/linux-arm64/kat-client`
+_output/bin/emissary/linux-arm64/kat-server: ## Build `_output/bin/emissary/linux-arm64/kat-server`
 
-# ##@ Image Targets
-local-images: ## Builds `emissary/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `emissary/images/push` to IMAGE_REPO
+##@ Image Targets
+local-images: ## Builds `emissary/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `emissary/images/push helm/push` to IMAGE_REPO
 emissary/images/amd64: ## Builds/pushes `emissary/images/amd64`
+helm/build: ## Builds/pushes `helm/build`
 emissary/images/push: ## Builds/pushes `emissary/images/push`
+helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets
 helm/build: ## Build helm chart
@@ -42,14 +54,14 @@ clean-repo: ## Removes source directory
 help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
-# ##@Update Helpers
-# run-target-in-docker: ## Run `MAKE_TARGET` using builder base docker container
-# update-attribution-checksums-docker: ## Update attribution and checksums using the builder base docker container
-# stop-docker-builder: ## Clean up builder base docker container
-# generate: ## Update UPSTREAM_PROJECTS.yaml
-# create-ecr-repos: ## Create repos in ECR for project images for local testing
+##@Update Helpers
+run-target-in-docker: ## Run `MAKE_TARGET` using builder base docker container
+update-attribution-checksums-docker: ## Update attribution and checksums using the builder base docker container
+stop-docker-builder: ## Clean up builder base docker container
+generate: ## Update UPSTREAM_PROJECTS.yaml
+create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `handle-dependencies validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `handle-dependencies validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
 ########### END GENERATED ###########################

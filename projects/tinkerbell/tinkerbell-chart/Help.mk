@@ -7,10 +7,16 @@
 
 
 ##@ Image Targets
-local-images: ## Builds `tinkerbell-chart/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `tinkerbell-chart/images/push` to IMAGE_REPO
+local-images: ## Builds `tinkerbell-chart/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `tinkerbell-chart/images/push helm/push` to IMAGE_REPO
 tinkerbell-chart/images/amd64: ## Builds/pushes `tinkerbell-chart/images/amd64`
+helm/build: ## Builds/pushes `helm/build`
 tinkerbell-chart/images/push: ## Builds/pushes `tinkerbell-chart/images/push`
+helm/push: ## Builds/pushes `helm/push`
+
+##@ Helm Targets
+helm/build: ## Build helm chart
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ License Targets
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
@@ -32,6 +38,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `build-chart`
-release: ## Called via prow postsubmit + release jobs, calls `publish-chart`
+build: ## Called via prow presubmit, calls `helm/build`
+release: ## Called via prow postsubmit + release jobs, calls `helm/push`
 ########### END GENERATED ###########################
