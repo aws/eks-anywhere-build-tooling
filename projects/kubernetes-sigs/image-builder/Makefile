@@ -59,7 +59,7 @@ FINAL_OVA_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/$(IMAGE_OS).ova
 FINAL_RAW_IMAGE_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/$(IMAGE_OS).gz
 FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
 FINAL_BOTTLEROCKET_RAW_PATH=$(ARTIFACTS_PATH)/raw/bottlerocket/bottlerocket.img.gz
-FAKE_UBUNTU_OVA_PATH=$(IMAGE_BUILDER_DIR)/output/fake-ubuntu.ova
+FAKE_UBUNTU_OVA_PATH=fake-ubuntu.ova
 FAKE_UBUNTU_RAW_PATH=$(IMAGE_BUILDER_DIR)/output/fake-ubuntu.gz
 
 IMAGE_OS?=ubuntu
@@ -118,9 +118,7 @@ export GOVC_INSECURE?=true
 
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
 $(FAKE_UBUNTU_OVA_PATH):
-	@mkdir -p $(@D)
 	touch $@
-	touch $(ARTIFACTS_PATH)/ova/ubuntu/packer.log
 
 $(FAKE_UBUNTU_RAW_PATH):
 	@mkdir -p $(@D)
