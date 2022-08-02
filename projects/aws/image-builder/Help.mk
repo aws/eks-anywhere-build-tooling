@@ -11,15 +11,14 @@ binaries: ## Build all binaries: `image-builder` for `linux/amd64 linux/arm64`
 _output/bin/image-builder/linux-amd64/image-builder: ## Build `_output/bin/image-builder/linux-amd64/image-builder`
 _output/bin/image-builder/linux-arm64/image-builder: ## Build `_output/bin/image-builder/linux-arm64/image-builder`
 
-##@ Image Targets
-local-images: ## Builds `image-builder/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `image-builder/images/push` to IMAGE_REPO
-image-builder/images/amd64: ## Builds/pushes `image-builder/images/amd64`
-image-builder/images/push: ## Builds/pushes `image-builder/images/push`
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
+
+##@ Artifact Targets
+tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
+s3-artifacts: # Prepare ARTIFACTS_PATH folder structure with tarballs/manifests/other items to be uploaded to s3
+upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S3
 
 ##@ License Targets
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
@@ -41,6 +40,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution  upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums  upload-artifacts`
 ########### END GENERATED ###########################
