@@ -17,8 +17,9 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 function image_build::common::download_latest_dev_image_builder_cli() {
-  local -r artifacts_bucket=${1-$ARTIFACTS_BUCKET}
-  local -r arch=${2-amd64}
+  local -r download_location=${1-/usr/bin}
+  local -r artifacts_bucket=${2-$ARTIFACTS_BUCKET}
+  local -r arch=${3-amd64}
 
   local -r latest_tar_url=$(build::common::get_latest_eksa_asset_url $artifacts_bucket 'aws/image-builder' $arch 'latest')
 
@@ -29,6 +30,6 @@ function image_build::common::download_latest_dev_image_builder_cli() {
     exit 1
   fi
   tar -xvf image-builder.tar.gz ./image-builder
-  mv image-builder /usr/bin/
+  mv image-builder $download_location/
   rm -rf image-builder.tar.gz
 }
