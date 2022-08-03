@@ -24,15 +24,15 @@ image_os="${1?Specify the first argument - image os}"
 release_channel="${2?Specify the second argument - release channel}"
 
 # Download and setup latest image-builder cli
-image_build::common::download_latest_dev_image_builder_cli
+image_build::common::download_latest_dev_image_builder_cli "${HOME}"
 
 # Setup vsphere config
-vsphere_config_file="/vsphere_config_file"
+vsphere_config_file="${HOME}/vsphere_config_file"
 echo "${VSPHERE_CONNECTION_DATA}" > $vsphere_config_file
 
 # Run image-builder cli
 if [[ $image_os == "ubuntu" ]]; then
-  ./image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel --force
+  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel --force
 elif [[ $image_os == "rhel" ]]; then
   echo "Redhat image building is not yet supported"
   exit 1
