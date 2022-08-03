@@ -119,6 +119,7 @@ export GOVC_INSECURE?=true
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
 $(FAKE_UBUNTU_OVA_PATH):
 	touch $@
+	touch $(ARTIFACTS_PATH)/ova/ubuntu/packer.log
 
 $(FAKE_UBUNTU_RAW_PATH):
 	@mkdir -p $(@D)
