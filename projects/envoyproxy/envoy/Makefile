@@ -7,9 +7,6 @@ IMAGE_BUILD_ARGS=ENVOY_IMAGE
 REPO=envoy
 REPO_OWNER=envoyproxy
 
-IMAGE_COMPONENT=envoy
-IMAGE_NAMES=$(IMAGE_COMPONENT)
-
 BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 
 REPO_NO_CLONE=true
