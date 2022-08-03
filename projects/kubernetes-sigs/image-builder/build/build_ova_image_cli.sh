@@ -32,7 +32,7 @@ echo "${VSPHERE_CONNECTION_DATA}" > $vsphere_config_file
 
 # Run image-builder cli
 if [[ $image_os == "ubuntu" ]]; then
-  image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel --force
+  ./image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel --force
 elif [[ $image_os == "rhel" ]]; then
   echo "Redhat image building is not yet supported"
   exit 1

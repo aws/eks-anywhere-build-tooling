@@ -29,6 +29,5 @@ function image_build::common::download_latest_dev_image_builder_cli() {
     exit 1
   fi
   tar -xvf image-builder.tar.gz ./image-builder
-  mv image-builder /usr/bin/
   rm -rf image-builder.tar.gz
 }
