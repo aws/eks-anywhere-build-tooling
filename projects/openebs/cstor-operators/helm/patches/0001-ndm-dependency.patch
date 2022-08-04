@@ -1,0 +1,1550 @@
+From 6cddbc15f548698e8c0847eb52d33ffe3bf5607d Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Tue, 2 Aug 2022 19:38:56 -0400
+Subject: [PATCH] ndm dependency
+
+---
+ .../helm/charts/charts/openebs-ndm/Chart.yaml |  22 ++
+ .../helm/charts/charts/openebs-ndm/README.md  |  93 +++++++
+ .../charts/openebs-ndm/crds/blockdevice.yaml  | 241 +++++++++++++++++
+ .../openebs-ndm/crds/blockdeviceclaim.yaml    | 144 +++++++++++
+ .../charts/openebs-ndm/templates/NOTES.txt    |   8 +
+ .../charts/openebs-ndm/templates/_helpers.tpl | 242 ++++++++++++++++++
+ .../templates/cluster-exporter-service.yaml   |  18 ++
+ .../templates/cluster-exporter.yaml           |  60 +++++
+ .../openebs-ndm/templates/configmap.yaml      |  45 ++++
+ .../openebs-ndm/templates/daemonset.yaml      | 179 +++++++++++++
+ .../openebs-ndm/templates/deployment.yaml     |  87 +++++++
+ .../templates/node-exporter-service.yaml      |  18 ++
+ .../openebs-ndm/templates/node-exporter.yaml  |  62 +++++
+ .../charts/openebs-ndm/templates/rbac.yaml    |  44 ++++
+ .../charts/charts/openebs-ndm/values.yaml     | 156 +++++++++++
+ 15 files changed, 1419 insertions(+)
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/Chart.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/README.md
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/crds/blockdevice.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/crds/blockdeviceclaim.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/NOTES.txt
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/_helpers.tpl
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/cluster-exporter-service.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/cluster-exporter.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/configmap.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/daemonset.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/deployment.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/node-exporter-service.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/node-exporter.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/templates/rbac.yaml
+ create mode 100644 deploy/helm/charts/charts/openebs-ndm/values.yaml
+
+diff --git a/deploy/helm/charts/charts/openebs-ndm/Chart.yaml b/deploy/helm/charts/charts/openebs-ndm/Chart.yaml
+new file mode 100644
+index 0000000..a82388a
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/Chart.yaml
+@@ -0,0 +1,22 @@
++apiVersion: v2
++name: openebs-ndm
++description: Helm chart for OpenEBS Node Disk Manager - a Kubernetes native storage device management solution. For instructions on how to install, refer to https://openebs.github.io/node-disk-manager/.
++version: 2.0.0
++appVersion: 2.0.0
++icon: https://raw.githubusercontent.com/cncf/artwork/master/projects/openebs/icon/color/openebs-icon-color.png
++home: http://www.openebs.io/
++keywords:
++  - cloud-native-storage
++  - block-storage
++  - ndm
++  - disk-inventory
++  - storage
++sources:
++  - https://github.com/openebs/node-disk-manager
++maintainers:
++  - name: akhilerm
++    email: akhil.mohan@mayadata.io
++  - name: xUnholy
++    email: michaelfornaro@gmail.com
++  - name: prateekpandey14
++    email: prateek.pandey@mayadata.io
+diff --git a/deploy/helm/charts/charts/openebs-ndm/README.md b/deploy/helm/charts/charts/openebs-ndm/README.md
+new file mode 100644
+index 0000000..e529944
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/README.md
+@@ -0,0 +1,93 @@
++## Introduction
++
++This chart bootstraps OpenEBS NDM deployment on a [Kubernetes](http://kubernetes.io) cluster using the
++[Helm](https://helm.sh) package manager.
++
++## Installation
++
++You can run OpenEBS NDM on any Kubernetes 1.17+ cluster in a matter of seconds.
++
++Please visit the [link](https://openebs.github.io/node-disk-manager/) for install instructions via helm3.
++
++## Configuration
++
++The following table lists the configurable parameters of the OpenEBS NDM chart and their default values.
++
++| Parameter                                                   | Description                                                                   | Default                                                                                    |
++|-------------------------------------------------------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
++| `imagePullSecrets`                                          | Provides image pull secrect                                                   | `""`                                                                                       |
++| `ndm.enabled`                                               | Enable Node Disk Manager                                                      | `true`                                                                                     |
++| `ndm.image.registry`                                        | Registry for Node Disk Manager image                                          | `""`                                                                                       |
++| `ndm.image.repository`                                      | Image repository for Node Disk Manager                                        | `openebs/node-disk-manager`                                                                |
++| `ndm.image.pullPolicy`                                      | Image pull policy for Node Disk Manager                                       | `IfNotPresent`                                                                             |
++| `ndm.image.tag`                                             | Image tag for Node Disk Manager                                               | `2.0.0`                                                                                    |
++| `ndm.sparse.path`                                           | Directory where Sparse files are created                                      | `/var/openebs/sparse`                                                                      |
++| `ndm.sparse.size`                                           | Size of the sparse file in bytes                                              | `10737418240`                                                                              |
++| `ndm.sparse.count`                                          | Number of sparse files to be created                                          | `0`                                                                                        |
++| `ndm.updateStrategy.type`                                   | Update strategy for NDM daemonset                                             | `RollingUpdate`                                                                            |
++| `ndm.annotations`                                           | Annotations for NDM daemonset metadata                                        | `""`                                                                                       |
++| `ndm.podAnnotations`                                        | Annotations for NDM daemonset's pods metadata                                 | `""`                                                                                       |
++| `ndm.resources`                                             | Resource and request and limit for containers                                 | `""`                                                                                       |
++| `ndm.podLabels`                                             | Appends labels to the pods                                                    | `""`                                                                                       |
++| `ndm.nodeSelector`                                          | Nodeselector for daemonset pods                                               | `""`                                                                                       |
++| `ndm.tolerations`                                           | NDM daemonset's pod toleration values                                         | `""`                                                                                       |
++| `ndm.securityContext`                                       | Seurity context for container                                                 | `""`                                                                                       |
++| `ndm.filters.enableOsDiskExcludeFilter`                     | Enable filters of OS disk exclude                                             | `true`                                                                                     |
++| `ndm.filters.osDiskExcludePaths`                            | Paths/Mountpoints to be excluded by OS Disk Filter                            | `/,/etc/hosts,/boot`                                                                       |
++| `ndm.filters.enableVendorFilter`                            | Enable filters of vendors                                                     | `true`                                                                                     |
++| `ndm.filters.excludeVendors`                                | Exclude devices with specified vendor                                         | `CLOUDBYT,OpenEBS`                                                                         |
++| `ndm.filters.enablePathFilter`                              | Enable filters of paths                                                       | `true`                                                                                     |
++| `ndm.filters.includePaths`                                  | Include devices with specified path patterns                                  | `""`                                                                                       |
++| `ndm.filters.excludePaths`                                  | Exclude devices with specified path patterns                                  | `loop,fd0,sr0,/dev/ram,/dev/dm-,/dev/md,/dev/rbd,/dev/zd`                                  |
++| `ndm.probes.enableSeachest`                                 | Enable Seachest probe for NDM                                                 | `false`                                                                                    |
++| `ndm.probes.enableUdevProbe`                                | Enable Udev probe for NDM                                                     | `true`                                                                                     |
++| `ndm.probes.enableSmartProbe`                               | Enable Smart probe for NDM                                                    | `true`                                                                                     |
++| `ndm.metaConfig.nodeLabelPattern`                           | Config for adding node labels as BD labels                                    | `kubernetes.io*,beta.kubernetes.io*`                                                       |
++| `ndm.metaConfig.deviceLabelTypes`                           | Config for adding device attributes as BD labels                              | `.spec.details.vendor,.spec.details.model,.spec.details.driveType,.spec.filesystem.fsType` |
++| `ndmOperator.enabled`                                       | Enable NDM Operator                                                           | `true`                                                                                     |
++| `ndmOperator.replica`                                       | Pod replica count for NDM operator                                            | `1`                                                                                        |
++| `ndmOperator.upgradeStrategy`                               | Update strategy NDM operator                                                  | `"Recreate"`                                                                               |
++| `ndmOperator.image.registry`                                | Registry for NDM operator image                                               | `""`                                                                                       |
++| `ndmOperator.image.repository`                              | Image repository for NDM operator                                             | `openebs/node-disk-operator`                                                               |
++| `ndmOperator.image.pullPolicy`                              | Image pull policy for NDM operator                                            | `IfNotPresent`                                                                             |
++| `ndmOperator.image.tag`                                     | Image tag for NDM operator                                                    | `2.0.0`                                                                                    |
++| `ndmOperator.annotations`                                   | Annotations for NDM operator metadata                                         | `""`                                                                                       |
++| `ndmOperator.podAnnotations`                                | Annotations for NDM operator's pods metadata                                  | `""`                                                                                       |
++| `ndmOperator.resources`                                     | Resource and request and limit for containers                                 | `""`                                                                                       |
++| `ndmOperator.podLabels`                                     | Appends labels to the pods                                                    | `""`                                                                                       |
++| `ndmOperator.nodeSelector`                                  | Nodeselector for operator pods                                                | `""`                                                                                       |
++| `ndmOperator.tolerations`                                   | NDM operator's pod toleration values                                          | `""`                                                                                       |
++| `ndmOperator.securityContext`                               | Security context for container                                                | `""`                                                                                       |
++| `ndmExporter.enabled`                                       | Enable NDM Exporters                                                          | `false`                                                                                    |
++| `ndmExporter.image.registry`                                | Registry for NDM Exporters image                                              | `""`                                                                                       |
++| `ndmExporter.repository`                                    | Image repository for NDM Exporters                                            | `openebs/node-disk-exporter`                                                               |
++| `ndmExporter.pullPolicy`                                    | Image pull policy for NDM Exporters                                           | `IfNotPresent`                                                                             |
++| `ndmExporter.tag`                                           | Image tag for NDM Exporters                                                   | `2.0.0`                                                                                    |
++| `ndmExporter.nodeExporter.metricsPort`                      | The TCP port number used for exposing NDM node exporter metrics               | `9101`                                                                                     |
++| `ndmExporter.nodeExporter.nodeExporter.nodeSelector`        | Node selector for NDM node exporter pods                                      | `9101`                                                                                     |
++| `ndmExporter.nodeExporter.nodeExporter.tolerations`         | NDM node exporter toleration values                                           | `9101`                                                                                     |
++| `ndmExporter.clusterExporter.metricsPort`                   | The TCP port number used for exposing NDM cluster exporter metrics            | `9100`                                                                                     |
++| `ndmExporter.clusterExporter.clusterExpoerter.nodeSelector` | Node selector for NDM cluster exporter pod                                    | `9100`                                                                                     |
++| `ndmExporter.clusterExporter.clusterExpoerter.tolerations`  | NDM cluster exporter toleraion values                                         | `9100`                                                                                     |
++| `featureGates.APIService.enabled`                           | Enable the gRPC API service of NDM                                            | `false`                                                                                    |
++| `featureGates.UseOSDisk.enabled`                            | Enable feature-gate to use free space on OS disk                              | `false`                                                                                    |
++| `featureGates.ChangeDetection.enabled`                      | Enable feature-gate to detect mountpoint/filesystem/size changes              | `false`                                                                                    |
++| `featureGates.PartitionTableUUID.enabled`                   | Enable feature-gate to use partition table UUID instead of creating partition | `true`                                                                                     |
++| `helperPod.image.registry`                                  | Registry for helper image                                                     | `""`                                                                                       |
++| `helperPod.image.repository`                                | Image for helper pod                                                          | `openebs/linux-utils`                                                                      |
++| `helperPod.image.pullPolicy`                                | Pull policy for helper pod                                                    | `IfNotPresent`                                                                             |
++| `helperPod.image.tag`                                       | Image tag for helper image                                                    | `3.3.0`                                                                                    |
++| `varDirectoryPath.baseDir`                                  | Directory to store debug info and so forth                                    | `/var/openebs`                                                                             |
++| `serviceAccount.create`                                     | Create a service account or not                                               | `true`                                                                                     |
++| `serviceAccount.name`                                       | Name for the service account                                                  | `true`                                                                                     |
++
++
++Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`.
++
++Alternatively, a YAML file that specifies the values for the parameters can be provided while installing the chart. For example,
++
++```bash
++helm install <release-name> -f values.yaml ndm/openebs-ndm
++```
++
++> **Tip**: You can use the default [values.yaml](values.yaml)
+diff --git a/deploy/helm/charts/charts/openebs-ndm/crds/blockdevice.yaml b/deploy/helm/charts/charts/openebs-ndm/crds/blockdevice.yaml
+new file mode 100644
+index 0000000..95f4070
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/crds/blockdevice.yaml
+@@ -0,0 +1,241 @@
++
++---
++apiVersion: apiextensions.k8s.io/v1
++kind: CustomResourceDefinition
++metadata:
++  annotations:
++    controller-gen.kubebuilder.io/version: v0.5.0
++  creationTimestamp: null
++  name: blockdevices.openebs.io
++spec:
++  group: openebs.io
++  names:
++    kind: BlockDevice
++    listKind: BlockDeviceList
++    plural: blockdevices
++    shortNames:
++    - bd
++    singular: blockdevice
++  scope: Namespaced
++  versions:
++  - additionalPrinterColumns:
++    - jsonPath: .spec.nodeAttributes.nodeName
++      name: NodeName
++      type: string
++    - jsonPath: .spec.path
++      name: Path
++      priority: 1
++      type: string
++    - jsonPath: .spec.filesystem.fsType
++      name: FSType
++      priority: 1
++      type: string
++    - jsonPath: .spec.capacity.storage
++      name: Size
++      type: string
++    - jsonPath: .status.claimState
++      name: ClaimState
++      type: string
++    - jsonPath: .status.state
++      name: Status
++      type: string
++    - jsonPath: .metadata.creationTimestamp
++      name: Age
++      type: date
++    name: v1alpha1
++    schema:
++      openAPIV3Schema:
++        description: BlockDevice is the Schema for the blockdevices API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: DeviceSpec defines the properties and runtime status of a BlockDevice
++            properties:
++              aggregateDevice:
++                description: AggregateDevice was intended to store the hierarchical information in cases of LVM. However this is currently not implemented and may need to be re-looked into for better design. To be deprecated
++                type: string
++              capacity:
++                description: Capacity
++                properties:
++                  logicalSectorSize:
++                    description: LogicalSectorSize is blockdevice logical-sector size in bytes
++                    format: int32
++                    type: integer
++                  physicalSectorSize:
++                    description: PhysicalSectorSize is blockdevice physical-Sector size in bytes
++                    format: int32
++                    type: integer
++                  storage:
++                    description: Storage is the blockdevice capacity in bytes
++                    format: int64
++                    type: integer
++                required:
++                - storage
++                type: object
++              claimRef:
++                description: ClaimRef is the reference to the BDC which has claimed this BD
++                properties:
++                  apiVersion:
++                    description: API version of the referent.
++                    type: string
++                  fieldPath:
++                    description: 'If referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: "spec.containers{name}" (where "name" refers to the name of the container that triggered the event) or if no container name is specified "spec.containers[2]" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object. TODO: this design is not final and this field is subject to change in the future.'
++                    type: string
++                  kind:
++                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++                    type: string
++                  name:
++                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
++                    type: string
++                  namespace:
++                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
++                    type: string
++                  resourceVersion:
++                    description: 'Specific resourceVersion to which this reference is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
++                    type: string
++                  uid:
++                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
++                    type: string
++                type: object
++              details:
++                description: Details contain static attributes of BD like model,serial, and so forth
++                properties:
++                  compliance:
++                    description: Compliance is standards/specifications version implemented by device firmware  such as SPC-1, SPC-2, etc
++                    type: string
++                  deviceType:
++                    description: DeviceType represents the type of device like sparse, disk, partition, lvm, crypt
++                    enum:
++                    - disk
++                    - partition
++                    - sparse
++                    - loop
++                    - lvm
++                    - crypt
++                    - dm
++                    - mpath
++                    type: string
++                  driveType:
++                    description: DriveType is the type of backing drive, HDD/SSD
++                    enum:
++                    - HDD
++                    - SSD
++                    - Unknown
++                    - ""
++                    type: string
++                  firmwareRevision:
++                    description: FirmwareRevision is the disk firmware revision
++                    type: string
++                  hardwareSectorSize:
++                    description: HardwareSectorSize is the hardware sector size in bytes
++                    format: int32
++                    type: integer
++                  logicalBlockSize:
++                    description: LogicalBlockSize is the logical block size in bytes reported by /sys/class/block/sda/queue/logical_block_size
++                    format: int32
++                    type: integer
++                  model:
++                    description: Model is model of disk
++                    type: string
++                  physicalBlockSize:
++                    description: PhysicalBlockSize is the physical block size in bytes reported by /sys/class/block/sda/queue/physical_block_size
++                    format: int32
++                    type: integer
++                  serial:
++                    description: Serial is serial number of disk
++                    type: string
++                  vendor:
++                    description: Vendor is vendor of disk
++                    type: string
++                type: object
++              devlinks:
++                description: DevLinks contains soft links of a block device like /dev/by-id/... /dev/by-uuid/...
++                items:
++                  description: DeviceDevLink holds the mapping between type and links like by-id type or by-path type link
++                  properties:
++                    kind:
++                      description: Kind is the type of link like by-id or by-path.
++                      enum:
++                      - by-id
++                      - by-path
++                      type: string
++                    links:
++                      description: Links are the soft links
++                      items:
++                        type: string
++                      type: array
++                  type: object
++                type: array
++              filesystem:
++                description: FileSystem contains mountpoint and filesystem type
++                properties:
++                  fsType:
++                    description: Type represents the FileSystem type of the block device
++                    type: string
++                  mountPoint:
++                    description: MountPoint represents the mountpoint of the block device.
++                    type: string
++                type: object
++              nodeAttributes:
++                description: NodeAttributes has the details of the node on which BD is attached
++                properties:
++                  nodeName:
++                    description: NodeName is the name of the Kubernetes node resource on which the device is attached
++                    type: string
++                type: object
++              parentDevice:
++                description: "ParentDevice was intended to store the UUID of the parent Block Device as is the case for partitioned block devices. \n For example: /dev/sda is the parent for /dev/sda1 To be deprecated"
++                type: string
++              partitioned:
++                description: Partitioned represents if BlockDevice has partitions or not (Yes/No) Currently always default to No. To be deprecated
++                enum:
++                - "Yes"
++                - "No"
++                type: string
++              path:
++                description: Path contain devpath (e.g. /dev/sdb)
++                type: string
++            required:
++            - capacity
++            - devlinks
++            - nodeAttributes
++            - path
++            type: object
++          status:
++            description: DeviceStatus defines the observed state of BlockDevice
++            properties:
++              claimState:
++                description: ClaimState represents the claim state of the block device
++                enum:
++                - Claimed
++                - Unclaimed
++                - Released
++                type: string
++              state:
++                description: State is the current state of the blockdevice (Active/Inactive/Unknown)
++                enum:
++                - Active
++                - Inactive
++                - Unknown
++                type: string
++            required:
++            - claimState
++            - state
++            type: object
++        type: object
++    served: true
++    storage: true
++    subresources: {}
++status:
++  acceptedNames:
++    kind: ""
++    plural: ""
++  conditions: []
++  storedVersions: []
+diff --git a/deploy/helm/charts/charts/openebs-ndm/crds/blockdeviceclaim.yaml b/deploy/helm/charts/charts/openebs-ndm/crds/blockdeviceclaim.yaml
+new file mode 100644
+index 0000000..81b9a35
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/crds/blockdeviceclaim.yaml
+@@ -0,0 +1,144 @@
++
++---
++apiVersion: apiextensions.k8s.io/v1
++kind: CustomResourceDefinition
++metadata:
++  annotations:
++    controller-gen.kubebuilder.io/version: v0.5.0
++  creationTimestamp: null
++  name: blockdeviceclaims.openebs.io
++spec:
++  group: openebs.io
++  names:
++    kind: BlockDeviceClaim
++    listKind: BlockDeviceClaimList
++    plural: blockdeviceclaims
++    shortNames:
++    - bdc
++    singular: blockdeviceclaim
++  scope: Namespaced
++  versions:
++  - additionalPrinterColumns:
++    - jsonPath: .spec.blockDeviceName
++      name: BlockDeviceName
++      type: string
++    - jsonPath: .status.phase
++      name: Phase
++      type: string
++    - jsonPath: .metadata.creationTimestamp
++      name: Age
++      type: date
++    name: v1alpha1
++    schema:
++      openAPIV3Schema:
++        description: BlockDeviceClaim is the Schema for the blockdeviceclaims API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: DeviceClaimSpec defines the request details for a BlockDevice
++            properties:
++              blockDeviceName:
++                description: BlockDeviceName is the reference to the block-device backing this claim
++                type: string
++              blockDeviceNodeAttributes:
++                description: BlockDeviceNodeAttributes is the attributes on the node from which a BD should be selected for this claim. It can include nodename, failure domain etc.
++                properties:
++                  hostName:
++                    description: HostName represents the hostname of the Kubernetes node resource where the BD should be present
++                    type: string
++                  nodeName:
++                    description: NodeName represents the name of the Kubernetes node resource where the BD should be present
++                    type: string
++                type: object
++              deviceClaimDetails:
++                description: Details of the device to be claimed
++                properties:
++                  allowPartition:
++                    description: AllowPartition represents whether to claim a full block device or a device that is a partition
++                    type: boolean
++                  blockVolumeMode:
++                    description: 'BlockVolumeMode represents whether to claim a device in Block mode or Filesystem mode. These are use cases of BlockVolumeMode: 1) Not specified: VolumeMode check will not be effective 2) VolumeModeBlock: BD should not have any filesystem or mountpoint 3) VolumeModeFileSystem: BD should have a filesystem and mountpoint. If DeviceFormat is    specified then the format should match with the FSType in BD'
++                    type: string
++                  formatType:
++                    description: Format of the device required, eg:ext4, xfs
++                    type: string
++                type: object
++              deviceType:
++                description: DeviceType represents the type of drive like SSD, HDD etc.,
++                nullable: true
++                type: string
++              hostName:
++                description: Node name from where blockdevice has to be claimed. To be deprecated. Use NodeAttributes.HostName instead
++                type: string
++              resources:
++                description: Resources will help with placing claims on Capacity, IOPS
++                properties:
++                  requests:
++                    additionalProperties:
++                      anyOf:
++                      - type: integer
++                      - type: string
++                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
++                      x-kubernetes-int-or-string: true
++                    description: 'Requests describes the minimum resources required. eg: if storage resource of 10G is requested minimum capacity of 10G should be available TODO for validating'
++                    type: object
++                required:
++                - requests
++                type: object
++              selector:
++                description: Selector is used to find block devices to be considered for claiming
++                properties:
++                  matchExpressions:
++                    description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
++                    items:
++                      description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
++                      properties:
++                        key:
++                          description: key is the label key that the selector applies to.
++                          type: string
++                        operator:
++                          description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
++                          type: string
++                        values:
++                          description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
++                          items:
++                            type: string
++                          type: array
++                      required:
++                      - key
++                      - operator
++                      type: object
++                    type: array
++                  matchLabels:
++                    additionalProperties:
++                      type: string
++                    description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
++                    type: object
++                type: object
++            type: object
++          status:
++            description: DeviceClaimStatus defines the observed state of BlockDeviceClaim
++            properties:
++              phase:
++                description: Phase represents the current phase of the claim
++                type: string
++            required:
++            - phase
++            type: object
++        type: object
++    served: true
++    storage: true
++    subresources: {}
++status:
++  acceptedNames:
++    kind: ""
++    plural: ""
++  conditions: []
++  storedVersions: []
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/NOTES.txt b/deploy/helm/charts/charts/openebs-ndm/templates/NOTES.txt
+new file mode 100644
+index 0000000..3c84551
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/NOTES.txt
+@@ -0,0 +1,8 @@
++The OpenEBS Node Disk Manager has been installed. Check its status by running:
++$ kubectl get pods -n {{ .Release.Namespace }}
++
++Use `kubectl get bd -n {{ .Release.Namespace }} ` to see the list of 
++blockdevices attached to the Kubernetes cluster nodes.
++
++For more information, visit our Slack at https://openebs.io/community or view 
++the documentation online at http://docs.openebs.io/.
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/_helpers.tpl b/deploy/helm/charts/charts/openebs-ndm/templates/_helpers.tpl
+new file mode 100644
+index 0000000..c975510
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/_helpers.tpl
+@@ -0,0 +1,242 @@
++{{/* vim: set filetype=mustache: */}}
++{{/*
++Expand the name of the chart.
++This name is used for ndm daemonset
++*/}}
++{{- define "openebs-ndm.name" -}}
++{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
++{{- end }}
++
++{{/*
++Create chart name and version as used by the chart label.
++*/}}
++{{- define "openebs-ndm.chart" -}}
++{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
++{{- end }}
++
++{{/*
++Create a default fully qualified ndm daemonset app name.
++We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
++If release name contains chart name it will be used as a full name.
++*/}}
++{{- define "openebs-ndm.fullname" -}}
++{{- if .Values.fullnameOverride }}
++{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
++{{- else }}
++{{- $name := default .Chart.Name .Values.nameOverride }}
++{{- if contains .Release.Name $name }}
++{{- $name | trunc 63 | trimSuffix "-" }}
++{{- else }}
++{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
++{{- end }}
++{{- end }}
++{{- end }}
++
++{{- define "openebs-ndm.operator.name" -}}
++{{- $ndmName := default .Chart.Name .Values.ndmOperator.nameOverride | trunc 63 | trimSuffix "-" }}
++{{- $componentName := .Values.ndmOperator.name | trunc 63 | trimSuffix "-" }}
++{{- printf "%s-%s" $ndmName $componentName | trunc 63 | trimSuffix "-" }}
++{{- end }}
++
++{{/*
++Create a default fully qualified ndm operator app name.
++We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
++If release name contains chart name it will be used as a full name.
++*/}}
++{{- define "openebs-ndm.operator.fullname" -}}
++{{- if .Values.ndmOperator.fullnameOverride }}
++{{- .Values.ndmOperator.fullnameOverride | trunc 63 | trimSuffix "-" }}
++{{- else }}
++{{- $ndmOperatorName := include "openebs-ndm.operator.name" .}}
++
++{{- $name := default $ndmOperatorName .Values.ndmOperator.nameOverride }}
++{{- if contains .Release.Name $name }}
++{{- $name | trunc 63 | trimSuffix "-" }}
++{{- else }}
++{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
++{{- end }}
++{{- end }}
++{{- end }}
++
++{{- define "openebs-ndm.cluster-exporter.name" -}}
++{{- $ndmName := default .Chart.Name .Values.ndmExporter.clusterExporter.nameOverride | trunc 63 | trimSuffix "-" }}
++{{- $componentName := .Values.ndmExporter.clusterExporter.name | trunc 63 | trimSuffix "-" }}
++{{- printf "%s-%s" $ndmName $componentName | trunc 63 | trimSuffix "-" }}
++{{- end }}
++
++{{/*
++Create a default fully qualified ndm cluster exporter name.
++We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
++If release name contains chart name it will be used as a full name.
++*/}}
++{{- define "openebs-ndm.cluster-exporter.fullname" -}}
++{{- if .Values.ndmExporter.clusterExporter.fullnameOverride }}
++{{- .Values.ndmExporter.clusterExporter.fullnameOverride | trunc 63 | trimSuffix "-" }}
++{{- else }}
++{{- $ndmClusterExporterName := include "openebs-ndm.cluster-exporter.name" .}}
++
++{{- $name := default $ndmClusterExporterName .Values.ndmExporter.clusterExporter.nameOverride }}
++{{- if contains .Release.Name $name }}
++{{- $name | trunc 63 | trimSuffix "-" }}
++{{- else }}
++{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
++{{- end }}
++{{- end }}
++{{- end }}
++
++{{- define "openebs-ndm.exporter.name" -}}
++{{- $ndmName := .Chart.Name | trunc 63 | trimSuffix "-" }}
++{{- $componentName := "exporter" | trunc 63 | trimSuffix "-" }}
++{{- printf "%s-%s" $ndmName $componentName | trunc 63 | trimSuffix "-" }}
++{{- end }}
++
++{{- define "openebs-ndm.node-exporter.name" -}}
++{{- $ndmName := default .Chart.Name .Values.ndmExporter.nodeExporter.nameOverride | trunc 63 | trimSuffix "-" }}
++{{- $componentName := .Values.ndmExporter.nodeExporter.name | trunc 63 | trimSuffix "-" }}
++{{- printf "%s-%s" $ndmName $componentName | trunc 63 | trimSuffix "-" }}
++{{- end }}
++
++{{/*
++Create a default fully qualified ndm node exporter name.
++We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
++If release name contains chart name it will be used as a full name.
++*/}}
++{{- define "openebs-ndm.node-exporter.fullname" -}}
++{{- if .Values.ndmExporter.nodeExporter.fullnameOverride }}
++{{- .Values.ndmExporter.nodeExporter.fullnameOverride | trunc 63 | trimSuffix "-" }}
++{{- else }}
++{{- $ndmNodeExporterName := include "openebs-ndm.node-exporter.name" .}}
++
++{{- $name := default $ndmNodeExporterName .Values.ndmExporter.nodeExporter.nameOverride }}
++{{- if contains .Release.Name $name }}
++{{- $name | trunc 63 | trimSuffix "-" }}
++{{- else }}
++{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
++{{- end }}
++{{- end }}
++{{- end }}
++
++{{/*
++Create the name of the service account to use
++*/}}
++{{- define "openebs-ndm.serviceAccountName" -}}
++{{- if .Values.serviceAccount.create }}
++{{- default (include "openebs-ndm.fullname" .) .Values.serviceAccount.name }}
++{{- else }}
++{{- default "default" .Values.serviceAccount.name }}
++{{- end }}
++{{- end }}
++
++{{/*
++Define meta labels for ndm components
++*/}}
++{{- define "openebs-ndm.common.metaLabels" -}}
++chart: {{ template "openebs-ndm.chart" . }}
++heritage: {{ .Release.Service }}
++openebs.io/version: {{ .Values.release.version | quote }}
++{{- end -}}
++
++
++{{/*
++Create match labels for ndm daemonset component
++*/}}
++{{- define "openebs-ndm.matchLabels" -}}
++app: {{ template "openebs-ndm.name" . }}
++release: {{ .Release.Name }}
++component: {{ .Values.ndm.componentName | quote }}
++{{- end -}}
++
++{{/*
++Create component labels for ndm daemonset component
++*/}}
++{{- define "openebs-ndm.componentLabels" -}}
++openebs.io/component-name: {{ .Values.ndm.componentName | quote }}
++{{- end -}}
++
++
++{{/*
++Create labels for ndm daemonset component
++*/}}
++{{- define "openebs-ndm.labels" -}}
++{{ include "openebs-ndm.common.metaLabels" . }}
++{{ include "openebs-ndm.matchLabels" . }}
++{{ include "openebs-ndm.componentLabels" . }}
++{{- end -}}
++
++{{/*
++Create match labels for ndm operator deployment
++*/}}
++{{- define "openebs-ndm.operator.matchLabels" -}}
++app: {{ template "openebs-ndm.operator.name" . }}
++release: {{ .Release.Name }}
++component: {{ default (include "openebs-ndm.operator.name" .) .Values.ndmOperator.componentName }}
++{{- end -}}
++
++{{/*
++Create component labels for ndm operator component
++*/}}
++{{- define "openebs-ndm.operator.componentLabels" -}}
++openebs.io/component-name: {{ default (include "openebs-ndm.operator.name" .) .Values.ndmOperator.componentName }}
++{{- end -}}
++
++
++{{/*
++Create labels for ndm operator component
++*/}}
++{{- define "openebs-ndm.operator.labels" -}}
++{{ include "openebs-ndm.common.metaLabels" . }}
++{{ include "openebs-ndm.operator.matchLabels" . }}
++{{ include "openebs-ndm.operator.componentLabels" . }}
++{{- end -}}
++
++{{/*
++Create match labels for ndm cluster exporter deployment
++*/}}
++{{- define "openebs-ndm.cluster-exporter.matchLabels" -}}
++app: {{ template "openebs-ndm.exporter.name" . }}
++release: {{ .Release.Name }}
++component: {{ default (include "openebs-ndm.cluster-exporter.name" .) .Values.ndmExporter.clusterExporter.componentName }}
++{{- end -}}
++
++{{/*
++Create component labels for ndm cluster exporter component
++*/}}
++{{- define "openebs-ndm.cluster-exporter.componentLabels" -}}
++openebs.io/component-name: {{ default (include "openebs-ndm.cluster-exporter.name" .) .Values.ndmExporter.clusterExporter.componentName }}
++{{- end -}}
++
++
++{{/*
++Create labels for ndm cluster exporter component
++*/}}
++{{- define "openebs-ndm.cluster-exporter.labels" -}}
++{{ include "openebs-ndm.common.metaLabels" . }}
++{{ include "openebs-ndm.cluster-exporter.matchLabels" . }}
++{{ include "openebs-ndm.cluster-exporter.componentLabels" . }}
++{{- end -}}
++
++{{/*
++Create match labels for ndm node exporter deployment
++*/}}
++{{- define "openebs-ndm.node-exporter.matchLabels" -}}
++app: {{ template "openebs-ndm.exporter.name" . }}
++release: {{ .Release.Name }}
++component: {{ default (include "openebs-ndm.node-exporter.name" .) .Values.ndmExporter.nodeExporter.componentName }}
++{{- end -}}
++
++{{/*
++Create component labels for ndm node exporter component
++*/}}
++{{- define "openebs-ndm.node-exporter.componentLabels" -}}
++openebs.io/component-name: {{ default (include "openebs-ndm.node-exporter.name" .) .Values.ndmExporter.nodeExporter.componentName }}
++{{- end -}}
++
++
++{{/*
++Create labels for ndm cluster node component
++*/}}
++{{- define "openebs-ndm.node-exporter.labels" -}}
++{{ include "openebs-ndm.common.metaLabels" . }}
++{{ include "openebs-ndm.node-exporter.matchLabels" . }}
++{{ include "openebs-ndm.node-exporter.componentLabels" . }}
++{{- end -}}
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/cluster-exporter-service.yaml b/deploy/helm/charts/charts/openebs-ndm/templates/cluster-exporter-service.yaml
+new file mode 100644
+index 0000000..719f6b4
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/cluster-exporter-service.yaml
+@@ -0,0 +1,18 @@
++{{- if and .Values.ndmExporter.enabled .Values.ndmExporter.clusterExporter.metricsPort }}
++apiVersion: v1
++kind: Service
++metadata:
++  name: {{ template "openebs-ndm.cluster-exporter.fullname" . }}-service
++  labels:
++    {{- include "openebs-ndm.cluster-exporter.labels" . | nindent 4 }}
++spec:
++  clusterIP: None
++  ports:
++    - name: metrics
++      port: {{ .Values.ndmExporter.clusterExporter.metricsPort }}
++      targetPort: {{ .Values.ndmExporter.clusterExporter.metricsPort }}
++  selector:
++    {{- with .Values.ndmExporter.clusterExporter.podLabels }}
++    {{ toYaml . }}
++    {{- end }}
++  {{- end }}
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/cluster-exporter.yaml b/deploy/helm/charts/charts/openebs-ndm/templates/cluster-exporter.yaml
+new file mode 100644
+index 0000000..af8b1e6
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/cluster-exporter.yaml
+@@ -0,0 +1,60 @@
++{{- if .Values.ndmExporter.enabled }}
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: {{ template "openebs-ndm.cluster-exporter.fullname" . }}
++  labels:
++    {{- include "openebs-ndm.cluster-exporter.labels" . | nindent 4 }}
++spec:
++  replicas: 1
++  strategy:
++    type: Recreate
++  selector:
++    matchLabels:
++      {{- include "openebs-ndm.cluster-exporter.matchLabels" . | nindent 6 }}
++  template:
++    metadata:
++      labels:
++        {{- include "openebs-ndm.cluster-exporter.labels" . | nindent 8 }}
++        {{- with .Values.ndmExporter.clusterExporter.podLabels }}
++        {{ toYaml . }}
++        {{- end }}
++    spec:
++      serviceAccountName: {{ template "openebs-ndm.serviceAccountName" . }}
++      containers:
++        - name: {{ template "openebs-ndm.cluster-exporter.fullname" . }}
++          image: "{{ .Values.ndmExporter.image.registry }}{{ .Values.ndmExporter.image.repository }}:{{ .Values.ndmExporter.image.tag }}"
++          command:
++            - /usr/local/bin/exporter
++          args:
++            - "start"
++            - "--mode=cluster"
++            - "--port=$(METRICS_LISTEN_PORT)"
++            - "--metrics=/metrics"
++          ports:
++            - containerPort: {{ .Values.ndmExporter.clusterExporter.metricsPort }}
++              protocol: TCP
++              name: metrics
++          imagePullPolicy: {{ .Values.ndmExporter.image.pullPolicy }}
++          env:
++            - name: NAMESPACE
++              valueFrom:
++                fieldRef:
++                  fieldPath: metadata.namespace
++            {{- if .Values.ndmExporter.clusterExporter.metricsPort }}
++            - name: METRICS_LISTEN_PORT
++              value: :{{ .Values.ndmExporter.clusterExporter.metricsPort }}
++            {{- end }}
++{{- if .Values.imagePullSecrets }}
++      imagePullSecrets:
++{{ toYaml .Values.imagePullSecrets | indent 8 }}
++{{- end }}
++{{- if .Values.ndmExporter.clusterExporter.nodeSelector }}
++      nodeSelector:
++{{ toYaml .Values.ndmExporter.clusterExporter.nodeSelector | indent 8 }}
++{{- end }}
++{{- if .Values.ndmExporter.clusterExporter.tolerations }}
++      tolerations:
++{{ toYaml .Values.ndmExporter.clusterExporter.tolerations | indent 8 }}
++{{- end }}
++{{- end }}
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/configmap.yaml b/deploy/helm/charts/charts/openebs-ndm/templates/configmap.yaml
+new file mode 100644
+index 0000000..99b814d
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/configmap.yaml
+@@ -0,0 +1,45 @@
++apiVersion: v1
++kind: ConfigMap
++metadata:
++  name: {{ include "openebs-ndm.fullname" . }}-config
++data:
++  # node-disk-manager-config contains config of available probes and filters.
++  # Probes and Filters will initialize with default values if config for that
++  # filter or probe are not present in configmap
++
++  # udev-probe is default or primary probe it should be enabled to run ndm
++  # filterconfigs contains configs of filters. To provide a group of include
++  # and exclude values add it as , separated string
++  node-disk-manager.config: |
++    probeconfigs:
++      - key: udev-probe
++        name: udev probe
++        state: {{ .Values.ndm.probes.enableUdevProbe }}
++      - key: seachest-probe
++        name: seachest probe
++        state: {{ .Values.ndm.probes.enableSeachest }}
++      - key: smart-probe
++        name: smart probe
++        state: {{ .Values.ndm.probes.enableSmartProbe }}
++    filterconfigs:
++      - key: os-disk-exclude-filter
++        name: os disk exclude filter
++        state: {{ .Values.ndm.filters.enableOsDiskExcludeFilter }}
++        exclude: "{{ .Values.ndm.filters.osDiskExcludePaths }}"
++      - key: vendor-filter
++        name: vendor filter
++        state: {{ .Values.ndm.filters.enableVendorFilter }}
++        include: ""
++        exclude: "{{ .Values.ndm.filters.excludeVendors }}"
++      - key: path-filter
++        name: path filter
++        state: {{ .Values.ndm.filters.enablePathFilter }}
++        include: "{{ .Values.ndm.filters.includePaths }}"
++        exclude: "{{ .Values.ndm.filters.excludePaths }}"
++    metaconfigs:
++      - key: node-labels
++        name: node labels
++        pattern: "{{ .Values.ndm.metaConfig.nodeLabelPattern }}"
++      - key: device-labels
++        name: device labels
++        type: "{{ .Values.ndm.metaConfig.deviceLabelTypes }}"
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/daemonset.yaml b/deploy/helm/charts/charts/openebs-ndm/templates/daemonset.yaml
+new file mode 100644
+index 0000000..715db87
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/daemonset.yaml
+@@ -0,0 +1,179 @@
++{{- if .Values.ndm.enabled }}
++apiVersion: apps/v1
++kind: DaemonSet
++metadata:
++  name: {{ template "openebs-ndm.fullname" . }}
++  {{- with .Values.ndm.annotations }}
++  annotations: {{ toYaml . | nindent 4 }}
++  {{- end }}
++  labels:
++    {{- include "openebs-ndm.labels" . | nindent 4 }}
++spec:
++  updateStrategy:
++{{ toYaml .Values.ndm.updateStrategy | indent 4 }}
++  selector:
++    matchLabels:
++      {{- include "openebs-ndm.matchLabels" . | nindent 6 }}
++  template:
++    metadata:
++      {{- with .Values.ndm.podAnnotations }}
++      annotations: {{ toYaml . | nindent 8 }}
++      {{- end }}
++      labels:
++        {{- include "openebs-ndm.labels" . | nindent 8 }}
++        {{- with .Values.ndm.podLabels}}
++        {{ toYaml . }}
++        {{- end}}
++    spec:
++      serviceAccountName: {{ template "openebs-ndm.serviceAccountName" . }}
++{{- if .Values.featureGates.enabled }}
++{{- if .Values.featureGates.APIService.enabled }}
++      hostPID: true
++{{- end}}
++{{- end}}
++      containers:
++      - name: {{ template "openebs-ndm.name" . }}
++        image: "{{ .Values.ndm.image.registry }}{{ .Values.ndm.image.repository }}:{{ .Values.ndm.image.tag }}"
++        args:
++          - -v=4
++{{- if .Values.featureGates.enabled }}
++{{- if .Values.featureGates.GPTBasedUUID.enabled }}
++          - --feature-gates={{ .Values.featureGates.GPTBasedUUID.featureGateFlag }}
++{{- end}}
++{{- if .Values.featureGates.APIService.enabled }}
++          - --feature-gates={{ .Values.featureGates.APIService.featureGateFlag }}
++          - --api-service-address={{ .Values.featureGates.APIService.address }}
++{{- end}}
++{{- if .Values.featureGates.UseOSDisk.enabled }}
++          - --feature-gates={{ .Values.featureGates.UseOSDisk.featureGateFlag }}
++{{- end}}
++{{- if .Values.featureGates.ChangeDetection.enabled }}
++          - --feature-gates={{ .Values.featureGates.ChangeDetection.featureGateFlag }}
++{{- end}}
++{{- if .Values.featureGates.PartitionTableUUID.enabled }}
++          - --feature-gates={{ .Values.featureGates.PartitionTableUUID.featureGateFlag }}
++{{- end}}
++{{- end}}
++        imagePullPolicy: {{ .Values.ndm.image.pullPolicy }}
++        resources:
++{{ toYaml .Values.ndm.resources | indent 12 }}
++        securityContext:
++          privileged: true
++        env:
++        # namespace in which NDM is installed will be passed to NDM Daemonset
++        # as environment variable
++        - name: NAMESPACE
++          valueFrom:
++            fieldRef:
++              fieldPath: metadata.namespace
++        # pass hostname as env variable using downward API to the NDM container
++        - name: NODE_NAME
++          valueFrom:
++            fieldRef:
++              fieldPath: spec.nodeName
++{{- if .Values.ndm.sparse }}
++{{- if .Values.ndm.sparse.path }}
++        # specify the directory where the sparse files need to be created.
++        # if not specified, then sparse files will not be created.
++        - name: SPARSE_FILE_DIR
++          value: "{{ .Values.ndm.sparse.path }}"
++{{- end }}
++{{- if .Values.ndm.sparse.size }}
++        # Size(bytes) of the sparse file to be created.
++        - name: SPARSE_FILE_SIZE
++          value: "{{ .Values.ndm.sparse.size }}"
++{{- end }}
++{{- if .Values.ndm.sparse.count }}
++        # Specify the number of sparse files to be created
++        - name: SPARSE_FILE_COUNT
++          value: "{{ .Values.ndm.sparse.count }}"
++{{- end }}
++{{- end }}
++        # Process name used for matching is limited to the 15 characters
++        # present in the pgrep output.
++        # So fullname can be used here with pgrep (cmd is < 15 chars).
++        livenessProbe:
++          exec:
++            command:
++            - pgrep
++            - "ndm"
++          initialDelaySeconds: {{ .Values.ndm.healthCheck.initialDelaySeconds }}
++          periodSeconds: {{ .Values.ndm.healthCheck.periodSeconds }}
++        volumeMounts:
++        - name: config
++          mountPath: /host/node-disk-manager.config
++          subPath: node-disk-manager.config
++          readOnly: true
++        - name: udev
++          mountPath: /run/udev
++        - name: procmount
++          mountPath: /host/proc
++          readOnly: true
++        - name: devmount
++          mountPath: /dev
++        - name: basepath
++          mountPath: /var/openebs/ndm
++{{- if .Values.ndm.sparse }}
++{{- if .Values.ndm.sparse.path }}
++        - name: sparsepath
++          mountPath: {{ .Values.ndm.sparse.path }}
++{{- end }}
++{{- end }}
++      volumes:
++      - name: config
++        configMap:
++          name: {{ include "openebs-ndm.fullname" . }}-config
++      - name: udev
++        hostPath:
++          path: /run/udev
++          type: Directory
++      # mount /proc (to access mount file of process 1 of host) inside container
++      # to read mount-point of disks and partitions
++      - name: procmount
++        hostPath:
++          path: /proc
++          type: Directory
++      - name: devmount
++      # the /dev directory is mounted so that we have access to the devices that
++      # are connected at runtime of the pod.
++        hostPath:
++          path: /dev
++          type: Directory
++      - name: basepath
++        hostPath:
++          path: "{{ .Values.varDirectoryPath.baseDir }}/ndm"
++          type: DirectoryOrCreate
++{{- if .Values.ndm.sparse }}
++{{- if .Values.ndm.sparse.path }}
++      - name: sparsepath
++        hostPath:
++          path: {{ .Values.ndm.sparse.path }}
++{{- end }}
++{{- end }}
++      # By default the node-disk-manager will be run on all kubernetes nodes
++      # If you would like to limit this to only some nodes, say the nodes
++      # that have storage attached, you could label those node and use
++      # nodeSelector.
++      #
++      # e.g. label the storage nodes with - "openebs.io/nodegroup"="storage-node"
++      # kubectl label node <node-name> "openebs.io/nodegroup"="storage-node"
++      #nodeSelector:
++      #  "openebs.io/nodegroup": "storage-node"
++{{- if .Values.imagePullSecrets }}
++      imagePullSecrets:
++{{ toYaml .Values.imagePullSecrets | indent 8 }}
++{{- end }}
++{{- if .Values.ndm.nodeSelector }}
++      nodeSelector:
++{{ toYaml .Values.ndm.nodeSelector | indent 8 }}
++{{- end }}
++{{- if .Values.ndm.tolerations }}
++      tolerations:
++{{ toYaml .Values.ndm.tolerations | indent 8 }}
++{{- end }}
++{{- if .Values.ndm.securityContext }}
++      securityContext:
++{{ toYaml .Values.ndm.securityContext | indent 8 }}
++{{- end }}
++      hostNetwork: true
++{{- end }}
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/deployment.yaml b/deploy/helm/charts/charts/openebs-ndm/templates/deployment.yaml
+new file mode 100644
+index 0000000..213a861
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/deployment.yaml
+@@ -0,0 +1,87 @@
++{{- if .Values.ndmOperator.enabled }}
++---
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: {{ template "openebs-ndm.operator.fullname" . }}
++  {{- with .Values.ndmOperator.annotations }}
++  annotations: {{ toYaml . | nindent 4 }}
++  {{- end }}
++  labels:
++    {{- include "openebs-ndm.operator.labels" . | nindent 4 }}
++spec:
++  replicas: {{ .Values.ndmOperator.replicas }}
++  strategy:
++    type: "Recreate"
++    rollingUpdate: null
++  selector:
++    matchLabels:
++      {{- include "openebs-ndm.operator.matchLabels" . | nindent 6 }}
++  template:
++    metadata:
++      {{- with .Values.ndmOperator.podAnnotations }}
++      annotations: {{ toYaml . | nindent 8 }}
++      {{- end }}
++      labels:
++        {{- include "openebs-ndm.operator.labels" . | nindent 8 }}
++        {{- with .Values.ndmOperator.podLabels}}
++        {{ toYaml . }}
++        {{- end}}
++    spec:
++      serviceAccountName: {{ template "openebs-ndm.serviceAccountName" . }}
++      containers:
++      - name: {{ template "openebs-ndm.operator.fullname" . }}
++        image: "{{ .Values.ndmOperator.image.registry }}{{ .Values.ndmOperator.image.repository }}:{{ .Values.ndmOperator.image.tag }}"
++        imagePullPolicy: {{ .Values.ndmOperator.image.pullPolicy }}
++        resources:
++{{ toYaml .Values.ndmOperator.resources | indent 12 }}
++        livenessProbe:
++          httpGet:
++            path: /healthz
++            port: 8585
++          initialDelaySeconds: {{ .Values.ndmOperator.healthCheck.initialDelaySeconds }}
++          periodSeconds: {{ .Values.ndmOperator.healthCheck.periodSeconds }}
++        readinessProbe:
++          httpGet:
++            path: /readyz
++            port: 8585
++          initialDelaySeconds: {{ .Values.ndmOperator.readinessCheck.initialDelaySeconds }}
++          periodSeconds: {{ .Values.ndmOperator.readinessCheck.periodSeconds }}
++        env:
++        - name: WATCH_NAMESPACE
++          valueFrom:
++            fieldRef:
++              fieldPath: metadata.namespace
++        - name: POD_NAME
++          valueFrom:
++            fieldRef:
++              fieldPath: metadata.name
++        - name: SERVICE_ACCOUNT
++          valueFrom:
++            fieldRef:
++              fieldPath: spec.serviceAccountName
++        - name: OPERATOR_NAME
++          value: "node-disk-operator"
++        - name: CLEANUP_JOB_IMAGE
++          value: "{{ .Values.helperPod.image.registry }}{{ .Values.helperPod.image.repository }}:{{ .Values.helperPod.image.tag }}"
++{{- if .Values.imagePullSecrets }}
++        - name: OPENEBS_IO_IMAGE_PULL_SECRETS
++          value: "{{- range $index, $secret := .Values.imagePullSecrets}}{{if $index}},{{end}}{{ $secret.name }}{{- end}}"
++{{- end }}
++{{- if .Values.imagePullSecrets }}
++      imagePullSecrets:
++{{ toYaml .Values.imagePullSecrets | indent 8 }}
++{{- end }}
++{{- if .Values.ndmOperator.nodeSelector }}
++      nodeSelector:
++{{ toYaml .Values.ndmOperator.nodeSelector | indent 8 }}
++{{- end }}
++{{- if .Values.ndmOperator.securityContext }}
++      securityContext:
++{{ toYaml .Values.ndmOperator.securityContext | indent 8 }}
++{{- end }}
++{{- if .Values.ndmOperator.tolerations }}
++      tolerations:
++{{ toYaml .Values.ndmOperator.tolerations | indent 8 }}
++{{- end }}
++{{- end }}
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/node-exporter-service.yaml b/deploy/helm/charts/charts/openebs-ndm/templates/node-exporter-service.yaml
+new file mode 100644
+index 0000000..026b77d
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/node-exporter-service.yaml
+@@ -0,0 +1,18 @@
++{{- if and .Values.ndmExporter.enabled .Values.ndmExporter.nodeExporter.metricsPort }}
++apiVersion: v1
++kind: Service
++metadata:
++  name: {{ template "openebs-ndm.node-exporter.fullname" . }}-service
++  labels:
++    {{- include "openebs-ndm.node-exporter.labels" . | nindent 4 }}
++spec:
++  clusterIP: None
++  ports:
++    - name: metrics
++      port: {{ .Values.ndmExporter.nodeExporter.metricsPort }}
++      targetPort: {{ .Values.ndmExporter.nodeExporter.metricsPort }}
++  selector:
++    {{- with .Values.ndmExporter.nodeExporter.podLabels }}
++    {{ toYaml . }}
++    {{- end }}
++  {{- end }}
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/node-exporter.yaml b/deploy/helm/charts/charts/openebs-ndm/templates/node-exporter.yaml
+new file mode 100644
+index 0000000..cd5f635
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/node-exporter.yaml
+@@ -0,0 +1,62 @@
++{{- if .Values.ndmExporter.enabled }}
++apiVersion: apps/v1
++kind: DaemonSet
++metadata:
++  name: {{ template "openebs-ndm.node-exporter.fullname" . }}
++  labels:
++    {{- include "openebs-ndm.node-exporter.labels" . | nindent 4 }}
++spec:
++  updateStrategy:
++    type: RollingUpdate
++  selector:
++    matchLabels:
++      {{- include "openebs-ndm.node-exporter.matchLabels" . | nindent 6 }}
++  template:
++    metadata:
++      labels:
++        {{- include "openebs-ndm.node-exporter.labels" . | nindent 8 }}
++        {{- with .Values.ndmExporter.nodeExporter.podLabels }}
++        {{ toYaml . }}
++        {{- end }}
++    spec:
++      serviceAccountName: {{ template "openebs-ndm.serviceAccountName" . }}
++      containers:
++        - name: {{ template "openebs-ndm.node-exporter.fullname" . }}
++          image: "{{ .Values.ndmExporter.image.registry }}{{ .Values.ndmExporter.image.repository }}:{{ .Values.ndmExporter.image.tag }}"
++          command:
++            - /usr/local/bin/exporter
++          args:
++            - "start"
++            - "--mode=node"
++            - "--port=$(METRICS_LISTEN_PORT)"
++            - "--metrics=/metrics"
++          ports:
++            - containerPort: {{ .Values.ndmExporter.nodeExporter.metricsPort }}
++              protocol: TCP
++              name: metrics
++          imagePullPolicy: {{ .Values.ndmExporter.image.pullPolicy }}
++          securityContext:
++            privileged: true
++          env:
++            - name: NAMESPACE
++              valueFrom:
++                fieldRef:
++                  fieldPath: metadata.namespace
++            {{- if .Values.ndmExporter.nodeExporter.metricsPort }}
++            - name: METRICS_LISTEN_PORT
++              value: :{{ .Values.ndmExporter.nodeExporter.metricsPort }}
++            {{- end }}
++{{- if .Values.imagePullSecrets }}
++      imagePullSecrets:
++{{ toYaml .Values.imagePullSecrets | indent 8 }}
++{{- end }}
++{{- if .Values.ndmExporter.nodeExporter.nodeSelector }}
++      nodeSelector:
++{{ toYaml .Values.ndmExporter.nodeExporter.nodeSelector | indent 8 }}
++{{- end }}
++{{- if .Values.ndmExporter.nodeExporter.tolerations }}
++      tolerations:
++{{ toYaml .Values.ndmExporter.nodeExporter.tolerations | indent 8 }}
++{{- end }}
++{{- end }}
++
+diff --git a/deploy/helm/charts/charts/openebs-ndm/templates/rbac.yaml b/deploy/helm/charts/charts/openebs-ndm/templates/rbac.yaml
+new file mode 100644
+index 0000000..8e81c49
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/templates/rbac.yaml
+@@ -0,0 +1,44 @@
++{{- if .Values.serviceAccount.create -}}
++apiVersion: v1
++kind: ServiceAccount
++metadata:
++  name: {{ include "openebs-ndm.serviceAccountName" . }}
++{{- end }}
++---
++kind: ClusterRole
++apiVersion: rbac.authorization.k8s.io/v1
++metadata:
++  name: {{ include "openebs-ndm.fullname" . }}
++rules:
++  - apiGroups: ["*"]
++    resources: ["nodes", "pods", "events", "configmaps", "jobs"]
++    verbs:
++      - '*'
++  - apiGroups: ["apiextensions.k8s.io"]
++    resources: ["customresourcedefinitions"]
++    verbs:
++      - '*'
++  - apiGroups:
++      - openebs.io
++    resources:
++      - blockdevices
++      - blockdeviceclaims
++    verbs:
++      - '*'
++---
++kind: ClusterRoleBinding
++apiVersion: rbac.authorization.k8s.io/v1
++metadata:
++  name: {{ include "openebs-ndm.fullname" . }}
++subjects:
++  - kind: ServiceAccount
++    name: {{ include "openebs-ndm.serviceAccountName" . }}
++    namespace: {{ .Release.Namespace }}
++  - kind: User
++    name: system:serviceaccount:default:default
++    apiGroup: rbac.authorization.k8s.io
++roleRef:
++  kind: ClusterRole
++  name: {{ include "openebs-ndm.fullname" . }}
++  apiGroup: rbac.authorization.k8s.io
++---
+diff --git a/deploy/helm/charts/charts/openebs-ndm/values.yaml b/deploy/helm/charts/charts/openebs-ndm/values.yaml
+new file mode 100644
+index 0000000..426413c
+--- /dev/null
++++ b/deploy/helm/charts/charts/openebs-ndm/values.yaml
+@@ -0,0 +1,156 @@
++# Default values for ndm.
++# This is a YAML-formatted file.
++# Declare variables to be passed into your templates.
++release:
++  version: "2.0.0"
++
++imagePullSecrets:
++#  - name: "image-pull-secret"
++
++ndm:
++  componentName: ndm
++  enabled: true
++  image:
++    # Make sure that registry name end with a '/'.
++    # For example : quay.io/ is a correct value here and quay.io is incorrect
++    registry:
++    repository: openebs/node-disk-manager
++    pullPolicy: IfNotPresent
++    # Overrides the image tag whose default is the chart appVersion.
++    tag: 2.0.0
++  sparse:
++    path: "/var/openebs/sparse"
++    size: "10737418240"
++    count: "0"
++  updateStrategy:
++    type: RollingUpdate
++  annotations: {}
++  podAnnotations: {}
++  resources: {}
++  # limits:
++  #   cpu: 10m
++  #   memory: 32Mi
++  # requests:
++  #   cpu: 10m
++  #   memory: 32Mi
++  ## Labels to be added to ndm daemonset pods
++  podLabels:
++    name: openebs-ndm
++  nodeSelector: {}
++  tolerations: []
++  securityContext: {}
++  filters:
++    enableOsDiskExcludeFilter: true
++    osDiskExcludePaths: "/,/etc/hosts,/boot"
++    enableVendorFilter: true
++    excludeVendors: "CLOUDBYT,OpenEBS"
++    enablePathFilter: true
++    includePaths: ""
++    excludePaths: "loop,fd0,sr0,/dev/ram,/dev/dm-,/dev/md,/dev/rbd,/dev/zd"
++  probes:
++    enableSeachest: false
++    enableUdevProbe: true
++    enableSmartProbe: true
++  metaConfig:
++    nodeLabelPattern: ""
++    deviceLabelTypes: ""
++  healthCheck:
++    initialDelaySeconds: 30
++    periodSeconds: 60
++
++ndmOperator:
++  name: operator
++  enabled: true
++  image:
++    registry:
++    repository: openebs/node-disk-operator
++    pullPolicy: IfNotPresent
++    # Overrides the image tag whose default is the chart appVersion.
++    tag: 2.0.0
++  podLabels:
++    name: openebs-ndm-operator
++  annotations: {}
++  podAnnotations: {}
++  nodeSelector: {}
++  resources: {}
++  securityContext: {}
++  tolerations: []
++  healthCheck:
++    initialDelaySeconds: 15
++    periodSeconds: 20
++  readinessCheck:
++    initialDelaySeconds: 5
++    periodSeconds: 10
++  replicas: 1
++  upgradeStrategy: Recreate
++
++ndmExporter:
++  enabled: false
++  image:
++    registry:
++    repository: openebs/node-disk-exporter
++    pullPolicy: IfNotPresent
++    # Overrides the image tag whose default is the chart appVersion.
++    tag: 2.0.0
++  nodeExporter:
++    name: node-exporter
++    podLabels:
++      name: openebs-ndm-node-exporter
++    # The TCP port number used for exposing ndm-node-exporter metrics.
++    # If not set, service will not be created to expose metrics endpoint to serviceMonitor
++    # and listen-port flag will not be set and container port will be empty.
++    metricsPort: 9101
++    nodeSelector: {}
++    tolerations: []
++  clusterExporter:
++    name: cluster-exporter
++    podLabels:
++      name: openebs-ndm-cluster-exporter
++    # The TCP port number used for exposing ndm-cluster-exporter metrics.
++    # If not set, service will not be created to expose metrics endpoint to serviceMonitor
++    # and listen-port flag will not be set and container port will be empty.
++    metricsPort: 9100
++    nodeSelector: {}
++    tolerations: []
++
++helperPod:
++  image:
++    registry: ""
++    repository: openebs/linux-utils
++    pullPolicy: IfNotPresent
++    # Overrides the image tag whose default is the chart appVersion.
++    tag: 3.3.0
++
++crd:
++  enableInstall: false
++
++featureGates:
++  enabled: true
++  GPTBasedUUID:
++    enabled: true
++    featureGateFlag: "GPTBasedUUID"
++  APIService:
++    enabled: false
++    featureGateFlag: "APIService"
++    address: "0.0.0.0:9115"
++  UseOSDisk:
++    enabled: false
++    featureGateFlag: "UseOSDisk"
++  ChangeDetection:
++    enabled: false
++    featureGateFlag: "ChangeDetection"
++  PartitionTableUUID:
++    enabled: false
++    featureGateFlag: "PartitionTableUUID"
++
++# Directory used by the OpenEBS to store debug information and so forth
++# that are generated in the course of running OpenEBS containers.
++varDirectoryPath:
++  baseDir: "/var/openebs"
++
++serviceAccount:
++  # Specifies whether a service account should be created
++  create: true
++  # The name of the service account to use.
++  # If not set and create is true, a name is generated using the fullname template
++  name: openebs-ndm
+-- 
+2.32.1 (Apple Git-133)
+
