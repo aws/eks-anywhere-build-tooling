@@ -130,7 +130,7 @@ func (b *BuildOptions) ValidateInputs() {
 		log.Fatalf("Error converting vsphere config path to absolute")
 	}
 
-	if b.ReleaseChannel != "1-20" && b.ReleaseChannel != "1-21" && b.ReleaseChannel != "1-22" {
-		log.Fatalf("release-channel should be one of 1-20, 1-21, 1-22")
+	if b.ReleaseChannel != "1-20" && b.ReleaseChannel != "1-21" && b.ReleaseChannel != "1-22" && b.ReleaseChannel != "1-23" {
+		log.Fatalf("release-channel should be one of 1-20, 1-21, 1-22, 1-23")
 	}
 }
