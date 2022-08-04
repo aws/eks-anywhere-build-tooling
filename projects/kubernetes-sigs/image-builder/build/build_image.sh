@@ -22,18 +22,29 @@ source "${MAKE_ROOT}/build/setup_image_builder_cli.sh"
 
 image_os="${1?Specify the first argument - image os}"
 release_channel="${2?Specify the second argument - release channel}"
+image_format="${3?Specify the third argument - image format}"
 
 # Download and setup latest image-builder cli
 image_build::common::download_latest_dev_image_builder_cli "${HOME}"
 
-# Setup vsphere config
-vsphere_config_file="${HOME}/vsphere_config_file"
-echo "${VSPHERE_CONNECTION_DATA}" > $vsphere_config_file
+if [[ $image_format == "ova" ]]; then
+  # Setup vsphere config
+  vsphere_config_file="${HOME}/vsphere_config_file"
+  echo "${VSPHERE_CONNECTION_DATA}" > $vsphere_config_file
 
-# Run image-builder cli
-if [[ $image_os == "ubuntu" ]]; then
-  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel --force
-elif [[ $image_os == "rhel" ]]; then
-  echo "Redhat image building is not yet supported"
-  exit 1
+  # Run image-builder cli
+  if [[ $image_os == "ubuntu" ]]; then
+    "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel --force
+  elif [[ $image_os == "rhel" ]]; then
+    echo "Redhat image building is not yet supported"
+    exit 1
+  fi
+elif [[ $image_format == "raw" ]]; then
+  # Run image-builder cli
+  if [[ $image_os == "ubuntu" ]]; then
+    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel --force
+  elif [[ $image_os == "rhel" ]]; then
+    echo "Redhat image building is not yet supported"
+    exit 1
+  fi
 fi

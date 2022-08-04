@@ -60,13 +60,13 @@ FINAL_RAW_IMAGE_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/$(IMAGE_OS).gz
 FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
 FINAL_BOTTLEROCKET_RAW_PATH=$(ARTIFACTS_PATH)/raw/bottlerocket/bottlerocket.img.gz
 FAKE_UBUNTU_OVA_PATH=fake-ubuntu.ova
-FAKE_UBUNTU_RAW_PATH=$(IMAGE_BUILDER_DIR)/output/fake-ubuntu.gz
+FAKE_UBUNTU_RAW_PATH=fake-ubuntu.gz
 
 IMAGE_OS?=ubuntu
 IMAGE_FORMAT?=
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
 BUILD_OVA_TARGETS=setup-packer-configs-ova download-bottlerocket-ova $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova upload-bottlerocket-ova
-BUILD_RAW_TARGETS=release-raw-ubuntu-2004-efi $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
+BUILD_RAW_TARGETS=release-raw-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
 ifneq ($(RELEASE_BRANCH),1-20)
 	BUILD_RAW_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
 endif
@@ -91,7 +91,7 @@ else ifeq ($(IMAGE_FORMAT),raw)
 		# same job because they are usually tied together with an EKS-A release so we want them
 		# to be uploaded to the same location to be picked up by the release process
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
-		RELEASE_TARGETS=release-raw-ubuntu-2004-efi upload-artifacts-raw
+		RELEASE_TARGETS=release-raw-$(IMAGE_OS) upload-artifacts-raw
 		ifneq ($(RELEASE_BRANCH),1-20)
 			RELEASE_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
 		endif
@@ -124,7 +124,6 @@ $(FAKE_UBUNTU_OVA_PATH):
 $(FAKE_UBUNTU_RAW_PATH):
 	@mkdir -p $(@D)
 	touch $@
-	touch $(@D)/packer.log
 
 # in the case of BR ova these targets are the same, guard against this to avoid the overwriting target warning
 ifneq ($(FINAL_BOTTLEROCKET_OVA_PATH),$(FINAL_OVA_PATH))
@@ -134,8 +133,8 @@ $(FINAL_OVA_PATH):
 endif
 
 $(FINAL_RAW_IMAGE_PATH):
-	mv $(IMAGE_BUILDER_DIR)/output/*.gz $@
-	mv $(IMAGE_BUILDER_DIR)/output/packer.log $(@D)/packer.log
+	@mkdir -p $(@D)
+	mv *.gz $@
 
 $(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(FINAL_BOTTLEROCKET_OVA_PATH):
@@ -194,7 +193,7 @@ release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 
 .PHONY: release-ova-%
 release-ova-%:
-	build/build_ova_image_cli.sh $* $(RELEASE_BRANCH)
+	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT)
 
 .PHONY: local-build-ova-ubuntu-2004
 local-build-ova-ubuntu-2004: MAKEFLAGS=
@@ -218,10 +217,8 @@ upload-bottlerocket-%:
 	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT)
 
 .PHONY: release-raw-%
-release-raw-%: MAKEFLAGS=
-release-raw-%: FULL_OUTPUT_DIR=$(subst $(BASE_DIRECTORY),/home/ec2-user/$(shell basename $(BASE_DIRECTORY)),$(MAKE_ROOT)/$(OUTPUT_DIR))/raw/$(IMAGE_OS)
-release-raw-%: deps-raw setup-packer-configs-raw
-	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)" $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
+release-raw-%:
+	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
 
 .PHONY: build-qemu-rhel-local
 build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
