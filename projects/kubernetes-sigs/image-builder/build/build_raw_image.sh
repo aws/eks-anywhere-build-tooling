@@ -118,7 +118,7 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH baremetal"
+SSH_COMMANDS="sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw"
 if [[ "$IMAGE_OS" =~ "rhel" ]]; then
     echo "Cannot build rhel image, as image-builder cli does not support it yet"
     exit 1
