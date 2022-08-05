@@ -23,9 +23,10 @@ source "${MAKE_ROOT}/build/setup_image_builder_cli.sh"
 image_os="${1?Specify the first argument - image os}"
 release_channel="${2?Specify the second argument - release channel}"
 image_format="${3?Specify the third argument - image format}"
+artifacts_bucket=${4-$ARTIFACTS_BUCKET}
 
 # Download and setup latest image-builder cli
-image_build::common::download_latest_dev_image_builder_cli "${HOME}"
+image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket
 
 if [[ $image_format == "ova" ]]; then
   # Setup vsphere config
