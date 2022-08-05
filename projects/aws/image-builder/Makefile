@@ -2,7 +2,6 @@
 BASE_DIRECTORY:=$(shell git -C .. rev-parse --show-toplevel)
 GOLANG_VERSION?=1.18
 GIT_TAG:=$(shell cat GIT_TAG)
-BUILD_TOOLING_GIT_TAG=$(shell cat BUILD_TOOLING_GIT_TAG)
 
 REPO=image-builder
 REPO_OWNER=aws
@@ -17,8 +16,7 @@ REPO_NO_CLONE=true
 GIT_CHECKOUT_TARGET=main.go
 FAKE_GIT_REPO_TARGET=.git
 
-EXTRA_GO_LDFLAGS=-X github.com/aws/eks-anywhere-build-tooling/image-builder/cmd.version=${GIT_TAG} \
-	-X github.com/aws/eks-anywhere-build-tooling/image-builder/builder.buildToolingTag=${BUILD_TOOLING_GIT_TAG}
+EXTRA_GO_LDFLAGS=-X github.com/aws/eks-anywhere-build-tooling/image-builder/cmd.version=${GIT_TAG}
 
 # Go 1.18 automatically embeds vcs information if there is a .git folder in the current path
 # this makes builds not reproducible due a sync timestamp 
