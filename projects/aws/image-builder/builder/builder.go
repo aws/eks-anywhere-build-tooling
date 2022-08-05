@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-var buildToolingTag string
-
 const buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
 
 func (b *BuildOptions) BuildImage() {
@@ -29,7 +27,7 @@ func (b *BuildOptions) BuildImage() {
 		// Clean up build tooling repo in cwd
 		cleanup(buildToolingRepoPath)
 	}
-	err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath, buildToolingTag)
+	err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
 	if err != nil {
 		log.Fatalf("Error clonning build tooling repo")
 	}

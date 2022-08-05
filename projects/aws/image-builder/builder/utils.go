@@ -7,9 +7,9 @@ import (
 	"os/exec"
 )
 
-func cloneRepo(cloneUrl, destination, tag string) error {
+func cloneRepo(cloneUrl, destination string) error {
 	log.Print("Cloning eks-anywhere-build-tooling...")
-	cloneRepoCommandSequence := fmt.Sprintf("git clone %s %s; cd %s; git checkout %s", cloneUrl, destination, destination, tag)
+	cloneRepoCommandSequence := fmt.Sprintf("git clone %s %s", cloneUrl, destination)
 	cmd := exec.Command("bash", "-c", cloneRepoCommandSequence)
 	return execCommandWithStreamOutput(cmd)
 }
