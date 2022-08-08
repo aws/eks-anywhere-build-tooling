@@ -9,17 +9,18 @@ DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 GO_MOD_PATHS=. ecrtokenrefresher
 
 IMAGE_COMPONENT=eks-anywhere-packages
-ECRTOKENREFRESHER_IMAGE_COMPONENT=eks-anywhere-packages/ecrtokenrefresher
+ECRTOKENREFRESHER_IMAGE_COMPONENT=ecr-token-refresher
 IMAGE_NAMES=eks-anywhere-packages ecrtokenrefresher
 
 BINARY_TARGET_FILES=package-manager ecrtokenrefresher
 BASE_IMAGE_NAME=eks-distro-minimal-base
+SOURCE_PATTERNS=. ./cmd/ecr-token-refresher
 
 FIX_LICENSES_ECRTOKENREFRESHER_TARGET=$(REPO)/ecrtokenrefresher/LICENSE
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/eks-anywhere-packages
-HELM_IMAGE_LIST=eks-anywhere-packages ecrtokenrefresher
+HELM_IMAGE_LIST=eks-anywhere-packages ecr-token-refresher
 
 # Needed to be built first for final helm/bundle builds
 PROJECT_DEPENDENCIES=eksa/goharbor/harbor eksa/aws-containers/hello-eks-anywhere
