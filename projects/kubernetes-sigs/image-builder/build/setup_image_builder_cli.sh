@@ -29,7 +29,6 @@ function image_build::common::download_latest_dev_image_builder_cli() {
     echo "Error downloading latest image builder cli"
     exit 1
   fi
-  tar -xvf image-builder.tar.gz ./image-builder
-  mv image-builder $download_location/
+  tar -xvf image-builder.tar.gz --directory $download_location/ ./image-builder
   rm -rf image-builder.tar.gz
 }
