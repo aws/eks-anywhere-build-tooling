@@ -1,0 +1,261 @@
+From 90d0b347807e7ed9b2ede86f146aa7de17eaf110 Mon Sep 17 00:00:00 2001
+From: Sallam <seifsall@f84d899362a8.ant.amazon.com>
+Date: Mon, 1 Aug 2022 15:04:10 -0400
+Subject: [PATCH] helm modifications
+
+---
+ .../charts/templates/admission-server.yaml    |  2 +-
+ .../helm/charts/templates/csi-controller.yaml | 12 ++--
+ .../helm/charts/templates/cspc-operator.yaml  |  2 +-
+ .../helm/charts/templates/cvc-operator.yaml   |  2 +-
+ deploy/helm/charts/values.yaml                | 60 +++++++++----------
+ 5 files changed, 39 insertions(+), 39 deletions(-)
+
+diff --git a/deploy/helm/charts/templates/admission-server.yaml b/deploy/helm/charts/templates/admission-server.yaml
+index 0909c9d..ac76e49 100644
+--- a/deploy/helm/charts/templates/admission-server.yaml
++++ b/deploy/helm/charts/templates/admission-server.yaml
+@@ -26,7 +26,7 @@ spec:
+       serviceAccountName: {{ .Values.serviceAccount.cstorOperator.name }}
+       containers:
+         - name: {{ template "cstor.fullname" . }}-admission-webhook
+-          image: "{{ .Values.admissionServer.image.registry }}{{ .Values.admissionServer.image.repository }}:{{ .Values.admissionServer.image.tag }}"
++          image: "{{ .Values.sourceRegistry }}/{{ .Values.admissionServer.image.repository }}@{{ .Values.admissionServer.image.digest }}"
+           imagePullPolicy: {{ .Values.admissionServer.image.pullPolicy }}
+           resources:
+ {{ toYaml .Values.admissionServer.resources | indent 12 }}
+diff --git a/deploy/helm/charts/templates/csi-controller.yaml b/deploy/helm/charts/templates/csi-controller.yaml
+index 2bcfc38..a1090af 100644
+--- a/deploy/helm/charts/templates/csi-controller.yaml
++++ b/deploy/helm/charts/templates/csi-controller.yaml
+@@ -25,7 +25,7 @@ spec:
+       serviceAccount: {{ .Values.serviceAccount.csiController.name }}
+       containers:
+         - name: {{ .Values.csiController.resizer.name }}
+-          image: "{{ .Values.csiController.resizer.image.registry }}{{ .Values.csiController.resizer.image.repository }}:{{ .Values.csiController.resizer.image.tag }}"
++          image: "public.ecr.aws/eks-distro/{{ .Values.csiController.resizer.image.repository }}:{{ .Values.csiController.resizer.image.tag }}"
+           resources:
+ {{ toYaml .Values.csiController.resources | indent 12 }}
+           args:
+@@ -40,7 +40,7 @@ spec:
+             - name: socket-dir
+               mountPath: /var/lib/csi/sockets/pluginproxy/
+         - name: {{ .Values.csiController.snapshotter.name }}
+-          image: "{{ .Values.csiController.snapshotter.image.registry }}{{ .Values.csiController.snapshotter.image.repository }}:{{ .Values.csiController.snapshotter.image.tag }}"
++          image: "public.ecr.aws/eks-distro/{{ .Values.csiController.snapshotter.image.repository }}:{{ .Values.csiController.snapshotter.image.tag }}"
+           args:
+             - "--csi-address=$(ADDRESS)"
+           env:
+@@ -51,13 +51,13 @@ spec:
+             - name: socket-dir
+               mountPath: /var/lib/csi/sockets/pluginproxy/
+         - name: {{ .Values.csiController.snapshotController.name }}
+-          image: "{{ .Values.csiController.snapshotController.image.registry }}{{ .Values.csiController.snapshotController.image.repository }}:{{ .Values.csiController.snapshotController.image.tag }}"
++          image: "public.ecr.aws/eks-distro/{{ .Values.csiController.snapshotController.image.repository }}:{{ .Values.csiController.snapshotController.image.tag }}"
+           args:
+             - "--v={{ .Values.csiController.snapshotController.logLevel | default .Values.csiController.logLevel }}"
+             - "--leader-election=false"
+           imagePullPolicy: {{ .Values.csiController.snapshotController.image.pullPolicy }}
+         - name: {{ .Values.csiController.provisioner.name }}
+-          image: "{{ .Values.csiController.provisioner.image.registry }}{{ .Values.csiController.provisioner.image.repository }}:{{ .Values.csiController.provisioner.image.tag }}"
++          image: "public.ecr.aws/eks-distro/{{ .Values.csiController.provisioner.image.repository }}:{{ .Values.csiController.provisioner.image.tag }}"
+           imagePullPolicy: {{ .Values.csiController.provisioner.image.pullPolicy }}
+           args:
+             - "--csi-address=$(ADDRESS)"
+@@ -78,7 +78,7 @@ spec:
+             - name: socket-dir
+               mountPath: /var/lib/csi/sockets/pluginproxy/
+         - name: {{ .Values.csiController.attacher.name }}
+-          image: "{{ .Values.csiController.attacher.image.registry }}{{ .Values.csiController.attacher.image.repository }}:{{ .Values.csiController.attacher.image.tag }}"
++          image: "public.ecr.aws/eks-distro/{{ .Values.csiController.attacher.image.repository }}:{{ .Values.csiController.attacher.image.tag }}"
+           imagePullPolicy: {{ .Values.csiController.attacher.image.pullPolicy }}
+           args:
+             - "--v={{ .Values.csiController.attacher.logLevel | default .Values.csiController.logLevel }}"
+@@ -90,7 +90,7 @@ spec:
+             - name: socket-dir
+               mountPath: /var/lib/csi/sockets/pluginproxy/
+         - name: {{ .Values.cstorCSIPlugin.name }}
+-          image: "{{ .Values.cstorCSIPlugin.image.registry }}{{ .Values.cstorCSIPlugin.image.repository }}:{{ .Values.cstorCSIPlugin.image.tag }}"
++          image: "{{ .Values.cstorCSIPlugin.image.registry }}{{ .Values.cstorCSIPlugin.image.repository }}:{{ .Values.cstorCSIPlugin.image.tag }}"
+           imagePullPolicy: {{ .Values.cstorCSIPlugin.image.pullPolicy }}
+           env:
+             - name: OPENEBS_CONTROLLER_DRIVER
+diff --git a/deploy/helm/charts/templates/cspc-operator.yaml b/deploy/helm/charts/templates/cspc-operator.yaml
+index 7ba61d3..e282a6f 100644
+--- a/deploy/helm/charts/templates/cspc-operator.yaml
++++ b/deploy/helm/charts/templates/cspc-operator.yaml
+@@ -29,7 +29,7 @@ spec:
+       containers:
+         - name: {{ template "cstor.fullname" . }}-cspc-operator
+           imagePullPolicy: {{ .Values.cspcOperator.image.pullPolicy }}
+-          image: "{{ .Values.cspcOperator.image.registry }}{{ .Values.cspcOperator.image.repository }}:{{ .Values.cspcOperator.image.tag }}"
++          image: "{{ .Values.sourceRegistry }}/{{ .Values.cspcOperator.image.repository }}@{{ .Values.cspcOperator.image.digest }}"
+           resources:
+ {{ toYaml .Values.cspcOperator.resources | indent 12 }}
+           env:
+diff --git a/deploy/helm/charts/templates/cvc-operator.yaml b/deploy/helm/charts/templates/cvc-operator.yaml
+index 22cd81c..4c1b38c 100644
+--- a/deploy/helm/charts/templates/cvc-operator.yaml
++++ b/deploy/helm/charts/templates/cvc-operator.yaml
+@@ -26,7 +26,7 @@ spec:
+       containers:
+         - name: {{ template "cstor.fullname" . }}-cvc-operator
+           imagePullPolicy: {{ .Values.cvcOperator.image.pullPolicy }}
+-          image: "{{ .Values.cvcOperator.image.registry }}{{ .Values.cvcOperator.image.repository }}:{{ .Values.cvcOperator.image.tag }}"
++          image: "{{ .Values.sourceRegistry }}/{{ .Values.cvcOperator.image.repository }}@{{ .Values.cvcOperator.image.digest }}"
+           args:
+             - "--v={{ .Values.cvcOperator.logLevel }}"
+             - "--leader-election=false"
+diff --git a/deploy/helm/charts/values.yaml b/deploy/helm/charts/values.yaml
+index ad5cfc3..780ef51 100644
+--- a/deploy/helm/charts/values.yaml
++++ b/deploy/helm/charts/values.yaml
+@@ -34,15 +34,15 @@ cspcOperator:
+     image:
+       registry:
+       repository: openebs/m-exporter
+-      tag: 3.3.0
++      tag: latest
+   image:
+     # Make sure that registry name end with a '/'.
+     # For example : quay.io/ is a correct value here and quay.io is incorrect
+-    registry:
+-    repository: openebs/cspc-operator
++    registry: public.ecr.aws/g4p7p1c7/
++    repository: cstor-operators/cspc-operator
+     pullPolicy: IfNotPresent
+     # Overrides the image tag whose default is the chart appVersion.
+-    tag: 3.3.0
++    digest: {{cstor-operators/cspc-operator}}
+   annotations: {}
+   resyncInterval: "30"
+   podAnnotations: {}
+@@ -70,15 +70,15 @@ cvcOperator:
+     image:
+       registry:
+       repository: openebs/m-exporter
+-      tag: 3.3.0
++      tag: latest
+   image:
+     # Make sure that registry name end with a '/'.
+     # For example : quay.io/ is a correct value here and quay.io is incorrect
+-    registry:
+-    repository: openebs/cvc-operator
++    registry: public.ecr.aws/g4p7p1c7/
++    repository: cstor-operators/cvc-operator
+     pullPolicy: IfNotPresent
+     # Overrides the image tag whose default is the chart appVersion.
+-    tag: 3.3.0
++    digest: {{cstor-operators/cvc-operator}}
+   annotations: {}
+   resyncInterval: "30"
+   podAnnotations: {}
+@@ -102,51 +102,51 @@ csiController:
+     image:
+       # Make sure that registry name end with a '/'.
+       # For example : quay.io/ is a correct value here and quay.io is incorrect
+-      registry: k8s.gcr.io/
+-      repository: sig-storage/csi-resizer
++      registry: public.ecr.aws/eks-distro/
++      repository: kubernetes-csi/external-resizer
+       pullPolicy: IfNotPresent
+       # Overrides the image tag whose default is the chart appVersion.
+-      tag: v1.2.0
++      tag: v1.5.0-eks-1-21-17
+   snapshotter:
+     name: "csi-snapshotter"
+     image:
+       # Make sure that registry name end with a '/'.
+       # For example : quay.io/ is a correct value here and quay.io is incorrect
+-      registry: k8s.gcr.io/
+-      repository: sig-storage/csi-snapshotter
++      registry: public.ecr.aws/eks-distro/
++      repository: kubernetes-csi/external-snapshotter/csi-snapshotter
+       pullPolicy: IfNotPresent
+       # Overrides the image tag whose default is the chart appVersion.
+-      tag: v3.0.3
++      tag: v6.0.1-eks-1-21-17
+   snapshotController:
+     name: "snapshot-controller"
+     image:
+       # Make sure that registry name end with a '/'.
+       # For example : quay.io/ is a correct value here and quay.io is incorrect
+-      registry: k8s.gcr.io/
+-      repository: sig-storage/snapshot-controller
++      registry: public.ecr.aws/eks-distro/
++      repository: kubernetes-csi/external-snapshotter/snapshot-controller
+       pullPolicy: IfNotPresent
+       # Overrides the image tag whose default is the chart appVersion.
+-      tag: v3.0.3
++      tag: v6.0.1-eks-1-21-17
+   attacher:
+     name: "csi-attacher"
+     image:
+       # Make sure that registry name end with a '/'.
+       # For example : quay.io/ is a correct value here and quay.io is incorrect
+-      registry: k8s.gcr.io/
+-      repository: sig-storage/csi-attacher
++      registry: public.ecr.aws/eks-distro/
++      repository: kubernetes-csi/external-attacher
+       pullPolicy: IfNotPresent
+       # Overrides the image tag whose default is the chart appVersion.
+-      tag: v3.1.0
++      tag: v3.5.0-eks-1-21-17
+   provisioner:
+     name: "csi-provisioner"
+     image:
+       # Make sure that registry name end with a '/'.
+       # For example : quay.io/ is a correct value here and quay.io is incorrect
+-      registry: k8s.gcr.io/
+-      repository: sig-storage/csi-provisioner
++      registry: public.ecr.aws/eks-distro/
++      repository: kubernetes-csi/external-provisioner
+       pullPolicy: IfNotPresent
+       # Overrides the image tag whose default is the chart appVersion.
+-      tag: v3.0.0
++      tag: v3.2.1-eks-1-21-17
+   annotations: {}
+   podAnnotations: {}
+   podLabels: {}
+@@ -164,7 +164,7 @@ cstorCSIPlugin:
+     repository: openebs/cstor-csi-driver
+     pullPolicy: IfNotPresent
+     # Overrides the image tag whose default is the chart appVersion.
+-    tag: 3.3.0
++    tag: latest
+   remount: "true"
+ 
+ csiNode:
+@@ -176,11 +176,11 @@ csiNode:
+   driverRegistrar:
+     name: "csi-node-driver-registrar"
+     image:
+-      registry: k8s.gcr.io/
+-      repository: sig-storage/csi-node-driver-registrar
++      registry: public.ecr.aws/eks-distro/
++      repository: kubernetes-csi/node-driver-registrar
+       pullPolicy: IfNotPresent
+       # Overrides the image tag whose default is the chart appVersion.
+-      tag: v2.3.0
++      tag: v2.5.1-eks-1-21-17
+   logLevel: "5"
+   updateStrategy:
+     type: RollingUpdate
+@@ -213,11 +213,11 @@ admissionServer:
+   image:
+     # Make sure that registry name end with a '/'.
+     # For example : quay.io/ is a correct value here and quay.io is incorrect
+-    registry:
+-    repository: openebs/cstor-webhook
++    registry: public.ecr.aws/g4p7p1c7/
++    repository: cstor-operators/webhook
+     pullPolicy: IfNotPresent
+     # Overrides the image tag whose default is the chart appVersion.
+-    tag: 3.3.0
++    digest: {{cstor-operators/webhook}}
+   failurePolicy: "Fail"
+   annotations: {}
+   podAnnotations: {}
+-- 
+2.32.1 (Apple Git-133)
+
