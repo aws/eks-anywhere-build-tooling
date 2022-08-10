@@ -1,0 +1,1 @@
+helm install openebs-cstor oci://public.ecr.aws/g4p7p1c7/openebs/cstor --namespace openebs-cstor --version 3.3.0-75eac31e866fec47b365f8601fae64b6ee1e636a --set sourceRegistry=public.ecr.aws/g4p7p1c7 --create-namespace
