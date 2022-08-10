@@ -9,7 +9,7 @@ import (
 )
 
 func waitForKubelet() error {
-	err := utils.WaitForSystemdService(utils.KubeletService, 1*time.Minute)
+	err := utils.WaitForSystemdService(utils.KubeletService, 90*time.Second)
 	if err != nil {
 		return err
 	}
