@@ -32,6 +32,10 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 build::common::use_go_version ${GOLANG_VERSION}
 
 cd $REPO
+
+KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
+sed -i 's,image: .*,image: '"${KUBE_RBAC_PROXY_IMAGE_OVERRIDE}"',' ./config/default-with-metrics-port/manager_auth_proxy_patch.yaml
+
 make release-manifests-metrics-port \
   RELEASE_DIR="out" \
   IMG="${IMAGE_REPO}/kubernetes-sigs/cluster-api-provider-cloudstack/release/manager:$IMAGE_TAG"

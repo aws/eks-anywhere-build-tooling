@@ -1,0 +1,10 @@
+ARG BASE_IMAGE
+ARG ENVOY_IMAGE
+
+FROM $ENVOY_IMAGE as envoy
+
+FROM $BASE_IMAGE
+
+COPY --from=envoy /usr/bin/envoy /THIRD-PARTY-LICENSES.txt /
+
+ENTRYPOINT [ "/envoy" ]

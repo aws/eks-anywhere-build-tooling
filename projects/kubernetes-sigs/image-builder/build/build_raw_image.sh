@@ -21,12 +21,11 @@ set -o pipefail
 
 REPO_ROOT="${1?Specify first argument - repo root}"
 PROJECT_PATH="${2?Specify second argument - Project path}"
-IMAGE_BUILDER_DIR="${3?Specify third argument - Image builder directory}"
-PACKER_VAR_FILES="${4?Specify fourth argument - Packer var files}"
-AMI_ID="${5?Specify fifth argument - AMI ID to create instance}"
-INSTANCE_TYPE="${6?Specify sixth argument - Instance type to create}"
-KEY_NAME="${7?Specify seventh argument - Key name to associate with instance}"
-BUILD_TARGET="${8?Specify eighth argument - Raw build target name}"
+RELEASE_BRANCH="${3?Specify third argument - Release branch}"
+AMI_ID="${4?Specify fourth argument - AMI ID to create instance}"
+INSTANCE_TYPE="${5?Specify fifth argument - Instance type to create}"
+KEY_NAME="${6?Specify sixth argument - Key name to associate with instance}"
+IMAGE_OS="${7?Specify seventh argument - Raw build target name}"
 
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 CI="${CI:-false}"
@@ -39,9 +38,8 @@ fi
 
 REPO_NAME=$(basename $REPO_ROOT)
 KEY_LOCATION=$REPO_ROOT/$PROJECT_PATH/$KEY_NAME.pem
-IMAGE_BUILDER_MAKE_ROOT=$PROJECT_PATH/$IMAGE_BUILDER_DIR
 REMOTE_HOME_DIR="/home/ec2-user"
-REMOTE_IMAGE_BUILDER_MAKE_ROOT=$REMOTE_HOME_DIR/$REPO_NAME/$IMAGE_BUILDER_MAKE_ROOT
+REMOTE_PROJECT_PATH=$REMOTE_HOME_DIR/$REPO_NAME/$PROJECT_PATH
 SSH_OPTS="-i $KEY_LOCATION -o StrictHostKeyChecking=no -o ConnectTimeout=120"
 
 terminate_instance() {
@@ -120,14 +118,14 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; PACKER_VAR_FILES='$PACKER_VAR_FILES' PACKER_FLAGS=-force PACKER_LOG=1 PACKER_LOG_PATH=$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log make build-raw-$BUILD_TARGET -C $REMOTE_IMAGE_BUILDER_MAKE_ROOT"
-if [[ "$BUILD_TARGET" =~ "rhel" ]]; then
-    SSH_COMMANDS="sudo wget https://redhat-iso-images.s3.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso -P $REMOTE_IMAGE_BUILDER_MAKE_ROOT; export RHSM_USER='$RHSM_USER' RHSM_PASS='$RHSM_PASS'; $SSH_COMMANDS"
+SSH_COMMANDS="sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
+if [[ "$IMAGE_OS" =~ "rhel" ]]; then
+    echo "Cannot build rhel image, as image-builder cli does not support it yet"
+    exit 1
 fi
 
 ssh $SSH_OPTS $REMOTE_HOST $SSH_COMMANDS
 
 # Copy built raw image from the instance back into the CI build environment
 mkdir -p $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output
-scp $SSH_OPTS $REMOTE_HOST:$REMOTE_IMAGE_BUILDER_MAKE_ROOT/output/*.gz $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output/
-scp $SSH_OPTS $REMOTE_HOST:$REMOTE_IMAGE_BUILDER_MAKE_ROOT/packer.log $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output/
+scp $SSH_OPTS $REMOTE_HOST:$REMOTE_HOME_DIR/*.gz $REPO_ROOT/$REPO_ROOT/$PROJECT_PATH/

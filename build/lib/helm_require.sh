@@ -78,7 +78,7 @@ done
 
 if [ -f ${JSON_SCHEMA_FILE} ]
 then
-  JSON_SCHEMA=$(cat ${JSON_SCHEMA_FILE} | gzip | base64)
+  JSON_SCHEMA=$(cat ${JSON_SCHEMA_FILE} | gzip | base64 | tr -d '\n')
   cat >>${REQUIRES_FILE} <<!
   schema: ${JSON_SCHEMA}
 !

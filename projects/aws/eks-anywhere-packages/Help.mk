@@ -11,16 +11,20 @@ clone-repo:  ## Clone upstream `eks-anywhere-packages`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `package-manager` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `package-manager ecrtokenrefresher` for `linux/amd64 linux/arm64`
 _output/bin/eks-anywhere-packages/linux-amd64/package-manager: ## Build `_output/bin/eks-anywhere-packages/linux-amd64/package-manager`
+_output/bin/eks-anywhere-packages/linux-amd64/ecrtokenrefresher: ## Build `_output/bin/eks-anywhere-packages/linux-amd64/ecrtokenrefresher`
 _output/bin/eks-anywhere-packages/linux-arm64/package-manager: ## Build `_output/bin/eks-anywhere-packages/linux-arm64/package-manager`
+_output/bin/eks-anywhere-packages/linux-arm64/ecrtokenrefresher: ## Build `_output/bin/eks-anywhere-packages/linux-arm64/ecrtokenrefresher`
 
 ##@ Image Targets
-local-images: ## Builds `eks-anywhere-packages/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `eks-anywhere-packages/images/push helm/push` to IMAGE_REPO
+local-images: ## Builds `eks-anywhere-packages/images/amd64 ecrtokenrefresher/images/amd64 helm/build` as oci tars for presumbit validation
+images: ## Pushes `eks-anywhere-packages/images/push ecrtokenrefresher/images/push helm/push` to IMAGE_REPO
 eks-anywhere-packages/images/amd64: ## Builds/pushes `eks-anywhere-packages/images/amd64`
+ecrtokenrefresher/images/amd64: ## Builds/pushes `ecrtokenrefresher/images/amd64`
 helm/build: ## Builds/pushes `helm/build`
 eks-anywhere-packages/images/push: ## Builds/pushes `eks-anywhere-packages/images/push`
+ecrtokenrefresher/images/push: ## Builds/pushes `ecrtokenrefresher/images/push`
 helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets
