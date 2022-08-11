@@ -1,4 +1,11 @@
 {{- if .Values.loadBalancer.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.kubevip.name }}
+  namespace: {{ .Values.namespace }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -11,6 +18,7 @@ rules:
       - "services"
       - "services/status"
       - "nodes"
+      - "endpoints"
     verbs: 
       - "list"
       - "get"
@@ -26,4 +34,18 @@ rules:
       - "watch"
       - "update"
       - "create"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.kubevip.roleBindingName }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.kubevip.roleName }}
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.kubevip.name }}
+  namespace: {{ .Values.namespace }}
+---
 {{- end }}

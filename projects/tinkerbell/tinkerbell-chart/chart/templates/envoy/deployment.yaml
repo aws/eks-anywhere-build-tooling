@@ -1,0 +1,35 @@
+{{- if .Values.loadBalancer.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.envoy.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.envoy.name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.envoy.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.envoy.name }}
+    spec:
+      containers:
+      - name: {{ .Values.envoy.name }}
+        image: {{ .Values.envoy.image }}
+        command: ["/envoy", "-c", "/etc/envoy/envoy.yaml"]
+        imagePullPolicy: {{ .Values.envoy.imagePullPolicy }}
+        volumeMounts:
+        - name: {{ .Values.envoy.name }}
+          mountPath: /etc/envoy
+        ports:
+        - name: {{ .Values.hegel.name }}
+          containerPort: {{ .Values.hegel.port.hostPort }}
+        - name: {{ .Values.tinkServer.name }}
+          containerPort: {{ .Values.tinkServer.port.hostPort }}
+      volumes:
+      - name: {{ .Values.envoy.name }}
+        configMap:
+          name: {{ .Values.envoy.name }}
+{{- end -}}
