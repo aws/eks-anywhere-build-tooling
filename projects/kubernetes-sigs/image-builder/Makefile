@@ -169,7 +169,7 @@ deps-%: $(GIT_PATCH_TARGET)
 
 .PHONY: setup-packer-configs-%
 setup-packer-configs-%:
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR)
+	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(GIT_BRANCH) $(IMAGE_BUILDER_DIR)
 
 .PHONY: build-ami-ubuntu-2004
 build-ami-ubuntu-2004: MAKEFLAGS=
