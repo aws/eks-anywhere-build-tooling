@@ -1,26 +1,43 @@
-From c57deec5c5090d0ea6fc6eea170d08dff27fd097 Mon Sep 17 00:00:00 2001
+From 73eae4f91dc74b45bbbb6f5341b1e59c9cb546a1 Mon Sep 17 00:00:00 2001
 From: jonahjon <jonahjones094@gmail.com>
-Date: Wed, 27 Jul 2022 14:39:43 -0500
-Subject: [PATCH] helm-changes
+Date: Fri, 12 Aug 2022 12:13:36 -0700
+Subject: [PATCH] helm changes
 
 Signed-off-by: jonahjon <jonahjones094@gmail.com>
 ---
  charts/emissary-ingress/.gitignore            |    4 -
  .../{Chart.yaml.in => Chart.yaml}             |   31 +-
+ .../ci.in/tests/manifests/backend.yaml        |   14 +-
  .../emissary-ingress/crds/emissary-crds.yaml  | 3996 +++++++++++++++++
- charts/emissary-ingress/templates/NOTES.txt   |    7 -
- .../emissary-ingress/templates/_helpers.tpl   |    6 +
+ charts/emissary-ingress/readme.tpl            |   10 +-
+ charts/emissary-ingress/templates/NOTES.txt   |   14 +-
+ .../emissary-ingress/templates/_helpers.tpl   |   18 +-
+ .../templates/admin-service.yaml              |    4 +-
  .../templates/ambassador-agent.yaml           |  277 --
+ charts/emissary-ingress/templates/config.yaml |    2 +-
  .../templates/deployment-apiext.yaml          |   66 +
- .../templates/deployment-canary.yaml          |    2 +-
- .../templates/deployment.yaml                 |    2 +-
- .../{values.yaml.in => values.yaml}           |   30 +-
- 10 files changed, 4093 insertions(+), 328 deletions(-)
+ .../templates/deployment-canary.yaml          |    4 +-
+ .../templates/deployment.yaml                 |   14 +-
+ .../templates/exporter-config.yaml            |    2 +-
+ charts/emissary-ingress/templates/hpa.yaml    |    2 +-
+ .../emissary-ingress/templates/listener.yaml  |    8 +-
+ charts/emissary-ingress/templates/module.yaml |    4 +-
+ .../emissary-ingress/templates/namespace.yaml |    2 +-
+ charts/emissary-ingress/templates/pdb.yaml    |    2 +-
+ .../templates/podsecuritypolicy.yaml          |    2 +-
+ charts/emissary-ingress/templates/rbac.yaml   |    8 +-
+ .../emissary-ingress/templates/resolvers.yaml |    8 +-
+ .../templates/service-canary.yaml             |    6 +-
+ .../emissary-ingress/templates/service.yaml   |    6 +-
+ .../templates/serviceaccount.yaml             |    2 +-
+ .../templates/servicemonitor.yaml             |    4 +-
+ .../{values.yaml.in => values.yaml}           |   32 +-
+ 27 files changed, 4148 insertions(+), 394 deletions(-)
  rename charts/emissary-ingress/{Chart.yaml.in => Chart.yaml} (52%)
  create mode 100644 charts/emissary-ingress/crds/emissary-crds.yaml
  delete mode 100644 charts/emissary-ingress/templates/ambassador-agent.yaml
  create mode 100644 charts/emissary-ingress/templates/deployment-apiext.yaml
- rename charts/emissary-ingress/{values.yaml.in => values.yaml} (94%)
+ rename charts/emissary-ingress/{values.yaml.in => values.yaml} (93%)
 
 diff --git a/charts/emissary-ingress/.gitignore b/charts/emissary-ingress/.gitignore
 index d19c5dc9a..42b472400 100644
@@ -83,6 +100,56 @@ index b974e5198..bab4360f7 100644
 +- https://github.com/datawire/ambassador
 +- https://github.com/prometheus/statsd_exporter
 +version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
+diff --git a/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml b/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml
+index b2d9205df..2a23de707 100644
+--- a/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml
++++ b/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml
+@@ -2,38 +2,38 @@
+ apiVersion: getambassador.io/v1
+ kind: Mapping
+ metadata:
+-  name: quote-backend
++  name:.Release.Namespace | default .Values.defaultNamespace | quote-backend
+ spec:
+   prefix: /backend/
+-  service: quote
++  service:.Release.Namespace | default .Values.defaultNamespace | quote
+ ---
+ apiVersion: v1
+ kind: Service
+ metadata:
+-  name: quote
++  name:.Release.Namespace | default .Values.defaultNamespace | quote
+ spec:
+   ports:
+   - name: http
+     port: 80
+     targetPort: 8080
+   selector:
+-    app: quote
++    app:.Release.Namespace | default .Values.defaultNamespace | quote
+ ---
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+-  name: quote
++  name:.Release.Namespace | default .Values.defaultNamespace | quote
+ spec:
+   replicas: 1
+   selector:
+     matchLabels:
+-      app: quote
++      app:.Release.Namespace | default .Values.defaultNamespace | quote
+   strategy:
+     type: RollingUpdate
+   template:
+     metadata:
+       labels:
+-        app: quote
++        app:.Release.Namespace | default .Values.defaultNamespace | quote
+     spec:
+       containers:
+       - name: backend
 diff --git a/charts/emissary-ingress/crds/emissary-crds.yaml b/charts/emissary-ingress/crds/emissary-crds.yaml
 new file mode 100644
 index 000000000..8e5f321d8
@@ -4086,29 +4153,108 @@ index 000000000..8e5f321d8
 +# Main                                                                         #
 +################################################################################
 \ No newline at end of file
+diff --git a/charts/emissary-ingress/readme.tpl b/charts/emissary-ingress/readme.tpl
+index cf5e60609..cc8b0abef 100644
+--- a/charts/emissary-ingress/readme.tpl
++++ b/charts/emissary-ingress/readme.tpl
+@@ -7,7 +7,7 @@
+ ```console
+ $ helm repo add {{ .Repository.Name }} {{ .Repository.URL }}
+ $ helm repo update
+-$ helm install {{ .Release.Name }} --devel {{ .Repository.Name }}/{{ .Chart.Name }} -n {{ .Release.Namespace }}{{ with .Chart.Version }} --version={{.}}{{ end }}
++$ helm install {{ .Release.Name }} --devel {{ .Repository.Name }}/{{ .Chart.Name }} -n {{ .Release.Namespace | default .Values.defaultNamespace | quote| default .Values.defaultNamespace | quote| default .Values.defaultNamespace | quote}}{{ with .Chart.Version }} --version={{.}}{{ end }}
+ ```
+ 
+ ## Introduction
+@@ -44,7 +44,7 @@ Ingress and Ambassador Edge Stack.
+ To install the chart with the release name `{{ .Release.Name }}`:
+ 
+ ```console
+-$ helm install {{ .Release.Name }} --devel {{ .Repository.Name }}/{{ .Chart.Name }} -n {{ .Release.Namespace }}{{ with .Chart.Version }} --version={{.}}{{ end }}
++$ helm install {{ .Release.Name }} --devel {{ .Repository.Name }}/{{ .Chart.Name }} -n {{ .Release.Namespace | default .Values.defaultNamespace | quote}}{{ with .Chart.Version }} --version={{.}}{{ end }}
+ ```
+ 
+ The command deploys {{ .Project.App }} on the Kubernetes cluster in the default configuration. The [configuration](#configuration) section lists the parameters that can be configured during installation.
+@@ -56,7 +56,7 @@ The command deploys {{ .Project.App }} on the Kubernetes cluster in the default
+ To uninstall/delete the `{{ .Release.Name }}`:
+ 
+ ```console
+-$ helm delete {{ .Release.Name }} -n {{ .Release.Namespace }}
++$ helm delete {{ .Release.Name }} -n {{ .Release.Namespace | default .Values.defaultNamespace | quote}}
+ ```
+ 
+ The command removes all the Kubernetes components associated with the chart and deletes the release.
+@@ -75,13 +75,13 @@ The following table lists the configurable parameters of the `{{ .Chart.Name }}`
+ Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example:
+ 
+ ```console
+-$ helm install {{ .Release.Name }} --devel {{ .Repository.Name }}/{{ .Chart.Name }} -n {{ .Release.Namespace }}{{ with .Chart.Version }} --version={{.}}{{ end }} --set {{ .Chart.ValuesExample }}
++$ helm install {{ .Release.Name }} --devel {{ .Repository.Name }}/{{ .Chart.Name }} -n {{ .Release.Namespace | default .Values.defaultNamespace | quote}}{{ with .Chart.Version }} --version={{.}}{{ end }} --set {{ .Chart.ValuesExample }}
+ ```
+ 
+ Alternatively, a YAML file that specifies the values for the parameters can be provided while
+ installing the chart. For example:
+ 
+ ```console
+-$ helm install {{ .Release.Name }} --devel {{ .Repository.Name }}/{{ .Chart.Name }} -n {{ .Release.Namespace }}{{ with .Chart.Version }} --version={{.}}{{ end }} --values values.yaml
++$ helm install {{ .Release.Name }} --devel {{ .Repository.Name }}/{{ .Chart.Name }} -n {{ .Release.Namespace | default .Values.defaultNamespace | quote}}{{ with .Chart.Version }} --version={{.}}{{ end }} --values values.yaml
+ ```
+ {{- end }}
 diff --git a/charts/emissary-ingress/templates/NOTES.txt b/charts/emissary-ingress/templates/NOTES.txt
-index dbcfc7c93..bbe0ed5b6 100644
+index dbcfc7c93..b8ecadd70 100644
 --- a/charts/emissary-ingress/templates/NOTES.txt
 +++ b/charts/emissary-ingress/templates/NOTES.txt
-@@ -12,13 +12,6 @@ To get the IP address of Emissary, run the following commands:
- NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-      You can watch the status of by running 'kubectl get svc -w  --namespace {{ include "ambassador.namespace" .}} {{ include "ambassador.fullname" . }}'
+@@ -5,22 +5,16 @@
+ To get the IP address of Emissary, run the following commands:
  
+ {{- if contains "NodePort" .Values.service.type }}
+-  export NODE_PORT=$(kubectl get --namespace {{ include "ambassador.namespace" .}} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "ambassador.fullname" . }})
+-  export NODE_IP=$(kubectl get nodes --namespace {{ include "ambassador.namespace" .}} -o jsonpath="{.items[0].status.addresses[0].address}")
++  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace | default .Values.defaultNamespace | quote }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "ambassador.fullname" . }})
++  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace | default .Values.defaultNamespace | quote }} -o jsonpath="{.items[0].status.addresses[0].address}")
+   echo http://$NODE_IP:$NODE_PORT
+ {{- else if contains "LoadBalancer" .Values.service.type }}
+ NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+-     You can watch the status of by running 'kubectl get svc -w  --namespace {{ include "ambassador.namespace" .}} {{ include "ambassador.fullname" . }}'
+-
 -  On GKE/Azure:
 -  export SERVICE_IP=$(kubectl get svc --namespace {{ include "ambassador.namespace" .}} {{ include "ambassador.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 -
 -  On AWS:
 -  export SERVICE_IP=$(kubectl get svc --namespace {{ include "ambassador.namespace" .}} {{ include "ambassador.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
--
--  echo http://$SERVICE_IP:{{ .Values.service.port }}
++     You can watch the status of by running 'kubectl get svc -w  --namespace {{ .Release.Namespace | default .Values.defaultNamespace | quote }} {{ include "ambassador.fullname" . }}'
+ 
+   echo http://$SERVICE_IP:{{ .Values.service.port }}
  {{- else if contains "ClusterIP" .Values.service.type }}
-   export POD_NAME=$(kubectl get pods --namespace {{ include "ambassador.namespace" .}} -l "app={{ include "ambassador.name" . }},release={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+-  export POD_NAME=$(kubectl get pods --namespace {{ include "ambassador.namespace" .}} -l "app={{ include "ambassador.name" . }},release={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
++  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace | default .Values.defaultNamespace | quote }} -l "app={{ include "ambassador.name" . }},release={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
    echo "Visit http://127.0.0.1:8080 to use your application"
+   kubectl port-forward $POD_NAME 8080:80
+ {{- end }}
 diff --git a/charts/emissary-ingress/templates/_helpers.tpl b/charts/emissary-ingress/templates/_helpers.tpl
-index 35bb75791..45e54b312 100644
+index 35bb75791..a017c4ce1 100644
 --- a/charts/emissary-ingress/templates/_helpers.tpl
 +++ b/charts/emissary-ingress/templates/_helpers.tpl
-@@ -125,3 +125,9 @@ Define the http port of the Ambassador service
+@@ -78,18 +78,6 @@ disabled if fullImageOverride is present
+ {{- end -}}
+ {{- end -}}
+ 
+-
+-{{/*
+-Create chart namespace based on override value.
+-*/}}
+-{{- define "ambassador.namespace" -}}
+-{{- if .Values.namespaceOverride -}}
+-{{- .Values.namespaceOverride -}}
+-{{- else -}}
+-{{- .Release.Namespace -}}
+-{{- end -}}
+-{{- end -}}
+-
+ {{/*
+ Create chart name and version as used by the chart label.
+ */}}
+@@ -125,3 +113,9 @@ Define the http port of the Ambassador service
  {{- end -}}
  {{- end -}}
  {{- end -}}
@@ -4118,7 +4264,28 @@ index 35bb75791..45e54b312 100644
 +{{- define "image.repository.path" -}}
 +{{- .repository }}@{{ .digest -}}
 +{{- end -}}
-\ No newline at end of file
+diff --git a/charts/emissary-ingress/templates/admin-service.yaml b/charts/emissary-ingress/templates/admin-service.yaml
+index 77f628459..a1c48b7ac 100644
+--- a/charts/emissary-ingress/templates/admin-service.yaml
++++ b/charts/emissary-ingress/templates/admin-service.yaml
+@@ -3,7 +3,7 @@ apiVersion: v1
+ kind: Service
+ metadata:
+   name: {{ include "ambassador.fullname" . }}-admin
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+@@ -45,7 +45,7 @@ spec:
+     {{- end }}
+   {{- if eq .Values.adminService.type "LoadBalancer" }}
+   {{- if not (empty .Values.adminService.loadBalancerIP) }}
+-  loadBalancerIP: {{ .Values.adminService.loadBalancerIP | quote }}
++  loadBalancerIP: {{ .Values.adminService.loadBalancerIP | .Release.Namespace | default .Values.defaultNamespace | quote }}
+   {{- end }}
+   {{- if not (empty .Values.adminService.loadBalancerSourceRanges) }}
+   loadBalancerSourceRanges:
 diff --git a/charts/emissary-ingress/templates/ambassador-agent.yaml b/charts/emissary-ingress/templates/ambassador-agent.yaml
 deleted file mode 100644
 index d94f4b6cb..000000000
@@ -4402,6 +4569,19 @@ index d94f4b6cb..000000000
 -    app.kubernetes.io/instance: {{ .Release.Name }}
 -{{- end }}
 -{{- end }}
+diff --git a/charts/emissary-ingress/templates/config.yaml b/charts/emissary-ingress/templates/config.yaml
+index cd6184dde..4ba1c911a 100644
+--- a/charts/emissary-ingress/templates/config.yaml
++++ b/charts/emissary-ingress/templates/config.yaml
+@@ -3,7 +3,7 @@ apiVersion: v1
+ kind: ConfigMap
+ metadata:
+   name: '{{ include "ambassador.fullname" . }}-file-config'
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/deployment-apiext.yaml b/charts/emissary-ingress/templates/deployment-apiext.yaml
 new file mode 100644
 index 000000000..07b9ec3ed
@@ -4476,9 +4656,18 @@ index 000000000..07b9ec3ed
 +            failureThreshold: 3
 \ No newline at end of file
 diff --git a/charts/emissary-ingress/templates/deployment-canary.yaml b/charts/emissary-ingress/templates/deployment-canary.yaml
-index c166d4fb0..d3d0261b2 100644
+index c166d4fb0..604f47d24 100644
 --- a/charts/emissary-ingress/templates/deployment-canary.yaml
 +++ b/charts/emissary-ingress/templates/deployment-canary.yaml
+@@ -8,7 +8,7 @@ metadata:
+   {{- else }}
+   name: {{ include "ambassador.fullname" . }}-canary
+   {{- end }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
 @@ -138,7 +138,7 @@ spec:
            {{- if ne (include "ambassador.canaryImage" .)  "" }}
            image: {{ include "ambassador.canaryImage" . }}
@@ -4489,9 +4678,36 @@ index c166d4fb0..d3d0261b2 100644
            imagePullPolicy: {{ .Values.image.pullPolicy }}
            ports:
 diff --git a/charts/emissary-ingress/templates/deployment.yaml b/charts/emissary-ingress/templates/deployment.yaml
-index 2d06c8127..f1e043136 100644
+index 2d06c8127..65b7ecc9f 100644
 --- a/charts/emissary-ingress/templates/deployment.yaml
 +++ b/charts/emissary-ingress/templates/deployment.yaml
+@@ -3,7 +3,7 @@ apiVersion: v1
+ kind: Pod
+ metadata:
+       name: {{ include "ambassador.fullname" . }}
+-      namespace: {{ include "ambassador.namespace" . }}
++      namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+ {{- else }}
+ {{- if .Values.daemonSet }}
+ apiVersion: apps/v1
+@@ -18,7 +18,7 @@ metadata:
+   {{- else }}
+   name: {{ include "ambassador.fullname" . }}
+   {{- end }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+@@ -99,7 +99,7 @@ spec:
+       {{- end }}
+       serviceAccountName: {{ include "ambassador.serviceAccountName" . }}
+       {{- if .Values.priorityClassName }}
+-      priorityClassName: {{ .Values.priorityClassName | quote }}
++      priorityClassName: {{ .Values.priorityClassName | .Release.Namespace | default .Values.defaultNamespace | quote }}
+       {{- end }}
+       volumes:
+         - name: ambassador-pod-info
 @@ -156,7 +156,7 @@ spec:
              {{- toYaml .Values.prometheusExporter.resources | nindent 12 }}
          {{- end }}
@@ -4501,15 +4717,327 @@ index 2d06c8127..f1e043136 100644
            imagePullPolicy: {{ .Values.image.pullPolicy }}
            ports:
              {{- range .Values.service.ports }}
+@@ -190,7 +190,7 @@ spec:
+             {{- end }}
+             - name: AMBASSADOR_NAMESPACE
+               {{- if .Values.namespace.name }}
+-              value: {{ .Values.namespace.name | quote }}
++              value: {{ .Values.namespace.name |.Release.Namespace | default .Values.defaultNamespace | quote }}
+               {{ else }}
+               valueFrom:
+                 fieldRef:
+@@ -200,8 +200,8 @@ spec:
+               value: {{ include "ambassador.fullname" . }}-agent-cloud-token
+             {{- if .Values.env }}
+             {{- range $key,$value := .Values.env }}
+-            - name: {{ $key | upper | quote}}
+-              value: {{ $value | quote}}
++            - name: {{ $key | upper | .Release.Namespace | default .Values.defaultNamespace | quote}}
++              value: {{ $value | .Release.Namespace | default .Values.defaultNamespace | quote}}
+             {{- end }}
+             {{- end }}
+             {{- if .Values.envRaw }}
+diff --git a/charts/emissary-ingress/templates/exporter-config.yaml b/charts/emissary-ingress/templates/exporter-config.yaml
+index c15802767..633a607ce 100644
+--- a/charts/emissary-ingress/templates/exporter-config.yaml
++++ b/charts/emissary-ingress/templates/exporter-config.yaml
+@@ -3,7 +3,7 @@ apiVersion: v1
+ kind: ConfigMap
+ metadata:
+   name: '{{ include "ambassador.fullname" . }}-exporter-config'
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+diff --git a/charts/emissary-ingress/templates/hpa.yaml b/charts/emissary-ingress/templates/hpa.yaml
+index f72ccc002..bd1a07e7a 100644
+--- a/charts/emissary-ingress/templates/hpa.yaml
++++ b/charts/emissary-ingress/templates/hpa.yaml
+@@ -3,7 +3,7 @@ apiVersion: autoscaling/v2beta2
+ kind: HorizontalPodAutoscaler
+ metadata:
+   name: {{ include "ambassador.fullname" . }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+diff --git a/charts/emissary-ingress/templates/listener.yaml b/charts/emissary-ingress/templates/listener.yaml
+index 033051cc8..0a8d60e13 100644
+--- a/charts/emissary-ingress/templates/listener.yaml
++++ b/charts/emissary-ingress/templates/listener.yaml
+@@ -4,7 +4,7 @@ apiVersion: getambassador.io/v3alpha1
+ kind: Listener
+ metadata:
+   name: {{ include "ambassador.fullname" . }}-https-listener
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+ spec:
+   port: 8443
+   protocol: HTTPS
+@@ -14,14 +14,14 @@ spec:
+       from: ALL
+   {{- if hasKey .Values.env "AMBASSADOR_ID" }}
+   ambassador_id:
+-  - {{ .Values.env.AMBASSADOR_ID | quote }}
++  - {{ .Values.env.AMBASSADOR_ID |.Release.Namespace | default .Values.defaultNamespace | quote }}
+   {{- end }}
+ ---
+ apiVersion: getambassador.io/v3alpha1
+ kind: Listener
+ metadata:
+   name: {{ include "ambassador.fullname" . }}-http-listener
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+ spec:
+   port: 8080
+   protocol: HTTP
+@@ -31,6 +31,6 @@ spec:
+       from: ALL
+   {{- if hasKey .Values.env "AMBASSADOR_ID" }}
+   ambassador_id:
+-  - {{ .Values.env.AMBASSADOR_ID | quote }}
++  - {{ .Values.env.AMBASSADOR_ID |.Release.Namespace | default .Values.defaultNamespace | quote }}
+   {{- end }}
+ {{ end }}
+diff --git a/charts/emissary-ingress/templates/module.yaml b/charts/emissary-ingress/templates/module.yaml
+index a13d45996..e9287ac4a 100644
+--- a/charts/emissary-ingress/templates/module.yaml
++++ b/charts/emissary-ingress/templates/module.yaml
+@@ -3,7 +3,7 @@ apiVersion: getambassador.io/v2
+ kind: Module
+ metadata:
+   name: ambassador
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+@@ -12,7 +12,7 @@ metadata:
+ spec:
+   {{- if .Values.env }}
+   {{- if hasKey .Values.env "AMBASSADOR_ID" }}
+-  ambassador_id: {{ .Values.env.AMBASSADOR_ID | quote }}
++  ambassador_id: {{ .Values.env.AMBASSADOR_ID |.Release.Namespace | default .Values.defaultNamespace | quote }}
+   {{- end }}
+   {{- end }}
+   config:
+diff --git a/charts/emissary-ingress/templates/namespace.yaml b/charts/emissary-ingress/templates/namespace.yaml
+index 4535c74f2..c3cde61b4 100644
+--- a/charts/emissary-ingress/templates/namespace.yaml
++++ b/charts/emissary-ingress/templates/namespace.yaml
+@@ -4,5 +4,5 @@ kind: Namespace
+ metadata:
+   labels:
+     product: aes
+-  name: {{ include "ambassador.namespace" . }}
++  name: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+ {{- end }}
+diff --git a/charts/emissary-ingress/templates/pdb.yaml b/charts/emissary-ingress/templates/pdb.yaml
+index 549a66fd6..2c5a124c9 100644
+--- a/charts/emissary-ingress/templates/pdb.yaml
++++ b/charts/emissary-ingress/templates/pdb.yaml
+@@ -3,7 +3,7 @@ apiVersion: policy/v1
+ kind: PodDisruptionBudget
+ metadata:
+   name: {{ include "ambassador.fullname" . }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+diff --git a/charts/emissary-ingress/templates/podsecuritypolicy.yaml b/charts/emissary-ingress/templates/podsecuritypolicy.yaml
+index 7c0a7489f..455fe9d33 100644
+--- a/charts/emissary-ingress/templates/podsecuritypolicy.yaml
++++ b/charts/emissary-ingress/templates/podsecuritypolicy.yaml
+@@ -3,7 +3,7 @@ apiVersion: policy/v1beta1
+ kind: PodSecurityPolicy
+ metadata:
+   name: {{ include "ambassador.fullname" . }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+diff --git a/charts/emissary-ingress/templates/rbac.yaml b/charts/emissary-ingress/templates/rbac.yaml
+index b177db0d7..cdcf282ca 100644
+--- a/charts/emissary-ingress/templates/rbac.yaml
++++ b/charts/emissary-ingress/templates/rbac.yaml
+@@ -35,7 +35,7 @@ roleRef:
+   name: {{ include "ambassador.rbacName" . }}
+ subjects:
+   - name: {{ include "ambassador.serviceAccountName" . }}
+-    namespace: {{ include "ambassador.namespace" . }}
++    namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+     kind: ServiceAccount
+ 
+ ---
+@@ -68,7 +68,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+ kind: Role
+ metadata:
+   name: {{ include "ambassador.rbacName" . }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+ {{- else }}
+ kind: ClusterRole
+ metadata:
+@@ -139,7 +139,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+ kind: RoleBinding
+ metadata:
+   name: {{ include "ambassador.rbacName" . }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+@@ -150,7 +150,7 @@ roleRef:
+   name: {{ include "ambassador.rbacName" . }}
+ subjects:
+   - name: {{ include "ambassador.serviceAccountName" . }}
+-    namespace: {{ include "ambassador.namespace" . }}
++    namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+     kind: ServiceAccount
+ {{- end }}
+ 
+diff --git a/charts/emissary-ingress/templates/resolvers.yaml b/charts/emissary-ingress/templates/resolvers.yaml
+index 349fe51a3..c724dbe5b 100644
+--- a/charts/emissary-ingress/templates/resolvers.yaml
++++ b/charts/emissary-ingress/templates/resolvers.yaml
+@@ -4,13 +4,13 @@ apiVersion: getambassador.io/v2
+ kind: KubernetesEndpointResolver
+ metadata:
+   name: {{ .Values.resolvers.endpoint.name }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+ {{- if hasKey .Values.env "AMBASSADOR_ID" }}
+ spec:
+-  ambassador_id: {{ .Values.env.AMBASSADOR_ID | quote }}
++  ambassador_id: {{ .Values.env.AMBASSADOR_ID |.Release.Namespace | default .Values.defaultNamespace | quote }}
+ {{- end }}
+ {{- end }}
+ {{- if .Values.resolvers.consul.create }}
+@@ -19,13 +19,13 @@ apiVersion: getambassador.io/v2
+ kind: ConsulResolver
+ metadata:
+   name: {{ .Values.resolvers.consul.name }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+ spec:
+   {{- if hasKey .Values.env "AMBASSADOR_ID" }}
+-  ambassador_id: {{ .Values.env.AMBASSADOR_ID | quote }}
++  ambassador_id: {{ .Values.env.AMBASSADOR_ID |.Release.Namespace | default .Values.defaultNamespace | quote }}
+   {{- end }}
+   {{- toYaml .Values.resolvers.consul.spec | nindent 2 }}
+ {{- end }}
+diff --git a/charts/emissary-ingress/templates/service-canary.yaml b/charts/emissary-ingress/templates/service-canary.yaml
+index 742473cd1..e1304ee82 100644
+--- a/charts/emissary-ingress/templates/service-canary.yaml
++++ b/charts/emissary-ingress/templates/service-canary.yaml
+@@ -8,7 +8,7 @@ metadata:
+   {{- else }}
+   name: {{ include "ambassador.fullname" . }}-canary
+   {{- end }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+@@ -22,10 +22,10 @@ metadata:
+     a8r.io/chat: http://a8r.io/Slack
+     a8r.io/bugs: https://github.com/datawire/ambassador/issues
+     a8r.io/support: https://www.getambassador.io/about-us/support/
+-    a8r.io/dependencies: {{ include "ambassador.fullname" . }}-redis.{{ include "ambassador.namespace" . }}
++    a8r.io/dependencies: {{ include "ambassador.fullname" . }}-redis.{{ .Release.Namespace | default .Values.defaultNamespace | quote|.Release.Namespace | default .Values.defaultNamespace | quote }}
+ {{- if .Values.service.annotations }}
+   {{- range $key, $value := .Values.service.annotations }}
+-    {{ $key }}: {{ $value | quote }}
++    {{ $key }}: {{ $value |.Release.Namespace | default .Values.defaultNamespace | quote }}
+   {{- end }}
+ {{- end }}
+ spec:
+diff --git a/charts/emissary-ingress/templates/service.yaml b/charts/emissary-ingress/templates/service.yaml
+index 1f3a6706c..5d17aba24 100644
+--- a/charts/emissary-ingress/templates/service.yaml
++++ b/charts/emissary-ingress/templates/service.yaml
+@@ -6,7 +6,7 @@ metadata:
+   {{- else }}
+   name: {{ include "ambassador.fullname" . }}
+   {{- end }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+@@ -20,10 +20,10 @@ metadata:
+     a8r.io/chat: http://a8r.io/Slack
+     a8r.io/bugs: https://github.com/datawire/ambassador/issues
+     a8r.io/support: https://www.getambassador.io/about-us/support/
+-    a8r.io/dependencies: {{ include "ambassador.fullname" . }}-redis.{{ include "ambassador.namespace" . }}
++    a8r.io/dependencies: {{ include "ambassador.fullname" . }}-redis.{{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+ {{- if .Values.service.annotations }}
+   {{- range $key, $value := .Values.service.annotations }}
+-    {{ $key }}: {{ $value | quote }}
++    {{ $key }}: {{ $value |.Release.Namespace | default .Values.defaultNamespace | quote }}
+   {{- end }}
+ {{- end }}
+ spec:
+diff --git a/charts/emissary-ingress/templates/serviceaccount.yaml b/charts/emissary-ingress/templates/serviceaccount.yaml
+index ef30c7659..a20596210 100644
+--- a/charts/emissary-ingress/templates/serviceaccount.yaml
++++ b/charts/emissary-ingress/templates/serviceaccount.yaml
+@@ -3,7 +3,7 @@ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+   name: {{ include "ambassador.serviceAccountName" . }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app.kubernetes.io/name: {{ include "ambassador.name" . }}
+     {{- include "ambassador.labels" . | nindent 4 }}
+diff --git a/charts/emissary-ingress/templates/servicemonitor.yaml b/charts/emissary-ingress/templates/servicemonitor.yaml
+index b2c8122a1..2360b9031 100644
+--- a/charts/emissary-ingress/templates/servicemonitor.yaml
++++ b/charts/emissary-ingress/templates/servicemonitor.yaml
+@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
+ kind: ServiceMonitor
+ metadata:
+   name: {{ include "ambassador.fullname" . }}
+-  namespace: {{ include "ambassador.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote|.Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     app: {{ include "ambassador.name" . }}
+     {{- if .Values.metrics.serviceMonitor.selector }}
+@@ -21,7 +21,7 @@ spec:
+       {{- end }}
+   namespaceSelector:
+     matchNames:
+-      - {{ include "ambassador.namespace" . }}
++      - {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   selector:
+     matchLabels:
+       service: ambassador-admin
 diff --git a/charts/emissary-ingress/values.yaml.in b/charts/emissary-ingress/values.yaml
-similarity index 94%
+similarity index 93%
 rename from charts/emissary-ingress/values.yaml.in
 rename to charts/emissary-ingress/values.yaml
-index c2767e002..da2ee71f8 100644
+index c2767e002..f7e1c3b32 100644
 --- a/charts/emissary-ingress/values.yaml.in
 +++ b/charts/emissary-ingress/values.yaml
-@@ -6,7 +6,7 @@ fullnameOverride: ''
- namespaceOverride: ''
+@@ -2,11 +2,11 @@
+ nameOverride: ''
+ # Override the generated release name. Defaults to .Release.Name.
+ fullnameOverride: ''
+-# Override the generated release namespace. Defaults to .Release.Namespace.
+-namespaceOverride: ''
++
++defaultNamespace: emissary-system
  
  # Number of Ambassador replicas
 -replicaCount: 3
@@ -4558,13 +5086,6 @@ index c2767e002..da2ee71f8 100644
  deploymentTool: ''
  
  # configure docker to pull from private registry
-@@ -421,4 +407,4 @@ lifecycle: # +doc-gen:break
-   #         - "-c"
-   #         - >
-   #           curl -XPOST localhost:8001/healthcheck/fail;
--  #           /bin/sleep 45;
-+  #           /bin/sleep 45;
-\ No newline at end of file
 -- 
 2.34.1
 
