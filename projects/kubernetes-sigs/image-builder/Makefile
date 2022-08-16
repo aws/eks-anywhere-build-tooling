@@ -5,7 +5,7 @@ REPO=image-builder
 REPO_OWNER=kubernetes-sigs
 
 IMAGE_BUILDER_DIR=$(REPO)/images/capi
-RAW_IMAGE_BUILD_AMI?=ami-0bd99362b6ccd24ea
+RAW_IMAGE_BUILD_AMI?=ami-0d70546e43a941d70
 RAW_IMAGE_BUILD_INSTANCE_TYPE?=t1.micro
 RAW_IMAGE_BUILD_KEY_NAME?=raw-image-build
 
