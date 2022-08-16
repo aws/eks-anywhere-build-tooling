@@ -38,7 +38,7 @@ fi
 
 REPO_NAME=$(basename $REPO_ROOT)
 KEY_LOCATION=$REPO_ROOT/$PROJECT_PATH/$KEY_NAME.pem
-REMOTE_HOME_DIR="/home/ec2-user"
+REMOTE_HOME_DIR="/home/ubuntu"
 REMOTE_PROJECT_PATH=$REMOTE_HOME_DIR/$REPO_NAME/$PROJECT_PATH
 SSH_OPTS="-i $KEY_LOCATION -o StrictHostKeyChecking=no -o ConnectTimeout=120"
 
@@ -97,7 +97,7 @@ aws ec2 wait instance-running --instance-ids $INSTANCE_ID
 
 # Get the public DNS of the instance to use as SSH hostname
 PUBLIC_DNS_NAME=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[].Instances[].PublicDnsName" --output text)
-REMOTE_HOST=ec2-user@$PUBLIC_DNS_NAME
+REMOTE_HOST=ubuntu@$PUBLIC_DNS_NAME
 
 # rsync might sometimes fail with flaky connection issues, so
 # implementing retry logic will make it more robust to flakes
@@ -122,7 +122,7 @@ fi
 ENV_EXPORT_COMMAND="export CODEBUILD_CI=true"
 ssh $SSH_OPTS $REMOTE_HOST $ENV_EXPORT_COMMAND
 
-SSH_COMMANDS="sudo usermod -a -G kvm ec2-user; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
+SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
 if [[ "$IMAGE_OS" =~ "rhel" ]]; then
     echo "Cannot build rhel image, as image-builder cli does not support it yet"
     exit 1
