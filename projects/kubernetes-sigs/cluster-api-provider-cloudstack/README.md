@@ -15,6 +15,6 @@ The [Cluster API Provider for CloudStack (CAPC)](https://github.com/kubernetes-s
    target has changed in the Makefile, and make the required changes in create_manifests.sh
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
-1. Update checksums and attribution using `make release -C projects/kubernetes-sigs/cluster-api-provider-cloudstack` from the top level directory of the eks-anywhere-build-tooling repo.
+1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
