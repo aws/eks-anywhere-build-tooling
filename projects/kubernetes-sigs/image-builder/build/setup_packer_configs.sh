@@ -25,16 +25,23 @@ IMAGE_OS="${3?Specify third argument - image OS}"
 ARTIFACTS_BUCKET="${4?Specify fourth argument - artifact bucket}"
 OVA_PATH="${5? Specify fifth argument - ova output path}"
 ADDITIONAL_PAUSE_IMAGE_FROM="${6? Specify sixth argument - additional pause image}"
-LATEST_TAG="${7? Specify seventh argument - latest tag}"
+GIT_BRANCH="${7? Specify seventh argument - current git branch}"
 IMAGE_BUILDER_DIR="${8? Specify eighth argument - image-builder directory}"
 
 CI="${CI:-false}"
+CODEBUILD_CI="${CODEBUILD_CI:-false}"
+DEV_RELEASE=false
+if [[ $CI ]] || [[ $CODEBUILD_CI ]]; then
+  DEV_RELEASE=true
+fi
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
+source "${MAKE_ROOT}/../../../build/lib/eksa_releases.sh"
 
 # Preload release yaml
 build::eksd_releases::load_release_yaml $RELEASE_BRANCH
+build::eksa_releases::load_bundle_manifest $DEV_RELEASE $GIT_BRANCH
 
 OUTPUT_CONFIGS="$MAKE_ROOT/_output/$RELEASE_BRANCH/$IMAGE_FORMAT/$IMAGE_OS/config"
 mkdir -p $OUTPUT_CONFIGS
@@ -74,10 +81,10 @@ export KUBERNETES_FULL_VERSION="$KUBERNETES_VERSION-eks-$RELEASE_BRANCH-$EKSD_RE
 export ETCD_HTTP_SOURCE=$(build::eksd_releases::get_eksd_component_url "etcd" $RELEASE_BRANCH)
 export ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $RELEASE_BRANCH)
 export ETCD_SHA256=$(build::eksd_releases::get_eksd_component_sha "etcd" $RELEASE_BRANCH)
-export ETCDADM_HTTP_SOURCE=${ETCDADM_HTTP_SOURCE:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/etcdadm' 'amd64' $LATEST_TAG)}
+export ETCDADM_HTTP_SOURCE=${ETCDADM_HTTP_SOURCE:-$(build::eksa_releases::get_eksa_component_asset_url 'eksD' 'etcdadm' $RELEASE_BRANCH $DEV_RELEASE $GIT_BRANCH)}
 export ETCDADM_VERSION='v0.1.5'
-export CRICTL_URL=${CRICTL_URL:-$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET 'kubernetes-sigs/cri-tools' 'amd64' $LATEST_TAG)}
-export CRICTL_SHA256="$CRICTL_URL.sha256"
+export CRICTL_URL=${CRICTL_URL:-$(build::eksa_releases::get_eksa_component_asset_url 'eksD' 'crictl' $RELEASE_BRANCH $DEV_RELEASE $GIT_BRANCH)}
+export CRICTL_SHA256="${CRICTL_SHA256:-$(build::eksa_releases::get_eksa_component_asset_artifact_checksum 'eksD' 'crictl' 'sha256' $RELEASE_BRANCH $DEV_RELEASE $GIT_BRANCH)}"
 
 envsubst '$IMAGE_REPO:$KUBERNETES_ASSET_BASE_URL:$KUBERNETES_VERSION:$KUBERNETES_SERIES:$CRICTL_URL:$CRICTL_SHA256:$ETCD_HTTP_SOURCE:$ETCD_VERSION:$ETCDADM_HTTP_SOURCE:$ETCD_SHA256:$ETCDADM_VERSION:$KUBERNETES_FULL_VERSION' \
     < "$MAKE_ROOT/packer/config/kubernetes.json.tmpl" \
