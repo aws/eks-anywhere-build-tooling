@@ -31,6 +31,11 @@ source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 build::common::use_go_version ${GOLANG_VERSION}
 
+if [[ ! ${TAG} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf >&2 'Error : %s is not a valid semver, so it will not work with clusterctl.\n' $TAG
+    exit 1
+fi
+
 cd $REPO
 
 KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
