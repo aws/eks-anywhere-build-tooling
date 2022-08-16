@@ -26,11 +26,6 @@ IMAGE_REPO="$5"
 IMAGE_TAG="$6"
 GOLANG_VERSION="$7"
 
-if [[ $TAG =~ [A-Z] ]]; then
-    echo "CAPC tag cannot contain uppercase letters as they may be inconsistent when used with clusterctl in EKS-A. Detected ${TAG}"
-    exit 1
-fi
-
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
