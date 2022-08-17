@@ -22,9 +22,6 @@ HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/eks-anywhere-packages
 HELM_IMAGE_LIST=eks-anywhere-packages ecr-token-refresher
 
-# Needed to be built first for final helm/bundle builds
-PROJECT_DEPENDENCIES=eksa/goharbor/harbor eksa/aws-containers/hello-eks-anywhere
-
 include $(BASE_DIRECTORY)/Common.mk
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_ECRTOKENREFRESHER_TARGET)
