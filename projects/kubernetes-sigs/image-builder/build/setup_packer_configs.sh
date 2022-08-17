@@ -31,7 +31,7 @@ IMAGE_BUILDER_DIR="${8? Specify eighth argument - image-builder directory}"
 CI="${CI:-false}"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 DEV_RELEASE=false
-if [[ $CI ]] || [[ $CODEBUILD_CI ]]; then
+if [[ $CI == true || $CODEBUILD_CI == true ]]; then
   DEV_RELEASE=true
 fi
 
