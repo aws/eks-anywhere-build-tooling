@@ -25,17 +25,16 @@ func execCommandWithStreamOutput(cmd *exec.Cmd) error {
 	return nil
 }
 
-func executeMakeBuildCommand(buildCommand, releaseChannel, artifactsBucket string) error {
+func executeMakeBuildCommand(buildCommand, releaseChannel string) error {
 	cmd := exec.Command("bash", "-c", buildCommand)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, fmt.Sprintf("RELEASE_BRANCH=%s", releaseChannel))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("ARTIFACTS_BUCKET=%s", artifactsBucket))
 	err := execCommandWithStreamOutput(cmd)
 	return err
 }
 
 func cleanup(buildToolingDir string) {
-	log.Print("Cleaning up files post build")
+	log.Print("Cleaning up cache build files")
 	err := os.RemoveAll(buildToolingDir)
 	if err != nil {
 		log.Fatalf("Error cleaning up build tooling dir: %v", err)

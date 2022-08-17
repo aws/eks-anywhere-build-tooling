@@ -11,6 +11,6 @@ type BuildOptions struct {
 	Hypervisor      string
 	VsphereConfig   string
 	ReleaseChannel  string
-	ArtifactsBucket string
+	artifactsBucket string
 	Force           bool
 }

@@ -9,7 +9,9 @@ import (
 	"strings"
 )
 
-const buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
+const (
+	buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
+)
 
 func (b *BuildOptions) BuildImage() {
 	// Clone build tooling repo
@@ -45,7 +47,7 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error writing vsphere config file to packer")
 		}
 		buildCommand := fmt.Sprintf("make -C %s local-build-ova-ubuntu-2004", imageBuilderProjectPath)
-		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel, b.ArtifactsBucket)
+		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for vsphere hypervisor: %v", err)
 		}
@@ -62,7 +64,7 @@ func (b *BuildOptions) BuildImage() {
 		if b.Os == Ubuntu {
 			// Patch firmware config for tool
 			upstreamPatchCommand := fmt.Sprintf("make -C %s image-builder/eks-anywhere-patched", imageBuilderProjectPath)
-			if err = executeMakeBuildCommand(upstreamPatchCommand, b.ReleaseChannel, b.ArtifactsBucket); err != nil {
+			if err = executeMakeBuildCommand(upstreamPatchCommand, b.ReleaseChannel); err != nil {
 				log.Fatalf("Error executing upstream patch command")
 			}
 
@@ -83,7 +85,7 @@ func (b *BuildOptions) BuildImage() {
 			log.Println("Patched upstream firmware config file")
 		}
 		buildCommand := fmt.Sprintf("make -C %s local-build-raw-ubuntu-2004-efi", imageBuilderProjectPath)
-		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel, b.ArtifactsBucket)
+		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
 		}
