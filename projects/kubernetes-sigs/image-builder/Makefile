@@ -92,6 +92,8 @@ else ifeq ($(IMAGE_FORMAT),raw)
 		ifneq ($(RELEASE_BRANCH),1-20)
 			S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_RAW_PATH)
 			RELEASE_TARGETS=download-bottlerocket-raw upload-bottlerocket-raw
+		else
+			RELEASE_TARGETS=
 		endif
 	else ifeq ($(IMAGE_OS),rhel)
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
