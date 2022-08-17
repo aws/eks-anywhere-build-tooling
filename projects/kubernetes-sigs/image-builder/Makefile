@@ -206,6 +206,7 @@ local-build-ova-ubuntu-2004: deps-ova setup-packer-configs-ova
 
 .PHONY: download-bottlerocket-%
 download-bottlerocket-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
+download-bottlerocket-%: BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 download-bottlerocket-%: $(BOTTLEROCKET_SETUP_TARGET)
 	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(BOTTLEROCKET_DOWNLOAD_PATH) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
 
