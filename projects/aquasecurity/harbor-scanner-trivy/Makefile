@@ -11,6 +11,8 @@ SOURCE_PATTERNS=./cmd/scanner-trivy
 HAS_S3_ARTIFACTS=true
 IMAGE_NAMES=
 
+EXCLUDE_FROM_STAGING_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
