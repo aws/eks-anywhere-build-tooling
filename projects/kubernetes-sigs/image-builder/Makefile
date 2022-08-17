@@ -73,12 +73,11 @@ endif
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
 ifeq ($(IMAGE_FORMAT),ova)
 	ifeq ($(IMAGE_OS),ubuntu)
-		# When building Ubuntu OVA for release, we also want to fetch Bottlerocket OVA in the
-		# same job because they are usually tied together with an EKS-A release so we want them
-		# to be uploaded to the same location to be picked up by the release process
-		# (TODO): Consider moving Bottlerocket to separate job to remove tight coupling
-		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH)
-		RELEASE_TARGETS=release-ova-$(IMAGE_OS) download-bottlerocket-ova upload-artifacts-ova upload-bottlerocket-ova
+		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH)
+		RELEASE_TARGETS=release-ova-$(IMAGE_OS) upload-artifacts-ova
+	else ifeq ($(IMAGE_OS),bottlerocket)
+		S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_OVA_PATH)
+		RELEASE_TARGETS=download-bottlerocket-ova upload-bottlerocket-ova
 	else ifeq ($(IMAGE_OS),rhel)
 		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH)
 		RELEASE_TARGETS=release-ova-$(IMAGE_OS) upload-artifacts-ova
@@ -87,13 +86,12 @@ ifeq ($(IMAGE_FORMAT),ova)
 	endif
 else ifeq ($(IMAGE_FORMAT),raw)
 	ifeq ($(IMAGE_OS),ubuntu)
-		# When building Ubuntu OVA for release, we also want to fetch Bottlerocket OVA in the
-		# same job because they are usually tied together with an EKS-A release so we want them
-		# to be uploaded to the same location to be picked up by the release process
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
 		RELEASE_TARGETS=release-raw-$(IMAGE_OS) upload-artifacts-raw
+	else ifeq ($(IMAGE_OS),bottlerocket)
 		ifneq ($(RELEASE_BRANCH),1-20)
-			RELEASE_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
+			S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_RAW_PATH)
+			RELEASE_TARGETS=download-bottlerocket-raw upload-bottlerocket-raw
 		endif
 	else ifeq ($(IMAGE_OS),rhel)
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
@@ -106,7 +104,7 @@ endif
 BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml
 BUILDSPEC_VARS_KEYS=IMAGE_OS RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_OS_DISTROS SUPPORTED_K8S_VERSIONS
-SUPPORTED_OS_DISTROS=ubuntu
+SUPPORTED_OS_DISTROS=bottlerocket
 
 PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm eksa/kubernetes-sigs/cri-tools
 
@@ -137,11 +135,13 @@ $(FINAL_RAW_IMAGE_PATH):
 	mv *.gz $@
 
 $(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
+$(FINAL_BOTTLEROCKET_OVA_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 $(FINAL_BOTTLEROCKET_OVA_PATH):
 	@mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ova/*.ova $@
 
 $(FINAL_BOTTLEROCKET_RAW_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
+$(FINAL_BOTTLEROCKET_RAW_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 $(FINAL_BOTTLEROCKET_RAW_PATH):
 	@mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/raw/*.gz $@
