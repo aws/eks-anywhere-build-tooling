@@ -118,11 +118,7 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-# Set CI env var on remote machine to pull from dev artifacts
-ENV_EXPORT_COMMAND="export CODEBUILD_CI=true"
-ssh $SSH_OPTS $REMOTE_HOST $ENV_EXPORT_COMMAND
-
-SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
+SSH_COMMANDS="export CODEBUILD_CI=true; sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
 if [[ "$IMAGE_OS" =~ "rhel" ]]; then
     echo "Cannot build rhel image, as image-builder cli does not support it yet"
     exit 1
