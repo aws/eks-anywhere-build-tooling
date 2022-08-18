@@ -107,7 +107,7 @@ govc library.create "<library name>"
 ```
 5. Run the image builder tool for appropriate release channel
 ```
-image-builder build --os ubuntu --hypervisor vsphere --vsphere-config <path to above json file> --release-channel <release channel>
+image-builder build --os ubuntu --hypervisor vsphere --vsphere-config <path to above json file> --release-channel <release channel, ex 1-23>
 ```
 
 ### Building Node Images for Baremetal
@@ -128,24 +128,29 @@ to build a node image for baremetal, the image builder tool needs to run on bare
     * distro.eks.amazonaws.com (to download EKS-D binaries)
     * d2glxqk2uabbnd.cloudfront.net (for EKS-A and EKS-D ECR container images)
 
-#### Building a vSphere OVA Node Image
+#### Building a baremetal Node Image
 1. Install pre-requisite packages and prep environment
 ```
 sudo apt update -y
 sudo apt install jq make qemu-kvm libvirt-daemon-system libvirt-clients virtinst cpu-checker libguestfs-tools libosinfo-bin unzip ansible -y
 sudo snap install yq
-sudo usermod -a -G kvm ubuntu
+sudo usermod -a -G kvm $USER
 sudo chmod 666 /dev/kvm
 sudo chown root:kvm /dev/kvm
+echo "HostKeyAlgorithms +ssh-rsa" >> /home/$USER/.ssh/config
+echo "PubkeyAcceptedKeyTypes +ssh-rsa" >> /home/$USER/.ssh/config
 ```
 2. Build or download the image builder tool
 3. Run the image builder tool for appropriate release channel
 ```
-image-builder build --os ubuntu --hypervisor baremetal --release-channel <release channel>
+image-builder build --os ubuntu --hypervisor baremetal --release-channel <release channel, ex 1-23>
 ```
 
+The baremetal image built from image-builder tool should be hosted and its URL should be provided to `osImageURL` under `TinkerbellDatacenterConfig`
+in the cluster spec to create a cluster using the built node image.
+
 ### Additional Configuration - Proxy
-The Image Builder tool also support some additional configuration. For now this is limited to supporting a proxy. 
+The Image Builder tool also supports some additional configuration. For now this is limited to supporting a proxy. 
 Users can use proxy server to route outbound requests to internet. To configure the image builder tool to use proxy, simply
 export the following proxy environment variables
 ```
