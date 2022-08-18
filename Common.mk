@@ -667,7 +667,7 @@ helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
 helm/push: helm/build
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(OUTPUT_DIR) $(IMAGE_COMPONENT) $(LATEST)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(IMAGE_COMPONENT) $(LATEST)
 
 ## Fetch Binary Targets
 .PHONY: handle-dependencies 
