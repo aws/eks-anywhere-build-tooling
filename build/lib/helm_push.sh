@@ -28,8 +28,7 @@ HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
 GIT_TAG="${4?Fourth arguement is the Git Tag}"
 OUTPUT_DIR="${5?Fifth arguement is output directory}"
-IMAGE_COMPONENT="${6?Sixth arguement is repo owner of the helm chart}"
-LATEST_TAG="${7?Seventh arguement is latest tag}"
+LATEST_TAG="${6?Sixth arguement is latest tag}"
 
 SEMVER="${IMAGE_TAG#[^0-9]}" # remove any leading non-digits
 SEMVER_GIT_TAG="${GIT_TAG#[^0-9]}"
@@ -57,9 +56,9 @@ trap "rm -f $TMPFILE" exit
 helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
 
 # Adds a 2nd tag to the helm chart for the bundle-release jobs.
-MANIFEST=$(aws ecr batch-get-image --repository-name ${IMAGE_COMPONENT} --image-ids imageTag=${SEMVER} --query images[].imageManifest --output text)
+MANIFEST=$(aws ecr batch-get-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-ids imageTag=${SEMVER} --query images[].imageManifest --output text)
 export AWS_PAGER=""
-aws ecr put-image --repository-name ${IMAGE_COMPONENT} --image-tag ${SEMVER_GIT_TAG}-${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
+aws ecr put-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-tag ${SEMVER_GIT_TAG}-${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
 
 DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 {
