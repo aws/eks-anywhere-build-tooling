@@ -56,7 +56,7 @@ helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee 
 # Adds a 2nd tag to the helm chart for the bundle-release jobs.
 MANIFEST=$(aws ecr batch-get-image --repository-name ${HELM_DESTINATION_OWNER}/${CHART_NAME} --image-ids imageTag=${SEMVER} --query images[].imageManifest --output text)
 export AWS_PAGER=""
-aws ecr put-image --repository-name ${HELM_DESTINATION_OWNER}/${CHART_NAME} --image-tag ${LATEST_TAG} --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
+aws ecr put-image --repository-name ${HELM_DESTINATION_OWNER}/${CHART_NAME} --image-tag ${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
 
 DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 {
