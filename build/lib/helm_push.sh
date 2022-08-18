@@ -27,6 +27,7 @@ IMAGE_REGISTRY="${1?First argument is image registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
 OUTPUT_DIR="${4?Fourth arguement is output directory}"
+LATEST_TAG="${5?Fifth arguement is latest tag}"
 
 SEMVER="${IMAGE_TAG#[^0-9]}" # remove any leading non-digits
 
@@ -47,9 +48,16 @@ function cleanup() {
   fi
   rm -f "${TMPFILE}"
 }
+
 trap cleanup err
 trap "rm -f $TMPFILE" exit
 helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
+
+# Adds a 2nd tag to the helm chart for the bundle-release jobs.
+MANIFEST=$(aws ecr batch-get-image --repository-name ${HELM_DESTINATION_OWNER}/${CHART_NAME} --image-ids imageTag=${SEMVER} --query images[].imageManifest --output text)
+export AWS_PAGER=""
+aws ecr put-image --repository-name ${HELM_DESTINATION_OWNER}/${CHART_NAME} --image-tag ${LATEST_TAG} --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
+
 DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 {
     set +x
