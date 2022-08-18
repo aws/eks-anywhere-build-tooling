@@ -78,7 +78,7 @@ Network
 1. Install pre-requisite packages
 ```
 sudo apt update -y
-sudo apt install jq unzip ansible -y
+sudo apt install jq unzip make ansible -y
 sudo snap install yq
 ```
 2. Build or download the image builder tool
@@ -132,7 +132,7 @@ to build a node image for baremetal, the image builder tool needs to run on bare
 1. Install pre-requisite packages and prep environment
 ```
 sudo apt update -y
-sudo apt install jq qemu-kvm libvirt-daemon-system libvirt-clients virtinst cpu-checker libguestfs-tools libosinfo-bin unzip ansible -y
+sudo apt install jq make qemu-kvm libvirt-daemon-system libvirt-clients virtinst cpu-checker libguestfs-tools libosinfo-bin unzip ansible -y
 sudo snap install yq
 sudo usermod -a -G kvm ubuntu
 sudo chmod 666 /dev/kvm
