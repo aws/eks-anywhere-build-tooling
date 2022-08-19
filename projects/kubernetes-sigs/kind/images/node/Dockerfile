@@ -17,15 +17,10 @@ FROM base-${TARGETARCH} as node
 ARG TARGETOS
 ARG TARGETARCH
 
-ARG PAUSE_IMAGE_TAG_OVERRIDE
-ARG PAUSE_IMAGE_TAG
-
 RUN set -x && \
 	# remove kubeadm override script and containerd/runc
 	rm /usr/local/bin/kubeadm && \
 	rm /etc/kubeadm.config && \
-	# Update containerd config to have eks-d pause image tag
-	sed -i "s,$PAUSE_IMAGE_TAG,$PAUSE_IMAGE_TAG_OVERRIDE," /etc/containerd/config.toml && \
 	# During base image build using buildkit the /tmp directory's perms get changed from
 	# 1777 to 3777.  This probably isnt normally an issue however there is a 
 	# k8s conformance test that checks for 1777 specifically
