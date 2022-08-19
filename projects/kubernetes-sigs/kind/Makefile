@@ -108,7 +108,6 @@ kind-node/images/push: BASE_IMAGE=$(VERSIONED_BASE_IMAGE)
 kind-node/images/push: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
 kind-node/images/push: IMAGE_TAG=$(NODE_IMAGE_TAG)
 kind-node/images/push: LATEST_TAG=$(NODE_IMAGE_LATEST_TAG)
-kind-node/images/push: IMAGE_BUILD_ARGS=PAUSE_IMAGE_TAG_OVERRIDE PAUSE_IMAGE_TAG
 kind-node/images/push: IMAGE_TARGET=node
 kind-node/images/push: $(KIND_NODE_BUILD_AMD64_TARGET) $(KIND_NODE_BUILD_ARM64_TARGET) $(ARM_ENV_CONF_TARGET)
 
