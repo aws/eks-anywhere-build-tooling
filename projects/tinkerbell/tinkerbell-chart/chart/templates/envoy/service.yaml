@@ -1,4 +1,4 @@
-{{- if .Values.loadBalancer.enabled -}}
+{{- if .Values.envoy.deploy -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -12,7 +12,9 @@ metadata:
     "helm.sh/hook-weight": "-5"
 spec:
   type: LoadBalancer
-  loadBalancerClass: {{ .Values.loadBalancer.class }}
+  {{- if .Values.kubevip.deploy }}
+  loadBalancerClass: {{ .Values.kubevip.loadBalancerClass }}
+  {{- end }}
   externalTrafficPolicy: Local
   ports:
   - name: {{ .Values.tinkServer.name }}
@@ -23,7 +25,7 @@ spec:
     port: {{ .Values.hegel.port.hostPort }}
     targetPort: {{ .Values.hegel.port.hostPort }}
     protocol: TCP
-  loadBalancerIP: {{ .Values.loadBalancer.ip }}
+  loadBalancerIP: {{ .Values.envoy.externalIp }}
   selector:
     app: {{ .Values.envoy.name }}
 {{- end -}}
