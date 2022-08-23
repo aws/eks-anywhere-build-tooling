@@ -1,0 +1,193 @@
+From db290b181c5992bac40e95dfa94922e6bcc8d2fc Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin@amazon.com>
+Date: Wed, 24 Aug 2022 07:08:19 -0500
+Subject: [PATCH] Add namespace to charts
+
+---
+ charts/opentelemetry-collector/templates/configmap-agent.yaml    | 1 +
+ .../opentelemetry-collector/templates/configmap-statefulset.yaml | 1 +
+ charts/opentelemetry-collector/templates/configmap.yaml          | 1 +
+ charts/opentelemetry-collector/templates/daemonset.yaml          | 1 +
+ charts/opentelemetry-collector/templates/deployment.yaml         | 1 +
+ charts/opentelemetry-collector/templates/hpa.yaml                | 1 +
+ charts/opentelemetry-collector/templates/ingress.yaml            | 1 +
+ charts/opentelemetry-collector/templates/pdb.yaml                | 1 +
+ charts/opentelemetry-collector/templates/podmonitor.yaml         | 1 +
+ charts/opentelemetry-collector/templates/prometheusrule.yaml     | 1 +
+ charts/opentelemetry-collector/templates/service.yaml            | 1 +
+ charts/opentelemetry-collector/templates/serviceaccount.yaml     | 1 +
+ charts/opentelemetry-collector/templates/servicemonitor.yaml     | 1 +
+ charts/opentelemetry-collector/templates/statefulset.yaml        | 1 +
+ 14 files changed, 14 insertions(+)
+
+diff --git a/charts/opentelemetry-collector/templates/configmap-agent.yaml b/charts/opentelemetry-collector/templates/configmap-agent.yaml
+index e267336..d673a40 100644
+--- a/charts/opentelemetry-collector/templates/configmap-agent.yaml
++++ b/charts/opentelemetry-collector/templates/configmap-agent.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: ConfigMap
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}-agent
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ data:
+diff --git a/charts/opentelemetry-collector/templates/configmap-statefulset.yaml b/charts/opentelemetry-collector/templates/configmap-statefulset.yaml
+index 59f9f04..a13c226 100644
+--- a/charts/opentelemetry-collector/templates/configmap-statefulset.yaml
++++ b/charts/opentelemetry-collector/templates/configmap-statefulset.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: ConfigMap
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}-statefulset
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ data:
+diff --git a/charts/opentelemetry-collector/templates/configmap.yaml b/charts/opentelemetry-collector/templates/configmap.yaml
+index 42ed59a..fe36e35 100644
+--- a/charts/opentelemetry-collector/templates/configmap.yaml
++++ b/charts/opentelemetry-collector/templates/configmap.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: ConfigMap
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ data:
+diff --git a/charts/opentelemetry-collector/templates/daemonset.yaml b/charts/opentelemetry-collector/templates/daemonset.yaml
+index 7ea532e..0f3ca0a 100644
+--- a/charts/opentelemetry-collector/templates/daemonset.yaml
++++ b/charts/opentelemetry-collector/templates/daemonset.yaml
+@@ -3,6 +3,7 @@ apiVersion: apps/v1
+ kind: DaemonSet
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}-agent
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ spec:
+diff --git a/charts/opentelemetry-collector/templates/deployment.yaml b/charts/opentelemetry-collector/templates/deployment.yaml
+index cad6ce0..acd02a2 100644
+--- a/charts/opentelemetry-collector/templates/deployment.yaml
++++ b/charts/opentelemetry-collector/templates/deployment.yaml
+@@ -3,6 +3,7 @@ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+   {{- include "opentelemetry-collector.annotations" . | nindent 2 }}
+diff --git a/charts/opentelemetry-collector/templates/hpa.yaml b/charts/opentelemetry-collector/templates/hpa.yaml
+index 51f2c84..b24b932 100644
+--- a/charts/opentelemetry-collector/templates/hpa.yaml
++++ b/charts/opentelemetry-collector/templates/hpa.yaml
+@@ -3,6 +3,7 @@ apiVersion: autoscaling/v2beta1
+ kind: HorizontalPodAutoscaler
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ spec:
+diff --git a/charts/opentelemetry-collector/templates/ingress.yaml b/charts/opentelemetry-collector/templates/ingress.yaml
+index 9a60601..9fb6854 100644
+--- a/charts/opentelemetry-collector/templates/ingress.yaml
++++ b/charts/opentelemetry-collector/templates/ingress.yaml
+@@ -11,6 +11,7 @@ metadata:
+   {{- else }}
+   name: {{ include "opentelemetry-collector.fullname" $ }}
+   {{- end }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" $ | nindent 4 }}
+     {{- include "opentelemetry-collector.component" $ | nindent 4 }}
+diff --git a/charts/opentelemetry-collector/templates/pdb.yaml b/charts/opentelemetry-collector/templates/pdb.yaml
+index d6761e8..a930276 100644
+--- a/charts/opentelemetry-collector/templates/pdb.yaml
++++ b/charts/opentelemetry-collector/templates/pdb.yaml
+@@ -3,6 +3,7 @@ apiVersion: {{ include "podDisruptionBudget.apiVersion" . }}
+ kind: PodDisruptionBudget
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+ spec:
+diff --git a/charts/opentelemetry-collector/templates/podmonitor.yaml b/charts/opentelemetry-collector/templates/podmonitor.yaml
+index 0343681..e896140 100644
+--- a/charts/opentelemetry-collector/templates/podmonitor.yaml
++++ b/charts/opentelemetry-collector/templates/podmonitor.yaml
+@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
+ kind: PodMonitor
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}-agent
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     {{- range $key, $value := .Values.podMonitor.extraLabels }}
+diff --git a/charts/opentelemetry-collector/templates/prometheusrule.yaml b/charts/opentelemetry-collector/templates/prometheusrule.yaml
+index 2f2ffe7..e8de6e6 100644
+--- a/charts/opentelemetry-collector/templates/prometheusrule.yaml
++++ b/charts/opentelemetry-collector/templates/prometheusrule.yaml
+@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
+ kind: PrometheusRule
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     {{- range $key, $value := .Values.prometheusRule.extraLabels }}
+diff --git a/charts/opentelemetry-collector/templates/service.yaml b/charts/opentelemetry-collector/templates/service.yaml
+index eeb1178..fc347a4 100644
+--- a/charts/opentelemetry-collector/templates/service.yaml
++++ b/charts/opentelemetry-collector/templates/service.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: Service
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     {{- include "opentelemetry-collector.component" . | nindent 4 }}
+diff --git a/charts/opentelemetry-collector/templates/serviceaccount.yaml b/charts/opentelemetry-collector/templates/serviceaccount.yaml
+index 5daa658..00cd049 100644
+--- a/charts/opentelemetry-collector/templates/serviceaccount.yaml
++++ b/charts/opentelemetry-collector/templates/serviceaccount.yaml
+@@ -3,6 +3,7 @@ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+   name: {{ include "opentelemetry-collector.serviceAccountName" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+   {{- with .Values.serviceAccount.annotations }}
+diff --git a/charts/opentelemetry-collector/templates/servicemonitor.yaml b/charts/opentelemetry-collector/templates/servicemonitor.yaml
+index dae68d2..005efda 100644
+--- a/charts/opentelemetry-collector/templates/servicemonitor.yaml
++++ b/charts/opentelemetry-collector/templates/servicemonitor.yaml
+@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
+ kind: ServiceMonitor
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+     {{- range $key, $value := .Values.serviceMonitor.extraLabels }}
+diff --git a/charts/opentelemetry-collector/templates/statefulset.yaml b/charts/opentelemetry-collector/templates/statefulset.yaml
+index d3b06e9..51b33bb 100644
+--- a/charts/opentelemetry-collector/templates/statefulset.yaml
++++ b/charts/opentelemetry-collector/templates/statefulset.yaml
+@@ -3,6 +3,7 @@ apiVersion: apps/v1
+ kind: StatefulSet
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
++  namespace: {{ .Release.Namespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+   {{- include "opentelemetry-collector.annotations" . | nindent 2 }}
+-- 
+2.31.0
+
