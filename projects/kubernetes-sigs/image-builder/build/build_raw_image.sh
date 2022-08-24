@@ -56,7 +56,7 @@ trap 'if [ -n "$INSTANCE_ID" ]; then terminate_instance $INSTANCE_ID; fi; delete
 
 # Check if key of that name already exists, else create keypair
 # Query and save the key contents into a local file for
-# communicating to EC2 instance via SSH 
+# communicating to EC2 instance via SSH
 if ! aws ec2 wait key-pair-exists --key-names=$KEY_NAME 2>/dev/null ; then
     aws ec2 create-key-pair --key-name $KEY_NAME --query "KeyMaterial" --output text > $KEY_LOCATION
 fi
@@ -118,7 +118,7 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="export CODEBUILD_CI=true; sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
+SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; CODEBUILD_CI=true ARTIFACTS_PATH=/home/ubuntu/$PROJECT_PATH/artifacts $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
 if [[ "$IMAGE_OS" =~ "rhel" ]]; then
     echo "Cannot build rhel image, as image-builder cli does not support it yet"
     exit 1
@@ -127,5 +127,4 @@ fi
 ssh $SSH_OPTS $REMOTE_HOST $SSH_COMMANDS
 
 # Copy built raw image from the instance back into the CI build environment
-mkdir -p $REPO_ROOT/$IMAGE_BUILDER_MAKE_ROOT/output
-scp $SSH_OPTS $REMOTE_HOST:$REMOTE_HOME_DIR/*.gz $REPO_ROOT/$REPO_ROOT/$PROJECT_PATH/
+scp $SSH_OPTS $REMOTE_HOST:$REMOTE_HOME_DIR/*.gz $REPO_ROOT/$PROJECT_PATH/
