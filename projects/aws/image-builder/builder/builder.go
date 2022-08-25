@@ -14,26 +14,37 @@ const (
 )
 
 func (b *BuildOptions) BuildImage() {
+	codebuild := os.Getenv("CODEBUILD_CI")
 	// Clone build tooling repo
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("Error retrieving current working directory: %v", err)
 	}
 	buildToolingRepoPath := filepath.Join(cwd, "eks-anywhere-build-tooling")
-	imageBuilderProjectPath := filepath.Join(buildToolingRepoPath, "projects/kubernetes-sigs/image-builder")
-	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, "image-builder/images/capi")
-	var outputArtifactPath string
-	var outputImageGlob []string
 
 	if b.Force {
 		// Clean up build tooling repo in cwd
 		cleanup(buildToolingRepoPath)
 	}
-	err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
-	if err != nil {
-		log.Fatalf("Error clonning build tooling repo")
+	if codebuild != "true" {
+		err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
+		if err != nil {
+			log.Fatalf("Error clonning build tooling repo")
+		}
+		log.Println("Cloned eks-anywhere-build-tooling repo")
+	} else {
+		if b.Hypervisor == VSphere {
+			buildToolingRepoPath = os.Getenv("CODEBUILD_SRC_DIR")
+		} else if b.Hypervisor == Baremetal {
+			buildToolingRepoPath = filepath.Join(os.Getenv("HOME"), "eks-anywhere-build-tooling")
+		}
+		log.Println("Using repo checked out from code commit")
 	}
-	log.Println("Cloned eks-anywhere-build-tooling repo")
+
+	imageBuilderProjectPath := filepath.Join(buildToolingRepoPath, "projects/kubernetes-sigs/image-builder")
+	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, "image-builder/images/capi")
+	var outputArtifactPath string
+	var outputImageGlob []string
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Hypervisor: %s\n", b.Os, b.Hypervisor)
 	if b.Hypervisor == VSphere {
