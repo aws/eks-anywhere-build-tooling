@@ -1,7 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
 HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
-GOLANG_VERSION?="1.17"
 
 REGISTRY=public.ecr.aws/aws-observability
 COLLECTOR_IMAGE=aws-otel-collector
@@ -12,10 +11,10 @@ REPO=aws-otel-collector
 SIMPLE_CREATE_BINARIES=false
 SIMPLE_CREATE_TARBALLS=false
 HAS_LICENSES=false
-IMAGE_NAMES=
 
 BUILD_TARGETS=helm/build
 RELEASE_TARGETS=helm/push
+EXCLUDE_FROM_STAGING_BUILDSPEC=true
 
 HAS_HELM_CHART=true
 
