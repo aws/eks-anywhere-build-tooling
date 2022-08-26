@@ -33,11 +33,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 		log.Println("Cloned eks-anywhere-build-tooling repo")
 	} else {
-		if b.Hypervisor == VSphere {
-			buildToolingRepoPath = os.Getenv("CODEBUILD_SRC_DIR")
-		} else if b.Hypervisor == Baremetal {
-			buildToolingRepoPath = filepath.Join(os.Getenv("HOME"), "eks-anywhere-build-tooling")
-		}
+		buildToolingRepoPath = os.Getenv("CODEBUILD_SRC_DIR")
 		log.Println("Using repo checked out from code commit")
 	}
 
