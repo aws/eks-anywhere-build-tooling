@@ -1,5 +1,5 @@
 ## **Envoy**
-![Version](https://img.shields.io/badge/version-v1.22.2-blue)
+![Version](https://img.shields.io/badge/version-v1.22.2.0--prod-blue)
 
 [Envoy](https://github.com/envoyproxy/envoy) is a Cloud-native hih-performance L7 proxy and communication bus designed for large modern service oriented architectures.
 
