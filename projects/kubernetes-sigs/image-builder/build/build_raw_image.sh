@@ -118,7 +118,7 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; CODEBUILD_CI=true ARTIFACTS_PATH=/home/ubuntu/$PROJECT_PATH/artifacts $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
+SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; CODEBUILD_CI=true CODEBUILD_SRC_DIR=$CODEBUILD_SRC_DIR ARTIFACTS_PATH=/home/ubuntu/$PROJECT_PATH/artifacts $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
 if [[ "$IMAGE_OS" =~ "rhel" ]]; then
     echo "Cannot build rhel image, as image-builder cli does not support it yet"
     exit 1
