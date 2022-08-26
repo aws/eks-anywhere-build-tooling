@@ -23,7 +23,7 @@ HELM_SOURCE_IMAGE_REPO=public.ecr.aws
 HELM_SOURCE_OWNER=open-telemetry
 HELM_SOURCE_REPOSITORY=opentelemetry-helm-charts
 HELM_DIRECTORY=charts/opentelemetry-collector
-HELM_DESTINATION_REPOSITORY=aws-otel/charts/aws-otel-collector
+HELM_DESTINATION_REPOSITORY=adot/charts/aws-otel-collector
 HELM_IMAGE_LIST=aws-observability/aws-otel-collector
 
 include $(BASE_DIRECTORY)/Common.mk
