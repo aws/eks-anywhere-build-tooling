@@ -30,8 +30,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 .PHONY: update-digests
 update-digests:
-	build/update_digest.sh $(REGISTRY) $(COLLECTOR_IMAGE) $(GIT_TAG) images/collector/IMAGE_DIGEST
-
+	source $(BUILD_LIB)/image_shasum.sh $(REGISTRY) $(COLLECTOR_IMAGE) $(GIT_TAG) > images/collector/IMAGE_DIGEST
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
