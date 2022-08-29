@@ -1,0 +1,122 @@
+From 6fee8be7bd2db1d94578aba39dc0f183c52c8da1 Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin@amazon.com>
+Date: Wed, 24 Aug 2022 07:36:21 -0500
+Subject: [PATCH] Update ADOT values.yaml file
+
+---
+ charts/opentelemetry-collector/values.yaml | 57 ++--------------------
+ 1 file changed, 3 insertions(+), 54 deletions(-)
+
+diff --git a/charts/opentelemetry-collector/values.yaml b/charts/opentelemetry-collector/values.yaml
+index 8685668..a045e18 100644
+--- a/charts/opentelemetry-collector/values.yaml
++++ b/charts/opentelemetry-collector/values.yaml
+@@ -6,7 +6,7 @@ nameOverride: ""
+ fullnameOverride: ""
+ 
+ # Valid values are "daemonset", "deployment", and "statefulset".
+-mode: ""
++mode: "deployment"
+ 
+ # Handles basic configuration of components that
+ # also require k8s modifications to work correctly.
+@@ -38,7 +38,8 @@ configMap:
+ 
+ config:
+   exporters:
+-    logging: {}
++    logging:
++      logLevel: debug
+   extensions:
+     # The health_check extension is mandatory for this chart.
+     # Without the health_check extension the collector will fail the readiness and liveliness probes.
+@@ -50,14 +51,6 @@ config:
+     # If set to null, will be overridden with values based on k8s resource limits
+     memory_limiter: null
+   receivers:
+-    jaeger:
+-      protocols:
+-        grpc:
+-          endpoint: 0.0.0.0:14250
+-        thrift_http:
+-          endpoint: 0.0.0.0:14268
+-        thrift_compact:
+-          endpoint: 0.0.0.0:6831
+     otlp:
+       protocols:
+         grpc:
+@@ -72,8 +65,6 @@ config:
+             static_configs:
+               - targets:
+                   - ${MY_POD_IP}:8888
+-    zipkin:
+-      endpoint: 0.0.0.0:9411
+   service:
+     telemetry:
+       metrics:
+@@ -82,14 +73,6 @@ config:
+       - health_check
+       - memory_ballast
+     pipelines:
+-      logs:
+-        exporters:
+-          - logging
+-        processors:
+-          - memory_limiter
+-          - batch
+-        receivers:
+-          - otlp
+       metrics:
+         exporters:
+           - logging
+@@ -99,16 +82,6 @@ config:
+         receivers:
+           - otlp
+           - prometheus
+-      traces:
+-        exporters:
+-          - logging
+-        processors:
+-          - memory_limiter
+-          - batch
+-        receivers:
+-          - otlp
+-          - jaeger
+-          - zipkin
+ 
+ image:
+   # If you want to use the core image `otel/opentelemetry-collector`, you also need to change `command.name` value to `otelcol`.
+@@ -187,30 +160,6 @@ ports:
+     servicePort: 4318
+     hostPort: 4318
+     protocol: TCP
+-  jaeger-compact:
+-    enabled: true
+-    containerPort: 6831
+-    servicePort: 6831
+-    hostPort: 6831
+-    protocol: UDP
+-  jaeger-thrift:
+-    enabled: true
+-    containerPort: 14268
+-    servicePort: 14268
+-    hostPort: 14268
+-    protocol: TCP
+-  jaeger-grpc:
+-    enabled: true
+-    containerPort: 14250
+-    servicePort: 14250
+-    hostPort: 14250
+-    protocol: TCP
+-  zipkin:
+-    enabled: true
+-    containerPort: 9411
+-    servicePort: 9411
+-    hostPort: 9411
+-    protocol: TCP
+   metrics:
+     # The metrics port is disabled by default. However you need to enable the port
+     # in order to use the ServiceMonitor (serviceMonitor.enabled) or PodMonitor (podMonitor.enabled).
+-- 
+2.31.0
+
