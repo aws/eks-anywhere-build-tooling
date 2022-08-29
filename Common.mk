@@ -148,11 +148,11 @@ IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(subst 
 
 BUILD_OCI_TARS?=false
 
-LOCAL_IMAGE_WO_HELM_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64)
-IMAGE_WO_HELM_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push))
+LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64)
+IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push))
 
-LOCAL_IMAGE_TARGETS=$(LOCAL_IMAGE_WO_HELM_TARGETS) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,)
-IMAGE_TARGETS=$(IMAGE_WO_HELM_TARGETS) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,)
+LOCAL_IMAGE_W_HELM_TARGETS=$(LOCAL_IMAGE_TARGETS) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,)
+IMAGE_W_HELM_TARGETS=$(IMAGE_TARGETS) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,)
 
 # If running in the builder base on prow or codebuild, grab the current tag to be used when building with cgo
 CURRENT_BUILDER_BASE_TAG=$(or $(and $(wildcard /config/BUILDER_BASE_TAG_FILE),$(shell cat /config/BUILDER_BASE_TAG_FILE)),latest)
@@ -385,8 +385,8 @@ SKIP_CHECKSUM_VALIDATION?=false
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images-wo-helm,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
-RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images-wo-helm,) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
+RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
 define BUILDCTL
@@ -573,9 +573,9 @@ endif
 #### Image Helpers
 
 ifneq ($(IMAGE_NAMES),)
-.PHONY: local-images-wo-helm images-wo-helm local-images images
-local-images-wo-helm: $(LOCAL_IMAGE_WO_HELM_TARGETS)
-images-wo-helm: $(IMAGE_WO_HELM_TARGETS)
+.PHONY: local-images-w-helm images-w-helm local-images images
+local-images-w-helm: $(LOCAL_IMAGE_W_HELM_TARGETS)
+images-w-helm: $(IMAGE_W_HELM_TARGETS)
 local-images: $(LOCAL_IMAGE_TARGETS)
 images: $(IMAGE_TARGETS)
 endif
@@ -722,7 +722,7 @@ help-list:
 add-generated-help-block: # Add or update generated help block to document project make file and support shell auto completion
 add-generated-help-block:
 	$(BUILD_LIB)/generate_help_body.sh $(MAKE_ROOT) "$(BINARY_TARGET_FILES)" "$(BINARY_PLATFORMS)" "${BINARY_TARGETS}" \
-		$(REPO) $(if $(PATCHES_DIR),true,false) "$(LOCAL_IMAGE_TARGETS)" "$(IMAGE_TARGETS)" "$(BUILD_TARGETS)" "$(RELEASE_TARGETS)" \
+		$(REPO) $(if $(PATCHES_DIR),true,false) "$(LOCAL_IMAGE_W_HELM_TARGETS)" "$(IMAGE_W_HELM_TARGETS)" "$(BUILD_TARGETS)" "$(RELEASE_TARGETS)" \
 		"$(HAS_S3_ARTIFACTS)" "$(HAS_LICENSES)" "$(REPO_NO_CLONE)" "$(PROJECT_DEPENDENCIES_TARGETS)" \
 		"$(HAS_HELM_CHART)"
 
