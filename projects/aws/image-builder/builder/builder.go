@@ -22,10 +22,11 @@ func (b *BuildOptions) BuildImage() {
 	}
 	buildToolingRepoPath := filepath.Join(cwd, "eks-anywhere-build-tooling")
 
-	if b.Force {
+	if b.Force && codebuild != "true" {
 		// Clean up build tooling repo in cwd
 		cleanup(buildToolingRepoPath)
 	}
+
 	if codebuild != "true" {
 		err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
 		if err != nil {
@@ -112,7 +113,10 @@ func (b *BuildOptions) BuildImage() {
 		log.Fatalf("Error moving output file to current working directory")
 	}
 
-	cleanup(buildToolingRepoPath)
+	if codebuild != "true" {
+		cleanup(buildToolingRepoPath)
+	}
+
 	log.Print("Build Successful. Output artifacts located at current working directory\n")
 }
 
