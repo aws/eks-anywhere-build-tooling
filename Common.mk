@@ -573,9 +573,7 @@ endif
 #### Image Helpers
 
 ifneq ($(IMAGE_NAMES),)
-.PHONY: local-images-w-helm images-w-helm local-images images
-local-images-w-helm: $(LOCAL_IMAGE_W_HELM_TARGETS)
-images-w-helm: $(IMAGE_W_HELM_TARGETS)
+.PHONY: local-images images
 local-images: $(LOCAL_IMAGE_TARGETS)
 images: $(IMAGE_TARGETS)
 endif
@@ -722,7 +720,7 @@ help-list:
 add-generated-help-block: # Add or update generated help block to document project make file and support shell auto completion
 add-generated-help-block:
 	$(BUILD_LIB)/generate_help_body.sh $(MAKE_ROOT) "$(BINARY_TARGET_FILES)" "$(BINARY_PLATFORMS)" "${BINARY_TARGETS}" \
-		$(REPO) $(if $(PATCHES_DIR),true,false) "$(LOCAL_IMAGE_W_HELM_TARGETS)" "$(IMAGE_W_HELM_TARGETS)" "$(BUILD_TARGETS)" "$(RELEASE_TARGETS)" \
+		$(REPO) $(if $(PATCHES_DIR),true,false) "$(LOCAL_IMAGE_TARGETS)" "$(IMAGE_TARGETS)" "$(BUILD_TARGETS)" "$(RELEASE_TARGETS)" \
 		"$(HAS_S3_ARTIFACTS)" "$(HAS_LICENSES)" "$(REPO_NO_CLONE)" "$(PROJECT_DEPENDENCIES_TARGETS)" \
 		"$(HAS_HELM_CHART)"
 
