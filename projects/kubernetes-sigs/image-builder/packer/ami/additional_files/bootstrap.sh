@@ -18,6 +18,24 @@ then
     VIP=$2
 fi
 
+# static ip configuration needs 5 parameters for cp nodes
+if [ $# -eq 5 ]
+then
+    KUBE_VIP_IMAGE=$1
+    VIP=$2
+    STATIC_IP=$3
+    GATEWAY=$4
+    CIDR=$5
+fi
+
+# static ip configuration needs 3 parameters for worker nodes
+if [ $# -eq 3 ]
+then
+    STATIC_IP=$1
+    GATEWAY=$2
+    CIDR=$3
+fi
+
 # Using instance id as a unique hostname before we implement hostname in capas
 INSTANCE_ID=$(curl 169.254.169.254/latest/meta-data/instance-id | sed -r 's/[.]+/-/g')
 hostnamectl set-hostname "$INSTANCE_ID"
@@ -46,6 +64,11 @@ DEFAULT_GATEWAY=$(ip r | grep default | awk '{print $3}')
 
 log::info "Using MAC: $MAC"
 log::info "Using default gateway: $DEFAULT_GATEWAY"
+
+# dhcp configuration needs 2 parameters for cp nodes, 0 parameters for worker nodes
+if [ $# -le 2 ]
+then
+log::info "Configuring DHCP"
 cat<<EOF >/etc/netplan/config.yaml
 network:
     version: 2
@@ -66,6 +89,33 @@ network:
                 - to: 169.254.169.254
                   via: $DEFAULT_GATEWAY
 EOF
+fi
+
+# dhcp configuration needs 5 parameters for cp nodes, nodes 3 parameters for worker nodes
+if [ $# -ge 3 ]
+then
+log::info "Configuring static ip: $STATIC_IP/$CIDR"
+cat<<EOF >/etc/netplan/config.yaml
+network:
+    version: 2
+    renderer: networkd
+    ethernets:
+        $DNI:
+            set-name: $DNI
+            addresses:
+                - $STATIC_IP/$CIDR
+            routes:
+                - to: default
+                  via: $GATEWAY
+                  metric: 50
+            match:
+                macaddress: $MAC
+        ens3:
+            routes:
+                - to: 169.254.169.254
+                  via: $DEFAULT_GATEWAY
+EOF
+fi
 
 netplan --debug apply
 
@@ -98,7 +148,7 @@ log::info "network configuration finished"
 
 # if vip is not provided, it's a worker node, we don't need kube-vip manifest
 # if `kubeadm init` command doesn't exist in the user-data, it's not the first control plane node, we should generate the kube-vip manifest after the `kubeadm join` command finishes
-if [ $# -eq 2 ]
+if [ $# -eq 2 ] || [ $# -eq 5 ]
 then
     if zgrep -q "kubeadm init --config /run/kubeadm/kubeadm.yaml" /var/lib/cloud/instance/user-data.txt
   then
