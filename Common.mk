@@ -151,9 +151,6 @@ BUILD_OCI_TARS?=false
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64)
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push))
 
-LOCAL_IMAGE_W_HELM_TARGETS=$(LOCAL_IMAGE_TARGETS) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,)
-IMAGE_W_HELM_TARGETS=$(IMAGE_TARGETS) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,)
-
 # If running in the builder base on prow or codebuild, grab the current tag to be used when building with cgo
 CURRENT_BUILDER_BASE_TAG=$(or $(and $(wildcard /config/BUILDER_BASE_TAG_FILE),$(shell cat /config/BUILDER_BASE_TAG_FILE)),latest)
 CURRENT_BUILDER_BASE_IMAGE=$(if $(CODEBUILD_BUILD_IMAGE),$(CODEBUILD_BUILD_IMAGE),$(BASE_IMAGE_REPO)/builder-base:$(CURRENT_BUILDER_BASE_TAG))
