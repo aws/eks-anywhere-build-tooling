@@ -1,4 +1,5 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+MAKE_ROOT=$(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder
 GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO=image-builder
@@ -61,15 +62,21 @@ FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
 FINAL_BOTTLEROCKET_RAW_PATH=$(ARTIFACTS_PATH)/raw/bottlerocket/bottlerocket.img.gz
 FAKE_UBUNTU_OVA_PATH=fake-ubuntu.ova
 FAKE_UBUNTU_RAW_PATH=fake-ubuntu.gz
+BOTTLEROCKET_OVA_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ova-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
+BOTTLEROCKET_RAW_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
 
 IMAGE_OS?=ubuntu
 IMAGE_FORMAT?=
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
-BUILD_OVA_TARGETS=setup-packer-configs-ova download-bottlerocket-ova $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova upload-bottlerocket-ova
+BUILD_OVA_TARGETS=setup-packer-configs-ova  $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH)  upload-artifacts-ova
 BUILD_RAW_TARGETS=release-raw-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
-ifneq ($(RELEASE_BRANCH),1-20)
+ifneq ($(BOTTLEROCKET_RAW_RELEASE_VERSION),null)
 	BUILD_RAW_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
 endif
+ifneq ($(BOTTLEROCKET_OVA_RELEASE_VERSION),null)
+	BUILD_OVA_TARGETS+=download-bottlerocket-ova $(FINAL_BOTTLEROCKET_OVA_PATH) upload-bottlerocket-ova
+endif
+
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
 ifeq ($(IMAGE_FORMAT),ova)
 	ifeq ($(IMAGE_OS),ubuntu)
