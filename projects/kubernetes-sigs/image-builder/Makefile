@@ -1,4 +1,5 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+MAKE_ROOT=$(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder
 GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO=image-builder
@@ -61,15 +62,21 @@ FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
 FINAL_BOTTLEROCKET_RAW_PATH=$(ARTIFACTS_PATH)/raw/bottlerocket/bottlerocket.img.gz
 FAKE_UBUNTU_OVA_PATH=fake-ubuntu.ova
 FAKE_UBUNTU_RAW_PATH=fake-ubuntu.gz
+BOTTLEROCKET_OVA_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ova-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
+BOTTLEROCKET_RAW_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
 
 IMAGE_OS?=ubuntu
 IMAGE_FORMAT?=
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
-BUILD_OVA_TARGETS=setup-packer-configs-ova download-bottlerocket-ova $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova upload-bottlerocket-ova
+BUILD_OVA_TARGETS=setup-packer-configs-ova  $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH)  upload-artifacts-ova
 BUILD_RAW_TARGETS=release-raw-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
-ifneq ($(RELEASE_BRANCH),1-20)
+ifneq ($(BOTTLEROCKET_RAW_RELEASE_VERSION),null)
 	BUILD_RAW_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
 endif
+ifneq ($(BOTTLEROCKET_OVA_RELEASE_VERSION),null)
+	BUILD_OVA_TARGETS+=download-bottlerocket-ova $(FINAL_BOTTLEROCKET_OVA_PATH) upload-bottlerocket-ova
+endif
+
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
 ifeq ($(IMAGE_FORMAT),ova)
 	ifeq ($(IMAGE_OS),ubuntu)
@@ -171,7 +178,7 @@ deps-%: $(GIT_PATCH_TARGET)
 
 .PHONY: setup-packer-configs-%
 setup-packer-configs-%:
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(GIT_BRANCH) $(IMAGE_BUILDER_DIR)
+	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR)
 
 .PHONY: build-ami-ubuntu-2004
 build-ami-ubuntu-2004: MAKEFLAGS=
@@ -220,7 +227,7 @@ upload-bottlerocket-%:
 	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT)
 
 .PHONY: release-raw-%
-release-raw-%:
+release-raw-%: $(GIT_PATCH_TARGET)
 	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
 
 .PHONY: build-qemu-rhel-local

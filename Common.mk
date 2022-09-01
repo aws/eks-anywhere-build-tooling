@@ -8,7 +8,6 @@ SHELL=bash
 RELEASE_ENVIRONMENT?=development
 
 GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
-GIT_BRANCH:=$(shell git rev-parse --abbrev-ref HEAD)
 
 COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
@@ -161,6 +160,7 @@ CURRENT_BUILDER_BASE_IMAGE=$(if $(CODEBUILD_BUILD_IMAGE),$(CODEBUILD_BUILD_IMAGE
 HAS_HELM_CHART?=false
 HELM_SOURCE_OWNER?=$(REPO_OWNER)
 HELM_SOURCE_REPOSITORY?=$(REPO)
+HELM_SOURCE_IMAGE_REPO?=$(IMAGE_REPO)
 HELM_GIT_TAG?=$(GIT_TAG)
 HELM_DIRECTORY?=.
 HELM_DESTINATION_REPOSITORY?=$(IMAGE_COMPONENT)
@@ -420,7 +420,7 @@ ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
 ifneq ($(REPO_SPARSE_CHECKOUT),)
 	git clone --depth 1 --filter=blob:none --sparse -b $(GIT_TAG) $(CLONE_URL) $(REPO)
-	git -C $(REPO) sparse-checkout set $(REPO_SPARSE_CHECKOUT) --cone
+	git -C $(REPO) sparse-checkout set $(REPO_SPARSE_CHECKOUT) --cone --skip-checks
 else
 	git clone $(CLONE_URL) $(REPO)
 endif
@@ -660,14 +660,14 @@ helm/build: $(LICENSES_TARGETS_FOR_PREREQ)
 helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
 	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(LATEST) $(HELM_IMAGE_LIST)
+	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(LATEST) $(HELM_IMAGE_LIST)
 	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
 helm/push: helm/build
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(IMAGE_COMPONENT) $(LATEST)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
 ## Fetch Binary Targets
 .PHONY: handle-dependencies 

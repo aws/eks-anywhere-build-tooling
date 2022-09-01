@@ -1,0 +1,76 @@
+From ed8b7ed630e87eb7655e19d2ca4f50c572b75fd9 Mon Sep 17 00:00:00 2001
+From: panktishah26 <shah.pankti2609@gmail.com>
+Date: Thu, 1 Sep 2022 17:11:07 +0000
+Subject: [PATCH] Added support for allowing image pull from local registry
+
+---
+ tink-docker/main.go | 33 ++++++++++++++++++++++++---------
+ 1 file changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/tink-docker/main.go b/tink-docker/main.go
+index 22d67a9..ef497bc 100644
+--- a/tink-docker/main.go
++++ b/tink-docker/main.go
+@@ -13,19 +13,21 @@ import (
+ )
+ 
+ type tinkConfig struct {
+-	registry      string
+-	baseURL       string
+-	tinkerbell    string
+-	syslogHost    string
+-	tinkServerTLS bool
++	registry            string
++	baseURL             string
++	tinkerbell          string
++	syslogHost          string
++	tinkServerTLS       bool
++	insecure_registries []string
+ 
+ 	// TODO add others
+ }
+ 
+ type dockerConfig struct {
+-	Debug     bool              `json:"debug"`
+-	LogDriver string            `json:"log-driver,omitempty"`
+-	LogOpts   map[string]string `json:"log-opts,omitempty"`
++	Debug               bool              `json:"debug"`
++	LogDriver           string            `json:"log-driver,omitempty"`
++	LogOpts             map[string]string `json:"log-opts,omitempty"`
++	Insecure_registries []string          `json:"insecure-registries,omitempty"`
+ }
+ 
+ func main() {
+@@ -63,8 +65,18 @@ func main() {
+ 		LogOpts: map[string]string{
+ 			"syslog-address": fmt.Sprintf("udp://%v:514", cfg.syslogHost),
+ 		},
++		Insecure_registries: cfg.insecure_registries,
+ 	}
+-	if err := d.writeToDisk("/etc/docker/daemon.json"); err != nil {
++	dockerPath := "/etc/docker/"
++
++	err = os.MkdirAll(dockerPath, os.ModeDir)
++	if err != nil {
++		panic(err)
++	}
++
++	daemonPath := fmt.Sprintf("%sdaemon.json", dockerPath)
++
++	if err := d.writeToDisk(daemonPath); err != nil {
+ 		fmt.Println("Failed to write docker config:", err)
+ 	}
+ 
+@@ -103,6 +115,9 @@ func parseCmdLine(cmdLines []string) (cfg tinkConfig) {
+ 		// Find Registry configuration
+ 		case "docker_registry":
+ 			cfg.registry = cmdLine[1]
++		case "insecure_registries":
++			registries := strings.Split(cmdLine[1], ",")
++			cfg.insecure_registries = registries
+ 		case "packet_base_url":
+ 			cfg.baseURL = cmdLine[1]
+ 		case "tinkerbell":
+-- 
+2.25.1
+

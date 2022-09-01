@@ -190,7 +190,8 @@ function build::kind::load_images(){
 	sed -i "s,image: $LOCAL_PATH_PROVISONER_IMAGE_TAG,image: $LOCAL_PATH_PROVISONER_RELEASE_OVERRIDE," $ROOT_FS/kind/manifests/default-storage.yaml
 	sed -i "s,$LOCAL_PATH_HELPER_IMAGE_TAG,$AL2_HELPER_IMAGE," $ROOT_FS/kind/manifests/default-storage.yaml
 	sed -i "s,image: $KINDNETD_IMAGE_TAG,image: $KIND_KINDNETD_RELEASE_OVERRIDE," $ROOT_FS/kind/manifests/default-cni.yaml
-
+	# Update containerd config to have eks-d pause image tag
+	sed -i "s,$PAUSE_IMAGE_TAG,$PAUSE_IMAGE_TAG_OVERRIDE," $ROOT_FS/etc/containerd/config.toml
 }
 
 if command -v docker &> /dev/null && docker info > /dev/null 2>&1 ; then
