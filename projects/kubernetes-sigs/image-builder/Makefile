@@ -1,5 +1,5 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
-include $(BASE_DIRECTORY)/Common.mk
+MAKE_ROOT=$(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder
 GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO=image-builder
@@ -116,6 +116,9 @@ BUILDSPEC_VARS_VALUES=SUPPORTED_OS_DISTROS SUPPORTED_K8S_VERSIONS
 SUPPORTED_OS_DISTROS=bottlerocket
 
 PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm eksa/kubernetes-sigs/cri-tools
+
+include $(BASE_DIRECTORY)/Common.mk
+
 
 export PATH:=$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
 export GOVC_INSECURE?=true
