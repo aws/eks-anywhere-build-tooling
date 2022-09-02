@@ -1,7 +1,7 @@
-From 63c3a4ee1ebbcb293c0ee1869e97076cb93a2393 Mon Sep 17 00:00:00 2001
+From 2efb247d6ed89766f60e8026b98b289dc6ea8d48 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 21:00:12 -0800
-Subject: [PATCH 3/9] Output vsphere builds to content library instead of
+Subject: [PATCH 3/8] Output vsphere builds to content library instead of
  exports
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
@@ -10,7 +10,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  1 file changed, 24 insertions(+), 12 deletions(-)
 
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 846d0eef1..c95c4f0e7 100644
+index 019119566..161016bf8 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
 @@ -165,6 +165,12 @@
@@ -77,18 +77,18 @@ index 846d0eef1..c95c4f0e7 100644
      {
        "custom_data": {
          "build_date": "{{isotime}}",
-@@ -294,7 +303,9 @@
+@@ -293,7 +302,9 @@
        ],
        "inline": [
          "cd {{user `output_dir`}}",
 -        "../../hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ../../hack/ovf_eula.txt --ovf_template ../../hack/ovf_template.xml --vmdk_file {{user `build_version`}}-disk-0.vmdk"
 +        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}",
 +        "govc library.rm /{{user `vsphere_library_name`}}/{{user `build_version`}}",
-+        "../hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ../hack/ovf_eula.txt --ovf_template ../hack/ovf_template.xml --vmdk_file {{user `build_version`}}-1.vmdk"
++        "../../hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ../../hack/ovf_eula.txt --ovf_template ../../hack/ovf_template.xml --vmdk_file {{user `build_version`}}-1.vmdk"
        ],
        "name": "vsphere",
        "type": "shell-local"
-@@ -454,6 +465,7 @@
+@@ -463,6 +474,7 @@
      "output_dir": "./output/{{user `build_version`}}",
      "username": "",
      "vcenter_server": "",
