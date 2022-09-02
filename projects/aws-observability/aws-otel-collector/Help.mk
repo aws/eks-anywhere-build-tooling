@@ -10,12 +10,6 @@
 clone-repo:  ## Clone upstream `aws-otel-collector`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
-##@ Image Targets
-local-images: ## Builds `helm/build` as oci tars for presumbit validation
-images: ## Pushes `helm/push` to IMAGE_REPO
-helm/build: ## Builds/pushes `helm/build`
-helm/push: ## Builds/pushes `helm/push`
-
 ##@ Helm Targets
 helm/build: ## Build helm chart
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.

@@ -11,12 +11,10 @@ clone-repo:  ## Clone upstream `hello-eks-anywhere`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Image Targets
-local-images: ## Builds `hello-eks-anywhere/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `hello-eks-anywhere/images/push helm/push` to IMAGE_REPO
+local-images: ## Builds `hello-eks-anywhere/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `hello-eks-anywhere/images/push` to IMAGE_REPO
 hello-eks-anywhere/images/amd64: ## Builds/pushes `hello-eks-anywhere/images/amd64`
-helm/build: ## Builds/pushes `helm/build`
 hello-eks-anywhere/images/push: ## Builds/pushes `hello-eks-anywhere/images/push`
-helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets
 helm/build: ## Build helm chart
@@ -38,6 +36,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images helm/build  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images helm/push `
 ########### END GENERATED ###########################
