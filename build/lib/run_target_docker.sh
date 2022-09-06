@@ -23,7 +23,10 @@ IMAGE_REPO="${3:-}"
 RELEASE_BRANCH="${4:-}"
 ARTIFACTS_BUCKET="${5:-}"
 
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+
+source "${SCRIPT_ROOT}/common.sh"
 
 echo "****************************************************************"
 echo "A docker container with the name eks-a-builder will be launched."
@@ -38,7 +41,7 @@ if ! docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
 fi
 
 EXTRA_INCLUDES=""
-PROJECT_DEPENDENCIES=$(make --no-print-directory -C $MAKE_ROOT/projects/$PROJECT var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=1-20)
+PROJECT_DEPENDENCIES=$(make --no-print-directory -C $MAKE_ROOT/projects/$PROJECT var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=$(build::eksd_releases::get_release_branch))
 if [ -n "$PROJECT_DEPENDENCIES" ]; then
 	DEPS=(${PROJECT_DEPENDENCIES// / })
 	for dep in "${DEPS[@]}"; do
