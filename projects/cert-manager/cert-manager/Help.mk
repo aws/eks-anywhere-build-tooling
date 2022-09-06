@@ -24,20 +24,18 @@ _output/bin/cert-manager/linux-arm64/cert-manager-webhook: ## Build `_output/bin
 _output/bin/cert-manager/linux-arm64/cert-manager-ctl: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-ctl`
 
 ##@ Image Targets
-local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64 cert-manager-ctl/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push cert-manager-ctl/images/push helm/push` to IMAGE_REPO
+local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64 cert-manager-ctl/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push cert-manager-ctl/images/push` to IMAGE_REPO
 cert-manager-acmesolver/images/amd64: ## Builds/pushes `cert-manager-acmesolver/images/amd64`
 cert-manager-cainjector/images/amd64: ## Builds/pushes `cert-manager-cainjector/images/amd64`
 cert-manager-controller/images/amd64: ## Builds/pushes `cert-manager-controller/images/amd64`
 cert-manager-webhook/images/amd64: ## Builds/pushes `cert-manager-webhook/images/amd64`
 cert-manager-ctl/images/amd64: ## Builds/pushes `cert-manager-ctl/images/amd64`
-helm/build: ## Builds/pushes `helm/build`
 cert-manager-acmesolver/images/push: ## Builds/pushes `cert-manager-acmesolver/images/push`
 cert-manager-cainjector/images/push: ## Builds/pushes `cert-manager-cainjector/images/push`
 cert-manager-controller/images/push: ## Builds/pushes `cert-manager-controller/images/push`
 cert-manager-webhook/images/push: ## Builds/pushes `cert-manager-webhook/images/push`
 cert-manager-ctl/images/push: ## Builds/pushes `cert-manager-ctl/images/push`
-helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets
 helm/build: ## Build helm chart
@@ -73,6 +71,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images upload-artifacts attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images upload-artifacts`
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images helm/build upload-artifacts attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images helm/push upload-artifacts`
 ########### END GENERATED ###########################

@@ -27,8 +27,8 @@ _output/bin/harbor/linux-arm64/harbor-migrate: ## Build `_output/bin/harbor/linu
 _output/bin/harbor/linux-arm64/harbor-exporter: ## Build `_output/bin/harbor/linux-arm64/harbor-exporter`
 
 ##@ Image Targets
-local-images: ## Builds `harbor-db/images/amd64 harbor-portal/images/amd64 harbor-core/images/amd64 harbor-log/images/amd64 harbor-nginx/images/amd64 harbor-jobservice/images/amd64 harbor-registry/images/amd64 harbor-registryctl/images/amd64 harbor-redis/images/amd64 harbor-exporter/images/amd64 harbor-trivy/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `harbor-db/images/push harbor-portal/images/push harbor-core/images/push harbor-log/images/push harbor-nginx/images/push harbor-jobservice/images/push harbor-registry/images/push harbor-registryctl/images/push harbor-redis/images/push harbor-exporter/images/push harbor-trivy/images/push helm/push` to IMAGE_REPO
+local-images: ## Builds `harbor-db/images/amd64 harbor-portal/images/amd64 harbor-core/images/amd64 harbor-log/images/amd64 harbor-nginx/images/amd64 harbor-jobservice/images/amd64 harbor-registry/images/amd64 harbor-registryctl/images/amd64 harbor-redis/images/amd64 harbor-exporter/images/amd64 harbor-trivy/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `harbor-db/images/push harbor-portal/images/push harbor-core/images/push harbor-log/images/push harbor-nginx/images/push harbor-jobservice/images/push harbor-registry/images/push harbor-registryctl/images/push harbor-redis/images/push harbor-exporter/images/push harbor-trivy/images/push` to IMAGE_REPO
 harbor-db/images/amd64: ## Builds/pushes `harbor-db/images/amd64`
 harbor-portal/images/amd64: ## Builds/pushes `harbor-portal/images/amd64`
 harbor-core/images/amd64: ## Builds/pushes `harbor-core/images/amd64`
@@ -40,7 +40,6 @@ harbor-registryctl/images/amd64: ## Builds/pushes `harbor-registryctl/images/amd
 harbor-redis/images/amd64: ## Builds/pushes `harbor-redis/images/amd64`
 harbor-exporter/images/amd64: ## Builds/pushes `harbor-exporter/images/amd64`
 harbor-trivy/images/amd64: ## Builds/pushes `harbor-trivy/images/amd64`
-helm/build: ## Builds/pushes `helm/build`
 harbor-db/images/push: ## Builds/pushes `harbor-db/images/push`
 harbor-portal/images/push: ## Builds/pushes `harbor-portal/images/push`
 harbor-core/images/push: ## Builds/pushes `harbor-core/images/push`
@@ -52,7 +51,6 @@ harbor-registryctl/images/push: ## Builds/pushes `harbor-registryctl/images/push
 harbor-redis/images/push: ## Builds/pushes `harbor-redis/images/push`
 harbor-exporter/images/push: ## Builds/pushes `harbor-exporter/images/push`
 harbor-trivy/images/push: ## Builds/pushes `harbor-trivy/images/push`
-helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets
 helm/build: ## Build helm chart
@@ -91,6 +89,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images helm/build  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images helm/push `
 ########### END GENERATED ###########################
