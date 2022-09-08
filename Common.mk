@@ -8,7 +8,6 @@ SHELL=bash
 RELEASE_ENVIRONMENT?=development
 
 GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
-GIT_BRANCH:=$(shell git rev-parse --abbrev-ref HEAD)
 
 COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)

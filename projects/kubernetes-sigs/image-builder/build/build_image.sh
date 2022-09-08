@@ -35,7 +35,7 @@ if [[ $image_format == "ova" ]]; then
 
   # Run image-builder cli
   if [[ $image_os == "ubuntu" ]]; then
-    "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel --force
+    "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel
   elif [[ $image_os == "rhel" ]]; then
     echo "Redhat image building is not yet supported"
     exit 1
@@ -43,7 +43,7 @@ if [[ $image_format == "ova" ]]; then
 elif [[ $image_format == "raw" ]]; then
   # Run image-builder cli
   if [[ $image_os == "ubuntu" ]]; then
-    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel --force
+    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel
   elif [[ $image_os == "rhel" ]]; then
     echo "Redhat image building is not yet supported"
     exit 1
