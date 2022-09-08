@@ -52,3 +52,11 @@ Following changes need to be made to the `yaml` files under `templates`:
     `{{- with .Values.imagePullSecrets }} / imagePullSecrets: / {{- toYaml . | nindent 8 }} / {{- end }}`.
 
 Note in some helm charts, fields above in `yaml` files are not hardcoded values but rather references to definitions in `tpl` files (also under the `templates` directory). In this case, you should update the `tpl` files directly while keeping the `yaml` files intact.
+
+### Dealing with CRDs
+
+For packages that include CRDs as well as custom resources, the CRDs must be deployed before the rest of the resources. CRDs can't be included in the `templates` directory because the result is a single yaml file applied once. To overcome this issue, there is a `crds` directory which will be applied before anything else. The problem with this approach is that these are not templated.
+
+For consistency across packages, the recommendation is to create a chart under the `charts` directory and declare it as a dependency. That chart should be called `crds` and contain the custom resource definitions (no custom resources) created in the `templates` directory.
+
+**caveats** This also means that deleting a package deletes the CRDs and therefore the custom resources as well.
