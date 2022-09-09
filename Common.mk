@@ -685,10 +685,13 @@ build: $(BUILD_TARGETS)
 .PHONY: release
 release: $(RELEASE_TARGETS)
 
+# Iterate over release branch versions, skipping version if directory not present
 .PHONY: %/release-branches/all
 %/release-branches/all:
 	@for version in $(SUPPORTED_K8S_VERSIONS) ; do \
-		$(MAKE) $* RELEASE_BRANCH=$$version; \
+	    if [ -d "$$version" ]; then \
+			$(MAKE) $* RELEASE_BRANCH=$$version; \
+		fi \
 	done;
 
 ###  Clean Targets
