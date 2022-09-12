@@ -205,14 +205,14 @@ release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 release-ova-%:
 	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT)
 
-.PHONY: local-build-ova-ubuntu-2004
-local-build-ova-ubuntu-2004: MAKEFLAGS=
-local-build-ova-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
-local-build-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
-local-build-ova-ubuntu-2004: deps-ova setup-packer-configs-ova
+.PHONY: local-build-ova-%
+local-build-ova-%: MAKEFLAGS=
+local-build-ova-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
+local-build-ova-%: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
+local-build-ova-%: deps-ova setup-packer-configs-ova
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-$*
 
 .PHONY: download-bottlerocket-%
 download-bottlerocket-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
