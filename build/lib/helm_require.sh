@@ -54,7 +54,7 @@ envsubst <helm/sedfile.template >${SEDFILE}
 echo "s,version: v,version: ,g" >>${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
 do
-  if [ "${IMAGE}" == "${HELM_DESTINATION_REPOSITORY}" ]
+  if [ "${IMAGE}" == "${HELM_DESTINATION_REPOSITORY}" ] || [ "${IMAGE_TAG}" != "${HELM_TAG}" ]
   then
     TAG="${IMAGE_TAG}"
   else
