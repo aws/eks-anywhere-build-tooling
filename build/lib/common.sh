@@ -105,10 +105,8 @@ function build::gather_licenses() {
 
   # the version of go used here must be the version go-licenses was installed with
   # by default we use 1.16, but due to changes in 1.17, there are some changes that require using 1.17
-  if [ "$golang_version" == "1.18" ]; then
-    build::common::use_go_version 1.18
-  elif [ "$golang_version" == "1.17" ]; then
-    build::common::use_go_version 1.17
+  if [[ ${golang_version#1.} -ge 16 ]]; then
+    build::common::use_go_version $golang_version
   else
     build::common::use_go_version 1.16
   fi
@@ -131,7 +129,7 @@ function build::gather_licenses() {
   # the following messages are safe to ignore since we do not need the license url for our process
   NOISY_MESSAGES="cannot determine URL for|Error discovering license URL|unsupported package host|contains non-Go code|has empty version|vendor.*\.s$"
 
-  go-licenses save --force $patterns --save_path="${outputdir}/LICENSES" 2>  >(grep -vE "$NOISY_MESSAGES" >&2)
+  go-licenses save --force $patterns --save_path "${outputdir}/LICENSES" 2>  >(grep -vE "$NOISY_MESSAGES" >&2)
   
   go-licenses csv $patterns > "${outputdir}/attribution/go-license.csv" 2>  >(grep -vE "$NOISY_MESSAGES" >&2)
 
@@ -197,6 +195,8 @@ function build::non-golang::copy_licenses(){
 }
 
 function build::generate_attribution(){
+  build::common::use_go_version 1.18
+
   local -r project_root=$1
   local -r golang_version=$2
   local -r output_directory=${3:-"${project_root}/_output"}
@@ -236,24 +236,59 @@ function build::common::get_go_path() {
   fi
 }
 
+USE_DOCKER="${USE_DOCKER:-true}"
+USE_BUILDCTL="${USE_BUILDCTL:-true}"
+
 function build::common::use_go_version() {
+  # TEMP
+  if [ "${JOB_TYPE:-}" == "presubmit" ]; then
+    rm -rf /root/sdk /go    
+  fi
+
   local -r version=$1
 
-  local -r gobinarypath=$(build::common::get_go_path $version)
+  # find project root which may not always be in the same relative location to pwd
+  local parts=()
+  local path=$(pwd)
+  while [[ "$(basename $path)" != "projects" ]]; do
+    parts+=($(basename $path))
+    path=$(dirname $path)
+  done
+
+  local -r repo_owner=${parts[-1]}
+  local -r repo=${parts[-2]}
+
+  local -r project_root="${path}/${repo_owner}/${repo}"
+  local -r overrides_root="${project_root}/_output/.path-overrides"
+  local gobinarypath="${overrides_root}"
+
+  if [[ "$USE_DOCKER" = "false" ]]; then
+    local gobinarypath=$(build::common::get_go_path $version)
+  elif [[ ! -f $overrides_root/.goversion ]] || [[ "$(cat $overrides_root/.goversion)" != "${version}" ]]; then
+    mkdir -p $gobinarypath
+    ln -sf $BUILD_ROOT/overrides/* $gobinarypath
+    echo "$version" > $gobinarypath/.goversion
+
+    if [[ "$USE_BUILDCTL" = "false" ]] && command -v docker &> /dev/null && docker info > /dev/null 2>&1 ; then
+      echo "Using container image for golang $version via docker"
+      build::docker::retry_pull public.ecr.aws/k1e6s8o8/generate-attribution:2022-09-11-1662925457
+      build::docker::retry_pull public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-golang:${version}-foo.2
+      build::docker::retry_pull public.ecr.aws/k1e6s8o8/go-licenses:${version}-latest
+
+      echo "true" > $gobinarypath/.usedocker
+    else
+      echo "Using container image for golang $version via buildctl"
+      echo "false" > $gobinarypath/.usedocker
+    fi
+  fi
+
+  export GOCACHE="${project_root}/_output/.go-cache/build/$version"
+  export GOMODCACHE="${project_root}/_output/.go-cache/mod/$version"
+  mkdir -p $GOCACHE $GOMODCACHE
+  
   echo "Adding $gobinarypath to PATH"
   # Adding to the beginning of PATH to allow for builds on specific version if it exists
-  export PATH=${gobinarypath}:$PATH
-  export GOCACHE=$(go env GOCACHE)/$version
-}
-
-# Use a seperate build cache for each project/version to ensure there are no
-# shared bits which can mess up the final checksum calculation
-# this is mostly needed for create checksums locally since in the builds
-# different versions of the same project are not built in the same container
-function build::common::set_go_cache() {
-  local -r project=$1
-  local -r git_tag=$2
-  export GOCACHE=$(go env GOCACHE)/$project/$git_tag
+  export PATH=${gobinarypath}:$PATH  
 }
 
 function build::common::re_quote() {
@@ -366,4 +401,32 @@ function build::bottlerocket::check_release_availablilty() {
     retval=1
   fi
   echo $retval
+}
+
+function build::common::longest_common_prefix()
+{
+  declare -a names
+  declare -a parts
+  declare i=0
+
+  names=("$@")
+  name="$1"
+  while x=$(dirname "$name"); [ "$x" != "/" ]
+  do
+    parts[$i]="$x"
+    i=$(($i + 1))
+    name="$x"
+  done
+
+  for prefix in "${parts[@]}" /
+  do
+    for name in "${names[@]}"
+    do
+      if [ "${name#$prefix/}" = "${name}" ]
+      then continue 2
+      fi
+    done
+    echo "$prefix"
+    break
+  done
 }

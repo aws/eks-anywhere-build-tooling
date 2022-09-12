@@ -1,0 +1,84 @@
+  #!/usr/bin/env bash
+# Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
+BUILD_LIB_ROOT="$(cd "$(dirname $(realpath "${BASH_SOURCE[0]}"))/.." && pwd -P)"
+
+source "${BUILD_LIB_ROOT}/common.sh"
+
+CONTAINER_IMAGE="public.ecr.aws/k1e6s8o8/generate-attribution:2022-09-11-1662925457"
+
+ROOT_MODULE_NAME="$1"
+PROJECT_ROOT="$2"
+GOLANG_VERSION_TAG="$3"
+OUTPUT_DIR="$4"
+
+USE_DOCKER=$(cat $SCRIPT_ROOT/.usedocker)
+
+if [[ "$USE_DOCKER" = "true" ]] ; then
+    docker run \
+        --mount type=bind,source="$PROJECT_ROOT",target=/project \
+        --mount type=bind,source="$OUTPUT_DIR",target=/output \
+        --entrypoint node $CONTAINER_IMAGE --dns-result-order=ipv4first generate-attribution-file.js $ROOT_MODULE_NAME /project $GOLANG_VERSION_TAG /output
+
+    exit $?
+fi
+
+
+DOCKERFILE_DIR=$(mktemp -d)
+trap "rm -rf $DOCKERFILE_DIR" EXIT
+
+CONTEXT=$(build::common::longest_common_prefix $PROJECT_ROOT $OUTPUT_DIR)
+RELATIVE_PROJECT_MOUNT=$(realpath --relative-to=$CONTEXT $PROJECT_ROOT)
+RELATIVE_OUTPUT_MOUNT=$(realpath --relative-to=$CONTEXT $OUTPUT_DIR)
+
+cat << EOF > $DOCKERFILE_DIR/Dockerfile
+FROM $CONTAINER_IMAGE AS run
+
+WORKDIR /project
+
+RUN --mount=type=bind,source=$RELATIVE_PROJECT_MOUNT,target=/project \
+    --mount=type=bind,source=$RELATIVE_OUTPUT_MOUNT,target=/output \
+    node --dns-result-order=ipv4first /usr/src/app/generate-attribution-file.js "${ROOT_MODULE_NAME}" "/project" "${GOLANG_VERSION_TAG}" "/output" "/attribution-output"
+
+FROM scratch as save
+COPY --from=run /attribution-output/* .
+
+EOF
+
+cat << EOF > $DOCKERFILE_DIR/Dockerfile.dockerignore
+*
+!**/GIT_TAG
+!**/LICENSES/**/*
+!**/attribution/*
+EOF
+
+LOG_FILE=$(mktemp)
+trap "rm -f $LOG_FILE" EXIT
+if ! $BUILD_LIB_ROOT/buildkit.sh  build \
+    --frontend dockerfile.v0 \
+    --local dockerfile=$DOCKERFILE_DIR \
+    --local context=$CONTEXT \
+    --progress plain \
+    --opt target=save \
+    --output type=local,dest=$OUTPUT_DIR/attribution 2>&1 > $LOG_FILE; then
+    
+    cat $LOG_FILE
+    exit 1
+fi        

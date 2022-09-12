@@ -702,6 +702,8 @@ clean-repo:
 
 .PHONY: clean
 clean: $(if $(filter true,$(REPO_NO_CLONE)),,clean-repo)
+#The module cache GOPATH/pkg/mod has no write permissions to prevent accident modifications to the files
+	@chmod -fR 777 _output/.go-cache/mod &> /dev/null || :
 	@rm -rf _output	
 
 ## --------------------------------------

@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
+BUILD_LIB_ROOT="$(cd "$(dirname $(realpath "${BASH_SOURCE[0]}"))/.." && pwd -P)"
+
+source "${BUILD_LIB_ROOT}/common.sh"
+
+PROJECT_MOUNT=$(realpath .)
+GOLANG_VERSION=$(cat $SCRIPT_ROOT/.goversion)
+USE_DOCKER=$(cat $SCRIPT_ROOT/.usedocker)
+CONTAINER_IMAGE="public.ecr.aws/k1e6s8o8/go-licenses:${GOLANG_VERSION}-latest"
+
+EXTRA_MOUNTS=""
+ARGS=()
+while test $# -gt 0; do
+  case "$1" in
+    --save_path)
+        shift
+        OUTPUT_MOUNT="$1"
+        EXTRA_MOUNTS="--mount type=bind,source=$(dirname $OUTPUT_MOUNT),target=/output"
+        ARGS+=("--save_path" "/output/$(basename $OUTPUT_MOUNT)")
+        mkdir -p $OUTPUT_MOUNT
+        shift
+        ;;
+    *)
+        ARGS+=("$1")
+        shift
+        ;;
+  esac
+done
+
+if [[ "$USE_DOCKER" = "true" ]] ; then
+    docker run \
+        --mount type=bind,source=$PROJECT_MOUNT,target=/project $EXTRA_MOUNTS -w /project \
+        -e GOFLAGS=$GOFLAGS -e GOOS=$GOOS -e GOARCH=$GOARCH \
+        $CONTAINER_IMAGE "${ARGS[@]}"
+
+    exit $?
+fi
+
+DOCKERFILE_DIR=$(mktemp -d)
+trap "rm -rf $DOCKERFILE_DIR" EXIT
+
+OUTPUT_MOUNT=${OUTPUT_MOUNT:-$PROJECT_MOUNT}
+
+CONTEXT=$(build::common::longest_common_prefix $PROJECT_MOUNT $OUTPUT_MOUNT)
+RELATIVE_PROJECT_MOUNT=$(realpath --relative-to=$CONTEXT $PROJECT_MOUNT)
+RELATIVE_OUTPUT_MOUNT=$(realpath --relative-to=$CONTEXT $OUTPUT_MOUNT)
+
+
+if [[ "${ARGS[0]}" = "save" ]]; then
+    TARGET="save"
+elif [[ "${ARGS[0]}" = "csv" ]]; then
+    TARGET="csv"
+else
+    echo "unexpected go subcommand: ${ARGS[@]}"
+    exit 1
+fi
+
+cat << EOF > $DOCKERFILE_DIR/Dockerfile
+FROM $CONTAINER_IMAGE AS run
+
+WORKDIR /project
+RUN --mount=type=bind,source=$RELATIVE_PROJECT_MOUNT,target=/project \
+    go-licenses ${ARGS[@]} > /build-output.stdout 2> /build-output.stderr
+
+FROM scratch as csv
+COPY --from=run /build-output.stdout /build-output.stderr ./
+
+FROM scratch as save
+COPY --from=run /output/* $RELATIVE_OUTPUT_MOUNT/
+COPY --from=run /build-output.stdout /build-output.stderr ./
+
+EOF
+
+LOG_FILE=$(mktemp)
+trap "rm -f $LOG_FILE" EXIT
+if ! $BUILD_LIB_ROOT/buildkit.sh build \
+    --frontend dockerfile.v0 \
+    --local dockerfile=$DOCKERFILE_DIR \
+    --local context=$CONTEXT \
+    --progress plain \
+    --opt target=$TARGET \
+    --output type=local,dest=$CONTEXT 2>&1 > $LOG_FILE; then
+    
+    cat $LOG_FILE
+    exit 1
+fi   
+
+cat $CONTEXT/build-output.stdout
+>&2 cat $CONTEXT/build-output.stderr
+
+rm $CONTEXT/build-output.stdout $CONTEXT/build-output.stderr
