@@ -13,14 +13,13 @@ const (
 	buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
 )
 
+var (
+	codebuild = os.Getenv("CODEBUILD_CI")
+)
 func (b *BuildOptions) BuildImage() {
-	codebuild := os.Getenv("CODEBUILD_CI")
 	// Clone build tooling repo
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Error retrieving current working directory: %v", err)
-	}
-	buildToolingRepoPath := filepath.Join(cwd, "eks-anywhere-build-tooling")
+	cwd, err := getCwd()
+	buildToolingRepoPath := getBuildToolingPath(cwd)
 
 	if b.Force && codebuild != "true" {
 		// Clean up build tooling repo in cwd
@@ -141,7 +140,8 @@ func (b *BuildOptions) ValidateInputs() {
 		log.Fatalf("Error converting vsphere config path to absolute")
 	}
 
-	if b.ReleaseChannel != "1-20" && b.ReleaseChannel != "1-21" && b.ReleaseChannel != "1-22" && b.ReleaseChannel != "1-23" && b.ReleaseChannel != "1-24"{
-		log.Fatalf("release-channel should be one of 1-20, 1-21, 1-22, 1-23, 1-24")
+	supportedReleaseBranches := GetSupportedReleaseBranches()
+	if !SliceContains(supportedReleaseBranches, b.ReleaseChannel) {
+		log.Fatalf("release-channel should be one of %v", supportedReleaseBranches)
 	}
 }
