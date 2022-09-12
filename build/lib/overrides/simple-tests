@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
+BUILD_LIB_ROOT="$(cd "$(dirname $(realpath "${BASH_SOURCE[0]}"))/.." && pwd -P)"
+
+source "${BUILD_LIB_ROOT}/common.sh"
+
+REPO="$1"
+
+USE_DOCKER=true build::common::use_go_version 1.18 && time build::common::echo_and_run go version
+USE_BUILDCTL=true build::common::use_go_version 1.18 && time build::common::echo_and_run go version
+
+cd $REPO
+
+USE_DOCKER=true build::common::use_go_version 1.18 && time build::common::echo_and_run go list -deps=true -json ./...
+USE_BUILDCTL=true build::common::use_go_version 1.18 && time build::common::echo_and_run go list -deps=true -json ./...
+
+USE_DOCKER=true build::common::use_go_version 1.18 && time build::common::echo_and_run go mod edit -json
+USE_BUILDCTL=true build::common::use_go_version 1.18 && time build::common::echo_and_run go mod edit -json
+
+tmp_dir=$(mktemp -d -t goinstall_XXXXXXXXXX)
+trap "rm -rf ${tmp_dir}" EXIT
+
+cd $tmp_dir
+# create a new module in the tmp directory
+USE_DOCKER=true build::common::use_go_version 1.18 && time build::common::echo_and_run go mod init fake/mod && ls $tmp_dir
+USE_BUILDCTL=true build::common::use_go_version 1.18 && rm -rf $tmp_dir/* && time build::common::echo_and_run go mod init fake/mod && ls $tmp_dir
+USE_DOCKER=true build::common::use_go_version 1.18 && rm -rf $tmp_dir/* && time build::common::echo_and_run go install -tags tools sigs.k8s.io/kustomize/kustomize/v4@v4.5.2 && ls $tmp_dir
+USE_BUILDCTL=true build::common::use_go_version 1.18 && rm -rf $tmp_dir/* && time build::common::echo_and_run go install -tags tools sigs.k8s.io/kustomize/kustomize/v4@v4.5.2 && ls $tmp_dir

@@ -30,6 +30,7 @@ SIMPLE_CREATE_TARBALLS=false
 FIX_LICENSES_HOOK_BOOTKIT_TARGET=$(REPO)/hook-bootkit/LICENSE
 FIX_LICENSES_HOOK_DOCKER_TARGET=$(REPO)/hook-docker/LICENSE
 
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
@@ -49,10 +50,14 @@ kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:$(LINUX_KERNEL_VERSIO
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
-$(CREATE_HOOK_FILES): tarballs
+$(CREATE_HOOK_FILES): export GOOS=$(BUILDER_PLATFORM_OS)
+$(CREATE_HOOK_FILES): export GOARCH=$(BUILDER_PLATFORM_ARCH)
+$(CREATE_HOOK_FILES): #tarballs
 # Modify the linuxkit config file hook/hook.yaml to point to IMAGE_REPO.
-# Upstream make target `dist` is triggered to perform linuxkit build and generate OSIE files ().
-	source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.16" && make dist IMAGE_REPO=$(IMAGE_REPO) LATEST_TAG=$(LATEST_TAG) -C $(REPO)
+# Upstream make target `dist-existing-images` is triggered to perform linuxkit build and generate OSIE files.
+	sed -i -E -e 's,quay.io/tinkerbell/hook-(bootkit|docker|kernel).*,$(IMAGE_REPO)/tinkerbell/hook-\1:$(LATEST_TAG),g' $(REPO)/hook.yaml
+	source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.16" && GO111MODULE=on GOBIN=$(OUTPUT_DIR) go install github.com/linuxkit/linuxkit/src/cmd/linuxkit@v0.0.0-20210616134744-ccece6a4889e
+	source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.16" && PATH=$(MAKE_ROOT)/$(OUTPUT_DIR):$$PATH make dist IMAGE_REPO=$(IMAGE_REPO) LATEST_TAG=$(LATEST_TAG) -C $(REPO)
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
 	cp $(REPO)/out/sha-*/rel/vmlinuz-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
 	cp $(REPO)/out/sha-*/rel/initramfs-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/

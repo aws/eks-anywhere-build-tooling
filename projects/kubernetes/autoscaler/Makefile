@@ -27,7 +27,6 @@ HELM_DIRECTORY=charts/cluster-autoscaler
 HELM_DESTINATION_REPOSITORY=cluster-autoscaler/charts/cluster-autoscaler
 HELM_IMAGE_LIST=kubernetes/autoscaler
 
-
 include $(BASE_DIRECTORY)/Common.mk
 
 

@@ -18,6 +18,9 @@ include $(BASE_DIRECTORY)/Common.mk
 s3-artifacts: create-manifests
 
 .PHONY: create-manifests
+create-manifests: MAKEFLAGS=
+create-manifests: export GOOS=$(BUILDER_PLATFORM_OS)
+create-manifests: export GOARCH=$(BUILDER_PLATFORM_ARCH)
 create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(GOLANG_VERSION)
 

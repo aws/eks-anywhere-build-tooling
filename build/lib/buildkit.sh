@@ -38,9 +38,9 @@ if [ -f "/buildkit.sh" ]; then
     done
 
     # space is limited on presubmit nodes, after each image build clear the build cache
-    if [ "${JOB_TYPE:-}" == "presubmit" ] && [ "${PRUNE_BUILDCTL:-false}" == "true" ]; then
-        $CMD prune --all
-    fi
+    # if [ "${JOB_TYPE:-}" == "presubmit" ] && [ "${PRUNE_BUILDCTL:-false}" == "true" ]; then
+    #     $CMD prune --all
+    # fi
 
     (exit $s)
 else

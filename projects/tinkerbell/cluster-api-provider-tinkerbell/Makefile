@@ -14,13 +14,17 @@ EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api
 
 HAS_S3_ARTIFACTS=true
 
+
 include $(BASE_DIRECTORY)/Common.mk
 
 s3-artifacts: create-manifests
 
 .PHONY: create-manifests
+create-manifests: MAKEFLAGS=
+create-manifests: export GOOS=$(BUILDER_PLATFORM_OS)
+create-manifests: export GOARCH=$(BUILDER_PLATFORM_ARCH)
 create-manifests: tarballs
-	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
+	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
 
 
 ########### DO NOT EDIT #############################

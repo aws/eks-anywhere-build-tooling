@@ -9,7 +9,7 @@ BINARY_TARGET_FILES=helm
 SOURCE_PATTERNS=./cmd/helm
 
 # Match upstream makefile - https://github.com/helm/helm/blob/main/Makefile
-K8S_MODULES_VER=$(subst ., ,$(subst v,,$(shell cd $(REPO) && go list -f '{{.Version}}' -m k8s.io/client-go)))
+K8S_MODULES_VER=$(subst ., ,$(subst v,,$(shell cd $(REPO) && cat go.mod | grep k8s.io/client-go | cut -d ' ' -f2)))
 K8S_MODULES_MAJOR_VER=$(shell echo $$(($(firstword $(K8S_MODULES_VER)) + 1)))
 K8S_MODULES_MINOR_VER=$(word 2,$(K8S_MODULES_VER))
 

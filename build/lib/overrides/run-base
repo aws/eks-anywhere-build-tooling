@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+# Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
+BUILD_LIB_ROOT="$(cd "$(dirname $(realpath "${BASH_SOURCE[0]}"))/.." && pwd -P)"
+
+source "${BUILD_LIB_ROOT}/common.sh"
+
+CONTAINER_IMAGE="$1"
+PROJECT_MOUNT="$2"
+OUTPUT_MOUNT="$3"
+CMD_ARGS="$4"
+DOCKERIGNORE_PATHS="$5"
+BUILDCTL_TARGET="$6"
+NEED_STDOUT="${7:-false}"
+
+
+GOLANG_VERSION=$(cat $SCRIPT_ROOT/.goversion)
+USE_DOCKER=$(cat $SCRIPT_ROOT/.usedocker)
+
+CGO_ENABLED=${CGO_ENABLED:-0}
+GOOS=${GOOS:-linux}
+GOARCH=${GOARCH:-amd64}
+GOPROXY=${GOPROXY:-direct}
+GOFLAGS=${GOFLAGS:-}
+
+# context will always be project root
+CONTEXT=$(realpath $(build::common::find_project_root_from_pwd))
+
+RELATIVE_PROJECT_MOUNT=$(realpath --relative-to=$CONTEXT $PROJECT_MOUNT)
+WORKDIR="/project"
+
+# when running from a subdir of REPO we need to make /project
+# point to the REPO and change the workdir to be the subdir
+#since in most cases files from above subdir are needed
+if [[ $RELATIVE_PROJECT_MOUNT == *"/"* ]]; then
+    WORKDIR+="/$(echo $RELATIVE_PROJECT_MOUNT | cut -d'/' -f2-)"
+    RELATIVE_PROJECT_MOUNT="$(echo $RELATIVE_PROJECT_MOUNT | cut -d'/' -f1)"
+fi
+
+# buildctl does not allow `.` as a bind mount
+# this happens for projects like aws/image-builder which have the source
+# code in the project root since there is no upstream repo
+if [ "$RELATIVE_PROJECT_MOUNT" = "." ]; then
+    RELATIVE_PROJECT_MOUNT=$(basename $CONTEXT)
+    CONTEXT=$(dirname $CONTEXT)
+fi
+
+if [[ -n "${OUTPUT_MOUNT:-}" ]]; then
+    RELATIVE_OUTPUT_MOUNT=$(realpath --relative-to=$CONTEXT $OUTPUT_MOUNT)
+else
+    RELATIVE_OUTPUT_MOUNT=$RELATIVE_PROJECT_MOUNT
+fi
+
+RELATIVE_ATTRIBUTION_MOUNT=$RELATIVE_OUTPUT_MOUNT
+if [ -d $CONTEXT/$RELATIVE_OUTPUT_MOUNT/attribution ]; then
+    RELATIVE_ATTRIBUTION_MOUNT=$RELATIVE_OUTPUT_MOUNT/attribution
+fi
+
+LOG_FILE=$(mktemp)
+BUILD_STDOUT_FILE=$(mktemp)
+BUILD_STDERR_FILE=$(mktemp)
+DOCKERFILE_DIR=$(mktemp -d)
+
+function show_output() {
+    if [ $? -eq 1 ]; then
+        if [ -f $DOCKERFILE_DIR/Dockerfile ]; then
+            echo "Dockerfile"
+            cat $DOCKERFILE_DIR/Dockerfile   
+        fi
+        if [ -f $DOCKERFILE_DIR/Dockerfile.dockerignore ]; then
+            echo "Dockerfile.dockerignore"
+            cat $DOCKERFILE_DIR/Dockerfile.dockerignore 
+        fi        
+        cat $LOG_FILE $BUILD_STDOUT_FILE $BUILD_STDERR_FILE
+    elif [[ "$NEED_STDOUT" = "true" ]]; then
+        cat $BUILD_STDOUT_FILE
+        cat $BUILD_STDERR_FILE >&2
+    else
+        if [ -f $DOCKERFILE_DIR/Dockerfile.dockerignore ]; then
+            echo "Dockerfile.dockerignore"
+            cat $DOCKERFILE_DIR/Dockerfile.dockerignore 
+        fi        
+        cat $LOG_FILE
+    fi   
+    
+    rm -rf $BUILD_STDOUT_FILE $BUILD_STDERR_FILE $LOG_FILE $DOCKERFILE_DIR   
+}
+
+trap "show_output" EXIT
+
+# for certain commands the stdout is what the caller is looking for
+# store stdout and stderr to files and onyl show on failure
+if [[ "$NEED_STDOUT" = "true" ]]; then
+     CMD_ARGS="if ! $CMD_ARGS 2> /build-output.stderr 1> /build-output.stdout; then cat /build-output.stdout /build-output.stderr && exit 1; fi"
+fi
+
+
+# When go installing binaries cross-arch, they get stored in a folder under gopath with the arch in the path
+# there is no (known) way to overide this so handle it as an extra mount in the docker/dockerfile
+GOBIN_PATH_IN_CONTAINER="/go/bin"
+if [[ "$GOOS" = "darwin" ]]; then
+    GOBIN_PATH_IN_CONTAINER="/go/bin/darwin_$GOARCH"
+fi
+
+# the GOMODCACHE needs to be preserved through runs otherwise module's built into the
+# final binary will be missing checksum information that effects the final checksum
+# in the case of docker, it is bind mounted to the _output folder
+# in the case of buildctl, a cache mount is used
+if [[ "$USE_DOCKER" = "true" ]] ; then
+    # on a linux host, the uid needs to match the host user otherwise
+    # git will complain about user permissions on the repo, when go
+    # goes to figure out the vcs information
+    USER_ID=""
+    if [ "$(uname -s)" = "Linux" ]; then
+        USER_ID="-u $(id -u ${USER}):$(id -g ${USER})"
+    fi
+
+    GOMODCACHE=$CONTEXT/_output/.cache/go/pkg/mod
+    mkdir -p $GOMODCACHE
+
+    build::docker::retry_pull $CONTAINER_IMAGE > $LOG_FILE 2>&1
+
+    # match buildctl as much as possible, use same "context" dir
+    cd $CONTEXT
+    # TODO: can we trap sigterm and kill the docker container here, currently it waits til it finishes
+    # no matter what ive tried with trapping outside or inside the container, I cant make it work
+    if ! build::common::echo_and_run docker run --rm -w $WORKDIR $USER_ID \
+        --mount type=bind,source=$(pwd)/$RELATIVE_PROJECT_MOUNT,target=/project \
+        --mount type=bind,source=$(pwd)/$RELATIVE_OUTPUT_MOUNT,target=/output \
+        --mount type=bind,source=$(pwd)/$RELATIVE_OUTPUT_MOUNT,target=$GOBIN_PATH_IN_CONTAINER \
+        --mount type=bind,source=$(pwd)/$RELATIVE_ATTRIBUTION_MOUNT,target=/attribution-output \
+        --mount type=bind,source=$GOMODCACHE,target=/go/pkg/mod \
+        --mount type=bind,source=$BUILD_STDOUT_FILE,target=/build-output.stdout \
+        --mount type=bind,source=$BUILD_STDERR_FILE,target=/build-output.stderr \
+        -e CGO_ENABLED=$CGO_ENABLED -e GOFLAGS=$GOFLAGS -e GOOS=$GOOS -e GOARCH=$GOARCH -e GOPROXY=$GOPROXY \
+        --entrypoint bash $CONTAINER_IMAGE -c "$CMD_ARGS" > $LOG_FILE 2>&1; then
+        exit 1
+    fi
+    exit 0
+fi
+
+IGNORES=(${DOCKERIGNORE_PATHS// / })
+echo -e "*" >> $DOCKERFILE_DIR/Dockerfile.dockerignore
+for ignore in "${IGNORES[@]}"; do
+    eval echo -e "$ignore" >> $DOCKERFILE_DIR/Dockerfile.dockerignore
+done
+
+if [[ "$NEED_STDOUT" = "true" ]]; then
+    BUILDCTL_TARGET="stdout"
+elif [[ -z "$BUILDCTL_TARGET" ]]; then
+    BUILDCTL_TARGET="build"
+fi
+
+MOD_CACHE_ID="$(basename $CONTEXT)-$GOLANG_VERSION"
+
+OUTPUT_BIND_MOUNT=""
+if [[ "$BUILDCTL_TARGET" = "attribution" ]]; then
+    OUTPUT_BIND_MOUNT="--mount=type=bind,source=$RELATIVE_OUTPUT_MOUNT,target=/output"
+fi
+
+cat << EOF > $DOCKERFILE_DIR/Dockerfile
+FROM $CONTAINER_IMAGE AS run
+
+ENV GOMODCACHE /go/pkg/mod/$GOLANG_VERSION
+ENV CGO_ENABLED $CGO_ENABLED
+ENV GOOS $GOOS
+ENV GOARCH $GOARCH
+ENV GOPROXY $GOPROXY
+
+WORKDIR $WORKDIR
+RUN --mount=type=bind,source=$RELATIVE_PROJECT_MOUNT,target=/project,rw $OUTPUT_BIND_MOUNT \
+    --mount=type=cache,target=/go/pkg/mod/$GOLANG_VERSION,id=$MOD_CACHE_ID \
+    $CMD_ARGS && \
+    if [[ "$BUILDCTL_TARGET" = "vendor" ]]; then \
+        mkdir -p ./vendor; \
+        cp -rf ./go.mod ./vendor /output/; \
+    fi
+
+FROM scratch as vendor
+COPY --from=run /output ${RELATIVE_PROJECT_MOUNT}${WORKDIR#"/project"}/
+
+FROM scratch as build
+COPY --from=run /output/* $RELATIVE_OUTPUT_MOUNT/
+
+FROM scratch as licenses-save
+COPY --from=run /output/ $RELATIVE_OUTPUT_MOUNT/
+
+FROM scratch as stdout
+COPY --from=run /build-output.* ./
+
+FROM scratch as attribution
+COPY --from=run /attribution-output/* $RELATIVE_OUTPUT_MOUNT/attribution/
+
+FROM scratch as install
+COPY --from=run $GOBIN_PATH_IN_CONTAINER/* $RELATIVE_OUTPUT_MOUNT/
+
+EOF
+
+if ! build::common::echo_and_run $BUILD_LIB_ROOT/buildkit.sh build \
+    --frontend dockerfile.v0 \
+    --local dockerfile=$DOCKERFILE_DIR \
+    --local context=$CONTEXT \
+    --progress plain \
+    --opt target=$BUILDCTL_TARGET \
+    --output type=local,dest=$CONTEXT > $LOG_FILE 2>&1; then
+    exit 1
+fi
+
+if [[ -f $CONTEXT/build-output.stdout ]]; then
+    mv $CONTEXT/build-output.stdout $BUILD_STDOUT_FILE
+fi
+
+if [[ -f $CONTEXT/build-output.stderr ]]; then
+    mv $CONTEXT/build-output.stderr $BUILD_STDERR_FILE    
+fi
+
+if [[ "$BUILDCTL_TARGET" = "build" ]]; then
+    # buildctl caches so if the binary hasnt changed it will have an older timestamp
+    touch ${CONTEXT}/${RELATIVE_OUTPUT_MOUNT}/*
+fi

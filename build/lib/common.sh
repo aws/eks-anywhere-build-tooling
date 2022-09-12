@@ -16,6 +16,9 @@
 BUILD_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
 source "${BUILD_ROOT}/eksd_releases.sh"
 
+USE_DOCKER="${USE_DOCKER:-false}"
+USE_BUILDCTL="${USE_BUILDCTL:-false}"
+
 function build::common::ensure_tar() {
   if [[ -n "${TAR:-}" ]]; then
     return
@@ -105,36 +108,35 @@ function build::gather_licenses() {
 
   # the version of go used here must be the version go-licenses was installed with
   # by default we use 1.16, but due to changes in 1.17, there are some changes that require using 1.17
-  if [ "$golang_version" == "1.19" ]; then
-    build::common::use_go_version 1.19
-  elif [ "$golang_version" == "1.18" ]; then
-    build::common::use_go_version 1.18
-  elif [ "$golang_version" == "1.17" ]; then
-    build::common::use_go_version 1.17
+  if [[ ${golang_version#1.} -ge 16 ]]; then
+    build::common::use_go_version $golang_version
   else
     build::common::use_go_version 1.16
   fi
 
-  if ! command -v go-licenses &> /dev/null
-  then
-    echo " go-licenses not found.  If you need license or attribution file handling"
-    echo " please refer to the doc in docs/development/attribution-files.md"
-    exit
-  fi
-
+  build::common::override_missing_tooling go-licenses
+  
   mkdir -p "${outputdir}/attribution"
   # attribution file generated uses the output go-deps and go-license to gather the necessary
   # data about each dependency to generate the amazon approved attribution.txt files
   # go-deps is needed for module versions
   # go-licenses are all the dependencies found from the module(s) that were passed in via patterns
-  go list -deps=true -json ./... | jq -s ''  > "${outputdir}/attribution/go-deps.json"
+  echo "($(pwd)) \$ go list -deps=true -json ./..."
+  local -r list=$(go list -deps=true -json ./...)
+  if ! $(echo $list | jq -s ''  > "${outputdir}/attribution/go-deps.json"); then
+    echo $list
+    exit 1
+  fi
+  
 
   # go-licenses can be a bit noisy with its output and lot of it can be confusing 
   # the following messages are safe to ignore since we do not need the license url for our process
   NOISY_MESSAGES="cannot determine URL for|Error discovering license URL|unsupported package host|contains non-Go code|has empty version|vendor.*\.s$"
 
-  go-licenses save --force $patterns --save_path="${outputdir}/LICENSES" 2>  >(grep -vE "$NOISY_MESSAGES" >&2)
-  
+  echo "($(pwd)) \$ go-licenses save --force $patterns --save_path ${outputdir}/LICENSES"
+  go-licenses save --force $patterns --save_path "${outputdir}/LICENSES" &>  >(grep -vE "$NOISY_MESSAGES" >&2)
+
+  echo "($(pwd)) \$ go-licenses csv $patterns"
   go-licenses csv $patterns > "${outputdir}/attribution/go-license.csv" 2>  >(grep -vE "$NOISY_MESSAGES" >&2)
 
   if cat "${outputdir}/attribution/go-license.csv" | grep -q "^vendor\/golang.org\/x"; then
@@ -199,14 +201,16 @@ function build::non-golang::copy_licenses(){
 }
 
 function build::generate_attribution(){
+  build::common::override_missing_tooling generate-attribution
+
   local -r project_root=$1
   local -r golang_version=$2
   local -r output_directory=${3:-"${project_root}/_output"}
   local -r attribution_file=${4:-"${project_root}/ATTRIBUTION.txt"}
 
   local -r root_module_name=$(cat ${output_directory}/attribution/root-module.txt)
-  local -r go_path=$(build::common::get_go_path $golang_version)
-  local -r golang_version_tag=$($go_path/go version | grep -o "go[0-9].* ")
+
+  local -r golang_version_tag=$(build::common::use_go_version $golang_version > /dev/null 2>&1 && go version | grep -o "go[0-9].* ")
 
   if cat "${output_directory}/attribution/go-license.csv" | grep -e ",LGPL-" -e ",GPL-"; then
     echo " one of the dependencies is licensed as LGPL or GPL"
@@ -215,7 +219,7 @@ function build::generate_attribution(){
     exit 1
   fi
 
-  generate-attribution $root_module_name $project_root $golang_version_tag $output_directory 
+  build::common::echo_and_run generate-attribution $root_module_name $project_root $golang_version_tag $output_directory 
   cp -f "${output_directory}/attribution/ATTRIBUTION.txt" $attribution_file
 }
 
@@ -225,16 +229,18 @@ function build::common::get_go_path() {
   # This is the path where the specific go binary versions reside in our builder-base image
   local -r gorootbinarypath="/go/go${version}/bin"
   # This is the path that will most likely be correct if running locally
-  local -r gopathbinarypath="$GOPATH/go${version}/bin"
+  local -r gopathbinarypath="${GOPATH:-}/go${version}/bin"
   if [ -d "$gorootbinarypath" ]; then
     echo $gorootbinarypath
   elif [ -d "$gopathbinarypath" ]; then
     echo $gopathbinarypath
-  else
+  elif command -v go &> /dev/null; then
     # not in builder-base, probably running in dev environment
     # return default go installation
     local -r which_go=$(which go)
     echo "$(dirname $which_go)"
+  else
+    echo ""
   fi
 }
 
@@ -242,20 +248,41 @@ function build::common::use_go_version() {
   local -r version=$1
 
   local -r gobinarypath=$(build::common::get_go_path $version)
-  echo "Adding $gobinarypath to PATH"
-  # Adding to the beginning of PATH to allow for builds on specific version if it exists
-  export PATH=${gobinarypath}:$PATH
-  export GOCACHE=$(go env GOCACHE)/$version
+
+  if [ -n "$gobinarypath" ]; then
+    export PATH=${gobinarypath}:$PATH
+    # the GOCACHE needs to be seperated, not preserved, by golang version otherwise it can leak
+    # into future builds effecting checksums and builds in general
+    export GOCACHE=$(go env GOCACHE)/$version
+  fi
+  
+  # if a go path is found above, still override if the version is not
+  # what we expect
+  build::common::override_missing_tooling go $version    
+  
+  
 }
 
-# Use a seperate build cache for each project/version to ensure there are no
-# shared bits which can mess up the final checksum calculation
-# this is mostly needed for create checksums locally since in the builds
-# different versions of the same project are not built in the same container
-function build::common::set_go_cache() {
-  local -r project=$1
-  local -r git_tag=$2
-  export GOCACHE=$(go env GOCACHE)/$project/$git_tag
+function build::common::find_project_root_from_pwd() {
+   # find project root which may not always be in the same relative location to pwd
+  local parts=()
+  local path=$(pwd)
+  while [[ "$(basename $path)" != "projects" ]] && [[ "$path" != "/" ]]; do
+    parts+=($(basename $path))
+    path=$(dirname $path)
+  done
+
+  # this shouldnt really happen in the context of our builds, but there are some cases
+  # where we create tmp directories that will not follow this pattern
+  if [[ "$path" = "/" ]]; then
+    echo $(pwd)
+    return
+  fi
+
+  local -r repo_owner=${parts[-1]}
+  local -r repo=${parts[-2]}
+
+  echo "${path}/${repo_owner}/${repo}"
 }
 
 function build::common::re_quote() {
@@ -368,4 +395,47 @@ function build::bottlerocket::check_release_availablilty() {
     retval=1
   fi
   echo $retval
+}
+
+function build::common::override_missing_tooling() {
+  local -r cmd="$1"
+  local -r version="${2:-}"
+
+  # TEMP
+  if [ "${USE_EXP_BUILDCTL_IN_PRESUBMIT}" = "true" ] && [ "${JOB_TYPE:-}" == "presubmit" ]; then
+    rm -rf /root/sdk /go /usr/bin/generate-attribution
+  fi
+
+  if [[ "$USE_DOCKER" = "false" ]] && 
+    [[ "$USE_BUILDCTL" = "false" ]] &&\
+    command -v $cmd &> /dev/null && \
+    [[ -z "$version" || "$($cmd version)" == *"$version"* ]]; then
+    return
+  fi
+
+  local -r project_root="$(build::common::find_project_root_from_pwd)"
+  local -r overrides_root="${project_root}/_output/.path-overrides"
+  
+  mkdir -p $overrides_root
+  ln -sf $BUILD_ROOT/overrides/$cmd $overrides_root
+  ln -sf $BUILD_ROOT/overrides/run-base $overrides_root
+
+  if [ -n "$version" ]; then
+    echo "$version" > $overrides_root/.${cmd}version
+  fi
+
+  if [[ "$USE_BUILDCTL" = "false" ]] && command -v docker &> /dev/null && docker info > /dev/null 2>&1 ; then
+    echo "Using container image for $cmd $version via docker"
+    echo "true" > $overrides_root/.usedocker
+  else
+    echo "Using container image for $cmd $version via buildctl"
+    echo "false" > $overrides_root/.usedocker
+  fi
+
+  export PATH=${overrides_root}:$PATH
+}
+
+function build::common::echo_and_run() {
+  echo "($(pwd)) \$ $*"
+  "$@"
 }

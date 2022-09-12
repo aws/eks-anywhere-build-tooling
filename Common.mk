@@ -190,7 +190,7 @@ trimap = $(and $(strip $2),$(strip $3),$(strip $4),$(call \
 
 _pos = $(if $(filter $1,$2),$(call _pos,$1,\
        $(call list-rem,$2),x $3),$3)
-pos = $(words $(call _pos,$1,$2))
+pos = $(words $(call _pos,$1,$2,))
 
 # TODO: this exist in the gmsl, https://gmsl.sourceforge.io/
 # look into introducting gmsl for things like this
@@ -334,7 +334,10 @@ GO_MOD_DOWNLOAD_TARGETS?=$(foreach path, $(UNIQ_GO_MOD_PATHS), $(call GO_MOD_DOW
 CGO_CREATE_BINARIES?=false
 CGO_SOURCE=$(OUTPUT_DIR)/source
 IS_ON_BUILDER_BASE?=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
-BUILDER_PLATFORM?=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
+
+BUILDER_PLATFORM_OS:=$(shell uname -s | tr '[:upper:]' '[:lower:]')
+BUILDER_PLATFORM_ARCH:=$(if $(filter x86_64,$(shell uname -m)),amd64,arm64)
+BUILDER_PLATFORM:=$(BUILDER_PLATFORM_OS)/$(BUILDER_PLATFORM_ARCH)
 needs-cgo-builder=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter-out $(1),$(BUILDER_PLATFORM)),true,))
 USE_DOCKER_FOR_CGO_BUILD?=false
 DOCKER_USE_ID_FOR_LINUX=$(shell if [ "$$(uname -s)" = "Linux" ]; then echo "-u $$(id -u $${USER}):$$(id -g $${USER})"; fi)
@@ -390,6 +393,11 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 SPECIAL_TARGET_SECONDARY=$(strip $(PROJECT_DEPENDENCIES_TARGETS) $(GO_MOD_DOWNLOAD_TARGETS))
 SKIP_CHECKSUM_VALIDATION?=false
+# temp - set to true for pojects that can build go/go-licenses/attribution via buildctl containers
+# instead of relying on builder-base. we plan to eventually shrink down the builder base
+# and use this method for all builds
+USE_EXP_BUILDCTL_IN_PRESUBMIT?=true
+export USE_EXP_BUILDCTL_IN_PRESUBMIT:=$(USE_EXP_BUILDCTL_IN_PRESUBMIT)
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
@@ -449,8 +457,8 @@ endif
 $(GIT_CHECKOUT_TARGET): | $(REPO)
 	@rm -f $(REPO)/eks-anywhere-*
 	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
-	git -C $(REPO) checkout -f $(GIT_TAG)
-	touch $@
+	git -C $(REPO) checkout --quiet -f $(GIT_TAG)
+	@touch $@
 
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	git -C $(REPO) config user.email prow@amazonaws.com
@@ -474,8 +482,8 @@ ifneq ($(GIT_TAG),$(HELM_GIT_TAG))
 $(HELM_GIT_CHECKOUT_TARGET): | $(HELM_SOURCE_REPOSITORY)
 	@echo rm -f $(HELM_SOURCE_REPOSITORY)/eks-anywhere-*
 	(cd $(HELM_SOURCE_REPOSITORY) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(HELM_GIT_TAG))
-	git -C $(HELM_SOURCE_REPOSITORY) checkout -f $(HELM_GIT_TAG)
-	touch $@
+	git -C $(HELM_SOURCE_REPOSITORY) checkout --quiet -f $(HELM_GIT_TAG)
+	@touch $@
 endif
 
 $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
@@ -493,7 +501,7 @@ $(OUTPUT_BIN_DIR)/%: SOURCE_PATTERN=$(if $(filter $(BINARY_TARGET),$(BINARY_TARG
 $(OUTPUT_BIN_DIR)/%: OUTPUT_PATH=$(if $(and $(if $(filter false,$(call IS_ONE_WORD,$(BINARY_TARGET_FILES_BUILD_TOGETHER))),$(filter $(BINARY_TARGET),$(BINARY_TARGET_FILES_BUILD_TOGETHER)))),$(@D)/,$@)
 $(OUTPUT_BIN_DIR)/%: GO_MOD_PATH=$($(call GO_MOD_TARGET_FOR_BINARY_VAR_NAME,$(BINARY_TARGET)))
 $(OUTPUT_BIN_DIR)/%: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH))
-	if [ "$(call needs-cgo-builder,$(PLATFORM))" == "true" ]; then \
+	@if [ "$(call needs-cgo-builder,$(PLATFORM))" == "true" ]; then \
 		$(MAKE) binary-builder/cgo/$(PLATFORM:linux/%=%) IMAGE_OUTPUT=dest=$(OUTPUT_BIN_DIR)/$(*D) CGO_TARGET=$@ IMAGE_BUILD_ARGS="GOPROXY COMPONENT CGO_TARGET"; \
 	else \
 		$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_PATH) $(REPO) $(GOLANG_VERSION) $(PLATFORM) "$(SOURCE_PATTERN)" \
@@ -727,6 +735,8 @@ clean-repo:
 
 .PHONY: clean
 clean: $(if $(filter true,$(REPO_NO_CLONE)),,clean-repo)
+#The module cache GOPATH/pkg/mod has no write permissions to prevent accident modifications to the files
+	@chmod -fR 777 _output/.cache &> /dev/null || :
 	@rm -rf _output	
 
 ## --------------------------------------
@@ -793,3 +803,7 @@ create-ecr-repos: $(foreach image,$(IMAGE_NAMES),$(image)/create-ecr-repo) $(if 
 var-value-%:
 	@echo $($*)
 
+.PHONY: run-command-overrides-simple-tests
+run-command-overrides-simple-tests: # *Local Only* testing go/go-licenses/attribution command override mechanism
+run-command-overrides-simple-tests:
+	$(BUILD_LIB)/overrides/simple-tests $(REPO)

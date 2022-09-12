@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -35,6 +34,15 @@ ALL_TARGET_FILES="${13:-}"
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
+function build::simple::print_go_env(){
+  for var in "GOOS" "GOARCH" "CGO_ENABLED" "GOCACHE" "GOFLAGS"; do
+    echo "$var: ${!var:-}"
+    if [ "$var" = "CGO_ENABLED" ] && [ "${!var:-}" = "1" ]; then
+      for other in "CGO_LDFLAGS" "CGO_CFLAGS" "LD_LIBRARY_PATH" "PKG_CONFIG_PATH"; do echo "$other: ${!other:-}"; done
+    fi
+  done
+}
+
 function build::simple::binaries(){
   mkdir -p $(dirname $TARGET_FILE)
   cd "$PROJECT_ROOT/$REPO/$REPO_SUBPATH"
@@ -54,9 +62,9 @@ function build::simple::binaries(){
     if [[ "$TARGET_FILE" == */ ]]; then
       mkdir -p $TARGET_FILE
     fi
-
-    CGO_ENABLED=$CGO_ENABLED GOOS=$OS GOARCH=$ARCH \
-      go $GOBUILD_COMMAND -trimpath -a -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -o $TARGET_FILE $SOURCE_PATTERN
+    export CGO_ENABLED=$CGO_ENABLED GOOS=$OS GOARCH=$ARCH 
+    build::simple::print_go_env
+    build::common::echo_and_run go $GOBUILD_COMMAND -trimpath -a -ldflags "$GO_LDFLAGS" $EXTRA_GOBUILD_FLAGS -o $TARGET_FILE $SOURCE_PATTERN
 
     if [[ "$TARGET_FILE" == */ ]]; then
       # in the case of outputing to a directory, the files will be named by the basename of the source pattern

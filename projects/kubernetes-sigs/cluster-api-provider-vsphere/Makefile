@@ -16,6 +16,7 @@ HAS_S3_ARTIFACTS=true
 
 FIX_LICENSES_VM_OPERATOR_TARGET=$(REPO)/vendor/github.com/vmware-tanzu/vm-operator/external/tanzu-topology/api/v1alpha1/LICENSE.txt
 
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
@@ -24,6 +25,9 @@ s3-artifacts: create-manifests
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_VM_OPERATOR_TARGET)
 
 .PHONY: create-manifests
+create-manifests: MAKEFLAGS=
+create-manifests: export GOOS=$(BUILDER_PLATFORM_OS)
+create-manifests: export GOARCH=$(BUILDER_PLATFORM_ARCH)
 create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
 

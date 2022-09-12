@@ -15,10 +15,13 @@ CAPC_MANIFESTS_TARGET=$(REPO)/pkg/mocks/mock_client.go
 
 HAS_S3_ARTIFACTS=true
 
+
 include $(BASE_DIRECTORY)/Common.mk
 
 $(REPO)/eks-anywhere-go-mod-download: $(CAPC_MANIFESTS_TARGET)
 
+$(CAPC_MANIFESTS_TARGET): export GOOS=$(BUILDER_PLATFORM_OS)
+$(CAPC_MANIFESTS_TARGET): export GOARCH=$(BUILDER_PLATFORM_ARCH)
 $(CAPC_MANIFESTS_TARGET): $(GIT_CHECKOUT_TARGET)
 	echo "Running generate-mocks for capc"
 	source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) && make -C $(REPO) generate-mocks
@@ -27,6 +30,8 @@ s3-artifacts: create-manifests
 
 .PHONY: create-manifests
 create-manifests: export PATH:=$(MAKE_ROOT)/$(OUTPUT_DIR):$(PATH)
+create-manifests: export GOOS=$(BUILDER_PLATFORM_OS)
+create-manifests: export GOARCH=$(BUILDER_PLATFORM_ARCH)
 create-manifests: $(KUSTOMIZE_TARGET) tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
 

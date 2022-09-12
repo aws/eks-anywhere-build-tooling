@@ -20,6 +20,8 @@ EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
 # falls into the second "batch" of builds, not blocking the first batch from finishing
 # since it takes significantly longer
 BUILDSPEC_DEPENDS_ON_OVERRIDE=eksa/kubernetes-sigs/etcdadm
+# mising cgo in builder image
+USE_EXP_BUILDCTL_IN_PRESUBMIT=false
 
 include $(BASE_DIRECTORY)/Common.mk
 

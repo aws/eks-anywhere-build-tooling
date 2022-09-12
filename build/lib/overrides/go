@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
+BUILD_LIB_ROOT="$(cd "$(dirname $(realpath "${BASH_SOURCE[0]}"))/.." && pwd -P)"
+
+source "${BUILD_LIB_ROOT}/common.sh"
+
+# track calls in log file
+echo "$@" >> $SCRIPT_ROOT/.go-call-log
+
+PROJECT_MOUNT=$(realpath .)
+GOLANG_VERSION=$(cat $SCRIPT_ROOT/.goversion)
+
+CONTAINER_IMAGE="public.ecr.aws/k1e6s8o8/eks-distro-minimal-base-golang:${GOLANG_VERSION}-foo.3"
+
+BUILDCTL_TARGET=""
+DOCKERIGNORE_PATHS='$RELATIVE_OUTPUT_MOUNT !$RELATIVE_OUTPUT_MOUNT '
+NEED_STDOUT=false
+GO_BUILD_ARGS="go "
+while test $# -gt 0; do
+  case "$1" in
+    -o)
+        shift
+        # if output directory does exist, assume the format is <output_dir>/<output_filename>
+        if [ ! -d $1 ]; then
+            OUTPUT_MOUNT=$(dirname $1)
+            OUTPUT_FILE=$(basename $1)
+            mkdir -p $OUTPUT_MOUNT
+        else
+            # the target will be a dir when building multiple bins
+            OUTPUT_MOUNT=$(realpath $1)
+            OUTPUT_FILE=""
+        fi      
+        GO_BUILD_ARGS+="-o /output/$OUTPUT_FILE "
+        shift
+        ;;
+    build|test)
+        DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT '
+        GO_BUILD_ARGS+="$1 "
+        GO_BUILD_ARGS="mkdir -p /output && $GO_BUILD_ARGS"
+        shift
+        ;;
+    run)
+        DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT '
+        NEED_STDOUT=true
+        GO_BUILD_ARGS+="$1 "
+        shift
+        ;;
+    list)
+        NEED_STDOUT=true
+        GO_BUILD_ARGS+="$1 "
+        DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT '
+        shift
+        ;;
+    version)
+        NEED_STDOUT=true
+        GO_BUILD_ARGS+="$1 "
+        DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT/Makefile '        
+        shift
+        ;;
+    mod)
+        shift
+        if [[ "$1" = "edit" ]]; then
+            NEED_STDOUT=true
+            DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT/go.mod !$RELATIVE_PROJECT_MOUNT/go.sum !$RELATIVE_PROJECT_MOUNT/*.go '
+        elif [[ "$1" = "vendor" ]] || [[ "$1" = "init" ]]; then
+            DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT '
+            BUILDCTL_TARGET="vendor"
+            GO_BUILD_ARGS="mkdir -p /output && $GO_BUILD_ARGS"
+        fi
+        GO_BUILD_ARGS+="mod $1 "
+        shift
+        ;;
+    env)    
+        shift
+        if [[ "$1" = "GOPROXY" ]]; then
+            echo $GOPROXY;
+        elif [[ "$1" = "GOARCH" ]]; then
+            echo ${GOARCH:-$([[ "$(uname -m)" = "x86_64" ]] && "amd64" || "arm64")};
+        elif [[ "$1" = "GOOS" ]]; then
+            echo ${GOOS:-$(uname -s | tr '[:upper:]' '[:lower:]')}; 
+        elif [[ "$@" = *"-json GOMOD GOPATH"* ]]; then
+            echo '{"GOMOD": "",	"GOPATH": ""}'
+        else
+            # commonly called by project makefiles, all can be returned as empty string
+            # GOBIN, GOPATH, GOMOD
+            echo ""
+        fi
+        exit 0
+        ;;
+    install)
+        if [[ -z "$GOBIN" ]]; then
+            echo "no go bin for install subcommand!"
+            exit 1
+        fi
+       
+        mkdir -p $GOBIN
+        OUTPUT_MOUNT=$(realpath $GOBIN)
+        GO_BUILD_ARGS+="$1 "
+        DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT '
+        BUILDCTL_TARGET="install"
+        shift
+        ;;
+    *)
+        if [[ $1 = *" "* ]]; then
+            GO_BUILD_ARGS+="\"$1\" "
+        else
+            GO_BUILD_ARGS+="$1 "
+        fi
+        shift
+        ;;
+  esac
+done
+
+$SCRIPT_ROOT/run-base "$CONTAINER_IMAGE" "$PROJECT_MOUNT" "${OUTPUT_MOUNT:-}" "$GO_BUILD_ARGS" "$DOCKERIGNORE_PATHS" "$BUILDCTL_TARGET" $NEED_STDOUT
