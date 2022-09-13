@@ -68,7 +68,12 @@ func getBuildToolingPath(cwd string) string {
 }
 
 func getRepoRoot() (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("error retrieving current working directory: %v", err)
+	}
+	buildToolingPath := getBuildToolingPath(cwd)
+	cmd := exec.Command("git", "-C", buildToolingPath, "rev-parse", "--show-toplevel")
 	return execCommandWithStreamOutput(cmd)
 }
 
@@ -79,12 +84,4 @@ func SliceContains(s []string, str string) bool {
 		}
 	}
 	return false
-}
-
-func getCwd() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("error retrieving current working directory: %v", err)
-	}
-	return cwd, nil
 }
