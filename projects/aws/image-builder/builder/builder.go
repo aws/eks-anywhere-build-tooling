@@ -42,6 +42,12 @@ func (b *BuildOptions) BuildImage() {
 		log.Println("Using repo checked out from code commit")
 	}
 
+	supportedReleaseBranches := GetSupportedReleaseBranches()
+	if !SliceContains(supportedReleaseBranches, b.ReleaseChannel) {
+		cleanup(buildToolingRepoPath)
+		log.Fatalf("release-channel should be one of %v", supportedReleaseBranches)
+	}
+
 	imageBuilderProjectPath := filepath.Join(buildToolingRepoPath, "projects/kubernetes-sigs/image-builder")
 	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, "image-builder/images/capi")
 	var outputArtifactPath string
@@ -150,11 +156,6 @@ func (b *BuildOptions) ValidateInputs() {
 
 	if b.Hypervisor == Baremetal && b.Os == RedHat {
 		log.Fatalf("Redhat is not supported with baremetal hypervisor. Please choose vsphere to build Redhat")
-	}
-
-	supportedReleaseBranches := GetSupportedReleaseBranches()
-	if !SliceContains(supportedReleaseBranches, b.ReleaseChannel) {
-		log.Fatalf("release-channel should be one of %v", supportedReleaseBranches)
 	}
 
 	// Validate vsphere config inputs

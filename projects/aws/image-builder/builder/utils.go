@@ -13,20 +13,18 @@ func cloneRepo(cloneUrl, destination string) error {
 	log.Print("Cloning eks-anywhere-build-tooling...")
 	cloneRepoCommandSequence := fmt.Sprintf("git clone %s %s", cloneUrl, destination)
 	cmd := exec.Command("bash", "-c", cloneRepoCommandSequence)
-	out, err := execCommandWithStreamOutput(cmd)
-	fmt.Println(out)
-	return err
+	return execCommandWithStreamOutput(cmd)
 }
 
-func execCommandWithStreamOutput(cmd *exec.Cmd) (string, error) {
+func execCommandWithStreamOutput(cmd *exec.Cmd) error {
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	log.Printf("Executing command: %v\n", cmd)
-	commandOutput, err := cmd.CombinedOutput()
-	commandOutputStr := strings.TrimSpace(string(commandOutput))
-
+	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("failed to run command: %v", err)
+		return fmt.Errorf("failed to run command: %v", err)
 	}
-	return commandOutputStr, nil
+	return nil
 }
 
 func executeMakeBuildCommand(buildCommand string, envVars ...string) error {
@@ -35,9 +33,7 @@ func executeMakeBuildCommand(buildCommand string, envVars ...string) error {
 	for _, envVar := range envVars {
 		cmd.Env = append(cmd.Env, envVar)
 	}
-	out, err := execCommandWithStreamOutput(cmd)
-	fmt.Println(out)
-	return err
+	return execCommandWithStreamOutput(cmd)
 }
 
 func cleanup(buildToolingDir string) {
@@ -76,7 +72,11 @@ func getRepoRoot() (string, error) {
 	}
 	buildToolingPath := getBuildToolingPath(cwd)
 	cmd := exec.Command("git", "-C", buildToolingPath, "rev-parse", "--show-toplevel")
-	return execCommandWithStreamOutput(cmd)
+	commandOut, err := execCommand(cmd)
+	if err != nil {
+		return "", err
+	}
+	return commandOut, nil
 }
 
 func SliceContains(s []string, str string) bool {
@@ -86,4 +86,15 @@ func SliceContains(s []string, str string) bool {
 		}
 	}
 	return false
+}
+
+func execCommand(cmd *exec.Cmd) (string, error) {
+	log.Printf("Executing command: %v\n", cmd)
+	commandOutput, err := cmd.CombinedOutput()
+	commandOutputStr := strings.TrimSpace(string(commandOutput))
+
+	if err != nil {
+		return "", fmt.Errorf("failed to run command: %v", err)
+	}
+	return commandOutputStr, nil
 }
