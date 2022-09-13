@@ -16,9 +16,13 @@ const (
 var (
 	codebuild = os.Getenv("CODEBUILD_CI")
 )
+
 func (b *BuildOptions) BuildImage() {
 	// Clone build tooling repo
-	cwd, err := getCwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("error retrieving current working directory: %v", err)
+	}
 	buildToolingRepoPath := getBuildToolingPath(cwd)
 
 	if b.Force && codebuild != "true" {
