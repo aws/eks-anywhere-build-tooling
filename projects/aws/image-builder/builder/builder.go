@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	buildToolingRepoUrl = "https://github.com/vignesh-goutham/eks-anywhere-build-tooling.git"
+	buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
 )
 
 var (
@@ -166,7 +166,7 @@ func (b *BuildOptions) ValidateInputs() {
 			}
 
 			if b.VsphereConfig.IsoUrl == "" {
-				log.Fatalf("\"iso_url\" is a required field in vpshere-config when os is redhat")
+				log.Fatalf("\"iso_url\" is a required field in vsphere-config when os is redhat")
 			}
 		}
 
