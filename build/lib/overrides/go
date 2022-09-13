@@ -58,10 +58,15 @@ while test $# -gt 0; do
 done
 
 if [[ "$USE_DOCKER" = "true" ]] ; then
+    USER_ID=""
+    if [ "$(uname -s)" = "Linux" ]; then
+        USER_ID="-u $(id -u ${USER}):$(id -g ${USER})"
+    fi
+
     docker run \
         --mount type=bind,source=$PROJECT_MOUNT,target=/project $EXTRA_MOUNTS -w /project \
         --mount type=bind,source=$GOCACHE,target=/.cache/build \
-        --mount type=bind,source=$GOMODCACHE,target=/.cache/mod \
+        --mount type=bind,source=$GOMODCACHE,target=/.cache/mod $USER_ID \
         -e CGO_ENABLED=${CGO_ENABLED:-0} -e GOOS=${GOOS:-} -e GOARCH=${GOARCH:-} -e GOPROXY=${GOPROXY:-direct} \
         -e GOCACHE=/.cache/build -e GOMODCACHE=/.cache/mod \
         $CONTAINER_IMAGE go "${ARGS[@]}"

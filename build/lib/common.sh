@@ -118,8 +118,6 @@ function build::gather_licenses() {
     exit
   fi
 
-  set -x
-
   mkdir -p "${outputdir}/attribution"
   # attribution file generated uses the output go-deps and go-license to gather the necessary
   # data about each dependency to generate the amazon approved attribution.txt files
@@ -216,7 +214,8 @@ function build::generate_attribution(){
     exit 1
   fi
 
-  generate-attribution $root_module_name $project_root $golang_version_tag $output_directory 
+  # TODO go version needs to come from image
+  generate-attribution $root_module_name $project_root "1.18" $output_directory 
   cp -f "${output_directory}/attribution/ATTRIBUTION.txt" $attribution_file
 }
 

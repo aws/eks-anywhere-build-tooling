@@ -32,9 +32,14 @@ OUTPUT_DIR="$4"
 USE_DOCKER=$(cat $SCRIPT_ROOT/.usedocker)
 
 if [[ "$USE_DOCKER" = "true" ]] ; then
+    USER_ID=""
+    if [ "$(uname -s)" = "Linux" ]; then
+        USER_ID="-u $(id -u ${USER}):$(id -g ${USER})"
+    fi
+
     docker run \
         --mount type=bind,source="$PROJECT_ROOT",target=/project \
-        --mount type=bind,source="$OUTPUT_DIR",target=/output \
+        --mount type=bind,source="$OUTPUT_DIR",target=/output $USER_ID \
         --entrypoint node $CONTAINER_IMAGE --dns-result-order=ipv4first generate-attribution-file.js $ROOT_MODULE_NAME /project $GOLANG_VERSION_TAG /output
 
     exit $?

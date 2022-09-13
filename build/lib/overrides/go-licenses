@@ -47,8 +47,13 @@ while test $# -gt 0; do
 done
 
 if [[ "$USE_DOCKER" = "true" ]] ; then
+    USER_ID=""
+    if [ "$(uname -s)" = "Linux" ]; then
+        USER_ID="-u $(id -u ${USER}):$(id -g ${USER})"
+    fi
+
     docker run \
-        --mount type=bind,source=$PROJECT_MOUNT,target=/project $EXTRA_MOUNTS -w /project \
+        --mount type=bind,source=$PROJECT_MOUNT,target=/project $EXTRA_MOUNTS -w /project $USER_ID \
         -e GOFLAGS=$GOFLAGS -e GOOS=$GOOS -e GOARCH=$GOARCH \
         $CONTAINER_IMAGE "${ARGS[@]}"
 
