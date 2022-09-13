@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,7 +11,7 @@ import (
 )
 
 const (
-	buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
+	buildToolingRepoUrl = "https://github.com/vignesh-goutham/eks-anywhere-build-tooling.git"
 )
 
 var (
@@ -45,20 +46,33 @@ func (b *BuildOptions) BuildImage() {
 	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, "image-builder/images/capi")
 	var outputArtifactPath string
 	var outputImageGlob []string
+	commandEnvVars := []string{fmt.Sprintf("RELEASE_BRANCH=%s", b.ReleaseChannel)}
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Hypervisor: %s\n", b.Os, b.Hypervisor)
 	if b.Hypervisor == VSphere {
 		// Read and set the vsphere connection data
-		vsphereConfigData, err := os.ReadFile(b.VsphereConfig)
+		vsphereConfigData, err := json.Marshal(b.VsphereConfig)
 		if err != nil {
-			log.Fatalf("Error reading the vsphere config file")
+			log.Fatalf("Error marshalling vsphere config data")
 		}
 		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/ova/vsphere.json"), vsphereConfigData, 0644)
 		if err != nil {
 			log.Fatalf("Error writing vsphere config file to packer")
 		}
-		buildCommand := fmt.Sprintf("make -C %s local-build-ova-ubuntu-2004", imageBuilderProjectPath)
-		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
+
+		var buildCommand string
+		switch b.Os {
+		case Ubuntu:
+			buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-2004", imageBuilderProjectPath)
+		case RedHat:
+			buildCommand = fmt.Sprintf("make -C %s local-build-ova-rhel-7", imageBuilderProjectPath)
+			commandEnvVars = append(commandEnvVars,
+				fmt.Sprintf("RHSM_USERNAME=%s", b.VsphereConfig.RhelUsername),
+				fmt.Sprintf("RHSM_PASSWORD=%s", b.VsphereConfig.RhelPassword),
+			)
+		}
+
+		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for vsphere hypervisor: %v", err)
 		}
@@ -75,7 +89,7 @@ func (b *BuildOptions) BuildImage() {
 		if b.Os == Ubuntu {
 			// Patch firmware config for tool
 			upstreamPatchCommand := fmt.Sprintf("make -C %s image-builder/eks-anywhere-patched", imageBuilderProjectPath)
-			if err = executeMakeBuildCommand(upstreamPatchCommand, b.ReleaseChannel); err != nil {
+			if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
 				log.Fatalf("Error executing upstream patch command")
 			}
 
@@ -96,7 +110,7 @@ func (b *BuildOptions) BuildImage() {
 			log.Println("Patched upstream firmware config file")
 		}
 		buildCommand := fmt.Sprintf("make -C %s local-build-raw-ubuntu-2004-efi", imageBuilderProjectPath)
-		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
+		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
 		}
@@ -125,8 +139,8 @@ func (b *BuildOptions) BuildImage() {
 
 func (b *BuildOptions) ValidateInputs() {
 	b.Os = strings.ToLower(b.Os)
-	if b.Os != Ubuntu {
-		log.Fatalf("Invalid OS type. Please choose ubuntu")
+	if b.Os != Ubuntu && b.Os != RedHat {
+		log.Fatalf("Invalid OS type. Please choose ubuntu or redhat")
 	}
 
 	b.Hypervisor = strings.ToLower(b.Hypervisor)
@@ -134,18 +148,37 @@ func (b *BuildOptions) ValidateInputs() {
 		log.Fatalf("Invalid hypervisor. Please choose vsphere or baremetal")
 	}
 
-	if b.Hypervisor == VSphere && b.VsphereConfig == "" {
-		log.Fatalf("vsphere-config is a required flag for vsphere hypervisor")
-	}
-
-	var err error
-	b.VsphereConfig, err = filepath.Abs(b.VsphereConfig)
-	if err != nil {
-		log.Fatalf("Error converting vsphere config path to absolute")
+	if b.Hypervisor == Baremetal && b.Os == RedHat {
+		log.Fatalf("Redhat is not supported with baremetal hypervisor. Please choose vsphere to build Redhat")
 	}
 
 	supportedReleaseBranches := GetSupportedReleaseBranches()
 	if !SliceContains(supportedReleaseBranches, b.ReleaseChannel) {
 		log.Fatalf("release-channel should be one of %v", supportedReleaseBranches)
+	}
+
+	// Validate vsphere config inputs
+	if b.VsphereConfig != nil {
+		// Validate Rhel username and password
+		if b.Os == RedHat {
+			if b.VsphereConfig.RhelUsername == "" || b.VsphereConfig.RhelPassword == "" {
+				log.Fatalf("\"rhel_username\" and \"rhel_username\" are required fields in vsphere-config when os is redhat")
+			}
+
+			if b.VsphereConfig.IsoUrl == "" {
+				log.Fatalf("\"iso_url\" is a required field in vpshere-config when os is redhat")
+			}
+		}
+
+		// Validate iso checksum and checksum type was provided
+		if b.VsphereConfig.IsoUrl != "" {
+			if b.VsphereConfig.IsoChecksum == "" {
+				log.Fatalf("Please provide a valid checksum for \"iso_checksum\" when providing \"iso_url\"")
+			}
+
+			if b.VsphereConfig.IsoChecksumType != "sha256" && b.VsphereConfig.IsoChecksumType != "sha512" {
+				log.Fatalf("\"iso_checksum_type\" is a required field when providing iso_checksum. Checksum type can be sha256 or sha512")
+			}
+		}
 	}
 }

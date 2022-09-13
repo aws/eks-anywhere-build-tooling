@@ -29,10 +29,12 @@ func execCommandWithStreamOutput(cmd *exec.Cmd) (string, error) {
 	return commandOutputStr, nil
 }
 
-func executeMakeBuildCommand(buildCommand, releaseChannel string) error {
+func executeMakeBuildCommand(buildCommand string, envVars ...string) error {
 	cmd := exec.Command("bash", "-c", buildCommand)
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("RELEASE_BRANCH=%s", releaseChannel))
+	for _, envVar := range envVars {
+		cmd.Env = append(cmd.Env, envVar)
+	}
 	out, err := execCommandWithStreamOutput(cmd)
 	fmt.Println(out)
 	return err
