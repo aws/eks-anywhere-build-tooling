@@ -19,8 +19,6 @@ func cloneRepo(cloneUrl, destination string) error {
 }
 
 func execCommandWithStreamOutput(cmd *exec.Cmd) (string, error) {
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 	log.Printf("Executing command: %v\n", cmd)
 	commandOutput, err := cmd.CombinedOutput()
 	commandOutputStr := strings.TrimSpace(string(commandOutput))
