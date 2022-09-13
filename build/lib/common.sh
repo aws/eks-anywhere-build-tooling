@@ -118,12 +118,15 @@ function build::gather_licenses() {
     exit
   fi
 
+  set -x
+
   mkdir -p "${outputdir}/attribution"
   # attribution file generated uses the output go-deps and go-license to gather the necessary
   # data about each dependency to generate the amazon approved attribution.txt files
   # go-deps is needed for module versions
   # go-licenses are all the dependencies found from the module(s) that were passed in via patterns
-  go list -deps=true -json ./... | jq -s ''  > "${outputdir}/attribution/go-deps.json"
+  local -r list=$(go list -deps=true -json ./...)
+  echo $list | jq -s ''  > "${outputdir}/attribution/go-deps.json"
 
   # go-licenses can be a bit noisy with its output and lot of it can be confusing 
   # the following messages are safe to ignore since we do not need the license url for our process

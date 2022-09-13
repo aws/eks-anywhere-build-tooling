@@ -79,14 +79,43 @@ RELATIVE_OUTPUT_MOUNT=$(realpath --relative-to=$CONTEXT $OUTPUT_MOUNT)
 RELATIVE_GOCACHE_MOUNT=$(realpath --relative-to=$CONTEXT $GOCACHE)
 RELATIVE_GOMODCACHE_MOUNT=$(realpath --relative-to=$CONTEXT $GOMODCACHE)
 
+LOG_FILE=$(mktemp)
+trap "rm -f $LOG_FILE" EXIT
+#BUILDCTL_OUTPUT="2>&1 > $LOG_FILE"
 if [[ $GO_BUILD_ARGS == *"go \"mod\" \"vendor\""* ]]; then
     TARGET="vendor"
+    #BUILDCTL_OUTPUT=""
+    cat << EOF > $DOCKERFILE_DIR/Dockerfile.dockerignore
+*
+!$RELATIVE_PROJECT_MOUNT/go.mod
+!$RELATIVE_PROJECT_MOUNT/go.sum
+!$RELATIVE_PROJECT_MOUNT/*.go
+EOF
+
 elif [[ $GO_BUILD_ARGS == *"go \"build\""* ]]; then
     TARGET="build"
+    #BUILDCTL_OUTPUT=""
+    cat << EOF > $DOCKERFILE_DIR/Dockerfile.dockerignore
+*
+!$RELATIVE_PROJECT_MOUNT
+EOF
+
 elif [[ $GO_BUILD_ARGS == *"go \"list\""* ]]; then
     TARGET="list"
+    cat << EOF > $DOCKERFILE_DIR/Dockerfile.dockerignore
+*
+!$RELATIVE_PROJECT_MOUNT
+EOF
+
 elif [[ $GO_BUILD_ARGS == *"go \"mod\" \"edit\""* ]]; then
     TARGET="mod-edit"
+    cat << EOF > $DOCKERFILE_DIR/Dockerfile.dockerignore
+*
+!$RELATIVE_PROJECT_MOUNT/go.mod
+!$RELATIVE_PROJECT_MOUNT/go.sum
+!$RELATIVE_PROJECT_MOUNT/*.go
+EOF
+
 else
     echo "unexpected go subcommand: ${GO_BUILD_ARGS}"
     exit 1
@@ -123,8 +152,7 @@ COPY --from=run /build-output ./
 EOF
 
 
-LOG_FILE=$(mktemp)
-trap "rm -f $LOG_FILE" EXIT
+
 if ! $BUILD_LIB_ROOT/buildkit.sh build \
     --frontend dockerfile.v0 \
     --local dockerfile=$DOCKERFILE_DIR \
