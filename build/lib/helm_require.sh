@@ -39,7 +39,7 @@ cat >${REQUIRES_FILE} <<!
 ---
 kind: EksaPackageRequires
 metadata:
-  name: ${HELM_DESTINATION_REPOSITORY}-${IMAGE_TAG/v}
+  name: ${HELM_DESTINATION_REPOSITORY}-${HELM_TAG/v}
   namespace: eksa-packages
 spec:
   images:
@@ -71,8 +71,19 @@ do
   else
     USE_TAG=$TAG
   fi
+  # If IMAGE_TAG is different from HELM_TAG, we are using images from upstream.
+  # Though we pull images directly from upstream for build tooling checks (i.e.
+  # get images shasums), we will use cached images in the helm charts. Cached
+  # images follow the convention of ${PROJECT_NAME}/${UPSTREAM_IMAGE_NAME}.
+  if [ "${IMAGE_TAG}" != "${HELM_TAG}" ]
+  then
+    PROJECT_NAME=$(echo "$HELM_DESTINATION_REPOSITORY" | awk -F "/" '{print $1}')
+    IMAGE_REPO="${PROJECT_NAME}/${IMAGE}"
+  else
+    IMAGE_REPO="${IMAGE}"
+  fi
   cat >>${REQUIRES_FILE} <<!
-  - repository: ${IMAGE}
+  - repository: ${IMAGE_REPO}
     tag: ${USE_TAG}
     digest: ${IMAGE_SHASUM}
 !
