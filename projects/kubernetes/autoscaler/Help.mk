@@ -7,20 +7,20 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `cloud-provider-vsphere`
+clone-repo:  ## Clone upstream `autoscaler`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `vsphere-cloud-controller-manager` for `linux/amd64 linux/arm64`
-_output/1-21/bin/cloud-provider-vsphere/linux-amd64/vsphere-cloud-controller-manager: ## Build `_output/1-21/bin/cloud-provider-vsphere/linux-amd64/vsphere-cloud-controller-manager`
-_output/1-21/bin/cloud-provider-vsphere/linux-arm64/vsphere-cloud-controller-manager: ## Build `_output/1-21/bin/cloud-provider-vsphere/linux-arm64/vsphere-cloud-controller-manager`
+binaries: ## Build all binaries: `cluster-autoscaler` for `linux/amd64 linux/arm64`
+_output/1-21/bin/autoscaler/linux-amd64/cluster-autoscaler: ## Build `_output/1-21/bin/autoscaler/linux-amd64/cluster-autoscaler`
+_output/1-21/bin/autoscaler/linux-arm64/cluster-autoscaler: ## Build `_output/1-21/bin/autoscaler/linux-arm64/cluster-autoscaler`
 
 ##@ Image Targets
-local-images: ## Builds `cloud-provider-vsphere/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `cloud-provider-vsphere/images/push` to IMAGE_REPO
-cloud-provider-vsphere/images/amd64: ## Builds/pushes `cloud-provider-vsphere/images/amd64`
-cloud-provider-vsphere/images/push: ## Builds/pushes `cloud-provider-vsphere/images/push`
+local-images: ## Builds `autoscaler/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `autoscaler/images/push` to IMAGE_REPO
+autoscaler/images/amd64: ## Builds/pushes `autoscaler/images/amd64`
+autoscaler/images/push: ## Builds/pushes `autoscaler/images/push`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
@@ -47,6 +47,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images   attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images  `
 ########### END GENERATED ###########################
