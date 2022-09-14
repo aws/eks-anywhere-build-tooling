@@ -163,7 +163,7 @@ func (b *BuildOptions) ValidateInputs() {
 		// Validate Rhel username and password
 		if b.Os == RedHat {
 			if b.VsphereConfig.RhelUsername == "" || b.VsphereConfig.RhelPassword == "" {
-				log.Fatalf("\"rhel_username\" and \"rhel_username\" are required fields in vsphere-config when os is redhat")
+				log.Fatalf("\"rhel_username\" and \"rhel_password\" are required fields in vsphere-config when os is redhat")
 			}
 
 			if b.VsphereConfig.IsoUrl == "" {
