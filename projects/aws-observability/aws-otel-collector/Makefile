@@ -1,6 +1,9 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
+GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
+IMAGE_TAG=$(GIT_TAG)
+HELM_TAG=$(GIT_TAG)-$(GIT_HASH)
 
 REGISTRY=public.ecr.aws/aws-observability
 COLLECTOR_IMAGE=aws-otel-collector
