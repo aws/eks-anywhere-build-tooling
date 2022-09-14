@@ -31,7 +31,7 @@ OUTPUT_DIR="${5?Fifth arguement is output directory}"
 LATEST_TAG="${6?Sixth arguement is latest tag}"
 
 SEMVER="${HELM_TAG#[^0-9]}" # remove any leading non-digits
-SEMVER_GIT_TAG="${GIT_TAG#[^0-9]}"
+SEMVER_GIT_TAG="${GIT_TAG#[^0-9:main]}"
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
