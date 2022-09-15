@@ -1,6 +1,9 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
 HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
+ # Upstream images are used directly without re-building and re-tagging in build
+ # tooling, so the IMAGE_TAG needs to be overwritten to match upstream ECR tags.
+IMAGE_TAG=$(GIT_TAG)
 
 REGISTRY=public.ecr.aws/aws-observability
 COLLECTOR_IMAGE=aws-otel-collector
