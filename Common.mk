@@ -8,7 +8,6 @@ SHELL=bash
 RELEASE_ENVIRONMENT?=development
 
 GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
-GIT_BRANCH:=$(shell git rev-parse --abbrev-ref HEAD)
 
 COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
@@ -149,8 +148,8 @@ IMAGE_IMPORT_CACHE?=type=registry,ref=$(LATEST_IMAGE) type=registry,ref=$(subst 
 
 BUILD_OCI_TARS?=false
 
-LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64) $(if $(filter true,$(HELM_PULL)),helm/pull,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) 
-IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push)) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) 
+LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/amd64)
+IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push))
 
 # If running in the builder base on prow or codebuild, grab the current tag to be used when building with cgo
 CURRENT_BUILDER_BASE_TAG=$(or $(and $(wildcard /config/BUILDER_BASE_TAG_FILE),$(shell cat /config/BUILDER_BASE_TAG_FILE)),latest)
@@ -163,6 +162,7 @@ HELM_SOURCE_OWNER?=$(REPO_OWNER)
 HELM_SOURCE_REPOSITORY?=$(REPO)
 HELM_SOURCE_IMAGE_REPO?=$(IMAGE_REPO)
 HELM_GIT_TAG?=$(GIT_TAG)
+HELM_TAG?=$(IMAGE_TAG)
 HELM_DIRECTORY?=.
 HELM_DESTINATION_REPOSITORY?=$(IMAGE_COMPONENT)
 HELM_IMAGE_LIST?=
@@ -383,8 +383,8 @@ SKIP_CHECKSUM_VALIDATION?=false
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
-RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
+RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
 define BUILDCTL
@@ -661,14 +661,14 @@ helm/build: $(LICENSES_TARGETS_FOR_PREREQ)
 helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
 	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(LATEST) $(HELM_IMAGE_LIST)
+	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(LATEST) $(HELM_IMAGE_LIST)
 	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
 helm/push: helm/build
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(IMAGE_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
 ## Fetch Binary Targets
 .PHONY: handle-dependencies 
@@ -686,10 +686,13 @@ build: $(BUILD_TARGETS)
 .PHONY: release
 release: $(RELEASE_TARGETS)
 
+# Iterate over release branch versions, skipping version if directory not present
 .PHONY: %/release-branches/all
 %/release-branches/all:
 	@for version in $(SUPPORTED_K8S_VERSIONS) ; do \
-		$(MAKE) $* RELEASE_BRANCH=$$version; \
+	    if [ -d "$$version" ]; then \
+			$(MAKE) $* RELEASE_BRANCH=$$version; \
+		fi \
 	done;
 
 ###  Clean Targets

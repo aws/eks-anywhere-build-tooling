@@ -7,12 +7,10 @@
 
 
 ##@ Image Targets
-local-images: ## Builds `tinkerbell-chart/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `tinkerbell-chart/images/push helm/push` to IMAGE_REPO
+local-images: ## Builds `tinkerbell-chart/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `tinkerbell-chart/images/push` to IMAGE_REPO
 tinkerbell-chart/images/amd64: ## Builds/pushes `tinkerbell-chart/images/amd64`
-helm/build: ## Builds/pushes `helm/build`
 tinkerbell-chart/images/push: ## Builds/pushes `tinkerbell-chart/images/push`
-helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets
 helm/build: ## Build helm chart

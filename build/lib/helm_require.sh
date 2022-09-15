@@ -23,8 +23,9 @@ IMAGE_REGISTRY="${1?First argument is registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
 OUTPUT_DIR="${3?Third argument is output directory}"
 IMAGE_TAG="${4?Fourth argument is image tag}"
-LATEST="${5?Fifth argument is latest tag}"
-HELM_IMAGE_LIST="${@:6}"
+HELM_TAG="${5?Seventh argument is helm tag}"
+LATEST="${6?Fifth argument is latest tag}"
+HELM_IMAGE_LIST="${@:7}"
 
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
@@ -38,7 +39,7 @@ cat >${REQUIRES_FILE} <<!
 ---
 kind: EksaPackageRequires
 metadata:
-  name: ${HELM_DESTINATION_REPOSITORY}-${IMAGE_TAG/v}
+  name: ${HELM_DESTINATION_REPOSITORY}-${HELM_TAG/v}
   namespace: eksa-packages
 spec:
   images:
@@ -46,13 +47,14 @@ spec:
 JSON_SCHEMA_FILE=helm/schema.json
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 export IMAGE_TAG
+export HELM_TAG
 export HELM_REGISTRY=$(aws ecr-public describe-registries --region us-east-1  --output text --query 'registries[*].registryUri')
 envsubst <helm/sedfile.template >${SEDFILE}
 # Semver requires that our version begin with a digit, so strip the v.
 echo "s,version: v,version: ,g" >>${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
 do
-  if [ "${IMAGE}" == "${HELM_DESTINATION_REPOSITORY}" ]
+  if [ "${IMAGE}" == "${HELM_DESTINATION_REPOSITORY}" ] || [ "${IMAGE_TAG}" != "${HELM_TAG}" ]
   then
     TAG="${IMAGE_TAG}"
   else
@@ -69,8 +71,19 @@ do
   else
     USE_TAG=$TAG
   fi
+  # If IMAGE_TAG is different from HELM_TAG, we are using images from upstream.
+  # Though we pull images directly from upstream for build tooling checks (i.e.
+  # get images shasums), we will use cached images in the helm charts. Cached
+  # images follow the convention of ${PROJECT_NAME}/${UPSTREAM_IMAGE_NAME}.
+  if [ "${IMAGE_TAG}" != "${HELM_TAG}" ]
+  then
+    PROJECT_NAME=$(echo "$HELM_DESTINATION_REPOSITORY" | awk -F "/" '{print $1}')
+    IMAGE_REPO="${PROJECT_NAME}/${IMAGE}"
+  else
+    IMAGE_REPO="${IMAGE}"
+  fi
   cat >>${REQUIRES_FILE} <<!
-  - repository: ${IMAGE}
+  - repository: ${IMAGE_REPO}
     tag: ${USE_TAG}
     digest: ${IMAGE_SHASUM}
 !

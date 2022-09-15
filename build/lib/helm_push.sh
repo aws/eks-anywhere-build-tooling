@@ -25,13 +25,13 @@ fi
 
 IMAGE_REGISTRY="${1?First argument is image registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
-IMAGE_TAG="${3?Third argument is image tag}"
+HELM_TAG="${3?Third argument is helm tag}"
 GIT_TAG="${4?Fourth arguement is the Git Tag}"
 OUTPUT_DIR="${5?Fifth arguement is output directory}"
 LATEST_TAG="${6?Sixth arguement is latest tag}"
 
-SEMVER="${IMAGE_TAG#[^0-9]}" # remove any leading non-digits
-SEMVER_GIT_TAG="${GIT_TAG#[^0-9]}"
+SEMVER="${HELM_TAG#[^0-9]}" # remove any leading non-digits
+SEMVER_GIT_TAG="${GIT_TAG#[^0-9:main]}"
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})

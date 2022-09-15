@@ -13,21 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Key for bundles manifest is environment/branch_name
+# Key for bundles manifest is environment/latest
 # example key = "dev/release-1.20"
 declare -A BUNDLE_MANIFEST=()
 
 function build::eksa_releases::load_bundle_manifest() {
   local -r dev_release=${1-false}
-  local -r branch_name=${2-main}
+  local -r latest=${2-latest}
   local -r echo=${3-true}
   oldopt=$-
   set +o nounset
   set +x
 
-  local -r bundle_manifest_key=$(build::eksa_releases::get_bundle_manifest_key $dev_release $branch_name)
+  local -r bundle_manifest_key=$(build::eksa_releases::get_bundle_manifest_key $dev_release $latest)
   if [ ! ${BUNDLE_MANIFEST[$bundle_manifest_key]+1} ]; then
-    local -r release_manifest_url=$(build::eksa_releases::get_eksa_release_manifest_url $dev_release $branch_name)
+    local -r release_manifest_url=$(build::eksa_releases::get_eksa_release_manifest_url $dev_release $latest)
     local -r release_manifest=$(curl -s --retry 5 $release_manifest_url)
 
     local -r latest_version=$(echo "$release_manifest" | yq e ".spec.latestVersion" -)
@@ -45,9 +45,9 @@ function build::eksa_releases::get_eksa_component_asset_url() {
   local -r asset=$2
   local -r release_branch=$3
   local -r dev_release=${4-false}
-  local -r branch_name=${5-main}
+  local -r latest=${5-main}
 
-  build::eksa_releases::get_eksa_component_asset_path $release_branch ".$component.$asset.uri" $dev_release $branch_name
+  build::eksa_releases::get_eksa_component_asset_path $release_branch ".$component.$asset.uri" $dev_release $latest
 }
 
 function build::eksa_releases::get_eksa_component_asset_artifact_checksum() {
@@ -56,26 +56,26 @@ function build::eksa_releases::get_eksa_component_asset_artifact_checksum() {
   local -r type=$3
   local -r release_branch=$4
   local -r dev_release=${5-false}
-  local -r branch_name=${6-main}
+  local -r latest=${6-main}
 
   if [[ $type != "sha256" ]] && [[ $type != "sha512" ]]; then
     echo "Invalid shasum type. Allowed types are sha256 and sha512"
   fi
 
-  build::eksa_releases::get_eksa_component_asset_path $release_branch ".$component.$asset.$type" $dev_release $branch_name
+  build::eksa_releases::get_eksa_component_asset_path $release_branch ".$component.$asset.$type" $dev_release $latest
 }
 
 function build::eksa_releases::get_eksa_component_asset_path() {
   local -r release_branch=$1
   local -r path=$2
   local -r dev_release=${3-false}
-  local -r branch_name=${4-main}
+  local -r latest=${4-main}
 
   oldopt=$-
   set +x
 
   # Get latest bundle manifest url
-  local bundle_manifest=$(build::eksa_releases::load_bundle_manifest $dev_release $branch_name)
+  local bundle_manifest=$(build::eksa_releases::load_bundle_manifest $dev_release $latest)
   local kube_version=$(echo $release_branch | sed 's/\-/\./g')
 
   local query=".spec.versionsBundles[] | select(.kubeVersion == \"$kube_version\") $path"
@@ -87,25 +87,25 @@ function build::eksa_releases::get_eksa_component_asset_path() {
 
 function build::eksa_releases::get_eksa_release_manifest_url() {
   local -r dev_release=${1-false}
-  local -r branch_name=${2-main}
+  local -r latest=${2-latest}
 
   if [[ $dev_release == false ]]; then
     echo "https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml"
-  elif [[ $branch_name == "main" ]]; then
+  elif [[ $latest == "latest" ]]; then
     echo "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/eks-a-release.yaml"
   else
-    echo "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/$branch_name/eks-a-release.yaml"
+    echo "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/$latest/eks-a-release.yaml"
   fi
 }
 
 function build::eksa_releases::get_bundle_manifest_key() {
   local -r dev_release=${1-false}
-  local -r branch_name=${2-main}
+  local -r latest=${2-latest}
 
   local environment="prod"
   if [ $dev_release == true ]; then
     environment="dev"
   fi
 
-  echo "$environment/$branch_name"
+  echo "$environment/$latest"
 }

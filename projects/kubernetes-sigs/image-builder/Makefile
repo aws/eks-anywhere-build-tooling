@@ -1,4 +1,5 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+MAKE_ROOT=$(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder
 GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO=image-builder
@@ -46,6 +47,7 @@ ADDITIONAL_PAUSE_1-20_FROM=1-19
 ADDITIONAL_PAUSE_1-21_FROM=1-20
 ADDITIONAL_PAUSE_1-22_FROM=1-21
 ADDITIONAL_PAUSE_1-23_FROM=1-22
+ADDITIONAL_PAUSE_1-24_FROM=1-23
 
 HAS_RELEASE_BRANCHES=true
 HAS_LICENSES=false
@@ -61,15 +63,21 @@ FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
 FINAL_BOTTLEROCKET_RAW_PATH=$(ARTIFACTS_PATH)/raw/bottlerocket/bottlerocket.img.gz
 FAKE_UBUNTU_OVA_PATH=fake-ubuntu.ova
 FAKE_UBUNTU_RAW_PATH=fake-ubuntu.gz
+BOTTLEROCKET_OVA_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ova-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
+BOTTLEROCKET_RAW_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
 
 IMAGE_OS?=ubuntu
 IMAGE_FORMAT?=
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
-BUILD_OVA_TARGETS=setup-packer-configs-ova download-bottlerocket-ova $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH) $(FINAL_BOTTLEROCKET_OVA_PATH) upload-artifacts-ova upload-bottlerocket-ova
+BUILD_OVA_TARGETS=setup-packer-configs-ova  $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH)  upload-artifacts-ova
 BUILD_RAW_TARGETS=release-raw-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
-ifneq ($(RELEASE_BRANCH),1-20)
+ifneq ($(BOTTLEROCKET_RAW_RELEASE_VERSION),null)
 	BUILD_RAW_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
 endif
+ifneq ($(BOTTLEROCKET_OVA_RELEASE_VERSION),null)
+	BUILD_OVA_TARGETS+=download-bottlerocket-ova $(FINAL_BOTTLEROCKET_OVA_PATH) upload-bottlerocket-ova
+endif
+
 BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
 ifeq ($(IMAGE_FORMAT),ova)
 	ifeq ($(IMAGE_OS),ubuntu)
@@ -171,7 +179,7 @@ deps-%: $(GIT_PATCH_TARGET)
 
 .PHONY: setup-packer-configs-%
 setup-packer-configs-%:
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(GIT_BRANCH) $(IMAGE_BUILDER_DIR)
+	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR)
 
 .PHONY: build-ami-ubuntu-2004
 build-ami-ubuntu-2004: MAKEFLAGS=
@@ -197,14 +205,14 @@ release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 release-ova-%:
 	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT)
 
-.PHONY: local-build-ova-ubuntu-2004
-local-build-ova-ubuntu-2004: MAKEFLAGS=
-local-build-ova-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
-local-build-ova-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
-local-build-ova-ubuntu-2004: deps-ova setup-packer-configs-ova
+.PHONY: local-build-ova-%
+local-build-ova-%: MAKEFLAGS=
+local-build-ova-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
+local-build-ova-%: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
+local-build-ova-%: deps-ova setup-packer-configs-ova
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-ubuntu-2004
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-$*
 
 .PHONY: download-bottlerocket-%
 download-bottlerocket-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket

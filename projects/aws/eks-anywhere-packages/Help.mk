@@ -18,14 +18,12 @@ _output/bin/eks-anywhere-packages/linux-arm64/package-manager: ## Build `_output
 _output/bin/eks-anywhere-packages/linux-arm64/ecrtokenrefresher: ## Build `_output/bin/eks-anywhere-packages/linux-arm64/ecrtokenrefresher`
 
 ##@ Image Targets
-local-images: ## Builds `eks-anywhere-packages/images/amd64 ecrtokenrefresher/images/amd64 helm/build` as oci tars for presumbit validation
-images: ## Pushes `eks-anywhere-packages/images/push ecrtokenrefresher/images/push helm/push` to IMAGE_REPO
+local-images: ## Builds `eks-anywhere-packages/images/amd64 ecrtokenrefresher/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `eks-anywhere-packages/images/push ecrtokenrefresher/images/push` to IMAGE_REPO
 eks-anywhere-packages/images/amd64: ## Builds/pushes `eks-anywhere-packages/images/amd64`
 ecrtokenrefresher/images/amd64: ## Builds/pushes `ecrtokenrefresher/images/amd64`
-helm/build: ## Builds/pushes `helm/build`
 eks-anywhere-packages/images/push: ## Builds/pushes `eks-anywhere-packages/images/push`
 ecrtokenrefresher/images/push: ## Builds/pushes `ecrtokenrefresher/images/push`
-helm/push: ## Builds/pushes `helm/push`
 
 ##@ Helm Targets
 helm/build: ## Build helm chart
@@ -56,6 +54,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images helm/build  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images helm/push `
 ########### END GENERATED ###########################

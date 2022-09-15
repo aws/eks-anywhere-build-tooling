@@ -59,6 +59,7 @@ The key pieces to setup in the Makefile  are:
 	These names need to match `IMAGE_NAME` in the below variable `<IMAGE_NAME>_IMAGE`.
 * <IMAGE_NAME>_IMAGE_COMPONENT (optional) - Common Makefile will use this if set to override the default 
 	component in the `IMAGE` variable.  By default `IMAGE` will be set to `$(IMAGE_REPO)/$(COMPONENT):$(IMAGE_TAG)`
+* GO_MOD_PATHS (optional) - Use this config if your targeted go.mod files are not in the project root.`
 
 ### Scripts
 
