@@ -154,6 +154,30 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
+	} else if b.Hypervisor == NutanixAHV {
+		// Read and set the vsphere connection data
+		nutnaixAHVConfigData, err := os.ReadFile(b.NutanixAHVConfig)
+		if err != nil {
+			log.Fatalf("Error reading the nutanix ahv config file")
+		}
+		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutnaixAHVConfigData, 0644)
+		if err != nil {
+			log.Fatalf("Error writing nutanix ahv config file to packer")
+		}
+		buildCommand := fmt.Sprintf("make -C %s local-build-nutanix-ahv-ubuntu-2004", imageBuilderProjectPath)
+		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
+		if err != nil {
+			log.Fatalf("Error executing image-builder for nutanix ahv hypervisor: %v", err)
+		}
+
+		// Move the output qcow2 to cwd
+		outputImageGlob, err = filepath.Glob(filepath.Join(upstreamImageBuilderProjectPath, "output/*.qcow2"))
+		if err != nil {
+			log.Fatalf("Error getting glob for output files: %v", err)
+		}
+		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.qcow2", b.Os))
+
+		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	}
 
 	// Moving artifacts from upstream directory to cwd

@@ -1,20 +1,22 @@
 package builder
 
 const (
-	Ubuntu    string = "ubuntu"
-	RedHat    string = "redhat"
-	VSphere   string = "vsphere"
-	Baremetal string = "baremetal"
+	Ubuntu     string = "ubuntu"
+	RedHat     string = "redhat"
+	VSphere    string = "vsphere"
+	Baremetal  string = "baremetal"
+	NutanixAHV string = "nutanixahv"
 )
 
 type BuildOptions struct {
-	Os              string
-	Hypervisor      string
-	VsphereConfig   *VsphereConfig
-	BaremetalConfig *BaremetalConfig
-	ReleaseChannel  string
-	artifactsBucket string
-	Force           bool
+	Os               string
+	Hypervisor       string
+	VsphereConfig    *VsphereConfig
+	BaremetalConfig  *BaremetalConfig
+	NutanixAHVConfig string
+	ReleaseChannel   string
+	artifactsBucket  string
+	Force            bool
 }
 
 type VsphereConfig struct {

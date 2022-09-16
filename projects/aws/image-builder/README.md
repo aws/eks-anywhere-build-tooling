@@ -8,6 +8,7 @@ The tool always builds an image with the latest release artifacts and latest OS 
 Supported Providers
 * vsphere
 * baremetal
+* nutanixahv
 
 Supported OSes
 * ubuntu
@@ -157,4 +158,50 @@ export the following proxy environment variables
 export HTTP_PROXY=<HTTP proxy URL e.g. http://proxy.corp.com:80>
 export HTTPS_PROXY=<HTTPS proxy URL e.g. http://proxy.corp.com:443>
 export NO_PROXY=<No proxy>
+```
+
+### Building Node Images for Nutanix AHV
+
+Nutanix is one of the supported infrastructure providers the Image builder tool can build EKS-A node images for. In order
+to build a node image for Nuntaix AHV, the image builder tool needs to run from an environment with network access to Nutanix Prism Central Endpoint.
+
+#### Pre-reqs for Nutanix AHV Image Builder
+* Machine running Ubuntu 22.04 that has access to the Nutanix Prism Central environment. This machine could also run as a vm on Nutanix AHV Prism Element.
+* Nutanix Prism Central user with permissions listed below
+* Minimum machine resources required
+  * 50 GB disk space on the machine
+  * 2 vCPUs
+  * 8 GB RAM
+* Machine as well as Nutanix Prism Central network used below must have network access to
+  * Nutanix Prism Central endpoint
+  * public.ecr.aws (to download container images from EKS-A)
+  * anywhere-assets.eks.amazonaws.com (to download EKS-A binaries)
+  * distro.eks.amazonaws.com (to download EKS-D binaries)
+  * d2glxqk2uabbnd.cloudfront.net (for EKS-A and EKS-D ECR container images)
+
+#### Building a Nutanix AHV Node Image
+1. Install pre-requisite packages
+```
+sudo apt update -y
+sudo apt install jq unzip make ansible -y
+sudo snap install yq
+```
+2. Build or download the image builder tool
+4. Create nutanix-connection.json config file
+```
+{
+  "nutanix_cluster_name": "",
+  "image_name": "",
+  "source_image_name": "",
+  "nutanix_endpoint": "",
+  "nutanix_insecure": "",
+  "nutanix_port": "9440",
+  "nutanix_username": "",
+  "nutanix_password": "",
+  "nutanix_subnet_name": ""
+}
+```
+5. Run the image builder tool for appropriate release channel
+```
+image-builder build --os ubuntu --hypervisor vsphere --nutanix-config <path to above json file> --release-channel <release channel, ex 1-23>
 ```
