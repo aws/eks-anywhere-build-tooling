@@ -1,21 +1,21 @@
 package builder
 
 const (
-	Ubuntu    string = "ubuntu"
-	RedHat    string = "redhat"
-	VSphere   string = "vsphere"
-	Baremetal string = "baremetal"
-	NutanixAHV       string = "nutanixahv"
+	Ubuntu     string = "ubuntu"
+	RedHat     string = "redhat"
+	VSphere    string = "vsphere"
+	Baremetal  string = "baremetal"
+	NutanixAHV string = "nutanixahv"
 )
 
 type BuildOptions struct {
-	Os              string
-	Hypervisor      string
-	VsphereConfig   string
-	NutanixAHVConfig   string
-	ReleaseChannel  string
-	artifactsBucket string
-	Force           bool
+	Os               string
+	Hypervisor       string
+	VsphereConfig    *VsphereConfig
+	NutanixAHVConfig *NutanixAHVConfig
+	ReleaseChannel   string
+	artifactsBucket  string
+	Force            bool
 }
 
 type VsphereConfig struct {
@@ -38,4 +38,16 @@ type VsphereConfig struct {
 	IsoChecksumType    string `json:"iso_checksum_type,omitempty"`
 	RhelUsername       string `json:"rhel_username"`
 	RhelPassword       string `json:"rhel_password"`
+}
+
+type NutanixAHVConfig struct {
+	ClusterName       string `json:nutanix_cluster_name`
+	ImageName         string `json:image_name`
+	SourceImageName   string `json:source_image_name`
+	NutanixEndpoint   string `json:nutanix_endpoint`
+	NutanixInsecure   string `json:nutanix_insecure`
+	NutanixPort       string `json:nutanix_port`
+	NutanixUserName   string `json:nutanix_username`
+	NutanixPassword   string `json:nutanix_password`
+	NutanixSubnetName string `json:nutanix_subnet_name`
 }

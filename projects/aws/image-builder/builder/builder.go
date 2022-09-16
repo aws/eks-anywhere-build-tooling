@@ -129,11 +129,11 @@ func (b *BuildOptions) BuildImage() {
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
 	} else if b.Hypervisor == NutanixAHV {
 		// Read and set the vsphere connection data
-		nutnaixAHVConfigData, err := os.ReadFile(b.NutanixAHVConfig)
+		nutanixAHVConfigData, err := json.Marshal(b.NutanixAHVConfig)
 		if err != nil {
-			log.Fatalf("Error reading the nutanix ahv config file")
+			log.Fatalf("Error marshalling nutanix ahv config data")
 		}
-		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutnaixAHVConfigData, 0644)
+		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
 		if err != nil {
 			log.Fatalf("Error writing nutanix ahv config file to packer")
 		}
@@ -174,8 +174,8 @@ func (b *BuildOptions) ValidateInputs() {
 	}
 
 	b.Hypervisor = strings.ToLower(b.Hypervisor)
-	if (b.Hypervisor != VSphere) && (b.Hypervisor != Baremetal) {
-		log.Fatalf("Invalid hypervisor. Please choose vsphere or baremetal")
+	if (b.Hypervisor != VSphere) && (b.Hypervisor != Baremetal) && (b.Hypervisor != NutanixAHV) {
+		log.Fatalf("Invalid hypervisor. Please choose vsphere or baremetal or nutanixahv")
 	}
 
 	if b.Hypervisor == Baremetal && b.Os == RedHat {
@@ -205,5 +205,18 @@ func (b *BuildOptions) ValidateInputs() {
 				log.Fatalf("\"iso_checksum_type\" is a required field when providing iso_checksum. Checksum type can be sha256 or sha512")
 			}
 		}
+	}
+
+	// Validate nutanix ahv config inputs
+	if b.NutanixAHVConfig != nil {
+		// Validate prism central username and password
+		if b.NutanixAHVConfig.NutanixUserName == "" || b.NutanixAHVConfig.NutanixPassword == "" {
+			log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
+		}
+
+		if b.VsphereConfig.IsoUrl == "" {
+			log.Fatalf("\"iso_url\" is a required field in vsphere-config when os is redhat")
+		}
+		// TODO Validate other fields as well
 	}
 }
