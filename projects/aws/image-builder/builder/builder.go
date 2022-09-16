@@ -156,11 +156,11 @@ func (b *BuildOptions) BuildImage() {
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
 	} else if b.Hypervisor == NutanixAHV {
 		// Read and set the vsphere connection data
-		nutnaixAHVConfigData, err := os.ReadFile(b.NutanixAHVConfig)
+		nutanixAHVConfigData, err := json.Marshal(b.NutanixAHVConfig)
 		if err != nil {
-			log.Fatalf("Error reading the nutanix ahv config file")
+			log.Fatalf("Error marshalling nutanix ahv config data")
 		}
-		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutnaixAHVConfigData, 0644)
+		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
 		if err != nil {
 			log.Fatalf("Error writing nutanix ahv config file to packer")
 		}
