@@ -203,5 +203,5 @@ sudo snap install yq
 ```
 5. Run the image builder tool for appropriate release channel
 ```
-image-builder build --os ubuntu --hypervisor vsphere --nutanix-config <path to above json file> --release-channel <release channel, ex 1-23>
+image-builder build --os ubuntu --hypervisor nutanixahv --nutanix-config <path to above json file> --release-channel <release channel, ex 1-23>
 ```
