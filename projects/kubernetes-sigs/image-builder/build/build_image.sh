@@ -34,12 +34,15 @@ if [[ $image_format == "ova" ]]; then
   echo "${VSPHERE_CONNECTION_DATA}" > $vsphere_config_file
 
   # Run image-builder cli
-  if [[ $image_os == "ubuntu" ]]; then
-    "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel
-  elif [[ $image_os == "rhel" ]]; then
-    echo "Redhat image building is not yet supported"
-    exit 1
+  if [[ $image_os == "rhel" ]]; then
+    echo "$(jq --arg rhel_username $RHSM_USERNAME \
+               --arg rhel_password $RHSM_PASSWORD \
+               --arg iso_url "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/7.9/rhel-server-7.9-x86_64-dvd.iso" \
+               --arg iso_checksum_type "sha256" \
+               --arg iso_checksum "2cb36122a74be084c551bc7173d2d38a1cfb75c8ffbc1489c630c916d1b31b25" \
+               '. += {"rhel_username": $rhel_username, "rhel_password": $rhel_password, "iso_url": $iso_url, "iso_checksum_type": $iso_checksum_type, "iso_checksum": $iso_checksum}' $vsphere_config_file)" > $vsphere_config_file
   fi
+  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel
 elif [[ $image_format == "raw" ]]; then
   # Run image-builder cli
   if [[ $image_os == "ubuntu" ]]; then
