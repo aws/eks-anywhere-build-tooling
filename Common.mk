@@ -163,6 +163,8 @@ HELM_SOURCE_REPOSITORY?=$(REPO)
 HELM_SOURCE_IMAGE_REPO?=$(IMAGE_REPO)
 HELM_GIT_TAG?=$(GIT_TAG)
 HELM_TAG?=$(GIT_TAG)-$(GIT_HASH)
+HELM_USE_UPSTREAM_IMAGE?=false
+# HELM_DIRECTORY must be a relative path from project root to the directory that contains a chart
 HELM_DIRECTORY?=.
 HELM_DESTINATION_REPOSITORY?=$(IMAGE_COMPONENT)
 HELM_IMAGE_LIST?=
@@ -449,7 +451,9 @@ $(REPO)/%ks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(
 ifneq ($(REPO),$(HELM_SOURCE_REPOSITORY))
 $(HELM_SOURCE_REPOSITORY):
 	git clone $(HELM_CLONE_URL) $(HELM_SOURCE_REPOSITORY)
+endif
 
+ifneq ($(GIT_TAG),$(HELM_GIT_TAG))
 $(HELM_GIT_CHECKOUT_TARGET): | $(HELM_SOURCE_REPOSITORY)
 	@echo rm -f $(HELM_SOURCE_REPOSITORY)/eks-anywhere-*
 	(cd $(HELM_SOURCE_REPOSITORY) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(HELM_GIT_TAG))
@@ -460,7 +464,7 @@ endif
 $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
 	git -C $(HELM_SOURCE_REPOSITORY) config user.email prow@amazonaws.com
 	git -C $(HELM_SOURCE_REPOSITORY) config user.name "Prow Bot"
-	git -C $(HELM_SOURCE_REPOSITORY) am --committer-date-is-author-date $(wildcard $(MAKE_ROOT)/helm/patches)/*
+	git -C $(HELM_SOURCE_REPOSITORY) am --committer-date-is-author-date $(wildcard $(PROJECT_ROOT)/helm/patches)/*
 	@touch $@
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
@@ -659,9 +663,9 @@ helm/pull:
 .PHONY: helm/build
 helm/build: $(LICENSES_TARGETS_FOR_PREREQ)
 helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
-helm/build: $(if $(wildcard $(MAKE_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
 	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(LATEST) $(HELM_IMAGE_LIST)
+	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
 	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
 
