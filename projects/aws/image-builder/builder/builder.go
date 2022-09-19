@@ -137,7 +137,10 @@ func (b *BuildOptions) BuildImage() {
 		if err != nil {
 			log.Fatalf("Error writing nutanix ahv config file to packer")
 		}
-		buildCommand := fmt.Sprintf("make -C %s local-build-nutanix-ahv-ubuntu-2004", imageBuilderProjectPath)
+		// TODO In absence of nutanix package plugin not being merged
+		// ref: https://github.com/kubernetes-sigs/image-builder/pull/921/files
+		// use following else it would be "make -C %s  build-nutanix-ubuntu-2004"
+		buildCommand := fmt.Sprintf("make -C %s build-qemu-ubuntu-2004", imageBuilderProjectPath)
 		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for nutanix ahv hypervisor: %v", err)
