@@ -128,15 +128,16 @@ func (b *BuildOptions) BuildImage() {
 
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
 	} else if b.Hypervisor == NutanixAHV {
-		// Read and set the vsphere connection data
-		nutanixAHVConfigData, err := json.Marshal(b.NutanixAHVConfig)
-		if err != nil {
-			log.Fatalf("Error marshalling nutanix ahv config data")
-		}
-		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
-		if err != nil {
-			log.Fatalf("Error writing nutanix ahv config file to packer")
-		}
+		// Read and set the nutanix connection data
+		// TODO Uncomment following once packer plugin is enabled
+		// nutanixAHVConfigData, err := json.Marshal(b.NutanixAHVConfig)
+		// if err != nil {
+		// 	log.Fatalf("Error marshalling nutanix ahv config data")
+		// }
+		// err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
+		// if err != nil {
+		// 	log.Fatalf("Error writing nutanix ahv config file to packer")
+		// }
 		// TODO In absence of nutanix package plugin not being merged
 		// ref: https://github.com/kubernetes-sigs/image-builder/pull/921/files
 		// use following else it would be "make -C %s  build-nutanix-ubuntu-2004"
