@@ -135,7 +135,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
 		if err != nil {
-			log.Fatalf("Error writing nutanix ahv config file to packer")
+			log.Fatalf("Error writing nutanix ahv config file to packer: %v", err)
 		}
 
 		buildCommand := fmt.Sprintf("make -C %s build-nutanix-ubuntu-2004", imageBuilderProjectPath)
