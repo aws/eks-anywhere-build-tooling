@@ -28,6 +28,7 @@ HELM_SOURCE_REPOSITORY=opentelemetry-helm-charts
 HELM_DIRECTORY=charts/opentelemetry-collector
 HELM_DESTINATION_REPOSITORY=adot/charts/aws-otel-collector
 HELM_IMAGE_LIST=aws-observability/aws-otel-collector
+HELM_USE_UPSTREAM_IMAGE=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
