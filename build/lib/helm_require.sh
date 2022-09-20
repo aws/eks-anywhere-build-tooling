@@ -23,9 +23,11 @@ IMAGE_REGISTRY="${1?First argument is registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
 OUTPUT_DIR="${3?Third argument is output directory}"
 IMAGE_TAG="${4?Fourth argument is image tag}"
-HELM_TAG="${5?Seventh argument is helm tag}"
-LATEST="${6?Fifth argument is latest tag}"
-HELM_IMAGE_LIST="${@:7}"
+HELM_TAG="${5?Fifth argument is helm tag}"
+PROJECT_ROOT="${6?Sixth argument is project root}"
+LATEST="${7?Seventh argument is latest tag}"
+HELM_USE_UPSTREAM_IMAGE="${8?Eigth argument is bool determining whether to use cached upstream images}"
+HELM_IMAGE_LIST="${@:9}"
 
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
@@ -49,7 +51,7 @@ SEDFILE=${OUTPUT_DIR}/helm/sedfile
 export IMAGE_TAG
 export HELM_TAG
 export HELM_REGISTRY=$(aws ecr-public describe-registries --region us-east-1  --output text --query 'registries[*].registryUri')
-envsubst <helm/sedfile.template >${SEDFILE}
+envsubst <$PROJECT_ROOT/helm/sedfile.template >${SEDFILE}
 # Semver requires that our version begin with a digit, so strip the v.
 echo "s,version: v,version: ,g" >>${SEDFILE}
 for IMAGE in ${HELM_IMAGE_LIST:-}
@@ -71,11 +73,11 @@ do
   else
     USE_TAG=$TAG
   fi
-  # If IMAGE_TAG is different from HELM_TAG, we are using images from upstream.
+  # If HELM_USE_UPSTREAM_IMAGE is true, we are using images from upstream.
   # Though we pull images directly from upstream for build tooling checks (i.e.
   # get images shasums), we will use cached images in the helm charts. Cached
   # images follow the convention of ${PROJECT_NAME}/${UPSTREAM_IMAGE_NAME}.
-  if [ "${IMAGE_TAG}" != "${HELM_TAG}" ]
+  if [ "${HELM_USE_UPSTREAM_IMAGE}" == true ]
   then
     PROJECT_NAME=$(echo "$HELM_DESTINATION_REPOSITORY" | awk -F "/" '{print $1}')
     IMAGE_REPO="${PROJECT_NAME}/${IMAGE}"
