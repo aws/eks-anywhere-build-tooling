@@ -129,19 +129,16 @@ func (b *BuildOptions) BuildImage() {
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
 	} else if b.Hypervisor == NutanixAHV {
 		// Read and set the nutanix connection data
-		// TODO Uncomment following once packer plugin is enabled
-		// nutanixAHVConfigData, err := json.Marshal(b.NutanixAHVConfig)
-		// if err != nil {
-		// 	log.Fatalf("Error marshalling nutanix ahv config data")
-		// }
-		// err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
-		// if err != nil {
-		// 	log.Fatalf("Error writing nutanix ahv config file to packer")
-		// }
-		// TODO In absence of nutanix package plugin not being merged
-		// ref: https://github.com/kubernetes-sigs/image-builder/pull/921/files
-		// use following else it would be "make -C %s  build-nutanix-ubuntu-2004"
-		buildCommand := fmt.Sprintf("make -C %s build-qemu-ubuntu-2004", imageBuilderProjectPath)
+		nutanixAHVConfigData, err := json.Marshal(b.NutanixAHVConfig)
+		if err != nil {
+			log.Fatalf("Error marshalling nutanix ahv config data")
+		}
+		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
+		if err != nil {
+			log.Fatalf("Error writing nutanix ahv config file to packer")
+		}
+
+		buildCommand := fmt.Sprintf("make -C %s build-nutanix-ubuntu-2004", imageBuilderProjectPath)
 		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for nutanix ahv hypervisor: %v", err)
@@ -218,9 +215,6 @@ func (b *BuildOptions) ValidateInputs() {
 			log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
 		}
 
-		if b.VsphereConfig.IsoUrl == "" {
-			log.Fatalf("\"iso_url\" is a required field in vsphere-config when os is redhat")
-		}
 		// TODO Validate other fields as well
 	}
 }
