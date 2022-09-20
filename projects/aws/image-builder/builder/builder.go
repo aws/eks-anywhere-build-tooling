@@ -160,12 +160,12 @@ func (b *BuildOptions) BuildImage() {
 		if err != nil {
 			log.Fatalf("Error marshalling nutanix ahv config data")
 		}
-		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
+		err = ioutil.WriteFile(filepath.Join(upstreamImageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixAHVConfigData, 0644)
 		if err != nil {
 			log.Fatalf("Error writing nutanix ahv config file to packer: %v", err)
 		}
 
-		buildCommand := fmt.Sprintf("make -C %s build-nutanix-ubuntu-2004", imageBuilderProjectPath)
+		buildCommand := fmt.Sprintf("make -C %s build-nutanix-ubuntu-2004", upstreamImageBuilderProjectPath)
 		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for nutanix ahv hypervisor: %v", err)
