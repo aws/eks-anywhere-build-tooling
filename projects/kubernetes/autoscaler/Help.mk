@@ -22,6 +22,10 @@ images: ## Pushes `autoscaler/images/push` to IMAGE_REPO
 autoscaler/images/amd64: ## Builds/pushes `autoscaler/images/amd64`
 autoscaler/images/push: ## Builds/pushes `autoscaler/images/push`
 
+##@ Helm Targets
+helm/build: ## Build helm chart
+helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
+
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
@@ -47,6 +51,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images   attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images  `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images helm/build  attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images helm/push `
 ########### END GENERATED ###########################
