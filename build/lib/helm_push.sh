@@ -29,9 +29,14 @@ HELM_TAG="${3?Third argument is helm tag}"
 GIT_TAG="${4?Fourth arguement is the Git Tag}"
 OUTPUT_DIR="${5?Fifth arguement is output directory}"
 LATEST_TAG="${6?Sixth arguement is latest tag}"
+SEMVER_GIT_TAG="${GIT_TAG#[^0-9:main]}"
 
 SEMVER="${HELM_TAG#[^0-9]}" # remove any leading non-digits
-SEMVER_GIT_TAG="${GIT_TAG#[^0-9:main]}"
+SEMVER_REGEX='^([0-9]+\.){0,2}(\*|[0-9]+)$'
+if [[ ! $SEMVER_GIT_TAG =~ $SEMVER_REGEX ]]; then
+  # if not a valid semver, fallback to helm tag semver
+  SEMVER_GIT_TAG=SEMVER
+fi
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
