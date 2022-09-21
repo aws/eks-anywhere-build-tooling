@@ -14,7 +14,7 @@ If the upstream repositories are Amazon-owned, the Amazon-built promise has been
 
 One thing to keep in mind is that we cannot default to use upstream images just because they are Amazon-built. Different Amazon teams have different approaches to software development and releases, and other teams' approach may not be compatible with EKS-A packages. Therefore, using existing Amazon-built images require a careful review of how the images
 are built and how the Amazon team that owns the images is maintaining 
-them. Refer to internal doc *Curated Package Support Model* for more guidance.
+them.
 
 ### If there are Amazon-built images, why don't we use them directly?
 
