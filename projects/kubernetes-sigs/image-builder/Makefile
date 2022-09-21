@@ -86,7 +86,7 @@ ifeq ($(IMAGE_FORMAT),ova)
 	else ifeq ($(IMAGE_OS),bottlerocket)
 		S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_OVA_PATH)
 		RELEASE_TARGETS=download-bottlerocket-ova upload-bottlerocket-ova
-	else ifeq ($(IMAGE_OS),rhel)
+	else ifeq ($(IMAGE_OS),redhat)
 		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH)
 		RELEASE_TARGETS=release-ova-$(IMAGE_OS) upload-artifacts-ova
 	else
