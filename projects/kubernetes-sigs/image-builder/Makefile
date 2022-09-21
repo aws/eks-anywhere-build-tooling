@@ -32,7 +32,7 @@ PACKER_OVA_VAR_FILES=$(MAKE_ROOT)/packer/ova/vsphere-library.json
 PACKER_OVA_VAR_FILES+=$(PACKER_OVA_CONF_FILE)
 
 PACKER_TYPE_VAR_FILES?=
-PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(PACKER_TYPE_VAR_FILES) $(FULL_OUTPUT_DIR)/config/common.json $(FULL_OUTPUT_DIR)/config/cni.json $(FULL_OUTPUT_DIR)/config/additional_components.json
+PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(FULL_OUTPUT_DIR)/config/common.json $(FULL_OUTPUT_DIR)/config/cni.json $(FULL_OUTPUT_DIR)/config/additional_components.json $(PACKER_TYPE_VAR_FILES)
 
 # Kubeadm hardcodes the version of the pause image it pulls, even tho containerd config
 # overrides which image is actually used
@@ -236,11 +236,11 @@ build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_O
 build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
 	build/build_qemu_rhel_local.sh $(MAKE_ROOT) $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
 
-.PHONY: local-build-raw-ubuntu-2004-efi
-local-build-raw-ubuntu-2004-efi: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/raw/$(IMAGE_OS)
-local-build-raw-ubuntu-2004-efi: deps-raw setup-packer-configs-raw
+.PHONY: local-build-raw-%
+local-build-raw-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/raw/$(IMAGE_OS)
+local-build-raw-%: deps-raw setup-packer-configs-raw
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-raw-ubuntu-2004-efi
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-raw-$*
 
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
