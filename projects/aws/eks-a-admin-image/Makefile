@@ -12,7 +12,7 @@ REPO=eks-a-admin-image
 REPO_OWNER=aws
 
 BUILD_TARGETS=validate
-RELEASE_TARGETS=build-raw-image
+RELEASE_TARGETS=latest-snow-raw-image
 
 PACKER_VERSION=1.8.0
 
@@ -58,13 +58,13 @@ $(PACKER):
 	rm packer.zip
 
 $(FULL_OUTPUT_DIR):
-	mkdir -p $(@D)
+	mkdir -p $@
 
 $(AMI_OUTPUT_DIR): $(FULL_OUTPUT_DIR)
-	mkdir -p $(@D)
+	mkdir -p $@
 
 $(OVA_OUTPUT_DIR): $(FULL_OUTPUT_DIR)
-	mkdir -p $(@D)
+	mkdir -p $@
 
 .PHONY: latest-snow-raw-image
 latest-snow-raw-image: EKSA_VERSION?=$(shell EKSA_RELEASE_MANIFEST_URL=$(EKSA_RELEASE_MANIFEST_URL) ./build/get_latest_eksa_version_by_date.sh)
