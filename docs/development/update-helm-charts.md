@@ -28,14 +28,16 @@ Following changes need to be made to the `values.yaml` file:
     - Add / modify  this field with value `{{${Image}}}`.
     - As part of the helm chart build process, [helm_require.sh](https://github.com/aws/eks-anywhere-build-tooling/blob/main/build/lib/helm_require.sh) will replace the `{{${IMAGE}}}` with `${IMAGE_SHASUM}`. In the example of [project metallb](https://github.com/aws/eks-anywhere-build-tooling/tree/main/projects/metallb/metallb), `{{metallb/controller}}` will be replaced with the shasum of image `metallb/controller` before packaging the helm chart. You can verify if this update is performed successfully by reviewing the generated `sedfile` under `_output/helm`.
     - To test the helm chart outside of the `eks-anywhere-build-tooling`, you can hardcode this value.
-- `imagePullSecrets:name` or similar field
-    - Add / modify this field with value `regcred`.
+- `imagePullSecrets` or similar field
+    - Add field if it doesnt exist. No value is needed.
+- `defaultNamespace` or similar field
+    - Add/ modify this field with value of where the default namespace for the project installation
 
 ### Update `templates` directory
 Following changes need to be made to the `yaml` files under `templates`:
 
 - `metadata:namespace` or similar field
-    - Add / modify this field with value `{{ .Release.Namespace | quote }}`.
+    - Add / modify this field with value `{{ .Release.Namespace | default .Values.defaultNamespace | quote }}`.
     - Note not all resources are in a namespace, so not all yaml files require the namespace metadata. Examples of resources not included in a namespace include `nodes`, `persistentvolumes`, `clusterrolebindings`, `clusterroles`, `csidrivers`, etc.
     You can look up if your resource is in (or not in) a namespace by running the following commands:
         ```bash
