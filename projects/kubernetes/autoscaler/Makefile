@@ -6,6 +6,7 @@ REPO=autoscaler
 REPO_OWNER=kubernetes
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
+SKIPPED_K8S_VERSIONS=1-20
 
 BINARY_TARGET_FILES=cluster-autoscaler
 SOURCE_PATTERNS=.

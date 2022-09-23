@@ -74,6 +74,8 @@ REPO_SPARSE_CHECKOUT?=
 HAS_RELEASE_BRANCHES?=false
 RELEASE_BRANCH?=
 SUPPORTED_K8S_VERSIONS:=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_BRANCHES)
+# Comma-separated list of Kubernetes versions to skip building artifacts for
+SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
 IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums,$(MAKECMDGOALS)))
@@ -690,11 +692,11 @@ build: $(BUILD_TARGETS)
 .PHONY: release
 release: $(RELEASE_TARGETS)
 
-# Iterate over release branch versions, skipping version if directory not present
+# Iterate over release branch versions, avoiding branches explicitly marked as skipped
 .PHONY: %/release-branches/all
 %/release-branches/all:
 	@for version in $(SUPPORTED_K8S_VERSIONS) ; do \
-	    if [ -d "$$version" ]; then \
+	    if ! [[ "$(SKIPPED_K8S_VERSIONS)" =~ $$version  ]]; then \
 			$(MAKE) $* RELEASE_BRANCH=$$version; \
 		fi \
 	done;
