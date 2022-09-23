@@ -171,21 +171,16 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error executing image-builder for nutanix ahv hypervisor: %v", err)
 		}
 
-		// Move the output qcow2 to cwd
-		outputImageGlob, err = filepath.Glob(filepath.Join(upstreamImageBuilderProjectPath, "output/*.qcow2"))
-		if err != nil {
-			log.Fatalf("Error getting glob for output files: %v", err)
-		}
-		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.qcow2", b.Os))
-
-		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
+		log.Printf("Image Build Successful\n Please find the image uploaded under Nutanix Image Service with name %s\n", b.NutanixAHVConfig.ImageName)
 	}
 
-	// Moving artifacts from upstream directory to cwd
-	log.Println("Moving artifacts from build directory to current working directory")
-	err = os.Rename(outputImageGlob[0], outputArtifactPath)
-	if err != nil {
-		log.Fatalf("Error moving output file to current working directory")
+	if outputArtifactPath != "" {
+		// Moving artifacts from upstream directory to cwd
+		log.Println("Moving artifacts from build directory to current working directory")
+		err = os.Rename(outputImageGlob[0], outputArtifactPath)
+		if err != nil {
+			log.Fatalf("Error moving output file to current working directory")
+		}
 	}
 
 	if codebuild != "true" {
