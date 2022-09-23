@@ -103,9 +103,9 @@ else ifeq ($(IMAGE_FORMAT),raw)
 		else
 			RELEASE_TARGETS=
 		endif
-	else ifeq ($(IMAGE_OS),rhel)
+	else ifeq ($(IMAGE_OS),redhat)
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
-		RELEASE_TARGETS=release-raw-rhel-8 upload-artifacts-raw
+		RELEASE_TARGETS=release-raw-$(IMAGE_OS) upload-artifacts-raw
 	endif
 else
 	S3_TARGET_PREREQUISITES?=
