@@ -28,6 +28,8 @@ Following changes need to be made to the `values.yaml` file:
     - Add / modify  this field with value `{{${Image}}}`.
     - As part of the helm chart build process, [helm_require.sh](https://github.com/aws/eks-anywhere-build-tooling/blob/main/build/lib/helm_require.sh) will replace the `{{${IMAGE}}}` with `${IMAGE_SHASUM}`. In the example of [project metallb](https://github.com/aws/eks-anywhere-build-tooling/tree/main/projects/metallb/metallb), `{{metallb/controller}}` will be replaced with the shasum of image `metallb/controller` before packaging the helm chart. You can verify if this update is performed successfully by reviewing the generated `sedfile` under `_output/helm`.
     - To test the helm chart outside of the `eks-anywhere-build-tooling`, you can hardcode this value.
+- `imagePullPolicy` or similar field
+    - Add / modify this field with value `IfNotPresent`.
 - `imagePullSecrets` or similar field
     - Add field if it doesnt exist. No value is needed.
 - `defaultNamespace` or similar field
