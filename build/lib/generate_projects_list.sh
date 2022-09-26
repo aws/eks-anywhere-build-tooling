@@ -48,6 +48,9 @@ for org_path in projects/*; do
         if [ "$org" = "aws" ] & [[ $repo =~ "eks-anywhere" ]]; then # Ignore self-referential repos
             continue
         fi
+        if [ "$org" = "kubernetes-sigs" ] & [[ "$repo" =~ "metrics-server" ]]; then # Ignore helm builds backed by eks-d images to reduce toil
+            continue
+        fi
         if curl --retry 5 -fIsS https://github.com/$org/$repo &> /dev/null; then # Check if org/repo combination is a Github repo
             repos+=("$repo")
         fi

@@ -34,7 +34,7 @@ function build::eksd_releases::load_release_yaml() {
     if $echo; then
         echo "${RELEASE_YAML[$release_branch]}"
     fi
-    set -$oldopt
+    set -$(echo $oldopt | sed 's/c//') # remove -c from options for when this is invoked with bash -c
 }
 
 function build::eksd_releases::get_release_yaml_url() {
@@ -122,7 +122,7 @@ function build::eksd_releases::get_eksd_component_asset_path() {
 
     echo "$yaml" | yq e "$query" -
     
-    set -$oldopt
+    set -$(echo $oldopt | sed 's/c//') # remove -c from options for when this is invoked with bash -c
 }
 
 function build::eksd_releases::get_eksd_component_asset_url() {
@@ -158,6 +158,15 @@ function build::eksd_releases::get_eksd_kubernetes_image_url() {
     local -r arch=${3-amd64}
 
     build::eksd_releases::get_eksd_component_asset_path "kubernetes" $release_branch ".image.uri" $arch $asset 
+}
+
+function build::eksd_releases::get_eksd_component_asset_image_tag() {
+    local -r component=$1
+    local -r asset=$2
+    local -r release_branch=${3-$(build::eksd_releases::get_release_branch)}
+    local -r arch=${4-amd64}
+
+    build::eksd_releases::get_eksd_component_asset_path $component $release_branch ".image.uri" $arch $asset | awk -F: '{print $2}'
 }
 
 function build::eksd_releases::get_eksd_component_url() {
