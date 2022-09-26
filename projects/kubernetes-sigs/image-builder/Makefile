@@ -244,7 +244,7 @@ local-build-raw-%: deps-raw setup-packer-configs-raw
 
 .PHONY: local-build-nutanix-ubuntu-2004
 local-build-nutanix-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/nutanix/$(IMAGE_OS)
-local-build-nutanix-ubuntu-2004: deps-raw setup-packer-configs-nutanix-ubuntu
+local-build-nutanix-ubuntu-2004: deps-nutanix setup-packer-configs-nutanix-ubuntu
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-nutanix-ubuntu-2004
 
