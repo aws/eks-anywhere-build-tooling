@@ -71,7 +71,7 @@ func (b *BuildOptions) BuildImage() {
 		case Ubuntu:
 			buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-2004", imageBuilderProjectPath)
 		case RedHat:
-			buildCommand = fmt.Sprintf("make -C %s local-build-ova-rhel-7", imageBuilderProjectPath)
+			buildCommand = fmt.Sprintf("make -C %s local-build-ova-rhel-8", imageBuilderProjectPath)
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("RHSM_USERNAME=%s", b.VsphereConfig.RhelUsername),
 				fmt.Sprintf("RHSM_PASSWORD=%s", b.VsphereConfig.RhelPassword),
