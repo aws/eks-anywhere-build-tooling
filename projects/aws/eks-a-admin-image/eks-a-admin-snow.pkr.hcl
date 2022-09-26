@@ -42,7 +42,7 @@ source "amazon-ebs" "ubuntu" {
   // the AMI is very big in size
   aws_polling {
     delay_seconds = 5
-    max_attempts  = 800
+    max_attempts  = 1440
   }
 }
 
