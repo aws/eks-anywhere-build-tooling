@@ -1,14 +1,12 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.17"
+GOLANG_VERSION?="1.15"
 
 REPO=vsphere-csi-driver
 REPO_OWNER=kubernetes-sigs
 
 BINARY_TARGET_FILES=vsphere-csi-driver vsphere-csi-syncer
 SOURCE_PATTERNS=./cmd/vsphere-csi ./cmd/syncer
-BINARY_TARGET_FILES_BUILD_ALONE=vsphere-csi-syncer
-EXTRA_GO_LDFLAGS=-X sigs.k8s.io/vsphere-csi-driver/v2/pkg/csi/service.Version=$(GIT_TAG)
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
@@ -18,11 +16,19 @@ CSI_SYNCER_IMAGE_COMPONENT=kubernetes-sigs/vsphere-csi-driver/csi/syncer
 
 IMAGE_NAMES=csi-driver csi-syncer
 
+OUTPUT_FILES_TARGET=$(OUTPUT_DIR)/files
+
 include $(BASE_DIRECTORY)/Common.mk
 
-$(OUTPUT_BIN_DIR)/linux-%/vsphere-csi-syncer: EXTRA_GO_LDFLAGS=-X sigs.k8s.io/vsphere-csi-driver/v2/pkg/syncer.Version=$(GIT_TAG)
-
 csi-driver/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-csi
+
+$(call IMAGE_TARGETS_FOR_NAME, csi-syncer): $(OUTPUT_FILES_TARGET)
+
+$(OUTPUT_FILES_TARGET):
+	@mkdir -p $@
+	cp $(REPO)/pkg/apis/cnsoperator/config/cnsregistervolume_crd.yaml \
+		$(REPO)/pkg/apis/cnsoperator/config/cnsfileaccessconfig_crd.yaml \
+		$(REPO)/pkg/internal/cnsoperator/config/cnsfilevolumeclient_crd.yaml $@
 
 
 ########### DO NOT EDIT #############################
