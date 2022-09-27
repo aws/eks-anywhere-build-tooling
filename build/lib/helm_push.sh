@@ -47,8 +47,7 @@ export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
 export HELM_EXPERIMENTAL_OCI=1
 TMPFILE=$(mktemp /tmp/helm-output.XXXXXX)
 function cleanup() {
-  if echo ${IMAGE_REGISTRY} | grep public.ecr.aws >/dev/null
-  then
+  if [[ "${IMAGE_REGISTRY}" == *"public.ecr.aws"* ]]; then
     echo "If authentication failed: aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws"
   else
     echo "If authentication failed: aws ecr get-login-password --region \${AWS_REGION} | docker login --username AWS --password-stdin ${IMAGE_REGISTRY}"
@@ -61,9 +60,11 @@ trap "rm -f $TMPFILE" exit
 helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
 
 # Adds a 2nd tag to the helm chart for the bundle-release jobs.
-MANIFEST=$(aws ecr batch-get-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-ids imageTag=${SEMVER} --query images[].imageManifest --output text)
-export AWS_PAGER=""
-aws ecr put-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-tag ${SEMVER_GIT_TAG}-${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
+if [[ "${IMAGE_REGISTRY}" != *"public.ecr.aws"* ]]; then
+  MANIFEST=$(aws ecr batch-get-image --repository-name "$HELM_DESTINATION_REPOSITORY" --image-ids imageTag=${SEMVER} --query "images[].imageManifest" --output text)
+  export AWS_PAGER=""
+  aws ecr put-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-tag ${SEMVER_GIT_TAG}-${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
+fi
 
 DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 {
