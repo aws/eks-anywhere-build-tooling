@@ -113,12 +113,12 @@ envsubst '$EKSD_NAME' \
 
 # This is the IP address that Packer will create the server on to host the local
 # directory containing the kickstart config
-if [ "$IMAGE_FORMAT" = "ova" ] && [ "$IMAGE_OS" = "rhel" ]; then
+if [ "$IMAGE_FORMAT" = "ova" ] && [ "$IMAGE_OS" = "redhat" ]; then
     ACTIVE_INTERFACE=""
     if [ "$(uname -s)" = "Linux" ]; then
         INTERFACES=($(ls /sys/class/net))
         for interface in "${INTERFACES[@]}"; do
-            if [ "$interface" = "eth0" ] || [ "$interface" = "en0" ]; then
+            if [ "$interface" = "eth0" ] || [ "$interface" = "en0" ] || [ "$interface" = "eno1" ]; then
                 ACTIVE_INTERFACE=$interface
                 break
             fi
@@ -132,7 +132,7 @@ if [ "$IMAGE_FORMAT" = "ova" ] && [ "$IMAGE_OS" = "rhel" ]; then
         exit 1
     fi
     export PACKER_HTTP_SERVER_IP=$(ip a l $ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
-    envsubst '$PACKER_HTTP_SERVER_IP' \
-        < "$MAKE_ROOT/$IMAGE_BUILDER_DIR/packer/ova/rhel-8.json" |
-        tee "$MAKE_ROOT/$IMAGE_BUILDER_DIR/packer/ova/rhel-8.json"
+    rhel_ova_config_file="${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova/rhel-8.json"
+    cat <<< $(jq --arg httpendpoint "http://$PACKER_HTTP_SERVER_IP:{{ .HTTPPort }}" \
+             '.boot_media_path=$httpendpoint' $rhel_ova_config_file) > $rhel_ova_config_file
 fi
