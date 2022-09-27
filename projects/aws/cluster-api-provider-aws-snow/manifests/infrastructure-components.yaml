@@ -9,13 +9,24 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
     controller-gen.kubebuilder.io/version: v0.4.1
-  creationTimestamp: null
   labels:
     cluster.x-k8s.io/provider: infrastructure-aws-snow
     cluster.x-k8s.io/v1beta1: v1beta1
   name: awssnowclusters.infrastructure.cluster.x-k8s.io
 spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: Cg==
+        service:
+          name: capas-webhook-service
+          namespace: capas-system
+          path: /convert
+      conversionReviewVersions:
+      - v1beta1
   group: infrastructure.cluster.x-k8s.io
   names:
     kind: AWSSnowCluster
@@ -210,13 +221,24 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
     controller-gen.kubebuilder.io/version: v0.4.1
-  creationTimestamp: null
   labels:
     cluster.x-k8s.io/provider: infrastructure-aws-snow
     cluster.x-k8s.io/v1beta1: v1beta1
   name: awssnowmachines.infrastructure.cluster.x-k8s.io
 spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: Cg==
+        service:
+          name: capas-webhook-service
+          namespace: capas-system
+          path: /convert
+      conversionReviewVersions:
+      - v1beta1
   group: infrastructure.cluster.x-k8s.io
   names:
     kind: AWSSnowMachine
@@ -693,13 +715,24 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
     controller-gen.kubebuilder.io/version: v0.4.1
-  creationTimestamp: null
   labels:
     cluster.x-k8s.io/provider: infrastructure-aws-snow
     cluster.x-k8s.io/v1beta1: v1beta1
   name: awssnowmachinetemplates.infrastructure.cluster.x-k8s.io
 spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: Cg==
+        service:
+          name: capas-webhook-service
+          namespace: capas-system
+          path: /convert
+      conversionReviewVersions:
+      - v1beta1
   group: infrastructure.cluster.x-k8s.io
   names:
     categories:
@@ -1309,6 +1342,20 @@ metadata:
   namespace: capas-system
 type: Opaque
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-aws-snow
+  name: capas-webhook-service
+  namespace: capas-system
+spec:
+  ports:
+  - port: 443
+    targetPort: webhook-server
+  selector:
+    cluster.x-k8s.io/provider: infrastructure-aws-snow
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1348,6 +1395,10 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz
@@ -1364,14 +1415,171 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
         volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
         - mountPath: /home/.aws
           name: ca-bundle
       serviceAccountName: capas-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: capas-webhook-service-cert
       - name: credentials
         secret:
           secretName: capas-manager-bootstrap-credentials
       - name: ca-bundle
         secret:
           secretName: capas-manager-bootstrap-credentials
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-aws-snow
+  name: capas-serving-cert
+  namespace: capas-system
+spec:
+  dnsNames:
+  - capas-webhook-service.capas-system.svc
+  - capas-webhook-service.capas-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: capas-selfsigned-issuer
+  secretName: capas-webhook-service-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-aws-snow
+  name: capas-selfsigned-issuer
+  namespace: capas-system
+spec:
+  selfSigned: {}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-aws-snow
+  name: capas-mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: capas-webhook-service
+      namespace: capas-system
+      path: /mutate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowcluster
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: default.awssnowcluster.infrastructure.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - infrastructure.cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - awssnowclusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: capas-webhook-service
+      namespace: capas-system
+      path: /mutate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowmachine
+  failurePolicy: Fail
+  name: mutation.awssnowmachine.infrastructure.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - infrastructure.cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - awssnowmachines
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-aws-snow
+  name: capas-validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: capas-webhook-service
+      namespace: capas-system
+      path: /validate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowcluster
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.awssnowcluster.infrastructure.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - infrastructure.cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - awssnowclusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: capas-webhook-service
+      namespace: capas-system
+      path: /validate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowmachine
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.awssnowmachine.infrastructure.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - infrastructure.cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - awssnowmachines
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: capas-webhook-service
+      namespace: capas-system
+      path: /validate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowmachinetemplate
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.awssnowmachinetemplate.infrastructure.x-k8s.io
+  rules:
+  - apiGroups:
+    - infrastructure.cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - awssnowmachinetemplates
+  sideEffects: None
