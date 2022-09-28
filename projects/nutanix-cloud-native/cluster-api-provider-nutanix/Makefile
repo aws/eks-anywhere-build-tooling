@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.19"
+GOLANG_VERSION?="1.18"
 
 REPO=cluster-api-provider-nutanix
 REPO_OWNER=nutanix-cloud-native
