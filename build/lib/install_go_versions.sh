@@ -55,7 +55,7 @@ build::common::use_go_version "1.18"
 GOBIN=${GOPATH}/go1.18/bin go install github.com/google/go-licenses@v1.2.1
 
 build::common::use_go_version "1.19"
-GOBIN=${GOPATH}/go1.19/bin go install github.com/google/go-licenses@v1.0.0
+GOBIN=${GOPATH}/go1.19/bin go install github.com/google/go-licenses@v1.2.1
 
 # 1.16 is the default so symlink it to /go/bin
 unlink ${GOPATH}/bin/go-licenses
