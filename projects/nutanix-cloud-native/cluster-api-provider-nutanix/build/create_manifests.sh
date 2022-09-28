@@ -40,6 +40,6 @@ make release-manifests \
 mkdir -p $OUTPUT_DIR/manifests/infrastructure-nutanix/$TAG
 cp out/metadata.yaml "$OUTPUT_DIR/manifests/infrastructure-nutanix/$TAG"
 cp out/cluster-template.yaml "$OUTPUT_DIR/manifests/infrastructure-nutanix/$TAG"
-cp out/infrastructure_components.yaml "$OUTPUT_DIR/manifests/infrastructure-nutanix/$TAG"
+cp out/infrastructure-components.yaml "$OUTPUT_DIR/manifests/infrastructure-nutanix/$TAG"
 
 cp -rf $OUTPUT_DIR/manifests $ARTIFACTS_PATH
