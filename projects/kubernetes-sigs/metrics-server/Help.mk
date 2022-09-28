@@ -7,7 +7,7 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `aws-otel-collector`
+clone-repo:  ## Clone upstream `metrics-server`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Helm Targets
