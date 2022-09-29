@@ -11,6 +11,7 @@ type BuildOptions struct {
 	Os              string
 	Hypervisor      string
 	VsphereConfig   *VsphereConfig
+	BaremetalConfig *BaremetalConfig
 	ReleaseChannel  string
 	artifactsBucket string
 	Force           bool
@@ -31,9 +32,22 @@ type VsphereConfig struct {
 	VcenterServer      string `json:"vcenter_server"`
 	Username           string `json:"username"`
 	Password           string `json:"password"`
-	IsoUrl             string `json:"iso_url,omitempty"`
-	IsoChecksum        string `json:"iso_checksum,omitempty"`
-	IsoChecksumType    string `json:"iso_checksum_type,omitempty"`
-	RhelUsername       string `json:"rhel_username"`
-	RhelPassword       string `json:"rhel_password"`
+	IsoConfig
+	RhelConfig
+}
+
+type BaremetalConfig struct {
+	IsoConfig
+	RhelConfig
+}
+
+type IsoConfig struct {
+	IsoUrl          string `json:"iso_url,omitempty"`
+	IsoChecksum     string `json:"iso_checksum,omitempty"`
+	IsoChecksumType string `json:"iso_checksum_type,omitempty"`
+}
+
+type RhelConfig struct {
+	RhelUsername string `json:"rhel_username"`
+	RhelPassword string `json:"rhel_password"`
 }

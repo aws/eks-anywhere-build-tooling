@@ -48,7 +48,17 @@ elif [[ $image_format == "raw" ]]; then
   if [[ $image_os == "ubuntu" ]]; then
     "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel
   elif [[ $image_os == "redhat" ]]; then
-    echo "Redhat image building is not yet supported"
-    exit 1
+    echo "Creating baremetal config"
+    baremetal_config_file="${HOME}/baremetal_config_file"
+    jq --null-input \
+      --arg rhel_username $RHSM_USERNAME \
+      --arg rhel_password $RHSM_PASSWORD \
+      --arg iso_url "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso" \
+      --arg iso_checksum_type "sha256" \
+      --arg iso_checksum "ea5f349d492fed819e5086d351de47261c470fc794f7124805d176d69ddf1fcd" \
+      --arg extra_rpms "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm" \
+      '{"rhel_username": $rhel_username, "rhel_password": $rhel_password, "iso_url": $iso_url, "iso_checksum_type": $iso_checksum_type, "iso_checksum": $iso_checksum, "extra_rpms": $extra_rpms}' > $baremetal_config_file
+
+    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel --baremetal-config $baremetal_config_file
   fi
 fi
