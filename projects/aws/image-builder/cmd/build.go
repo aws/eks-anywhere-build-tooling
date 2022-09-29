@@ -95,8 +95,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 					return err
 				}
 			}
-			if err = validateCustomIso(bo.VsphereConfig.IsoChecksum, bo.VsphereConfig.IsoChecksumType); err != nil {
-				return err
+			if bo.VsphereConfig.IsoUrl != "" {
+				if err = validateCustomIso(bo.VsphereConfig.IsoChecksum, bo.VsphereConfig.IsoChecksumType); err != nil {
+					return err
+				}
 			}
 		case builder.Baremetal:
 			if err = json.Unmarshal(config, &bo.BaremetalConfig); err != nil {
@@ -107,8 +109,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 					return err
 				}
 			}
-			if err = validateCustomIso(bo.BaremetalConfig.IsoChecksum, bo.BaremetalConfig.IsoChecksumType); err != nil {
-				return err
+			if bo.BaremetalConfig != nil && bo.BaremetalConfig.IsoUrl != "" {
+				if err = validateCustomIso(bo.BaremetalConfig.IsoChecksum, bo.BaremetalConfig.IsoChecksumType); err != nil {
+					return err
+				}
 			}
 		}
 	}
