@@ -92,6 +92,18 @@ func (b *BuildOptions) BuildImage() {
 
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == Baremetal {
+		baremetalConfigFile := filepath.Join(imageBuilderProjectPath, "packer/config/baremetal.json")
+		if b.BaremetalConfig != nil {
+			baremetalConfigData, err := json.Marshal(b.BaremetalConfig)
+			if err != nil {
+				log.Fatalf("Error marshalling baremetal config data")
+			}
+			err = ioutil.WriteFile(baremetalConfigFile, baremetalConfigData, 0644)
+			if err != nil {
+				log.Fatalf("Error writing baremetal config file to packer")
+			}
+		}
+
 		if b.Os == Ubuntu {
 			// Patch firmware config for tool
 			upstreamPatchCommand := fmt.Sprintf("make -C %s image-builder/eks-anywhere-patched", imageBuilderProjectPath)
@@ -115,7 +127,22 @@ func (b *BuildOptions) BuildImage() {
 			}
 			log.Println("Patched upstream firmware config file")
 		}
-		buildCommand := fmt.Sprintf("make -C %s local-build-raw-ubuntu-2004-efi", imageBuilderProjectPath)
+
+		var buildCommand string
+		switch b.Os {
+		case Ubuntu:
+			buildCommand = fmt.Sprintf("make -C %s local-build-raw-ubuntu-2004-efi", imageBuilderProjectPath)
+		case RedHat:
+			buildCommand = fmt.Sprintf("make -C %s local-build-raw-rhel-8", imageBuilderProjectPath)
+			commandEnvVars = append(commandEnvVars,
+				fmt.Sprintf("RHSM_USERNAME=%s", b.BaremetalConfig.RhelUsername),
+				fmt.Sprintf("RHSM_PASSWORD=%s", b.BaremetalConfig.RhelPassword),
+			)
+		}
+		if b.BaremetalConfig != nil {
+			commandEnvVars = append(commandEnvVars, fmt.Sprintf("PACKER_TYPE_VAR_FILES=%s", baremetalConfigFile))
+		}
+
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
@@ -141,45 +168,4 @@ func (b *BuildOptions) BuildImage() {
 	}
 
 	log.Print("Build Successful. Output artifacts located at current working directory\n")
-}
-
-func (b *BuildOptions) ValidateInputs() {
-	b.Os = strings.ToLower(b.Os)
-	if b.Os != Ubuntu && b.Os != RedHat {
-		log.Fatalf("Invalid OS type. Please choose ubuntu or redhat")
-	}
-
-	b.Hypervisor = strings.ToLower(b.Hypervisor)
-	if (b.Hypervisor != VSphere) && (b.Hypervisor != Baremetal) {
-		log.Fatalf("Invalid hypervisor. Please choose vsphere or baremetal")
-	}
-
-	if b.Hypervisor == Baremetal && b.Os == RedHat {
-		log.Fatalf("Redhat is not supported with baremetal hypervisor. Please choose vsphere to build Redhat")
-	}
-
-	// Validate vsphere config inputs
-	if b.VsphereConfig != nil {
-		// Validate Rhel username and password
-		if b.Os == RedHat {
-			if b.VsphereConfig.RhelUsername == "" || b.VsphereConfig.RhelPassword == "" {
-				log.Fatalf("\"rhel_username\" and \"rhel_password\" are required fields in vsphere-config when os is redhat")
-			}
-
-			if b.VsphereConfig.IsoUrl == "" {
-				log.Fatalf("\"iso_url\" is a required field in vsphere-config when os is redhat")
-			}
-		}
-
-		// Validate iso checksum and checksum type was provided
-		if b.VsphereConfig.IsoUrl != "" {
-			if b.VsphereConfig.IsoChecksum == "" {
-				log.Fatalf("Please provide a valid checksum for \"iso_checksum\" when providing \"iso_url\"")
-			}
-
-			if b.VsphereConfig.IsoChecksumType != "sha256" && b.VsphereConfig.IsoChecksumType != "sha512" {
-				log.Fatalf("\"iso_checksum_type\" is a required field when providing iso_checksum. Checksum type can be sha256 or sha512")
-			}
-		}
-	}
 }
