@@ -117,7 +117,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				}
 			}
 		case builder.NutanixAHV:
-			if err = json.Unmarshal(config, &bo.NutanixAHV); err != nil {
+			if err = json.Unmarshal(config, &bo.NutanixAHVConfig); err != nil {
 				return err
 			}
 			if bo.NutanixAHVConfig.NutanixUserName == "" || bo.NutanixAHVConfig.NutanixPassword == "" {
