@@ -128,7 +128,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			}
 
 			if bo.Os == builder.RedHat {
-				log.Fatalf("\"only ubuntu os is supported when hypervisor is nutanix")
+				log.Fatalf("only ubuntu os is supported when hypervisor is nutanix")
 			}
 			if bo.NutanixConfig.NutanixUserName == "" || bo.NutanixConfig.NutanixPassword == "" {
 				log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
