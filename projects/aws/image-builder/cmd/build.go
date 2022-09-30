@@ -17,7 +17,7 @@ var (
 	bo                   = &builder.BuildOptions{}
 	vSphereConfigFile    string
 	baremetalConfigFile  string
-	nutanixAHVConfigFile string
+	nutanixConfigFile string
 	err                  error
 )
 
@@ -41,7 +41,7 @@ func init() {
 	buildCmd.Flags().StringVar(&bo.Hypervisor, "hypervisor", "", "Target hypervisor EKS-A node image")
 	buildCmd.Flags().StringVar(&baremetalConfigFile, "baremetal-config", "", "Path to Baremetal Config file")
 	buildCmd.Flags().StringVar(&vSphereConfigFile, "vsphere-config", "", "Path to vSphere Config file")
-	buildCmd.Flags().StringVar(&nutanixAHVConfigFile, "nutanix-config", "", "Path to Nutanix AHV Config file")
+	buildCmd.Flags().StringVar(&nutanixConfigFile, "nutanix-config", "", "Path to Nutanix Config file")
 	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-23", "EKS-D Release channel for node image. Can be 1-20, 1-21, 1-22 or 1-23")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
@@ -116,11 +116,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 					return err
 				}
 			}
-		case builder.NutanixAHV:
-			if err = json.Unmarshal(config, &bo.NutanixAHVConfig); err != nil {
+		case builder.Nutanix:
+			if err = json.Unmarshal(config, &bo.NutanixConfig); err != nil {
 				return err
 			}
-			if bo.NutanixAHVConfig.NutanixUserName == "" || bo.NutanixAHVConfig.NutanixPassword == "" {
+			if bo.NutanixConfig.NutanixUserName == "" || bo.NutanixConfig.NutanixPassword == "" {
 				log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
 			}
 			// TODO Validate other fields as well

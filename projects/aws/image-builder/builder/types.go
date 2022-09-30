@@ -1,22 +1,22 @@
 package builder
 
 const (
-	Ubuntu     string = "ubuntu"
-	RedHat     string = "redhat"
-	VSphere    string = "vsphere"
-	Baremetal  string = "baremetal"
-	NutanixAHV string = "nutanixahv"
+	Ubuntu    string = "ubuntu"
+	RedHat    string = "redhat"
+	VSphere   string = "vsphere"
+	Baremetal string = "baremetal"
+	Nutanix   string = "nutanix"
 )
 
 type BuildOptions struct {
-	Os               string
-	Hypervisor       string
-	VsphereConfig    *VsphereConfig
-	BaremetalConfig  *BaremetalConfig
-	NutanixAHVConfig *NutanixAHVConfig
-	ReleaseChannel   string
-	artifactsBucket  string
-	Force            bool
+	Os              string
+	Hypervisor      string
+	VsphereConfig   *VsphereConfig
+	BaremetalConfig *BaremetalConfig
+	NutanixConfig   *NutanixConfig
+	ReleaseChannel  string
+	artifactsBucket string
+	Force           bool
 }
 
 type VsphereConfig struct {
@@ -54,7 +54,7 @@ type RhelConfig struct {
 	RhelPassword string `json:"rhel_password"`
 }
 
-type NutanixAHVConfig struct {
+type NutanixConfig struct {
 	ClusterName       string `json:"nutanix_cluster_name"`
 	ImageName         string `json:"image_name"`
 	SourceImageName   string `json:"source_image_name"`

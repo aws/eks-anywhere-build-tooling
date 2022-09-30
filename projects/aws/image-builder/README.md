@@ -8,7 +8,7 @@ The tool always builds an image with the latest release artifacts and latest OS 
 Supported Providers
 * vsphere
 * baremetal
-* nutanixahv
+* nutanix
 
 Supported OSes
 * ubuntu
@@ -203,5 +203,5 @@ sudo snap install yq
 ```
 5. Run the image builder tool for appropriate release channel
 ```
-image-builder build --os ubuntu --hypervisor nutanixahv --nutanix-config <path to above json file> --release-channel <release channel, ex 1-23>
+image-builder build --os ubuntu --hypervisor nutanix --nutanix-config <path to above json file> --release-channel <release channel, ex 1-23>
 ```
