@@ -166,7 +166,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		buildCommand := fmt.Sprintf("make -C %s local-build-nutanix-ubuntu-2004", imageBuilderProjectPath)
-		err = executeMakeBuildCommand(buildCommand, b.ReleaseChannel)
+		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for nutanix ahv hypervisor: %v", err)
 		}
