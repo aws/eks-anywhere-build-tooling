@@ -46,7 +46,7 @@ metadata:
 spec:
   images:
 !
-JSON_SCHEMA_FILE=helm/schema.json
+JSON_SCHEMA_FILE=$PROJECT_ROOT/helm/schema.json
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 export IMAGE_TAG
 export HELM_TAG
