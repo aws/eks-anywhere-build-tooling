@@ -14,11 +14,11 @@ import (
 )
 
 var (
-	bo                   = &builder.BuildOptions{}
-	vSphereConfigFile    string
-	baremetalConfigFile  string
-	nutanixConfigFile string
-	err                  error
+	bo                  = &builder.BuildOptions{}
+	vSphereConfigFile   string
+	baremetalConfigFile string
+	nutanixConfigFile   string
+	err                 error
 )
 
 var buildCmd = &cobra.Command{
@@ -60,8 +60,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		log.Fatalf("Invalid OS type. Please choose ubuntu or redhat")
 	}
 
-	if (bo.Hypervisor != builder.VSphere) && (bo.Hypervisor != builder.Baremetal) {
-		log.Fatalf("Invalid hypervisor. Please choose vsphere or baremetal")
+	if (bo.Hypervisor != builder.VSphere) &&
+		(bo.Hypervisor != builder.Baremetal) &&
+		(bo.Hypervisor != builder.Nutanix) {
+		log.Fatalf("Invalid hypervisor. Please choose vsphere or baremetal or nutanix")
 	}
 
 	configPath := ""
@@ -70,12 +72,16 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		configPath = vSphereConfigFile
 	case builder.Baremetal:
 		configPath = baremetalConfigFile
+	case builder.Nutanix:
+		configPath = nutanixConfigFile
 	}
 	bo.Os = strings.ToLower(bo.Os)
 	bo.Hypervisor = strings.ToLower(bo.Hypervisor)
 
 	if configPath == "" {
-		if bo.Hypervisor == builder.VSphere || (bo.Hypervisor == builder.Baremetal && bo.Os == builder.RedHat) {
+		if bo.Hypervisor == builder.VSphere ||
+			(bo.Hypervisor == builder.Baremetal && bo.Os == builder.RedHat) ||
+			(bo.Hypervisor == builder.Nutanix) {
 			return fmt.Errorf("%s-config is a required flag for %s hypervisor or when os is redhat", bo.Hypervisor, bo.Hypervisor)
 		}
 	} else {
@@ -119,6 +125,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		case builder.Nutanix:
 			if err = json.Unmarshal(config, &bo.NutanixConfig); err != nil {
 				return err
+			}
+
+			if bo.Os == builder.RedHat {
+				log.Fatalf("\"only ubuntu os is supported when hypervisor is nutanix")
 			}
 			if bo.NutanixConfig.NutanixUserName == "" || bo.NutanixConfig.NutanixPassword == "" {
 				log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
