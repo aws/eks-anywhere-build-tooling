@@ -163,7 +163,7 @@ function build::eksd_releases::get_eksd_kubernetes_image_url() {
 function build::eksd_releases::get_eksd_component_asset_image_tag() {
     local -r component=$1
     local -r asset=$2
-    local -r release_branch=${3-$(build::eksd_releases::get_release_branch)}
+    local -r release_branch=$3
     local -r arch=${4-amd64}
 
     build::eksd_releases::get_eksd_component_asset_path $component $release_branch ".image.uri" $arch $asset | awk -F: '{print $2}'
