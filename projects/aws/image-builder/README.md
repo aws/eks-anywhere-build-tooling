@@ -187,7 +187,7 @@ sudo apt install jq unzip make ansible -y
 sudo snap install yq
 ```
 2. Build or download the image builder tool
-4. Create nutanix-connection.json config file
+4. Create nutanix-connection.json config file. more details on values can be found here https://image-builder.sigs.k8s.io/capi/providers/nutanix.html
 ```
 {
   "nutanix_cluster_name": "",
