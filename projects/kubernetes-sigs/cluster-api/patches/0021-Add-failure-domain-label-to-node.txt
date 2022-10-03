@@ -1,0 +1,49 @@
+From c74390e36b212ed9e83b8e5804613069d1bb047a Mon Sep 17 00:00:00 2001
+From: Wonkun Kim <wonkun@amazon.com>
+Date: Mon, 3 Oct 2022 13:24:06 -0500
+Subject: [PATCH] [PATCH 21/21] Add the failure domain label to node
+
+To use https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/#interaction-with-node-affinity-and-node-selectors, 
+a label containing the failure domain where the node belongs to is required.
+https://github.com/kubernetes-sigs/cluster-api/pull/7296 will meet our requirements, 
+however, it's still in a design phase and the implementation in CAPI and the integration 
+to EKS-A might take months.
+---
+ api/v1beta1/common_types.go                                | 4 ++++
+ internal/controllers/machine/machine_controller_noderef.go | 5 +++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/api/v1beta1/common_types.go b/api/v1beta1/common_types.go
+index 7d19c0e05..54c7a95c3 100644
+--- a/api/v1beta1/common_types.go
++++ b/api/v1beta1/common_types.go
+@@ -105,6 +105,10 @@ const (
+ 	// InterruptibleLabel is the label used to mark the nodes that run on interruptible instances.
+ 	InterruptibleLabel = "cluster.x-k8s.io/interruptible"
+ 
++	// FailureDomainLabel is the label set on nodes identifying the failure domain of the cluster the node belongs to.
++	// Note: This is subject to remove when https://github.com/kubernetes-sigs/cluster-api/pull/7296 is implemented.
++	FailureDomainLabel = "cluster.x-k8s.io/failure-domain"
++
+ 	// ManagedByAnnotation is an annotation that can be applied to InfraCluster resources to signify that
+ 	// some external system is managing the cluster infrastructure.
+ 	//
+diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
+index 3641258a3..2f4dc2a36 100644
+--- a/internal/controllers/machine/machine_controller_noderef.go
++++ b/internal/controllers/machine/machine_controller_noderef.go
+@@ -95,6 +95,11 @@ func (r *Reconciler) reconcileNode(ctx context.Context, cluster *clusterv1.Clust
+ 	// Set the NodeSystemInfo.
+ 	machine.Status.NodeInfo = &node.Status.NodeInfo
+ 
++	// Add failure domain to node labels
++	if machine.Spec.FailureDomain != nil {
++		node.Labels[clusterv1.FailureDomainLabel] = *machine.Spec.FailureDomain
++	}
++
+ 	// Reconcile node annotations.
+ 	patchHelper, err := patch.NewHelper(node, remoteClient)
+ 	if err != nil {
+-- 
+2.37.3
+
