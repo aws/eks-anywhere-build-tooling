@@ -242,6 +242,12 @@ local-build-raw-%: deps-raw setup-packer-configs-raw
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-raw-$*
 
+.PHONY: local-build-nutanix-ubuntu-2004
+local-build-nutanix-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/nutanix/$(IMAGE_OS)
+local-build-nutanix-ubuntu-2004: deps-nutanix setup-packer-configs-nutanix
+	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/nutanix/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-nutanix-ubuntu-2004
+
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
 	sh validate/validate.sh $(FULL_OUTPUT_DIR)/config/validate_goss_inline_vars.json

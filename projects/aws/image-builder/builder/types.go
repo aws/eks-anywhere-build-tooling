@@ -5,6 +5,7 @@ const (
 	RedHat    string = "redhat"
 	VSphere   string = "vsphere"
 	Baremetal string = "baremetal"
+	Nutanix   string = "nutanix"
 )
 
 type BuildOptions struct {
@@ -12,6 +13,7 @@ type BuildOptions struct {
 	Hypervisor      string
 	VsphereConfig   *VsphereConfig
 	BaremetalConfig *BaremetalConfig
+	NutanixConfig   *NutanixConfig
 	ReleaseChannel  string
 	artifactsBucket string
 	Force           bool
@@ -50,4 +52,16 @@ type IsoConfig struct {
 type RhelConfig struct {
 	RhelUsername string `json:"rhel_username"`
 	RhelPassword string `json:"rhel_password"`
+}
+
+type NutanixConfig struct {
+	ClusterName       string `json:"nutanix_cluster_name"`
+	ImageName         string `json:"image_name"`
+	SourceImageName   string `json:"source_image_name"`
+	NutanixEndpoint   string `json:"nutanix_endpoint"`
+	NutanixInsecure   string `json:"nutanix_insecure"`
+	NutanixPort       string `json:"nutanix_port"`
+	NutanixUserName   string `json:"nutanix_username"`
+	NutanixPassword   string `json:"nutanix_password"`
+	NutanixSubnetName string `json:"nutanix_subnet_name"`
 }
