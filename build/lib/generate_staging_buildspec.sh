@@ -99,21 +99,34 @@ for project in "${PROJECTS[@]}"; do
             BUILDSPEC_VARS_VALUES=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_VARS_VALUES RELEASE_BRANCH=$RELEASE_BRANCH)
             VARS=(${BUILDSPEC_VARS_VALUES// / })
             
-            # Note: only support 2 vars for now since that is all we need for image-builder
-            VALUES_1=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[0]} RELEASE_BRANCH=$RELEASE_BRANCH)
-            VALUES_2=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[1]} RELEASE_BRANCH=$RELEASE_BRANCH)
-
-            ARR_1=(${VALUES_1// / })
-            ARR_2=(${VALUES_2// / })
-            for val1 in "${ARR_1[@]}"; do
-                for val2 in "${ARR_2[@]}"; do
+            # Note: only support 1 or 2 vars for now since that is all we need for kind + image-builder 
+            if [ ${#VARS[@]} -eq 1 ]; then
+                VALUES_1=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[0]} RELEASE_BRANCH=$RELEASE_BRANCH)
+                ARR_1=(${VALUES_1// / })
+                
+                for val1 in "${ARR_1[@]}"; do                
                     BUILDSPEC_NAME=$(basename $buildspec .yml)
-                    IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}_${val2//-/_}_${BUILDSPEC_NAME//-/_}
+                    IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}_${BUILDSPEC_NAME//-/_}
                     yq eval -i -P \
-                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"}}}]" \
-                        $STAGING_BUILDSPEC_FILE 
+                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"}}}]" \
+                        $STAGING_BUILDSPEC_FILE             
                 done
-            done
+            else
+                VALUES_1=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[0]} RELEASE_BRANCH=$RELEASE_BRANCH)
+                VALUES_2=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[1]} RELEASE_BRANCH=$RELEASE_BRANCH)
+
+                ARR_1=(${VALUES_1// / })
+                ARR_2=(${VALUES_2// / })
+                for val1 in "${ARR_1[@]}"; do
+                    for val2 in "${ARR_2[@]}"; do
+                        BUILDSPEC_NAME=$(basename $buildspec .yml)
+                        IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}_${val2//-/_}_${BUILDSPEC_NAME//-/_}
+                        yq eval -i -P \
+                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"}}}]" \
+                            $STAGING_BUILDSPEC_FILE 
+                    done
+                done
+            fi
         else
             yq eval -i -P \
                 ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL}}}]" \

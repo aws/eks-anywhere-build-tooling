@@ -52,6 +52,10 @@ IMAGE_NAMES=haproxy kindnetd kind-base
 
 FIX_LICENSES_KINDNETD_TARGET=$(REPO)/images/kindnetd/LICENSE
 
+BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
+BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
+
+
 include $(BASE_DIRECTORY)/Common.mk
 
 # Do not need to import if running clean or any var-value-% targets
