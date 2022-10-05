@@ -16,6 +16,11 @@ CGO_DEPS_TARGET=$(CGO_SOURCE)/linux-%/lib64/libgit2.so
 CGO_CREATE_BINARIES=true
 EXTRA_GOBUILD_FLAGS=-x -tags netgo,osusergo,static_build
 
+# This is an artificial dep so that during the staging batch build the source-controller
+# falls into the second "batch" of builds, not blocking the first batch from finishing
+# since it takes significantly longer
+PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
