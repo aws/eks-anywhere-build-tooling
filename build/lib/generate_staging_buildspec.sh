@@ -65,12 +65,16 @@ for project in "${PROJECTS[@]}"; do
         DEPS=(${PROJECT_DEPENDENCIES// / })
         for dep in "${DEPS[@]}"; do
             DEP_PRODUCT="$(cut -d/ -f1 <<< $dep)"
-            DEP_ORG="$(cut -d/ -f2 <<< $dep)"
-            DEP_REPO="$(cut -d/ -f3 <<< $dep)"
             if [[ "$DEP_PRODUCT" == "eksd" ]]; then
                 continue
             fi
-            DEPEND_ON+="\"${DEP_ORG//-/_}_${DEP_REPO//-/_}\","
+            DEP_ORG="$(cut -d/ -f2 <<< $dep)"
+            DEP_REPO="$(cut -d/ -f3 <<< $dep)"
+            if [[ "$DEP_REPO" == "kind" ]]; then
+                DEPEND_ON+="\"kubernetes_sigs_kind_1_24_buildspec\","
+            else
+                DEPEND_ON+="\"${DEP_ORG//-/_}_${DEP_REPO//-/_}\","
+            fi
 
             if [ ! -d $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO ]; then
                 echo "Non-existent project dependency: $dep!!!"
