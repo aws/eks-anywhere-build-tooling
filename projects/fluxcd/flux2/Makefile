@@ -16,16 +16,8 @@ EXTRA_GO_LDFLAGS=-X main.VERSION=$(GIT_TAG:v%=%)
 FLUX_MANIFESTS_TARGET=$(REPO)/cmd/flux/manifests
 
 HAS_S3_ARTIFACTS=true
-# HAS_HELM_CHART=true
-# HELM_DESTINATION_REPOSITORY=fluxcd/flux2
-# HELM_SOURCE_OWNER=fluxcd-community
-# HELM_SOURCE_REPOSITORY=helm-charts
-# HELM_GIT_TAG?=$(shell cat HELM_GIT_TAG)
-# HELM_DIRECTORY=charts/flux2
-# HELM_IMAGE_LIST="fluxcd/flux-cli fluxcd/helm-controller fluxcd/kustomize-controller fluxcd/notification-controller fluxcd/source-controller"
 
-# Needed to be built for the helm chart build, which happens in this project
-PROJECT_DEPENDENCIES=eksa/fluxcd/source-controller eksd/kubernetes/client
+PROJECT_DEPENDENCIES=eksd/kubernetes/client
 
 include $(BASE_DIRECTORY)/Common.mk
 

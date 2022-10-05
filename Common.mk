@@ -40,6 +40,7 @@ endif
 CODEBUILD_CI?=false
 CI?=false
 JOB_TYPE?=
+CODEBUILD_BUILD_IMAGE?=
 CLONE_URL?=$(call GET_CLONE_URL,$(REPO_OWNER),$(REPO))
 #HELM_CLONE_URL=$(call GET_CLONE_URL,$(HELM_SOURCE_OWNER),$(HELM_SOURCE_REPOSITORY))
 HELM_CLONE_URL=https://github.com/$(HELM_SOURCE_OWNER)/$(HELM_SOURCE_REPOSITORY).git
@@ -335,6 +336,9 @@ CGO_SOURCE=$(OUTPUT_DIR)/source
 IS_ON_BUILDER_BASE?=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
 BUILDER_PLATFORM?=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
 needs-cgo-builder=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter-out $(1),$(BUILDER_PLATFORM)),true,))
+USE_DOCKER_FOR_CGO_BUILD?=false
+DOCKER_USE_ID_FOR_LINUX=$(shell if [ "$$(uname -s)" = "Linux" ]; then echo "-u $$(id -u $${USER}):$$(id -g $${USER})"; fi)
+GO_MOD_CACHE=$(shell source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) > /dev/null 2>&1 && go env GOMODCACHE)
 ######################
 
 #### BUILD FLAGS ####
@@ -392,22 +396,31 @@ RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter t
 ####################################################
 
 define BUILDCTL
-	$(BUILD_LIB)/buildkit.sh \
-		build \
-		--frontend dockerfile.v0 \
-		--opt platform=$(IMAGE_PLATFORMS) \
-		--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
-		--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
-		--opt build-arg:RELEASE_BRANCH=$(RELEASE_BRANCH) \
-		$(foreach BUILD_ARG,$(IMAGE_BUILD_ARGS),--opt build-arg:$(BUILD_ARG)=$($(BUILD_ARG))) \
-		--progress plain \
-		--local dockerfile=$(DOCKERFILE_FOLDER) \
-		--local context=$(IMAGE_CONTEXT_DIR) \
-		--opt target=$(IMAGE_TARGET) \
-		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT) \
-		$(if $(filter push=true,$(IMAGE_OUTPUT)),--export-cache type=inline,) \
-		$(foreach IMPORT_CACHE,$(IMAGE_IMPORT_CACHE),--import-cache $(IMPORT_CACHE))
-
+	if [[ "$(USE_DOCKER_FOR_CGO_BUILD)" = "true" ]]; then \
+		source $(BUILD_LIB)/common.sh && build::docker::retry_pull $(BUILDER_IMAGE); \
+		docker run --rm -w /eks-anywhere-build-tooling/projects/$(COMPONENT) $(DOCKER_USE_ID_FOR_LINUX) \
+			--mount type=bind,source=$(BASE_DIRECTORY),target=/eks-anywhere-build-tooling \
+			--mount type=bind,source=$(GO_MOD_CACHE),target=/mod-cache \
+			-e GOPROXY=$(GOPROXY) -e GOMODCACHE=/mod-cache \
+			--platform $(IMAGE_PLATFORMS) \
+			--init --entrypoint make $(BUILDER_IMAGE) $(CGO_TARGET) BINARY_PLATFORMS=$(IMAGE_PLATFORMS); \
+	else \
+		$(BUILD_LIB)/buildkit.sh \
+			build \
+			--frontend dockerfile.v0 \
+			--opt platform=$(IMAGE_PLATFORMS) \
+			--opt build-arg:BASE_IMAGE=$(BASE_IMAGE) \
+			--opt build-arg:BUILDER_IMAGE=$(BUILDER_IMAGE) \
+			--opt build-arg:RELEASE_BRANCH=$(RELEASE_BRANCH) \
+			$(foreach BUILD_ARG,$(IMAGE_BUILD_ARGS),--opt build-arg:$(BUILD_ARG)=$($(BUILD_ARG))) \
+			--progress plain \
+			--local dockerfile=$(DOCKERFILE_FOLDER) \
+			--local context=$(IMAGE_CONTEXT_DIR) \
+			--opt target=$(IMAGE_TARGET) \
+			--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT) \
+			$(if $(filter push=true,$(IMAGE_OUTPUT)),--export-cache type=inline,) \
+			$(foreach IMPORT_CACHE,$(IMAGE_IMPORT_CACHE),--import-cache $(IMPORT_CACHE)); \
+	fi
 endef 
 
 define WRITE_LOCAL_IMAGE_TAG
@@ -644,6 +657,9 @@ prepare-cgo-folder:
 
 %/cgo/arm64: prepare-cgo-folder
 	$(BUILDCTL)
+
+# As an attempt to see if using docker is more stable for cgo builds in Codebuild
+binary-builder/cgo/%: USE_DOCKER_FOR_CGO_BUILD=$(shell command -v docker &> /dev/null && docker info > /dev/null 2>&1 && echo "true")
 
 ## Useradd targets
 %-useradd/images/export: IMAGE_OUTPUT_TYPE=local
