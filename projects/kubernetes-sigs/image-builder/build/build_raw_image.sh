@@ -119,6 +119,9 @@ if [ "$CODEBUILD_CI" = "false" ]; then
 fi
 
 SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=/home/ubuntu/$PROJECT_PATH/artifacts $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
+if [[ "$IMAGE_OS" == "redhat" ]]; then
+  SSH_COMMANDS="export RHSM_USERNAME='$RHSM_USERNAME' RHSM_PASSWORD='$RHSM_PASSWORD'; $SSH_COMMANDS"
+fi
 
 ssh $SSH_OPTS $REMOTE_HOST $SSH_COMMANDS
 
