@@ -155,6 +155,12 @@ func (b *BuildOptions) BuildImage() {
 
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
 	} else if b.Hypervisor == Nutanix {
+		// Patch firmware config for tool
+		upstreamPatchCommand := fmt.Sprintf("make -C %s image-builder/eks-anywhere-patched", imageBuilderProjectPath)
+		if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
+			log.Fatalf("Error executing upstream patch command")
+		}
+
 		// Read and set the nutanix connection data
 		nutanixConfigData, err := json.Marshal(b.NutanixConfig)
 		if err != nil {
