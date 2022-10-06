@@ -21,6 +21,10 @@ images: ## Pushes `source-controller/images/push` to IMAGE_REPO
 source-controller/images/amd64: ## Builds/pushes `source-controller/images/amd64`
 source-controller/images/push: ## Builds/pushes `source-controller/images/push`
 
+##@ Fetch Binary Targets
+_output/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
+_output/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
+
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
@@ -46,6 +50,6 @@ generate: ## Update UPSTREAM_PROJECTS.yaml
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  attribution-pr`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images `
+build: ## Called via prow presubmit, calls `validate-checksums attribution local-images   attribution-pr`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images  `
 ########### END GENERATED ###########################
