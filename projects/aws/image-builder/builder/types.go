@@ -39,6 +39,7 @@ type VsphereConfig struct {
 }
 
 type BaremetalConfig struct {
+	ExtraRpms string `json:"extra_rpms,omitempty"`
 	IsoConfig
 	RhelConfig
 }
