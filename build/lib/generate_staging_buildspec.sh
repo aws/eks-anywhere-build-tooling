@@ -20,6 +20,9 @@ set -o pipefail
 BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
 ALL_PROJECTS="${2?Specify second argument - All projects in repo}"
 
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
+
 STAGING_BUILDSPEC_FILE="$BASE_DIRECTORY/release/staging-build.yml"
 
 YQ_LATEST_RELEASE_URL="https://github.com/mikefarah/yq/releases/latest"
@@ -47,7 +50,8 @@ for project in "${PROJECTS[@]}"; do
     PROJECT_PATH=$MAKE_ROOT/projects/$org/$repo
 
     # TODO: refactor use of release_branch to get git_tag and golang_version in makefile, we should be able to push this to common.mk and avoid needing to pass it here
-    if [[ "true" == "$(make --no-print-directory -C $PROJECT_PATH var-value-EXCLUDE_FROM_STAGING_BUILDSPEC RELEASE_BRANCH=1-20)" ]]; then
+    RELEASE_BRANCH=$(build::eksd_releases::get_release_branch)
+    if [[ "true" == "$(make --no-print-directory -C $PROJECT_PATH var-value-EXCLUDE_FROM_STAGING_BUILDSPEC RELEASE_BRANCH=$RELEASE_BRANCH)" ]]; then
         continue
     fi
 
@@ -56,7 +60,7 @@ for project in "${PROJECTS[@]}"; do
     echo "Adding: $IDENTIFIER"
 
     DEPEND_ON=""
-    PROJECT_DEPENDENCIES=$(make --no-print-directory -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=1-20)
+    PROJECT_DEPENDENCIES=$(make --no-print-directory -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=$RELEASE_BRANCH)
     if [ -n "$PROJECT_DEPENDENCIES" ]; then
         DEPS=(${PROJECT_DEPENDENCIES// / })
         for dep in "${DEPS[@]}"; do
@@ -80,24 +84,24 @@ for project in "${PROJECTS[@]}"; do
     fi
 
     CLONE_URL=""
-    if [[ "true" != "$(make --no-print-directory -C $PROJECT_PATH var-value-REPO_NO_CLONE RELEASE_BRANCH=1-20)" ]]; then
-        REPO=$(make --no-print-directory -C $PROJECT_PATH var-value-CLONE_URL AWS_REGION=us-west-2 CODEBUILD_CI=true RELEASE_BRANCH=1-20)
+    if [[ "true" != "$(make --no-print-directory -C $PROJECT_PATH var-value-REPO_NO_CLONE RELEASE_BRANCH=$RELEASE_BRANCH)" ]]; then
+        REPO=$(make --no-print-directory -C $PROJECT_PATH var-value-CLONE_URL AWS_REGION=us-west-2 CODEBUILD_CI=true RELEASE_BRANCH=$RELEASE_BRANCH)
         CLONE_URL=",\"CLONE_URL\":\"$REPO\""
     fi
 
-    BUILDSPECS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPECS RELEASE_BRANCH=1-20)
+    BUILDSPECS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPECS RELEASE_BRANCH=$RELEASE_BRANCH)
     SPECS=(${BUILDSPECS// / })
     for buildspec in "${SPECS[@]}"; do
-        BUILDSPEC_VARS_KEYS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_VARS_KEYS RELEASE_BRANCH=1-20)
+        BUILDSPEC_VARS_KEYS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_VARS_KEYS RELEASE_BRANCH=$RELEASE_BRANCH)
         if [[ -n "$BUILDSPEC_VARS_KEYS" ]]; then
             KEYS=(${BUILDSPEC_VARS_KEYS// / })
 
-            BUILDSPEC_VARS_VALUES=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_VARS_VALUES RELEASE_BRANCH=1-20)
+            BUILDSPEC_VARS_VALUES=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_VARS_VALUES RELEASE_BRANCH=$RELEASE_BRANCH)
             VARS=(${BUILDSPEC_VARS_VALUES// / })
             
             # Note: only support 2 vars for now since that is all we need for image-builder
-            VALUES_1=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[0]} RELEASE_BRANCH=1-20)
-            VALUES_2=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[1]} RELEASE_BRANCH=1-20)
+            VALUES_1=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[0]} RELEASE_BRANCH=$RELEASE_BRANCH)
+            VALUES_2=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[1]} RELEASE_BRANCH=$RELEASE_BRANCH)
 
             ARR_1=(${VALUES_1// / })
             ARR_2=(${VALUES_2// / })
