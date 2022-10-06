@@ -36,7 +36,7 @@ LATEST_TAG=$(LATEST)
 UNVERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(GIT_TAG)-$(GIT_HASH)
 VERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)-$(GIT_TAG)-$(GIT_HASH)
 
-HAS_S3_ARTIFACTS=true
+HAS_S3_ARTIFACTS?=true
 HAS_RELEASE_BRANCHES=true
 
 PROJECT_DEPENDENCIES=eksd/kubernetes/client eksa/kubernetes-sigs/etcdadm eksd/cni-plugins eksa/kubernetes-sigs/cri-tools eksd/etcd/etcd.tar.gz
@@ -48,9 +48,15 @@ KIND_NODE_BUILD_ARM64_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/io.containerd.
 
 HAPROXY_CFG=$(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg
 
-IMAGE_NAMES=haproxy kindnetd kind-base 
+IMAGE_NAMES?=haproxy kindnetd kind-base 
 
 FIX_LICENSES_KINDNETD_TARGET=$(REPO)/images/kindnetd/LICENSE
+
+BUILDSPECS=projects/$(COMPONENT)/buildspecs/binaries.yml projects/$(COMPONENT)/buildspecs/images.yml
+BUILDSPEC_1_DEPENDS_ON_OVERRIDE=none
+BUILDSPEC_2_VARS_KEYS=RELEASE_BRANCH
+BUILDSPEC_2_VARS_VALUES=SUPPORTED_K8S_VERSIONS
+
 
 include $(BASE_DIRECTORY)/Common.mk
 
