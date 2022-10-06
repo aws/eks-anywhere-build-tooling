@@ -19,7 +19,7 @@ EXTRA_GOBUILD_FLAGS=-x -tags netgo,osusergo,static_build
 # This is an artificial dep so that during the staging batch build the source-controller
 # falls into the second "batch" of builds, not blocking the first batch from finishing
 # since it takes significantly longer
-PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm
+BUILDSPEC_DEPENDS_ON_OVERRIDE=eksa/kubernetes-sigs/etcdadm
 
 include $(BASE_DIRECTORY)/Common.mk
 

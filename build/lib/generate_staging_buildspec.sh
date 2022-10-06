@@ -74,8 +74,11 @@ for project in "${PROJECTS[@]}"; do
         # something other than empty string since some overrides are empty strings
         PROJECT_DEPENDENCIES="false"
         for var in "BUILDSPEC_DEPENDS_ON_OVERRIDE" "BUILDSPEC_$((( $i + 1 )))_DEPENDS_ON_OVERRIDE"; do
-            if [[ "none" = "$(make --no-print-directory -C $PROJECT_PATH var-value-$var RELEASE_BRANCH=$RELEASE_BRANCH 2>/dev/null)" ]]; then
+            BUILDSPEC_DEPENDS_ON="$(make --no-print-directory -C $PROJECT_PATH var-value-$var RELEASE_BRANCH=$RELEASE_BRANCH 2>/dev/null)"
+            if [[ "none" = "$BUILDSPEC_DEPENDS_ON" ]]; then
                 PROJECT_DEPENDENCIES=""
+            elif [[ -n "$BUILDSPEC_DEPENDS_ON" ]]; then
+                PROJECT_DEPENDENCIES=$BUILDSPEC_DEPENDS_ON
             fi
         done
 
