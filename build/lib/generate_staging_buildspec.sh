@@ -59,34 +59,6 @@ for project in "${PROJECTS[@]}"; do
 
     echo "Adding: $IDENTIFIER"
 
-    DEPEND_ON=""
-    PROJECT_DEPENDENCIES=$(make --no-print-directory -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=$RELEASE_BRANCH)
-    if [ -n "$PROJECT_DEPENDENCIES" ]; then
-        DEPS=(${PROJECT_DEPENDENCIES// / })
-        for dep in "${DEPS[@]}"; do
-            DEP_PRODUCT="$(cut -d/ -f1 <<< $dep)"
-            if [[ "$DEP_PRODUCT" == "eksd" ]]; then
-                continue
-            fi
-            DEP_ORG="$(cut -d/ -f2 <<< $dep)"
-            DEP_REPO="$(cut -d/ -f3 <<< $dep)"
-            if [[ "$DEP_REPO" == "kind" ]]; then
-                DEPEND_ON+="\"kubernetes_sigs_kind_1_24_buildspec\","
-            else
-                DEPEND_ON+="\"${DEP_ORG//-/_}_${DEP_REPO//-/_}\","
-            fi
-
-            if [ ! -d $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO ]; then
-                echo "Non-existent project dependency: $dep!!!"
-                exit 1
-            fi
-        done
-    fi
-
-    if [ -n "$DEPEND_ON" ]; then
-        DEPEND_ON="\"depend-on\":[${DEPEND_ON%?}],"
-    fi
-
     CLONE_URL=""
     if [[ "true" != "$(make --no-print-directory -C $PROJECT_PATH var-value-REPO_NO_CLONE RELEASE_BRANCH=$RELEASE_BRANCH)" ]]; then
         REPO=$(make --no-print-directory -C $PROJECT_PATH var-value-CLONE_URL AWS_REGION=us-west-2 CODEBUILD_CI=true RELEASE_BRANCH=$RELEASE_BRANCH)
@@ -95,12 +67,55 @@ for project in "${PROJECTS[@]}"; do
 
     BUILDSPECS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPECS RELEASE_BRANCH=$RELEASE_BRANCH)
     SPECS=(${BUILDSPECS// / })
-    for buildspec in "${SPECS[@]}"; do
+    for (( i=0; i < ${#SPECS[@]}; i++ )); do
+        buildspec=${SPECS[$i]}
+
+        DEPEND_ON=""
+        # something other than empty string since some overrides are empty strings
+        PROJECT_DEPENDENCIES="false"
+        for var in "BUILDSPEC_DEPENDS_ON_OVERRIDE" "BUILDSPEC_$((( $i + 1 )))_DEPENDS_ON_OVERRIDE"; do
+            if [[ "none" = "$(make --no-print-directory -C $PROJECT_PATH var-value-$var RELEASE_BRANCH=$RELEASE_BRANCH 2>/dev/null)" ]]; then
+                PROJECT_DEPENDENCIES=""
+            fi
+        done
+
+        if [ "$PROJECT_DEPENDENCIES" = "false" ]; then
+            PROJECT_DEPENDENCIES=$(make --no-print-directory -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=$RELEASE_BRANCH)
+        fi
+
+        if [ -n "$PROJECT_DEPENDENCIES" ]; then
+            DEPS=(${PROJECT_DEPENDENCIES// / })
+            for dep in "${DEPS[@]}"; do
+                DEP_PRODUCT="$(cut -d/ -f1 <<< $dep)"
+                if [[ "$DEP_PRODUCT" == "eksd" ]]; then
+                    continue
+                fi
+                DEP_ORG="$(cut -d/ -f2 <<< $dep)"
+                DEP_REPO="$(cut -d/ -f3 <<< $dep)"
+                DEPEND_ON+="\"${DEP_ORG//-/_}_${DEP_REPO//-/_}\","
+
+                if [ ! -d $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO ]; then
+                    echo "Non-existent project dependency: $dep!!!"
+                    exit 1
+                fi
+            done
+        fi
+
+        if [ -n "$DEPEND_ON" ]; then
+            DEPEND_ON="\"depend-on\":[${DEPEND_ON%?}],"
+        fi
         BUILDSPEC_VARS_KEYS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_VARS_KEYS RELEASE_BRANCH=$RELEASE_BRANCH)
+        if [[ -z "$BUILDSPEC_VARS_KEYS" ]]; then
+            BUILDSPEC_VARS_KEYS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_$((( $i + 1 )))_VARS_KEYS RELEASE_BRANCH=$RELEASE_BRANCH 2>/dev/null)
+        fi
+
         if [[ -n "$BUILDSPEC_VARS_KEYS" ]]; then
             KEYS=(${BUILDSPEC_VARS_KEYS// / })
 
             BUILDSPEC_VARS_VALUES=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_VARS_VALUES RELEASE_BRANCH=$RELEASE_BRANCH)
+            if [[ -z "$BUILDSPEC_VARS_VALUES" ]]; then
+                BUILDSPEC_VARS_VALUES=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_$((( $i + 1 )))_VARS_VALUES RELEASE_BRANCH=$RELEASE_BRANCH 2>/dev/null)
+            fi
             VARS=(${BUILDSPEC_VARS_VALUES// / })
             
             # Note: only support 1 or 2 vars for now since that is all we need for kind + image-builder 
@@ -110,7 +125,7 @@ for project in "${PROJECTS[@]}"; do
                 
                 for val1 in "${ARR_1[@]}"; do                
                     BUILDSPEC_NAME=$(basename $buildspec .yml)
-                    IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}_${BUILDSPEC_NAME//-/_}
+                    IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}
                     yq eval -i -P \
                         ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"}}}]" \
                         $STAGING_BUILDSPEC_FILE             
