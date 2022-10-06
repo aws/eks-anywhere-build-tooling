@@ -106,7 +106,7 @@ func (b *BuildOptions) BuildImage() {
 
 		if b.Os == Ubuntu {
 			// Patch firmware config for tool
-			upstreamPatchCommand := fmt.Sprintf("make -C %s image-builder/eks-anywhere-patched", imageBuilderProjectPath)
+			upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
 			if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
 				log.Fatalf("Error executing upstream patch command")
 			}
@@ -156,7 +156,7 @@ func (b *BuildOptions) BuildImage() {
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
 	} else if b.Hypervisor == Nutanix {
 		// Patch firmware config for tool
-		upstreamPatchCommand := fmt.Sprintf("make -C %s image-builder/eks-anywhere-patched", imageBuilderProjectPath)
+		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
 		if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
 			log.Fatalf("Error executing upstream patch command")
 		}
