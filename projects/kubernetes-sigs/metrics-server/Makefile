@@ -19,7 +19,6 @@ IMAGE_NAMES=
 BUILD_TARGETS=helm/build
 RELEASE_TARGETS=helm/push
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
-IMAGE_REPO=public.ecr.aws/eks-distro
 
 HAS_HELM_CHART=true
 
