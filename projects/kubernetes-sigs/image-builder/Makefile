@@ -91,6 +91,7 @@ ifeq ($(IMAGE_FORMAT),ova)
 		RELEASE_TARGETS=release-ova-$(IMAGE_OS) upload-artifacts-ova
 	else
 		S3_TARGET_PREREQUISITES?=
+		RELEASE_TARGETS=unsupported-release-target
 	endif
 else ifeq ($(IMAGE_FORMAT),raw)
 	ifeq ($(IMAGE_OS),ubuntu)
@@ -101,7 +102,7 @@ else ifeq ($(IMAGE_FORMAT),raw)
 			S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_RAW_PATH)
 			RELEASE_TARGETS=download-bottlerocket-raw upload-bottlerocket-raw
 		else
-			RELEASE_TARGETS=
+			RELEASE_TARGETS=unsupported-release-target
 		endif
 	else ifeq ($(IMAGE_OS),redhat)
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
@@ -109,6 +110,7 @@ else ifeq ($(IMAGE_FORMAT),raw)
 	endif
 else
 	S3_TARGET_PREREQUISITES?=
+	RELEASE_TARGETS=unsupported-release-target
 endif
 
 BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml
@@ -204,7 +206,7 @@ release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 
 .PHONY: release-ova-%
 release-ova-%:
-	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT)
+	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
 
 .PHONY: local-build-ova-%
 local-build-ova-%: MAKEFLAGS=
@@ -270,6 +272,10 @@ upload-artifacts-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/
 upload-artifacts-%: s3-artifacts-%
 	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$*
 
+
+.PHONY: unsupported-release-target
+unsupported-release-target:
+	@echo "Unsupported combination of image format and image os chosen. Build will quit now..."
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
