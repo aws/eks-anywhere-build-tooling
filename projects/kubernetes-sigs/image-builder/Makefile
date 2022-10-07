@@ -198,7 +198,7 @@ release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 
 .PHONY: release-ova-%
 release-ova-%:
-	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT)
+	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
 
 .PHONY: local-build-ova-ubuntu-2004
 local-build-ova-ubuntu-2004: MAKEFLAGS=
