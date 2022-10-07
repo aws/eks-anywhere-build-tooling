@@ -1,5 +1,5 @@
 ## **cert-manager**
-![Version](https://img.shields.io/badge/version-v1.8.2-blue)
+![Version](https://img.shields.io/badge/version-v1.9.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUkphQkhWTUpOOVE1OFVLU0dHQmVFUXZJV0dJaGVLYmtEZHp0aGtDRnJBQUxtaHVqOWp3S0l6d0NlTytqNWpwc2tNTmF6RnNhMTZ3d1J1RXErR0lWcldZPSIsIml2UGFyYW1ldGVyU3BlYyI6IlQyU2lIcVVtU3ozZVZSVTgiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [cert-manager](https://github.com/cert-manager/cert-manager) is a Kubernetes add-on to automate the management and issuance of TLS certificates from various issuing sources, such as [Let’s Encrypt](https://letsencrypt.org), [HashiCorp Vault](https://www.vaultproject.io), [Venafi](https://www.venafi.com/), a simple signing key pair, or self signed. It periodically ensures that certificates are valid and up-to-date, and attempts to renew certificates at an appropriate time before expiry.
@@ -58,6 +58,7 @@ from github during each build, and so we're sure nothing changes in the file eve
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
 1. Update the cert-manager.yaml manifest using `make update-cert-manager-manifest` from this directory
+1. Update `manifests/cert-manager.yaml` with file created in `build/cert-manager.yaml`
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=cert-manager/cert-manager` from the root of the repo.
 1. Update the version at the top of this Readme.
 1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
