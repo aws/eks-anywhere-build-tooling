@@ -19,7 +19,6 @@ WORKDIR /
 
 COPY --from=wget-builder /newroot /
 
-COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/cloudflare/cfssl /usr/local/bin
 COPY _output/bin/tink/$TARGETOS-$TARGETARCH/tink-server /usr/bin/tink-server
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
