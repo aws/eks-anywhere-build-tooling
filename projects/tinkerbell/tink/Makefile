@@ -24,8 +24,6 @@ EXTRA_GO_LDFLAGS=-X main.version=$(VERSION)
 
 HAS_S3_ARTIFACTS=true
 
-PROJECT_DEPENDENCIES=eksa/cloudflare/cfssl
-
 include $(BASE_DIRECTORY)/Common.mk
 
 s3-artifacts: create-manifests

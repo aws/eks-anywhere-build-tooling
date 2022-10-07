@@ -36,6 +36,7 @@ include $(BASE_DIRECTORY)/Common.mk
 update-digests:
 	source $(BUILD_LIB)/image_shasum.sh $(REGISTRY) $(COLLECTOR_IMAGE) $(GIT_TAG) > images/collector/IMAGE_DIGEST
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
