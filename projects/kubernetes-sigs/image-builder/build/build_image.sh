@@ -25,8 +25,13 @@ release_channel="${2?Specify the second argument - release channel}"
 image_format="${3?Specify the third argument - image format}"
 artifacts_bucket=${4-$ARTIFACTS_BUCKET}
 
+s3_path="latest"
+if [[ "${BRANCH_NAME}" != "main" ]]; then
+  s3_path="${BRANCH_NAME}"
+fi
+
 # Download and setup latest image-builder cli
-image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket
+image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket 'amd64' $s3_path
 
 if [[ $image_format == "ova" ]]; then
   # Setup vsphere config
