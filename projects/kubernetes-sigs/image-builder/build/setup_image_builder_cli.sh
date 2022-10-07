@@ -20,8 +20,9 @@ function image_build::common::download_latest_dev_image_builder_cli() {
   local -r download_location=${1-/usr/bin}
   local -r artifacts_bucket=${2-$ARTIFACTS_BUCKET}
   local -r arch=${3-amd64}
+  local -r latest=${4-latest}
 
-  local -r latest_tar_url=$(build::common::get_latest_eksa_asset_url $artifacts_bucket 'aws/image-builder' $arch 'latest')
+  local -r latest_tar_url=$(build::common::get_latest_eksa_asset_url $artifacts_bucket 'aws/image-builder' $arch $latest)
 
   # Download the tar ball and decompress
   local -r http_code=$(curl -s -w "%{http_code}" $latest_tar_url -o image-builder.tar.gz)
