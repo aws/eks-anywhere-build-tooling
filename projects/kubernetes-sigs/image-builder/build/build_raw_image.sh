@@ -26,6 +26,7 @@ AMI_ID="${4?Specify fourth argument - AMI ID to create instance}"
 INSTANCE_TYPE="${5?Specify fifth argument - Instance type to create}"
 KEY_NAME="${6?Specify sixth argument - Key name to associate with instance}"
 IMAGE_OS="${7?Specify seventh argument - Raw build target name}"
+LATEST="${8?Specify the eight argument - Latest tag}"
 
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 CI="${CI:-false}"
@@ -118,7 +119,7 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=/home/ubuntu/$PROJECT_PATH/artifacts $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET"
+SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=/home/ubuntu/$PROJECT_PATH/artifacts $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH raw $ARTIFACTS_BUCKET $LATEST"
 if [[ "$IMAGE_OS" == "redhat" ]]; then
   SSH_COMMANDS="export RHSM_USERNAME='$RHSM_USERNAME' RHSM_PASSWORD='$RHSM_PASSWORD'; $SSH_COMMANDS"
 fi
