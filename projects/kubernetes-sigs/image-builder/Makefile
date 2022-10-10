@@ -107,6 +107,9 @@ else ifeq ($(IMAGE_FORMAT),raw)
 	else ifeq ($(IMAGE_OS),redhat)
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
 		RELEASE_TARGETS=release-raw-$(IMAGE_OS) upload-artifacts-raw
+	else
+		S3_TARGET_PREREQUISITES?=
+		RELEASE_TARGETS=unsupported-release-target
 	endif
 else
 	S3_TARGET_PREREQUISITES?=
@@ -232,7 +235,7 @@ upload-bottlerocket-%:
 
 .PHONY: release-raw-%
 release-raw-%: $(GIT_PATCH_TARGET)
-	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $*
+	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $* $(LATEST)
 
 .PHONY: build-qemu-rhel-local
 build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
