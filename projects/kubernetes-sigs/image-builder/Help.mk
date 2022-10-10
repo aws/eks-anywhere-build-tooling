@@ -40,5 +40,5 @@ create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
 build: ## Called via prow presubmit, calls `release-raw-ubuntu fake-ubuntu.gz _output/tar/1-21/raw/ubuntu/ubuntu.gz upload-artifacts-raw download-bottlerocket-raw _output/tar/1-21/raw/bottlerocket/bottlerocket.img.gz upload-bottlerocket-raw build-ami-ubuntu-2004 setup-packer-configs-ova  fake-ubuntu.ova _output/tar/1-21/ova/ubuntu/ubuntu.ova  upload-artifacts-ova download-bottlerocket-ova _output/tar/1-21/ova/bottlerocket/bottlerocket.ova upload-bottlerocket-ova`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images  `
+release: ## Called via prow postsubmit + release jobs, calls `unsupported-release-target`
 ########### END GENERATED ###########################
