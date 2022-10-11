@@ -15,3 +15,4 @@ You can find the latest version of this image [on ECR Public Gallery](https://ga
 4. Run `make update-attribution-checksums-docker` for each release version in this folder.
 5. Update CHECKSUMS as necessary (updated by default).
 6. Update the versions at the top of this Readme.
+7. Update the hardcoded appVersion values in sedfile.template
