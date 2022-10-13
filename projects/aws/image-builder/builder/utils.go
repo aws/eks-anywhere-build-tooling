@@ -11,7 +11,7 @@ import (
 
 func cloneRepo(cloneUrl, destination string) error {
 	log.Print("Cloning eks-anywhere-build-tooling...")
-	cloneRepoCommandSequence := fmt.Sprintf("git clone %s %s", cloneUrl, destination)
+	cloneRepoCommandSequence := fmt.Sprintf("git clone %s %s && cd %s && git checkout cloudstack-image", cloneUrl, destination, destination)
 	cmd := exec.Command("bash", "-c", cloneRepoCommandSequence)
 	return execCommandWithStreamOutput(cmd)
 }

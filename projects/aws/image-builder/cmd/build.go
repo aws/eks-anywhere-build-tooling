@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	bo                  = &builder.BuildOptions{}
-	vSphereConfigFile   string
-	baremetalConfigFile string
-	nutanixConfigFile   string
-	err                 error
+	bo                   = &builder.BuildOptions{}
+	vSphereConfigFile    string
+	baremetalConfigFile  string
+	nutanixConfigFile    string
+	cloudstackConfigFile string
+	err                  error
 )
 
 var buildCmd = &cobra.Command{
@@ -42,6 +43,7 @@ func init() {
 	buildCmd.Flags().StringVar(&baremetalConfigFile, "baremetal-config", "", "Path to Baremetal Config file")
 	buildCmd.Flags().StringVar(&vSphereConfigFile, "vsphere-config", "", "Path to vSphere Config file")
 	buildCmd.Flags().StringVar(&nutanixConfigFile, "nutanix-config", "", "Path to Nutanix Config file")
+	buildCmd.Flags().StringVar(&cloudstackConfigFile, "cloudstack-config", "", "Path to CloudStack Config file")
 	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-23", "EKS-D Release channel for node image. Can be 1-20, 1-21, 1-22 or 1-23")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
@@ -60,10 +62,12 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		log.Fatalf("Invalid OS type. Please choose ubuntu or redhat")
 	}
 
-	if (bo.Hypervisor != builder.VSphere) &&
-		(bo.Hypervisor != builder.Baremetal) &&
-		(bo.Hypervisor != builder.Nutanix) {
-		log.Fatalf("Invalid hypervisor. Please choose vsphere or baremetal or nutanix")
+	if err = validateSupportedHypervisors(bo.Hypervisor); err != nil {
+		log.Fatal(err.Error())
+	}
+
+	if bo.Hypervisor == builder.CloudStack && bo.Os != builder.RedHat {
+		log.Fatalf("Invalid OS type. Only redhat os is supported for CloudStack")
 	}
 
 	configPath := ""
@@ -74,6 +78,8 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		configPath = baremetalConfigFile
 	case builder.Nutanix:
 		configPath = nutanixConfigFile
+	case builder.CloudStack:
+		configPath = cloudstackConfigFile
 	}
 	bo.Os = strings.ToLower(bo.Os)
 	bo.Hypervisor = strings.ToLower(bo.Hypervisor)
@@ -81,7 +87,8 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 	if configPath == "" {
 		if bo.Hypervisor == builder.VSphere ||
 			(bo.Hypervisor == builder.Baremetal && bo.Os == builder.RedHat) ||
-			(bo.Hypervisor == builder.Nutanix) {
+			(bo.Hypervisor == builder.Nutanix) ||
+			(bo.Hypervisor == builder.CloudStack) {
 			return fmt.Errorf("%s-config is a required flag for %s hypervisor or when os is redhat", bo.Hypervisor, bo.Hypervisor)
 		}
 	} else {
@@ -134,6 +141,20 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
 			}
 			// TODO Validate other fields as well
+		case builder.CloudStack:
+			if err = json.Unmarshal(config, &bo.CloudstackConfig); err != nil {
+				return err
+			}
+			if bo.Os == builder.RedHat {
+				if err = validateRedhat(bo.CloudstackConfig.RhelUsername, bo.CloudstackConfig.RhelPassword, bo.CloudstackConfig.IsoUrl); err != nil {
+					return err
+				}
+			}
+			if bo.CloudstackConfig.IsoUrl != "" {
+				if err = validateCustomIso(bo.CloudstackConfig.IsoChecksum, bo.CloudstackConfig.IsoChecksumType); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -158,4 +179,13 @@ func validateCustomIso(isoChecksum, isoChecksumType string) error {
 		return fmt.Errorf("\"iso_checksum_type\" is a required field when providing iso_checksum. Checksum type can be sha256 or sha512")
 	}
 	return nil
+}
+
+func validateSupportedHypervisors(hypervisor string) error {
+	for _, supportedHypervisor := range builder.SupportedHypervisors {
+		if supportedHypervisor == hypervisor {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s is not supported yet. Please select one of %s", hypervisor, strings.Join(builder.SupportedHypervisors, ","))
 }
