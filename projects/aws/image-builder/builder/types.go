@@ -1,22 +1,31 @@
 package builder
 
 const (
-	Ubuntu    string = "ubuntu"
-	RedHat    string = "redhat"
-	VSphere   string = "vsphere"
-	Baremetal string = "baremetal"
-	Nutanix   string = "nutanix"
+	Ubuntu     string = "ubuntu"
+	RedHat     string = "redhat"
+	VSphere    string = "vsphere"
+	Baremetal  string = "baremetal"
+	Nutanix    string = "nutanix"
+	CloudStack string = "cloudstack"
 )
 
+var SupportedHypervisors = []string{
+	VSphere,
+	Baremetal,
+	Nutanix,
+	CloudStack,
+}
+
 type BuildOptions struct {
-	Os              string
-	Hypervisor      string
-	VsphereConfig   *VsphereConfig
-	BaremetalConfig *BaremetalConfig
-	NutanixConfig   *NutanixConfig
-	ReleaseChannel  string
-	artifactsBucket string
-	Force           bool
+	Os               string
+	Hypervisor       string
+	VsphereConfig    *VsphereConfig
+	BaremetalConfig  *BaremetalConfig
+	NutanixConfig    *NutanixConfig
+	CloudstackConfig *CloudstackConfig
+	ReleaseChannel   string
+	artifactsBucket  string
+	Force            bool
 }
 
 type VsphereConfig struct {
@@ -40,6 +49,12 @@ type VsphereConfig struct {
 
 type BaremetalConfig struct {
 	ExtraRpms string `json:"extra_rpms,omitempty"`
+	IsoConfig
+	RhelConfig
+}
+
+type CloudstackConfig struct {
+	AnsibleUserVars string `json:"ansible_user_vars"`
 	IsoConfig
 	RhelConfig
 }

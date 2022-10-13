@@ -178,6 +178,49 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		log.Printf("Image Build Successful\n Please find the image uploaded under Nutanix Image Service with name %s\n", b.NutanixConfig.ImageName)
+	} else if b.Hypervisor == CloudStack {
+		// Create config file
+		cloudstackConfigFile := filepath.Join(imageBuilderProjectPath, "packer/config/cloudstack.json")
+
+		//Assign ansible user var for cloudstack provider
+		b.CloudstackConfig.AnsibleUserVars = "provider=cloudstack"
+		if b.CloudstackConfig != nil {
+			cloudstackConfigData, err := json.Marshal(b.CloudstackConfig)
+			if err != nil {
+				log.Fatalf("Error marshalling cloudstack config data")
+			}
+			err = ioutil.WriteFile(cloudstackConfigFile, cloudstackConfigData, 0644)
+			if err != nil {
+				log.Fatalf("Error writing cloudstack config file to packer")
+			}
+		}
+
+		var buildCommand string
+		var outputImageGlobPattern string
+		switch b.Os {
+		case RedHat:
+			outputImageGlobPattern = "output/rhel-*/rhel-*"
+			buildCommand = fmt.Sprintf("make -C %s local-build-qemu-rhel-8", imageBuilderProjectPath)
+			commandEnvVars = append(commandEnvVars,
+				fmt.Sprintf("RHSM_USERNAME=%s", b.CloudstackConfig.RhelUsername),
+				fmt.Sprintf("RHSM_PASSWORD=%s", b.CloudstackConfig.RhelPassword),
+			)
+		}
+		if b.CloudstackConfig != nil {
+			commandEnvVars = append(commandEnvVars, fmt.Sprintf("PACKER_TYPE_VAR_FILES=%s", cloudstackConfigFile))
+		}
+
+		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
+		if err != nil {
+			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
+		}
+
+		outputImageGlob, err = filepath.Glob(filepath.Join(upstreamImageBuilderProjectPath, outputImageGlobPattern))
+		if err != nil {
+			log.Fatalf("Error getting glob for output files: %v", err)
+		}
+
+		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.qcow2", b.Os))
 	}
 
 	if outputArtifactPath != "" {
