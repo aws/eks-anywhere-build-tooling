@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	buildToolingRepoUrl = "https://github.com/vignesh-goutham/eks-anywhere-build-tooling.git"
+	buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
 )
 
 var (
