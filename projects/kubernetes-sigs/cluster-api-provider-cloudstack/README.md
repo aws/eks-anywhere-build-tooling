@@ -1,5 +1,5 @@
 ## **Cluster API Provider for CloudStack**
-![Version](https://img.shields.io/badge/version-v0.4.7--rc3-blue)
+![Version](https://img.shields.io/badge/version-v0.4.8--rc4-blue)
 [![Go Report Card](https://goreportcard.com/badge/kubernetes-sigs/cluster-api-provider-cloudstack)](https://goreportcard.com/report/kubernetes-sigs/cluster-api-provider-cloudstack)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiS0M4VGRyK0xWM2ZZY0pRbVMvY0pHRWlVSEJ3M1I4SXNRaVNxSnB5blVYTHpHSkNFWlpXcWhHSmdlSkhCVnVwSXJyVm16NFlSUzVSRC9vN2g2bmY5NjVnPSIsIml2UGFyYW1ldGVyU3BlYyI6ImQ4ZldMWnMweEIyTmxrTk8iLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
@@ -15,6 +15,6 @@ The [Cluster API Provider for CloudStack (CAPC)](https://github.com/kubernetes-s
    target has changed in the Makefile, and make the required changes in create_manifests.sh
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
-1. Update checksums and attribution using `make update-attribution-checksums-docker`.
+1. Update checksums using `make checksum-files-project-kubernetes-sigs_cluster-api-provider-cloudstack` from the root directory of this repo.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
