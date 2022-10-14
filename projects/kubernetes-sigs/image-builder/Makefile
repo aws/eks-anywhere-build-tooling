@@ -119,6 +119,7 @@ else ifeq ($(IMAGE_FORMAT),cloudstack)
 	else
 		S3_TARGET_PREREQUISITES?=
 		RELEASE_TARGETS=unsupported-release-target
+	endif
 else
 	S3_TARGET_PREREQUISITES?=
 	RELEASE_TARGETS=unsupported-release-target
