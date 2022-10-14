@@ -29,6 +29,18 @@ latest=${5-latest}
 # Download and setup latest image-builder cli
 image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket 'amd64' $latest
 
+image_builder_config_file="${HOME}/image_builder_config_file"
+redhat_config_file="${HOME}/redhat_config_file"
+if [[ $image_os == "redhat" ]]; then
+  jq --null-input \
+    --arg rhel_username $RHSM_USERNAME \
+    --arg rhel_password $RHSM_PASSWORD \
+    --arg iso_url "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso" \
+    --arg iso_checksum_type "sha256" \
+    --arg iso_checksum "ea5f349d492fed819e5086d351de47261c470fc794f7124805d176d69ddf1fcd" \
+    '{"rhel_username": $rhel_username, "rhel_password": $rhel_password, "iso_url": $iso_url, "iso_checksum_type": $iso_checksum_type, "iso_checksum": $iso_checksum}' > $redhat_config_file
+fi
+
 if [[ $image_format == "ova" ]]; then
   # Setup vsphere config
   vsphere_config_file="${HOME}/vsphere_config_file"
@@ -36,30 +48,29 @@ if [[ $image_format == "ova" ]]; then
 
   # Run image-builder cli
   if [[ $image_os == "redhat" ]]; then
-    echo "$(jq --arg rhel_username $RHSM_USERNAME \
-               --arg rhel_password $RHSM_PASSWORD \
-               --arg iso_url "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso" \
-               --arg iso_checksum_type "sha256" \
-               --arg iso_checksum "ea5f349d492fed819e5086d351de47261c470fc794f7124805d176d69ddf1fcd" \
-               '. += {"rhel_username": $rhel_username, "rhel_password": $rhel_password, "iso_url": $iso_url, "iso_checksum_type": $iso_checksum_type, "iso_checksum": $iso_checksum}' $vsphere_config_file)" > $vsphere_config_file
+    jq -s add $vsphere_config_file $redhat_config_file > $image_builder_config_file
+  else
+    image_builder_config_file=$vsphere_config_file
   fi
-  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $vsphere_config_file --release-channel $release_channel
+
+  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $image_builder_config_file --release-channel $release_channel
 elif [[ $image_format == "raw" ]]; then
   # Run image-builder cli
   if [[ $image_os == "ubuntu" ]]; then
     "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel
   elif [[ $image_os == "redhat" ]]; then
     echo "Creating baremetal config"
-    baremetal_config_file="${HOME}/baremetal_config_file"
-    jq --null-input \
-      --arg rhel_username $RHSM_USERNAME \
-      --arg rhel_password $RHSM_PASSWORD \
-      --arg iso_url "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso" \
-      --arg iso_checksum_type "sha256" \
-      --arg iso_checksum "ea5f349d492fed819e5086d351de47261c470fc794f7124805d176d69ddf1fcd" \
-      --arg extra_rpms "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm" \
-      '{"rhel_username": $rhel_username, "rhel_password": $rhel_password, "iso_url": $iso_url, "iso_checksum_type": $iso_checksum_type, "iso_checksum": $iso_checksum, "extra_rpms": $extra_rpms}' > $baremetal_config_file
+    echo "$(jq --arg extra_rpms "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm" \
+      '. += {"extra_rpms": $extra_rpms}' $redhat_config_file)" > $image_builder_config_file
 
-    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel --baremetal-config $baremetal_config_file
+    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel --baremetal-config $image_builder_config_file
   fi
+elif [[ $image_format == "cloudstack" ]]; then
+  echo "Creating cloudstack config"
+  if [[ $image_os != "redhat" ]]; then
+    echo "Cloudstack builds does not support any non-redhat os"
+    exit 1
+  fi
+  image_builder_config_file=$redhat_config_file
+  "${HOME}"/image-builder build --hypervisor cloudstack --os $image_os --release-channel $release_channel --cloudstack-config $image_builder_config_file
 fi
