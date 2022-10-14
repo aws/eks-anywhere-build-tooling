@@ -1,0 +1,794 @@
+From 6836b06a9dfb6ad43c5ef86131059e5e01680e10 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Wed, 21 Sep 2022 10:01:23 -0400
+Subject: [PATCH] packages patches
+
+---
+ charts/{metallb/charts => }/crds/.helmignore  |   0
+ charts/{metallb/charts => }/crds/Chart.yaml   |   0
+ charts/{metallb/charts => }/crds/README.md    |   0
+ .../charts => }/crds/templates/crds.yaml      |   4 +-
+ charts/crds/values.yaml                       |   1 +
+ charts/metallb/Chart.lock                     |   6 -
+ charts/metallb/Chart.yaml                     |   4 -
+ charts/metallb/templates/_helpers.tpl         |   9 +
+ .../metallb/templates/bgpadvertisements.yaml  |  34 ++
+ charts/metallb/templates/controller.yaml      |   7 +-
+ charts/metallb/templates/ipaddresspools.yaml  |  12 +
+ .../metallb/templates/l2advertisements.yaml   |  14 +
+ charts/metallb/templates/rbac.yaml            |   8 +-
+ charts/metallb/templates/secret.yaml          |  16 +
+ .../metallb/templates/service-accounts.yaml   |   2 +
+ charts/metallb/templates/speaker.yaml         | 296 +-----------------
+ charts/metallb/values.schema.json             |  44 +--
+ charts/metallb/values.yaml                    |  33 +-
+ 18 files changed, 137 insertions(+), 353 deletions(-)
+ rename charts/{metallb/charts => }/crds/.helmignore (100%)
+ rename charts/{metallb/charts => }/crds/Chart.yaml (100%)
+ rename charts/{metallb/charts => }/crds/README.md (100%)
+ rename charts/{metallb/charts => }/crds/templates/crds.yaml (99%)
+ create mode 100644 charts/crds/values.yaml
+ delete mode 100644 charts/metallb/Chart.lock
+ create mode 100644 charts/metallb/templates/bgpadvertisements.yaml
+ create mode 100644 charts/metallb/templates/ipaddresspools.yaml
+ create mode 100644 charts/metallb/templates/l2advertisements.yaml
+ create mode 100644 charts/metallb/templates/secret.yaml
+
+diff --git a/charts/metallb/charts/crds/.helmignore b/charts/crds/.helmignore
+similarity index 100%
+rename from charts/metallb/charts/crds/.helmignore
+rename to charts/crds/.helmignore
+diff --git a/charts/metallb/charts/crds/Chart.yaml b/charts/crds/Chart.yaml
+similarity index 100%
+rename from charts/metallb/charts/crds/Chart.yaml
+rename to charts/crds/Chart.yaml
+diff --git a/charts/metallb/charts/crds/README.md b/charts/crds/README.md
+similarity index 100%
+rename from charts/metallb/charts/crds/README.md
+rename to charts/crds/README.md
+diff --git a/charts/metallb/charts/crds/templates/crds.yaml b/charts/crds/templates/crds.yaml
+similarity index 99%
+rename from charts/metallb/charts/crds/templates/crds.yaml
+rename to charts/crds/templates/crds.yaml
+index 3de9e7de..ecf4d78c 100644
+--- a/charts/metallb/charts/crds/templates/crds.yaml
++++ b/charts/crds/templates/crds.yaml
+@@ -22,7 +22,7 @@ spec:
+         # with "unable to parse bytes as PEM block", The controller will patch it with the right content after it starts
+         caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tDQpNSUlGWlRDQ0EwMmdBd0lCQWdJVU5GRW1XcTM3MVpKdGkrMmlSQzk1WmpBV1MxZ3dEUVlKS29aSWh2Y05BUUVMDQpCUUF3UWpFTE1Ba0dBMVVFQmhNQ1dGZ3hGVEFUQmdOVkJBY01ERVJsWm1GMWJIUWdRMmwwZVRFY01Cb0dBMVVFDQpDZ3dUUkdWbVlYVnNkQ0JEYjIxd1lXNTVJRXgwWkRBZUZ3MHlNakEzTVRrd09UTXlNek5hRncweU1qQTRNVGd3DQpPVE15TXpOYU1FSXhDekFKQmdOVkJBWVRBbGhZTVJVd0V3WURWUVFIREF4RVpXWmhkV3gwSUVOcGRIa3hIREFhDQpCZ05WQkFvTUUwUmxabUYxYkhRZ1EyOXRjR0Z1ZVNCTWRHUXdnZ0lpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElDDQpEd0F3Z2dJS0FvSUNBUUNxVFpxMWZRcC9vYkdlenhES0o3OVB3Ny94azJwellualNzMlkzb1ZYSm5sRmM4YjVlDQpma2ZZQnY2bndscW1keW5PL2phWFBaQmRQSS82aFdOUDBkdVhadEtWU0NCUUpyZzEyOGNXb3F0MGNTN3pLb1VpDQpvcU1tQ0QvRXVBeFFNZjhRZDF2c1gvVllkZ0poVTZBRXJLZEpIaXpFOUJtUkNkTDBGMW1OVW55Rk82UnRtWFZUDQpidkxsTDVYeTc2R0FaQVBLOFB4aVlDa0NtbDdxN0VnTWNiOXlLWldCYmlxQ3VkTXE5TGJLNmdKNzF6YkZnSXV4DQo1L1pXK2JraTB2RlplWk9ZODUxb1psckFUNzJvMDI4NHNTWW9uN0pHZVZkY3NoUnh5R1VpSFpSTzdkaXZVTDVTDQpmM2JmSDFYbWY1ZDQzT0NWTWRuUUV2NWVaOG8zeWVLa3ZrbkZQUGVJMU9BbjdGbDlFRVNNR2dhOGFaSG1URSttDQpsLzlMSmdDYjBnQmtPT0M0WnV4bWh2aERKV1EzWnJCS3pMQlNUZXN0NWlLNVlwcXRWVVk2THRyRW9FelVTK1lsDQpwWndXY2VQWHlHeHM5ZURsR3lNVmQraW15Y3NTU1UvVno2Mmx6MnZCS21NTXBkYldDQWhud0RsRTVqU2dyMjRRDQp0eGNXLys2N3d5KzhuQlI3UXdqVTFITndVRjBzeERWdEwrZ1NHVERnSEVZSlhZelYvT05zMy94TkpoVFNPSkxNDQpoeXNVdyttaGdackdhbUdXcHVIVU1DUitvTWJzMTc1UkcrQjJnUFFHVytPTjJnUTRyOXN2b0ZBNHBBQm8xd1dLDQpRYjRhY3pmeVVscElBOVFoSmFsZEY3S3dPSHVlV3gwRUNrNXg0T2tvVDBvWVp0dzFiR0JjRGtaSmF3SURBUUFCDQpvMU13VVRBZEJnTlZIUTRFRmdRVW90UlNIUm9IWTEyRFZ4R0NCdEhpb1g2ZmVFQXdId1lEVlIwakJCZ3dGb0FVDQpvdFJTSFJvSFkxMkRWeEdDQnRIaW9YNmZlRUF3RHdZRFZSMFRBUUgvQkFVd0F3RUIvekFOQmdrcWhraUc5dzBCDQpBUXNGQUFPQ0FnRUFSbkpsWWRjMTFHd0VxWnh6RDF2R3BDR2pDN2VWTlQ3aVY1d3IybXlybHdPYi9aUWFEa0xYDQpvVStaOVVXT1VlSXJTdzUydDdmQUpvVVAwSm5iYkMveVIrU1lqUGhvUXNiVHduOTc2ZldBWTduM3FMOXhCd1Y0DQphek41OXNjeUp0dlhMeUtOL2N5ak1ReDRLajBIMFg0bWJ6bzVZNUtzWWtYVU0vOEFPdWZMcEd0S1NGVGgrSEFDDQpab1Q5YnZHS25adnNHd0tYZFF0Wnh0akhaUjVqK3U3ZGtQOTJBT051RFNabS8rWVV4b2tBK09JbzdSR3BwSHNXDQo1ZTdNY0FTVXRtb1FORXd6dVFoVkJaRWQ1OGtKYjUrV0VWbGNzanlXNnRTbzErZ25tTWNqR1BsMWgxR2hVbjV4DQpFY0lWRnBIWXM5YWo1NmpBSjk1MVQvZjhMaWxmTlVnanBLQ0c1bnl0SUt3emxhOHNtdGlPdm1UNEpYbXBwSkI2DQo4bmdHRVluVjUrUTYwWFJ2OEhSSGp1VG9CRHVhaERrVDA2R1JGODU1d09FR2V4bkZpMXZYWUxLVllWb1V2MXRKDQo4dVdUR1pwNllDSVJldlBqbzg5ZytWTlJSaVFYUThJd0dybXE5c0RoVTlqTjA0SjdVL1RvRDFpNHE3VnlsRUc5DQorV1VGNkNLaEdBeTJIaEhwVncyTGFoOS9lUzdZMUZ1YURrWmhPZG1laG1BOCtqdHNZamJadnR5Mm1SWlF0UUZzDQpUU1VUUjREbUR2bVVPRVRmeStpRHdzK2RkWXVNTnJGeVVYV2dkMnpBQU4ydVl1UHFGY2pRcFNPODFzVTJTU3R3DQoxVzAyeUtYOGJEYmZFdjBzbUh3UzliQnFlSGo5NEM1Mjg0YXpsdTBmaUdpTm1OUEM4ckJLRmhBPQ0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQ==
+         service:
+-          namespace: {{ .Release.Namespace }}
++          namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+           name: metallb-webhook-service
+           path: /convert
+   versions:
+@@ -533,7 +533,7 @@ spec:
+         # with "unable to parse bytes as PEM block", The controller will patch it with the right content after it starts
+         caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tDQpNSUlGWlRDQ0EwMmdBd0lCQWdJVU5GRW1XcTM3MVpKdGkrMmlSQzk1WmpBV1MxZ3dEUVlKS29aSWh2Y05BUUVMDQpCUUF3UWpFTE1Ba0dBMVVFQmhNQ1dGZ3hGVEFUQmdOVkJBY01ERVJsWm1GMWJIUWdRMmwwZVRFY01Cb0dBMVVFDQpDZ3dUUkdWbVlYVnNkQ0JEYjIxd1lXNTVJRXgwWkRBZUZ3MHlNakEzTVRrd09UTXlNek5hRncweU1qQTRNVGd3DQpPVE15TXpOYU1FSXhDekFKQmdOVkJBWVRBbGhZTVJVd0V3WURWUVFIREF4RVpXWmhkV3gwSUVOcGRIa3hIREFhDQpCZ05WQkFvTUUwUmxabUYxYkhRZ1EyOXRjR0Z1ZVNCTWRHUXdnZ0lpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElDDQpEd0F3Z2dJS0FvSUNBUUNxVFpxMWZRcC9vYkdlenhES0o3OVB3Ny94azJwellualNzMlkzb1ZYSm5sRmM4YjVlDQpma2ZZQnY2bndscW1keW5PL2phWFBaQmRQSS82aFdOUDBkdVhadEtWU0NCUUpyZzEyOGNXb3F0MGNTN3pLb1VpDQpvcU1tQ0QvRXVBeFFNZjhRZDF2c1gvVllkZ0poVTZBRXJLZEpIaXpFOUJtUkNkTDBGMW1OVW55Rk82UnRtWFZUDQpidkxsTDVYeTc2R0FaQVBLOFB4aVlDa0NtbDdxN0VnTWNiOXlLWldCYmlxQ3VkTXE5TGJLNmdKNzF6YkZnSXV4DQo1L1pXK2JraTB2RlplWk9ZODUxb1psckFUNzJvMDI4NHNTWW9uN0pHZVZkY3NoUnh5R1VpSFpSTzdkaXZVTDVTDQpmM2JmSDFYbWY1ZDQzT0NWTWRuUUV2NWVaOG8zeWVLa3ZrbkZQUGVJMU9BbjdGbDlFRVNNR2dhOGFaSG1URSttDQpsLzlMSmdDYjBnQmtPT0M0WnV4bWh2aERKV1EzWnJCS3pMQlNUZXN0NWlLNVlwcXRWVVk2THRyRW9FelVTK1lsDQpwWndXY2VQWHlHeHM5ZURsR3lNVmQraW15Y3NTU1UvVno2Mmx6MnZCS21NTXBkYldDQWhud0RsRTVqU2dyMjRRDQp0eGNXLys2N3d5KzhuQlI3UXdqVTFITndVRjBzeERWdEwrZ1NHVERnSEVZSlhZelYvT05zMy94TkpoVFNPSkxNDQpoeXNVdyttaGdackdhbUdXcHVIVU1DUitvTWJzMTc1UkcrQjJnUFFHVytPTjJnUTRyOXN2b0ZBNHBBQm8xd1dLDQpRYjRhY3pmeVVscElBOVFoSmFsZEY3S3dPSHVlV3gwRUNrNXg0T2tvVDBvWVp0dzFiR0JjRGtaSmF3SURBUUFCDQpvMU13VVRBZEJnTlZIUTRFRmdRVW90UlNIUm9IWTEyRFZ4R0NCdEhpb1g2ZmVFQXdId1lEVlIwakJCZ3dGb0FVDQpvdFJTSFJvSFkxMkRWeEdDQnRIaW9YNmZlRUF3RHdZRFZSMFRBUUgvQkFVd0F3RUIvekFOQmdrcWhraUc5dzBCDQpBUXNGQUFPQ0FnRUFSbkpsWWRjMTFHd0VxWnh6RDF2R3BDR2pDN2VWTlQ3aVY1d3IybXlybHdPYi9aUWFEa0xYDQpvVStaOVVXT1VlSXJTdzUydDdmQUpvVVAwSm5iYkMveVIrU1lqUGhvUXNiVHduOTc2ZldBWTduM3FMOXhCd1Y0DQphek41OXNjeUp0dlhMeUtOL2N5ak1ReDRLajBIMFg0bWJ6bzVZNUtzWWtYVU0vOEFPdWZMcEd0S1NGVGgrSEFDDQpab1Q5YnZHS25adnNHd0tYZFF0Wnh0akhaUjVqK3U3ZGtQOTJBT051RFNabS8rWVV4b2tBK09JbzdSR3BwSHNXDQo1ZTdNY0FTVXRtb1FORXd6dVFoVkJaRWQ1OGtKYjUrV0VWbGNzanlXNnRTbzErZ25tTWNqR1BsMWgxR2hVbjV4DQpFY0lWRnBIWXM5YWo1NmpBSjk1MVQvZjhMaWxmTlVnanBLQ0c1bnl0SUt3emxhOHNtdGlPdm1UNEpYbXBwSkI2DQo4bmdHRVluVjUrUTYwWFJ2OEhSSGp1VG9CRHVhaERrVDA2R1JGODU1d09FR2V4bkZpMXZYWUxLVllWb1V2MXRKDQo4dVdUR1pwNllDSVJldlBqbzg5ZytWTlJSaVFYUThJd0dybXE5c0RoVTlqTjA0SjdVL1RvRDFpNHE3VnlsRUc5DQorV1VGNkNLaEdBeTJIaEhwVncyTGFoOS9lUzdZMUZ1YURrWmhPZG1laG1BOCtqdHNZamJadnR5Mm1SWlF0UUZzDQpUU1VUUjREbUR2bVVPRVRmeStpRHdzK2RkWXVNTnJGeVVYV2dkMnpBQU4ydVl1UHFGY2pRcFNPODFzVTJTU3R3DQoxVzAyeUtYOGJEYmZFdjBzbUh3UzliQnFlSGo5NEM1Mjg0YXpsdTBmaUdpTm1OUEM4ckJLRmhBPQ0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQ==
+         service:
+-          namespace: {{ .Release.Namespace }}
++          namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+           name: metallb-webhook-service
+           path: /convert
+   versions:
+diff --git a/charts/crds/values.yaml b/charts/crds/values.yaml
+new file mode 100644
+index 00000000..98176443
+--- /dev/null
++++ b/charts/crds/values.yaml
+@@ -0,0 +1 @@
++defaultNamespace: "metallb-system"
+diff --git a/charts/metallb/Chart.lock b/charts/metallb/Chart.lock
+deleted file mode 100644
+index 9da4d986..00000000
+--- a/charts/metallb/Chart.lock
++++ /dev/null
+@@ -1,6 +0,0 @@
+-dependencies:
+-- name: crds
+-  repository: ""
+-  version: 0.13.5
+-digest: sha256:32dad748dd2b98f9b2b285f0a6d6df1cd32b1ab782f81b1053fab6a5c5538355
+-generated: "2022-09-01T12:28:30.421530481+02:00"
+diff --git a/charts/metallb/Chart.yaml b/charts/metallb/Chart.yaml
+index 3781941c..cbaccff1 100644
+--- a/charts/metallb/Chart.yaml
++++ b/charts/metallb/Chart.yaml
+@@ -5,10 +5,6 @@ home: https://metallb.universe.tf
+ sources:
+   - https://github.com/metallb/metallb
+ icon: https://metallb.universe.tf/images/logo/metallb-white.png
+-dependencies:
+-- name: crds
+-  condition: crds.enabled
+-  version: 0.13.5
+ 
+ # A chart can be either an 'application' or a 'library' chart.
+ #
+diff --git a/charts/metallb/templates/_helpers.tpl b/charts/metallb/templates/_helpers.tpl
+index 53d9528d..f0611c8c 100644
+--- a/charts/metallb/templates/_helpers.tpl
++++ b/charts/metallb/templates/_helpers.tpl
+@@ -111,3 +111,12 @@ Create the name of the settings Secret to use.
+ {{ .Values.speaker.frr.metricsPort }}
+ {{- end }}
+ {{- end }}
++
++{{/*
++Create imagePullSecret
++*/}}
++{{- define "imagePullSecret" }}
++{{- with .Values.imageCredentials }}
++{{- printf "{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"%s\",\"auth\":\"%s\"}}}" .registry .username .password .email (printf "%s:%s" .username .password | b64enc) | b64enc }}
++{{- end }}
++{{- end }}
+diff --git a/charts/metallb/templates/bgpadvertisements.yaml b/charts/metallb/templates/bgpadvertisements.yaml
+new file mode 100644
+index 00000000..ed8f08bf
+--- /dev/null
++++ b/charts/metallb/templates/bgpadvertisements.yaml
+@@ -0,0 +1,34 @@
++{{- $idx := 0 -}}
++{{- range .Values.BGPAdvertisements }}
++apiVersion: metallb.io/v1beta1
++kind: BGPAdvertisement
++metadata:
++  name: {{ .name | default ( printf "%s-%d" "bgpadv" $idx ) }}
++  namespace: {{ $.Release.Namespace | default $.Values.defaultNamespace | quote }}
++spec:
++  {{- if not ( empty .aggregationLength ) }}
++  aggregationLength: {{ .aggregationLength }}
++  {{- end }}
++  {{- if not ( empty .aggregationLengthV6 ) }}
++  aggregationLengthV6: {{ .aggregationLengthV6 }}
++  {{- end }}
++  {{- with ( concat ( .ipAddressPoolSelectors | default (list) ) ( .IPAddressPoolSelectors | default (list) ) ) }}
++  ipAddressPoolSelectors: 
++    {{- toYaml . | nindent 4 }}
++  {{- end }}
++  {{- with .communities }}
++  communities:
++    {{- toYaml . | nindent 4 }}
++  {{- end }}
++  {{- if not ( empty .localPref ) }}
++  localPref: {{ .localPref }}
++  {{- end }}
++  ipAddressPools:
++    {{- toYaml (concat ( .IPAddressPools | default (list) ) ( .ipAddressPools | default (list) )) | nindent 4 }}
++  {{- with .peers }}
++  peers:
++    {{- toYaml . | nindent 4 }}
++  {{- end }}
++{{- $idx = add1 $idx }}
++---
++{{- end }}
+diff --git a/charts/metallb/templates/controller.yaml b/charts/metallb/templates/controller.yaml
+index efb51c9d..ae287c95 100644
+--- a/charts/metallb/templates/controller.yaml
++++ b/charts/metallb/templates/controller.yaml
+@@ -3,6 +3,7 @@ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   name: {{ template "metallb.fullname" . }}-controller
++  namespace: {{ .Release.Namespace | default "metallb-system" | quote }}
+   labels:
+     {{- include "metallb.labels" . | nindent 4 }}
+     app.kubernetes.io/component: controller
+@@ -45,7 +46,7 @@ spec:
+ {{- end }}
+       containers:
+       - name: controller
+-        image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}
++        image: {{ .Values.sourceRegistry }}/{{ .Values.controller.image.repository }}@{{ .Values.controller.image.digest }}
+         {{- if .Values.controller.image.pullPolicy }}
+         imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+         {{- end }}
+@@ -72,10 +73,6 @@ spec:
+         - name: METALLB_DEPLOYMENT
+           value: {{ template "metallb.fullname" . }}-controller
+         {{- end }}
+-        {{- if .Values.speaker.frr.enabled }}
+-        - name: METALLB_BGP_TYPE
+-          value: frr
+-        {{- end }}
+         ports:
+         - name: monitoring
+           containerPort: {{ .Values.prometheus.metricsPort }}
+diff --git a/charts/metallb/templates/ipaddresspools.yaml b/charts/metallb/templates/ipaddresspools.yaml
+new file mode 100644
+index 00000000..ee235279
+--- /dev/null
++++ b/charts/metallb/templates/ipaddresspools.yaml
+@@ -0,0 +1,12 @@
++{{- range .Values.IPAddressPools }}
++apiVersion: metallb.io/v1beta1
++kind: IPAddressPool
++metadata:
++  name: {{ .name }}
++  namespace: {{ $.Release.Namespace | default $.Values.defaultNamespace | quote }}
++spec:
++  autoAssign: {{ .autoAssign | default "true" }}
++  addresses:
++    {{- toYaml .addresses | nindent 4 }}
++---
++{{- end }}
+diff --git a/charts/metallb/templates/l2advertisements.yaml b/charts/metallb/templates/l2advertisements.yaml
+new file mode 100644
+index 00000000..e0c87749
+--- /dev/null
++++ b/charts/metallb/templates/l2advertisements.yaml
+@@ -0,0 +1,14 @@
++{{- $idx := 0 -}}
++{{- range .Values.L2Advertisements }}
++apiVersion: metallb.io/v1beta1
++kind: L2Advertisement
++metadata:
++  name: {{ .name | default ( printf "%s-%d" "l2adv" $idx ) }}
++  namespace: {{ $.Release.Namespace | default $.Values.defaultNamespace | quote }}
++spec:
++  autoAssign: {{ .autoAssign | default "true" }}
++  ipAddressPools:
++    {{- toYaml (concat ( .IPAddressPools | default (list) ) ( .ipAddressPools | default (list) )) | nindent 4 }}
++{{- $idx = add1 $idx }}
++---
++{{- end }}
+diff --git a/charts/metallb/templates/rbac.yaml b/charts/metallb/templates/rbac.yaml
+index 1869e44f..b3b8df1e 100644
+--- a/charts/metallb/templates/rbac.yaml
++++ b/charts/metallb/templates/rbac.yaml
+@@ -59,6 +59,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+ kind: Role
+ metadata:
+   name: {{ include "metallb.fullname" . }}-pod-lister
++  namespace: {{ .Release.Namespace | default "metallb-system" | quote }}
+   labels: {{- include "metallb.labels" . | nindent 4 }}
+ rules:
+ - apiGroups: [""]
+@@ -93,6 +94,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+ kind: Role
+ metadata:
+   name: {{ include "metallb.fullname" . }}-controller
++  namespace: {{ .Release.Namespace | default "metallb-system" | quote }}
+   labels: {{- include "metallb.labels" . | nindent 4 }}
+ rules:
+ {{- if .Values.speaker.memberlist.enabled }}
+@@ -142,7 +144,7 @@ metadata:
+ subjects:
+ - kind: ServiceAccount
+   name: {{ template "metallb.controller.serviceAccountName" . }}
+-  namespace: {{ .Release.Namespace }}
++  namespace: {{ .Release.Namespace | default "metallb-system" | quote }}
+ roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+@@ -157,7 +159,7 @@ metadata:
+ subjects:
+ - kind: ServiceAccount
+   name: {{ template "metallb.speaker.serviceAccountName" . }}
+-  namespace: {{ .Release.Namespace }}
++  namespace: {{ .Release.Namespace | default "metallb-system" | quote }}
+ roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+@@ -167,6 +169,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+ kind: RoleBinding
+ metadata:
+   name: {{ include "metallb.fullname" . }}-pod-lister
++  namespace: {{ .Release.Namespace | default "metallb-system" | quote }}
+   labels: {{- include "metallb.labels" . | nindent 4 }}
+ roleRef:
+   apiGroup: rbac.authorization.k8s.io
+@@ -180,6 +183,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+ kind: RoleBinding
+ metadata:
+   name: {{ include "metallb.fullname" . }}-controller
++  namespace: {{ .Release.Namespace | default "metallb-system" | quote }}
+   labels: {{- include "metallb.labels" . | nindent 4 }}
+ roleRef:
+   apiGroup: rbac.authorization.k8s.io
+diff --git a/charts/metallb/templates/secret.yaml b/charts/metallb/templates/secret.yaml
+new file mode 100644
+index 00000000..5ef8eaa7
+--- /dev/null
++++ b/charts/metallb/templates/secret.yaml
+@@ -0,0 +1,16 @@
++{{ if .Values.imagePullSecrets }}
++{{ if .Values.pullSecretName }}
++apiVersion: v1
++kind: Secret
++metadata:
++  name: {{.Values.pullSecretName}}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
++type: kubernetes.io/dockerconfigjson
++data:
++  {{ if .Values.pullSecretData }}
++  .dockerconfigjson: {{.Values.pullSecretData}}
++  {{ else }}
++  .dockerconfigjson: {{ template "imagePullSecret" . }}
++  {{ end }}
++{{ end }}
++{{ end }}
+diff --git a/charts/metallb/templates/service-accounts.yaml b/charts/metallb/templates/service-accounts.yaml
+index 95609e5e..a478458e 100644
+--- a/charts/metallb/templates/service-accounts.yaml
++++ b/charts/metallb/templates/service-accounts.yaml
+@@ -4,6 +4,7 @@ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+   name: {{ template "metallb.controller.serviceAccountName" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     {{- include "metallb.labels" . | nindent 4 }}
+     app.kubernetes.io/component: controller
+@@ -18,6 +19,7 @@ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+   name: {{ template "metallb.speaker.serviceAccountName" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     {{- include "metallb.labels" . | nindent 4 }}
+     app.kubernetes.io/component: speaker
+diff --git a/charts/metallb/templates/speaker.yaml b/charts/metallb/templates/speaker.yaml
+index 616ee7e8..5ada21c5 100644
+--- a/charts/metallb/templates/speaker.yaml
++++ b/charts/metallb/templates/speaker.yaml
+@@ -1,112 +1,9 @@
+-{{- if .Values.speaker.frr.enabled }}
+-# FRR expects to have these files owned by frr:frr on startup.
+-# Having them in a ConfigMap allows us to modify behaviors: for example enabling more daemons on startup.
+-apiVersion: v1
+-kind: ConfigMap
+-metadata:
+-  name: {{ template "metallb.fullname" . }}-frr-startup
+-  labels:
+-    {{- include "metallb.labels" . | nindent 4 }}
+-    app.kubernetes.io/component: speaker
+-data:
+-  daemons: |
+-    # This file tells the frr package which daemons to start.
+-    #
+-    # Sample configurations for these daemons can be found in
+-    # /usr/share/doc/frr/examples/.
+-    #
+-    # ATTENTION:
+-    #
+-    # When activating a daemon for the first time, a config file, even if it is
+-    # empty, has to be present *and* be owned by the user and group "frr", else
+-    # the daemon will not be started by /etc/init.d/frr. The permissions should
+-    # be u=rw,g=r,o=.
+-    # When using "vtysh" such a config file is also needed. It should be owned by
+-    # group "frrvty" and set to ug=rw,o= though. Check /etc/pam.d/frr, too.
+-    #
+-    # The watchfrr and zebra daemons are always started.
+-    #
+-    bgpd=yes
+-    ospfd=no
+-    ospf6d=no
+-    ripd=no
+-    ripngd=no
+-    isisd=no
+-    pimd=no
+-    ldpd=no
+-    nhrpd=no
+-    eigrpd=no
+-    babeld=no
+-    sharpd=no
+-    pbrd=no
+-    bfdd=yes
+-    fabricd=no
+-    vrrpd=no
+-
+-    #
+-    # If this option is set the /etc/init.d/frr script automatically loads
+-    # the config via "vtysh -b" when the servers are started.
+-    # Check /etc/pam.d/frr if you intend to use "vtysh"!
+-    #
+-    vtysh_enable=yes
+-    zebra_options="  -A 127.0.0.1 -s 90000000"
+-    bgpd_options="   -A 127.0.0.1 -p 0"
+-    ospfd_options="  -A 127.0.0.1"
+-    ospf6d_options=" -A ::1"
+-    ripd_options="   -A 127.0.0.1"
+-    ripngd_options=" -A ::1"
+-    isisd_options="  -A 127.0.0.1"
+-    pimd_options="   -A 127.0.0.1"
+-    ldpd_options="   -A 127.0.0.1"
+-    nhrpd_options="  -A 127.0.0.1"
+-    eigrpd_options=" -A 127.0.0.1"
+-    babeld_options=" -A 127.0.0.1"
+-    sharpd_options=" -A 127.0.0.1"
+-    pbrd_options="   -A 127.0.0.1"
+-    staticd_options="-A 127.0.0.1"
+-    bfdd_options="   -A 127.0.0.1"
+-    fabricd_options="-A 127.0.0.1"
+-    vrrpd_options="  -A 127.0.0.1"
+-
+-    # configuration profile
+-    #
+-    #frr_profile="traditional"
+-    #frr_profile="datacenter"
+-
+-    #
+-    # This is the maximum number of FD's that will be available.
+-    # Upon startup this is read by the control files and ulimit
+-    # is called. Uncomment and use a reasonable value for your
+-    # setup if you are expecting a large number of peers in
+-    # say BGP.
+-    #MAX_FDS=1024
+-
+-    # The list of daemons to watch is automatically generated by the init script.
+-    #watchfrr_options=""
+-
+-    # for debugging purposes, you can specify a "wrap" command to start instead
+-    # of starting the daemon directly, e.g. to use valgrind on ospfd:
+-    #   ospfd_wrap="/usr/bin/valgrind"
+-    # or you can use "all_wrap" for all daemons, e.g. to use perf record:
+-    #   all_wrap="/usr/bin/perf record --call-graph -"
+-    # the normal daemon command is added to this at the end.
+-  vtysh.conf: |+
+-    service integrated-vtysh-config
+-  frr.conf: |+
+-    ! This file gets overriden the first time the speaker renders a config.
+-    ! So anything configured here is only temporary.
+-    frr version 7.5.1
+-    frr defaults traditional
+-    hostname Router
+-    line vty
+-    log file /etc/frr/frr.log informational
+-{{- end }}
+----
+ {{- if .Values.speaker.enabled }}
+ apiVersion: apps/v1
+ kind: DaemonSet
+ metadata:
+   name: {{ template "metallb.fullname" . }}-speaker
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     {{- include "metallb.labels" . | nindent 4 }}
+     app.kubernetes.io/component: speaker
+@@ -147,55 +44,9 @@ spec:
+       terminationGracePeriodSeconds: 0
+       hostNetwork: true
+       volumes:
+-      {{- if .Values.speaker.frr.enabled }}
+-        - name: frr-sockets
+-          emptyDir: {}
+-        - name: frr-startup
+-          configMap:
+-            name: {{ template "metallb.fullname" . }}-frr-startup
+-        - name: frr-conf
+-          emptyDir: {}
+-        - name: reloader
+-          emptyDir: {}
+-        - name: metrics
+-          emptyDir: {}
+-      {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+-        - name: metrics-certs
+-          secret:
+-            secretName: {{ .Values.prometheus.speakerMetricsTLSSecret }}
+-      {{- end }}
+-      initContainers:
+-        # Copies the initial config files with the right permissions to the shared volume.
+-        - name: cp-frr-files
+-          image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
+-          securityContext:
+-            runAsUser: 100
+-            runAsGroup: 101
+-          command: ["/bin/sh", "-c", "cp -rLf /tmp/frr/* /etc/frr/"]
+-          volumeMounts:
+-            - name: frr-startup
+-              mountPath: /tmp/frr
+-            - name: frr-conf
+-              mountPath: /etc/frr
+-        # Copies the reloader to the shared volume between the speaker and reloader.
+-        - name: cp-reloader
+-          image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
+-          command: ["/bin/sh", "-c", "cp -f /frr-reloader.sh /etc/frr_reloader/"]
+-          volumeMounts:
+-            - name: reloader
+-              mountPath: /etc/frr_reloader
+-        # Copies the metrics exporter
+-        - name: cp-metrics
+-          image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
+-          command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
+-          volumeMounts:
+-            - name: metrics
+-              mountPath: /etc/frr_metrics
+-      shareProcessNamespace: true
+-      {{- end }}
+       containers:
+       - name: speaker
+-        image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
++        image: {{ .Values.sourceRegistry }}/{{ .Values.speaker.image.repository }}@{{ .Values.speaker.image.digest }}
+         {{- if .Values.speaker.image.pullPolicy }}
+         imagePullPolicy: {{ .Values.speaker.image.pullPolicy }}
+         {{- end }}
+@@ -235,14 +86,6 @@ spec:
+               name: {{ include "metallb.secretName" . }}
+               key: secretkey
+         {{- end }}
+-        {{- if .Values.speaker.frr.enabled }}
+-        - name: FRR_CONFIG_FILE
+-          value: /etc/frr_reloader/frr.conf
+-        - name: FRR_RELOADER_PID_FILE
+-          value: /etc/frr_reloader/reloader.pid
+-        - name: METALLB_BGP_TYPE
+-          value: frr
+-        {{- end }}
+         ports:
+         - name: monitoring
+           containerPort: {{ .Values.prometheus.metricsPort }}
+@@ -288,141 +131,6 @@ spec:
+             - ALL
+             add:
+             - NET_RAW
+-        {{- if .Values.speaker.frr.enabled }}
+-        volumeMounts:
+-          - name: reloader
+-            mountPath: /etc/frr_reloader
+-         {{- end }}
+-      {{- if .Values.speaker.frr.enabled }}
+-      - name: frr
+-        securityContext:
+-          capabilities:
+-            add:
+-            - NET_ADMIN
+-            - NET_RAW
+-            - SYS_ADMIN
+-            - NET_BIND_SERVICE
+-        image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
+-        {{- if .Values.speaker.frr.image.pullPolicy }}
+-        imagePullPolicy: {{ .Values.speaker.frr.image.pullPolicy }}
+-        {{- end }}
+-        env:
+-          - name: TINI_SUBREAPER
+-            value: "true"
+-        volumeMounts:
+-          - name: frr-sockets
+-            mountPath: /var/run/frr
+-          - name: frr-conf
+-            mountPath: /etc/frr
+-        # The command is FRR's default entrypoint & waiting for the log file to appear and tailing it.
+-        # If the log file isn't created in 60 seconds the tail fails and the container is restarted.
+-        # This workaround is needed to have the frr logs as part of kubectl logs -c frr < speaker_pod_name >.
+-        command:
+-          - /bin/sh
+-          - -c
+-          - |
+-            /sbin/tini -- /usr/lib/frr/docker-start &
+-            attempts=0
+-            until [[ -f /etc/frr/frr.log || $attempts -eq 60 ]]; do
+-              sleep 1
+-              attempts=$(( $attempts + 1 ))
+-            done
+-            tail -f /etc/frr/frr.log
+-      - name: reloader
+-        image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
+-        {{- if .Values.speaker.frr.image.pullPolicy }}
+-        imagePullPolicy: {{ .Values.speaker.frr.image.pullPolicy }}
+-        {{- end }}
+-        command: ["/etc/frr_reloader/frr-reloader.sh"]
+-        volumeMounts:
+-          - name: frr-sockets
+-            mountPath: /var/run/frr
+-          - name: frr-conf
+-            mountPath: /etc/frr
+-          - name: reloader
+-            mountPath: /etc/frr_reloader
+-      - name: frr-metrics
+-        image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
+-        command: ["/etc/frr_metrics/frr-metrics"]
+-        args:
+-          - --metrics-port={{ .Values.speaker.frr.metricsPort }}
+-        ports:
+-          - containerPort: {{ .Values.speaker.frr.metricsPort }}
+-            name: monitoring
+-        volumeMounts:
+-          - name: frr-sockets
+-            mountPath: /var/run/frr
+-          - name: frr-conf
+-            mountPath: /etc/frr
+-          - name: metrics
+-            mountPath: /etc/frr_metrics
+-      {{- end }}
+-      {{- if .Values.prometheus.secureMetricsPort }}
+-      - name: kube-rbac-proxy
+-        image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag }}
+-        imagePullPolicy: IfNotPresent
+-        args:
+-          - --logtostderr
+-          - --secure-listen-address=:{{ .Values.prometheus.secureMetricsPort }}
+-          - --upstream=http://$(METALLB_HOST):{{ .Values.prometheus.metricsPort }}/
+-          - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+-        {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+-          - --tls-private-key-file=/etc/metrics/tls.key
+-          - --tls-cert-file=/etc/metrics/tls.crt
+-        {{- end }}
+-        ports:
+-          - containerPort: {{ .Values.prometheus.secureMetricsPort }}
+-            name: metricshttps
+-        env:
+-          - name: METALLB_HOST
+-            valueFrom:
+-              fieldRef:
+-                fieldPath: status.hostIP
+-        resources:
+-          requests:
+-            cpu: 10m
+-            memory: 20Mi
+-        terminationMessagePolicy: FallbackToLogsOnError
+-        {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+-        volumeMounts:
+-          - name: metrics-certs
+-            mountPath: /etc/metrics
+-            readOnly: true
+-        {{- end }}
+-      {{ end }}
+-      {{- if .Values.speaker.frr.secureMetricsPort }}
+-      - name: kube-rbac-proxy-frr
+-        image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag | default .Chart.AppVersion }}
+-        imagePullPolicy: IfNotPresent
+-        args:
+-          - --logtostderr
+-          - --secure-listen-address=:{{ .Values.speaker.frr.secureMetricsPort }}
+-          - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+-          - --upstream=http://$(METALLB_HOST):{{ .Values.speaker.frr.metricsPort }}/
+-        {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+-          - --tls-private-key-file=/etc/metrics/tls.key
+-          - --tls-cert-file=/etc/metrics/tls.crt
+-        {{- end }}
+-        ports:
+-          - containerPort: {{ .Values.speaker.frr.secureMetricsPort }}
+-            name: metricshttps
+-        env:
+-          - name: METALLB_HOST
+-            valueFrom:
+-              fieldRef:
+-                fieldPath: status.hostIP
+-        resources:
+-          requests:
+-            cpu: 10m
+-            memory: 20Mi
+-        terminationMessagePolicy: FallbackToLogsOnError
+-        {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+-        volumeMounts:
+-          - name: metrics-certs
+-            mountPath: /etc/metrics
+-            readOnly: true
+-        {{- end }}
+-      {{ end }}
+       nodeSelector:
+         "kubernetes.io/os": linux
+         {{- with .Values.speaker.nodeSelector }}
+diff --git a/charts/metallb/values.schema.json b/charts/metallb/values.schema.json
+index 3ae5755a..e28adf7a 100644
+--- a/charts/metallb/values.schema.json
++++ b/charts/metallb/values.schema.json
+@@ -62,11 +62,8 @@
+             "repository": {
+               "type": "string"
+             },
+-            "tag": {
+-              "anyOf": [
+-                { "type": "string" },
+-                { "type": "null" }
+-              ]
++            "digest": {
++              "type": "string"
+             },
+             "pullPolicy": {
+               "anyOf": [
+@@ -332,27 +329,32 @@
+             },
+             "secretName": {
+               "type": "string"
+-            },
+-            "frr": {
+-              "description": "Install FRR container in speaker deployment",
+-              "type": "object",
+-              "properties": {
+-                "enabled": {
+-                  "type": "boolean"
+-                },
+-                "image": { "$ref": "#/definitions/component/properties/image" },
+-                "metricsPort": { "type": "integer" },
+-                "secureMetricsPort": { "type": "integer" }
+-              },
+-              "required": [ "enabled" ]
+-            },
+-            "command" : {
+-              "type": "string"
+             }
+           },
+           "required": [ "tolerateMaster" ]
+         }
+       ]
++    },
++    "peers": {
++      "description": "BGP Peers",
++      "type": "array",
++      "items": {
++        "type": "object"
++      }
++    },
++    "bgp-communities": {
++      "description": "BGP communities",
++      "type": "array",
++      "items": {
++        "type": "object"
++      }
++    },
++    "address-pools": {
++      "description": "Address pools",
++      "type": "array",
++      "items": {
++        "type": "object"
++      }
+     }
+   },
+   "controller": { 
+diff --git a/charts/metallb/values.yaml b/charts/metallb/values.yaml
+index ef470c0d..363589a3 100644
+--- a/charts/metallb/values.yaml
++++ b/charts/metallb/values.yaml
+@@ -6,6 +6,16 @@ imagePullSecrets: []
+ nameOverride: ""
+ fullnameOverride: ""
+ loadBalancerClass: ""
++defaultNamespace: "metallb-system"
++
++# Values for configuring pull secrets through charts
++pullSecretName :
++pullSecretData :
++imageCredentials:
++  registry: ""
++  username: ""
++  password: ""
++  email: ""
+ 
+ # To configure MetalLB, you must specify ONE of the following two
+ # options.
+@@ -193,8 +203,8 @@ controller:
+   # command: /controller
+   # webhookMode: enabled
+   image:
+-    repository: quay.io/metallb/controller
+-    tag:
++    repository: metallb/controller
++    digest: {{metallb/controller}}
+     pullPolicy:
+   ## @param controller.updateStrategy.type Metallb controller deployment strategy type.
+   ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+@@ -256,7 +266,8 @@ speaker:
+     enabled: true
+     mlBindPort: 7946
+   image:
+-    repository: quay.io/metallb/speaker
++    repository: metallb/speaker
++    digest: {{metallb/speaker}}
+     tag:
+     pullPolicy:
+   ## @param speaker.updateStrategy.type Speaker daemonset strategy type
+@@ -303,19 +314,3 @@ speaker:
+     periodSeconds: 10
+     successThreshold: 1
+     timeoutSeconds: 1
+-  # frr contains configuration specific to the MetalLB FRR container,
+-  # for speaker running alongside FRR.
+-  frr:
+-    enabled: false
+-    image:
+-      repository: frrouting/frr
+-      tag: v7.5.1
+-      pullPolicy:
+-    metricsPort: 7473
+-
+-    # if set, enables a rbac proxy sidecar container on the speaker to
+-    # expose the frr metrics via tls.
+-    # secureMetricsPort: 9121
+-
+-crds:
+-  enabled: true
+-- 
+2.34.1
+
