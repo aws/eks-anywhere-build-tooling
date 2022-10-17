@@ -68,7 +68,7 @@ BOTTLEROCKET_OVA_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ova-release-ve
 BOTTLEROCKET_RAW_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
 
 IMAGE_OS?=ubuntu
-IMAGE_FORMAT?=ova
+IMAGE_FORMAT?=raw
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
 BUILD_OVA_TARGETS=setup-packer-configs-ova  $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH)  upload-artifacts-ova
 BUILD_RAW_TARGETS=release-image-build-on-metal-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
