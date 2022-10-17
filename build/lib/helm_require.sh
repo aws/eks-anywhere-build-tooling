@@ -32,6 +32,7 @@ HELM_IMAGE_LIST="${@:9}"
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PACKAGE_DEPENDENCIES=${PACKAGE_DEPENDENCIES:=""}
 
 #
 # Image tags
@@ -97,4 +98,11 @@ then
   cat >>${REQUIRES_FILE} <<!
   schema: ${JSON_SCHEMA}
 !
+fi
+
+if [ -n ${PACKAGE_DEPENDENCIES} ]; then
+  echo "  dependencies:" >> ${REQUIRES_FILE}
+  echo ${PACKAGE_DEPENDENCIES} | tr ',' '\n'  | while read dep; do
+      echo "  - ${dep}"
+  done >> ${REQUIRES_FILE}
 fi
