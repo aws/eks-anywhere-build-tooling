@@ -790,3 +790,4 @@ create-ecr-repos: $(foreach image,$(IMAGE_NAMES),$(image)/create-ecr-repo) $(if 
 .PHONY: var-value-%
 var-value-%:
 	@echo $($*)
+
