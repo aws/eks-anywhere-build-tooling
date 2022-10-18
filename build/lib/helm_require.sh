@@ -100,7 +100,7 @@ then
 !
 fi
 
-if [ -n ${PACKAGE_DEPENDENCIES} ]; then
+if [ -n "${PACKAGE_DEPENDENCIES}" ]; then
   echo "  dependencies:" >> ${REQUIRES_FILE}
   echo ${PACKAGE_DEPENDENCIES} | tr ',' '\n'  | while read dep; do
       echo "  - ${dep}"
