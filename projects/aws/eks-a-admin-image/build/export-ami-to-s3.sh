@@ -18,9 +18,9 @@ set -o nounset
 set -o pipefail
 
 
-AMI_MANIFEST_OUTPUT="${1?Specify second argument - AMI manifest output file from packer}"
-IMAGE_FORMAT="${2?Specify third argument - Format for exported image \(vmdk\|raw\|vhd\)}"
-S3_DST_EXPORT_PATH="${3?Specify fourth argument - Destination S3 path}"
+AMI_MANIFEST_OUTPUT="${1?Specify first argument - AMI manifest output file from packer}"
+IMAGE_FORMAT="${2?Specify second argument - Format for exported image \(vmdk\|raw\|vhd\)}"
+S3_DST_EXPORT_PATH="${3?Specify third argument - Destination S3 path}"
 REPLICAS="${4?Specify fourth argument - Comma separated list of s3 destinations for exported image copies}"
 
 ARTIFACT_ID=$(cat $AMI_MANIFEST_OUTPUT | jq -r '.builds[0].artifact_id')
