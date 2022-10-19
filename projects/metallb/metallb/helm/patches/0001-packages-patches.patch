@@ -1,4 +1,4 @@
-From cd669b7c4686fd9a00cb4a3d01b3e448c78d67f4 Mon Sep 17 00:00:00 2001
+From 8166feca582334e1a8aa230009402b25b119c401 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 21 Sep 2022 10:01:23 -0400
 Subject: [PATCH] packages patches
@@ -15,7 +15,7 @@ Subject: [PATCH] packages patches
  .../metallb/templates/bgpadvertisements.yaml  |  34 ++
  charts/metallb/templates/controller.yaml      |   7 +-
  charts/metallb/templates/ipaddresspools.yaml  |  12 +
- .../metallb/templates/l2advertisements.yaml   |  14 +
+ .../metallb/templates/l2advertisements.yaml   |  13 +
  charts/metallb/templates/podmonitor.yaml      |   7 +-
  charts/metallb/templates/prometheusrules.yaml |   1 +
  charts/metallb/templates/rbac.yaml            |   8 +-
@@ -26,7 +26,7 @@ Subject: [PATCH] packages patches
  charts/metallb/templates/webhooks.yaml        |  16 +-
  charts/metallb/values.schema.json             |  44 +--
  charts/metallb/values.yaml                    |  33 +-
- 22 files changed, 160 insertions(+), 364 deletions(-)
+ 22 files changed, 159 insertions(+), 364 deletions(-)
  rename charts/{metallb/charts => }/crds/.helmignore (100%)
  rename charts/{metallb/charts => }/crds/Chart.yaml (100%)
  rename charts/{metallb/charts => }/crds/README.md (100%)
@@ -218,10 +218,10 @@ index 00000000..ee235279
 +{{- end }}
 diff --git a/charts/metallb/templates/l2advertisements.yaml b/charts/metallb/templates/l2advertisements.yaml
 new file mode 100644
-index 00000000..e0c87749
+index 00000000..21f74019
 --- /dev/null
 +++ b/charts/metallb/templates/l2advertisements.yaml
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,13 @@
 +{{- $idx := 0 -}}
 +{{- range .Values.L2Advertisements }}
 +apiVersion: metallb.io/v1beta1
@@ -230,7 +230,6 @@ index 00000000..e0c87749
 +  name: {{ .name | default ( printf "%s-%d" "l2adv" $idx ) }}
 +  namespace: {{ $.Release.Namespace | default $.Values.defaultNamespace | quote }}
 +spec:
-+  autoAssign: {{ .autoAssign | default "true" }}
 +  ipAddressPools:
 +    {{- toYaml (concat ( .IPAddressPools | default (list) ) ( .ipAddressPools | default (list) )) | nindent 4 }}
 +{{- $idx = add1 $idx }}
