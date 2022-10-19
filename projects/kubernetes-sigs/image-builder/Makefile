@@ -59,6 +59,7 @@ BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-c
 
 FINAL_OVA_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/$(IMAGE_OS).ova
 FINAL_RAW_IMAGE_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/$(IMAGE_OS).gz
+FINAL_CLOUDSTACK_IMAGE_PATH=$(ARTIFACTS_PATH)/cloudstack/$(IMAGE_OS)/$(IMAGE_OS).qcow2
 FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
 FINAL_BOTTLEROCKET_RAW_PATH=$(ARTIFACTS_PATH)/raw/bottlerocket/bottlerocket.img.gz
 FAKE_UBUNTU_OVA_PATH=fake-ubuntu.ova
@@ -67,10 +68,10 @@ BOTTLEROCKET_OVA_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ova-release-ve
 BOTTLEROCKET_RAW_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
 
 IMAGE_OS?=ubuntu
-IMAGE_FORMAT?=
+IMAGE_FORMAT?=raw
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
 BUILD_OVA_TARGETS=setup-packer-configs-ova  $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH)  upload-artifacts-ova
-BUILD_RAW_TARGETS=release-raw-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
+BUILD_RAW_TARGETS=release-image-build-on-metal-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
 ifneq ($(BOTTLEROCKET_RAW_RELEASE_VERSION),null)
 	BUILD_RAW_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
 endif
@@ -96,7 +97,7 @@ ifeq ($(IMAGE_FORMAT),ova)
 else ifeq ($(IMAGE_FORMAT),raw)
 	ifeq ($(IMAGE_OS),ubuntu)
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
-		RELEASE_TARGETS=release-raw-$(IMAGE_OS) upload-artifacts-raw
+		RELEASE_TARGETS=release-image-build-on-metal-$(IMAGE_OS) upload-artifacts-raw
 	else ifeq ($(IMAGE_OS),bottlerocket)
 		ifneq ($(RELEASE_BRANCH),1-20)
 			S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_RAW_PATH)
@@ -106,7 +107,15 @@ else ifeq ($(IMAGE_FORMAT),raw)
 		endif
 	else ifeq ($(IMAGE_OS),redhat)
 		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
-		RELEASE_TARGETS=release-raw-$(IMAGE_OS) upload-artifacts-raw
+		RELEASE_TARGETS=release-image-build-on-metal-$(IMAGE_OS) upload-artifacts-raw
+	else
+		S3_TARGET_PREREQUISITES?=
+		RELEASE_TARGETS=unsupported-release-target
+	endif
+else ifeq ($(IMAGE_FORMAT),cloudstack)
+	ifeq ($(IMAGE_OS),redhat)
+		S3_TARGET_PREREQUISITES=$(FINAL_CLOUDSTACK_IMAGE_PATH)
+		RELEASE_TARGETS=release-image-build-on-metal-$(IMAGE_OS)
 	else
 		S3_TARGET_PREREQUISITES?=
 		RELEASE_TARGETS=unsupported-release-target
@@ -149,6 +158,10 @@ endif
 $(FINAL_RAW_IMAGE_PATH):
 	@mkdir -p $(@D)
 	mv *.gz $@
+
+$(FINAL_CLOUDSTACK_IMAGE_PATH):
+	@mkdir -p $(@D)
+	mv *.qcow2 $@
 
 $(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(FINAL_BOTTLEROCKET_OVA_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
@@ -233,9 +246,9 @@ upload-bottlerocket-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PAT
 upload-bottlerocket-%:
 	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT)
 
-.PHONY: release-raw-%
-release-raw-%: $(GIT_PATCH_TARGET)
-	build/build_raw_image.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $* $(LATEST)
+.PHONY: release-image-build-on-metal-%
+release-image-build-on-metal-%: $(GIT_PATCH_TARGET)
+	build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $* $(IMAGE_FORMAT) $(LATEST)
 
 .PHONY: build-qemu-rhel-local
 build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
