@@ -133,4 +133,8 @@ fi
 ssh $SSH_OPTS $REMOTE_HOST $SSH_COMMANDS
 
 # Copy built raw image from the instance back into the CI build environment
-scp $SSH_OPTS $REMOTE_HOST:$REMOTE_HOME_DIR/*.gz $REPO_ROOT/$PROJECT_PATH/
+OUTPUT_IMAGE_BLOB="*.gz"
+if [[ "$IMAGE_FORMAT" == "cloudstack" ]]; then
+  OUTPUT_IMAGE_BLOB="*.qcow2"
+fi
+scp $SSH_OPTS $REMOTE_HOST:$REMOTE_HOME_DIR/$OUTPUT_IMAGE_BLOB $REPO_ROOT/$PROJECT_PATH/
