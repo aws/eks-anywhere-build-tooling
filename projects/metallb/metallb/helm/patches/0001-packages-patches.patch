@@ -1,4 +1,4 @@
-From 8166feca582334e1a8aa230009402b25b119c401 Mon Sep 17 00:00:00 2001
+From b6317669296ff5c1f7037c6c6e2cf67599c48fc3 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 21 Sep 2022 10:01:23 -0400
 Subject: [PATCH] packages patches
@@ -14,7 +14,7 @@ Subject: [PATCH] packages patches
  charts/metallb/templates/_helpers.tpl         |   9 +
  .../metallb/templates/bgpadvertisements.yaml  |  34 ++
  charts/metallb/templates/controller.yaml      |   7 +-
- charts/metallb/templates/ipaddresspools.yaml  |  12 +
+ charts/metallb/templates/ipaddresspools.yaml  |  14 +
  .../metallb/templates/l2advertisements.yaml   |  13 +
  charts/metallb/templates/podmonitor.yaml      |   7 +-
  charts/metallb/templates/prometheusrules.yaml |   1 +
@@ -26,7 +26,7 @@ Subject: [PATCH] packages patches
  charts/metallb/templates/webhooks.yaml        |  16 +-
  charts/metallb/values.schema.json             |  44 +--
  charts/metallb/values.yaml                    |  33 +-
- 22 files changed, 159 insertions(+), 364 deletions(-)
+ 22 files changed, 161 insertions(+), 364 deletions(-)
  rename charts/{metallb/charts => }/crds/.helmignore (100%)
  rename charts/{metallb/charts => }/crds/Chart.yaml (100%)
  rename charts/{metallb/charts => }/crds/README.md (100%)
@@ -200,10 +200,10 @@ index efb51c9d..4a177cee 100644
            containerPort: {{ .Values.prometheus.metricsPort }}
 diff --git a/charts/metallb/templates/ipaddresspools.yaml b/charts/metallb/templates/ipaddresspools.yaml
 new file mode 100644
-index 00000000..ee235279
+index 00000000..f8dc3c96
 --- /dev/null
 +++ b/charts/metallb/templates/ipaddresspools.yaml
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,14 @@
 +{{- range .Values.IPAddressPools }}
 +apiVersion: metallb.io/v1beta1
 +kind: IPAddressPool
@@ -211,7 +211,9 @@ index 00000000..ee235279
 +  name: {{ .name }}
 +  namespace: {{ $.Release.Namespace | default $.Values.defaultNamespace | quote }}
 +spec:
-+  autoAssign: {{ .autoAssign | default "true" }}
++  {{- if eq "false" ( .autoAssign | toString | lower ) }}
++  autoAssign: false
++  {{- end }}
 +  addresses:
 +    {{- toYaml .addresses | nindent 4 }}
 +---
