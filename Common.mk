@@ -418,10 +418,10 @@ endif
 ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
 ifneq ($(REPO_SPARSE_CHECKOUT),)
-	git clone --depth 1 --filter=blob:none --sparse -b $(GIT_TAG) $(CLONE_URL) $(REPO)
+	source $(BUILD_LIB)/common.sh && retry git clone --depth 1 --filter=blob:none --sparse -b $(GIT_TAG) $(CLONE_URL) $(REPO)
 	git -C $(REPO) sparse-checkout set $(REPO_SPARSE_CHECKOUT) --cone --skip-checks
 else
-	git clone $(CLONE_URL) $(REPO)
+	source $(BUILD_LIB)/common.sh && retry git clone $(CLONE_URL) $(REPO)
 endif
 endif
 
