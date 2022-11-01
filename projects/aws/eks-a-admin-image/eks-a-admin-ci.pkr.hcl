@@ -82,8 +82,12 @@ build {
   ]
 
   provisioner "shell" {
-    script            = "provisioners/upgrade_linux.sh"
+    script            = "provisioners/ubuntu/upgrade_linux.sh"
     expect_disconnect = true
+  }
+
+  provisioner "shell" {
+    script = "provisioners/ubuntu/install_deps.sh"
   }
 
   provisioner "shell" {
@@ -92,7 +96,7 @@ build {
     ]
     // wait for reboot before starting
     pause_before      = "10s"
-    script            = "provisioners/install_docker.sh"
+    script            = "provisioners/setup_docker.sh"
     expect_disconnect = true
   }
 
@@ -139,7 +143,7 @@ build {
   }
 
   provisioner "shell" {
-    script = "provisioners/cleanup.sh"
+    script = "provisioners/ubuntu/cleanup.sh"
   }
 
   post-processor "manifest" {
