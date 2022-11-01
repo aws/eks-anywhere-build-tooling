@@ -12,7 +12,7 @@ REPO=eks-a-admin-image
 REPO_OWNER=aws
 
 BUILD_TARGETS=validate
-RELEASE_TARGETS=validate-release-manifest-version eksa-latest-snow-raw-image
+RELEASE_TARGETS=validate-release-manifest-version latest-snow-raw-image
 
 PACKER_VERSION=1.8.0
 
