@@ -8,7 +8,7 @@ packer {
   }
 }
 
-source "amazon-ebs" "ubuntu" {
+source "amazon-ebs" "amazonlinux2" {
   ami_name      = "${local.image_name}"
   instance_type = "t3.xlarge"
   // with t3.micro 48 min
@@ -18,18 +18,17 @@ source "amazon-ebs" "ubuntu" {
   region = "us-west-2"
   source_ami_filter {
     filters = {
-      name                = "ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"
+      name                = "amzn2-ami-hvm-2*"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
     }
     most_recent = true
-    // canonical account
-    owners = ["099720109477"]
+    owners      = ["amazon"]
   }
-  ssh_username = "ubuntu"
+  ssh_username = "ec2-user"
 
   launch_block_device_mappings {
-    device_name           = "/dev/sda1"
+    device_name           = "/dev/xvda"
     delete_on_termination = true
     volume_size           = 50
     volume_type           = "gp3"
@@ -49,27 +48,34 @@ source "amazon-ebs" "ubuntu" {
 build {
   name = "eks-a-admin-snow-image"
   sources = [
-    "source.amazon-ebs.ubuntu",
+    "source.amazon-ebs.amazonlinux2",
   ]
 
   provisioner "shell" {
-    script            = "provisioners/upgrade_linux.sh"
+    script            = "provisioners/al2/upgrade_linux.sh"
     expect_disconnect = true
   }
 
   provisioner "shell" {
     environment_vars = [
-      "USER=${var.build-username}",
+      "YQ_URL=${var.yq-url}",
+    ]
+    script = "provisioners/al2/install_deps.sh"
+  }
+
+  provisioner "shell" {
+    environment_vars = [
+      "USER=ec2-user",
     ]
     // wait for reboot before starting
     pause_before      = "10s"
-    script            = "provisioners/install_docker.sh"
+    script            = "provisioners/setup_docker.sh"
     expect_disconnect = true
   }
 
   provisioner "shell" {
     environment_vars = [
-      "USER=${var.build-username}",
+      "USER=ec2-user",
     ]
     // wait for reboot before starting
     pause_before = "10s"
@@ -79,6 +85,7 @@ build {
   provisioner "shell" {
     environment_vars = [
       "KUBECTL_URL=${var.kubectl-url}",
+      "YQ_URL=${var.yq-url}",
       "EKSA_VERSION=${var.eks-a-version}",
       "EKSA_RELEASE_MANIFEST_URL=${var.eks-a-release-manifest-url}",
     ]
@@ -94,7 +101,7 @@ build {
   }
 
   provisioner "shell" {
-    script = "provisioners/cleanup.sh"
+    script = "provisioners/al2/cleanup.sh"
   }
 
   post-processor "manifest" {
