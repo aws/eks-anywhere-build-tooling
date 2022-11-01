@@ -45,7 +45,7 @@ yq eval --null-input '.batch={"fast-fail":true,"build-graph":[]}' > $STAGING_BUI
 PROJECTS=(${ALL_PROJECTS// / })
 for project in "${PROJECTS[@]}"; do
     org=$(cut -d_ -f1 <<< $project)
-    repo=$(cut -d_ -f2 <<< $project)
+    repo=$(cut -d_ -f2- <<< $project)
 
     PROJECT_PATH=$MAKE_ROOT/projects/$org/$repo
 
