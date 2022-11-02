@@ -18,16 +18,9 @@ include $(BASE_DIRECTORY)/Common.mk
 # Module "github.com" should be "github.com/prometheus/node_exporter"
 $(ATTRIBUTION_TARGETS): fix-go-licenses
 
-# Fix go.mod that has mismatched checksum from upstream.
-$(GO_MOD_DOWNLOAD_TARGETS): fix-go-mod
-
 .phony: fix-go-licenses
 fix-go-licenses: $(GATHER_LICENSES_TARGETS)
 	build/sed_replace.sh "github.com,https" "github.com\/prometheus\/node_exporter,https" $(OUTPUT_DIR)/attribution/go-license.csv
-
-.phony: fix-go-mod
-fix-go-mod:
-	build/sed_replace.sh "github.com\/safchain\/ethtool v0.2.0" "github.com\/safchain\/ethtool v0.1.1-0.20220305102649-532e6d132c2e" node_exporter/go.mod
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
