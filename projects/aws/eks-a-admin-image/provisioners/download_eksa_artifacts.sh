@@ -19,8 +19,8 @@ sudo chmod -R a+r $ARTIFACTS_NAME_DIR
 
 # The download images command pulls down all the images in the bundle
 # but after the images get saved to a tar archive, the images are still
-# in the local Docker runtime, that bloats the final admin image. This can cause
-# downstream resource heavy operations to fail due to lack of disk space.
-# To mitigate this, we prune all the images and unused volumes to bring down
-# size of the admin image.
-sudo docker system prune --volumes --force
+# in the local Docker runtime, that bloats the final admin image. This can
+# cause downstream resource heavy operations to fail due to lack of disk
+# space. To mitigate this, we prune all the dangling and unused images and
+# volumes to increase the free disk space on the admin image.
+sudo docker system prune --all --volumes --force
