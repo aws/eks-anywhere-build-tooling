@@ -15,12 +15,11 @@ EXCLUDE_FROM_STAGING_BUILDSPEC=true
 include $(BASE_DIRECTORY)/Common.mk
 
 # Before running GO_MOD_DOWNLOAD_TARGETS, we need to perform two preparation steps:
-# (1) run make assets cp-npm-licenses assets-compress to generate web UI related resources;
+# (1) run make prometheus/web/ui/embed.go to generate web UI related resources;
 # (2) copy files needed by the docker container to the OUTPUT_DIR.
 $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 
-$(OUTPUT_DIR)/$(REPO): assets cp-npm-licenses assets-compress
-
+$(OUTPUT_DIR)/$(REPO): prometheus/web/ui/embed.go
 	mkdir -p $(OUTPUT_DIR)/extra/etc/prometheus
 	cp prometheus/documentation/examples/prometheus.yml $(OUTPUT_DIR)/extra/etc/prometheus/prometheus.yml
 
@@ -36,30 +35,22 @@ $(OUTPUT_DIR)/$(REPO): assets cp-npm-licenses assets-compress
 # module names. Module "github.com" should be "github.com/prometheus/prometheus".
 $(ATTRIBUTION_TARGETS): fix-go-licenses
 
-.PHONY: assets
-assets: ui-install ui-build
-
-.PHONY: assets-compress
-assets-compress:
+prometheus/web/ui/embed.go:
+	@echo '>> install required node version'
+	if [ $(shell node -v | cut -d. -f1 | cut -dv -f2) -lt 16 ]; then \
+		curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash && \
+    	source ~/.nvm/nvm.sh && nvm install 16; \
+	fi
+	@echo '>> npm install and npm build'
+	cd prometheus/web/ui && source ~/.nvm/nvm.sh && nvm use 16 && npm install && CI="" npm run build
+	@echo ">> bundling npm licenses"
+	yum install -y bzip2 && build/cp_npm_licenses.sh
 	@echo '>> compressing assets'
 	build/compress_assets.sh
-
-.PHONY: cp-npm-licenses
-cp-npm-licenses:
-	@echo ">> bundling npm licenses"
-	build/cp_npm_licenses.sh $(OUTPUT_DIR)
 
 .phony: fix-go-licenses
 fix-go-licenses: $(GATHER_LICENSES_TARGETS)
 	build/fix_go_licenses.sh "github.com,https" "github.com\/prometheus\/prometheus,https" $(OUTPUT_DIR)/attribution/go-license.csv
-
-.PHONY: ui-install
-ui-install:
-	cd prometheus/web/ui && npm install
-
-.PHONY: ui-build
-ui-build:
-	cd prometheus/web/ui && CI="" npm run build
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
