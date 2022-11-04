@@ -6,6 +6,7 @@ REPO=node_exporter
 REPO_OWNER=prometheus
 
 BINARY_TARGET_FILES=node_exporter
+BASE_IMAGE_NAME=eks-distro-minimal-base
 EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
 
 NODE_EXPORTER_IMAGE_COMPONENT=prometheus/node-exporter
