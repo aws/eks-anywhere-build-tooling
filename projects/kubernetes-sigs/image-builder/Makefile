@@ -23,7 +23,7 @@ VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
 DEV_ACCOUNTS?=
 
-PACKER_AMI_VAR_FILES=$(MAKE_ROOT)/packer/ami/packer.json
+PACKER_AMI_VAR_FILES=$(MAKE_ROOT)/packer/ami/ami.json
 PACKER_AMI_SHARE_FILE=$(MAKE_ROOT)/packer/ami/share-ami.json
 PACKER_AMI_VAR_FILES+=$(PACKER_AMI_SHARE_FILE)
 
@@ -120,6 +120,12 @@ else ifeq ($(IMAGE_FORMAT),cloudstack)
 		S3_TARGET_PREREQUISITES?=
 		RELEASE_TARGETS=unsupported-release-target
 	endif
+else ifeq ($(IMAGE_FORMAT),ami)
+	ifeq ($(IMAGE_OS),ubuntu)
+		RELEASE_TARGETS=release-ami-$(IMAGE_OS)
+	else
+		RELEASE_TARGETS=unsupported-release-target
+	endif
 else
 	S3_TARGET_PREREQUISITES?=
 	RELEASE_TARGETS=unsupported-release-target
@@ -177,7 +183,7 @@ $(FINAL_BOTTLEROCKET_RAW_PATH):
 
 .PHONY: setup-ami-share
 setup-ami-share:
-	jq -n '{"ami_users": "$(DEV_ACCOUNTS)", "snapshot_users": "$(DEV_ACCOUNTS)"}' > $(PACKER_AMI_SHARE_FILE)
+	jq -n '{"ami_users": "$(DEV_ACCOUNTS)", "ami_groups": "", "snapshot_users": "$(DEV_ACCOUNTS)", "snapshot_groups": ""}' > $(PACKER_AMI_SHARE_FILE)
 
 $(BOTTLEROCKET_SETUP_TARGET): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(BOTTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
@@ -207,17 +213,15 @@ build-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
 build-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
 	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) validate-ami-ubuntu-2004
 
-.PHONY: release-ami-ubuntu-2004
-release-ami-ubuntu-2004: MAKEFLAGS=
-release-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
-release-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
-release-ami-ubuntu-2004: export MANIFEST_OUTPUT=$(FULL_OUTPUT_DIR)/manifest.json
-release-ami-ubuntu-2004: EXPORT_AMI_BUCKET?=$(ARTIFACTS_BUCKET)
-release-ami-ubuntu-2004: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami/$(IMAGE_OS)
-release-ami-ubuntu-2004: EXPORT_AMI_DST=$(AMI_S3_DST)/$(GIT_HASH)
-release-ami-ubuntu-2004: LATEST_AMI_S3_URL=$(AMI_S3_DST)/$(LATEST)/ubuntu.raw
-release-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
-	PACKER_LOG=1 PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-ubuntu-2004
+.PHONY: release-ami-%
+release-ami-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
+release-ami-%: export MANIFEST_OUTPUT=$(FULL_OUTPUT_DIR)/manifest.json
+release-ami-%: EXPORT_AMI_BUCKET?=$(ARTIFACTS_BUCKET)
+release-ami-%: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami/$(IMAGE_OS)
+release-ami-%: EXPORT_AMI_DST=$(AMI_S3_DST)/$(GIT_HASH)
+release-ami-%: LATEST_AMI_S3_URL=$(AMI_S3_DST)/$(LATEST)/ubuntu.raw
+release-ami-%: setup-ami-share
+	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
 	build/export-ami-to-s3.sh $(RELEASE_BRANCH) $(MANIFEST_OUTPUT) raw $(EXPORT_AMI_DST) $(LATEST_AMI_S3_URL)
 
 .PHONY: release-ova-%
@@ -254,6 +258,14 @@ release-image-build-on-metal-%: $(GIT_PATCH_TARGET)
 build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
 build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
 	build/build_qemu_rhel_local.sh $(MAKE_ROOT) $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
+
+.PHONY: local-build-ami-%
+local-build-ami-%: MAKEFLAGS=
+local-build-ami-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
+local-build-ami-%: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
+local-build-ami-%: deps-ami setup-packer-configs-ami
+	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ami/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-$*
 
 .PHONY: local-build-raw-%
 local-build-raw-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/raw/$(IMAGE_OS)
