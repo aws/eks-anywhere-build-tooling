@@ -34,7 +34,7 @@ func (b *BuildOptions) BuildImage() {
 	if codebuild != "true" {
 		err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
 		if err != nil {
-			log.Fatalf("Error clonning build tooling repo")
+			log.Fatalf("Error cloning build tooling repo")
 		}
 		log.Println("Cloned eks-anywhere-build-tooling repo")
 	} else {
@@ -221,6 +221,31 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.qcow2", b.Os))
+	} else if b.Hypervisor == AMI {
+		amiConfigFile := filepath.Join(imageBuilderProjectPath, "packer/ami/ami.json")
+
+		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
+		if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
+			log.Fatalf("Error executing upstream patch command")
+		}
+
+		if b.AMIConfig != nil {
+			amiConfigData, err := json.Marshal(b.AMIConfig)
+			if err != nil {
+				log.Fatalf("Error marshalling AMI config data")
+			}
+
+			err = ioutil.WriteFile(amiConfigFile, amiConfigData, 0644)
+			if err != nil {
+				log.Fatalf("Error writing AMI config file to packer")
+			}
+		}
+
+		buildCommand := fmt.Sprintf("make -C %s local-build-ami-ubuntu-2004", imageBuilderProjectPath)
+		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
+		if err != nil {
+			log.Fatalf("Error executing image-builder for AMI hypervisor: %v", err)
+		}
 	}
 
 	if outputArtifactPath != "" {

@@ -7,6 +7,7 @@ const (
 	Baremetal  string = "baremetal"
 	Nutanix    string = "nutanix"
 	CloudStack string = "cloudstack"
+	AMI        string = "ami"
 )
 
 var SupportedHypervisors = []string{
@@ -14,6 +15,7 @@ var SupportedHypervisors = []string{
 	Baremetal,
 	Nutanix,
 	CloudStack,
+	AMI,
 }
 
 type BuildOptions struct {
@@ -23,6 +25,7 @@ type BuildOptions struct {
 	BaremetalConfig  *BaremetalConfig
 	NutanixConfig    *NutanixConfig
 	CloudstackConfig *CloudstackConfig
+	AMIConfig        *AMIConfig
 	ReleaseChannel   string
 	artifactsBucket  string
 	Force            bool
@@ -80,4 +83,20 @@ type NutanixConfig struct {
 	NutanixUserName   string `json:"nutanix_username"`
 	NutanixPassword   string `json:"nutanix_password"`
 	NutanixSubnetName string `json:"nutanix_subnet_name"`
+}
+
+type AMIConfig struct {
+	AMIFilterName       string   `json:"ami_filter_name"`
+	AMIFilterOwners     string   `json:"ami_filter_owners"`
+	AMIRegions          string   `json:"ami_regions"`
+	AWSRegion           string   `json:"aws_region"`
+	AnsibleExtraVars    string   `json:"ansible_extra_vars"`
+	BuilderInstanceType string   `json:"builder_instance_type"`
+	CustomRole          string   `json:"custom_role"`
+	CustomRoleNameList  []string `json:"custom_role_name_list,omitempty"`
+	CustomRoleNames     string   `json:"custom_role_names"`
+	ManifestOutput      string   `json:"manifest_output"`
+	RootDeviceName      string   `json:"root_device_name"`
+	VolumeSize          string   `json:"volume_size"`
+	VolumeType          string   `json:"volume_type"`
 }
