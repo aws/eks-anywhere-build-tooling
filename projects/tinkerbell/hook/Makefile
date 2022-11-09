@@ -9,8 +9,8 @@ REPO_OWNER=tinkerbell
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
-BOOTKIT_IMAGE_COMPONENT=tinkerbell/hook-bootkit
-TINK_DOCKER_IMAGE_COMPONENT=tinkerbell/hook-docker
+HOOK_BOOTKIT_IMAGE_COMPONENT=tinkerbell/hook-bootkit
+HOOK_DOCKER_IMAGE_COMPONENT=tinkerbell/hook-docker
 KERNEL_IMAGE_COMPONENT=tinkerbell/hook-kernel
 
 IMAGE_NAMES=hook-bootkit hook-docker kernel
@@ -20,20 +20,20 @@ SOURCE_PATTERNS=./ ./
 GO_MOD_PATHS=hook-bootkit hook-docker
 # by default the first target is assumed to be the primary and will produce a attribution with no prefix
 # for this build we want to prefix all the files
-BOOTKIT_ATTRIBUTION_OVERRIDE=hook-bootkit
+HOOK_BOOTKIT_ATTRIBUTION_OVERRIDE=hook-bootkit
 
-CREATE_HOOK_FILES=$(REPO)/dist/vmlinuz-x86_64
+CREATE_HOOK_FILES=$(REPO)/out/sha-6d43b8b/rel/vmlinuz-x86_64
 
 HAS_S3_ARTIFACTS=true
 SIMPLE_CREATE_TARBALLS=false
 
-FIX_LICENSES_BOOTKIT_TARGET=$(REPO)/hook-bootkit/LICENSE
-FIX_LICENSES_TINK_DOCKER_TARGET=$(REPO)/hook-docker/LICENSE
+FIX_LICENSES_HOOK_BOOTKIT_TARGET=$(REPO)/hook-bootkit/LICENSE
+FIX_LICENSES_HOOK_DOCKER_TARGET=$(REPO)/hook-docker/LICENSE
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_BOOTKIT_TARGET) $(FIX_LICENSES_TINK_DOCKER_TARGET)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_HOOK_BOOTKIT_TARGET) $(FIX_LICENSES_HOOK_DOCKER_TARGET)
 
 # For local image builds we override to push to local registry.
 %/images/amd64: IMAGE_OUTPUT=push=true
@@ -51,11 +51,11 @@ s3-artifacts: $(CREATE_HOOK_FILES)
 
 $(CREATE_HOOK_FILES): tarballs
 # Modify the linuxkit config file hook/hook.yaml to point to IMAGE_REPO.
-# Upstream make target `dist-existing-images` is triggered to perform linuxkit build and generate OSIE files.
-	sed -i -E -e 's,quay.io/tinkerbell/hook-(bootkit|docker|kernel).*,$(IMAGE_REPO)/tinkerbell/hook-\1:$(LATEST_TAG),g' $(REPO)/hook.yaml
-	source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.16" && make dist-existing-images -C $(REPO)
+# Upstream make target `dist` is triggered to perform linuxkit build and generate OSIE files ().
+	source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.16" && make dist IMAGE_REPO=$(IMAGE_REPO) LATEST_TAG=$(LATEST_TAG) -C $(REPO)
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
-	cp $(REPO)/dist/* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
+	cp $(REPO)/out/sha-*/rel/vmlinuz-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
+	cp $(REPO)/out/sha-*/rel/initramfs-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
 	mkdir -p $(ARTIFACTS_PATH)
 	cp -rf $(OUTPUT_DIR)/hook/* $(ARTIFACTS_PATH)
 
