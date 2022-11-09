@@ -23,6 +23,8 @@ fi
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
+source $SCRIPT_ROOT/../lib/common.sh
+
 ORIGIN_ORG="eks-distro-pr-bot"
 UPSTREAM_ORG="aws"
 
@@ -37,7 +39,7 @@ git config remote.upstream.url >&- || git remote add upstream https://github.com
 
 # Files have already changed, stash to perform rebase
 git stash
-git fetch upstream
+retry git fetch upstream
 
 git checkout $MAIN_BRANCH
 # there will be conflicts before we are on the bots fork at this point
