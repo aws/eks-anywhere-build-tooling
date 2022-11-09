@@ -20,7 +20,7 @@ clean: $(addprefix clean-project-, $(ALL_PROJECTS))
 
 .PHONY: add-generated-help-block-project-%
 add-generated-help-block-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(eval PROJECT_PATH=projects/$(patsubst $(firstword $(subst _, ,$*))_%,$(firstword $(subst _, ,$*))/%,$*))
 	$(MAKE) add-generated-help-block -C $(PROJECT_PATH) RELEASE_BRANCH=1-21
 
 .PHONY: add-generated-help-block
@@ -29,7 +29,7 @@ add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_P
 
 .PHONY: attribution-files-project-%
 attribution-files-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(eval PROJECT_PATH=projects/$(patsubst $(firstword $(subst _, ,$*))_%,$(firstword $(subst _, ,$*))/%,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
 
 .PHONY: attribution-files
