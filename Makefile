@@ -30,7 +30,7 @@ add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_P
 .PHONY: attribution-files-project-%
 attribution-files-project-%:
 	$(eval PROJECT_PATH=projects/$(patsubst $(firstword $(subst _, ,$*))_%,$(firstword $(subst _, ,$*))/%,$*))
-	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) "attribution clean"
+	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
 
 .PHONY: attribution-files
 attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
@@ -40,7 +40,8 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 checksum-files-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) "checksums clean"
-
+	go clean -modcache -cache
+	
 .PHONY: checksum-files
 checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
 	build/update-attribution-files/create_pr.sh
