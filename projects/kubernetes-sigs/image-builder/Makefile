@@ -115,7 +115,7 @@ else ifeq ($(IMAGE_FORMAT),raw)
 else ifeq ($(IMAGE_FORMAT),cloudstack)
 	ifeq ($(IMAGE_OS),redhat)
 		S3_TARGET_PREREQUISITES=$(FINAL_CLOUDSTACK_IMAGE_PATH)
-		RELEASE_TARGETS=release-image-build-on-metal-$(IMAGE_OS)
+		RELEASE_TARGETS=release-image-build-on-metal-$(IMAGE_OS) upload-artifacts-cloudstack
 	else
 		S3_TARGET_PREREQUISITES?=
 		RELEASE_TARGETS=unsupported-release-target
