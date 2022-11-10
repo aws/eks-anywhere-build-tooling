@@ -5,7 +5,7 @@ ARG TARGETARCH
 ARG TARGETOS
 
 COPY _output/bin/hook/$TARGETOS-$TARGETARCH/hook-bootkit /usr/bin/bootkit
-# COPY _output/hook-bootkit/LICENSES /LICENSES
+COPY _output/hook-bootkit/LICENSES /LICENSES
 COPY HOOK_BOOTKIT_ATTRIBUTION.txt /ATTRIBUTION.txt
 
 ENTRYPOINT [ "/usr/bin/bootkit" ]
