@@ -4,6 +4,7 @@ AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output tex
 AWS_REGION?=us-west-2
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 ECR_PUBLIC_URI?=$(shell aws ecr-public describe-registries --region us-east-1 --query 'registries[0].registryUri' --output text)
+JOB_TYPE?=
 
 RELEASE_BRANCH?=
 GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
@@ -31,6 +32,7 @@ add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_P
 attribution-files-project-%:
 	$(eval PROJECT_PATH=projects/$(patsubst $(firstword $(subst _, ,$*))_%,$(firstword $(subst _, ,$*))/%,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
+	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod $(PROJECT_PATH)/_output,)
 
 .PHONY: attribution-files
 attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
@@ -39,7 +41,8 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 .PHONY: checksum-files-project-%
 checksum-files-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
-	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) checksums
+	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) "checksums clean"
+	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod $(PROJECT_PATH)/_output,)
 
 .PHONY: checksum-files
 checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
