@@ -44,15 +44,15 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 .PHONY: checksum-files-project-%
 checksum-files-project-%:
 	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
-	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) "checksums clean"
-	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod && buildctl prune --all,)
+	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) checksums
+	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod && make -C $(PROJECT_PATH) clean && buildctl prune --all,)
 
-.PHONY: checksum-files
-checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
+.PHONY: update-checksum-files
+update-checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
 	build/update-attribution-files/create_pr.sh
 
 .PHONY: update-attribution-files
-update-attribution-files: add-generated-help-block attribution-files checksum-files
+update-attribution-files: add-generated-help-block attribution-files
 	build/lib/update_go_versions.sh
 	build/update-attribution-files/create_pr.sh
 
