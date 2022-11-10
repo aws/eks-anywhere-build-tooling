@@ -32,7 +32,7 @@ add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_P
 attribution-files-project-%:
 	$(eval PROJECT_PATH=projects/$(patsubst $(firstword $(subst _, ,$*))_%,$(firstword $(subst _, ,$*))/%,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
-	$(if $(findstring periodic,$(JOB_TYPE)),go clean -modcache -cache,)
+	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod $(PROJECT_PATH)/_output,)
 
 .PHONY: attribution-files
 attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
@@ -42,7 +42,7 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 checksum-files-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) "checksums clean"
-	$(if $(findstring periodic,$(JOB_TYPE)),go clean -modcache -cache,)
+	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod $(PROJECT_PATH)/_output,)
 
 .PHONY: checksum-files
 checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
