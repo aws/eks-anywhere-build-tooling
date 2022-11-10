@@ -10,9 +10,12 @@ RELEASE_BRANCH?=
 GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 ALL_PROJECTS=$(shell $(BUILD_LIB)/all_projects.sh $(BASE_DIRECTORY))
 
+# $1 - project name using _ as seperator, ex: rancher_local-path-provisoner
+PROJECT_PATH_MAP=projects/$(patsubst $(firstword $(subst _, ,$(1)))_%,$(firstword $(subst _, ,$(1)))/%,$(1))
+
 .PHONY: clean-project-%
 clean-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
 	$(MAKE) clean -C $(PROJECT_PATH)
 
 .PHONY: clean
@@ -21,7 +24,7 @@ clean: $(addprefix clean-project-, $(ALL_PROJECTS))
 
 .PHONY: add-generated-help-block-project-%
 add-generated-help-block-project-%:
-	$(eval PROJECT_PATH=projects/$(patsubst $(firstword $(subst _, ,$*))_%,$(firstword $(subst _, ,$*))/%,$*))
+	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
 	$(MAKE) add-generated-help-block -C $(PROJECT_PATH) RELEASE_BRANCH=1-21
 
 .PHONY: add-generated-help-block
@@ -30,7 +33,7 @@ add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_P
 
 .PHONY: attribution-files-project-%
 attribution-files-project-%:
-	$(eval PROJECT_PATH=projects/$(patsubst $(firstword $(subst _, ,$*))_%,$(firstword $(subst _, ,$*))/%,$*))
+	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
 	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod $(PROJECT_PATH)/_output,)
 
@@ -40,7 +43,7 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 
 .PHONY: checksum-files-project-%
 checksum-files-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) "checksums clean"
 	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod && buildctl prune --all,)
 
