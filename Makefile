@@ -42,7 +42,7 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 checksum-files-project-%:
 	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) "checksums clean"
-	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod $(PROJECT_PATH)/_output,)
+	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod && buildctl prune --all,)
 
 .PHONY: checksum-files
 checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
