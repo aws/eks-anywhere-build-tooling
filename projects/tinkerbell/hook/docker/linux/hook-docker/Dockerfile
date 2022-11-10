@@ -30,8 +30,8 @@ WORKDIR /
 
 COPY --from=docker-builder /newroot /
 
-COPY _output/bin/hook/$TARGETOS-$TARGETARCH/tink-docker /usr/bin/tink-docker
-COPY _output/tink-docker/LICENSES /LICENSES
-COPY TINK_DOCKER_ATTRIBUTION.txt /ATTRIBUTION.txt
+COPY _output/bin/hook/$TARGETOS-$TARGETARCH/hook-docker /usr/bin/tink-docker
+COPY _output/hook-docker/LICENSES /LICENSES
+COPY HOOK_DOCKER_ATTRIBUTION.txt /ATTRIBUTION.txt
 
 ENTRYPOINT [ "/usr/bin/tink-docker" ]
