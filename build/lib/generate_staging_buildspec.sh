@@ -19,11 +19,11 @@ set -o pipefail
 
 BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
 ALL_PROJECTS="${2?Specify second argument - All projects in repo}"
+STAGING_BUILDSPEC_FILE="${3}"
+SKIP_DEPEND_ON="${4:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
-
-STAGING_BUILDSPEC_FILE="$BASE_DIRECTORY/release/staging-build.yml"
 
 YQ_LATEST_RELEASE_URL="https://github.com/mikefarah/yq/releases/latest"
 CURRENT_YQ_VERSION=$(yq -V | awk '{print $NF}')
@@ -40,6 +40,7 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 cd $MAKE_ROOT
 
+mkdir -p $(dirname $STAGING_BUILDSPEC_FILE)
 yq eval --null-input '.batch={"fast-fail":true,"build-graph":[]}' > $STAGING_BUILDSPEC_FILE # Creates an empty YAML array
 
 PROJECTS=(${ALL_PROJECTS// / })
@@ -86,7 +87,7 @@ for project in "${PROJECTS[@]}"; do
             PROJECT_DEPENDENCIES=$(make --no-print-directory -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=$RELEASE_BRANCH)
         fi
 
-        if [ -n "$PROJECT_DEPENDENCIES" ]; then
+        if [ -n "$PROJECT_DEPENDENCIES" ] && [ "$SKIP_DEPEND_ON" != "true" ]; then
             DEPS=(${PROJECT_DEPENDENCIES// / })
             for dep in "${DEPS[@]}"; do
                 DEP_PRODUCT="$(cut -d/ -f1 <<< $dep)"

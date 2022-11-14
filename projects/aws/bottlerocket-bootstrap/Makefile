@@ -15,6 +15,9 @@ GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".releases[] | select(.branch==\"${RELEA
 
 HAS_RELEASE_BRANCHES=true
 
+BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
+BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
+
 # This project is a bit of odd ball when it comes to using the standard makefile targets
 # - the image builds are release branch aware but the binary is the same across all versions
 # - there is no clone of source since the source for the bootstrap exist in this repo already
