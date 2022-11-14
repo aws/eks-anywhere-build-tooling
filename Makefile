@@ -94,7 +94,7 @@ generate: generate-project-list generate-staging-buildspec
 
 .PHONY: validate-generated
 validate-generated: generate
-	@if [ "$$(git status --porcelain -- UPSTREAM_PROJECTS.yaml release/staging-build.yml | wc -l)" -gt 0 ]; then \
+	@if [ "$$(git status --porcelain -- UPSTREAM_PROJECTS.yaml release/staging-build.yml **/batch-build.yml | wc -l)" -gt 0 ]; then \
 		echo "Error: Generated files, UPSTREAM_PROJECTS.yaml release/staging-build.yml, do not match expected. Please run `make generate` to update"; \
 		git diff -- UPSTREAM_PROJECTS.yaml release/staging-build.yml; \
 		exit 1; \
