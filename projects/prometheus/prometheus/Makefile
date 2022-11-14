@@ -1,5 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
+HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
 GOLANG_VERSION?="1.18"
 
 REPO=prometheus
@@ -14,6 +15,13 @@ WEB_UI_TARGETS=prometheus/web/ui/embed.go
 EXTRA_DOCKER_FILE_TARGETS=$(OUTPUT_DIR)/extra/etc/prometheus/prometheus.yml
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
+
+HAS_HELM_CHART=true
+HELM_SOURCE_OWNER=prometheus-community
+HELM_SOURCE_REPOSITORY=helm-charts
+HELM_DIRECTORY=charts/prometheus-server
+HELM_DESTINATION_REPOSITORY=prometheus/charts/prometheus
+HELM_IMAGE_LIST=prometheus/prometheus
 
 include $(BASE_DIRECTORY)/Common.mk
 
