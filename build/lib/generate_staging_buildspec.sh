@@ -166,4 +166,6 @@ if [[ "${#PROJECTS[@]}" = "1" ]]; then
     # if there is only one project we do not want project_path and clone_url to be set since it will be set at the codebuild level
     yq -i 'del(.batch.build-graph.[].env.variables.PROJECT_PATH)' $STAGING_BUILDSPEC_FILE
     yq -i 'del(.batch.build-graph.[].env.variables.CLONE_URL)' $STAGING_BUILDSPEC_FILE
+    yq -i 'del(.. | select(tag == "!!map" and length == 0))' $STAGING_BUILDSPEC_FILE
+    yq -i 'del(.. | select(tag == "!!map" and length == 0))' $STAGING_BUILDSPEC_FILE
 fi
