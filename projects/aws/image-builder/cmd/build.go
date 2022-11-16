@@ -157,7 +157,22 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				}
 			}
 		case builder.AMI:
-			if err = json.Unmarshal(config, &bo.AMIConfig); err != nil {
+			// Default configuration for AMI builds
+			defaultAMIConfig := &builder.AMIConfig{
+				AMIFilterName:       builder.DefaultUbuntuAMIFilterName,
+				AMIFilterOwners:     builder.DefaultUbuntuAMIFilterOwners,
+				AMIRegions:          builder.DefaultAMIBuildRegion,
+				AWSRegion:           builder.DefaultAMIBuildRegion,
+				BuilderInstanceType: builder.DefaultAMIBuilderInstanceType,
+				CustomRole:          "true",
+				CustomRoleNames:     builder.DefaultAMICustomRoleNames,
+				AnsibleExtraVars:    builder.DefaultAMIAnsibleExtraVars,
+				ManifestOutput:      builder.DefaultAMIManifestOutput,
+				RootDeviceName:      builder.DefaultAMIRootDeviceName,
+				VolumeSize:          builder.DefaultAMIVolumeSize,
+				VolumeType:          builder.DefaultAMIVolumeType,
+			}
+			if err = json.Unmarshal(config, defaultAMIConfig); err != nil {
 				return err
 			}
 			if bo.AMIConfig.CustomRole == "true" {
@@ -170,12 +185,6 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 					bo.AMIConfig.CustomRoleNames = strings.Join(bo.AMIConfig.CustomRoleNameList, " ")
 					bo.AMIConfig.CustomRoleNameList = nil
 				}
-			}
-			if bo.AMIConfig.AMIFilterOwners == "" {
-				bo.AMIConfig.AMIFilterOwners = builder.DefaultUbuntuAMIFilterOwners
-			}
-			if bo.AMIConfig.AMIFilterName == "" {
-				bo.AMIConfig.AMIFilterName = builder.DefaultUbuntuAMIFilterName
 			}
 		}
 	}
