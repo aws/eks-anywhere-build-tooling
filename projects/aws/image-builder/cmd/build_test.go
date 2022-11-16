@@ -12,7 +12,7 @@ func TestValidateSupportedHypervisor(t *testing.T) {
 	testCases := []struct {
 		testName     string
 		buildOptions builder.BuildOptions
-		wantErr string
+		wantErr      string
 	}{
 		{
 			testName: "vSphere hypervisor",
