@@ -379,6 +379,7 @@ HAS_S3_ARTIFACTS?=false
 SIMPLE_CREATE_TARBALLS?=true
 TAR_FILE_PREFIX?=$(REPO)
 FAKE_ARM_BINARIES_FOR_VALIDATION?=$(if $(filter linux/arm64,$(BINARY_PLATFORMS)),false,true)
+FAKE_AMD_BINARIES_FOR_VALIDATION?=$(if $(filter linux/amd64,$(BINARY_PLATFORMS)),false,true)
 FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 IMAGE_FORMAT?=
 IMAGE_OS?=
@@ -585,7 +586,7 @@ endif
 .PHONY: validate-checksums
 validate-checksums: $(BINARY_TARGETS)
 ifneq ($(and $(strip $(BINARY_TARGETS)), $(filter false, $(SKIP_CHECKSUM_VALIDATION))),)
-	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION)
+	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION)
 endif
 
 #### Image Helpers

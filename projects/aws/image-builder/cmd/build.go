@@ -19,6 +19,7 @@ var (
 	baremetalConfigFile  string
 	nutanixConfigFile    string
 	cloudstackConfigFile string
+	amiConfigFile        string
 	err                  error
 )
 
@@ -44,6 +45,7 @@ func init() {
 	buildCmd.Flags().StringVar(&vSphereConfigFile, "vsphere-config", "", "Path to vSphere Config file")
 	buildCmd.Flags().StringVar(&nutanixConfigFile, "nutanix-config", "", "Path to Nutanix Config file")
 	buildCmd.Flags().StringVar(&cloudstackConfigFile, "cloudstack-config", "", "Path to CloudStack Config file")
+	buildCmd.Flags().StringVar(&amiConfigFile, "ami-config", "", "Path to AMI Config file")
 	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-23", "EKS-D Release channel for node image. Can be 1-20, 1-21, 1-22 or 1-23")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
@@ -66,8 +68,8 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		log.Fatal(err.Error())
 	}
 
-	if bo.Hypervisor == builder.CloudStack && bo.Os != builder.RedHat {
-		log.Fatalf("Invalid OS type. Only redhat os is supported for CloudStack")
+	if err = validateOSHypervisorCombinations(bo.Os, bo.Hypervisor); err != nil {
+		log.Fatal(err.Error())
 	}
 
 	configPath := ""
@@ -80,6 +82,8 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		configPath = nutanixConfigFile
 	case builder.CloudStack:
 		configPath = cloudstackConfigFile
+	case builder.AMI:
+		configPath = amiConfigFile
 	}
 	bo.Os = strings.ToLower(bo.Os)
 	bo.Hypervisor = strings.ToLower(bo.Hypervisor)
@@ -134,9 +138,6 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				return err
 			}
 
-			if bo.Os == builder.RedHat {
-				log.Fatalf("only ubuntu os is supported when hypervisor is nutanix")
-			}
 			if bo.NutanixConfig.NutanixUserName == "" || bo.NutanixConfig.NutanixPassword == "" {
 				log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
 			}
@@ -155,12 +156,57 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 					return err
 				}
 			}
+		case builder.AMI:
+			// Default configuration for AMI builds
+			defaultAMIConfig := &builder.AMIConfig{
+				AMIFilterName:       builder.DefaultUbuntuAMIFilterName,
+				AMIFilterOwners:     builder.DefaultUbuntuAMIFilterOwners,
+				AMIRegions:          builder.DefaultAMIBuildRegion,
+				AWSRegion:           builder.DefaultAMIBuildRegion,
+				BuilderInstanceType: builder.DefaultAMIBuilderInstanceType,
+				CustomRole:          "true",
+				CustomRoleNames:     builder.DefaultAMICustomRoleNames,
+				AnsibleExtraVars:    builder.DefaultAMIAnsibleExtraVars,
+				ManifestOutput:      builder.DefaultAMIManifestOutput,
+				RootDeviceName:      builder.DefaultAMIRootDeviceName,
+				VolumeSize:          builder.DefaultAMIVolumeSize,
+				VolumeType:          builder.DefaultAMIVolumeType,
+			}
+			if err = json.Unmarshal(config, defaultAMIConfig); err != nil {
+				return err
+			}
+			if bo.AMIConfig.CustomRole == "true" {
+				if (bo.AMIConfig.CustomRoleNameList == nil && bo.AMIConfig.CustomRoleNames == "") ||
+					(bo.AMIConfig.CustomRoleNameList != nil && bo.AMIConfig.CustomRoleNames != "") {
+					log.Fatalf("Exactly one of \"custom_role_name_list\" or \"custom_role_names\" must be provided")
+				}
+
+				if bo.AMIConfig.CustomRoleNameList != nil {
+					bo.AMIConfig.CustomRoleNames = strings.Join(bo.AMIConfig.CustomRoleNameList, " ")
+					bo.AMIConfig.CustomRoleNameList = nil
+				}
+			}
 		}
 	}
 
 	return nil
 }
 
+func validateOSHypervisorCombinations(os, hypervisor string) error {
+	if hypervisor == builder.CloudStack && os != builder.RedHat {
+		return fmt.Errorf("Invalid OS type. Only redhat OS is supported for CloudStack")
+	}
+
+	if hypervisor == builder.Nutanix && os != builder.Ubuntu {
+		return fmt.Errorf("Invalid OS type. Only ubuntu OS is supported for Nutanix")
+	}
+
+	if hypervisor == builder.AMI && os != builder.Ubuntu {
+		return fmt.Errorf("Invalid OS type. Only ubuntu OS is supported for AMI")
+	}
+
+	return nil
+}
 func validateRedhat(rhelUsername, rhelPassword, isoUrl string) error {
 	if rhelUsername == "" || rhelPassword == "" {
 		return fmt.Errorf("\"rhel_username\" and \"rhel_password\" are required fields in config when os is redhat")
@@ -182,10 +228,8 @@ func validateCustomIso(isoChecksum, isoChecksumType string) error {
 }
 
 func validateSupportedHypervisors(hypervisor string) error {
-	for _, supportedHypervisor := range builder.SupportedHypervisors {
-		if supportedHypervisor == hypervisor {
-			return nil
-		}
+	if builder.SliceContains(builder.SupportedHypervisors, hypervisor) {
+		return nil
 	}
 	return fmt.Errorf("%s is not supported yet. Please select one of %s", hypervisor, strings.Join(builder.SupportedHypervisors, ","))
 }

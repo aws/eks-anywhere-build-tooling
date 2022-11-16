@@ -83,7 +83,7 @@ in the same project.  Refer to [cert-manager](../../projects/cert-manager/cert-m
 an example of this.
 
 By default the base image will be `eks-distro-base`, but this can be overridden by setting `BASE_IMAGE_NAME` in
-the Makefile.  This base image name should be one of the `eks-distro-base` variants.
+the Makefile.  This base image name should be one of the `eks-distro-base` variants. For curated packages, the base image should be one of the `eks-distro-minimal-base` variants if possible. This may require a multi-stage builds for some packages. Refer to [hello-eks-anywhere](https://github.com/aws/eks-anywhere-build-tooling/blob/main/projects/aws-containers/hello-eks-anywhere/docker/linux/Dockerfile) as an example.
 
 Since we building outside of docker, most Dockerfiles look like:
 

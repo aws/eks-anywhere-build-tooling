@@ -22,5 +22,5 @@ create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
 build: ## Called via prow presubmit, calls `validate`
-release: ## Called via prow postsubmit + release jobs, calls `latest-snow-raw-image`
+release: ## Called via prow postsubmit + release jobs, calls `validate-release-manifest-version latest-snow-raw-image`
 ########### END GENERATED ###########################

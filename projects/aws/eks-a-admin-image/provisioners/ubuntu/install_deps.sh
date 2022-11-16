@@ -7,7 +7,7 @@ set -o pipefail
 
 # Install prerequisites
 sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+sudo apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common tar
 
 # Install docker gpg key
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
@@ -18,17 +18,9 @@ ARCH=$(dpkg --print-architecture)
 SOURCE="deb [arch=$ARCH] https://download.docker.com/linux/ubuntu $LSB_RELEASE stable"
 sudo add-apt-repository "$SOURCE"
 
-# Installation
+# Install docker and containerd
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 
-# Enabling docker
-sudo systemctl start docker
-sudo systemctl enable docker
-
-USER="${USER:-ubuntu}"
-# Setting permisions to avoid sudo
-sudo usermod -a -G docker $USER
-
-# Rebooting to get permissions
-sudo reboot
+# Install yq
+sudo snap install yq

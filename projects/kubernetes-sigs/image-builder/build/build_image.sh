@@ -66,11 +66,26 @@ elif [[ $image_format == "raw" ]]; then
     "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel --baremetal-config $image_builder_config_file
   fi
 elif [[ $image_format == "cloudstack" ]]; then
-  echo "Creating cloudstack config"
   if [[ $image_os != "redhat" ]]; then
-    echo "Cloudstack builds does not support any non-redhat os"
+    echo "Cloudstack builds do not support any non-redhat OS"
     exit 1
   fi
+
+  echo "Creating cloudstack config"
   image_builder_config_file=$redhat_config_file
   "${HOME}"/image-builder build --hypervisor cloudstack --os $image_os --release-channel $release_channel --cloudstack-config $image_builder_config_file
+elif [[ $image_format == "ami" ]]; then
+  if [[ $image_os != "ubuntu" ]]; then
+    echo "AMI builds do not support any non-ubuntu os"
+    exit 1
+  fi
+
+  echo "Creating AMI config"
+  jq --null-input \
+    --arg ami_filter_owners "099720109477" \
+    --arg custom_role_names "$MAKE_ROOT/ansible/roles/load_additional_files" \
+    --arg ansible_extra_vars "@$MAKE_ROOT/packer/ami/ansible_extra_vars.yaml" \
+    --arg manifest_output "$MANIFEST_OUTPUT" \
+    '{"ami_filter_owners": $ami_filter_owners, "custom_role_names": $custom_role_names, "ansible_extra_vars": $ansible_extra_vars, "manifest_output": $manifest_output}' > $image_builder_config_file
+  "${HOME}"/image-builder build --hypervisor ami --os $image_os --release-channel $release_channel --ami-config $image_builder_config_file
 fi

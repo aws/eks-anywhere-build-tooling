@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -67,7 +66,7 @@ if [[ "$STATUS" != "completed" ]]; then
     exit 1
 fi
 
-echo "Image import for ami $AMI_ID succeed"
+echo "Image import for ami $AMI_ID succeeded"
 
 for dst in "${REPLICAS_SPLIT[@]}"
 do

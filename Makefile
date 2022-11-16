@@ -4,14 +4,18 @@ AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output tex
 AWS_REGION?=us-west-2
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
 ECR_PUBLIC_URI?=$(shell aws ecr-public describe-registries --region us-east-1 --query 'registries[0].registryUri' --output text)
+JOB_TYPE?=
 
 RELEASE_BRANCH?=
 GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 ALL_PROJECTS=$(shell $(BUILD_LIB)/all_projects.sh $(BASE_DIRECTORY))
 
+# $1 - project name using _ as seperator, ex: rancher_local-path-provisoner
+PROJECT_PATH_MAP=projects/$(patsubst $(firstword $(subst _, ,$(1)))_%,$(firstword $(subst _, ,$(1)))/%,$(1))
+
 .PHONY: clean-project-%
 clean-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
 	$(MAKE) clean -C $(PROJECT_PATH)
 
 .PHONY: clean
@@ -20,7 +24,7 @@ clean: $(addprefix clean-project-, $(ALL_PROJECTS))
 
 .PHONY: add-generated-help-block-project-%
 add-generated-help-block-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
 	$(MAKE) add-generated-help-block -C $(PROJECT_PATH) RELEASE_BRANCH=1-21
 
 .PHONY: add-generated-help-block
@@ -29,8 +33,9 @@ add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_P
 
 .PHONY: attribution-files-project-%
 attribution-files-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
+	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod $(PROJECT_PATH)/_output,)
 
 .PHONY: attribution-files
 attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
@@ -38,15 +43,16 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 
 .PHONY: checksum-files-project-%
 checksum-files-project-%:
-	$(eval PROJECT_PATH=projects/$(subst _,/,$*))
+	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
 	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) checksums
+	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod && make -C $(PROJECT_PATH) clean && buildctl prune --all,)
 
-.PHONY: checksum-files
-checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
+.PHONY: update-checksum-files
+update-checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
 	build/update-attribution-files/create_pr.sh
 
 .PHONY: update-attribution-files
-update-attribution-files: add-generated-help-block attribution-files checksum-files
+update-attribution-files: add-generated-help-block attribution-files
 	build/lib/update_go_versions.sh
 	build/update-attribution-files/create_pr.sh
 
