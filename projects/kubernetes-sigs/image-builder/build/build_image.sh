@@ -66,11 +66,33 @@ elif [[ $image_format == "raw" ]]; then
     "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel --baremetal-config $image_builder_config_file
   fi
 elif [[ $image_format == "cloudstack" ]]; then
-  echo "Creating cloudstack config"
   if [[ $image_os != "redhat" ]]; then
-    echo "Cloudstack builds does not support any non-redhat os"
+    echo "Cloudstack builds do not support any non-redhat OS"
     exit 1
   fi
+
+  echo "Creating cloudstack config"
   image_builder_config_file=$redhat_config_file
   "${HOME}"/image-builder build --hypervisor cloudstack --os $image_os --release-channel $release_channel --cloudstack-config $image_builder_config_file
+elif [[ $image_format == "ami" ]]; then
+  if [[ $image_os != "ubuntu" ]]; then
+    echo "AMI builds do not support any non-ubuntu os"
+    exit 1
+  fi
+
+  echo "Creating AMI config"
+  jq --null-input \
+    --arg ami_filter_owners "099720109477" \
+    --arg ami_regions "us-west-2" \
+    --arg aws_region "us-west-2" \
+    --arg builder_instance_type "t3.small" \
+    --arg custom_role "true" \
+    --arg custom_role_names "$MAKE_ROOT/ansible/roles/load_additional_files" \
+    --arg ansible_extra_vars "@$MAKE_ROOT/packer/ami/ansible_extra_vars.yaml" \
+    --arg manifest_output "$MANIFEST_OUTPUT" \
+    --arg root_device_name "/dev/sda1" \
+    --arg volume_size "25" \
+    --arg volume_type "gp3" \
+    '{"ami_filter_owners": $ami_filter_owners, "ami_regions": $ami_regions, "aws_region": $aws_region, "builder_instance_type": $builder_instance_type, "custom_role": $custom_role, "custom_role_names": $custom_role_names, "ansible_extra_vars": $ansible_extra_vars, "root_device_name": $root_device_name, "volume_size": $volume_size, "volume_type": $volume_type, "manifest_output": $manifest_output}' > $image_builder_config_file
+  "${HOME}"/image-builder build --hypervisor ami --os $image_os --release-channel $release_channel --ami-config $image_builder_config_file
 fi
