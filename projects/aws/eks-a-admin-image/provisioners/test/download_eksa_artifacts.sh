@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 EKSA_MANIFESTS_PATH="${EKSA_MANIFESTS_PATH:-/usr/lib/eks-a/manifests}"
-EKSA_ARTIFACTS_TAR_PATH="${EKSA_ARTIFACTS_TAR_PATH:-/usr/lib/eks-a/artifacts/artifacts.tar}"
+EKSA_ARTIFACTS_TAR_PATH="${EKSA_ARTIFACTS_TAR_PATH:-/usr/lib/eks-a/artifacts/artifacts.tar.gz}"
 
 if test -d $EKSA_MANIFESTS_PATH; then
 	echo "Manifests dir exists. Pass."
