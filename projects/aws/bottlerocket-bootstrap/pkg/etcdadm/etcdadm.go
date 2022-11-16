@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
 )
@@ -39,12 +40,12 @@ func New(userData *utils.UserData) *etcdadm {
 
 func (e *etcdadm) InitializeDirectories() error {
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0640); err != nil {
+		if err := os.MkdirAll(dir, 0o640); err != nil {
 			return errors.Wrapf(err, "error creating etcdadm directory [%s]", dir)
 		}
 	}
 
-	if err := utils.CreateSymLink(rootfsEtcdBaseDir, etcdBaseDir); err != nil {
+	if err := files.CreateSymLink(rootfsEtcdBaseDir, etcdBaseDir); err != nil {
 		return errors.Wrap(err, "failed init symlinks for etcdadm")
 	}
 

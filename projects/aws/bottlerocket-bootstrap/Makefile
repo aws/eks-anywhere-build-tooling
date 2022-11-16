@@ -6,10 +6,15 @@ REPO=bottlerocket-bootstrap
 REPO_OWNER=aws
 
 BASE_IMAGE_NAME?=eks-distro-base
-IMAGE_COMPONENT=bottlerocket-bootstrap
 
-BINARY_TARGET_FILES=bottlerocket-bootstrap
-GO_MOD_PATHS=..
+IMAGE_NAMES=bottlerocket-bootstrap bottlerocket-bootstrap-snow
+
+BOTTLEROCKET_BOOTSTRAP_IMAGE_COMPONENT=bottlerocket-bootstrap
+BOTTLEROCKET_BOOTSTRAP_SNOW_IMAGE_COMPONENT=bottlerocket-bootstrap-snow
+
+BINARY_TARGET_FILES=bottlerocket-bootstrap bottlerocket-bootstrap-snow
+SOURCE_PATTERNS=. ./pkg/providers/snow
+GO_MOD_PATHS=.. ..
 
 GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".releases[] | select(.branch==\"${RELEASE_BRANCH}\").number" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)
 
@@ -50,6 +55,8 @@ $(ATTRIBUTION_TARGETS): GIT_TAG
 $(FAKE_GIT_REPO_TARGET):
 	@git init
 	@git remote add origin https://github.com/aws/eks-anywhere-build-tooling.git 
+
+bottlerocket-bootstrap-snow/images/%: DOCKERFILE_FOLDER=./docker/linux/snow
 
 GIT_TAG:
 	echo 0.0.0 > $@

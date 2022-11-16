@@ -8,15 +8,15 @@ import (
 	"io/ioutil"
 	"os"
 	"os/user"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/service"
-
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
+
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/service"
 )
 
 const (
@@ -79,6 +79,7 @@ func processUserData(data []byte) (*UserData, error) {
 		return userData, nil
 	}
 }
+
 func processAWSSecretsManagerUserData(data []byte, secretsManagerService service.SecretsManagerService) (*UserData, error) {
 	// If this is a AWSSecretsManager typped UserData, parse it as AWSSecretsManagerUserData
 	fmt.Println("The loaded userdata is referecing an external userdata, loading it...")
@@ -115,7 +116,6 @@ func loadUserDataFromSecretsManager(awsSecretsManagerUserData *AWSSecretsManager
 	}
 	base64UserDataString := string(uncompressedData)
 	actualUserDataByte, err := base64.StdEncoding.DecodeString(base64UserDataString)
-
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +138,9 @@ func WriteUserDataFiles(userData *UserData) error {
 		if err != nil {
 			return errors.Wrap(err, "Error converting string to int for permissions")
 		}
-		dir := filepath.Dir(file.Path)
-		err = os.MkdirAll(dir, 0640)
-		if err != nil {
-			return errors.Wrap(err, "Error creating directories")
-		}
-		err = ioutil.WriteFile(file.Path, []byte(file.Content), fs.FileMode(perm))
-		if err != nil {
-			return errors.Wrapf(err, "Error creating file: %s", file.Path)
+
+		if err := files.Write(file.Path, []byte(file.Content), fs.FileMode(perm)); err != nil {
+			return errors.Wrapf(err, "Error writing file: %s", file.Path)
 		}
 		// get owner
 		owners := strings.Split(file.Owner, ":")
