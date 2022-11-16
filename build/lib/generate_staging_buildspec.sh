@@ -19,15 +19,15 @@ set -o pipefail
 
 BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
 ALL_PROJECTS="${2?Specify second argument - All projects in repo}"
+STAGING_BUILDSPEC_FILE="${3}"
+SKIP_DEPEND_ON="${4:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
-STAGING_BUILDSPEC_FILE="$BASE_DIRECTORY/release/staging-build.yml"
-
 YQ_LATEST_RELEASE_URL="https://github.com/mikefarah/yq/releases/latest"
 CURRENT_YQ_VERSION=$(yq -V | awk '{print $NF}')
-CURRENT_YQ_MAJOR_VERSION=${CURRENT_YQ_VERSION:0:1}
+CURRENT_YQ_MAJOR_VERSION=${CURRENT_YQ_VERSION:1:1}
 LATEST_YQ_VERSION=$(curl -fIsS $YQ_LATEST_RELEASE_URL | grep "location:" | awk -F/ '{print $NF}')
 LATEST_YQ_MAJOR_VERSION=${LATEST_YQ_VERSION:1:1}
 if [ $CURRENT_YQ_MAJOR_VERSION -lt $LATEST_YQ_MAJOR_VERSION ]; then
@@ -40,6 +40,7 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 cd $MAKE_ROOT
 
+mkdir -p $(dirname $STAGING_BUILDSPEC_FILE)
 yq eval --null-input '.batch={"fast-fail":true,"build-graph":[]}' > $STAGING_BUILDSPEC_FILE # Creates an empty YAML array
 
 PROJECTS=(${ALL_PROJECTS// / })
@@ -86,7 +87,7 @@ for project in "${PROJECTS[@]}"; do
             PROJECT_DEPENDENCIES=$(make --no-print-directory -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=$RELEASE_BRANCH)
         fi
 
-        if [ -n "$PROJECT_DEPENDENCIES" ]; then
+        if [ -n "$PROJECT_DEPENDENCIES" ] && [ "$SKIP_DEPEND_ON" != "true" ]; then
             DEPS=(${PROJECT_DEPENDENCIES// / })
             for dep in "${DEPS[@]}"; do
                 DEP_PRODUCT="$(cut -d/ -f1 <<< $dep)"
@@ -160,3 +161,11 @@ done
 
 HEAD_COMMENT=$(cat $BASE_DIRECTORY/hack/boilerplate.yq.txt)
 yq eval -i ". headComment=\"$HEAD_COMMENT\"" $STAGING_BUILDSPEC_FILE # Add a header comment with license verbiage and no-edit warning
+
+if [[ "${#PROJECTS[@]}" = "1" ]]; then
+    # if there is only one project we do not want project_path and clone_url to be set since it will be set at the codebuild level
+    yq -i 'del(.batch.build-graph.[].env.variables.PROJECT_PATH)' $STAGING_BUILDSPEC_FILE
+    yq -i 'del(.batch.build-graph.[].env.variables.CLONE_URL)' $STAGING_BUILDSPEC_FILE
+    yq -i 'del(.. | select(tag == "!!map" and length == 0))' $STAGING_BUILDSPEC_FILE
+    yq -i 'del(.. | select(tag == "!!map" and length == 0))' $STAGING_BUILDSPEC_FILE
+fi
