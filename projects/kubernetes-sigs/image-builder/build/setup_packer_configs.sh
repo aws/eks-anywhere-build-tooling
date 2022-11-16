@@ -52,13 +52,13 @@ export CNI_VERSION=$(build::eksd_releases::get_eksd_component_version 'cni-plugi
 
 # Get CNI sha256 to validate cni plugins in image are from eks-d
 # Use sha from manfiest to validate tar and then generate sha from specific binary
-TMP_CNI="/tmp/eks-image-builder-cni"
+TMP_CNI="$HOME/tmp/eks-image-builder-cni"
 mkdir -p $TMP_CNI
 curl -o $TMP_CNI/cni-plugins.tar.gz "$PLUGINS_ASSET_BASE_URL/$CNI_VERSION/cni-plugins-linux-amd64-$CNI_VERSION.tar.gz"
 echo "$(echo $CNI_SHA | sed -E 's/.*sha256:(.*)$/\1/') $TMP_CNI/cni-plugins.tar.gz" > $TMP_CNI/cni.sha256
 sha256sum -c $TMP_CNI/cni.sha256
 tar -zxvf $TMP_CNI/cni-plugins.tar.gz -C $TMP_CNI ./host-device 
-export CNI_HOST_DEVICE_SHA256="$(sha256sum /tmp/cni/host-device | awk -F ' ' '{print $1}')"
+export CNI_HOST_DEVICE_SHA256="$(sha256sum $TMP_CNI/host-device | awk -F ' ' '{print $1}')"
 rm -rf $TMP_CNI
 
 envsubst '$CNI_SHA:$PLUGINS_ASSET_BASE_URL:$CNI_VERSION:$CNI_HOST_DEVICE_SHA256' \
