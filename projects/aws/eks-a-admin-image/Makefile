@@ -12,12 +12,17 @@ REPO=eks-a-admin-image
 REPO_OWNER=aws
 
 BUILD_TARGETS=validate
-RELEASE_TARGETS=latest-snow-raw-image
+RELEASE_TARGETS=validate-release-manifest-version latest-snow-raw-image
 
 PACKER_VERSION=1.8.0
 
-EKSA_VERSION?=v0.0.0
-EKSA_RELEASE_MANIFEST_URL?=https://dev-release-prod-pdx.s3.us-west-2.amazonaws.com/eks-a-release.yaml
+EKSA_PRODUCTION_ARTIFACTS_BUCKET?=eksa-production-artifacts-bucket
+EKSA_RELEASE_MANIFEST_S3_PATH?=https://$(EKSA_PRODUCTION_ARTIFACTS_BUCKET).s3.amazonaws.com/releases/eks-a/manifest.yaml
+EKSA_RELEASE_MANIFEST_URL?=https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml
+EKSA_VERSION?=$(shell EKSA_RELEASE_MANIFEST_URL=$(EKSA_RELEASE_MANIFEST_URL) ./build/get_latest_eksa_version_by_date.sh)
+
+YQ_VERSION?=v4.28.1
+YQ_URL=https://github.com/mikefarah/yq/releases/download/$(YQ_VERSION)/yq_linux_amd64
 
 FULL_OUTPUT_DIR?=$(MAKE_ROOT)/$(OUTPUT_DIR)
 AMI_OUTPUT_DIR?=$(FULL_OUTPUT_DIR)/ami
@@ -29,8 +34,10 @@ OVA_MANIFEST_PATH?=$(OVA_OUTPUT_DIR)/$(MANIFEST_FILE)
 ARTIFACTS_UPLOAD_PATH?=$(PROJECT_PATH)
 EXPORT_AMI_BUCKET?=$(ARTIFACTS_BUCKET)
 AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)
-EXPORT_AMI_DST=$(AMI_S3_DST)/$(EKSA_VERSION)/$(GIT_HASH)/
+EXPORT_AMI_DST=$(AMI_S3_DST)/$(EKSA_VERSION)/$(which)/
 LATEST_AMI_S3_URL=$(AMI_S3_DST)/$(LATEST)/snow-admin.raw
+
+PROD_AMI_S3_DST=$(EKSA_PRODUCTION_ARTIFACTS_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)
 
 EXPORT_OVA_BUCKET?=$(ARTIFACTS_BUCKET)
 EKSA_ADMIN_PROJECT_PATH?=projects/aws/eks-a-admin-image
@@ -40,7 +47,6 @@ EXCLUDE_FROM_STAGING_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
 PACKER=$(BINARY_DEPS_DIR)/packer
 
 build-%: export PKR_VAR_eks-a-version=$(EKSA_VERSION)
@@ -48,7 +54,7 @@ build-%: export PKR_VAR_eks-a-release-manifest-url=$(EKSA_RELEASE_MANIFEST_URL)
 build-%: export PKR_VAR_build-version=$(shell echo $(GIT_HASH) | cut -c1-7)
 build-%: KUBECTL_URL?=$(shell ./build/get_kubectl_url.sh)
 build-%: export PKR_VAR_kubectl-url=$(KUBECTL_URL)
-
+build-%: export PKR_VAR_yq-url=$(YQ_URL)
 
 $(PACKER): OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
 $(PACKER):
@@ -66,8 +72,11 @@ $(AMI_OUTPUT_DIR): $(FULL_OUTPUT_DIR)
 $(OVA_OUTPUT_DIR): $(FULL_OUTPUT_DIR)
 	mkdir -p $@
 
+.PHONY: validate-release-manifest-version
+validate-release-manifest-version:
+	build/validate-release-manifest-version.sh $(EKSA_RELEASE_MANIFEST_S3_PATH) $(EKSA_RELEASE_MANIFEST_URL)
+
 .PHONY: latest-snow-raw-image
-latest-snow-raw-image: EKSA_VERSION?=$(shell EKSA_RELEASE_MANIFEST_URL=$(EKSA_RELEASE_MANIFEST_URL) ./build/get_latest_eksa_version_by_date.sh)
 latest-snow-raw-image: snow-raw-image
 
 .PHONY: snow-raw-image
@@ -75,12 +84,13 @@ snow-raw-image: build-snow-ami export-to-raw
 
 .PHONY: build-snow-ami
 build-snow-ami: export PKR_VAR_manifest-output=$(AMI_MANIFEST_PATH)
-build-snow-ami: $(PACKER) init clean-ami $(AMI_OUTPUT_DIR)
+build-snow-ami: $(PACKER) init clean-ami $(AMI_OUTPUT_DIR) validate-release-manifest-version
 	$(PACKER) build -only='*.amazon-ebs.*' .
 
 .PHONY: export-to-raw
+export-to-raw: PROD_AMI_S3_DST=$(shell EKSA_RELEASE_MANIFEST_URL=$(EKSA_RELEASE_MANIFEST_URL) EKSA_VERSION=$(EKSA_VERSION) build/get_prod_admin_ami_path.sh)
 export-to-raw:
-	build/export-ami-to-s3.sh $(AMI_OUTPUT_DIR)/$(MANIFEST_FILE) raw $(EXPORT_AMI_DST) $(LATEST_AMI_S3_URL)
+	build/export-ami-to-s3.sh $(AMI_OUTPUT_DIR)/$(MANIFEST_FILE) raw $(EXPORT_AMI_DST) $(PROD_AMI_S3_DST)
 
 .PHONY: build-ova
 build-ova: export PKR_VAR_manifest-output=$(OVA_MANIFEST_PATH)

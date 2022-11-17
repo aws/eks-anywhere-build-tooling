@@ -44,6 +44,11 @@ variable "kind-url" {
   default = "https://github.com/kubernetes-sigs/kind/releases/download/v0.13.0/kind-linux-amd64"
 }
 
+variable "yq-url" {
+  type    = string
+  default = "https://github.com/mikefarah/yq/releases/download/v4.28.1/yq_linux_amd64"
+}
+
 variable "build-version" {
   type    = string
   default = "v0.0.0"
