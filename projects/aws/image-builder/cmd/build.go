@@ -158,7 +158,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			}
 		case builder.AMI:
 			// Default configuration for AMI builds
-			defaultAMIConfig := &builder.AMIConfig{
+			amiConfig := &builder.AMIConfig{
 				AMIFilterName:       builder.DefaultUbuntuAMIFilterName,
 				AMIFilterOwners:     builder.DefaultUbuntuAMIFilterOwners,
 				AMIRegions:          builder.DefaultAMIBuildRegion,
@@ -172,20 +172,22 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				VolumeSize:          builder.DefaultAMIVolumeSize,
 				VolumeType:          builder.DefaultAMIVolumeType,
 			}
-			if err = json.Unmarshal(config, defaultAMIConfig); err != nil {
+			if err = json.Unmarshal(config, amiConfig); err != nil {
 				return err
 			}
-			if bo.AMIConfig.CustomRole == "true" {
-				if (bo.AMIConfig.CustomRoleNameList == nil && bo.AMIConfig.CustomRoleNames == "") ||
-					(bo.AMIConfig.CustomRoleNameList != nil && bo.AMIConfig.CustomRoleNames != "") {
+			if amiConfig.CustomRole == "true" {
+				if (amiConfig.CustomRoleNameList == nil && amiConfig.CustomRoleNames == "") ||
+					(amiConfig.CustomRoleNameList != nil && amiConfig.CustomRoleNames != "") {
 					log.Fatalf("Exactly one of \"custom_role_name_list\" or \"custom_role_names\" must be provided")
 				}
 
-				if bo.AMIConfig.CustomRoleNameList != nil {
-					bo.AMIConfig.CustomRoleNames = strings.Join(bo.AMIConfig.CustomRoleNameList, " ")
-					bo.AMIConfig.CustomRoleNameList = nil
+				if amiConfig.CustomRoleNameList != nil {
+					amiConfig.CustomRoleNames = strings.Join(amiConfig.CustomRoleNameList, " ")
+					amiConfig.CustomRoleNameList = nil
 				}
 			}
+
+			bo.AMIConfig = amiConfig
 		}
 	}
 
