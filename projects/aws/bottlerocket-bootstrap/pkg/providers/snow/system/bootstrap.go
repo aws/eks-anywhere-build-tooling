@@ -26,6 +26,6 @@ func Bootstrap() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Snow bootstrap tasks succeeded")
+	fmt.Println("SUCCESS: Snow bootstrap tasks finished.")
 	os.Exit(0)
 }

@@ -56,11 +56,20 @@ func configureDNI() error {
 		"metadataServiceIP": metadataServiceIP,
 	}
 
-	if err := files.WriteTemplate(netConfigPath, netConfig, val, 0o640); err != nil {
+	b, err := generateNetworkTemplate(val)
+	if err != nil {
+		return errors.Wrap(err, "error generating network template")
+	}
+
+	if err := files.Write(netConfigPath, b, 0o640); err != nil {
 		return errors.Wrapf(err, "error writing network configuration to %s", netConfigPath)
 	}
 
 	return nil
+}
+
+func generateNetworkTemplate(data map[string]interface{}) ([]byte, error) {
+	return files.ExecuteTemplate(netConfig, data)
 }
 
 func dniList() ([]string, error) {
@@ -126,7 +135,7 @@ func httpGet(url string) (string, error) {
 		return "", errors.Wrapf(err, "error sending http GET request to %s", url)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.Errorf("requesting %s returns status code %s", url, resp.StatusCode)
+		return "", errors.Errorf("requesting %s returns status code %d", url, resp.StatusCode)
 	}
 	defer resp.Body.Close()
 

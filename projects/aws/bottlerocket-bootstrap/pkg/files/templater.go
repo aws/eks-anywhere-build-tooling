@@ -2,7 +2,6 @@ package files
 
 import (
 	"bytes"
-	"io/fs"
 	"text/template"
 
 	"github.com/pkg/errors"
@@ -21,12 +20,4 @@ func ExecuteTemplate(content string, data interface{}) ([]byte, error) {
 		return nil, errors.Wrap(err, "Error substituting values for template")
 	}
 	return buf.Bytes(), nil
-}
-
-func WriteTemplate(path, content string, data interface{}, permission fs.FileMode) error {
-	b, err := ExecuteTemplate(content, data)
-	if err != nil {
-		return errors.Wrap(err, "Error executing template")
-	}
-	return Write(path, b, permission)
 }
