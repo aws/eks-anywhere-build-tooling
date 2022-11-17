@@ -1,7 +1,8 @@
-package utils
+package files
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/pkg/errors"
@@ -15,4 +16,9 @@ func CreateSymLink(from, to string) error {
 	}
 
 	return nil
+}
+
+func PathExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }

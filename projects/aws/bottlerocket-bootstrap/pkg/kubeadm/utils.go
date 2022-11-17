@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
@@ -51,8 +52,7 @@ func setHostName(filepath string) error {
 	fileDataStr = strings.ReplaceAll(fileDataStr, "{{ ds.meta_data.hostname }}", hostname)
 
 	// Write the file back
-	err = ioutil.WriteFile(filepath, []byte(fileDataStr), 0640)
-	if err != nil {
+	if err := files.Write(filepath, []byte(fileDataStr), 0o640); err != nil {
 		return errors.Wrap(err, "Error writing file")
 	}
 	fmt.Println("Wrote config file back to kubeadm")

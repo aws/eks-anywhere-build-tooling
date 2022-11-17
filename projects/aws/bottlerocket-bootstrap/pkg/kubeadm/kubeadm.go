@@ -19,7 +19,7 @@ func New(userData *utils.UserData) *kubeadm {
 
 func (k *kubeadm) InitializeDirectories() error {
 	fmt.Println("Initializing directories")
-	err := os.MkdirAll("/.bottlerocket/rootfs/var/lib/kubeadm/pki", 0640)
+	err := os.MkdirAll("/.bottlerocket/rootfs/var/lib/kubeadm/pki", 0o640)
 	if err != nil {
 		return errors.Wrap(err, "error creating directory")
 	}
