@@ -1,6 +1,6 @@
-From a7f19541953f632d2bc0ce30a8b89b03adfb7ee1 Mon Sep 17 00:00:00 2001
-From: "Ostosh, Ivy" <ivyjin@amazon.com>
-Date: Thu, 29 Sep 2022 20:13:33 -0500
+From d28483fb5d37bb36b1ef52b509e235aacb4f8dc8 Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin215@gmail.com>
+Date: Wed, 16 Nov 2022 19:20:35 -0600
 Subject: [PATCH] Add namespace to charts
 
 ---
@@ -59,7 +59,7 @@ index 42ed59a..610179b 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
  data:
 diff --git a/charts/opentelemetry-collector/templates/daemonset.yaml b/charts/opentelemetry-collector/templates/daemonset.yaml
-index 06f4d9e..477ebe1 100644
+index 7582d04..152310a 100644
 --- a/charts/opentelemetry-collector/templates/daemonset.yaml
 +++ b/charts/opentelemetry-collector/templates/daemonset.yaml
 @@ -3,6 +3,7 @@ apiVersion: apps/v1
@@ -69,9 +69,9 @@ index 06f4d9e..477ebe1 100644
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
- spec:
+   {{- with .Values.annotations }}
 diff --git a/charts/opentelemetry-collector/templates/deployment.yaml b/charts/opentelemetry-collector/templates/deployment.yaml
-index 82fa84e..daa915a 100644
+index 23fc529..8475de3 100644
 --- a/charts/opentelemetry-collector/templates/deployment.yaml
 +++ b/charts/opentelemetry-collector/templates/deployment.yaml
 @@ -3,6 +3,7 @@ apiVersion: apps/v1
@@ -81,7 +81,7 @@ index 82fa84e..daa915a 100644
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
-   {{- include "opentelemetry-collector.annotations" . | nindent 2 }}
+   {{- with .Values.annotations }}
 diff --git a/charts/opentelemetry-collector/templates/hpa.yaml b/charts/opentelemetry-collector/templates/hpa.yaml
 index 51f2c84..d0afab1 100644
 --- a/charts/opentelemetry-collector/templates/hpa.yaml
@@ -95,7 +95,7 @@ index 51f2c84..d0afab1 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
  spec:
 diff --git a/charts/opentelemetry-collector/templates/ingress.yaml b/charts/opentelemetry-collector/templates/ingress.yaml
-index 9a60601..9ae999e 100644
+index 202ac37..69894c5 100644
 --- a/charts/opentelemetry-collector/templates/ingress.yaml
 +++ b/charts/opentelemetry-collector/templates/ingress.yaml
 @@ -11,6 +11,7 @@ metadata:
@@ -143,7 +143,7 @@ index 2f2ffe7..d34f70e 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
      {{- range $key, $value := .Values.prometheusRule.extraLabels }}
 diff --git a/charts/opentelemetry-collector/templates/service.yaml b/charts/opentelemetry-collector/templates/service.yaml
-index eeb1178..8dac959 100644
+index caf69d3..c9c5d26 100644
 --- a/charts/opentelemetry-collector/templates/service.yaml
 +++ b/charts/opentelemetry-collector/templates/service.yaml
 @@ -3,6 +3,7 @@ apiVersion: v1
@@ -155,7 +155,7 @@ index eeb1178..8dac959 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
      {{- include "opentelemetry-collector.component" . | nindent 4 }}
 diff --git a/charts/opentelemetry-collector/templates/serviceaccount.yaml b/charts/opentelemetry-collector/templates/serviceaccount.yaml
-index 5daa658..ccbed4e 100644
+index 164bf0e..b01adbe 100644
 --- a/charts/opentelemetry-collector/templates/serviceaccount.yaml
 +++ b/charts/opentelemetry-collector/templates/serviceaccount.yaml
 @@ -3,6 +3,7 @@ apiVersion: v1
@@ -179,7 +179,7 @@ index dae68d2..bfa63d8 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
      {{- range $key, $value := .Values.serviceMonitor.extraLabels }}
 diff --git a/charts/opentelemetry-collector/templates/statefulset.yaml b/charts/opentelemetry-collector/templates/statefulset.yaml
-index 4584165..b329c5b 100644
+index fc4815e..db2e592 100644
 --- a/charts/opentelemetry-collector/templates/statefulset.yaml
 +++ b/charts/opentelemetry-collector/templates/statefulset.yaml
 @@ -3,6 +3,7 @@ apiVersion: apps/v1
@@ -189,9 +189,9 @@ index 4584165..b329c5b 100644
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
-   {{- include "opentelemetry-collector.annotations" . | nindent 2 }}
+   {{- with .Values.annotations }}
 diff --git a/charts/opentelemetry-collector/values.schema.json b/charts/opentelemetry-collector/values.schema.json
-index 9b5eae1..0819c3d 100644
+index 07797f1..c4ac4af 100644
 --- a/charts/opentelemetry-collector/values.schema.json
 +++ b/charts/opentelemetry-collector/values.schema.json
 @@ -35,6 +35,10 @@
@@ -206,7 +206,7 @@ index 9b5eae1..0819c3d 100644
        "type": "string",
        "enum": [
 diff --git a/charts/opentelemetry-collector/values.yaml b/charts/opentelemetry-collector/values.yaml
-index c209222..732b105 100644
+index 2d4b631..af1edde 100644
 --- a/charts/opentelemetry-collector/values.yaml
 +++ b/charts/opentelemetry-collector/values.yaml
 @@ -5,6 +5,7 @@
