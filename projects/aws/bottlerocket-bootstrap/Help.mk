@@ -7,15 +7,19 @@
 
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `bottlerocket-bootstrap` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `bottlerocket-bootstrap bottlerocket-bootstrap-snow` for `linux/amd64 linux/arm64`
 _output/bin/bottlerocket-bootstrap/linux-amd64/bottlerocket-bootstrap: ## Build `_output/bin/bottlerocket-bootstrap/linux-amd64/bottlerocket-bootstrap`
+_output/bin/bottlerocket-bootstrap/linux-amd64/bottlerocket-bootstrap-snow: ## Build `_output/bin/bottlerocket-bootstrap/linux-amd64/bottlerocket-bootstrap-snow`
 _output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap: ## Build `_output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap`
+_output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap-snow: ## Build `_output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap-snow`
 
 ##@ Image Targets
-local-images: ## Builds `bottlerocket-bootstrap/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `bottlerocket-bootstrap/images/push` to IMAGE_REPO
+local-images: ## Builds `bottlerocket-bootstrap/images/amd64 bottlerocket-bootstrap-snow/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `bottlerocket-bootstrap/images/push bottlerocket-bootstrap-snow/images/push` to IMAGE_REPO
 bottlerocket-bootstrap/images/amd64: ## Builds/pushes `bottlerocket-bootstrap/images/amd64`
+bottlerocket-bootstrap-snow/images/amd64: ## Builds/pushes `bottlerocket-bootstrap-snow/images/amd64`
 bottlerocket-bootstrap/images/push: ## Builds/pushes `bottlerocket-bootstrap/images/push`
+bottlerocket-bootstrap-snow/images/push: ## Builds/pushes `bottlerocket-bootstrap-snow/images/push`
 
 ##@ Fetch Binary Targets
 _output/1-21/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/kubernetes/client`
