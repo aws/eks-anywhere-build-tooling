@@ -1,25 +1,26 @@
-From 7c760f587b0625cbe40f612cfadd28ae46b66336 Mon Sep 17 00:00:00 2001
+From ecc3a74d1d2736cff560d36ded75595fbd03f2c0 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Sat, 2 Apr 2022 22:00:37 -0500
 Subject: [PATCH 1/2] Switch to AL2 base image for node image
 
 Signed-off-by: Jackson West <jgw@amazon.com>
+Signed-off-by: Prow Bot <prow@amazonaws.com>
 ---
  images/base/Dockerfile                        | 166 +++++++-----------
  images/base/files/usr/local/bin/clean-install |   9 +-
  2 files changed, 70 insertions(+), 105 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index 5ba03ea7..bad06cd6 100644
+index bbc087ad..a1f0f1f3 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -19,53 +19,25 @@
  
  # start from ubuntu, this image is reasonably small as a starting point
  # for a kubernetes node image, it doesn't contain much we don't need
--ARG BASE_IMAGE=ubuntu:21.10
+-ARG BASE_IMAGE=ubuntu:22.04
 -FROM $BASE_IMAGE as build
-+ARG BASE_IMAGE=ubuntu:21.04
++ARG BASE_IMAGE
 +ARG BUILDER_IMAGE
 +FROM $BASE_IMAGE as base-amd64
 +
@@ -33,27 +34,27 @@ index 5ba03ea7..bad06cd6 100644
  
 -# Configure containerd and runc binaries from kind-ci/containerd-nightlies repository
 -# The repository contains latest stable releases and nightlies built for multiple architectures
--ARG CONTAINERD_VERSION="1.6.4"
--ARG CONTAINERD_BASE_URL="https://github.com/kind-ci/containerd-nightlies/releases/download/containerd-${CONTAINERD_VERSION}"
--ARG CONTAINERD_URL="${CONTAINERD_BASE_URL}/containerd-${CONTAINERD_VERSION}-linux-${TARGETARCH}.tar.gz"
--ARG CONTAINERD_AMD64_SHA256SUM="57d432c144871d3602b174232533619d7613b8453131a4fe30153ba9e2adae76"
--ARG CONTAINERD_ARM64_SHA256SUM="8f566009eca685d4cd4ac351834a88f2c435bf299fe84dde9a975a989d806a2c"
--ARG CONTAINERD_PPC64LE_SHA256SUM="39ba5b1974fb79559d20b1d644734c55505969df0ac67b0dc33a6499b15ba451"
--ARG CONTAINERD_S390X_SHA256SUM="8b7f114ea9dfc6d3042cb31ec70ad7ae8afd3db3ef33ec6856c85b154c9be32e"
+-ARG CONTAINERD_VERSION="1.6.9"
+-ARG CONTAINERD_BASE_URL="https://github.com/kind-ci/containerd-nightlies/releases/download"
+-ARG CONTAINERD_URL="${CONTAINERD_BASE_URL}/containerd-${CONTAINERD_VERSION}/containerd-${CONTAINERD_VERSION}-linux-${TARGETARCH}.tar.gz"
+-ARG CONTAINERD_AMD64_SHA256SUM="9bbc3bb338b7a12c6a1d05e32dcb442d5caf809ca14d96e97822a7cba79d710e"
+-ARG CONTAINERD_ARM64_SHA256SUM="3a4c2e302a00970c1c13ca721ba0d8c10ee08f257a926766655ac2724a68988a"
+-ARG CONTAINERD_PPC64LE_SHA256SUM="69d1b4ab4a56e42d47c6d2d4d58e06e8f3dfc99094e2e40b354879ba97d49bee"
+-ARG CONTAINERD_S390X_SHA256SUM="631eb055a66485b2f6b5903620d265602e30759ac102115a4b3f1cce666475f8"
 -
--ARG RUNC_URL="${CONTAINERD_BASE_URL}/runc.${TARGETARCH}"
--ARG RUNC_AMD64_SHA256SUM="ebe475dc7b5e42f6c8940038582f8a642eab3e7da98693df83e5bd11ae598a1c"
--ARG RUNC_ARM64_SHA256SUM="5f87f14a64563fe9c1822b661e049b7c0e6e038ac12082b6f91b76b751b6eca0"
--ARG RUNC_PPC64LE_SHA256SUM="5ace7abfbca9a20e87567bf0718627f813b4430be398f6c01ca6fe2a0e04a364"
--ARG RUNC_S390X_SHA256SUM="6e7d2c3d3e97df4fb8bcecd0e7b84ccbbba5b401a8c37da90cbd8f4714cf89ee"
+-ARG RUNC_URL="${CONTAINERD_BASE_URL}/containerd-${CONTAINERD_VERSION}/runc.${TARGETARCH}"
+-ARG RUNC_AMD64_SHA256SUM="82710042741bbe86088ac0658c93ff7131f7b5ae68fa3fdea5a362db91c521b5"
+-ARG RUNC_ARM64_SHA256SUM="21924dfdbe8a72589857799ee9a996a24f06972530823bc8f62d13d79efb42af"
+-ARG RUNC_PPC64LE_SHA256SUM="de090ecf7ec9eff774f2b2c50703a01472642dbe38652dad467b621d7f0b0d9e"
+-ARG RUNC_S390X_SHA256SUM="a7fb998a7598d615a816303583ff88ffa3aa2ca6841a59e21474d342c2a453ed"
 -
 -# Configure crictl binary from upstream
--ARG CRICTL_VERSION="v1.24.0"
+-ARG CRICTL_VERSION="v1.25.0"
 -ARG CRICTL_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-${TARGETARCH}.tar.gz"
--ARG CRICTL_AMD64_SHA256SUM="3df4a4306e0554aea4fdc26ecef9eea29a58c8460bebfaca3405799787609880"
--ARG CRICTL_ARM64_SHA256SUM="b6fe172738dfa68ca4c71ade53574e859bf61a3e34d21b305587b1ad4ab28d24"
--ARG CRICTL_PPC64LE_SHA256SUM="586c263678c6d8d543976607ea1732115e622d44993e2bcbed29832370d3a754"
--ARG CRICTL_S390X_SHA256SUM="4e50aabd330ca28d4da8d5cbacb8bd0ab6fcde5f5cfb8a1d2fbe973944085745"
+-ARG CRICTL_AMD64_SHA256SUM="86ab210c007f521ac4cdcbcf0ae3fb2e10923e65f16de83e0e1db191a07f0235"
+-ARG CRICTL_ARM64_SHA256SUM="651c939eca010bbf48cc3932516b194028af0893025f9e366127f5b50ad5c4f4"
+-ARG CRICTL_PPC64LE_SHA256SUM="1b77d1f198c67b2015104eee6fe7690465b8efa4675ea6b4b958c63d60a487e7"
+-ARG CRICTL_S390X_SHA256SUM="6b70ecaae209e196b2b0553e4c5e1b53240d002c88cb05cad442ddd8190d1481"
 -
 -# Configure CNI binaries from upstream
 -ARG CNI_PLUGINS_VERSION="v1.1.1"
@@ -93,7 +94,7 @@ index 5ba03ea7..bad06cd6 100644
 +      conntrack iptables iproute ethtool socat util-linux ebtables kmod \
 +      libseccomp pigz \
        bash ca-certificates curl rsync \
--      nfs-common fuse-overlayfs \
+-      nfs-common fuse-overlayfs open-iscsi \
 -      jq \
 +      nfs-utils \
 +      containerd which tar procps hostname jq lockdev \
@@ -255,5 +256,5 @@ index bfeff602..06de894f 100755
 -   /usr/share/local/*
 +   /usr/share/local/* || true
 -- 
-2.36.1
+2.38.1
 
