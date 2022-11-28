@@ -51,7 +51,7 @@ helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGE
 .PHONY: helm/push
 helm/push: helm/build
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) emissary/crds $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) emissary-ingress/crds $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
