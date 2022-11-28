@@ -1,10 +1,18 @@
-From df519ae4667a52153c7e09651d28a10278d25d25 Mon Sep 17 00:00:00 2001
+From d86e9701a57099d05748ab48f3cf2e5b4f9bedbc Mon Sep 17 00:00:00 2001
 From: jonahjon <jonahjones094@gmail.com>
-Date: Mon, 15 Aug 2022 20:14:37 -0500
-Subject: [PATCH] helm-changes
+Date: Tue, 22 Nov 2022 11:29:05 -0600
+Subject: [PATCH] packages-patch
 
 Signed-off-by: jonahjon <jonahjones094@gmail.com>
 ---
+ charts/crds/.helmignore                       |   23 +
+ charts/crds/Chart.yaml                        |    6 +
+ charts/crds/README.md                         |   11 +
+ charts/crds/templates/_helpers.tpl            |    4 +
+ charts/crds/templates/apiext.yaml             |  180 +
+ charts/crds/templates/crds.yaml               | 3965 +++++++++++++++++
+ charts/crds/templates/namespace.yaml          |    6 +
+ charts/crds/values.yaml                       |   11 +
  charts/emissary-ingress/.gitignore            |    4 -
  .../{Chart.yaml.in => Chart.yaml}             |   31 +-
  charts/emissary-ingress/OWNERS                |   10 -
@@ -24,14 +32,12 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  .../ci.in/tests/manifests/helm-init.yaml      |   18 -
  .../ci.in/tests/manifests/helm2-values.yaml   |    2 -
  .../ci.in/tests/manifests/tls.yaml            |   18 -
- .../emissary-ingress/crds/emissary-crds.yaml  | 3996 +++++++++++++++++
  charts/emissary-ingress/readme.tpl            |   87 -
  charts/emissary-ingress/templates/NOTES.txt   |   14 +-
- .../emissary-ingress/templates/_helpers.tpl   |   18 +-
+ .../emissary-ingress/templates/_helpers.tpl   |   33 +-
  .../templates/admin-service.yaml              |    2 +-
- .../templates/ambassador-agent.yaml           |  277 --
+ .../templates/ambassador-agent.yaml           |  284 --
  charts/emissary-ingress/templates/config.yaml |    2 +-
- .../templates/deployment-apiext.yaml          |   66 +
  .../templates/deployment-canary.yaml          |    4 +-
  .../templates/deployment.yaml                 |    6 +-
  .../templates/exporter-config.yaml            |    2 +-
@@ -47,9 +53,17 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  .../emissary-ingress/templates/service.yaml   |    4 +-
  .../templates/serviceaccount.yaml             |    2 +-
  .../templates/servicemonitor.yaml             |    4 +-
- .../{values.yaml.in => values.yaml}           |   32 +-
- 43 files changed, 4124 insertions(+), 690 deletions(-)
- rename charts/emissary-ingress/{Chart.yaml.in => Chart.yaml} (52%)
+ .../{values.yaml.in => values.yaml}           |   37 +-
+ 49 files changed, 4265 insertions(+), 720 deletions(-)
+ create mode 100644 charts/crds/.helmignore
+ create mode 100644 charts/crds/Chart.yaml
+ create mode 100644 charts/crds/README.md
+ create mode 100644 charts/crds/templates/_helpers.tpl
+ create mode 100644 charts/crds/templates/apiext.yaml
+ create mode 100644 charts/crds/templates/crds.yaml
+ create mode 100644 charts/crds/templates/namespace.yaml
+ create mode 100644 charts/crds/values.yaml
+ rename charts/emissary-ingress/{Chart.yaml.in => Chart.yaml} (56%)
  delete mode 100644 charts/emissary-ingress/OWNERS
  delete mode 100644 charts/emissary-ingress/ci.in/01-psp-values.yaml
  delete mode 100644 charts/emissary-ingress/ci.in/06-hpa-values.yaml
@@ -67,423 +81,277 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  delete mode 100644 charts/emissary-ingress/ci.in/tests/manifests/helm-init.yaml
  delete mode 100644 charts/emissary-ingress/ci.in/tests/manifests/helm2-values.yaml
  delete mode 100644 charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
- create mode 100644 charts/emissary-ingress/crds/emissary-crds.yaml
  delete mode 100644 charts/emissary-ingress/readme.tpl
  delete mode 100644 charts/emissary-ingress/templates/ambassador-agent.yaml
- create mode 100644 charts/emissary-ingress/templates/deployment-apiext.yaml
- rename charts/emissary-ingress/{values.yaml.in => values.yaml} (93%)
+ rename charts/emissary-ingress/{values.yaml.in => values.yaml} (92%)
 
-diff --git a/charts/emissary-ingress/.gitignore b/charts/emissary-ingress/.gitignore
-index d19c5dc9a..42b472400 100644
---- a/charts/emissary-ingress/.gitignore
-+++ b/charts/emissary-ingress/.gitignore
-@@ -1,7 +1,3 @@
--# Generated from .in files
--/Chart.yaml
--/values.yaml
--
- # Generated from values.yaml by kubepack.dev/chart-doc-gen
- /README.md
- 
-diff --git a/charts/emissary-ingress/Chart.yaml.in b/charts/emissary-ingress/Chart.yaml
-similarity index 52%
-rename from charts/emissary-ingress/Chart.yaml.in
-rename to charts/emissary-ingress/Chart.yaml
-index b974e5198..bab4360f7 100644
---- a/charts/emissary-ingress/Chart.yaml.in
-+++ b/charts/emissary-ingress/Chart.yaml
-@@ -1,13 +1,8 @@
- apiVersion: v1
--appVersion: @version@
-+appVersion: v3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
- description: A Helm chart for Emissary Ingress
--name: emissary-ingress
--version: @chartVersion@
--icon: https://www.getambassador.io/images/logo.png
- home: https://www.getambassador.io/
--sources:
--- https://github.com/datawire/ambassador
--- https://github.com/prometheus/statsd_exporter
-+icon: https://www.getambassador.io/images/logo.png
- keywords:
- - api gateway
- - ambassador
-@@ -16,12 +11,16 @@ keywords:
- - emissary
- - emissary ingress
- maintainers:
--- name: flydiverny
--  email: markus@maga.se
--- name: kflynn
--  email: flynn@datawire.io
--- name: nbkrause
--  email: nkrause@datawire.io
--- name: lukeshu
--  email: lukeshu@datawire.io
--engine: gotpl
-+- email: markus@maga.se
-+  name: flydiverny
-+- email: flynn@datawire.io
-+  name: kflynn
-+- email: nkrause@datawire.io
-+  name: nbkrause
-+- email: lukeshu@datawire.io
-+  name: lukeshu
-+name: emissary
-+sources:
-+- https://github.com/datawire/ambassador
-+- https://github.com/prometheus/statsd_exporter
-+version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
-diff --git a/charts/emissary-ingress/OWNERS b/charts/emissary-ingress/OWNERS
-deleted file mode 100644
-index 42543ecf6..000000000
---- a/charts/emissary-ingress/OWNERS
-+++ /dev/null
-@@ -1,10 +0,0 @@
--approvers:
--- flydiverny
--- kflynn
--- nbkrause
--- lukeshu
--reviewers:
--- flydiverny
--- kflynn
--- nbkrause
--- lukeshu
-diff --git a/charts/emissary-ingress/ci.in/01-psp-values.yaml b/charts/emissary-ingress/ci.in/01-psp-values.yaml
-deleted file mode 100644
-index 163be3e84..000000000
---- a/charts/emissary-ingress/ci.in/01-psp-values.yaml
-+++ /dev/null
-@@ -1,41 +0,0 @@
--security:
--  # Security Context for all containers in the pod.
--  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podsecuritycontext-v1-core
--  podSecurityContext:
--    runAsUser: 8888
--  # Security Context for the Ambassador container specifically
--  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#securitycontext-v1-core
--  containerSecurityContext:
--    allowPrivilegeEscalation: false
--  # A basic PodSecurityPolicy to ensure Ambassador is running with appropriate security permissions
--  # https://kubernetes.io/docs/concepts/policy/pod-security-policy/
--  #
--  # A set of reasonable defaults is outlined below. This is not created by default as it should only
--  # be created by a one Release. If you want to use the PodSecurityPolicy in the chart, create it in
--  # the "master" Release and then leave it unset in all others. Set the `rbac.podSecurityPolicies`
--  # in all non-"master" Releases.
--  podSecurityPolicy:
--    # Add AppArmor and Seccomp annotations
--    # https://kubernetes.io/docs/concepts/policy/pod-security-policy/#apparmor
--    annotations:
--      seccomp.security.alpha.kubernetes.io/defaultProfileName: runtime/default
--    spec:
--      seLinux:
--        rule: RunAsAny
--      supplementalGroups:
--        rule: 'MustRunAs'
--        ranges:
--          # Forbid adding the root group.
--          - min: 1
--            max: 65535
--      fsGroup:
--        rule: 'MustRunAs'
--        ranges:
--          # Forbid adding the root group.
--          - min: 1
--            max: 65535
--      privileged: false
--      allowPrivilegeEscalation: false
--      runAsUser:
--        rule: MustRunAsNonRoot
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/06-hpa-values.yaml b/charts/emissary-ingress/ci.in/06-hpa-values.yaml
-deleted file mode 100644
-index 28d953e10..000000000
---- a/charts/emissary-ingress/ci.in/06-hpa-values.yaml
-+++ /dev/null
-@@ -1,9 +0,0 @@
--deploymentStrategy:
--  type: Recreate
--
--service:
--  type: NodePort
--
--autoscaling:
--  enabled: true
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/08-single-namespace-values.yaml b/charts/emissary-ingress/ci.in/08-single-namespace-values.yaml
-deleted file mode 100644
-index 20f7af8fe..000000000
---- a/charts/emissary-ingress/ci.in/08-single-namespace-values.yaml
-+++ /dev/null
-@@ -1,9 +0,0 @@
--service:
--  type: NodePort
--
--deploymentStrategy:
--  type: Recreate
--
--scope:
--  singleNamespace: true
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/09-redis-false-values.yaml b/charts/emissary-ingress/ci.in/09-redis-false-values.yaml
-deleted file mode 100644
-index bdacc851d..000000000
---- a/charts/emissary-ingress/ci.in/09-redis-false-values.yaml
-+++ /dev/null
-@@ -1,10 +0,0 @@
--service:
--  type: NodePort
--
--redis:
--  enabled: false
--  # Annotations for Ambassador Pro's redis instance.
--
--deploymentStrategy:
--  type: Recreate
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/12-daemonset-values.yaml b/charts/emissary-ingress/ci.in/12-daemonset-values.yaml
-deleted file mode 100644
-index 2aa0263e1..000000000
---- a/charts/emissary-ingress/ci.in/12-daemonset-values.yaml
-+++ /dev/null
-@@ -1,9 +0,0 @@
--service:
--  type: NodePort
--
--deploymentStrategy:
--  type: RollingUpdate
--
--daemonSet: true
--
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/14-deployment-labels.yaml b/charts/emissary-ingress/ci.in/14-deployment-labels.yaml
-deleted file mode 100644
-index ef82c41dc..000000000
---- a/charts/emissary-ingress/ci.in/14-deployment-labels.yaml
-+++ /dev/null
-@@ -1,4 +0,0 @@
--deploymentLabels:
--  label: foo
--  label2: bar
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/15-test-resolvers.yaml b/charts/emissary-ingress/ci.in/15-test-resolvers.yaml
-deleted file mode 100644
-index 4471dfb35..000000000
---- a/charts/emissary-ingress/ci.in/15-test-resolvers.yaml
-+++ /dev/null
-@@ -1,12 +0,0 @@
--resolvers:
--  endpoint:
--    create: true
--    name: endpoint-foo
--
--  consul:
--    create: true
--    name: consul-foo
--    spec:
--      address: ${HOST_IP}
--      datacenter: dc1
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/16-test-module.yaml b/charts/emissary-ingress/ci.in/16-test-module.yaml
-deleted file mode 100644
-index 16dc5df31..000000000
---- a/charts/emissary-ingress/ci.in/16-test-module.yaml
-+++ /dev/null
-@@ -1,10 +0,0 @@
--module:
--  lua_scripts: |
--  function envoy_on_response(response_handle)
--    response_handle:headers():add("Lua-Scripts-Enabled", "Processed")
--  end
--
--  ip_allow:
--  - peer: 127.0.0.1
--  - remote: 99.99.0.0/16
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/17-test-canary.yaml b/charts/emissary-ingress/ci.in/17-test-canary.yaml
-deleted file mode 100644
-index 93489c2e2..000000000
---- a/charts/emissary-ingress/ci.in/17-test-canary.yaml
-+++ /dev/null
-@@ -1,7 +0,0 @@
--canary:
--  enabled: true
--  mixPods: true
--  replicaCount: 0
--  envRaw: |
--    - name: AES_LOG_LEVEL
--      value: "debug"
-\ No newline at end of file
-diff --git a/charts/emissary-ingress/ci.in/18-test-progress-deadline.yaml b/charts/emissary-ingress/ci.in/18-test-progress-deadline.yaml
-deleted file mode 100644
-index 1c7f68303..000000000
---- a/charts/emissary-ingress/ci.in/18-test-progress-deadline.yaml
-+++ /dev/null
-@@ -1,3 +0,0 @@
--# configures progressDeadlineSeconds for deployments
--progressDeadlines:
--  ambassador: 800
-\ No newline at end of file
-diff --git a/charts/emissary-ingress/ci.in/19-test-lifecycle-values.yaml b/charts/emissary-ingress/ci.in/19-test-lifecycle-values.yaml
-deleted file mode 100644
-index 54975d9ac..000000000
---- a/charts/emissary-ingress/ci.in/19-test-lifecycle-values.yaml
-+++ /dev/null
-@@ -1,15 +0,0 @@
--deploymentStrategy:
--  type: Recreate
--
--service:
--  type: NodePort
--
--lifecycle:
--  preStop:
--    exec:
--      command:
--        - "sh"
--        - "-c"
--        - "/bin/sleep 3"
--
--createDefaultListeners: true
-diff --git a/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml b/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml
-deleted file mode 100644
-index b2d9205df..000000000
---- a/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml
-+++ /dev/null
-@@ -1,47 +0,0 @@
-----
--apiVersion: getambassador.io/v1
--kind: Mapping
--metadata:
--  name: quote-backend
--spec:
--  prefix: /backend/
--  service: quote
-----
--apiVersion: v1
--kind: Service
--metadata:
--  name: quote
--spec:
--  ports:
--  - name: http
--    port: 80
--    targetPort: 8080
--  selector:
--    app: quote
-----
--apiVersion: apps/v1
--kind: Deployment
--metadata:
--  name: quote
--spec:
--  replicas: 1
--  selector:
--    matchLabels:
--      app: quote
--  strategy:
--    type: RollingUpdate
--  template:
--    metadata:
--      labels:
--        app: quote
--    spec:
--      containers:
--      - name: backend
--        image: datawire/quote:0.4.0
--        ports:
--        - name: http
--          containerPort: 8080
--        resources:
--          limits:
--            cpu: "0.1"
--            memory: 100Mi
-diff --git a/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml b/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml
-deleted file mode 100644
-index 0a1ec852e..000000000
---- a/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml
-+++ /dev/null
-@@ -1,9 +0,0 @@
--#env:
--#  AMBASSADOR_SINGLE_NAMESPACE: true
--#  AMBASSADOR_NO_KUBEWATCH: no_kubewatch
--
--deploymentStrategy:
--  type: Recreate
--
--service:
--  type: NodePort
-diff --git a/charts/emissary-ingress/ci.in/tests/manifests/helm-init.yaml b/charts/emissary-ingress/ci.in/tests/manifests/helm-init.yaml
-deleted file mode 100644
-index 1fcf47dca..000000000
---- a/charts/emissary-ingress/ci.in/tests/manifests/helm-init.yaml
-+++ /dev/null
-@@ -1,18 +0,0 @@
--apiVersion: v1
--kind: ServiceAccount
--metadata:
--  name: tiller
--  namespace: kube-system
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRoleBinding
--metadata:
--  name: tiller
--roleRef:
--  apiGroup: rbac.authorization.k8s.io
--  kind: ClusterRole
--  name: cluster-admin
--subjects:
--  - kind: ServiceAccount
--    name: tiller
--    namespace: kube-system
-diff --git a/charts/emissary-ingress/ci.in/tests/manifests/helm2-values.yaml b/charts/emissary-ingress/ci.in/tests/manifests/helm2-values.yaml
-deleted file mode 100644
-index eb6ea6526..000000000
---- a/charts/emissary-ingress/ci.in/tests/manifests/helm2-values.yaml
-+++ /dev/null
-@@ -1,2 +0,0 @@
--service:
--  type: NodePort
-diff --git a/charts/emissary-ingress/ci.in/tests/manifests/tls.yaml b/charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
-deleted file mode 100644
-index bc25cf664..000000000
---- a/charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
-+++ /dev/null
-@@ -1,18 +0,0 @@
-----
--apiVersion: v1
--data:
--  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNzRENDQVpnQ0NRRHVzSjFYNE54NjJEQU5CZ2txaGtpRzl3MEJBUXNGQURBYU1SZ3dGZ1lEVlFRRERBOWgKYldKaGMzTmhaRzl5TFdObGNuUXdIaGNOTVRreE1qRXpNakV3TXpBNVdoY05NakF4TWpFeU1qRXdNekE1V2pBYQpNUmd3RmdZRFZRUUREQTloYldKaGMzTmhaRzl5TFdObGNuUXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCCkR3QXdnZ0VLQW9JQkFRQzJjcms1OTk0dklURnZpUGNJRjJpd3R0dVdpajFTeUZNSzVpbERieFByMmJCL3RmbDYKcmRwVUFlWkkrMTVDR2VHbi80ZitwRlFXODdwZ2ZvbDhlL3lCSTUvWStpdVIrQUY1bzhQV2h4aHBJdVk3RXdVbgpyT3ZJajcxaUZWa1Q4akRYZW9RWWdKalQ1MWh4SisyelVLZ3VtZDB6L05USEwrQndFbHZ4Z1ZuWlhUdlhsVGFiClBoWloyK3dZdDQvSnozN3lBMHJwNURKeTg5SStQNmVRSmNseUVyWmsvRUNuRFBxTlhDK1VyclVySXBsNkRScHUKdGZWOE9KM3BJZWc2YjBWQi9TQnRPNzFhMThkaXFPclFVREU5MEFOSWJsYWp0ODN5M0FIc29SNytpVGI0QXFvVwpiNG5LcVV1bEQ2QU0xVUg0TzR0SExIM05SemVOL1E1ZUtVb0ZBZ01CQUFFd0RRWUpLb1pJaHZjTkFRRUxCUUFECmdnRUJBQ045b050OVJXT2JOTTBmajg1cm9GUG1zRE1UWElFOU5SNmpDMjV1SGtpY0lnamtGd043NTFkTnQxT0YKZWZLSkFzTDlSWmZUNmVmMUMxOFlnWE1xbTF5Yis0Q1VWWU9RZW96MlgweEdyT1lLZUhPM0hqamNqcXZ1cUxTeApTQ2duVlM1NkhqZU15MzJBNnIxcUhBL1FsYkkraGJFbHN0MVNwYnFSOG95dE9oUzZpNFNWbWxacWxBRkx5WFRRCjZ6Nm5wc25lTmdXMXhkdDN2UkpleXVFWEFZL0Z0eUxmZnkxdk5uODhhTkg2Y2Z2eWJjaHNkaWlRNnVXTnowVGMKeVVodGZUYWFRVjA1d21KZEJ3ZmJndXF0UjFxbXdyNCtzcjA0MEhoQ0pSVmlRUUdHa2VWSVU5ZHFPY0ZkZk5FTQo5NmczU01YWGRrcVhBYzFFb2hZdEthMWwvNTA9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
--  tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdG5LNU9mZmVMeUV4YjRqM0NCZG9zTGJibG9vOVVzaFRDdVlwUTI4VDY5bXdmN1g1CmVxM2FWQUhtU1B0ZVFobmhwLytIL3FSVUZ2TzZZSDZKZkh2OGdTT2YyUG9ya2ZnQmVhUEQxb2NZYVNMbU94TUYKSjZ6cnlJKzlZaFZaRS9JdzEzcUVHSUNZMCtkWWNTZnRzMUNvTHBuZE0velV4eS9nY0JKYjhZRloyVjA3MTVVMgptejRXV2R2c0dMZVB5YzkrOGdOSzZlUXljdlBTUGorbmtDWEpjaEsyWlB4QXB3ejZqVnd2bEs2MUt5S1plZzBhCmJyWDFmRGlkNlNIb09tOUZRZjBnYlR1OVd0ZkhZcWpxMEZBeFBkQURTRzVXbzdmTjh0d0I3S0VlL29rMitBS3EKRm0rSnlxbExwUStnRE5WQitEdUxSeXg5elVjM2pmME9YaWxLQlFJREFRQUJBb0lCQUVOQy9qaDV3Z2E4QlA2cQpqdkFEdVV2VXpoV3N0empxczNyRUtaZzd2aXRvSU9La1V1cEFaOG9xdlJ4UTE0b2xBb1V0OXBRUlB4TUxIYjN2ClNINkZNeXprMWt4bXhtTlUvQzQ5Q3Jqdkt6ZXZieE4rU3BzNjY5NFA1L0RlRCs0RGpyQVI4ZHNhcGIwUmdCQ1AKZU5sdnRlRWdSbVdoSTB5ZndPMXdSMGM4dWNRaE5GcjNNd0lMQ1FES0Zpa2NDSi9GV0FmNXc4ZGFnYnBYTXAxawo3ci9ya1BFcVh6NnRxam04eWZZWlRoaGIwUE5LcSsxOGdkaCtLeTZPL1RnTVZ2d1BLVkIrZUhoQmJZY2R6VGYxCmxia3pVeUFhZmR3VlBTTnhVOWhzSzBqNExWZG83YlVkajZySHNXTlBWcm1Ib1VsUnNjcno2aDhPZlQ0bU9WTi8KRmhtcEhvRUNnWUVBNlVENVlWMUJrWEg4S21WRjhiVGVGVGlTY1IvRGI4TVlRY3NLNzQrNEg5aEFmbjR3d3ZWeQpidi9kL2NsOWZHY0xXN0w1QWM1WWRxNlNWZGFHRVZpVzVOTy8xV0wwN3JjaG8xZTRaSzlPemJiUllNWW51cWRHCmF5eGhoUks0R25ubzZXMTlMWWc1d1F3TUJvUzNSbFVxUWN3UU1ESiszMVc4emwrazdpODk0dVVDZ1lFQXlEMXIKZHVMSGRMcG9UWEd2ZjZIVk9HQ1pWczQvSXg1M1B1WnRXY1FkYkc5MDZNWHRwdldWdDN1ek8rVVd2WGJIWHBSMQpjZWVrUHRucTI4a1BFT2oyd3NoVFRQQ05OT0dUWE01SzREbTVjNjVaeWY0WVJjQ0NZNEpSSUNqWHExeE9uc21nCk8ydTZiYlVQWE9veXFmVllWK0wwK25zcHNLOUNCd0ZaMjJqMXVLRUNnWUVBbzcyZTBzQ2FaTFcxcFRWT3NteWIKY2g0eWZ3TWpPUE9sdFpvSlpUNW9yTUlzRkNBVnJ1YUtuRzAxc3hDYzdKV1JuWiszdVpMVyt3bDFaSmlocU0rZApyYWtRQTRYaUZ5bXJqWFRvMXBWU0pvcnQxSmVHRUR1WTdXZE1WaFJiOVFvYmZMSUZxODd6YkJjKzRkeU1vK3pwCkt5TkxRZXBRc2dzSDdYK3EwaUdMdWhrQ2dZQUlYQWdRZm9jMUtGTVNhSnliQjNhUFUva1MxcWxzSGVsOGhzSXAKN1RZTlFObnduZEsrRmFLYWRsK1ZNSXN5ZmJMMUQ5MlhVOFJYbTJGaXE1SWxjcFJhcldKTTQvNEJKeW12eGl6NgpEMjdlbFhqS0pnRjlaL3dKaTNjM2tIendlbm9OeHYwWmZmWGFmcVNWakhGeEJ2MFpMakJzQkpoSStBZ1pvc1ROCmxDUXVBUUtCZ1FESHVxNUVseU1RS2NZWm5tRlN6T2ZYWXNJYm8rZEJJTlEyNnB0OFdacGMydnpsNkNrQXV3TWwKQU9jRllrbjBXSnVJRXRubnhPT3Rwcnh0VGRIWGIvOWZWY090Unp2TitvVjN2OVNEalZjWTRESWp3MXlpMkt1Vwp6MmV1N1lCNExlbG13TFlHMEJUMWp0ejJJREUxYW85MzgybEpWV2J4Y1dsdHArWTFCRWhkdmc9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
--kind: Secret
--metadata:
--  name: self-signed-cert
--type: kubernetes.io/tls
-----
--apiVersion: getambassador.io/v1
--kind: TLSContext
--metadata:
--  name: tls
--spec:
--  hosts: ["*"]
--  secret: self-signed-cert
--
-diff --git a/charts/emissary-ingress/crds/emissary-crds.yaml b/charts/emissary-ingress/crds/emissary-crds.yaml
+diff --git a/charts/crds/.helmignore b/charts/crds/.helmignore
 new file mode 100644
-index 000000000..8e5f321d8
+index 000000000..0e8a0eb36
 --- /dev/null
-+++ b/charts/emissary-ingress/crds/emissary-crds.yaml
-@@ -0,0 +1,3996 @@
++++ b/charts/crds/.helmignore
+@@ -0,0 +1,23 @@
++# Patterns to ignore when building packages.
++# This supports shell glob matching, relative path matching, and
++# negation (prefixed with !). Only one pattern per line.
++.DS_Store
++# Common VCS dirs
++.git/
++.gitignore
++.bzr/
++.bzrignore
++.hg/
++.hgignore
++.svn/
++# Common backup files
++*.swp
++*.bak
++*.tmp
++*.orig
++*~
++# Various IDEs
++.project
++.idea/
++*.tmproj
++.vscode/
+diff --git a/charts/crds/Chart.yaml b/charts/crds/Chart.yaml
+new file mode 100644
+index 000000000..5b5c4b56a
+--- /dev/null
++++ b/charts/crds/Chart.yaml
+@@ -0,0 +1,6 @@
++apiVersion: v2
++appVersion: v3.3.0
++description: Emissary CRDs
++type: application
++version: 3.3.0-cbf68a7dd53dda13c681af3e19660a5605050839
++name: crds
+diff --git a/charts/crds/README.md b/charts/crds/README.md
+new file mode 100644
+index 000000000..fe60db2a3
+--- /dev/null
++++ b/charts/crds/README.md
+@@ -0,0 +1,11 @@
++# crds
++
++![Version: 0.0.0](https://img.shields.io/badge/Version-0.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v0.0.0](https://img.shields.io/badge/AppVersion-v0.0.0-informational?style=flat-square)
++
++Emissary CRDs
++
++**Homepage:** <https://www.getambassador.io/docs/emissary/>
++
++## Source Code
++
++* <https://github.com/emissary-ingress/emissary>
+diff --git a/charts/crds/templates/_helpers.tpl b/charts/crds/templates/_helpers.tpl
+new file mode 100644
+index 000000000..084b6db5f
+--- /dev/null
++++ b/charts/crds/templates/_helpers.tpl
+@@ -0,0 +1,4 @@
++{{/* Generate image repository path. */}}
++{{- define "image.repository.path" -}}
++{{- .repository }}@{{ .digest -}}
++{{- end -}}
+diff --git a/charts/crds/templates/apiext.yaml b/charts/crds/templates/apiext.yaml
+new file mode 100644
+index 000000000..e82616992
+--- /dev/null
++++ b/charts/crds/templates/apiext.yaml
+@@ -0,0 +1,180 @@
++################################################################################
++# Cluster permissions                                                          #
++################################################################################
++---
++apiVersion: v1
++kind: ServiceAccount
++metadata:
++  name: emissary-apiext
++  namespace: emissary-system
++  labels:
++    app.kubernetes.io/instance: emissary-apiext
++    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
++    app.kubernetes.io/name: emissary-apiext
++    app.kubernetes.io/part-of: emissary-apiext
++---
++apiVersion: rbac.authorization.k8s.io/v1
++kind: ClusterRole
++metadata:
++  name: emissary-apiext
++  labels:
++    app.kubernetes.io/instance: emissary-apiext
++    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
++    app.kubernetes.io/name: emissary-apiext
++    app.kubernetes.io/part-of: emissary-apiext
++rules:
++  - apiGroups: [ "apiextensions.k8s.io" ]
++    resources: [ "customresourcedefinitions" ]
++    verbs: [ "list", "watch" ]
++  - apiGroups: [ "apiextensions.k8s.io" ]
++    resources: [ "customresourcedefinitions" ]
++    resourceNames:
++      - authservices.getambassador.io
++      - consulresolvers.getambassador.io
++      - devportals.getambassador.io
++      - hosts.getambassador.io
++      - kubernetesendpointresolvers.getambassador.io
++      - kubernetesserviceresolvers.getambassador.io
++      - listeners.getambassador.io
++      - logservices.getambassador.io
++      - mappings.getambassador.io
++      - modules.getambassador.io
++      - ratelimitservices.getambassador.io
++      - tcpmappings.getambassador.io
++      - tlscontexts.getambassador.io
++      - tracingservices.getambassador.io
++    verbs: [ "update" ]
++---
++apiVersion: rbac.authorization.k8s.io/v1
++kind: ClusterRoleBinding
++metadata:
++  name: emissary-apiext
++  labels:
++    app.kubernetes.io/instance: emissary-apiext
++    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
++    app.kubernetes.io/name: emissary-apiext
++    app.kubernetes.io/part-of: emissary-apiext
++roleRef:
++  apiGroup: rbac.authorization.k8s.io
++  kind: ClusterRole
++  name: emissary-apiext
++subjects:
++  - kind: ServiceAccount
++    namespace: emissary-system
++    name: emissary-apiext
++---
++################################################################################
++# Namespaced permissions                                                       #
++################################################################################
++---
++apiVersion: rbac.authorization.k8s.io/v1
++kind: Role
++metadata:
++  name: emissary-apiext
++  namespace: emissary-system
++  labels:
++    app.kubernetes.io/instance: emissary-apiext
++    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
++    app.kubernetes.io/name: emissary-apiext
++    app.kubernetes.io/part-of: emissary-apiext
++rules:
++  - apiGroups: [""]
++    resources: ["secrets"]
++    verbs: ["create"]
++  - apiGroups: [""]
++    resources: ["secrets"]
++    resourceNames: ["emissary-ingress-webhook-ca"]
++    verbs: ["get", "update"]
++---
++apiVersion: rbac.authorization.k8s.io/v1
++kind: RoleBinding
++metadata:
++  name: emissary-apiext
++  namespace: emissary-system
++  labels:
++    app.kubernetes.io/instance: emissary-apiext
++    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
++    app.kubernetes.io/name: emissary-apiext
++    app.kubernetes.io/part-of: emissary-apiext
++roleRef:
++  apiGroup: rbac.authorization.k8s.io
++  kind: Role
++  name: emissary-apiext
++subjects:
++- kind: ServiceAccount
++  namespace: emissary-system
++  name: emissary-apiext
++---
++################################################################################
++# Main                                                                         #
++################################################################################
++---
++apiVersion: v1
++kind: Service
++metadata:
++  name: emissary-apiext
++  namespace: emissary-system
++  labels:
++    app.kubernetes.io/instance: emissary-apiext
++    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
++    app.kubernetes.io/name: emissary-apiext
++    app.kubernetes.io/part-of: emissary-apiext
++spec:
++  type: ClusterIP
++  ports:
++    - name: https
++      port: 443
++      targetPort: https
++  selector:
++    app.kubernetes.io/instance: emissary-apiext
++    app.kubernetes.io/name: emissary-apiext
++    app.kubernetes.io/part-of: emissary-apiext
++---
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: emissary-apiext
++  namespace: emissary-system
++  labels:
++    app.kubernetes.io/instance: emissary-apiext
++    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
++    app.kubernetes.io/name: emissary-apiext
++    app.kubernetes.io/part-of: emissary-apiext
++spec:
++  selector:
++    matchLabels:
++      app.kubernetes.io/instance: emissary-apiext
++      app.kubernetes.io/name: emissary-apiext
++      app.kubernetes.io/part-of: emissary-apiext
++  replicas: 2
++  template:
++    metadata:
++      labels:
++        app.kubernetes.io/instance: emissary-apiext
++        app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
++        app.kubernetes.io/name: emissary-apiext
++        app.kubernetes.io/part-of: emissary-apiext
++    spec:
++      serviceAccountName: emissary-apiext
++      containers:
++        - name: emissary-apiext
++          image: {{ .Values.sourceRegistry }}/{{ include "image.repository.path" .Values.image }}
++          imagePullPolicy: Always
++          command: [ "apiext", "emissary-apiext" ]
++          ports:
++            - name: http
++              containerPort: 8080
++            - name: https
++              containerPort: 8443
++          livenessProbe:
++            httpGet:
++              scheme: HTTP
++              path: /probes/live
++              port: 8080
++            initialDelaySeconds: 5
++            periodSeconds: 3
++            failureThreshold: 3
++      {{- with .Values.imagePullSecrets }}
++      imagePullSecrets:
++        {{- toYaml . | nindent 8 }}
++      {{- end }}
+diff --git a/charts/crds/templates/crds.yaml b/charts/crds/templates/crds.yaml
+new file mode 100644
+index 000000000..1b71b25ed
+--- /dev/null
++++ b/charts/crds/templates/crds.yaml
+@@ -0,0 +1,3965 @@
 +# GENERATED FILE: edits made by hand will not be preserved.
 +---
 +apiVersion: apiextensions.k8s.io/v1
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -651,7 +519,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -784,7 +652,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -870,7 +738,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -895,7 +763,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -927,14 +795,14 @@ index 000000000..8e5f321d8
 +    schema:
 +      openAPIV3Schema:
 +        description: "DevPortal is the Schema for the DevPortals API \n DevPortal
-+          resources specify the `what` and `how` is shown in a DevPortal: \n * `what`
-+          is in a DevPortal can be controlled with   - a `selector`, that can be used
-+          for filtering `Mappings`.   - a `docs` listing of (services, url) * `how`
-+          is a pointer to some `contents` (a checkout of a Git repository   with go-templates/markdown/css).
-+          \n Multiple `DevPortal`s can exist in the cluster, and the Dev Portal server
-+          will show them at different endpoints. A `DevPortal` resource with a special
-+          name, `ambassador`, will be used for configuring the default Dev Portal
-+          (served at `/docs/` by default)."
++          resources specify the `what` and `how` is shown in a DevPortal: \n  1. `what`
++          is in a DevPortal can be controlled with \n     - a `selector`, that can
++          be used for filtering `Mappings`. \n     - a `docs` listing of (services,
++          url) \n  2. `how` is a pointer to some `contents` (a checkout of a Git repository
++          \    with go-templates/markdown/css). \n Multiple `DevPortal`s can exist
++          in the cluster, and the Dev Portal server will show them at different endpoints.
++          A `DevPortal` resource with a special name, `ambassador`, will be used for
++          configuring the default Dev Portal (served at `/docs/` by default)."
 +        properties:
 +          apiVersion:
 +            description: 'APIVersion defines the versioned schema of this representation
@@ -1040,14 +908,14 @@ index 000000000..8e5f321d8
 +    schema:
 +      openAPIV3Schema:
 +        description: "DevPortal is the Schema for the DevPortals API \n DevPortal
-+          resources specify the `what` and `how` is shown in a DevPortal: \n * `what`
-+          is in a DevPortal can be controlled with   - a `selector`, that can be used
-+          for filtering `Mappings`.   - a `docs` listing of (services, url) * `how`
-+          is a pointer to some `contents` (a checkout of a Git repository   with go-templates/markdown/css).
-+          \n Multiple `DevPortal`s can exist in the cluster, and the Dev Portal server
-+          will show them at different endpoints. A `DevPortal` resource with a special
-+          name, `ambassador`, will be used for configuring the default Dev Portal
-+          (served at `/docs/` by default)."
++          resources specify the `what` and `how` is shown in a DevPortal: \n  1. `what`
++          is in a DevPortal can be controlled with \n     - a `selector`, that can
++          be used for filtering `Mappings`. \n     - a `docs` listing of (services,
++          url) \n  2. `how` is a pointer to some `contents` (a checkout of a Git repository
++          \    with go-templates/markdown/css). \n Multiple `DevPortal`s can exist
++          in the cluster, and the Dev Portal server will show them at different endpoints.
++          A `DevPortal` resource with a special name, `ambassador`, will be used for
++          configuring the default Dev Portal (served at `/docs/` by default)."
 +        properties:
 +          apiVersion:
 +            description: 'APIVersion defines the versioned schema of this representation
@@ -1067,7 +935,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -1170,7 +1038,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -1400,22 +1268,18 @@ index 000000000..8e5f321d8
 +                    type: string
 +                type: object
 +              tlsSecret:
-+                description: "Name of the Kubernetes secret into which to save generated
++                description: Name of the Kubernetes secret into which to save generated
 +                  certificates.  If ACME is enabled (see $acmeProvider), then the
-+                  default is $hostname; otherwise the default is \"\".  If the value
-+                  is \"\", then we do not do TLS for this Host. \n Note that this
-+                  is a native-Kubernetes-style core.v1.LocalObjectReference, not an
-+                  Ambassador-style `{name}.{namespace}` string.  Because we're opinionated,
-+                  it does not support referencing a Secret in another namespace (because
-+                  most native Kubernetes resources don't support that), but if we
-+                  ever abandon that opinion and decide to support non-local references
-+                  it, it would be by adding a `namespace:` field by changing it from
-+                  a core.v1.LocalObjectReference to a core.v1.SecretReference, not
-+                  by adopting the `{name}.{namespace}` notation."
++                  default is $hostname; otherwise the default is "".  If the value
++                  is "", then we do not do TLS for this Host.
 +                properties:
 +                  name:
-+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-+                      TODO: Add other useful fields. apiVersion, kind, uid?'
++                    description: Name is unique within a namespace to reference a
++                      secret resource.
++                    type: string
++                  namespace:
++                    description: Namespace defines the space within which the secret
++                      name must be unique.
 +                    type: string
 +                type: object
 +            type: object
@@ -1732,22 +1596,18 @@ index 000000000..8e5f321d8
 +                    type: string
 +                type: object
 +              tlsSecret:
-+                description: "Name of the Kubernetes secret into which to save generated
++                description: Name of the Kubernetes secret into which to save generated
 +                  certificates.  If ACME is enabled (see $acmeProvider), then the
-+                  default is $hostname; otherwise the default is \"\".  If the value
-+                  is \"\", then we do not do TLS for this Host. \n Note that this
-+                  is a native-Kubernetes-style core.v1.LocalObjectReference, not an
-+                  Ambassador-style `{name}.{namespace}` string.  Because we're opinionated,
-+                  it does not support referencing a Secret in another namespace (because
-+                  most native Kubernetes resources don't support that), but if we
-+                  ever abandon that opinion and decide to support non-local references
-+                  it, it would be by adding a `namespace:` field by changing it from
-+                  a core.v1.LocalObjectReference to a core.v1.SecretReference, not
-+                  by adopting the `{name}.{namespace}` notation."
++                  default is $hostname; otherwise the default is "".  If the value
++                  is "", then we do not do TLS for this Host.
 +                properties:
 +                  name:
-+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-+                      TODO: Add other useful fields. apiVersion, kind, uid?'
++                    description: Name is unique within a namespace to reference a
++                      secret resource.
++                    type: string
++                  namespace:
++                    description: Namespace defines the space within which the secret
++                      name must be unique.
 +                    type: string
 +                type: object
 +            type: object
@@ -1814,7 +1674,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -1895,7 +1755,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -1919,7 +1779,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -2000,7 +1860,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -2024,7 +1884,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -2085,7 +1945,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -2221,7 +2081,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -2333,7 +2193,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -2399,7 +2259,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -2890,7 +2750,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -3415,7 +3275,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -3502,7 +3362,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -3535,7 +3395,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -3585,6 +3445,10 @@ index 000000000..8e5f321d8
 +            properties:
 +              domain:
 +                type: string
++              failure_mode_deny:
++                description: FailureModeDeny when set to true, envoy will deny traffic
++                  if it is unable to communicate with the rate limit service.
++                type: boolean
 +              protocol_version:
 +                enum:
 +                - v2
@@ -3630,6 +3494,10 @@ index 000000000..8e5f321d8
 +                type: array
 +              domain:
 +                type: string
++              failure_mode_deny:
++                description: FailureModeDeny when set to true, envoy will deny traffic
++                  if it is unable to communicate with the rate limit service.
++                type: boolean
 +              protocol_version:
 +                description: ProtocolVersion is the envoy api transport protocol version
 +                enum:
@@ -3709,7 +3577,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -3832,7 +3700,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -3944,7 +3812,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -4070,7 +3938,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -4139,7 +4007,7 @@ index 000000000..8e5f321d8
 +kind: CustomResourceDefinition
 +metadata:
 +  annotations:
-+    controller-gen.kubebuilder.io/version: 3.0.0-cbf68a7dd53dda13c681af3e19660a5605050839
++    controller-gen.kubebuilder.io/version: v0.6.2
 +  labels:
 +    app.kubernetes.io/instance: emissary-apiext
 +    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
@@ -4240,6 +4108,51 @@ index 000000000..8e5f321d8
 +                items:
 +                  type: string
 +                type: array
++              v3CustomTags:
++                items:
++                  description: TracingCustomTag provides a data structure for capturing
++                    envoy's `type.tracing.v3.CustomTag`
++                  properties:
++                    environment:
++                      description: Environment explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        default_value:
++                          type: string
++                        name:
++                          type: string
++                      required:
++                      - name
++                      type: object
++                    literal:
++                      description: Literal explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        value:
++                          type: string
++                      required:
++                      - value
++                      type: object
++                    request_header:
++                      description: Header explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        default_value:
++                          type: string
++                        name:
++                          type: string
++                      required:
++                      - name
++                      type: object
++                    tag:
++                      type: string
++                  required:
++                  - tag
++                  type: object
++                type: array
 +              v3StatsName:
 +                type: string
 +            required:
@@ -4273,7 +4186,7 @@ index 000000000..8e5f321d8
 +              ambassador_id:
 +                description: "AmbassadorID declares which Ambassador instances should
 +                  pay attention to this resource. If no value is provided, the default
-+                  is: \n    ambassador_id:    - \"default\" \n TODO(lukeshu): In v3alpha2,
++                  is: \n \tambassador_id: \t- \"default\" \n TODO(lukeshu): In v3alpha2,
 +                  consider renaming all of the `ambassador_id` (singular) fields to
 +                  `ambassador_ids` (plural)."
 +                items:
@@ -4311,6 +4224,51 @@ index 000000000..8e5f321d8
 +                  trace_id_128bit:
 +                    type: boolean
 +                type: object
++              custom_tags:
++                items:
++                  description: TracingCustomTag provides a data structure for capturing
++                    envoy's `type.tracing.v3.CustomTag`
++                  properties:
++                    environment:
++                      description: Environment explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        default_value:
++                          type: string
++                        name:
++                          type: string
++                      required:
++                      - name
++                      type: object
++                    literal:
++                      description: Literal explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        value:
++                          type: string
++                      required:
++                      - value
++                      type: object
++                    request_header:
++                      description: Header explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        default_value:
++                          type: string
++                        name:
++                          type: string
++                      required:
++                      - name
++                      type: object
++                    tag:
++                      type: string
++                  required:
++                  - tag
++                  type: object
++                type: array
 +              driver:
 +                enum:
 +                - lightstep
@@ -4331,6 +4289,9 @@ index 000000000..8e5f321d8
 +              stats_name:
 +                type: string
 +              tag_headers:
++                description: 'Deprecated: tag_headers is deprecated. Use custom_tags
++                  instead. `tag_headers: ["header"]` can be defined as `custom_tags:
++                  [{"request_header": {"name": "header"}}]`.'
 +                items:
 +                  type: string
 +                type: array
@@ -4349,131 +4310,433 @@ index 000000000..8e5f321d8
 +        x-kubernetes-preserve-unknown-fields: true
 +    served: false
 +    storage: false
-+---
-+################################################################################
-+# Namespace                                                                    #
-+################################################################################
+diff --git a/charts/crds/templates/namespace.yaml b/charts/crds/templates/namespace.yaml
+new file mode 100644
+index 000000000..f0b1c7eb0
+--- /dev/null
++++ b/charts/crds/templates/namespace.yaml
+@@ -0,0 +1,6 @@
 +---
 +apiVersion: v1
 +kind: Namespace
 +metadata:
 +  name: emissary-system
 +---
-+################################################################################
-+# ServiceAccount                                                               #
-+################################################################################
-+---
-+apiVersion: v1
-+kind: ServiceAccount
-+metadata:
-+  name: emissary-apiext
-+  namespace: emissary-system
-+  labels:
-+    app.kubernetes.io/instance: emissary-apiext
-+    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
-+    app.kubernetes.io/name: emissary-apiext
-+    app.kubernetes.io/part-of: emissary-apiext
-+---
-+################################################################################
-+# Cluster permissions                                                          #
-+################################################################################
-+---
-+apiVersion: rbac.authorization.k8s.io/v1
-+kind: ClusterRole
-+metadata:
-+  name: emissary-apiext
-+  labels:
-+    app.kubernetes.io/instance: emissary-apiext
-+    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
-+    app.kubernetes.io/name: emissary-apiext
-+    app.kubernetes.io/part-of: emissary-apiext
-+rules:
-+  - apiGroups: [ "apiextensions.k8s.io" ]
-+    resources: [ "customresourcedefinitions" ]
-+    verbs: [ "list", "watch" ]
-+  - apiGroups: [ "apiextensions.k8s.io" ]
-+    resources: [ "customresourcedefinitions" ]
-+    resourceNames:
-+      - authservices.getambassador.io
-+      - consulresolvers.getambassador.io
-+      - devportals.getambassador.io
-+      - hosts.getambassador.io
-+      - kubernetesendpointresolvers.getambassador.io
-+      - kubernetesserviceresolvers.getambassador.io
-+      - listeners.getambassador.io
-+      - logservices.getambassador.io
-+      - mappings.getambassador.io
-+      - modules.getambassador.io
-+      - ratelimitservices.getambassador.io
-+      - tcpmappings.getambassador.io
-+      - tlscontexts.getambassador.io
-+      - tracingservices.getambassador.io
-+    verbs: [ "update" ]
-+---
-+apiVersion: rbac.authorization.k8s.io/v1
-+kind: ClusterRoleBinding
-+metadata:
-+  name: emissary-apiext
-+  labels:
-+    app.kubernetes.io/instance: emissary-apiext
-+    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
-+    app.kubernetes.io/name: emissary-apiext
-+    app.kubernetes.io/part-of: emissary-apiext
-+roleRef:
-+  apiGroup: rbac.authorization.k8s.io
-+  kind: ClusterRole
-+  name: emissary-apiext
-+subjects:
-+  - kind: ServiceAccount
-+    namespace: emissary-system
-+    name: emissary-apiext
-+---
-+################################################################################
-+# Namespaced permissions                                                       #
-+################################################################################
-+---
-+apiVersion: rbac.authorization.k8s.io/v1
-+kind: Role
-+metadata:
-+  name: emissary-apiext
-+  namespace: emissary-system
-+  labels:
-+    app.kubernetes.io/instance: emissary-apiext
-+    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
-+    app.kubernetes.io/name: emissary-apiext
-+    app.kubernetes.io/part-of: emissary-apiext
-+rules:
-+  - apiGroups: [""]
-+    resources: ["secrets"]
-+    verbs: ["create"]
-+  - apiGroups: [""]
-+    resources: ["secrets"]
-+    resourceNames: ["emissary-ingress-webhook-ca"]
-+    verbs: ["get", "update"]
-+---
-+apiVersion: rbac.authorization.k8s.io/v1
-+kind: RoleBinding
-+metadata:
-+  name: emissary-apiext
-+  namespace: emissary-system
-+  labels:
-+    app.kubernetes.io/instance: emissary-apiext
-+    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
-+    app.kubernetes.io/name: emissary-apiext
-+    app.kubernetes.io/part-of: emissary-apiext
-+roleRef:
-+  apiGroup: rbac.authorization.k8s.io
-+  kind: Role
-+  name: emissary-apiext
-+subjects:
-+- kind: ServiceAccount
-+  namespace: emissary-system
-+  name: emissary-apiext
-+---
-+################################################################################
-+# Main                                                                         #
-+################################################################################
+diff --git a/charts/crds/values.yaml b/charts/crds/values.yaml
+new file mode 100644
+index 000000000..278971856
+--- /dev/null
++++ b/charts/crds/values.yaml
+@@ -0,0 +1,11 @@
++imagePullSecrets: []
++
++sourceRegistry: "public.ecr.aws/eks-anywhere"
++
++image:
++  # Emissary Ingress ecr repo
++  repository: emissary-ingress/emissary
++  digest: {{emissary-ingress/emissary}}
++  tag:
++  # Pod container image pull policy
++  pullPolicy: IfNotPresent
+diff --git a/charts/emissary-ingress/.gitignore b/charts/emissary-ingress/.gitignore
+index d19c5dc9a..42b472400 100644
+--- a/charts/emissary-ingress/.gitignore
++++ b/charts/emissary-ingress/.gitignore
+@@ -1,7 +1,3 @@
+-# Generated from .in files
+-/Chart.yaml
+-/values.yaml
+-
+ # Generated from values.yaml by kubepack.dev/chart-doc-gen
+ /README.md
+ 
+diff --git a/charts/emissary-ingress/Chart.yaml.in b/charts/emissary-ingress/Chart.yaml
+similarity index 56%
+rename from charts/emissary-ingress/Chart.yaml.in
+rename to charts/emissary-ingress/Chart.yaml
+index b974e5198..82c14cc03 100644
+--- a/charts/emissary-ingress/Chart.yaml.in
++++ b/charts/emissary-ingress/Chart.yaml
+@@ -1,13 +1,8 @@
+ apiVersion: v1
+-appVersion: @version@
++appVersion: v3.3.0
+ description: A Helm chart for Emissary Ingress
+-name: emissary-ingress
+-version: @chartVersion@
+-icon: https://www.getambassador.io/images/logo.png
+ home: https://www.getambassador.io/
+-sources:
+-- https://github.com/datawire/ambassador
+-- https://github.com/prometheus/statsd_exporter
++icon: https://www.getambassador.io/images/logo.png
+ keywords:
+ - api gateway
+ - ambassador
+@@ -16,12 +11,16 @@ keywords:
+ - emissary
+ - emissary ingress
+ maintainers:
+-- name: flydiverny
+-  email: markus@maga.se
+-- name: kflynn
+-  email: flynn@datawire.io
+-- name: nbkrause
+-  email: nkrause@datawire.io
+-- name: lukeshu
+-  email: lukeshu@datawire.io
+-engine: gotpl
++- email: markus@maga.se
++  name: flydiverny
++- email: flynn@datawire.io
++  name: kflynn
++- email: nkrause@datawire.io
++  name: nbkrause
++- email: lukeshu@datawire.io
++  name: lukeshu
++name: emissary
++sources:
++- https://github.com/datawire/ambassador
++- https://github.com/prometheus/statsd_exporter
++version: 3.3.0-cbf68a7dd53dda13c681af3e19660a5605050839
+diff --git a/charts/emissary-ingress/OWNERS b/charts/emissary-ingress/OWNERS
+deleted file mode 100644
+index 42543ecf6..000000000
+--- a/charts/emissary-ingress/OWNERS
++++ /dev/null
+@@ -1,10 +0,0 @@
+-approvers:
+-- flydiverny
+-- kflynn
+-- nbkrause
+-- lukeshu
+-reviewers:
+-- flydiverny
+-- kflynn
+-- nbkrause
+-- lukeshu
+diff --git a/charts/emissary-ingress/ci.in/01-psp-values.yaml b/charts/emissary-ingress/ci.in/01-psp-values.yaml
+deleted file mode 100644
+index 163be3e84..000000000
+--- a/charts/emissary-ingress/ci.in/01-psp-values.yaml
++++ /dev/null
+@@ -1,41 +0,0 @@
+-security:
+-  # Security Context for all containers in the pod.
+-  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#podsecuritycontext-v1-core
+-  podSecurityContext:
+-    runAsUser: 8888
+-  # Security Context for the Ambassador container specifically
+-  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#securitycontext-v1-core
+-  containerSecurityContext:
+-    allowPrivilegeEscalation: false
+-  # A basic PodSecurityPolicy to ensure Ambassador is running with appropriate security permissions
+-  # https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+-  #
+-  # A set of reasonable defaults is outlined below. This is not created by default as it should only
+-  # be created by a one Release. If you want to use the PodSecurityPolicy in the chart, create it in
+-  # the "master" Release and then leave it unset in all others. Set the `rbac.podSecurityPolicies`
+-  # in all non-"master" Releases.
+-  podSecurityPolicy:
+-    # Add AppArmor and Seccomp annotations
+-    # https://kubernetes.io/docs/concepts/policy/pod-security-policy/#apparmor
+-    annotations:
+-      seccomp.security.alpha.kubernetes.io/defaultProfileName: runtime/default
+-    spec:
+-      seLinux:
+-        rule: RunAsAny
+-      supplementalGroups:
+-        rule: 'MustRunAs'
+-        ranges:
+-          # Forbid adding the root group.
+-          - min: 1
+-            max: 65535
+-      fsGroup:
+-        rule: 'MustRunAs'
+-        ranges:
+-          # Forbid adding the root group.
+-          - min: 1
+-            max: 65535
+-      privileged: false
+-      allowPrivilegeEscalation: false
+-      runAsUser:
+-        rule: MustRunAsNonRoot
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/06-hpa-values.yaml b/charts/emissary-ingress/ci.in/06-hpa-values.yaml
+deleted file mode 100644
+index 28d953e10..000000000
+--- a/charts/emissary-ingress/ci.in/06-hpa-values.yaml
++++ /dev/null
+@@ -1,9 +0,0 @@
+-deploymentStrategy:
+-  type: Recreate
+-
+-service:
+-  type: NodePort
+-
+-autoscaling:
+-  enabled: true
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/08-single-namespace-values.yaml b/charts/emissary-ingress/ci.in/08-single-namespace-values.yaml
+deleted file mode 100644
+index 20f7af8fe..000000000
+--- a/charts/emissary-ingress/ci.in/08-single-namespace-values.yaml
++++ /dev/null
+@@ -1,9 +0,0 @@
+-service:
+-  type: NodePort
+-
+-deploymentStrategy:
+-  type: Recreate
+-
+-scope:
+-  singleNamespace: true
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/09-redis-false-values.yaml b/charts/emissary-ingress/ci.in/09-redis-false-values.yaml
+deleted file mode 100644
+index bdacc851d..000000000
+--- a/charts/emissary-ingress/ci.in/09-redis-false-values.yaml
++++ /dev/null
+@@ -1,10 +0,0 @@
+-service:
+-  type: NodePort
+-
+-redis:
+-  enabled: false
+-  # Annotations for Ambassador Pro's redis instance.
+-
+-deploymentStrategy:
+-  type: Recreate
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/12-daemonset-values.yaml b/charts/emissary-ingress/ci.in/12-daemonset-values.yaml
+deleted file mode 100644
+index 2aa0263e1..000000000
+--- a/charts/emissary-ingress/ci.in/12-daemonset-values.yaml
++++ /dev/null
+@@ -1,9 +0,0 @@
+-service:
+-  type: NodePort
+-
+-deploymentStrategy:
+-  type: RollingUpdate
+-
+-daemonSet: true
+-
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/14-deployment-labels.yaml b/charts/emissary-ingress/ci.in/14-deployment-labels.yaml
+deleted file mode 100644
+index ef82c41dc..000000000
+--- a/charts/emissary-ingress/ci.in/14-deployment-labels.yaml
++++ /dev/null
+@@ -1,4 +0,0 @@
+-deploymentLabels:
+-  label: foo
+-  label2: bar
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/15-test-resolvers.yaml b/charts/emissary-ingress/ci.in/15-test-resolvers.yaml
+deleted file mode 100644
+index 4471dfb35..000000000
+--- a/charts/emissary-ingress/ci.in/15-test-resolvers.yaml
++++ /dev/null
+@@ -1,12 +0,0 @@
+-resolvers:
+-  endpoint:
+-    create: true
+-    name: endpoint-foo
+-
+-  consul:
+-    create: true
+-    name: consul-foo
+-    spec:
+-      address: ${HOST_IP}
+-      datacenter: dc1
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/16-test-module.yaml b/charts/emissary-ingress/ci.in/16-test-module.yaml
+deleted file mode 100644
+index 16dc5df31..000000000
+--- a/charts/emissary-ingress/ci.in/16-test-module.yaml
++++ /dev/null
+@@ -1,10 +0,0 @@
+-module:
+-  lua_scripts: |
+-  function envoy_on_response(response_handle)
+-    response_handle:headers():add("Lua-Scripts-Enabled", "Processed")
+-  end
+-
+-  ip_allow:
+-  - peer: 127.0.0.1
+-  - remote: 99.99.0.0/16
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/17-test-canary.yaml b/charts/emissary-ingress/ci.in/17-test-canary.yaml
+deleted file mode 100644
+index 93489c2e2..000000000
+--- a/charts/emissary-ingress/ci.in/17-test-canary.yaml
++++ /dev/null
+@@ -1,7 +0,0 @@
+-canary:
+-  enabled: true
+-  mixPods: true
+-  replicaCount: 0
+-  envRaw: |
+-    - name: AES_LOG_LEVEL
+-      value: "debug"
 \ No newline at end of file
+diff --git a/charts/emissary-ingress/ci.in/18-test-progress-deadline.yaml b/charts/emissary-ingress/ci.in/18-test-progress-deadline.yaml
+deleted file mode 100644
+index 1c7f68303..000000000
+--- a/charts/emissary-ingress/ci.in/18-test-progress-deadline.yaml
++++ /dev/null
+@@ -1,3 +0,0 @@
+-# configures progressDeadlineSeconds for deployments
+-progressDeadlines:
+-  ambassador: 800
+\ No newline at end of file
+diff --git a/charts/emissary-ingress/ci.in/19-test-lifecycle-values.yaml b/charts/emissary-ingress/ci.in/19-test-lifecycle-values.yaml
+deleted file mode 100644
+index 54975d9ac..000000000
+--- a/charts/emissary-ingress/ci.in/19-test-lifecycle-values.yaml
++++ /dev/null
+@@ -1,15 +0,0 @@
+-deploymentStrategy:
+-  type: Recreate
+-
+-service:
+-  type: NodePort
+-
+-lifecycle:
+-  preStop:
+-    exec:
+-      command:
+-        - "sh"
+-        - "-c"
+-        - "/bin/sleep 3"
+-
+-createDefaultListeners: true
+diff --git a/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml b/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml
+deleted file mode 100644
+index b2d9205df..000000000
+--- a/charts/emissary-ingress/ci.in/tests/manifests/backend.yaml
++++ /dev/null
+@@ -1,47 +0,0 @@
+----
+-apiVersion: getambassador.io/v1
+-kind: Mapping
+-metadata:
+-  name: quote-backend
+-spec:
+-  prefix: /backend/
+-  service: quote
+----
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  name: quote
+-spec:
+-  ports:
+-  - name: http
+-    port: 80
+-    targetPort: 8080
+-  selector:
+-    app: quote
+----
+-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  name: quote
+-spec:
+-  replicas: 1
+-  selector:
+-    matchLabels:
+-      app: quote
+-  strategy:
+-    type: RollingUpdate
+-  template:
+-    metadata:
+-      labels:
+-        app: quote
+-    spec:
+-      containers:
+-      - name: backend
+-        image: datawire/quote:0.4.0
+-        ports:
+-        - name: http
+-          containerPort: 8080
+-        resources:
+-          limits:
+-            cpu: "0.1"
+-            memory: 100Mi
+diff --git a/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml b/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml
+deleted file mode 100644
+index 0a1ec852e..000000000
+--- a/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml
++++ /dev/null
+@@ -1,9 +0,0 @@
+-#env:
+-#  AMBASSADOR_SINGLE_NAMESPACE: true
+-#  AMBASSADOR_NO_KUBEWATCH: no_kubewatch
+-
+-deploymentStrategy:
+-  type: Recreate
+-
+-service:
+-  type: NodePort
+diff --git a/charts/emissary-ingress/ci.in/tests/manifests/helm-init.yaml b/charts/emissary-ingress/ci.in/tests/manifests/helm-init.yaml
+deleted file mode 100644
+index 1fcf47dca..000000000
+--- a/charts/emissary-ingress/ci.in/tests/manifests/helm-init.yaml
++++ /dev/null
+@@ -1,18 +0,0 @@
+-apiVersion: v1
+-kind: ServiceAccount
+-metadata:
+-  name: tiller
+-  namespace: kube-system
+----
+-apiVersion: rbac.authorization.k8s.io/v1
+-kind: ClusterRoleBinding
+-metadata:
+-  name: tiller
+-roleRef:
+-  apiGroup: rbac.authorization.k8s.io
+-  kind: ClusterRole
+-  name: cluster-admin
+-subjects:
+-  - kind: ServiceAccount
+-    name: tiller
+-    namespace: kube-system
+diff --git a/charts/emissary-ingress/ci.in/tests/manifests/helm2-values.yaml b/charts/emissary-ingress/ci.in/tests/manifests/helm2-values.yaml
+deleted file mode 100644
+index eb6ea6526..000000000
+--- a/charts/emissary-ingress/ci.in/tests/manifests/helm2-values.yaml
++++ /dev/null
+@@ -1,2 +0,0 @@
+-service:
+-  type: NodePort
+diff --git a/charts/emissary-ingress/ci.in/tests/manifests/tls.yaml b/charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
+deleted file mode 100644
+index bc25cf664..000000000
+--- a/charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
++++ /dev/null
+@@ -1,18 +0,0 @@
+----
+-apiVersion: v1
+-data:
+-  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNzRENDQVpnQ0NRRHVzSjFYNE54NjJEQU5CZ2txaGtpRzl3MEJBUXNGQURBYU1SZ3dGZ1lEVlFRRERBOWgKYldKaGMzTmhaRzl5TFdObGNuUXdIaGNOTVRreE1qRXpNakV3TXpBNVdoY05NakF4TWpFeU1qRXdNekE1V2pBYQpNUmd3RmdZRFZRUUREQTloYldKaGMzTmhaRzl5TFdObGNuUXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCCkR3QXdnZ0VLQW9JQkFRQzJjcms1OTk0dklURnZpUGNJRjJpd3R0dVdpajFTeUZNSzVpbERieFByMmJCL3RmbDYKcmRwVUFlWkkrMTVDR2VHbi80ZitwRlFXODdwZ2ZvbDhlL3lCSTUvWStpdVIrQUY1bzhQV2h4aHBJdVk3RXdVbgpyT3ZJajcxaUZWa1Q4akRYZW9RWWdKalQ1MWh4SisyelVLZ3VtZDB6L05USEwrQndFbHZ4Z1ZuWlhUdlhsVGFiClBoWloyK3dZdDQvSnozN3lBMHJwNURKeTg5SStQNmVRSmNseUVyWmsvRUNuRFBxTlhDK1VyclVySXBsNkRScHUKdGZWOE9KM3BJZWc2YjBWQi9TQnRPNzFhMThkaXFPclFVREU5MEFOSWJsYWp0ODN5M0FIc29SNytpVGI0QXFvVwpiNG5LcVV1bEQ2QU0xVUg0TzR0SExIM05SemVOL1E1ZUtVb0ZBZ01CQUFFd0RRWUpLb1pJaHZjTkFRRUxCUUFECmdnRUJBQ045b050OVJXT2JOTTBmajg1cm9GUG1zRE1UWElFOU5SNmpDMjV1SGtpY0lnamtGd043NTFkTnQxT0YKZWZLSkFzTDlSWmZUNmVmMUMxOFlnWE1xbTF5Yis0Q1VWWU9RZW96MlgweEdyT1lLZUhPM0hqamNqcXZ1cUxTeApTQ2duVlM1NkhqZU15MzJBNnIxcUhBL1FsYkkraGJFbHN0MVNwYnFSOG95dE9oUzZpNFNWbWxacWxBRkx5WFRRCjZ6Nm5wc25lTmdXMXhkdDN2UkpleXVFWEFZL0Z0eUxmZnkxdk5uODhhTkg2Y2Z2eWJjaHNkaWlRNnVXTnowVGMKeVVodGZUYWFRVjA1d21KZEJ3ZmJndXF0UjFxbXdyNCtzcjA0MEhoQ0pSVmlRUUdHa2VWSVU5ZHFPY0ZkZk5FTQo5NmczU01YWGRrcVhBYzFFb2hZdEthMWwvNTA9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+-  tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdG5LNU9mZmVMeUV4YjRqM0NCZG9zTGJibG9vOVVzaFRDdVlwUTI4VDY5bXdmN1g1CmVxM2FWQUhtU1B0ZVFobmhwLytIL3FSVUZ2TzZZSDZKZkh2OGdTT2YyUG9ya2ZnQmVhUEQxb2NZYVNMbU94TUYKSjZ6cnlJKzlZaFZaRS9JdzEzcUVHSUNZMCtkWWNTZnRzMUNvTHBuZE0velV4eS9nY0JKYjhZRloyVjA3MTVVMgptejRXV2R2c0dMZVB5YzkrOGdOSzZlUXljdlBTUGorbmtDWEpjaEsyWlB4QXB3ejZqVnd2bEs2MUt5S1plZzBhCmJyWDFmRGlkNlNIb09tOUZRZjBnYlR1OVd0ZkhZcWpxMEZBeFBkQURTRzVXbzdmTjh0d0I3S0VlL29rMitBS3EKRm0rSnlxbExwUStnRE5WQitEdUxSeXg5elVjM2pmME9YaWxLQlFJREFRQUJBb0lCQUVOQy9qaDV3Z2E4QlA2cQpqdkFEdVV2VXpoV3N0empxczNyRUtaZzd2aXRvSU9La1V1cEFaOG9xdlJ4UTE0b2xBb1V0OXBRUlB4TUxIYjN2ClNINkZNeXprMWt4bXhtTlUvQzQ5Q3Jqdkt6ZXZieE4rU3BzNjY5NFA1L0RlRCs0RGpyQVI4ZHNhcGIwUmdCQ1AKZU5sdnRlRWdSbVdoSTB5ZndPMXdSMGM4dWNRaE5GcjNNd0lMQ1FES0Zpa2NDSi9GV0FmNXc4ZGFnYnBYTXAxawo3ci9ya1BFcVh6NnRxam04eWZZWlRoaGIwUE5LcSsxOGdkaCtLeTZPL1RnTVZ2d1BLVkIrZUhoQmJZY2R6VGYxCmxia3pVeUFhZmR3VlBTTnhVOWhzSzBqNExWZG83YlVkajZySHNXTlBWcm1Ib1VsUnNjcno2aDhPZlQ0bU9WTi8KRmhtcEhvRUNnWUVBNlVENVlWMUJrWEg4S21WRjhiVGVGVGlTY1IvRGI4TVlRY3NLNzQrNEg5aEFmbjR3d3ZWeQpidi9kL2NsOWZHY0xXN0w1QWM1WWRxNlNWZGFHRVZpVzVOTy8xV0wwN3JjaG8xZTRaSzlPemJiUllNWW51cWRHCmF5eGhoUks0R25ubzZXMTlMWWc1d1F3TUJvUzNSbFVxUWN3UU1ESiszMVc4emwrazdpODk0dVVDZ1lFQXlEMXIKZHVMSGRMcG9UWEd2ZjZIVk9HQ1pWczQvSXg1M1B1WnRXY1FkYkc5MDZNWHRwdldWdDN1ek8rVVd2WGJIWHBSMQpjZWVrUHRucTI4a1BFT2oyd3NoVFRQQ05OT0dUWE01SzREbTVjNjVaeWY0WVJjQ0NZNEpSSUNqWHExeE9uc21nCk8ydTZiYlVQWE9veXFmVllWK0wwK25zcHNLOUNCd0ZaMjJqMXVLRUNnWUVBbzcyZTBzQ2FaTFcxcFRWT3NteWIKY2g0eWZ3TWpPUE9sdFpvSlpUNW9yTUlzRkNBVnJ1YUtuRzAxc3hDYzdKV1JuWiszdVpMVyt3bDFaSmlocU0rZApyYWtRQTRYaUZ5bXJqWFRvMXBWU0pvcnQxSmVHRUR1WTdXZE1WaFJiOVFvYmZMSUZxODd6YkJjKzRkeU1vK3pwCkt5TkxRZXBRc2dzSDdYK3EwaUdMdWhrQ2dZQUlYQWdRZm9jMUtGTVNhSnliQjNhUFUva1MxcWxzSGVsOGhzSXAKN1RZTlFObnduZEsrRmFLYWRsK1ZNSXN5ZmJMMUQ5MlhVOFJYbTJGaXE1SWxjcFJhcldKTTQvNEJKeW12eGl6NgpEMjdlbFhqS0pnRjlaL3dKaTNjM2tIendlbm9OeHYwWmZmWGFmcVNWakhGeEJ2MFpMakJzQkpoSStBZ1pvc1ROCmxDUXVBUUtCZ1FESHVxNUVseU1RS2NZWm5tRlN6T2ZYWXNJYm8rZEJJTlEyNnB0OFdacGMydnpsNkNrQXV3TWwKQU9jRllrbjBXSnVJRXRubnhPT3Rwcnh0VGRIWGIvOWZWY090Unp2TitvVjN2OVNEalZjWTRESWp3MXlpMkt1Vwp6MmV1N1lCNExlbG13TFlHMEJUMWp0ejJJREUxYW85MzgybEpWV2J4Y1dsdHArWTFCRWhkdmc9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+-kind: Secret
+-metadata:
+-  name: self-signed-cert
+-type: kubernetes.io/tls
+----
+-apiVersion: getambassador.io/v1
+-kind: TLSContext
+-metadata:
+-  name: tls
+-spec:
+-  hosts: ["*"]
+-  secret: self-signed-cert
+-
 diff --git a/charts/emissary-ingress/readme.tpl b/charts/emissary-ingress/readme.tpl
 deleted file mode 100644
 index cf5e60609..000000000
@@ -4599,7 +4862,7 @@ index dbcfc7c93..b8ecadd70 100644
    kubectl port-forward $POD_NAME 8080:80
  {{- end }}
 diff --git a/charts/emissary-ingress/templates/_helpers.tpl b/charts/emissary-ingress/templates/_helpers.tpl
-index 35bb75791..a017c4ce1 100644
+index 78dda417b..23bd122ef 100644
 --- a/charts/emissary-ingress/templates/_helpers.tpl
 +++ b/charts/emissary-ingress/templates/_helpers.tpl
 @@ -78,18 +78,6 @@ disabled if fullImageOverride is present
@@ -4621,16 +4884,32 @@ index 35bb75791..a017c4ce1 100644
  {{/*
  Create chart name and version as used by the chart label.
  */}}
-@@ -125,3 +113,9 @@ Define the http port of the Ambassador service
+@@ -126,22 +114,7 @@ Define the http port of the Ambassador service
  {{- end -}}
  {{- end -}}
- {{- end -}}
-+
-+
+ 
+-{{/*
+-Set the image that should be used for the agent.
+-Use agent.repository and agent.tag if present,
+-Then use fullImageOverride if present,
+-Then if the image repository is explicitly set, use "repository:image"
+-*/}}
+-{{- define "agent.image" -}}
+-
+-{{- if .Values.agent.image.repository -}}
+-    {{- printf "%s:%s" .Values.agent.image.repository .Values.agent.image.tag -}}
+-{{- else if .Values.image.fullImageOverride -}}
+-    {{- .Values.image.fullImageOverride }}
+-{{- else if hasKey .Values.image "repository" -}}
+-    {{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
+-{{- else -}}
+-    {{- printf "%s:%s" "docker.io/emissaryingress/emissary" .Values.image.tag -}}
+-{{- end -}}
+-
 +{{/* Generate image repository path. */}}
 +{{- define "image.repository.path" -}}
 +{{- .repository }}@{{ .digest -}}
-+{{- end -}}
+ {{- end -}}
 diff --git a/charts/emissary-ingress/templates/admin-service.yaml b/charts/emissary-ingress/templates/admin-service.yaml
 index 77f628459..6b32df2e8 100644
 --- a/charts/emissary-ingress/templates/admin-service.yaml
@@ -4646,10 +4925,10 @@ index 77f628459..6b32df2e8 100644
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/ambassador-agent.yaml b/charts/emissary-ingress/templates/ambassador-agent.yaml
 deleted file mode 100644
-index d94f4b6cb..000000000
+index 1c06cd360..000000000
 --- a/charts/emissary-ingress/templates/ambassador-agent.yaml
 +++ /dev/null
-@@ -1,277 +0,0 @@
+@@ -1,284 +0,0 @@
 -{{- if .Values.agent.enabled }}
 -{{- $allowAgent := false -}}
 -
@@ -4717,6 +4996,9 @@ index d94f4b6cb..000000000
 -- apiGroups: [""]
 -  resources: [ "configmaps" ]
 -  verbs: [ "get", "list", "watch" ]
+-- apiGroups: [""]
+-  resources: [ "secrets"]
+-  verbs: [ "get", "create", "delete", "patch", "watch"]
 ----
 -apiVersion: rbac.authorization.k8s.io/v1
 -kind: ClusterRoleBinding
@@ -4875,7 +5157,7 @@ index d94f4b6cb..000000000
 -      serviceAccountName: {{ include "ambassador.fullname" . }}-agent
 -      containers:
 -      - name: agent
--        image: {{ include "ambassador.image" . }}
+-        image: {{ include "agent.image" . }}
 -        imagePullPolicy: {{ .Values.image.pullPolicy }}
 -        command: [ "agent" ]
 -        ports:
@@ -4892,6 +5174,10 @@ index d94f4b6cb..000000000
 -          value: {{ .Values.agent.rpcAddress }}
 -        - name: AES_SNAPSHOT_URL
 -          value: "http://{{ include "ambassador.fullname" . }}-admin.{{ include "ambassador.namespace" . }}:{{ .Values.adminService.snapshotPort }}/snapshot-external"
+-        - name: AES_REPORT_DIAGNOSTICS_TO_CLOUD
+-          value: {{ .Values.agent.reportDiagnostics | quote }}
+-        - name: AES_DIAGNOSTICS_URL
+-          value: "http://{{ include "ambassador.fullname" . }}-admin.{{ include "ambassador.namespace" . }}:{{ .Values.adminService.port }}/ambassador/v0/diag/?json=true"
 -  {{ if .Values.progressDeadlines }}
 -  {{ if hasKey .Values.progressDeadlines "agent" }}
 -  progressDeadlineSeconds: {{ .Values.progressDeadlines.agent }}
@@ -4940,79 +5226,6 @@ index cd6184dde..4ba1c911a 100644
    labels:
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
-diff --git a/charts/emissary-ingress/templates/deployment-apiext.yaml b/charts/emissary-ingress/templates/deployment-apiext.yaml
-new file mode 100644
-index 000000000..07b9ec3ed
---- /dev/null
-+++ b/charts/emissary-ingress/templates/deployment-apiext.yaml
-@@ -0,0 +1,66 @@
-+---
-+apiVersion: v1
-+kind: Service
-+metadata:
-+  name: emissary-apiext
-+  namespace: emissary-system
-+  labels:
-+    app.kubernetes.io/instance: emissary-apiext
-+    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
-+    app.kubernetes.io/name: emissary-apiext
-+    app.kubernetes.io/part-of: emissary-apiext
-+spec:
-+  type: ClusterIP
-+  ports:
-+    - name: https
-+      port: 443
-+      targetPort: https
-+  selector:
-+    app.kubernetes.io/instance: emissary-apiext
-+    app.kubernetes.io/name: emissary-apiext
-+    app.kubernetes.io/part-of: emissary-apiext
-+---
-+apiVersion: apps/v1
-+kind: Deployment
-+metadata:
-+  name: emissary-apiext
-+  namespace: emissary-system
-+  labels:
-+    app.kubernetes.io/instance: emissary-apiext
-+    app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
-+    app.kubernetes.io/name: emissary-apiext
-+    app.kubernetes.io/part-of: emissary-apiext
-+spec:
-+  selector:
-+    matchLabels:
-+      app.kubernetes.io/instance: emissary-apiext
-+      app.kubernetes.io/name: emissary-apiext
-+      app.kubernetes.io/part-of: emissary-apiext
-+  replicas: 2
-+  template:
-+    metadata:
-+      labels:
-+        app.kubernetes.io/instance: emissary-apiext
-+        app.kubernetes.io/managed-by: kubectl_apply_-f_emissary-apiext.yaml
-+        app.kubernetes.io/name: emissary-apiext
-+        app.kubernetes.io/part-of: emissary-apiext
-+    spec:
-+      serviceAccountName: emissary-apiext
-+      containers:
-+        - name: emissary-apiext
-+          image: {{ .Values.sourceRegistry }}/{{ include "image.repository.path" .Values.image }}
-+          imagePullPolicy: Always
-+          command: [ "apiext", "emissary-apiext" ]
-+          ports:
-+            - name: http
-+              containerPort: 8080
-+            - name: https
-+              containerPort: 8443
-+          livenessProbe:
-+            httpGet:
-+              scheme: HTTP
-+              path: /probes/live
-+              port: 8080
-+            initialDelaySeconds: 5
-+            periodSeconds: 3
-+            failureThreshold: 3
-\ No newline at end of file
 diff --git a/charts/emissary-ingress/templates/deployment-canary.yaml b/charts/emissary-ingress/templates/deployment-canary.yaml
 index c166d4fb0..604f47d24 100644
 --- a/charts/emissary-ingress/templates/deployment-canary.yaml
@@ -5306,10 +5519,10 @@ index b2c8122a1..8f33136cf 100644
      matchLabels:
        service: ambassador-admin
 diff --git a/charts/emissary-ingress/values.yaml.in b/charts/emissary-ingress/values.yaml
-similarity index 93%
+similarity index 92%
 rename from charts/emissary-ingress/values.yaml.in
 rename to charts/emissary-ingress/values.yaml
-index c2767e002..f7e1c3b32 100644
+index bb812d760..9e314c2f4 100644
 --- a/charts/emissary-ingress/values.yaml.in
 +++ b/charts/emissary-ingress/values.yaml
 @@ -2,11 +2,11 @@
@@ -5327,7 +5540,7 @@ index c2767e002..f7e1c3b32 100644
  # If true, Create a DaemonSet. By default Deployment controller will be created
  daemonSet: false
  # If true, Create a bare Pod instead of a Deployment or DaemonSet; for
-@@ -142,11 +142,13 @@ security:
+@@ -143,11 +143,13 @@ security:
      #   runAsUser:
      #     rule: MustRunAsNonRoot
  
@@ -5345,25 +5558,37 @@ index c2767e002..f7e1c3b32 100644
    # Pod container image pull policy
    pullPolicy: IfNotPresent
  
-@@ -382,22 +384,6 @@ prometheusExporter: # +doc-gen:break
+@@ -348,7 +350,6 @@ resolvers: # +doc-gen:break
+ module:
+   diagnostics:
+     enabled: false
+-    allow_non_local: true
+ 
+ # DEPRECATED: Enabling the prometheus exporter creates a sidecar and configures ambassador to use it
+ #
+@@ -384,26 +385,6 @@ prometheusExporter: # +doc-gen:break
  # securityContext:
  #   runAsUser: 8888
  
 -
 -# Configure the ambassador agent
 -agent:
--  # If `true`, installs the ambassador-agent Deployment, ServiceAccount and ClusterRole in the ambassador namespace, enabling the Service Catalog
+-  # If `true`, installs the ambassador-agent Deployment, ServiceAccount and ClusterRole in the ambassador namespace, enabling the Ambassador Cloud connectivity.
 -  enabled: true
--  # API token for reporting snapshots to the [Service Catalog](https://app.getambassador.io/cloud/catalog/);
+-  # API token for reporting snapshots to [Ambassador Cloud](https://app.getambassador.io/cloud/);
 -  # If empty, agent will not report snapshots
 -  cloudConnectToken: ''
--  # Address of the ambassador Service Catalog rpc server.
+-  # Address of the Ambassador Cloud rpc server.
 -  rpcAddress: https://app.getambassador.io/
+-
+-  # If `true`, Ambassador Agent will report diagnostics to Ambassador Cloud
+-  reportDiagnostics: true
+-
 -  createArgoRBAC: true
 -  image:
 -    # Leave blank to use image.repository and image.tag
--    tag:
--    repository:
+-    tag: 3.1.0
+-    repository: docker.io/emissaryingress/emissary
 -
  deploymentTool: ''
  

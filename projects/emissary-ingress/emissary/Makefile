@@ -28,14 +28,30 @@ AMBASSADOR_VERSION_TARGET=$(REPO)/python/ambassador.version
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
 $(GO_MOD_DOWNLOAD_TARGETS): $(AMBASSADOR_VERSION_TARGET)
 
 # do not pass our makeflags down to emissary make since there will be unncessary warnings
 $(AMBASSADOR_VERSION_TARGET): MAKEFLAGS=
 $(AMBASSADOR_VERSION_TARGET):
-	@export VERSION="v3.0.0" && export CHART_VERSION=$(CHART_VERSION) && cd emissary && GOPATH=/var && make python/ambassador.version
+	@export VERSION="v3.3.0" && export CHART_VERSION=$(CHART_VERSION) && cd emissary && GOPATH=/var && make python/ambassador.version
 
+# Build helm chart
+.PHONY: helm/build
+helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+	# Emissary requires 2 charts. Consider this a temporary work-around.
+	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) emissary/crds charts/crds $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) emissary/crds  $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
+	$(BUILD_LIB)/helm_replace.sh emissary/crds $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) emissary/crds
+	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
+	PACKAGE_DEPENDENCIES=emissary-crds $(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
+	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
+
+.PHONY: helm/push
+helm/push: helm/build
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) emissary/crds $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

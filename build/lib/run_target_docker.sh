@@ -21,7 +21,7 @@ PROJECT="$1"
 TARGET="$2"
 IMAGE_REPO="${3:-}"
 RELEASE_BRANCH="${4:-}"
-ARTIFACTS_BUCKET="${5:-}"
+ARTIFACTS_BUCKET="${5:-$ARTIFACTS_BUCKET}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -35,8 +35,14 @@ echo "Run 'make stop-docker-builder' when you are done to stop it."
 echo "****************************************************************"
 
 if ! docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
-	docker pull public.ecr.aws/eks-distro-build-tooling/builder-base:latest
-	docker run -d --name eks-a-builder --privileged -e GOPROXY=$GOPROXY --entrypoint sleep \
+	build::docker::retry_pull public.ecr.aws/eks-distro-build-tooling/builder-base:latest
+
+	NETRC=""
+	if [ -f $HOME/.netrc ]; then
+		NETRC="--mount type=bind,source=$HOME/.netrc,target=/root/.netrc"
+	fi
+
+	docker run -d --name eks-a-builder --privileged $NETRC -e GOPROXY=$GOPROXY --entrypoint sleep \
 		public.ecr.aws/eks-distro-build-tooling/builder-base:latest  infinity 
 fi
 
