@@ -19,9 +19,9 @@ EXCLUDE_FROM_STAGING_BUILDSPEC=true
 HAS_HELM_CHART=true
 HELM_SOURCE_OWNER=prometheus-community
 HELM_SOURCE_REPOSITORY=helm-charts
-HELM_DIRECTORY=charts/prometheus-server
+HELM_DIRECTORY=charts/prometheus
 HELM_DESTINATION_REPOSITORY=prometheus/charts/prometheus
-HELM_IMAGE_LIST=prometheus/prometheus
+HELM_IMAGE_LIST=prometheus/prometheus prometheus/node-exporter
 
 include $(BASE_DIRECTORY)/Common.mk
 
