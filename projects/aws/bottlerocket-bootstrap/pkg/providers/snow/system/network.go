@@ -12,8 +12,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
+	"gopkg.in/yaml.v2"
 
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 )
 
 //go:embed config/net.toml
@@ -22,12 +24,28 @@ var netConfig string
 const (
 	rootfs            = "/.bottlerocket/rootfs"
 	metadataServiceIP = "169.254.169.254"
+	staticIPFilePath  = "/tmp/static-ips.yaml"
 )
 
 var (
 	netConfigPath = filepath.Join(rootfs, "/var/lib/netdog/net.toml")
 	currentIPPath = filepath.Join(rootfs, "/var/lib/netdog/current_ip")
 )
+
+type staticIPs struct {
+	static []StaticIP `yaml:"static"`
+}
+
+type StaticIP struct {
+	Address string `yaml:"address"`
+	Gateway string `yaml:"gateway"`
+	Primary bool   `yaml:"primary,omitempty"`
+}
+
+type Network struct {
+	DNI string
+	*StaticIP
+}
 
 func configureDNI() error {
 	if files.PathExists(netConfigPath) {
@@ -39,24 +57,24 @@ func configureDNI() error {
 		return errors.Wrap(err, "error getting local instance ip")
 	}
 
-	dnis, err := dniList()
-	if err != nil {
-		return errors.Wrap(err, "error getting DNI list")
-	}
-
 	defaultGateway, err := defaultGateway()
 	if err != nil {
 		return errors.Wrap(err, "error getting default gateway")
 	}
 
-	val := map[string]interface{}{
-		"dnis":              dnis,
+	network, err := dniMapping()
+	if err != nil {
+		return errors.Wrap(err, "error generating network mapping with dni and optional static ip")
+	}
+
+	data := map[string]interface{}{
+		"network":           network,
 		"instanceIP":        instanceIP,
 		"defaultGateway":    defaultGateway,
 		"metadataServiceIP": metadataServiceIP,
 	}
 
-	b, err := generateNetworkTemplate(val)
+	b, err := GenerateNetworkTemplate(data)
 	if err != nil {
 		return errors.Wrap(err, "error generating network template")
 	}
@@ -68,8 +86,55 @@ func configureDNI() error {
 	return nil
 }
 
-func generateNetworkTemplate(data map[string]interface{}) ([]byte, error) {
+func GenerateNetworkTemplate(data map[string]interface{}) ([]byte, error) {
 	return files.ExecuteTemplate(netConfig, data)
+}
+
+// dniMapping returns a single network mapping of DNI and optional static IP.
+// currently only support single primary DNI and static IP configuration.
+func dniMapping() (*Network, error) {
+	dniList, err := dniList()
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting DNI list")
+	}
+
+	if len(dniList) <= 0 {
+		return nil, errors.Wrap(err, "error finding any valid DNI")
+	}
+
+	staticIPList, err := parseStaticIPFile()
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing static ip file")
+	}
+
+	n := &Network{
+		DNI: dniList[0],
+	}
+
+	if len(staticIPList) > 0 {
+		n.Address = staticIPList[0].Address
+		n.Gateway = staticIPList[0].Gateway
+	}
+
+	return n, nil
+}
+
+func parseStaticIPFile() ([]StaticIP, error) {
+	userData, err := utils.ResolveUserData()
+	if err != nil {
+		return nil, errors.Wrap(err, "error resolving user data")
+	}
+	for _, file := range userData.WriteFiles {
+		if file.Path == staticIPFilePath {
+			staticIPs := &staticIPs{}
+			err := yaml.Unmarshal([]byte(file.Content), staticIPs)
+			if err != nil {
+				return nil, errors.Wrap(err, "error unmarshalling static IP file content")
+			}
+			return staticIPs.static, nil
+		}
+	}
+	return nil, nil
 }
 
 func dniList() ([]string, error) {
