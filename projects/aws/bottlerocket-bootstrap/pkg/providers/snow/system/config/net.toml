@@ -1,10 +1,14 @@
 version = 2
-{{- range .dnis }}
-[{{ . }}]
-{{- if (eq . "eth1") }}
-primary = true
-{{- end }}
+{{- if .network.StaticIP }}
+[{{ .network.DNI }}.static4]
+addresses = ["{{ .network.Address }}"]
+[{{ .network.DNI  }}.route]
+to = "default"
+via = "{{ .network.Gateway }}"
+{{- else }}
+[{{ .network.DNI }}]
 dhcp4 = true
+primary = true
 {{- end }}
 [eth0.static4]
 addresses = ["{{ .instanceIP }}/25"]
