@@ -33,6 +33,10 @@ build::common::use_go_version $GOLANG_VERSION
 
 cd $REPO
 
+sed -i'' -e 's@newName: .*@newName: '"${IMAGE_REPO}/nutanix-cloud-native/cluster-api-provider-nutanix"'@' config/manager/kustomization.yaml
+sed -i'' -e 's@newTag: .*@newTag: '"${IMAGE_TAG}"'@' config/manager/kustomization.yaml
+sed -i'' -e 's@image: .*@image: '"${IMAGE_REPO}/brancz/kube-rbac-proxy:latest"'@' config/default/manager_auth_proxy_patch.yaml
+
 make release-manifests \
   RELEASE_DIR="out" \
   IMG="${IMAGE_REPO}:${IMAGE_TAG}"
