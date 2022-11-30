@@ -4,9 +4,10 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/bin/eks-anywhere-packages/$TARGETOS-$TARGETARCH/package-manager /manager
+COPY _output/bin/eks-anywhere-packages/$TARGETOS-$TARGETARCH/package-manager /package-manager
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 USER 65532
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/package-manager"]
+CMD ["server"]
