@@ -230,8 +230,8 @@ metadata:
 spec:
   group: infrastructure.cluster.x-k8s.io
   names:
-    kind: AWSSnowIpPool
-    listKind: AWSSnowIpPoolList
+    kind: AWSSnowIPPool
+    listKind: AWSSnowIPPoolList
     plural: awssnowippools
     singular: awssnowippool
   scope: Namespaced
@@ -239,7 +239,7 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: AWSSnowIpPool is the Schema for the awssnowippools API
+        description: AWSSnowIPPool is the Schema for the awssnowippools API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -254,13 +254,13 @@ spec:
           metadata:
             type: object
           spec:
-            description: AWSSnowIpPoolSpec defines the desired state of AWSSnowIpPool
+            description: AWSSnowIPPoolSpec defines the desired state of AWSSnowIPPool
             properties:
               pools:
-                description: IpPools is the configuration of static ips used for machine's
+                description: IPPools is the configuration of static ips used for machine's
                   ip.
                 items:
-                  description: IpPool is the configuration of static ips used for
+                  description: IPPool is the configuration of static ips used for
                     machine's ip.
                   properties:
                     gateway:
@@ -268,10 +268,10 @@ spec:
                         routing purpose
                       type: string
                     ipEnd:
-                      description: IpEnd is the end of an ip range
+                      description: IPEnd is the end of an ip range
                       type: string
                     ipStart:
-                      description: IpStart is the start of an ip range
+                      description: IPStart is the start of an ip range
                       type: string
                     subnet:
                       description: Subnet is customers' network subnet, we can use
@@ -281,7 +281,7 @@ spec:
                 type: array
             type: object
           status:
-            description: AWSSnowIpPoolStatus defines the observed state of AWSSnowIpPool
+            description: AWSSnowIPPoolStatus defines the observed state of AWSSnowIPPool
             type: object
         type: object
     served: true
@@ -335,7 +335,7 @@ spec:
               of an object. Servers should convert recognized schemas to the latest
               internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
             type: string
-          deviceIp:
+          deviceIP:
             type: string
           kind:
             description: 'Kind is a string value representing the REST resource this
@@ -530,9 +530,9 @@ spec:
               network:
                 description: Network is the DNI and ip address settings for this machine
                 properties:
-                  additionalDirectNetworkInterface:
-                    description: AdditionalDNIsConfig is the configuration requirements
-                      for additional DNIs
+                  directNetworkInterfaces:
+                    description: DirectNetworkInterfaces is the configuration requirements
+                      for DNIs
                     items:
                       description: AWSSnowDirectNetworkInterface is configuration
                         of DNIs specified by customers.
@@ -547,7 +547,7 @@ spec:
                           minimum: 1
                           type: integer
                         ipPool:
-                          description: IpPool is the ip pool for this DNI if customers
+                          description: IPPool is the ip pool for this DNI if customers
                             want to specify
                           properties:
                             apiVersion:
@@ -566,14 +566,14 @@ spec:
                             metadata:
                               type: object
                             spec:
-                              description: AWSSnowIpPoolSpec defines the desired state
-                                of AWSSnowIpPool
+                              description: AWSSnowIPPoolSpec defines the desired state
+                                of AWSSnowIPPool
                               properties:
                                 pools:
-                                  description: IpPools is the configuration of static
+                                  description: IPPools is the configuration of static
                                     ips used for machine's ip.
                                   items:
-                                    description: IpPool is the configuration of static
+                                    description: IPPool is the configuration of static
                                       ips used for machine's ip.
                                     properties:
                                       gateway:
@@ -581,10 +581,10 @@ spec:
                                           subnet. Used for routing purpose
                                         type: string
                                       ipEnd:
-                                        description: IpEnd is the end of an ip range
+                                        description: IPEnd is the end of an ip range
                                         type: string
                                       ipStart:
-                                        description: IpStart is the start of an ip
+                                        description: IPStart is the start of an ip
                                           range
                                         type: string
                                       subnet:
@@ -596,10 +596,14 @@ spec:
                                   type: array
                               type: object
                             status:
-                              description: AWSSnowIpPoolStatus defines the observed
-                                state of AWSSnowIpPool
+                              description: AWSSnowIPPoolStatus defines the observed
+                                state of AWSSnowIPPool
                               type: object
                           type: object
+                        primary:
+                          description: Primary indicates whether the DNI is primary
+                            or not
+                          type: boolean
                         vlanID:
                           description: VlanID is the vlan ID assigned by the user
                           format: int64
@@ -607,84 +611,13 @@ spec:
                           minimum: 0
                           type: integer
                       type: object
+                    minItems: 1
                     type: array
                   dns:
                     description: DNS is just for bottlerocket static ip config
                     items:
                       type: string
                     type: array
-                  primaryDirectNetworkInterface:
-                    description: PrimaryDNIConfig is the configuration requirements
-                      for primary DNI
-                    properties:
-                      dhcp:
-                        description: DHCP is whether we assign ip using DHCP for this
-                          DNI
-                        type: boolean
-                      index:
-                        description: Index is the index number of DNI
-                        maximum: 7
-                        minimum: 1
-                        type: integer
-                      ipPool:
-                        description: IpPool is the ip pool for this DNI if customers
-                          want to specify
-                        properties:
-                          apiVersion:
-                            description: 'APIVersion defines the versioned schema
-                              of this representation of an object. Servers should
-                              convert recognized schemas to the latest internal value,
-                              and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-                            type: string
-                          kind:
-                            description: 'Kind is a string value representing the
-                              REST resource this object represents. Servers may infer
-                              this from the endpoint the client submits requests to.
-                              Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-                            type: string
-                          metadata:
-                            type: object
-                          spec:
-                            description: AWSSnowIpPoolSpec defines the desired state
-                              of AWSSnowIpPool
-                            properties:
-                              pools:
-                                description: IpPools is the configuration of static
-                                  ips used for machine's ip.
-                                items:
-                                  description: IpPool is the configuration of static
-                                    ips used for machine's ip.
-                                  properties:
-                                    gateway:
-                                      description: Gateway is the gateway of this
-                                        subnet. Used for routing purpose
-                                      type: string
-                                    ipEnd:
-                                      description: IpEnd is the end of an ip range
-                                      type: string
-                                    ipStart:
-                                      description: IpStart is the start of an ip range
-                                      type: string
-                                    subnet:
-                                      description: Subnet is customers' network subnet,
-                                        we can use it to determine if two ip addresses
-                                        are in the same subnet.
-                                      type: string
-                                  type: object
-                                type: array
-                            type: object
-                          status:
-                            description: AWSSnowIpPoolStatus defines the observed
-                              state of AWSSnowIpPool
-                            type: object
-                        type: object
-                      vlanID:
-                        description: VlanID is the vlan ID assigned by the user
-                        format: int64
-                        maximum: 4095
-                        minimum: 0
-                        type: integer
-                    type: object
                 type: object
               networkInterfaces:
                 description: NetworkInterfaces is a list of ENIs to associate with
@@ -1208,9 +1141,9 @@ spec:
                         description: Network is the DNI and ip address settings for
                           this machine
                         properties:
-                          additionalDirectNetworkInterface:
-                            description: AdditionalDNIsConfig is the configuration
-                              requirements for additional DNIs
+                          directNetworkInterfaces:
+                            description: DirectNetworkInterfaces is the configuration
+                              requirements for DNIs
                             items:
                               description: AWSSnowDirectNetworkInterface is configuration
                                 of DNIs specified by customers.
@@ -1225,7 +1158,7 @@ spec:
                                   minimum: 1
                                   type: integer
                                 ipPool:
-                                  description: IpPool is the ip pool for this DNI
+                                  description: IPPool is the ip pool for this DNI
                                     if customers want to specify
                                   properties:
                                     apiVersion:
@@ -1245,14 +1178,14 @@ spec:
                                     metadata:
                                       type: object
                                     spec:
-                                      description: AWSSnowIpPoolSpec defines the desired
-                                        state of AWSSnowIpPool
+                                      description: AWSSnowIPPoolSpec defines the desired
+                                        state of AWSSnowIPPool
                                       properties:
                                         pools:
-                                          description: IpPools is the configuration
+                                          description: IPPools is the configuration
                                             of static ips used for machine's ip.
                                           items:
-                                            description: IpPool is the configuration
+                                            description: IPPool is the configuration
                                               of static ips used for machine's ip.
                                             properties:
                                               gateway:
@@ -1261,11 +1194,11 @@ spec:
                                                   purpose
                                                 type: string
                                               ipEnd:
-                                                description: IpEnd is the end of an
+                                                description: IPEnd is the end of an
                                                   ip range
                                                 type: string
                                               ipStart:
-                                                description: IpStart is the start
+                                                description: IPStart is the start
                                                   of an ip range
                                                 type: string
                                               subnet:
@@ -1278,10 +1211,14 @@ spec:
                                           type: array
                                       type: object
                                     status:
-                                      description: AWSSnowIpPoolStatus defines the
-                                        observed state of AWSSnowIpPool
+                                      description: AWSSnowIPPoolStatus defines the
+                                        observed state of AWSSnowIPPool
                                       type: object
                                   type: object
+                                primary:
+                                  description: Primary indicates whether the DNI is
+                                    primary or not
+                                  type: boolean
                                 vlanID:
                                   description: VlanID is the vlan ID assigned by the
                                     user
@@ -1290,90 +1227,13 @@ spec:
                                   minimum: 0
                                   type: integer
                               type: object
+                            minItems: 1
                             type: array
                           dns:
                             description: DNS is just for bottlerocket static ip config
                             items:
                               type: string
                             type: array
-                          primaryDirectNetworkInterface:
-                            description: PrimaryDNIConfig is the configuration requirements
-                              for primary DNI
-                            properties:
-                              dhcp:
-                                description: DHCP is whether we assign ip using DHCP
-                                  for this DNI
-                                type: boolean
-                              index:
-                                description: Index is the index number of DNI
-                                maximum: 7
-                                minimum: 1
-                                type: integer
-                              ipPool:
-                                description: IpPool is the ip pool for this DNI if
-                                  customers want to specify
-                                properties:
-                                  apiVersion:
-                                    description: 'APIVersion defines the versioned
-                                      schema of this representation of an object.
-                                      Servers should convert recognized schemas to
-                                      the latest internal value, and may reject unrecognized
-                                      values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-                                    type: string
-                                  kind:
-                                    description: 'Kind is a string value representing
-                                      the REST resource this object represents. Servers
-                                      may infer this from the endpoint the client
-                                      submits requests to. Cannot be updated. In CamelCase.
-                                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-                                    type: string
-                                  metadata:
-                                    type: object
-                                  spec:
-                                    description: AWSSnowIpPoolSpec defines the desired
-                                      state of AWSSnowIpPool
-                                    properties:
-                                      pools:
-                                        description: IpPools is the configuration
-                                          of static ips used for machine's ip.
-                                        items:
-                                          description: IpPool is the configuration
-                                            of static ips used for machine's ip.
-                                          properties:
-                                            gateway:
-                                              description: Gateway is the gateway
-                                                of this subnet. Used for routing purpose
-                                              type: string
-                                            ipEnd:
-                                              description: IpEnd is the end of an
-                                                ip range
-                                              type: string
-                                            ipStart:
-                                              description: IpStart is the start of
-                                                an ip range
-                                              type: string
-                                            subnet:
-                                              description: Subnet is customers' network
-                                                subnet, we can use it to determine
-                                                if two ip addresses are in the same
-                                                subnet.
-                                              type: string
-                                          type: object
-                                        type: array
-                                    type: object
-                                  status:
-                                    description: AWSSnowIpPoolStatus defines the observed
-                                      state of AWSSnowIpPool
-                                    type: object
-                                type: object
-                              vlanID:
-                                description: VlanID is the vlan ID assigned by the
-                                  user
-                                format: int64
-                                maximum: 4095
-                                minimum: 0
-                                type: integer
-                            type: object
                         type: object
                       networkInterfaces:
                         description: NetworkInterfaces is a list of ENIs to associate
