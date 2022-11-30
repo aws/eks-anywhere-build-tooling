@@ -1,7 +1,7 @@
 # Disable built-in rules and variables
 MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
 SHELL=bash
-.SHELLFLAGS:=-eu -o pipefail -c
+.SHELLFLAGS:=-eu -o pipefail -x -c
 .SUFFIXES:
 .SECONDEXPANSION:
 
