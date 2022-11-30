@@ -157,6 +157,7 @@ IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS
 # If running in the builder base on prow or codebuild, grab the current tag to be used when building with cgo
 CURRENT_BUILDER_BASE_TAG=$(or $(and $(wildcard /config/BUILDER_BASE_TAG_FILE),$(shell cat /config/BUILDER_BASE_TAG_FILE)),latest)
 CURRENT_BUILDER_BASE_IMAGE=$(if $(CODEBUILD_BUILD_IMAGE),$(CODEBUILD_BUILD_IMAGE),$(BASE_IMAGE_REPO)/builder-base:$(CURRENT_BUILDER_BASE_TAG))
+GOLANG_GCC_BUILDER_IMAGE=$(BASE_IMAGE_REPO)/golang:$(shell cat $(BASE_DIRECTORY)/EKS_DISTRO_MINIMAL_BASE_GOLANG_COMPILER_$(GOLANG_VERSION)_GCC_TAG_FILE)
 ####################################################
 
 #################### HELM ##########################
@@ -338,7 +339,7 @@ IS_ON_BUILDER_BASE?=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
 BUILDER_PLATFORM?=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
 needs-cgo-builder=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter-out $(1),$(BUILDER_PLATFORM)),true,))
 USE_DOCKER_FOR_CGO_BUILD?=false
-DOCKER_USE_ID_FOR_LINUX=$(shell if [ "$$(uname -s)" = "Linux" ] && [ -n "$${USER}" ]; then echo "-u $$(id -u $${USER}):$$(id -g $${USER})"; fi)
+DOCKER_USE_ID_FOR_LINUX=$(shell if [ "$$(uname -s)" = "Linux" ] && [ -n "$${USER:-}" ]; then echo "-u $$(id -u $${USER}):$$(id -g $${USER})"; fi)
 GO_MOD_CACHE=$(shell source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) > /dev/null 2>&1 && go env GOMODCACHE)
 CGO_TARGET?=
 ######################
@@ -417,7 +418,7 @@ define BUILDCTL
 endef 
 
 define CGO_DOCKER
-	source $(BUILD_LIB)/common.sh && build::docker::retry_pull $(BUILDER_IMAGE); \
+	source $(BUILD_LIB)/common.sh && build::docker::retry_pull --platform $(IMAGE_PLATFORMS) $(BUILDER_IMAGE); \
 	INTERACTIVE="$(shell if [ -t 0 ]; then echo '-it'; fi)"; \
 	docker run --rm $$INTERACTIVE -w /eks-anywhere-build-tooling/projects/$(COMPONENT) $(DOCKER_USE_ID_FOR_LINUX) \
 		--mount type=bind,source=$(BASE_DIRECTORY),target=/eks-anywhere-build-tooling \
@@ -656,7 +657,7 @@ prepare-cgo-folder:
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY COMPONENT
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
-%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(CURRENT_BUILDER_BASE_IMAGE)
+%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(GOLANG_GCC_BUILDER_IMAGE)
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
