@@ -1,0 +1,49 @@
+From 82e733168d41e0c2fdb58816b51f29b46c6e9dd0 Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin215@gmail.com>
+Date: Tue, 29 Nov 2022 17:33:59 -0600
+Subject: [PATCH] Update pod update strategy due to configmap changes
+
+---
+ charts/prometheus/templates/server/deploy.yaml | 5 +++--
+ charts/prometheus/templates/server/sts.yaml    | 5 +++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/charts/prometheus/templates/server/deploy.yaml b/charts/prometheus/templates/server/deploy.yaml
+index bbf8ce29..9d6aaa81 100644
+--- a/charts/prometheus/templates/server/deploy.yaml
++++ b/charts/prometheus/templates/server/deploy.yaml
+@@ -23,10 +23,11 @@ spec:
+ {{- end }}
+   template:
+     metadata:
+-    {{- if .Values.server.podAnnotations }}
+       annotations:
++        checksum/config: {{ include (print $.Template.BasePath "/server/cm.yaml") . | sha256sum }}
++      {{- if .Values.server.podAnnotations }}
+         {{ toYaml .Values.server.podAnnotations | nindent 8 }}
+-    {{- end }}
++      {{- end }}
+       labels:
+         {{- include "prometheus.server.labels" . | nindent 8 }}
+         {{- if .Values.server.podLabels}}
+diff --git a/charts/prometheus/templates/server/sts.yaml b/charts/prometheus/templates/server/sts.yaml
+index a4db912e..7ca07a16 100644
+--- a/charts/prometheus/templates/server/sts.yaml
++++ b/charts/prometheus/templates/server/sts.yaml
+@@ -23,10 +23,11 @@ spec:
+   podManagementPolicy: {{ .Values.server.statefulSet.podManagementPolicy }}
+   template:
+     metadata:
+-    {{- if .Values.server.podAnnotations }}
+       annotations:
++        checksum/config: {{ include (print $.Template.BasePath "/server/cm.yaml") . | sha256sum }}
++      {{- if .Values.server.podAnnotations }}
+         {{ toYaml .Values.server.podAnnotations | nindent 8 }}
+-    {{- end }}
++      {{- end }}
+       labels:
+         {{- include "prometheus.server.labels" . | nindent 8 }}
+         {{- if .Values.server.podLabels}}
+-- 
+2.31.0
+
