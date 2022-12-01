@@ -71,7 +71,7 @@ clean-extra:
 clean: clean-extra
 
 unit-test:
-	go test ./...
+	source $(BUILD_LIB)/common.sh && build::common::use_go_version "$(GOLANG_VERSION)" && go test ./...
 
 
 ########### DO NOT EDIT #############################

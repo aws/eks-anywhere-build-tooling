@@ -114,7 +114,9 @@ function build::gather_licenses() {
     build::common::use_go_version 1.16
   fi
 
-  build::common::override_missing_tooling go-licenses
+  if [ -z "${USE_HOST_GO_LICENSES:-}" ]; then    
+    build::common::override_missing_tooling go-licenses
+  fi  
   
   mkdir -p "${outputdir}/attribution"
   # attribution file generated uses the output go-deps and go-license to gather the necessary
@@ -201,7 +203,9 @@ function build::non-golang::copy_licenses(){
 }
 
 function build::generate_attribution(){
-  build::common::override_missing_tooling generate-attribution
+  if [ -z "${USE_HOST_GENERATE_ATTRIBUTION:-}" ]; then    
+    build::common::override_missing_tooling generate-attribution
+  fi
 
   local -r project_root=$1
   local -r golang_version=$2
@@ -247,20 +251,21 @@ function build::common::get_go_path() {
 function build::common::use_go_version() {
   local -r version=$1
 
-  local -r gobinarypath=$(build::common::get_go_path $version)
-
-  if [ -n "$gobinarypath" ]; then
-    export PATH=${gobinarypath}:$PATH
-    # the GOCACHE needs to be seperated, not preserved, by golang version otherwise it can leak
-    # into future builds effecting checksums and builds in general
-    export GOCACHE=$(go env GOCACHE)/$version
+  if [ -z "${USE_HOST_GO:-}" ]; then    
+    build::common::override_missing_tooling go $version
+    return
   fi
-  
-  # if a go path is found above, still override if the version is not
-  # what we expect
-  build::common::override_missing_tooling go $version    
-  
-  
+
+  local -r gobinarypath=$(build::common::get_go_path $version)
+  if [ -z "${gobinarypath}" ]; then
+    echo "golang not available on host!"
+    exit 1
+  fi
+
+  export PATH=${gobinarypath}:$PATH
+  # the GOCACHE needs to be seperated, not preserved, by golang version otherwise it can leak
+  # into future builds effecting checksums and builds in general
+  export GOCACHE=$(go env GOCACHE)/$version
 }
 
 function build::common::find_project_root_from_pwd() {
@@ -405,17 +410,18 @@ function build::common::override_missing_tooling() {
   if [ "${USE_EXP_BUILDCTL_IN_PRESUBMIT}" = "true" ] && [ "${JOB_TYPE:-}" == "presubmit" ]; then
     rm -rf /root/sdk /go /usr/bin/generate-attribution
   fi
-
-  if [[ "$USE_DOCKER" = "false" ]] && 
-    [[ "$USE_BUILDCTL" = "false" ]] &&\
-    command -v $cmd &> /dev/null && \
-    [[ -z "$version" || "$($cmd version)" == *"$version"* ]]; then
-    return
-  fi
-
+  
   local -r project_root="$(build::common::find_project_root_from_pwd)"
   local -r overrides_root="${project_root}/_output/.path-overrides"
-  
+
+  if [ "${cmd}" = "go" ] && [ ! -f $overrides_root/$cmd ]; then
+    echo "************************************************************************************************************************"
+    echo "By default this repo uses golang provided by the EKS-Distro golang containers instead of installed versions on the host."
+    echo "If docker is available ``docker run`` will be used, otherwise ``buildctl build`` will be used."
+    echo "To override this behavior, ``export USE_HOST_GO=true``."
+    echo "************************************************************************************************************************"  
+  fi
+
   mkdir -p $overrides_root
   ln -sf $BUILD_ROOT/overrides/$cmd $overrides_root
   ln -sf $BUILD_ROOT/overrides/run-base $overrides_root

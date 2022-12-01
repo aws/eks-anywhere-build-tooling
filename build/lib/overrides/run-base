@@ -177,6 +177,8 @@ elif [[ -z "$BUILDCTL_TARGET" ]]; then
     BUILDCTL_TARGET="build"
 fi
 
+# the GOCACHE needs to be seperated, not preserved, by golang version otherwise it can leak
+# into future builds effecting checksums and builds in general
 MOD_CACHE_ID="$(basename $CONTEXT)-$GOLANG_VERSION"
 
 OUTPUT_BIND_MOUNT=""
@@ -187,7 +189,7 @@ fi
 cat << EOF > $DOCKERFILE_DIR/Dockerfile
 FROM $CONTAINER_IMAGE AS run
 
-ENV GOMODCACHE /go/pkg/mod/$GOLANG_VERSION
+ENV GOMODCACHE /go/pkg/mod
 ENV CGO_ENABLED $CGO_ENABLED
 ENV GOOS $GOOS
 ENV GOARCH $GOARCH
@@ -195,7 +197,7 @@ ENV GOPROXY $GOPROXY
 
 WORKDIR $WORKDIR
 RUN --mount=type=bind,source=$RELATIVE_PROJECT_MOUNT,target=/project,rw $OUTPUT_BIND_MOUNT \
-    --mount=type=cache,target=/go/pkg/mod/$GOLANG_VERSION,id=$MOD_CACHE_ID \
+    --mount=type=cache,target=/go/pkg/mod,id=$MOD_CACHE_ID \
     --mount=type=secret,id=netrc,target=/root/.netrc \
     $CMD_ARGS && \
     if [[ "$BUILDCTL_TARGET" = "vendor" ]]; then \

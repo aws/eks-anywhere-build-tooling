@@ -79,8 +79,8 @@ SUPPORTED_K8S_VERSIONS:=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_
 SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
-IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker create-ecr-repos,$(MAKECMDGOALS)))
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=build release clean help stop-docker-builder
+IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker,$(MAKECMDGOALS)))
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=build release clean help stop-docker-builder create-ecr-repos
 MAKECMDGOALS_WITHOUT_VAR_VALUE=$(foreach t,$(MAKECMDGOALS),$(if $(findstring var-value-,$(t)),,$(t)))
 ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BRANCH_TARGET))),)
 	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
@@ -815,4 +815,4 @@ run-$(1)-in-docker: MAKE_TARGET=$(1)
 run-$(1)-in-docker: run-target-in-docker
 endef
 
-$(foreach target,binaries clean,$(eval $(call RUN_IN_DOCKER_TARGET,$(target))))
+$(foreach target,attribution binaries checksums clean,$(eval $(call RUN_IN_DOCKER_TARGET,$(target))))

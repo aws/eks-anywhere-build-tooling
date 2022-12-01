@@ -36,7 +36,9 @@ source "${SCRIPT_ROOT}/common.sh"
 
 function build::simple::print_go_env(){
   for var in "GOOS" "GOARCH" "CGO_ENABLED" "GOCACHE" "GOFLAGS"; do
-    echo "$var: ${!var:-}"
+    if [ -n "${!var:-}" ]; then
+      echo "$var: ${!var:-}"
+    fi
     if [ "$var" = "CGO_ENABLED" ] && [ "${!var:-}" = "1" ]; then
       for other in "CGO_LDFLAGS" "CGO_CFLAGS" "LD_LIBRARY_PATH" "PKG_CONFIG_PATH"; do echo "$other: ${!other:-}"; done
     fi
