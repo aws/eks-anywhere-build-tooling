@@ -128,7 +128,7 @@ if [[ "$USE_DOCKER" = "true" ]] ; then
     # git will complain about user permissions on the repo, when go
     # goes to figure out the vcs information
     USER_ID=""
-    if [ "$(uname -s)" = "Linux" ]; then
+    if [ "$(uname -s)" = "Linux" ] && [ -n "${USER:-}" ]; then
         USER_ID="-u $(id -u ${USER}):$(id -g ${USER})"
     fi
 
@@ -139,9 +139,18 @@ if [[ "$USE_DOCKER" = "true" ]] ; then
 
     # match buildctl as much as possible, use same "context" dir
     cd $CONTEXT
-    # TODO: can we trap sigterm and kill the docker container here, currently it waits til it finishes
-    # no matter what ive tried with trapping outside or inside the container, I cant make it work
-    if ! build::common::echo_and_run docker run --rm -w $WORKDIR $USER_ID \
+
+    INTERACTIVE=""
+    if [ -t 0 ]; then 
+        INTERACTIVE="-it"
+    fi
+
+    NETRC=""
+	if [ -f $HOME/.netrc ]; then
+		NETRC="--mount type=bind,source=$HOME/.netrc,target=/root/.netrc"
+	fi
+    
+    if ! build::common::echo_and_run docker run $INTERACTIVE $NETRC --rm -w $WORKDIR $USER_ID \
         --mount type=bind,source=$(pwd)/$RELATIVE_PROJECT_MOUNT,target=/project \
         --mount type=bind,source=$(pwd)/$RELATIVE_OUTPUT_MOUNT,target=/output \
         --mount type=bind,source=$(pwd)/$RELATIVE_OUTPUT_MOUNT,target=$GOBIN_PATH_IN_CONTAINER \
@@ -187,6 +196,7 @@ ENV GOPROXY $GOPROXY
 WORKDIR $WORKDIR
 RUN --mount=type=bind,source=$RELATIVE_PROJECT_MOUNT,target=/project,rw $OUTPUT_BIND_MOUNT \
     --mount=type=cache,target=/go/pkg/mod/$GOLANG_VERSION,id=$MOD_CACHE_ID \
+    --mount=type=secret,id=netrc,target=/root/.netrc \
     $CMD_ARGS && \
     if [[ "$BUILDCTL_TARGET" = "vendor" ]]; then \
         mkdir -p ./vendor; \
@@ -213,12 +223,17 @@ COPY --from=run $GOBIN_PATH_IN_CONTAINER/* $RELATIVE_OUTPUT_MOUNT/
 
 EOF
 
+NETRC=""
+if [ -f $HOME/.netrc ]; then
+    NETRC="--secret id=netrc,src=$HOME/.netrc"
+fi
+
 if ! build::common::echo_and_run $BUILD_LIB_ROOT/buildkit.sh build \
     --frontend dockerfile.v0 \
     --local dockerfile=$DOCKERFILE_DIR \
     --local context=$CONTEXT \
     --progress plain \
-    --opt target=$BUILDCTL_TARGET \
+    --opt target=$BUILDCTL_TARGET $NETRC \
     --output type=local,dest=$CONTEXT > $LOG_FILE 2>&1; then
     exit 1
 fi

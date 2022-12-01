@@ -35,15 +35,15 @@ echo "Run 'make stop-docker-builder' when you are done to stop it."
 echo "****************************************************************"
 
 if ! docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
-	build::docker::retry_pull public.ecr.aws/eks-distro-build-tooling/builder-base:latest
+	build::docker::retry_pull public.ecr.aws/eks-distro-build-tooling/builder-base:minimal-latest
 
 	NETRC=""
 	if [ -f $HOME/.netrc ]; then
 		NETRC="--mount type=bind,source=$HOME/.netrc,target=/root/.netrc"
 	fi
 
-	docker run -d --name eks-a-builder --privileged $NETRC -e GOPROXY=$GOPROXY --entrypoint sleep \
-		public.ecr.aws/eks-distro-build-tooling/builder-base:latest  infinity 
+	docker run -d --name eks-a-builder --privileged $NETRC -e GOPROXY=$GOPROXY --entrypoint bash \
+		public.ecr.aws/eks-distro-build-tooling/builder-base:minimal-latest -c "source /docker.sh && start::dockerd && sleep infinity"
 fi
 
 EXTRA_INCLUDES=""

@@ -807,3 +807,12 @@ var-value-%:
 run-command-overrides-simple-tests: # *Local Only* testing go/go-licenses/attribution command override mechanism
 run-command-overrides-simple-tests:
 	$(BUILD_LIB)/overrides/simple-tests $(REPO)
+
+# $1 - target
+define RUN_IN_DOCKER_TARGET
+.PHONY: run-$(1)-in-docker
+run-$(1)-in-docker: MAKE_TARGET=$(1)
+run-$(1)-in-docker: run-target-in-docker
+endef
+
+$(foreach target,binaries clean,$(eval $(call RUN_IN_DOCKER_TARGET,$(target))))
