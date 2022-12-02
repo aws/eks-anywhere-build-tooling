@@ -31,7 +31,7 @@ GOLANG_VERSION=$(cat $SCRIPT_ROOT/.goversion)
 CONTAINER_IMAGE="public.ecr.aws/eks-distro-build-tooling/golang:$(cat ${BUILD_LIB_ROOT}/../../EKS_DISTRO_MINIMAL_BASE_GOLANG_COMPILER_${GOLANG_VERSION}_BASE_TAG_FILE)"
 
 BUILDCTL_TARGET=""
-DOCKERIGNORE_PATHS='$RELATIVE_OUTPUT_MOUNT !$RELATIVE_OUTPUT_MOUNT '
+DOCKERIGNORE_PATHS='' #'$RELATIVE_OUTPUT_MOUNT ' # !$RELATIVE_OUTPUT_MOUNT '
 NEED_STDOUT=false
 GO_BUILD_ARGS="go "
 while test $# -gt 0; do
@@ -81,7 +81,7 @@ while test $# -gt 0; do
             NEED_STDOUT=true
             DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT/go.mod !$RELATIVE_PROJECT_MOUNT/go.sum !$RELATIVE_PROJECT_MOUNT/*.go '
         elif [[ "$1" = "vendor" ]] || [[ "$1" = "init" ]]; then
-            DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT '
+            DOCKERIGNORE_PATHS+='!$RELATIVE_PROJECT_MOUNT $RELATIVE_PROJECT_MOUNT/vendor '
             BUILDCTL_TARGET="vendor"
             GO_BUILD_ARGS="mkdir -p /output && $GO_BUILD_ARGS"
         fi

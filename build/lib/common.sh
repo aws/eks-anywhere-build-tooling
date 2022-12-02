@@ -124,9 +124,12 @@ function build::gather_licenses() {
   # go-deps is needed for module versions
   # go-licenses are all the dependencies found from the module(s) that were passed in via patterns
   echo "($(pwd)) \$ go list -deps=true -json ./..."
-  local -r list=$(go list -deps=true -json ./...)
-  if ! $(echo $list | jq -s ''  > "${outputdir}/attribution/go-deps.json"); then
-    echo $list
+  if ! list=$(go list -deps=true -json ./...); then
+    printf "$list"
+    exit 1 
+  fi
+
+  if ! echo $list | jq -s '' > "${outputdir}/attribution/go-deps.json"; then
     exit 1
   fi
   
