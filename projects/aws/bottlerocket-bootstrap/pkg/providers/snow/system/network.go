@@ -24,7 +24,7 @@ var netConfig string
 const (
 	rootfs            = "/.bottlerocket/rootfs"
 	metadataServiceIP = "169.254.169.254"
-	staticIPFilePath  = "/tmp/static-ips.yaml"
+	networkFilePath   = "/tmp/network.yaml"
 )
 
 var (
@@ -32,8 +32,9 @@ var (
 	currentIPPath = filepath.Join(rootfs, "/var/lib/netdog/current_ip")
 )
 
-type staticIPs struct {
-	static []StaticIP `yaml:"static"`
+type network struct {
+	dniCount int        `yaml:"dniCount"`
+	static   []StaticIP `yaml:"static,omitempty"`
 }
 
 type StaticIP struct {
@@ -42,7 +43,7 @@ type StaticIP struct {
 	Primary bool   `yaml:"primary,omitempty"`
 }
 
-type Network struct {
+type NetworkMapping struct {
 	DNI string
 	*StaticIP
 }
@@ -62,9 +63,9 @@ func configureDNI() error {
 		return errors.Wrap(err, "error getting default gateway")
 	}
 
-	network, err := dniMapping()
+	network, err := networkMapping()
 	if err != nil {
-		return errors.Wrap(err, "error generating network mapping with dni and optional static ip")
+		return errors.Wrap(err, "error generating network mapping")
 	}
 
 	data := map[string]interface{}{
@@ -90,48 +91,54 @@ func GenerateNetworkTemplate(data map[string]interface{}) ([]byte, error) {
 	return files.ExecuteTemplate(netConfig, data)
 }
 
-// dniMapping returns a single network mapping of DNI and optional static IP.
+// networkMapping returns a single network mapping of DNI and optional static IP.
 // currently only support single primary DNI and static IP configuration.
-func dniMapping() (*Network, error) {
+func networkMapping() ([]NetworkMapping, error) {
 	dniList, err := dniList()
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting DNI list")
 	}
 
-	if len(dniList) <= 0 {
-		return nil, errors.Wrap(err, "error finding any valid DNI")
-	}
-
-	staticIPList, err := parseStaticIPFile()
+	network, err := parseNetworkFile()
 	if err != nil {
-		return nil, errors.Wrap(err, "error parsing static ip file")
+		return nil, errors.Wrap(err, "error parsing network file")
 	}
 
-	n := &Network{
-		DNI: dniList[0],
+	if len(dniList) != network.dniCount {
+		return nil, errors.Wrap(err, "the number of DNI found does not match the dniCount in the network file")
 	}
 
-	if len(staticIPList) > 0 {
-		n.Address = staticIPList[0].Address
-		n.Gateway = staticIPList[0].Gateway
+	if len(network.static) > 0 && len(network.static) < network.dniCount {
+		return nil, errors.Wrap(err, "mix of using DHCP and static IP is not supported")
 	}
 
-	return n, nil
+	m := make([]NetworkMapping, network.dniCount)
+	for i, dni := range dniList {
+		n := NetworkMapping{
+			DNI: dni,
+		}
+		if len(network.static) > 0 {
+			n.StaticIP = &network.static[i]
+		}
+		m = append(m, n)
+	}
+
+	return m, nil
 }
 
-func parseStaticIPFile() ([]StaticIP, error) {
+func parseNetworkFile() (*network, error) {
 	userData, err := utils.ResolveUserData()
 	if err != nil {
 		return nil, errors.Wrap(err, "error resolving user data")
 	}
 	for _, file := range userData.WriteFiles {
-		if file.Path == staticIPFilePath {
-			staticIPs := &staticIPs{}
-			err := yaml.Unmarshal([]byte(file.Content), staticIPs)
+		if file.Path == networkFilePath {
+			network := &network{}
+			err := yaml.Unmarshal([]byte(file.Content), network)
 			if err != nil {
-				return nil, errors.Wrap(err, "error unmarshalling static IP file content")
+				return nil, errors.Wrap(err, "error unmarshalling network file content")
 			}
-			return staticIPs.static, nil
+			return network, nil
 		}
 	}
 	return nil, nil

@@ -1,14 +1,22 @@
 version = 2
-{{- if .network.StaticIP }}
-[{{ .network.DNI }}.static4]
-addresses = ["{{ .network.Address }}"]
-[{{ .network.DNI  }}.route]
-to = "default"
-via = "{{ .network.Gateway }}"
-{{- else }}
-[{{ .network.DNI }}]
-dhcp4 = true
+{{- range $i, $n := .network }}
+{{- if $n.StaticIP }}
+{{- if $n.StaticIP.Primary }}
+[{{ $n.DNI }}]
 primary = true
+{{- end }}
+[{{ $n.DNI }}.static4]
+addresses = ["{{ $n.StaticIP.Address }}"]
+[{{ $n.DNI }}.route]
+to = "default"
+via = "{{ $n.StaticIP.Gateway }}"
+{{- else }}
+[{{ $n.DNI }}]
+dhcp4 = true
+{{- if eq $i 0 }}
+primary = true
+{{- end }}
+{{- end }}
 {{- end }}
 [eth0.static4]
 addresses = ["{{ .instanceIP }}/25"]
