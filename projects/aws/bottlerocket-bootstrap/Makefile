@@ -43,6 +43,9 @@ FAKE_GIT_REPO_TARGET=.git
 
 PROJECT_DEPENDENCIES=eksd/kubernetes/client eksd/kubernetes/server eksa/kubernetes-sigs/etcdadm
 
+TOOLS_BIN_DIR := $(shell pwd)/hack/tools/bin
+MOCKGEN := $(TOOLS_BIN_DIR)/mockgen
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
@@ -59,6 +62,12 @@ $(FAKE_GIT_REPO_TARGET):
 	@git init
 	@git remote add origin https://github.com/aws/eks-anywhere-build-tooling.git 
 
+$(TOOLS_BIN_DIR):
+	@mkdir -p $(TOOLS_BIN_DIR)
+
+$(MOCKGEN): $(TOOLS_BIN_DIR)
+	GOBIN=$(TOOLS_BIN_DIR) go install github.com/golang/mock/mockgen@v1.6.0
+
 bottlerocket-bootstrap-snow/images/%: DOCKERFILE_FOLDER=./docker/linux/snow
 
 GIT_TAG:
@@ -73,6 +82,9 @@ clean: clean-extra
 unit-test:
 	go test ./...
 
+.PHONY: mocks
+mocks: $(MOCKGEN)
+	go generate ./...
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
