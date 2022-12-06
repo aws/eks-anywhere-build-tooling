@@ -3,39 +3,37 @@ package system
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
 )
 
-func configureKubernetesSettings() error {
-	if err := setCloudProvider(); err != nil {
+func (s *Snow) configureKubernetesSettings() error {
+	if err := s.setCloudProvider(); err != nil {
 		return errors.Wrap(err, "Error setting K8s cloud provider")
 	}
 
-	if err := setProviderID(); err != nil {
+	if err := s.setProviderID(); err != nil {
 		return errors.Wrap(err, "Error setting K8s provider id")
 	}
 
-	if err := setNodeIP(); err != nil {
+	if err := s.setNodeIP(); err != nil {
+		return errors.Wrap(err, "Error setting K8s node ip")
+	}
+
+	if err := s.allowUnsafeSysctls(); err != nil {
 		return errors.Wrap(err, "Error setting K8s node ip")
 	}
 
 	return nil
 }
 
-func setCloudProvider() error {
-	cmd := exec.Command(utils.ApiclientBinary, "set", `kubernetes.cloud-provider=""`)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "Error running command: %v, output: %s\n", cmd, string(out))
-	}
-	return nil
+func (s *Snow) setCloudProvider() error {
+	return s.api.SetKubernetesCloudProvider("")
 }
 
-func setNodeIP() error {
+func (s *Snow) setNodeIP() error {
 	nodeIPConfiguredPath := filepath.Join(bootstrapContainerPath, "nodeip.configured")
 
 	// only set K8s node ip once after reboot
@@ -48,9 +46,8 @@ func setNodeIP() error {
 		return errors.Wrap(err, "Error getting current ip address")
 	}
 
-	cmd := exec.Command(utils.ApiclientBinary, "set", "kubernetes.node-ip="+ip)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "Error running command: %v, output: %s\n", cmd, string(out))
+	if err := s.api.SetKubernetesNodeIP(ip); err != nil {
+		return err
 	}
 
 	// Write node ip configured file to make sure the node ip is only configured once
@@ -61,18 +58,12 @@ func setNodeIP() error {
 	return nil
 }
 
-func setProviderID() error {
+func (s *Snow) setProviderID() error {
 	id, err := instanceID()
 	if err != nil {
 		errors.Wrap(err, "error getting instance id")
 	}
-
-	cmd := exec.Command(utils.ApiclientBinary, "set", "kubernetes.provider-id=aws-snow:////"+id)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "Error running command: %v, output: %s\n", cmd, string(out))
-	}
-
-	return nil
+	return s.api.SetKubernetesProviderID("aws-snow:////" + id)
 }
 
 func instanceID() (string, error) {
@@ -83,4 +74,11 @@ func instanceID() (string, error) {
 	}
 
 	return string(body), nil
+}
+
+func (s *Snow) allowUnsafeSysctls() error {
+	sysctls := []string{
+		"net.ipv4.tcp_mtu_probing",
+	}
+	return s.api.SetKubernetesAllowUnsafeSysctls(sysctls)
 }

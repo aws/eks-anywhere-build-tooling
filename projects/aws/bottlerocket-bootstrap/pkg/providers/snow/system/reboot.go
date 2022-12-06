@@ -2,13 +2,11 @@ package system
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/pkg/errors"
 
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 )
 
 const (
@@ -17,7 +15,7 @@ const (
 
 var rebootedPath = filepath.Join(bootstrapContainerPath, "rebooted")
 
-func rebootInstanceIfNeeded() error {
+func (s *Snow) rebootInstanceIfNeeded() error {
 	// Skip reboot when instance is already rebooted once
 	if files.PathExists(rebootedPath) {
 		return nil
@@ -28,17 +26,9 @@ func rebootInstanceIfNeeded() error {
 		return errors.Wrap(err, "Error writing rebooted file")
 	}
 
-	if err := reboot(); err != nil {
+	if err := s.api.Reboot(); err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func reboot() error {
-	cmd := exec.Command(utils.ApiclientBinary, "reboot")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "Error running command: %v, output: %s\n", cmd, string(out))
-	}
 	return nil
 }
