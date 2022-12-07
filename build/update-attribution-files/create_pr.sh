@@ -104,6 +104,12 @@ This PR updates the Help.mk files across all dependency projects if there have b
 EOF
 )
         ;;
+    go-mod)
+        pr_body=$(cat <<'EOF'
+This PR updates the checked in go.mod and go.sum files across all dependency projects to support automated vulnerability scanning.
+EOF
+)
+        ;;
     *)
         echo "Invalid argument: $1"
         exit 1
@@ -138,6 +144,15 @@ function pr::create::help() {
     local -r commit_message="[PR BOT] Update Help.mk files"
     local -r pr_branch="help-makefiles-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "makehelp")
+
+    pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
+}
+
+function pr::create::go-mod() {
+    local -r pr_title="Update go.mod files"
+    local -r commit_message="[PR BOT] Update go.mod files"
+    local -r pr_branch="go-mod-update-$MAIN_BRANCH"
+    local -r pr_body=$(pr::create::pr_body "go-mod")
 
     pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
 }
@@ -195,4 +210,21 @@ for FILE in $(find . -type f \( -name Help.mk -o -name Makefile \)); do
     pr::file:add $FILE
 done
 
+# Not handling go.sum/go.mod yet in eks-a
+# stash go.sum files
+#git stash --keep-index
+
 pr::create::help
+
+# git checkout $MAIN_BRANCH
+
+# if [ "$(git stash list)" != "" ]; then
+#     git stash pop
+# fi
+
+# # Add go.mod files
+# for FILE in $(find . -type f \( -name go.sum -o -name go.mod \)); do    
+#     git check-ignore -q $FILE || git add $FILE
+# done
+
+# pr::create::go-mod

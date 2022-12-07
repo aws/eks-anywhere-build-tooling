@@ -13,25 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
-set -o errexit
-set -o nounset
+set -e
 set -o pipefail
+set -x
 
-SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-source "${SCRIPT_ROOT}/common.sh"
+function registry_ready() {
+  for i in {1..24}
+  do
+    if ! curl http://$IMAGE_REPO/ > /dev/null 2>&1;
+    then
+      echo "Local registry at ${IMAGE_REPO} is not running. Retrying."
+      sleep 5
+    else
+      exit 0
+    fi
+  done
+  echo "Local registry at ${IMAGE_REPO} is not available"
+  exit 1
+}
 
-if [[ -z "$JOB_TYPE" ]]; then
-    exit 0
-fi
-
-GOPATH=$GOPATH
-if [ -d "/go" ]; then
-    GOPATH="/go"
-fi
-
-for go in $GOPATH/go*/bin/go; do
-    VERSION=$($go version | grep -o "go[0-9].* " | grep -o "[0-9\.]*")
-    NOPATCH=$(cut -d. -f"1,2" <<< $VERSION)
-    sed -i "s,\${GOLANG${NOPATCH//./}_VERSION:-.*},\${GOLANG${NOPATCH//./}_VERSION:-$VERSION}," ./build/lib/install_go_versions.sh 
-done
+registry_ready
