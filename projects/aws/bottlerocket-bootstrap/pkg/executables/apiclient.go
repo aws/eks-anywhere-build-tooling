@@ -18,7 +18,7 @@ func NewAPIClient() *APIClient {
 }
 
 func (a *APIClient) SetKubernetesCloudProvider(cloudProvider string) error {
-	_, err := a.Execute("set", fmt.Sprintf("kubernetes.cloud-providers=%q", cloudProvider))
+	_, err := a.Execute("set", fmt.Sprintf("kubernetes.cloud-provider=%q", cloudProvider))
 	return err
 }
 
