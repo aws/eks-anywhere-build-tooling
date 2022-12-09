@@ -19,6 +19,11 @@ source "${BUILD_ROOT}/eksd_releases.sh"
 USE_DOCKER="${USE_DOCKER:-false}"
 USE_BUILDCTL="${USE_BUILDCTL:-false}"
 
+# go-licenses can be a bit noisy with its output and lot of it can be confusing 
+# the following messages are safe to ignore since we do not need the license url for our process
+NOISY_MESSAGES="cannot determine URL for|Error discovering license URL|unsupported package host|contains non-Go code|has empty version|vendor.*\.s$"
+
+
 function build::common::ensure_tar() {
   if [[ -n "${TAR:-}" ]]; then
     return
@@ -93,10 +98,9 @@ function build::common::upload_artifacts() {
   fi
 }
 
-function build::gather_licenses() {
+function build::gather_licenses::prereqs() {
   local -r outputdir=$1
-  local -r patterns=$2
-  local -r golang_version=$3
+  local -r golang_version=$2
 
   # Force deps to only be pulled form vendor directories
   # this is important in a couple cases where license files
@@ -116,33 +120,40 @@ function build::gather_licenses() {
 
   if [ -z "${USE_HOST_GO_LICENSES:-}" ]; then    
     build::common::override_missing_tooling go-licenses
-  fi  
-  
+  fi
+
   mkdir -p "${outputdir}/attribution"
-  # attribution file generated uses the output go-deps and go-license to gather the necessary
-  # data about each dependency to generate the amazon approved attribution.txt files
-  # go-deps is needed for module versions
-  # go-licenses are all the dependencies found from the module(s) that were passed in via patterns
-  echo "($(pwd)) \$ go list -deps=true -json ./..."
-  if ! list=$(go list -deps=true -json ./...); then
-    printf "$list"
-    exit 1 
-  fi
+}
 
-  if ! echo $list | jq -s '' > "${outputdir}/attribution/go-deps.json"; then
-    exit 1
-  fi
+function build::gather_licenses::go_deps() {
+  local -r outputdir=$1
   
+  build::common::echo_and_run go list -deps=true -json ./... > >(jq '.' > "${outputdir}/attribution/go-deps.json")
+}
 
-  # go-licenses can be a bit noisy with its output and lot of it can be confusing 
-  # the following messages are safe to ignore since we do not need the license url for our process
-  NOISY_MESSAGES="cannot determine URL for|Error discovering license URL|unsupported package host|contains non-Go code|has empty version|vendor.*\.s$"
+function build::gather_licenses::licenses_save() {
+  local -r outputdir=$1
+  local -r patterns=$2
 
-  echo "($(pwd)) \$ go-licenses save --force $patterns --save_path ${outputdir}/LICENSES"
-  go-licenses save --force $patterns --save_path "${outputdir}/LICENSES" &>  >(grep -vE "$NOISY_MESSAGES" >&2)
+  build::common::echo_and_run go-licenses save --force $patterns --save_path "${outputdir}/LICENSES" 2>  >(grep -vE "$NOISY_MESSAGES")
+  
+  # go-license is pretty eager to copy src for certain license types
+  # when it does, it applies strange permissions to the copied files
+  # which makes deleting them later awkward
+  # this behavior may change in the future with the following PR
+  # https://github.com/google/go-licenses/pull/28
+  # We can delete these additional files because we are running go mod vendor
+  # prior to this call so we know the source is the same as upstream
+  # go-licenses is copying this code because it doesnt know if its be modified or not
+  chmod -R 777 "${outputdir}/LICENSES"
+  find "${outputdir}/LICENSES" -type f \( -name '*.yml' -o -name '*.go' -o -name '*.mod' -o -name '*.sum' -o -name '*gitignore' \) -delete
+}
 
-  echo "($(pwd)) \$ go-licenses csv $patterns"
-  go-licenses csv $patterns > "${outputdir}/attribution/go-license.csv" 2>  >(grep -vE "$NOISY_MESSAGES" >&2)
+function build::gather_licenses::licenses_csv() {
+  local -r outputdir=$1
+  local -r patterns=$2
+
+  build::common::echo_and_run go-licenses csv $patterns > "${outputdir}/attribution/go-license.csv" 2>  >(grep -vE "$NOISY_MESSAGES")
 
   if cat "${outputdir}/attribution/go-license.csv" | grep -q "^vendor\/golang.org\/x"; then
       echo " go-licenses created a file with a std golang package (golang.org/x/*)"
@@ -159,24 +170,34 @@ function build::gather_licenses() {
     echo " please look into removing the dependency"
     exit 1
   fi
+}
 
-  # go-license is pretty eager to copy src for certain license types
-  # when it does, it applies strange permissions to the copied files
-  # which makes deleting them later awkward
-  # this behavior may change in the future with the following PR
-  # https://github.com/google/go-licenses/pull/28
-  # We can delete these additional files because we are running go mod vendor
-  # prior to this call so we know the source is the same as upstream
-  # go-licenses is copying this code because it doesnt know if its be modified or not
-  chmod -R 777 "${outputdir}/LICENSES"
-  find "${outputdir}/LICENSES" -type f \( -name '*.yml' -o -name '*.go' -o -name '*.mod' -o -name '*.sum' -o -name '*gitignore' \) -delete
+function build::gather_licenses::root_module() {
+  local -r outputdir=$1
 
-  # most of the packages show up the go-license.csv file as the module name
-  # from the go.mod file, storing that away since the source dirs usually get deleted
-  MODULE_NAME=$(go mod edit -json | jq -r '.Module.Path')
-  if [ ! -f ${outputdir}/attribution/root-module.txt ]; then
-  	echo $MODULE_NAME > ${outputdir}/attribution/root-module.txt
+  if [ -f ${outputdir}/attribution/root-module.txt ]; then
+    return
   fi
+
+  build::common::echo_and_run go mod edit -json | \
+    jq -sRr '. as $raw | try (fromjson | .Module.Path) catch $raw' \
+    > ${outputdir}/attribution/root-module.txt  
+}
+
+function build::gather_licenses() {
+  local -r outputdir=$1
+  local -r patterns=$2
+  local -r golang_version=$3
+
+  build::gather_licenses::prereqs $outputdir $golang_version
+
+  build::gather_licenses::go_deps $outputdir
+
+  # build::gather_licenses::licenses_save $outputdir $patterns
+
+  # build::gather_licenses::licenses_csv $outputdir $patterns
+
+  build::gather_licenses::root_module $outputdir
 }
 
 function build::non-golang::gather_licenses(){
@@ -445,6 +466,6 @@ function build::common::override_missing_tooling() {
 }
 
 function build::common::echo_and_run() {
-  echo "($(pwd)) \$ $*"
+  >&2 echo "($(pwd)) \$ $*"
   "$@"
 }

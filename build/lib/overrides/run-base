@@ -44,14 +44,19 @@ GOFLAGS=${GOFLAGS:-}
 CONTEXT=$(realpath $(build::common::find_project_root_from_pwd))
 
 RELATIVE_PROJECT_MOUNT=$(realpath --relative-to=$CONTEXT $PROJECT_MOUNT)
+RELATIVE_GO_MOD_MOUNT="$RELATIVE_PROJECT_MOUNT"
+
 WORKDIR="/project"
 
 # when running from a subdir of REPO we need to make /project
 # point to the REPO and change the workdir to be the subdir
 #since in most cases files from above subdir are needed
 if [[ $RELATIVE_PROJECT_MOUNT == *"/"* ]]; then
-    WORKDIR+="/$(echo $RELATIVE_PROJECT_MOUNT | cut -d'/' -f2-)"
+    RELATIVE_PROJECT_SUBDIR_MOUNT="$(echo $RELATIVE_PROJECT_MOUNT | cut -d'/' -f2-)"
     RELATIVE_PROJECT_MOUNT="$(echo $RELATIVE_PROJECT_MOUNT | cut -d'/' -f1)"
+    
+    WORKDIR+="/$RELATIVE_PROJECT_SUBDIR_MOUNT"
+    # RELATIVE_GO_MOD_MOUNT+="/$RELATIVE_PROJECT_SUBDIR_MOUNT"
 fi
 
 # buildctl does not allow `.` as a bind mount
@@ -79,35 +84,47 @@ BUILD_STDERR_FILE=$(mktemp)
 DOCKERFILE_DIR=$(mktemp -d)
 
 function show_output() {
+    if [ -f $DOCKERFILE_DIR/Dockerfile ]; then
+        echo "Dockerfile"
+        cat $DOCKERFILE_DIR/Dockerfile   
+    fi
+    if [ -f $DOCKERFILE_DIR/Dockerfile.dockerignore ]; then
+        echo "Dockerfile.dockerignore"
+        cat $DOCKERFILE_DIR/Dockerfile.dockerignore 
+    fi        
+    [[ "$NEED_STDOUT" = "false" ]] || cat $LOG_FILE $BUILD_STDOUT_FILE $BUILD_STDERR_FILE
+}
+
+function handle_exit() {
     if [ $? -eq 1 ]; then
-        if [ -f $DOCKERFILE_DIR/Dockerfile ]; then
-            echo "Dockerfile"
-            cat $DOCKERFILE_DIR/Dockerfile   
+        # to handle sigterm correctly due to the fact that this can be piped/redirect
+        # to another cmd, like bash or jq, check if stdout is attached to the terminal
+        # if it is, then it wasnt redirected and can be safely written to
+        # if not, write to stderr instead (which may also be redirected in some cases)
+        if [ -t 1 ] ; then
+            show_output
+        else
+            >&2 show_output
         fi
-        if [ -f $DOCKERFILE_DIR/Dockerfile.dockerignore ]; then
-            echo "Dockerfile.dockerignore"
-            cat $DOCKERFILE_DIR/Dockerfile.dockerignore 
-        fi        
-        [[ "$NEED_STDOUT" = "false" ]] || cat $LOG_FILE $BUILD_STDOUT_FILE $BUILD_STDERR_FILE
-    elif [[ "$NEED_STDOUT" = "true" ]]; then
-        cat $BUILD_STDOUT_FILE
+    else
+        [[ "$NEED_STDOUT" = "false" ]] || cat $BUILD_STDOUT_FILE
         cat $BUILD_STDERR_FILE >&2
     fi
-
     rm -rf $BUILD_STDOUT_FILE $BUILD_STDERR_FILE $LOG_FILE $DOCKERFILE_DIR   
 }
 
-trap "show_output" EXIT
-
+trap "handle_exit" EXIT
+# trap "echo foo" SIGTERM
+# trap "echo foo1" SIGPIPE
 shopt -s expand_aliases
 #set -x
 # for certain commands the stdout is what the caller is looking for
 # store stdout and stderr to files and onyl show on failure
 if [[ "$NEED_STDOUT" = "true" ]]; then
-    CMD_ARGS="if ! $CMD_ARGS 2> /build-output.stderr 1> /build-output.stdout; then cat /build-output.stdout /build-output.stderr && exit 1; fi"
+    CMD_ARGS="if ! $CMD_ARGS > /build-output.stdout 2> /build-output.stderr; then cat /build-output.stdout /build-output.stderr && exit 1; fi"
     alias handle_output='while IFS= read -r line; do echo $line >> $LOG_FILE; done'
 else
-    CMD_ARGS="$CMD_ARGS 2> >(tee /build-output.stderr) 1> >(tee /build-output.stdout)"
+    CMD_ARGS="$CMD_ARGS > >(tee /build-output.stdout) 2> /build-output.stderr"
     alias handle_output='tee $LOG_FILE'
 fi
 
@@ -134,7 +151,7 @@ if [[ "$USE_DOCKER" = "true" ]] ; then
     GOMODCACHE=$CONTEXT/_output/.cache/go/pkg/mod/$GOLANG_VERSION
     mkdir -p $GOMODCACHE
 
-    build::docker::retry_pull $CONTAINER_IMAGE > $LOG_FILE 2>&1
+    build::common::echo_and_run build::docker::retry_pull $CONTAINER_IMAGE | handle_output
 
     # match buildctl as much as possible, use same "context" dir
     cd $CONTEXT
@@ -148,11 +165,15 @@ if [[ "$USE_DOCKER" = "true" ]] ; then
 	if [ -f $HOME/.netrc ]; then
 		NETRC="--mount type=bind,source=$HOME/.netrc,target=/root/.netrc"
 	fi
+
+    GOBIN_MOUNT=""
+    if [[ "$BUILDCTL_TARGET" = "install" ]]; then
+        GOBIN_MOUNT=--mount type=bind,source=$(pwd)/$RELATIVE_OUTPUT_MOUNT,target=$GOBIN_PATH_IN_CONTAINER
+    fi
     
     if ! build::common::echo_and_run docker run $INTERACTIVE $NETRC --rm -w $WORKDIR $USER_ID \
         --mount type=bind,source=$(pwd)/$RELATIVE_PROJECT_MOUNT,target=/project \
-        --mount type=bind,source=$(pwd)/$RELATIVE_OUTPUT_MOUNT,target=/output \
-        --mount type=bind,source=$(pwd)/$RELATIVE_OUTPUT_MOUNT,target=$GOBIN_PATH_IN_CONTAINER \
+        --mount type=bind,source=$(pwd)/$RELATIVE_OUTPUT_MOUNT,target=/output $GOBIN_MOUNT \
         --mount type=bind,source=$(pwd)/$RELATIVE_ATTRIBUTION_MOUNT,target=/attribution-output \
         --mount type=bind,source=$GOMODCACHE,target=/go/pkg/mod \
         --mount type=bind,source=$BUILD_STDOUT_FILE,target=/build-output.stdout \
@@ -214,21 +235,26 @@ RUN --mount=type=bind,source=$RELATIVE_PROJECT_MOUNT,target=/project,rw $OUTPUT_
 
 FROM scratch as vendor
 COPY --from=run /output ${RELATIVE_PROJECT_MOUNT}${WORKDIR#"/project"}/
+COPY --from=run /build-output.* ./
 
 FROM scratch as build
 COPY --from=run /output/* $RELATIVE_OUTPUT_MOUNT/
+COPY --from=run /build-output.* ./
 
 FROM scratch as licenses-save
 COPY --from=run /output/ $RELATIVE_OUTPUT_MOUNT/
+COPY --from=run /build-output.* ./
 
 FROM scratch as stdout
 COPY --from=run /build-output.* ./
 
 FROM scratch as attribution
 COPY --from=run /attribution-output/* $RELATIVE_OUTPUT_MOUNT/attribution/
+COPY --from=run /build-output.* ./
 
 FROM scratch as install
 COPY --from=run $GOBIN_PATH_IN_CONTAINER/* $RELATIVE_OUTPUT_MOUNT/
+COPY --from=run /build-output.* ./
 
 EOF
 
@@ -244,7 +270,7 @@ if ! build::common::echo_and_run $BUILD_LIB_ROOT/buildkit.sh build \
     --local context=$CONTEXT \
     --progress plain \
     --opt target=$BUILDCTL_TARGET $NETRC \
-    --output type=local,dest=$CONTEXT | handle_output 2>&1; then
+    --output type=local,dest=$CONTEXT | handle_output; then
     exit 1
 fi
 
