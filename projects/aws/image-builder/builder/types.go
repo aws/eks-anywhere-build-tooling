@@ -44,6 +44,7 @@ type VsphereConfig struct {
 	ResourcePool       string `json:"resource_pool"`
 	Template           string `json:"template"`
 	VcenterServer      string `json:"vcenter_server"`
+	VsphereLibraryName string `json:"vsphere_library_name"`
 	Username           string `json:"username"`
 	Password           string `json:"password"`
 	IsoConfig
