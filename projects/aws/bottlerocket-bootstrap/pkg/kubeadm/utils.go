@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
@@ -16,6 +17,8 @@ import (
 
 const (
 	apiServerManifestPath = "/.bottlerocket/rootfs/etc/kubernetes/manifests/kube-apiserver"
+	ebsInitMarker         = "/tmp/run-ebs-init"
+	ebsInitScript         = "/tmp/ebs-init.sh"
 )
 
 func getBootstrapToken() (string, error) {
@@ -169,4 +172,61 @@ func unmarshalIntoMap(content []byte) (map[string]interface{}, error) {
 	}
 
 	return parsedMap, err
+}
+
+type EbsInitControl struct {
+	Command *exec.Cmd
+	Timeout <-chan time.Time
+}
+
+// startEbsInit starts the ebs-init script in the background
+// if marker file is present. Currenlty ebs-init is best-effort
+// and if it fails it won't prevent the instance from bootstrapping.
+// A 2 minutes timeout is added so that instance bootstrap time is
+// not inflated.
+func startEbsInit() *EbsInitControl {
+	if _, err := os.Stat(ebsInitMarker); err == nil {
+
+		if err = createEbsInitScript(); err != nil {
+			fmt.Printf("Failed to create ebs-init script")
+			return nil
+		}
+		cmd := exec.Command("bash", "-c", ebsInitScript)
+		if err = cmd.Start(); err != nil {
+			fmt.Printf("Failed starting ebs-init with %v \n", err)
+			return nil
+		}
+		fmt.Printf("Starting ebs-init \n")
+		ebsInitControl := &EbsInitControl{}
+		ebsInitControl.Timeout = time.After(2 * time.Minute)
+		ebsInitControl.Command = cmd
+		return ebsInitControl
+	} else {
+		fmt.Printf("Skipping ebs initialization \n")
+		return nil
+	}
+}
+
+// createEbsInitScript writes the ebs-init script contents to disk
+func createEbsInitScript() error {
+	fmt.Printf("Creating %s file \n", ebsInitScript)
+	contents := `
+#!/bin/bash
+# This script is meant to initialize EBS volumes
+# by reading all files on the filesystem.
+# Doing so will prevent potential blocked IO in
+# the event where the instance is running on 
+# Outpost and the Outpost gets disconnected
+# before EBS is synced from region.
+
+find /.bottlerocket -not \( -path "/.bottlerocket/rootfs/proc" -prune \) \
+-not \( -path "/.bottlerocket/rootfs/sys" -prune \) \
+-not \( -path "/.bottlerocket/rootfs/run" -prune \) -type f -print0 \
+| xargs -0 -I {} dd if={} of=/dev/null bs=1M &> /dev/null
+`
+	err := os.WriteFile(ebsInitScript, []byte(contents), 0655)
+	if err != nil {
+		return err
+	}
+	return nil
 }
