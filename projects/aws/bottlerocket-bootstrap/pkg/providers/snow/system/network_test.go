@@ -50,17 +50,17 @@ var networkConfigTest = []struct {
 primary = true
 [dni0.static4]
 addresses = ["address0"]
-[dni0.route]
+[[dni0.route]]
 to = "default"
 via = "gateway0"
 [dni1.static4]
 addresses = ["address1"]
-[dni1.route]
+[[dni1.route]]
 to = "default"
 via = "gateway1"
 [dni2.static4]
 addresses = ["address2"]
-[dni2.route]
+[[dni2.route]]
 to = "default"
 via = "gateway2"
 [eth0.static4]

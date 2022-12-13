@@ -1,14 +1,29 @@
 package executables
 
 import (
+	"encoding/json"
 	"fmt"
-	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 )
 
 type APIClient struct {
 	Executable
+}
+
+type APISetting struct {
+	Kernel     *Kernel     `json:"kernel,omitempty"`
+	Kubernetes *Kubernetes `json:"kubernetes,omitempty"`
+}
+
+type Kernel struct {
+	Sysctl map[string]string `json:"sysctl,omitempty"`
+}
+
+type Kubernetes struct {
+	AllowedUnsafeSysctls []string `json:"allowed-unsafe-sysctls,omitempty"`
 }
 
 func NewAPIClient() *APIClient {
@@ -32,27 +47,12 @@ func (a *APIClient) SetKubernetesProviderID(id string) error {
 	return err
 }
 
-func (a *APIClient) SetKubernetesAllowUnsafeSysctls(sysctls []string) error {
-	q := make([]string, len(sysctls))
-	for idx, ctl := range sysctls {
-		q[idx] = fmt.Sprintf("%q", ctl)
+func (a *APIClient) Set(setting *APISetting) error {
+	config, err := json.Marshal(setting)
+	if err != nil {
+		return errors.Wrap(err, "error json marshalling api setting")
 	}
-	_, err := a.Execute("set", fmt.Sprintf("allowed-unsafe-sysctls=[%s]", strings.Join(q[:], ",")))
-	return err
-}
-
-func (a *APIClient) SetKernelRmemMax(size string) error {
-	_, err := a.Execute("set", "kernel.sysctl.net.core.rmem_max="+size)
-	return err
-}
-
-func (a *APIClient) SetKernelWmemMax(size string) error {
-	_, err := a.Execute("set", "kernel.sysctl.net.core.wmem_max="+size)
-	return err
-}
-
-func (a *APIClient) SetKernelCorePattern(pattern string) error {
-	_, err := a.Execute("set", fmt.Sprintf("kernel.core_pattern=%q", pattern))
+	_, err = a.Execute("set", "--json", string(config))
 	return err
 }
 

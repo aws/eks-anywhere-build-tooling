@@ -14,10 +14,7 @@ type APIClient interface {
 	SetKubernetesCloudProvider(cloudProvider string) error
 	SetKubernetesNodeIP(ip string) error
 	SetKubernetesProviderID(id string) error
-	SetKubernetesAllowUnsafeSysctls(sysctls []string) error
-	SetKernelRmemMax(size string) error
-	SetKernelWmemMax(size string) error
-	SetKernelCorePattern(pattern string) error
+	Set(setting *executables.APISetting) error
 	Reboot() error
 }
 

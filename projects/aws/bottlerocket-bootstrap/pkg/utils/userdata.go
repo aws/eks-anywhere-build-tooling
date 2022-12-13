@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	userDataFile      = "/.bottlerocket/host-containers/current/user-data"
-	awsSecretsManager = "AWSSecretsManager"
+	hostContainerUserDataFile      = "/.bottlerocket/host-containers/current/user-data"
+	bootstrapContainerUserDataFile = "/.bottlerocket/bootstrap-containers/current/user-data"
+	awsSecretsManager              = "AWSSecretsManager"
 )
 
 type WriteFile struct {
@@ -52,14 +53,22 @@ type UserData struct {
 	RunCmd       string      `yaml:"runcmd"`
 }
 
-func ResolveUserData() (*UserData, error) {
+func buildUserData(filePath string) (*UserData, error) {
 	fmt.Println("Reading userdata file")
 	// read userdata from the file
-	data, err := ioutil.ReadFile(userDataFile)
+	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error reading user data file")
 	}
 	return processUserData(data)
+}
+
+func ResolveBootstrapContainerUserData() (*UserData, error) {
+	return buildUserData(bootstrapContainerUserDataFile)
+}
+
+func ResolveHostContainerUserData() (*UserData, error) {
+	return buildUserData(hostContainerUserDataFile)
 }
 
 func processUserData(data []byte) (*UserData, error) {
