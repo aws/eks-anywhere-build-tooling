@@ -57,7 +57,7 @@ func Bootstrap() {
 
 	fmt.Println("Initiating bottlerocket bootstrap")
 	acquireLock()
-	userData, err := utils.ResolveUserData()
+	userData, err := utils.ResolveHostContainerUserData()
 	if err != nil {
 		fmt.Printf("Error parsing user-data: %v\n", err)
 		os.Exit(1)

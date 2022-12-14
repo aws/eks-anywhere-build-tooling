@@ -1,6 +1,8 @@
 package system
 
-import "github.com/pkg/errors"
+import (
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/executables"
+)
 
 const (
 	// Temporary hardcoded kernel config values for beta.
@@ -10,17 +12,20 @@ const (
 )
 
 func (s *Snow) configureKernelSettings() error {
-	if err := s.api.SetKernelRmemMax(maxSocketBufferSize); err != nil {
-		return errors.Wrap(err, "Error setting kernel maximum socket receive buffer size")
+	kernelSetting := &executables.APISetting{
+		Kubernetes: &executables.Kubernetes{
+			AllowedUnsafeSysctls: []string{
+				"net.ipv4.tcp_mtu_probing",
+			},
+		},
+		Kernel: &executables.Kernel{
+			Sysctl: map[string]string{
+				"net.core.rmem_max":   maxSocketBufferSize,
+				"net.core.wmem_max":   maxSocketBufferSize,
+				"kernel.core_pattern": kernelCorePattern,
+			},
+		},
 	}
 
-	if err := s.api.SetKernelWmemMax(maxSocketBufferSize); err != nil {
-		return errors.Wrap(err, "Error setting kernel maximum socket send buffer size")
-	}
-
-	if err := s.api.SetKernelCorePattern(kernelCorePattern); err != nil {
-		return errors.Wrap(err, "Error setting kernel core pattern")
-	}
-
-	return nil
+	return s.api.Set(kernelSetting)
 }

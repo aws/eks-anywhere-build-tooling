@@ -37,21 +37,21 @@ func TestSetKubernetesCloudProvider(t *testing.T) {
 		{
 			testName:      "cloud provider empty string",
 			cloudProvider: "",
-			args:          []string{"set", `kubernetes.cloud-providers=""`},
+			args:          []string{"set", `kubernetes.cloud-provider=""`},
 			returnError:   false,
 			wantError:     false,
 		},
 		{
 			testName:      "cloud provider aws",
 			cloudProvider: "aws",
-			args:          []string{"set", `kubernetes.cloud-providers="aws"`},
+			args:          []string{"set", `kubernetes.cloud-provider="aws"`},
 			returnError:   false,
 			wantError:     false,
 		},
 		{
 			testName:      "cloud provider empty, error",
 			cloudProvider: "",
-			args:          []string{"set", `kubernetes.cloud-providers=""`},
+			args:          []string{"set", `kubernetes.cloud-provider=""`},
 			returnError:   true,
 			wantError:     true,
 		},
@@ -169,25 +169,44 @@ func TestSetKubernetesProviderID(t *testing.T) {
 	}
 }
 
-func TestSetKubernetesAllowUnsafeSysctls(t *testing.T) {
+func TestAPISet(t *testing.T) {
 	tests := []struct {
 		testName    string
-		sysctls     []string
+		setting     *executables.APISetting
 		args        []string
 		wantError   bool
 		returnError bool
 	}{
 		{
-			testName:    "valid",
-			sysctls:     []string{"sysctl-1", "sysctl-2", "sysctl-3"},
-			args:        []string{"set", `allowed-unsafe-sysctls=["sysctl-1","sysctl-2","sysctl-3"]`},
+			testName: "kernel config",
+			setting: &executables.APISetting{
+				Kernel: &executables.Kernel{
+					Sysctl: map[string]string{
+						"net.core.rmem_max":   "0123",
+						"net.core.wmem_max":   "0123",
+						"kernel.core_pattern": "/var/corefile/core.%e.%p.%h.%t",
+					},
+				},
+				Kubernetes: &executables.Kubernetes{
+					AllowedUnsafeSysctls: []string{
+						"net.ipv4.tcp_mtu_probing",
+					},
+				},
+			},
+			args:        []string{"set", "--json", `{"kernel":{"sysctl":{"kernel.core_pattern":"/var/corefile/core.%e.%p.%h.%t","net.core.rmem_max":"0123","net.core.wmem_max":"0123"}},"kubernetes":{"allowed-unsafe-sysctls":["net.ipv4.tcp_mtu_probing"]}}`},
 			returnError: false,
 			wantError:   false,
 		},
 		{
-			testName:    "exec error",
-			sysctls:     []string{"sysctl-1"},
-			args:        []string{"set", `allowed-unsafe-sysctls=["sysctl-1"]`},
+			testName: "exec error",
+			setting: &executables.APISetting{
+				Kernel: &executables.Kernel{
+					Sysctl: map[string]string{
+						"kernel.core_pattern": "pattern-1",
+					},
+				},
+			},
+			args:        []string{"set", "--json", `{"kernel":{"sysctl":{"kernel.core_pattern":"pattern-1"}}}`},
 			returnError: true,
 			wantError:   true,
 		},
@@ -202,136 +221,7 @@ func TestSetKubernetesAllowUnsafeSysctls(t *testing.T) {
 				tt.e.EXPECT().Execute(tc.args).Return([]byte{}, nil)
 			}
 
-			err := tt.a.SetKubernetesAllowUnsafeSysctls(tc.sysctls)
-			if tc.wantError {
-				tt.Expect(err).NotTo(BeNil())
-			} else {
-				tt.Expect(err).To(BeNil())
-			}
-		})
-	}
-}
-
-func TestSetKernelRmemMax(t *testing.T) {
-	tests := []struct {
-		testName    string
-		size        string
-		args        []string
-		wantError   bool
-		returnError bool
-	}{
-		{
-			testName:    "valid",
-			size:        "0123",
-			args:        []string{"set", "kernel.sysctl.net.core.rmem_max=0123"},
-			returnError: false,
-			wantError:   false,
-		},
-		{
-			testName:    "exec error",
-			size:        "0123",
-			args:        []string{"set", "kernel.sysctl.net.core.rmem_max=0123"},
-			returnError: true,
-			wantError:   true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.testName, func(t *testing.T) {
-			tt := newAPIClientTest(t)
-			if tc.returnError {
-				tt.e.EXPECT().Execute(tc.args).Return(nil, errors.New("exec error"))
-			} else {
-				tt.e.EXPECT().Execute(tc.args).Return([]byte{}, nil)
-			}
-
-			err := tt.a.SetKernelRmemMax(tc.size)
-			if tc.wantError {
-				tt.Expect(err).NotTo(BeNil())
-			} else {
-				tt.Expect(err).To(BeNil())
-			}
-		})
-	}
-}
-
-func TestSetKernelWmemMax(t *testing.T) {
-	tests := []struct {
-		testName    string
-		size        string
-		args        []string
-		wantError   bool
-		returnError bool
-	}{
-		{
-			testName:    "valid",
-			size:        "0123",
-			args:        []string{"set", "kernel.sysctl.net.core.wmem_max=0123"},
-			returnError: false,
-			wantError:   false,
-		},
-		{
-			testName:    "exec error",
-			size:        "0123",
-			args:        []string{"set", "kernel.sysctl.net.core.wmem_max=0123"},
-			returnError: true,
-			wantError:   true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.testName, func(t *testing.T) {
-			tt := newAPIClientTest(t)
-			if tc.returnError {
-				tt.e.EXPECT().Execute(tc.args).Return(nil, errors.New("exec error"))
-			} else {
-				tt.e.EXPECT().Execute(tc.args).Return([]byte{}, nil)
-			}
-
-			err := tt.a.SetKernelWmemMax(tc.size)
-			if tc.wantError {
-				tt.Expect(err).NotTo(BeNil())
-			} else {
-				tt.Expect(err).To(BeNil())
-			}
-		})
-	}
-}
-
-func TestSetKernelCorePattern(t *testing.T) {
-	tests := []struct {
-		testName    string
-		pattern     string
-		args        []string
-		wantError   bool
-		returnError bool
-	}{
-		{
-			testName:    "valid",
-			pattern:     "pattern-1",
-			args:        []string{"set", `kernel.core_pattern="pattern-1"`},
-			returnError: false,
-			wantError:   false,
-		},
-		{
-			testName:    "exec error",
-			pattern:     "pattern-1",
-			args:        []string{"set", `kernel.core_pattern="pattern-1"`},
-			returnError: true,
-			wantError:   true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.testName, func(t *testing.T) {
-			tt := newAPIClientTest(t)
-			if tc.returnError {
-				tt.e.EXPECT().Execute(tc.args).Return(nil, errors.New("exec error"))
-			} else {
-				tt.e.EXPECT().Execute(tc.args).Return([]byte{}, nil)
-			}
-
-			err := tt.a.SetKernelCorePattern(tc.pattern)
+			err := tt.a.Set(tc.setting)
 			if tc.wantError {
 				tt.Expect(err).NotTo(BeNil())
 			} else {

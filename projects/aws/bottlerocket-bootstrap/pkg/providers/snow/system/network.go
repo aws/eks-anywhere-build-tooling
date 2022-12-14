@@ -32,9 +32,9 @@ var (
 	currentIPPath = filepath.Join(rootfs, "/var/lib/netdog/current_ip")
 )
 
-type network struct {
-	dniCount int        `yaml:"dniCount"`
-	static   []StaticIP `yaml:"static,omitempty"`
+type Network struct {
+	DniCount int        `yaml:"dniCount"`
+	Static   []StaticIP `yaml:"static,omitempty"`
 }
 
 type StaticIP struct {
@@ -104,21 +104,21 @@ func networkMapping() ([]NetworkMapping, error) {
 		return nil, errors.Wrap(err, "error parsing network file")
 	}
 
-	if len(dniList) != network.dniCount {
+	if len(dniList) != network.DniCount {
 		return nil, errors.Wrap(err, "the number of DNI found does not match the dniCount in the network file")
 	}
 
-	if len(network.static) > 0 && len(network.static) < network.dniCount {
+	if len(network.Static) > 0 && len(network.Static) < network.DniCount {
 		return nil, errors.Wrap(err, "mix of using DHCP and static IP is not supported")
 	}
 
-	m := make([]NetworkMapping, network.dniCount)
+	m := make([]NetworkMapping, 0, network.DniCount)
 	for i, dni := range dniList {
 		n := NetworkMapping{
 			DNI: dni,
 		}
-		if len(network.static) > 0 {
-			n.StaticIP = &network.static[i]
+		if len(network.Static) > 0 {
+			n.StaticIP = &network.Static[i]
 		}
 		m = append(m, n)
 	}
@@ -126,14 +126,14 @@ func networkMapping() ([]NetworkMapping, error) {
 	return m, nil
 }
 
-func parseNetworkFile() (*network, error) {
-	userData, err := utils.ResolveUserData()
+func parseNetworkFile() (*Network, error) {
+	userData, err := utils.ResolveBootstrapContainerUserData()
 	if err != nil {
 		return nil, errors.Wrap(err, "error resolving user data")
 	}
 	for _, file := range userData.WriteFiles {
 		if file.Path == networkFilePath {
-			network := &network{}
+			network := &Network{}
 			err := yaml.Unmarshal([]byte(file.Content), network)
 			if err != nil {
 				return nil, errors.Wrap(err, "error unmarshalling network file content")

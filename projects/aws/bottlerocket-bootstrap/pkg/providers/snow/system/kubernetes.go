@@ -22,10 +22,6 @@ func (s *Snow) configureKubernetesSettings() error {
 		return errors.Wrap(err, "Error setting K8s node ip")
 	}
 
-	if err := s.allowUnsafeSysctls(); err != nil {
-		return errors.Wrap(err, "Error setting K8s node ip")
-	}
-
 	return nil
 }
 
@@ -74,11 +70,4 @@ func instanceID() (string, error) {
 	}
 
 	return string(body), nil
-}
-
-func (s *Snow) allowUnsafeSysctls() error {
-	sysctls := []string{
-		"net.ipv4.tcp_mtu_probing",
-	}
-	return s.api.SetKubernetesAllowUnsafeSysctls(sysctls)
 }
