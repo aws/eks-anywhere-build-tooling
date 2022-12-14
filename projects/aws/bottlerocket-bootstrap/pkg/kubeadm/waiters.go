@@ -1,6 +1,7 @@
 package kubeadm
 
 import (
+	"fmt"
 	"os/exec"
 	"time"
 
@@ -43,4 +44,19 @@ func killCmdAfterJoinFilesGeneration(cmd *exec.Cmd) error {
 		"/var/lib/kubeadm/pki/ca.crt",
 	}
 	return utils.KillCmdAfterFilesGeneration(cmd, checkFiles)
+}
+
+// checkEbsInit checks the execution of ebs-init goroutine,
+// the goroutine will be stopped if timeout is reached
+func checkEbsInit(ctrl *EbsInitControl) {
+
+	select {
+	case <-ctrl.Timeout:
+		ctrl.Cancel()
+		fmt.Printf("Killing ebs-init, timeout reached \n")
+		return
+	case <-ctrl.OkChan:
+		fmt.Printf("Finished ebs-init \n")
+		return
+	}
 }

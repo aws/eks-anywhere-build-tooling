@@ -18,6 +18,9 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error replacing hostname on kubeadm")
 	}
 
+	// start optional EBS initialization
+	ebsInitControl := startEbsInit()
+
 	cmd := exec.Command(kubeadmBinary, utils.LogVerbosity, "join", "phase", "control-plane-prepare", "all", "--config", kubeadmJoinFile)
 	if err := cmd.Run(); err != nil {
 		return errors.Wrapf(err, "Error running command: %v", cmd)
@@ -109,6 +112,11 @@ func controlPlaneJoin() error {
 	if err := cmd.Run(); err != nil {
 		return errors.Wrapf(err, "Error running command: %v", cmd)
 	}
+
+	if ebsInitControl != nil {
+		checkEbsInit(ebsInitControl)
+	}
+
 	return nil
 }
 

@@ -21,6 +21,9 @@ func controlPlaneInit() error {
 		return errors.Wrap(err, "Error replacing hostname on kubeadm")
 	}
 
+	// start optional EBS initialization
+	ebsInitControl := startEbsInit()
+
 	// Generate keys and write all the manifests
 	fmt.Println("Running kubeadm init commands")
 	cmd := exec.Command(kubeadmBinary, utils.LogVerbosity, "init", "phase", "certs", "all", "--config", kubeadmFile)
@@ -140,6 +143,10 @@ func controlPlaneInit() error {
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Error running command: %v, output: %s\n", cmd, string(out))
+	}
+
+	if ebsInitControl != nil {
+		checkEbsInit(ebsInitControl)
 	}
 	return nil
 }
