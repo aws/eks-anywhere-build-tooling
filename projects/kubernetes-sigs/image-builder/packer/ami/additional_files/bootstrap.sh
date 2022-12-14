@@ -11,102 +11,137 @@ touch $SCRIPT_LOG
 # restore stdout and stderr at bottom of script
 exec 3>&1 4>&2 >>$SCRIPT_LOG 2>&1
 
-# Check number of variables, given worker nodes don't need kube-vip
-if [ $# -eq 2 ]
-then
-    KUBE_VIP_IMAGE=$1
-    VIP=$2
-fi
+echo "127.0.0.1   $(hostname)" >>/etc/hosts
 
-# Using instance id as a unique hostname before we implement hostname in capas
-INSTANCE_ID=$(curl 169.254.169.254/latest/meta-data/instance-id | sed -r 's/[.]+/-/g')
-hostnamectl set-hostname "$INSTANCE_ID"
-log::info "Using hostname: $INSTANCE_ID"
-log::info "preserve_hostname: true" > /etc/cloud/cloud.cfg.d/99_hostname.cfg
-
-cat <<EOF > /etc/hosts
-127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
-::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
-127.0.0.1   $INSTANCE_ID
-EOF
+NETWORK_CONFIG_PATH=/tmp/network.yaml
+NETPLAN_CONFIG_PATH=/etc/netplan/config.yaml
 
 # configure DNI
-DNI=$(ip -br link | grep -Ev 'lo|ens3|docker0' | awk '{print $1}')
-while [ -z "$DNI" ]
+DNI_COUNT=$(grep -E "dniCount" $NETWORK_CONFIG_PATH | awk '{print $2}')
+DNI_LIST=$(ip -br link | grep -Ev 'lo|ens3' | awk '{print $1}')
+while [ -z "$DNI_LIST" ] || [[ $(echo "$DNI_LIST" | wc -l) != "$DNI_COUNT" ]]
 do
   # creating DNI is a separate api call, which has some delays
-  log::info "DNI is not ready, retry after 5 s"
+  log::info "DNI is not ready, retrying"
   sleep 5
-  DNI=$(ip -br link | grep -Ev 'lo|ens3|docker0' | awk '{print $1}')
+  DNI_LIST=$(ip -br link | grep -Ev 'lo|ens3' | awk '{print $1}')
 done
-log::info "Using DNI: $DNI"
+log::info "Using DNI: $DNI_LIST"
 
-MAC=$(ip -br link | grep -Ev 'lo|ens3|docker0' |  awk '{print $3}')
 DEFAULT_GATEWAY=$(ip r | grep default | awk '{print $3}')
-
-log::info "Using MAC: $MAC"
 log::info "Using default gateway: $DEFAULT_GATEWAY"
-cat<<EOF >/etc/netplan/config.yaml
+
+# route imds traffic to private nic
+cat<<EOF >"$NETPLAN_CONFIG_PATH"
 network:
     version: 2
     renderer: networkd
     ethernets:
-        $DNI:
-            set-name: $DNI
-            dhcp4: true
-            dhcp-identifier: mac
-            dhcp4-overrides:
-                route-metric: 50
-                send-hostname: true
-                hostname: $INSTANCE_ID
-            match:
-                macaddress: $MAC
         ens3:
             routes:
                 - to: 169.254.169.254
                   via: $DEFAULT_GATEWAY
 EOF
 
+METRIC=0
+INDEX=1
+for DNI in $(ip -br link | grep -Ev 'lo|ens3' | awk '{print $1}')
+do
+MAC=$(ip -br link | grep -E "$DNI" |  awk '{print $3}')
+if ! grep -q "static" "$NETWORK_CONFIG_PATH"
+then
+echo "Configuring DHCP"
+cat<<EOF >>"$NETPLAN_CONFIG_PATH"
+        $DNI:
+            set-name: $DNI
+            dhcp4: true
+            dhcp-identifier: mac
+            dhcp4-overrides:
+                route-metric: $METRIC
+                send-hostname: true
+                hostname: $(hostname)
+            match:
+                macaddress: $MAC
+EOF
+else
+echo "Configuring static ips: $(cat $NETWORK_CONFIG_PATH)"
+STATIC_IP=$(awk -v j="$INDEX" '/address/{i++}i==j{print;exit}' $NETWORK_CONFIG_PATH | awk '{print $3}')
+GATEWAY=$(awk -v j="$INDEX" '/gateway/{i++}i==j{print;exit}' $NETWORK_CONFIG_PATH | awk '{print $2}')
+if grep -A 2 "$STATIC_IP" "$NETWORK_CONFIG_PATH" | grep -q "primary"
+then
+METRIC=0
+else
+METRIC=50
+fi
+cat<<EOF >>"$NETPLAN_CONFIG_PATH"
+        $DNI:
+            set-name: $DNI
+            addresses:
+                - $STATIC_IP
+            routes:
+                - to: default
+                  via: $GATEWAY
+                  metric: $METRIC
+            match:
+                macaddress: $MAC
+EOF
+fi
+METRIC=50
+((INDEX=INDEX+1))
+done
+
 netplan --debug apply
 
-# wait ip leasing via DHCP for 10 s
-sleep 10
-MY_IP=$(ip route show | grep default | grep "$DNI" | awk '{print $9}')
-while [ -z "$MY_IP" ]
+sleep 5
+DNI_IP_LIST=$(ip route show | grep -Ev 'default|lo|ens3'  | awk '{print $9}' | sort | uniq)
+while [ -z "$DNI_IP_LIST" ] || [[ $(echo "$DNI_IP_LIST" | wc -l) != "$DNI_COUNT" ]]
 do
-    # if ip is not ready in 10 s, need to retry netplan apply
+    # if ip is not ready in 5 s, need to retry netplan apply
     log::info "IP is not ready, retrying"
     netplan --debug apply
-    sleep 10
-    MY_IP=$(ip route show | grep default | grep "$DNI" | awk '{print $9}')
+    sleep 5
+    DNI_IP_LIST=$(ip route show | grep -Ev 'default|lo|ens3' | awk '{print $9}' | sort | uniq)
 done
-log::info "IP leased from DHCP: $MY_IP"
-log::info "netplan applied successfully"
-
-# other network configuration
-cat <<EOF >/etc/sysctl.d/kubernetes.conf
-net.bridge.bridge-nf-call-ip6tables = 1
-net.bridge.bridge-nf-call-iptables = 1
-net.ipv4.ip_forward = 1
-EOF
-
-sysctl --system
-
-swapoff -a
+log::info "IP leased: $DNI_IP_LIST"
 
 log::info "network configuration finished"
 
-# if vip is not provided, it's a worker node, we don't need kube-vip manifest
-# if `kubeadm init` command doesn't exist in the user-data, it's not the first control plane node, we should generate the kube-vip manifest after the `kubeadm join` command finishes
-if [ $# -eq 2 ]
-then
-    if zgrep -q "kubeadm init --config /run/kubeadm/kubeadm.yaml" /var/lib/cloud/instance/user-data.txt
-  then
-    log::info "This is first control plane node, generating kube-vip manifest"
-    /etc/eks/generate-kube-vip-manifest.sh "$KUBE_VIP_IMAGE" "$VIP"
-  fi
+# mount container data volume if exists
+DEVICE=$(lsblk | grep -E vd | awk '{print $1}')
+if [ -n "$DEVICE" ]; then
+    log::info "found new device /dev/$DEVICE"
+
+    # stop containerd and kubelet
+    systemctl stop containerd
+    systemctl stop kubelet
+
+    MOUNT_POINT=/var/lib/containerd
+    BACKUP_DIR=/var/lib/containerd_backup
+
+    # backup containerd data
+    mv "$MOUNT_POINT" "$BACKUP_DIR"
+
+    # recreate dir
+    mkdir "$MOUNT_POINT"
+
+    # format disk
+    mkfs -t ext4 /dev/"$DEVICE"
+
+    # mount new device
+    echo "/dev/$DEVICE $MOUNT_POINT     ext4    defaults        0 0" >>/etc/fstab
+    mount -a
+
+    # move containerd data back
+    mv "$BACKUP_DIR"/* "$MOUNT_POINT"/
+    rm -rf "$BACKUP_DIR"
+
+    # restart containerd and kubelet
+    systemctl restart containerd
+    systemctl restart kubelet
+
+    log::info "successfully mounted new device /dev/$DEVICE"
 else
-  log::info "No VIP provided, this is worker node"
+    log::info "no new device found, skipping volume mount process"
 fi
 
 # restore stdout and stderr
