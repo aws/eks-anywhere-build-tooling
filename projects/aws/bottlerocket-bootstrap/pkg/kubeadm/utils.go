@@ -192,14 +192,14 @@ func startEbsInit() *EbsInitControl {
 		okChan := make(chan bool)
 		ctx, cancel := context.WithCancel(context.Background())
 		fmt.Printf("Starting ebs-init \n")
-		ebsInitControl := &EbsInitControl{}
-		ebsInitControl.Timeout = time.After(2 * time.Minute)
-		ebsInitControl.Cancel = cancel
-		ebsInitControl.OkChan = okChan
+		ebsInitControl := &EbsInitControl{
+			Timeout: time.After(2 * time.Minute),
+			Cancel:  cancel,
+			OkChan:  okChan,
+		}
 
 		go func(ctx context.Context, okChan chan bool) {
 			for {
-				time.Sleep(2 * time.Second)
 				select {
 				case <-ctx.Done():
 					return
