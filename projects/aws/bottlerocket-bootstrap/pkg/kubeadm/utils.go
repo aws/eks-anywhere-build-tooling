@@ -1,12 +1,16 @@
 package kubeadm
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
@@ -16,6 +20,7 @@ import (
 
 const (
 	apiServerManifestPath = "/.bottlerocket/rootfs/etc/kubernetes/manifests/kube-apiserver"
+	ebsInitMarker         = "/tmp/run-ebs-init"
 )
 
 func getBootstrapToken() (string, error) {
@@ -169,4 +174,68 @@ func unmarshalIntoMap(content []byte) (map[string]interface{}, error) {
 	}
 
 	return parsedMap, err
+}
+
+type EbsInitControl struct {
+	Cancel  context.CancelFunc
+	OkChan  chan bool
+	Timeout <-chan time.Time
+}
+
+// startEbsInit starts the ebs-init goroutine in the background
+// if marker file is present. Currenlty ebs-init is best-effort
+// and if it fails it won't prevent the instance from bootstrapping.
+// A 2 minutes timeout is added so that instance bootstrap time is
+// not inflated.
+func startEbsInit() *EbsInitControl {
+	if _, err := os.Stat(ebsInitMarker); err == nil {
+		okChan := make(chan bool)
+		ctx, cancel := context.WithCancel(context.Background())
+		fmt.Printf("Starting ebs-init \n")
+		ebsInitControl := &EbsInitControl{
+			Timeout: time.After(2 * time.Minute),
+			Cancel:  cancel,
+			OkChan:  okChan,
+		}
+
+		go func(ctx context.Context, okChan chan bool) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					readFiles()
+					okChan <- true
+					return
+				}
+			}
+
+		}(ctx, okChan)
+
+		return ebsInitControl
+	} else {
+		fmt.Printf("Skipping ebs-init \n")
+		return nil
+	}
+}
+
+// readFiles walks the filesystem tree and reads all regular files
+// skipping certain folders that contain special files.
+func readFiles() {
+	root := "/.bottlerocket/rootfs/"
+	filepath.WalkDir(root, func(path string, dirEntry fs.DirEntry, err error) error {
+
+		if dirEntry.IsDir() {
+			if dirEntry.Name() == "proc" || dirEntry.Name() == "sys" || dirEntry.Name() == "run" {
+				return filepath.SkipDir
+			}
+		} else {
+			entryInfo, _ := dirEntry.Info()
+			if entryInfo.Mode().IsRegular() {
+				ioutil.ReadFile(path)
+			}
+		}
+		return nil
+	})
+	fmt.Printf("All files read \n")
 }
