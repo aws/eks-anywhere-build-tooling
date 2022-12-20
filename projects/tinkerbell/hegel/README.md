@@ -1,5 +1,5 @@
 ## **Hegel**
-![Version](https://img.shields.io/badge/version-7b286fdc8e8fa91a6e9a179a5494b6ee29fce17b-blue)
+![Version](https://img.shields.io/badge/version-v0.10.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUFJ0a1NyeGo1SXlHVzFMWFp3YytQTk0zeXMrSE9oYUw2VFM2MUlpa0tkbmh5S3RGYUQwTzI5VC9KVUJ6ZUJYK3NZb05ZaU15SGVMMzFNSTdmL3lzUlBjPSIsIml2UGFyYW1ldGVyU3BlYyI6IllOR29JZFNSRUFoL2ROUkIiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Hegel](https://github.com/tinkerbell/hegel) is a gRPC and HTTP metadata service for Tinkerbell. Subscribes to changes in metadata, get notified when data is added/removed, etc.
@@ -13,5 +13,3 @@
 1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
-
-You should also update `HEGEL_SERVER_IMAGE` under `tinkerbell/sandbox/.env` with the new image tag once it's built.
