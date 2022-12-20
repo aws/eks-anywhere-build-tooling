@@ -122,16 +122,11 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 
 %/harbor-core: EXTRA_GO_LDFLAGS=-X $(PKG_PATH)/version.GitCommit=$(GITCOMMIT) -X $(PKG_PATH)/version.ReleaseVersion=$(RELEASEVERSION)
 
-$(call IMAGE_TARGETS_FOR_NAME, harbor-portal): clean-go-cache
-
+ifeq ($(JOB_TYPE),presubmit)
 # space is very limited in presubmit jobs, the image builds can push the total used space over the limit
 # after the binaries are built there are ~3GBs of go build/mod cache
-.PHONY: clean-go-cache
-clean-go-cache:
-	if [ "$(JOB_TYPE)" == "presubmit" ]; then \
-		source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) && go clean -modcache -cache; \
-		$(MAKE) clean-repo; \
-	fi
+$(call IMAGE_TARGETS_FOR_NAME, harbor-portal): clean-go-cache clean-repo
+endif
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_XEIPUUV_TARGET)
 
