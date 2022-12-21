@@ -400,6 +400,16 @@ BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images,)
 RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
+# Locale settings impact file ordering in ls or shell file expansion. The file order is used to
+# generate files that are subsequently validated by the CI. If local environments use different 
+# locales to the CI we get unexpected failures that are tricky to debug without knowledge of 
+# locales so we'll explicitly warn here.
+ifneq ($(call TO_LOWER, $(LANG)), c.utf-8)
+ifneq ($(call TO_LOWER, $(LANG)), posix)
+  $(warning WARNING: Environment locale set to $(LANG). This may create non-deterministic behavior when generating files. If the CI fails validation try `LANG=C.UTF-8 make <recipe>` to generate files instead.)
+endif
+endif
+
 define BUILDCTL
 	$(BUILD_LIB)/buildkit.sh \
 		build \
