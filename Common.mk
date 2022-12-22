@@ -657,7 +657,7 @@ prepare-cgo-folder:
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY COMPONENT
 %/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
-%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(GOLANG_GCC_BUILDER_IMAGE)
+%/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(CURRENT_BUILDER_BASE_IMAGE)
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
