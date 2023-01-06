@@ -393,6 +393,8 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 SPECIAL_TARGET_SECONDARY=$(strip $(PROJECT_DEPENDENCIES_TARGETS) $(GO_MOD_DOWNLOAD_TARGETS))
 SKIP_CHECKSUM_VALIDATION?=false
+CGO_DOCKER_RUN_TIMEOUT?=15m
+DOCKER_RUN_COMMAND?=$(if $(filter true,$(CODEBUILD_CI)),retry_with_timeout $(CGO_DOCKER_RUN_TIMEOUT)) docker run $(shell if [ "$(CODEBUILD_CI)" != "true" ] && [ -t 0 ]; then echo '-it'; fi)
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
@@ -428,10 +430,11 @@ define BUILDCTL
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
 endef 
 
+# This will occansionally stall out in codebuild for an unknown reason
+# retry after a configurable timeout
 define CGO_DOCKER
 	source $(BUILD_LIB)/common.sh && build::docker::retry_pull --platform $(IMAGE_PLATFORMS) $(BUILDER_IMAGE); \
-	INTERACTIVE="$(shell if [ -t 0 ]; then echo '-it'; fi)"; \
-	docker run --rm $$INTERACTIVE -w /eks-anywhere-build-tooling/projects/$(COMPONENT) $(DOCKER_USE_ID_FOR_LINUX) \
+	$(DOCKER_RUN_COMMAND) --rm -w /eks-anywhere-build-tooling/projects/$(COMPONENT) $(DOCKER_USE_ID_FOR_LINUX) \
 		--mount type=bind,source=$(BASE_DIRECTORY),target=/eks-anywhere-build-tooling \
 		--mount type=bind,source=$(GO_MOD_CACHE),target=/mod-cache \
 		-e GOPROXY=$(GOPROXY) -e GOMODCACHE=/mod-cache \

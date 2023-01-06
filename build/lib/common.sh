@@ -354,6 +354,29 @@ function retry() {
   done
 }
 
+# $1 - timeout value, should include unit (s/m/h/etc) ex: 10m
+function retry_with_timeout() {
+  TIMEOUT=$1
+  shift
+
+  local n=1
+  local max=120
+  local delay=5
+  while true; do
+    timeout $TIMEOUT "$@" && break || {
+      if [[ $n -lt $max ]]; then
+        ((n++))
+        # multiple the numeric part of the timeout by 1.5 and suffix with the last char which is the unit
+        TIMEOUT=$((${TIMEOUT:0:-1} * 3/2))${TIMEOUT: -1}
+        echo "Command failed. Attempt $n/$max with timeout ${TIMEOUT}:"
+        sleep $delay;
+      else
+        fail "The command has failed after $n attempts."
+      fi
+    }
+  done
+}
+
 function build::docker::retry_pull() {
   retry docker pull "$@"
 }
