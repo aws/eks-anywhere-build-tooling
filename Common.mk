@@ -13,7 +13,7 @@ COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
 PROJECT_PATH?=$(subst $(BASE_DIRECTORY)/,,$(MAKE_ROOT))
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
-OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
+OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO) 
 
 #################### AWS ###########################
 AWS_REGION?=us-west-2
