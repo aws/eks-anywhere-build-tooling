@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.18"
+GOLANG_VERSION?="1.19"
 
 REPO=cluster-api
 REPO_OWNER=kubernetes-sigs
@@ -27,7 +27,8 @@ HAS_S3_ARTIFACTS=true
 
 
 FIX_LICENSES_GO_JSON_TARGET=$(REPO)/vendor/github.com/github.com/ajeddeloh/go-json/LICENSE.txt
-FIX_LICENSES_TEST_CONTAINER_TARGET=$(REPO)/test/infrastructure/container/LICENSE 
+FIX_LICENSES_TEST_CONTAINER_TARGET=$(REPO)/test/infrastructure/docker/LICENSE
+FIX_LICENSES_TEST_DOCKER_TARGET=$(REPO)/test/infrastructure/container/LICENSE 
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -36,7 +37,7 @@ $(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=
 
 s3-artifacts: create-manifests
 
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET) $(FIX_LICENSES_TEST_CONTAINER_TARGET)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET) $(FIX_LICENSES_TEST_CONTAINER_TARGET) $(FIX_LICENSES_TEST_DOCKER_TARGET)
 
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
 
@@ -53,8 +54,13 @@ $(FIX_LICENSES_GO_JSON_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 			$(REPO)/vendor/github.com/ajeddeloh/go-json/LICENSE.txt;
 
 $(FIX_LICENSES_TEST_CONTAINER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
-#capd pulls in a dep in test/infra/container which does not have a LICENSE file and go-licenses does look up
-	cp $(REPO)/test/infrastructure/docker/LICENSE $@
+# capd pulls in a dep in test/infra/container which does not have a LICENSE file and go-licenses does look up
+# We use capi license instead
+	cp $(REPO)/LICENSE $@
+
+$(FIX_LICENSES_TEST_DOCKER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+# capd is a separate module but it doesn't have its own license, it inherits the one at the REPO top level. 
+	cp $(REPO)/LICENSE $@
 
 
 ########### DO NOT EDIT #############################

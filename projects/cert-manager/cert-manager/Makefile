@@ -47,7 +47,7 @@ create-manifests:
 
 .PHONY: update-cert-manager-manifest
 update-cert-manager-manifest:
-	wget -q https://github.com/cert-manager/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O build/cert-manager.yaml
+	wget -q https://github.com/cert-manager/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O manifests/cert-manager.yaml
 
 
 ########### DO NOT EDIT #############################

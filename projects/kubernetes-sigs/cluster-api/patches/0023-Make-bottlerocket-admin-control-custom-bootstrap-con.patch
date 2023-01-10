@@ -1,58 +1,45 @@
-From 89646ed173c65b66c32c3342bf1ea69283336961 Mon Sep 17 00:00:00 2001
+From dd40b00df6a640b72c133a880160ae6f1b872ddf Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Thu, 5 Jan 2023 14:56:09 -0500
-Subject: [PATCH 24/25] Make bottlerocket admin, control, custom bootstrap container
- images updatable in webhook
+Subject: [PATCH 23/26] Make bottlerocket admin, control, custom bootstrap
+ container images updatable in webhook
 
 ---
- .../v1beta1/kubeadm_control_plane_webhook.go  | 12 ++++-
+ .../v1beta1/kubeadm_control_plane_webhook.go  |  6 +++
  .../kubeadm_control_plane_webhook_test.go     | 54 +++++++++++++++++++
- 2 files changed, 64 insertions(+), 2 deletions(-)
+ 2 files changed, 60 insertions(+)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index fd9bff9b5..1cbb31bd3 100644
+index 475ec8389..d11063629 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-@@ -46,8 +46,10 @@ func (in *KubeadmControlPlane) SetupWebhookWithManager(mgr ctrl.Manager) error {
- // +kubebuilder:webhook:verbs=create;update,path=/mutate-controlplane-cluster-x-k8s-io-v1beta1-kubeadmcontrolplane,mutating=true,failurePolicy=fail,matchPolicy=Equivalent,groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes,versions=v1beta1,name=default.kubeadmcontrolplane.controlplane.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
- // +kubebuilder:webhook:verbs=create;update,path=/validate-controlplane-cluster-x-k8s-io-v1beta1-kubeadmcontrolplane,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes,versions=v1beta1,name=validation.kubeadmcontrolplane.controlplane.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
- 
--var _ webhook.Defaulter = &KubeadmControlPlane{}
--var _ webhook.Validator = &KubeadmControlPlane{}
-+var (
-+	_ webhook.Defaulter = &KubeadmControlPlane{}
-+	_ webhook.Validator = &KubeadmControlPlane{}
-+)
- 
- // Default implements webhook.Defaulter so a webhook will be registered for the type.
- func (in *KubeadmControlPlane) Default() {
-@@ -136,6 +138,9 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+@@ -141,6 +141,9 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
  	allowedPaths := [][]string{
  		{"metadata", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketAdmin", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketControl", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketCustomBootstrapContainers"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs", "*"},
-@@ -150,6 +155,9 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
- 		{spec, kubeadmConfigSpec, initConfiguration, nodeRegistration, "*"},
- 		{spec, kubeadmConfigSpec, initConfiguration, patches, directory},
+@@ -160,6 +163,9 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+ 		{spec, kubeadmConfigSpec, joinConfiguration, skipPhases},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketAdmin", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
- 		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
- 		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
- 		{spec, kubeadmConfigSpec, joinConfiguration, patches, directory},
+ 		{spec, kubeadmConfigSpec, preKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, postKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, files},
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-index 629385c6d..473cf9f4d 100644
+index 7cf158ff9..1b444e83e 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-@@ -627,12 +627,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
- 	validUpdateClusterConfBRBootstrapImage := before.DeepCopy()
- 	validUpdateClusterConfBRBootstrapImage.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
+@@ -648,6 +648,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
+ 	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
  
 +	validUpdateClusterConfBRAdminImage := before.DeepCopy()
 +	validUpdateClusterConfBRAdminImage.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketAdmin = bootstrapv1.BottlerocketAdmin{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
@@ -63,12 +50,6 @@ index 629385c6d..473cf9f4d 100644
 +	validUpdateClusterConfBRCustomBootstrapContainers := before.DeepCopy()
 +	validUpdateClusterConfBRCustomBootstrapContainers.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketCustomBootstrapContainers = []bootstrapv1.BottlerocketBootstrapContainer{{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}}
 +
- 	validUpdateJoinConfPauseImage := before.DeepCopy()
- 	validUpdateJoinConfPauseImage.Spec.KubeadmConfigSpec.JoinConfiguration.Pause = bootstrapv1.Pause{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
- 
- 	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
- 	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
- 
 +	validUpdateJoinConfBRAdminImage := before.DeepCopy()
 +	validUpdateJoinConfBRAdminImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketAdmin = bootstrapv1.BottlerocketAdmin{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
 +
@@ -78,10 +59,10 @@ index 629385c6d..473cf9f4d 100644
 +	validUpdateJoinConfBRCustomBootstrapContainers := before.DeepCopy()
 +	validUpdateJoinConfBRCustomBootstrapContainers.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketCustomBootstrapContainers = []bootstrapv1.BottlerocketBootstrapContainer{{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}}
 +
- 	tests := []struct {
- 		name                  string
- 		enableIgnitionFeature bool
-@@ -983,6 +1001,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 	updateInitConfigurationSkipPhases := before.DeepCopy()
+ 	updateInitConfigurationSkipPhases.Spec.KubeadmConfigSpec.InitConfiguration.SkipPhases = []string{"addon/kube-proxy"}
+ 
+@@ -1008,6 +1026,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateClusterConfBRBootstrapImage,
  		},
@@ -106,7 +87,7 @@ index 629385c6d..473cf9f4d 100644
  		{
  			name:      "should allow changes to join configuration pause image",
  			expectErr: false,
-@@ -995,6 +1031,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1020,6 +1056,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateJoinConfBRBootstrapImage,
  		},
@@ -132,5 +113,5 @@ index 629385c6d..473cf9f4d 100644
  
  	for _, tt := range tests {
 -- 
-2.37.2
+2.34.1
 
