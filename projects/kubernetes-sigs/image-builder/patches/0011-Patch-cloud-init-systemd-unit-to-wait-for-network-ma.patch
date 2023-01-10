@@ -1,0 +1,52 @@
+From 6eb44207c6cd9206e1db927318fe26a704294100 Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Mon, 9 Jan 2023 14:11:18 -0600
+Subject: [PATCH] Patch cloud-init systemd unit to wait for network manager
+ online
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+Signed-off-by: Prow Bot <prow@amazonaws.com>
+---
+ .../system/cloud-init.service.d/boot-order.conf   |  2 ++
+ .../capi/ansible/roles/providers/tasks/main.yml   | 15 +++++++++++++++
+ 2 files changed, 17 insertions(+)
+ create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/cloud-init.service.d/boot-order.conf
+
+diff --git a/images/capi/ansible/roles/providers/files/etc/systemd/system/cloud-init.service.d/boot-order.conf b/images/capi/ansible/roles/providers/files/etc/systemd/system/cloud-init.service.d/boot-order.conf
+new file mode 100644
+index 000000000..e1059e3eb
+--- /dev/null
++++ b/images/capi/ansible/roles/providers/files/etc/systemd/system/cloud-init.service.d/boot-order.conf
+@@ -0,0 +1,2 @@
++[Unit]
++After=NetworkManager-wait-online.service
+\ No newline at end of file
+diff --git a/images/capi/ansible/roles/providers/tasks/main.yml b/images/capi/ansible/roles/providers/tasks/main.yml
+index 37e2768da..b22fceac4 100644
+--- a/images/capi/ansible/roles/providers/tasks/main.yml
++++ b/images/capi/ansible/roles/providers/tasks/main.yml
+@@ -70,6 +70,21 @@
+     group: root
+     mode: "0755"
+ 
++- name: Creates unit file directory for cloud-init
++  file:
++    path: /etc/systemd/system/cloud-init.service.d
++    state: directory
++  when: ansible_os_family == "RedHat"
++
++- name: Create cloud-init boot order drop in file
++  copy:
++    dest: /etc/systemd/system/cloud-init.service.d/boot-order.conf
++    src: etc/systemd/system/cloud-init.service.d/boot-order.conf
++    owner: root
++    group: root
++    mode: "0755"
++  when: ansible_os_family == "RedHat"
++
+ # Some OS might disable cloud-final service on boot (rhel 7).
+ # Enable all cloud-init services on boot.
+ - name: Make sure all cloud init services are enabled
+-- 
+2.37.1 (Apple Git-137.1)
+
