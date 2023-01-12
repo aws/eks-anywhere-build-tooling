@@ -374,6 +374,9 @@ GATHER_LICENSES_TARGETS?=$(call pairmap,LICENSE_TARGET_FROM_BINARY_GO_MOD,$(BINA
 LICENSES_OUTPUT_DIR?=$(OUTPUT_DIR)
 LICENSES_TARGETS_FOR_PREREQ=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSES_TARGETS) \
 	$(foreach target,$(ATTRIBUTION_TARGETS),_output/$(target)),)
+# .9 is the default if nothing is passed to go-licenses
+# allow override on a per project basis for super specific cases
+LICENSE_THRESHOLD?=.9
 ####################################################
 
 #################### TARBALLS ######################
@@ -559,7 +562,7 @@ $(OUTPUT_DIR)/%ttribution/go-license.csv: BINARY_TARGET=$(if $(filter .,$(*D)),,
 $(OUTPUT_DIR)/%ttribution/go-license.csv: GO_MOD_PATH=$(if $(BINARY_TARGET),$(GO_MOD_TARGET_FOR_BINARY_$(call TO_UPPER,$(BINARY_TARGET))),$(word 1,$(UNIQ_GO_MOD_PATHS)))
 $(OUTPUT_DIR)/%ttribution/go-license.csv: LICENSE_PACKAGE_FILTER=$(GO_MOD_$(subst /,_,$(GO_MOD_PATH))_LICENSE_PACKAGE_FILTER)
 $(OUTPUT_DIR)/%ttribution/go-license.csv: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH))	
-	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/$(BINARY_TARGET) "$(LICENSE_PACKAGE_FILTER)" $(GO_MOD_PATH) $(GOLANG_VERSION)
+	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/$(BINARY_TARGET) "$(LICENSE_PACKAGE_FILTER)" $(GO_MOD_PATH) $(GOLANG_VERSION) $(LICENSE_THRESHOLD)
 
 .PHONY: gather-licenses
 gather-licenses: $(GATHER_LICENSES_TARGETS)

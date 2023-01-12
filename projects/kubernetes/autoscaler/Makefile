@@ -13,6 +13,7 @@ SOURCE_PATTERNS=.
 GO_MOD_PATHS=cluster-autoscaler
 
 FIX_LICENSES=$(REPO)/cluster-autoscaler/LICENSE
+FIX_LICENSES_AZURE_TARGET=$(REPO)/cluster-autoscaler/vendor/github.com/Azure/azure-sdk-for-go/LICENSE.txt
 
 HAS_RELEASE_BRANCHES=true
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
@@ -27,15 +28,20 @@ HELM_DIRECTORY=charts/cluster-autoscaler
 HELM_DESTINATION_REPOSITORY=cluster-autoscaler/charts/cluster-autoscaler
 HELM_IMAGE_LIST=kubernetes/autoscaler
 
-
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES) $(FIX_LICENSES_AZURE_TARGET) 
 
 $(FIX_LICENSES): | $(GO_MOD_DOWNLOAD_TARGETS)
 #go-licenses requires a LICENSE file in each folder with the go.mod
 	cp $(REPO)/LICENSE $@
+
+$(FIX_LICENSES_AZURE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+# The azure sdk dependency github repo has a LICENSE however it does not have a go.mod
+# checked in to the repo. Hence we need to manually download LICENSE from Github
+# and place them in the vendor directory so that they is available for go-licenses to pick up
+	wget -q --retry-connrefused https://raw.githubusercontent.com/Azure/azure-sdk-for-go/main/LICENSE.txt -O $@
 
 
 ########### DO NOT EDIT #############################
