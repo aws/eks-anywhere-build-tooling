@@ -91,7 +91,7 @@ function build::common::upload_artifacts() {
     if [ "$do_not_delete" = "true" ]; then
       aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --acl public-read
     else
-      aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" -delete --acl public-read
+      aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read
     fi
   fi
 }
