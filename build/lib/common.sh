@@ -285,7 +285,7 @@ function build::common::get_latest_eksa_asset_url() {
     s3artifactfolder=$s3downloadpath/artifacts
   fi
 
-  local -r tar_file_prefix=$(make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
+  local -r tar_file_prefix=$(MAKEFLAGS= make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
  
   local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
 
