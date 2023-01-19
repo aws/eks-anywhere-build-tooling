@@ -80,7 +80,7 @@ for project in "${PROJECTS[@]}"; do
             elif [[ -n "$BUILDSPEC_DEPENDS_ON" ]]; then
                 HARDCODED_DEP="true"
                 PROJECT_DEPENDENCIES=$BUILDSPEC_DEPENDS_ON
-            fi         
+            fi
         done
 
         BUILDSPEC_IDENTIFIER_OVERRIDE="$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_$((( $i + 1 )))_IDENTIFIER_OVERRIDE RELEASE_BRANCH=$RELEASE_BRANCH 2>/dev/null)"
