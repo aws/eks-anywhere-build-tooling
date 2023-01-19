@@ -69,22 +69,23 @@ $(LIBGIT2_LICENSES_TARGET):
 .PHONY: download-binaries-from-bucket
 download-binaries-from-bucket: fake-binary-prereqs $(foreach arch,amd64 arm64,$(BINARY_DEPS_DIR)/linux-$(arch)/eksa/fluxcd/source-controller) move-downloaded-artifacts validate-checksums
 
+# reset the binary timestamps to make sure make doesnt think they are older than the pre-req targets, like go-mod-download
 .PHONY: move-downloaded-artifacts
 move-downloaded-artifacts:
 	for arch in amd64 arm64; do \
 		mkdir -p $(OUTPUT_BIN_DIR)/linux-$$arch; \
 	 	mv $(BINARY_DEPS_DIR)/linux-$$arch/eksa/fluxcd/source-controller/source-controller $(OUTPUT_BIN_DIR)/linux-$$arch; \
+		touch $(OUTPUT_BIN_DIR)/linux-$$arch/source-controller; \
 	done
 	rm -rf $(BINARY_DEPS_DIR)
 
 # When downloading the binaries vs building the standard make targets (release/images/etc) will still try to rebuild since
-# the binary targets have prereqs on go-mod-download and the libgit2 cgo deps target
-# fake these during this flow
-# touch -t 9407031305 sets the time of the newly created file to some really old date to make sure its older than the downloaded binary
+# the binary targets have prereqs on the libgit2 cgo deps target fake these during this flow
 .PHONY: fake-binary-prereqs
 fake-binary-prereqs: $(GO_MOD_DOWNLOAD_TARGETS)
 	mkdir -p $(CGO_SOURCE)/linux-amd64/usr/lib64 $(CGO_SOURCE)/linux-arm64/usr/lib64
-	touch -t 9407031305 $(GO_MOD_DOWNLOAD_TARGETS) $(CGO_SOURCE)/linux-amd64/usr/lib64/libgit2.so $(CGO_SOURCE)/linux-arm64/usr/lib64/libgit2.so $(GIT_CHECKOUT_TARGET)
+	touch $(CGO_SOURCE)/linux-amd64/usr/lib64/libgit2.so $(CGO_SOURCE)/linux-arm64/usr/lib64/libgit2.so
+	
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
