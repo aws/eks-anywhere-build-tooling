@@ -16,10 +16,20 @@ CGO_DEPS_TARGET=$(CGO_SOURCE)/linux-%/lib64/libgit2.so
 CGO_CREATE_BINARIES=true
 EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
 
-# This is an artificial dep so that during the staging batch build the source-controller
-# falls into the second "batch" of builds, not blocking the first batch from finishing
-# since it takes significantly longer
-BUILDSPEC_DEPENDS_ON_OVERRIDE=eksa/kubernetes-sigs/etcdadm
+# These artifacts are only used to coordinate between code build batch builds
+# they will not exist in the final eks-a bundle
+HAS_S3_ARTIFACTS?=true
+
+BUILDSPECS=projects/$(COMPONENT)/buildspecs/binaries.yml projects/$(COMPONENT)/buildspecs/images.yml
+BUILDSPEC_1_VARS_KEYS=BINARY_PLATFORMS
+BUILDSPEC_1_VARS_VALUES=BINARY_PLATFORMS
+BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
+BUILDSPEC_2_DEPENDS_ON_OVERRIDE=fluxcd_source_controller_linux_amd64 fluxcd_source_controller_linux_arm64
+
+# Since we build the arm and amd binaries on difference instances in codebuild
+# we do not want to delete missing files when s3 sync-ing from local to the bucket
+# since this would clobber the other build's artifacts
+UPLOAD_DO_NOT_DELETE=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -53,6 +63,29 @@ $(FIX_LICENSES_API_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 $(LIBGIT2_LICENSES_TARGET):
 	$(BASE_DIRECTORY)/build/lib/gather_non_golang_licenses.sh libgit2/libgit2 v1.3.1 $(MAKE_ROOT)/$(OUTPUT_DIR)
 
+# in codebuild batch builds we seperate binary builds from image builds to work around
+# issue building arm on an amd instance
+# use the standard handle-dependencies process and extract to $(OUTPUT_BIN_DIR) and validate checksums match what is checked in
+.PHONY: download-binaries-from-bucket
+download-binaries-from-bucket: fake-binary-prereqs $(foreach arch,amd64 arm64,$(BINARY_DEPS_DIR)/linux-$(arch)/eksa/fluxcd/source-controller) move-downloaded-artifacts validate-checksums
+
+# reset the binary timestamps to make sure make doesnt think they are older than the pre-req targets, like go-mod-download
+.PHONY: move-downloaded-artifacts
+move-downloaded-artifacts:
+	for arch in amd64 arm64; do \
+		mkdir -p $(OUTPUT_BIN_DIR)/linux-$$arch; \
+	 	mv $(BINARY_DEPS_DIR)/linux-$$arch/eksa/fluxcd/source-controller/source-controller $(OUTPUT_BIN_DIR)/linux-$$arch; \
+		touch $(OUTPUT_BIN_DIR)/linux-$$arch/source-controller; \
+	done
+	rm -rf $(BINARY_DEPS_DIR)
+
+# When downloading the binaries vs building the standard make targets (release/images/etc) will still try to rebuild since
+# the binary targets have prereqs on the libgit2 cgo deps target fake these during this flow
+.PHONY: fake-binary-prereqs
+fake-binary-prereqs: $(GO_MOD_DOWNLOAD_TARGETS)
+	mkdir -p $(CGO_SOURCE)/linux-amd64/usr/lib64 $(CGO_SOURCE)/linux-arm64/usr/lib64
+	touch $(CGO_SOURCE)/linux-amd64/usr/lib64/libgit2.so $(CGO_SOURCE)/linux-arm64/usr/lib64/libgit2.so
+	
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

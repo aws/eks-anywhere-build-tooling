@@ -99,7 +99,8 @@ generate-staging-buildspec:
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_bottlerocket-bootstrap" "$(BASE_DIRECTORY)/projects/aws/bottlerocket-bootstrap/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes_cloud-provider-vsphere" "$(BASE_DIRECTORY)/projects/kubernetes/cloud-provider-vsphere/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes-sigs_kind" "$(BASE_DIRECTORY)/projects/kubernetes-sigs/kind/buildspecs/batch-build.yml" true
-	
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "fluxcd_source-controller" "$(BASE_DIRECTORY)/projects/fluxcd/source-controller/buildspecs/batch-build.yml" false
+
 .PHONY: generate
 generate: generate-project-list generate-staging-buildspec
 
