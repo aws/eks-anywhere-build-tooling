@@ -409,8 +409,12 @@ RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter t
 # generate files that are subsequently validated by the CI. If local environments use different 
 # locales to the CI we get unexpected failures that are tricky to debug without knowledge of 
 # locales so we'll explicitly warn here.
+# In a AL2 container image (like builder base), LANG will be empty which is equilvant to posix
+# In a AL2 (or other distro) full instance the LANG will be en-us.UTF-8 which produces different sorts
+# On Mac, LANG will be en-us.UTF-8 but has a fix applied to sort to avoid the difference
 ifeq ($(shell uname -s),Linux)
-  LOCALE := $(call TO_LOWER,$(shell locale | grep LANG | cut -d= -f2 | tr -d '"'))
+  LOCALE:=$(call TO_LOWER,$(shell locale | grep LANG | cut -d= -f2 | tr -d '"'))
+  LOCALE:=$(if $(LOCALE),$(LOCALE),posix)
   ifeq ($(filter c.utf-8 posix,$(LOCALE)),)
     $(warning WARNING: Environment locale set to $(LANG). On Linux systems this may create \
 	non-deterministic behavior when running generation recipes. If the CI fails validation try \
