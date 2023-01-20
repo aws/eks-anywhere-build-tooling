@@ -389,6 +389,7 @@ FAKE_AMD_BINARIES_FOR_VALIDATION?=$(if $(filter linux/amd64,$(BINARY_PLATFORMS))
 FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 IMAGE_FORMAT?=
 IMAGE_OS?=
+UPLOAD_DO_NOT_DELETE?=false
 ####################################################
 
 #################### OTHER #########################
@@ -409,10 +410,17 @@ RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter t
 # generate files that are subsequently validated by the CI. If local environments use different 
 # locales to the CI we get unexpected failures that are tricky to debug without knowledge of 
 # locales so we'll explicitly warn here.
-ifneq ($(call TO_LOWER, $(LANG)), c.utf-8)
-ifneq ($(call TO_LOWER, $(LANG)), posix)
-  $(warning WARNING: Environment locale set to $(LANG). This may create non-deterministic behavior when generating files. If the CI fails validation try `LANG=C.UTF-8 make <recipe>` to generate files instead.)
-endif
+# In a AL2 container image (like builder base), LANG will be empty which is equilvant to posix
+# In a AL2 (or other distro) full instance the LANG will be en-us.UTF-8 which produces different sorts
+# On Mac, LANG will be en-us.UTF-8 but has a fix applied to sort to avoid the difference
+ifeq ($(shell uname -s),Linux)
+  LOCALE:=$(call TO_LOWER,$(shell locale | grep LANG | cut -d= -f2 | tr -d '"'))
+  LOCALE:=$(if $(LOCALE),$(LOCALE),posix)
+  ifeq ($(filter c.utf-8 posix,$(LOCALE)),)
+    $(warning WARNING: Environment locale set to $(LANG). On Linux systems this may create \
+	non-deterministic behavior when running generation recipes. If the CI fails validation try \
+	`LANG=C.UTF-8 make <recipe>` to generate files instead.)
+  endif
 endif
 
 define BUILDCTL
@@ -592,12 +600,12 @@ endif
 
 .PHONY: upload-artifacts
 upload-artifacts: s3-artifacts
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN)
+	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN) $(UPLOAD_DO_NOT_DELETE)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(IMAGE_FORMAT) $(IMAGE_OS)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION) $(IMAGE_FORMAT) $(IMAGE_OS)
 
 
 ### Checksum Targets

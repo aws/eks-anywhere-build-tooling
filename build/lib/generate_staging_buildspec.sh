@@ -56,10 +56,6 @@ for project in "${PROJECTS[@]}"; do
         continue
     fi
 
-    IDENTIFIER="${org//-/_}_${repo//-/_}"
-
-    echo "Adding: $IDENTIFIER"
-
     CLONE_URL=""
     if [[ "true" != "$(make --no-print-directory -C $PROJECT_PATH var-value-REPO_NO_CLONE RELEASE_BRANCH=$RELEASE_BRANCH)" ]]; then
         REPO=$(make --no-print-directory -C $PROJECT_PATH var-value-CLONE_URL AWS_REGION=us-west-2 CODEBUILD_CI=true RELEASE_BRANCH=$RELEASE_BRANCH)
@@ -69,6 +65,8 @@ for project in "${PROJECTS[@]}"; do
     BUILDSPECS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPECS RELEASE_BRANCH=$RELEASE_BRANCH)
     SPECS=(${BUILDSPECS// / })
     for (( i=0; i < ${#SPECS[@]}; i++ )); do
+        IDENTIFIER="${org//-/_}_${repo//-/_}"
+
         buildspec=${SPECS[$i]}
 
         DEPEND_ON=""
@@ -76,12 +74,21 @@ for project in "${PROJECTS[@]}"; do
         PROJECT_DEPENDENCIES="false"
         for var in "BUILDSPEC_DEPENDS_ON_OVERRIDE" "BUILDSPEC_$((( $i + 1 )))_DEPENDS_ON_OVERRIDE"; do
             BUILDSPEC_DEPENDS_ON="$(make --no-print-directory -C $PROJECT_PATH var-value-$var RELEASE_BRANCH=$RELEASE_BRANCH 2>/dev/null)"
+            HARDCODED_DEP="false"
             if [[ "none" = "$BUILDSPEC_DEPENDS_ON" ]]; then
                 PROJECT_DEPENDENCIES=""
             elif [[ -n "$BUILDSPEC_DEPENDS_ON" ]]; then
+                HARDCODED_DEP="true"
                 PROJECT_DEPENDENCIES=$BUILDSPEC_DEPENDS_ON
             fi
         done
+
+        BUILDSPEC_IDENTIFIER_OVERRIDE="$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPEC_$((( $i + 1 )))_IDENTIFIER_OVERRIDE RELEASE_BRANCH=$RELEASE_BRANCH 2>/dev/null)"
+        if [[ -n "$BUILDSPEC_IDENTIFIER_OVERRIDE" ]]; then
+            IDENTIFIER="$BUILDSPEC_IDENTIFIER_OVERRIDE"
+        fi   
+       
+        echo "Adding: $IDENTIFIER"
 
         if [ "$PROJECT_DEPENDENCIES" = "false" ]; then
             PROJECT_DEPENDENCIES=$(make --no-print-directory -C $PROJECT_PATH var-value-PROJECT_DEPENDENCIES RELEASE_BRANCH=$RELEASE_BRANCH)
@@ -90,6 +97,11 @@ for project in "${PROJECTS[@]}"; do
         if [ -n "$PROJECT_DEPENDENCIES" ] && [ "$SKIP_DEPEND_ON" != "true" ]; then
             DEPS=(${PROJECT_DEPENDENCIES// / })
             for dep in "${DEPS[@]}"; do
+                if [ "$HARDCODED_DEP" = "true" ]; then
+                    DEPEND_ON+="\"$dep\","
+                    continue
+                fi
+
                 DEP_PRODUCT="$(cut -d/ -f1 <<< $dep)"
                 if [[ "$DEP_PRODUCT" == "eksd" ]]; then
                     continue
@@ -129,10 +141,21 @@ for project in "${PROJECTS[@]}"; do
                 
                 for val1 in "${ARR_1[@]}"; do                
                     BUILDSPEC_NAME=$(basename $buildspec .yml)
-                    IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}
+                    IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//[-\/]/_}
+                    
+                    # If building on one binary platform assume we want to run on a specific arch instance
+                    ARCH_TYPE=""
+                    if [ "${KEYS[0]}" = "BINARY_PLATFORMS" ]; then
+                        if [ "${val1}" = "linux/amd64" ]; then
+                            ARCH_TYPE="\"type\":\"LINUX_CONTAINER\","
+                        else
+                            ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"BUILD_GENERAL1_LARGE\","
+                        fi
+                    fi
+
                     yq eval -i -P \
-                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"}}}]" \
-                        $STAGING_BUILDSPEC_FILE             
+                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"}}}]" \
+                        $STAGING_BUILDSPEC_FILE
                 done
             else
                 VALUES_1=$(make --no-print-directory -C $PROJECT_PATH var-value-${VARS[0]} RELEASE_BRANCH=$RELEASE_BRANCH)

@@ -18,10 +18,13 @@ PROJECT_PATH_MAP=projects/$(patsubst $(firstword $(subst _, ,$(1)))_%,$(firstwor
 # locales to the CI we get unexpected failures that are tricky to debug without knowledge of 
 # locales so we'll explicitly warn here.
 TO_LOWER = $(shell echo $(1) | tr '[:upper:]' '[:lower:]')
-ifneq ($(call TO_LOWER, $(LANG)), c.utf-8)
-ifneq ($(call TO_LOWER, $(LANG)), posix)
-  $(warning WARNING: Environment locale set to $(LANG). This may create non-deterministic behavior when generating files. If the CI fails validation try `LANG=C.UTF-8 make <recipe>` to generate files instead.)
-endif
+ifeq ($(shell uname -s),Linux)
+  LOCALE := $(call TO_LOWER,$(shell locale | grep LANG | cut -d= -f2 | tr -d '"'))
+  ifeq ($(filter c.utf-8 posix,$(LOCALE)),)
+    $(warning WARNING: Environment locale set to $(LANG). On Linux systems this may create \
+	non-deterministic behavior when running generation recipes. If the CI fails validation try \
+	`LANG=C.UTF-8 make <recipe>` to generate files instead.)
+  endif
 endif
 
 .PHONY: clean-project-%
@@ -99,7 +102,8 @@ generate-staging-buildspec:
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_bottlerocket-bootstrap" "$(BASE_DIRECTORY)/projects/aws/bottlerocket-bootstrap/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes_cloud-provider-vsphere" "$(BASE_DIRECTORY)/projects/kubernetes/cloud-provider-vsphere/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes-sigs_kind" "$(BASE_DIRECTORY)/projects/kubernetes-sigs/kind/buildspecs/batch-build.yml" true
-	
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "fluxcd_source-controller" "$(BASE_DIRECTORY)/projects/fluxcd/source-controller/buildspecs/batch-build.yml" false
+
 .PHONY: generate
 generate: generate-project-list generate-staging-buildspec
 
