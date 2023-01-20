@@ -18,10 +18,13 @@ PROJECT_PATH_MAP=projects/$(patsubst $(firstword $(subst _, ,$(1)))_%,$(firstwor
 # locales to the CI we get unexpected failures that are tricky to debug without knowledge of 
 # locales so we'll explicitly warn here.
 TO_LOWER = $(shell echo $(1) | tr '[:upper:]' '[:lower:]')
-ifneq ($(call TO_LOWER, $(LANG)), c.utf-8)
-ifneq ($(call TO_LOWER, $(LANG)), posix)
-  $(warning WARNING: Environment locale set to $(LANG). This may create non-deterministic behavior when generating files. If the CI fails validation try `LANG=C.UTF-8 make <recipe>` to generate files instead.)
-endif
+ifeq ($(shell uname -s),Linux)
+  LOCALE := $(call TO_LOWER,$(shell locale | grep LANG | cut -d= -f2 | tr -d '"'))
+  ifeq ($(filter c.utf-8 posix,$(LOCALE)),)
+    $(warning WARNING: Environment locale set to $(LANG). On Linux systems this may create \
+	non-deterministic behavior when running generation recipes. If the CI fails validation try \
+	`LANG=C.UTF-8 make <recipe>` to generate files instead.)
+  endif
 endif
 
 .PHONY: clean-project-%
