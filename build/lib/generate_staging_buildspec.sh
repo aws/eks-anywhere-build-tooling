@@ -149,7 +149,7 @@ for project in "${PROJECTS[@]}"; do
                         if [ "${val1}" = "linux/amd64" ]; then
                             ARCH_TYPE="\"type\":\"LINUX_CONTAINER\","
                         else
-                            ARCH_TYPE="\"type\":\"ARM_CONTAINER\","
+                            ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"BUILD_GENERAL1_LARGE\","
                         fi
                     fi
 
