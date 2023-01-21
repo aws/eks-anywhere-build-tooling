@@ -14,9 +14,7 @@ const (
 	buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
 )
 
-var (
-	codebuild = os.Getenv("CODEBUILD_CI")
-)
+var codebuild = os.Getenv("CODEBUILD_CI")
 
 func (b *BuildOptions) BuildImage() {
 	// Clone build tooling repo
@@ -61,7 +59,7 @@ func (b *BuildOptions) BuildImage() {
 		if err != nil {
 			log.Fatalf("Error marshalling vsphere config data")
 		}
-		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/ova/vsphere.json"), vsphereConfigData, 0644)
+		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/ova/vsphere.json"), vsphereConfigData, 0o644)
 		if err != nil {
 			log.Fatalf("Error writing vsphere config file to packer")
 		}
@@ -98,7 +96,7 @@ func (b *BuildOptions) BuildImage() {
 			if err != nil {
 				log.Fatalf("Error marshalling baremetal config data")
 			}
-			err = ioutil.WriteFile(baremetalConfigFile, baremetalConfigData, 0644)
+			err = ioutil.WriteFile(baremetalConfigFile, baremetalConfigData, 0o644)
 			if err != nil {
 				log.Fatalf("Error writing baremetal config file to packer")
 			}
@@ -122,7 +120,7 @@ func (b *BuildOptions) BuildImage() {
 			if err := os.Remove(ubuntuEfiConfigPath); err != nil {
 				log.Fatalf("Error removing the old ubuntu efi config file: %v", err)
 			}
-			if err := os.WriteFile(ubuntuEfiConfigPath, []byte(ubuntuPatchedEfiConfig), 0644); err != nil {
+			if err := os.WriteFile(ubuntuEfiConfigPath, []byte(ubuntuPatchedEfiConfig), 0o644); err != nil {
 				log.Fatalf("Error writing the new ubuntu efi config file: %v", err)
 			}
 			log.Println("Patched upstream firmware config file")
@@ -166,7 +164,7 @@ func (b *BuildOptions) BuildImage() {
 		if err != nil {
 			log.Fatalf("Error marshalling nutanix config data")
 		}
-		err = ioutil.WriteFile(filepath.Join(upstreamImageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixConfigData, 0644)
+		err = ioutil.WriteFile(filepath.Join(upstreamImageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixConfigData, 0o644)
 		if err != nil {
 			log.Fatalf("Error writing nutanix config file to packer: %v", err)
 		}
@@ -182,14 +180,14 @@ func (b *BuildOptions) BuildImage() {
 		// Create config file
 		cloudstackConfigFile := filepath.Join(imageBuilderProjectPath, "packer/config/cloudstack.json")
 
-		//Assign ansible user var for cloudstack provider
+		// Assign ansible user var for cloudstack provider
 		b.CloudstackConfig.AnsibleUserVars = "provider=cloudstack"
 		if b.CloudstackConfig != nil {
 			cloudstackConfigData, err := json.Marshal(b.CloudstackConfig)
 			if err != nil {
 				log.Fatalf("Error marshalling cloudstack config data")
 			}
-			err = ioutil.WriteFile(cloudstackConfigFile, cloudstackConfigData, 0644)
+			err = ioutil.WriteFile(cloudstackConfigFile, cloudstackConfigData, 0o644)
 			if err != nil {
 				log.Fatalf("Error writing cloudstack config file to packer")
 			}
@@ -235,7 +233,7 @@ func (b *BuildOptions) BuildImage() {
 				log.Fatalf("Error marshalling AMI config data")
 			}
 
-			err = ioutil.WriteFile(amiConfigFile, amiConfigData, 0644)
+			err = ioutil.WriteFile(amiConfigFile, amiConfigData, 0o644)
 			if err != nil {
 				log.Fatalf("Error writing AMI config file to packer")
 			}
