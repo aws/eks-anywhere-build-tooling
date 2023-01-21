@@ -98,6 +98,7 @@ type AMIConfig struct {
 	CustomRoleNames     string   `json:"custom_role_names"`
 	ManifestOutput      string   `json:"manifest_output"`
 	RootDeviceName      string   `json:"root_device_name"`
+	SubnetID            string   `json:"subnet_id"`
 	VolumeSize          string   `json:"volume_size"`
 	VolumeType          string   `json:"volume_type"`
 }
