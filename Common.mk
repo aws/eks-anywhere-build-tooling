@@ -389,6 +389,7 @@ FAKE_AMD_BINARIES_FOR_VALIDATION?=$(if $(filter linux/amd64,$(BINARY_PLATFORMS))
 FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 IMAGE_FORMAT?=
 IMAGE_OS?=
+UPLOAD_DO_NOT_DELETE?=false
 ####################################################
 
 #################### OTHER #########################
@@ -599,12 +600,12 @@ endif
 
 .PHONY: upload-artifacts
 upload-artifacts: s3-artifacts
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN)
+	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN) $(UPLOAD_DO_NOT_DELETE)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(IMAGE_FORMAT) $(IMAGE_OS)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION) $(IMAGE_FORMAT) $(IMAGE_OS)
 
 
 ### Checksum Targets

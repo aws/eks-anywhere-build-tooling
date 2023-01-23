@@ -22,8 +22,9 @@ PROJECT_ROOT="$1"
 ARTIFACTS_FOLDER="$2"
 GIT_TAG="$3"
 FAKE_ARM_ARTIFACTS_FOR_VALIDATION="$4"
-IMAGE_FORMAT="${5:-}"
-IMAGE_OS="${6:-}"
+FAKE_AMD_BINARIES_FOR_VALIDATION="$5"
+IMAGE_FORMAT="${6:-}"
+IMAGE_OS="${7:-}"
 
 EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts
 if [ -n "$IMAGE_FORMAT" ]; then
@@ -49,6 +50,10 @@ envsubst "\$GIT_TAG:\$IMAGE_OS" \
 
 if $FAKE_ARM_ARTIFACTS_FOR_VALIDATION; then
     sed -i '/arm64/d' "$EXPECTED_FILES"
+fi
+
+if $FAKE_AMD_BINARIES_FOR_VALIDATION; then
+    sed -i '/amd64/d' "$EXPECTED_FILES"
 fi
 
 # The versions of sort found on macOS and Linux can behave
