@@ -59,8 +59,5 @@ Note in some helm charts, fields above in `yaml` files are not hardcoded values 
 
 ### Dealing with CRDs
 
-For packages that include CRDs as well as custom resources, the CRDs must be deployed before the rest of the resources. CRDs can't be included in the `templates` directory because the result is a single yaml file applied once. To overcome this issue, there is a `crds` directory which will be applied before anything else. The problem with this approach is that these are not templated.
+For packages that include CRDs as well as custom resources, the CRDs must be deployed before the rest of the resources. CRDs can't be included in the `templates` directory because the result is a single yaml file applied once. To overcome this issue, CRDs must be defined in their own package under the `templates` directory. Once a CRDs package is ready, a dependency to that package can be declared in the package bundle definition. To add the dependency to the resulting bundle file, add `PACKAGE_DEPENDENCIES=X` to your package `Makefile` in build tooling. If both the CRDs and the actual chart are built from the same project, you'll have to use the same workaround as used in metallb which involves redefining the helm/build and helm/push targets.
 
-For consistency across packages, the recommendation is to create a chart under the `charts` directory and declare it as a dependency. That chart should be called `crds` and contain the custom resource definitions (no custom resources) created in the `templates` directory.
-
-**caveats** This also means that deleting a package deletes the CRDs and therefore the custom resources as well.
