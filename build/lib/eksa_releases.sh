@@ -32,7 +32,7 @@ function build::eksa_releases::load_bundle_manifest() {
 
     local -r latest_version=$(echo "$release_manifest" | yq e ".spec.latestVersion" -)
     local -r bundle_manifest_url=$(echo "$release_manifest" | yq e ".spec.releases[] | select(.version == \"$latest_version\") .bundleManifestUrl" -)
-    BUNDLE_MANIFEST[$bundle_manifest_key]=$(yq | curl -s --retry 5 "$bundle_manifest_url")
+    BUNDLE_MANIFEST[$bundle_manifest_key]=$(curl -s --retry 5 "$bundle_manifest_url" | yq)
   fi
   if $echo; then
     echo "${BUNDLE_MANIFEST[$bundle_manifest_key]}"
