@@ -165,7 +165,6 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				AWSRegion:           builder.DefaultAMIBuildRegion,
 				BuilderInstanceType: builder.DefaultAMIBuilderInstanceType,
 				CustomRole:          "true",
-				CustomRoleNames:     builder.DefaultAMICustomRoleNames,
 				AnsibleExtraVars:    builder.DefaultAMIAnsibleExtraVars,
 				ManifestOutput:      builder.DefaultAMIManifestOutput,
 				RootDeviceName:      builder.DefaultAMIRootDeviceName,
@@ -209,6 +208,7 @@ func validateOSHypervisorCombinations(os, hypervisor string) error {
 
 	return nil
 }
+
 func validateRedhat(rhelUsername, rhelPassword, isoUrl string) error {
 	if rhelUsername == "" || rhelPassword == "" {
 		return fmt.Errorf("\"rhel_username\" and \"rhel_password\" are required fields in config when os is redhat")
