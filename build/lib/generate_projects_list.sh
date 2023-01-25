@@ -65,7 +65,7 @@ for org_path in projects/*; do
                 if [ $repo = "cilium" ]; then
                     yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"tag\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
                 else
-                    if [ "$(git ls-remote --tags https://github.com/$org/$repo | grep $tag || true)" ]; then
+                    if [ "$(git ls-remote --tags https://github.com/$org/$repo | awk '{print $2}' | grep $tag || true)" ]; then
                         yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"tag\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
                     else
                         yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"commit\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
