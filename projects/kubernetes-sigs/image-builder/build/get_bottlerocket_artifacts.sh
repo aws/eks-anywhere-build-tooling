@@ -30,28 +30,36 @@ CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
 # Setting version and URL parameters for downloading the OVA
 OS_DOWNLOAD_PATH=
-VARIANT="vmware"
-if [[ $FORMAT == "raw" ]]; then
-  VARIANT="metal"
-fi
 KUBEVERSION=$(echo $RELEASE_CHANNEL | tr '-' '.')
 BOTTLEROCKET_RELEASE_VERSION=$(yq e ".${RELEASE_CHANNEL}.${FORMAT}-release-version" $MAKE_ROOT/BOTTLEROCKET_RELEASES)
 if [[ $BOTTLEROCKET_RELEASE_VERSION == "null" ]] ; then
   echo "Bottlerocket build for ${RELEASE_CHANNEL} is not enabled. Terminating silently."
   exit 0
 fi
+case $FORMAT in
+ami)
+  VARIANT="aws"
+  TARGET="bottlerocket-${VARIANT}-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.img.lz4"
+  ;;
+raw)
+  VARIANT="metal"
+  TARGET="bottlerocket-${VARIANT}-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.img.lz4"
+  ;;
+ova)
+  VARIANT="vmware"
+  TARGET="bottlerocket-${VARIANT}-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
+  ;;
+*)
+  echo "Invalid image format: $FORMAT"
+  exit 1
+  ;;
+esac
 
 BOTTLEROCKET_METADATA_URL="https://updates.bottlerocket.aws/2020-07-07/${VARIANT}-k8s-${KUBEVERSION}/x86_64/"
 BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
 OS_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/${FORMAT}
-TARGET=
-if [[ $VARIANT == "vmware" ]]; then
-  TARGET="bottlerocket-vmware-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.ova"
-fi
-if [[ $VARIANT == "metal" ]]; then
-  TARGET="bottlerocket-metal-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.img.lz4"
-fi
 rm -rf $OS_DOWNLOAD_PATH
+
 # Downloading the TARGET from the Bottlerocket target location using Tuftool
 tuftool download "${OS_DOWNLOAD_PATH}" \
     --target-name "${TARGET}" \
@@ -59,10 +67,10 @@ tuftool download "${OS_DOWNLOAD_PATH}" \
     --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
     --targets-url "${BOTTLEROCKET_TARGETS_URL}"
 
-# Post processing for metal
-if [[ $VARIANT == "metal" ]]; then
-  BOTTLEROCKET_METAL_IMG="bottlerocket-metal-k8s-${KUBEVERSION}-x86_64-${BOTTLEROCKET_RELEASE_VERSION}.img"
-  lz4 --decompress ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_METAL_IMG}
-  gzip ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_METAL_IMG}
+# Post processing for aws and metal variants
+if [[ $VARIANT == "aws" ]] || [[ $VARIANT == "metal" ]]; then
+  BOTTLEROCKET_IMG="${TARGET%.lz4}"
+  lz4 --decompress ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
+  gzip ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
   rm -f ${OS_DOWNLOAD_PATH}/${TARGET}
 fi

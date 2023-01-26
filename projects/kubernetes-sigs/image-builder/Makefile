@@ -60,10 +60,12 @@ BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-c
 FINAL_OVA_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/$(IMAGE_OS).ova
 FINAL_RAW_IMAGE_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/$(IMAGE_OS).gz
 FINAL_CLOUDSTACK_IMAGE_PATH=$(ARTIFACTS_PATH)/cloudstack/$(IMAGE_OS)/$(IMAGE_OS).qcow2
+FINAL_BOTTLEROCKET_AMI_PATH=$(ARTIFACTS_PATH)/ami/bottlerocket/bottlerocket.img.gz
 FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
 FINAL_BOTTLEROCKET_RAW_PATH=$(ARTIFACTS_PATH)/raw/bottlerocket/bottlerocket.img.gz
 FAKE_UBUNTU_OVA_PATH=fake-ubuntu.ova
 FAKE_UBUNTU_RAW_PATH=fake-ubuntu.gz
+BOTTLEROCKET_AMI_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ami-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
 BOTTLEROCKET_OVA_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ova-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
 BOTTLEROCKET_RAW_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
 
@@ -72,6 +74,9 @@ IMAGE_FORMAT?=raw
 BUILD_AMI_TARGETS=build-ami-ubuntu-2004
 BUILD_OVA_TARGETS=setup-packer-configs-ova  $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH)  upload-artifacts-ova
 BUILD_RAW_TARGETS=release-image-build-on-metal-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
+ifneq ($(BOTTLEROCKET_AMI_RELEASE_VERSION),null)
+	BUILD_AMI_TARGETS+=download-bottlerocket-ami $(FINAL_BOTTLEROCKET_AMI_PATH) upload-bottlerocket-ami
+endif
 ifneq ($(BOTTLEROCKET_RAW_RELEASE_VERSION),null)
 	BUILD_RAW_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
 endif
@@ -103,6 +108,7 @@ else ifeq ($(IMAGE_FORMAT),raw)
 			S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_RAW_PATH)
 			RELEASE_TARGETS=download-bottlerocket-raw upload-bottlerocket-raw
 		else
+			S3_TARGET_PREREQUISITES?=
 			RELEASE_TARGETS=unsupported-release-target
 		endif
 	else ifeq ($(IMAGE_OS),redhat)
@@ -123,7 +129,11 @@ else ifeq ($(IMAGE_FORMAT),cloudstack)
 else ifeq ($(IMAGE_FORMAT),ami)
 	ifeq ($(IMAGE_OS),ubuntu)
 		RELEASE_TARGETS=release-ami-$(IMAGE_OS)
+	else ifeq ($(IMAGE_OS),bottlerocket)
+		S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_AMI_PATH)
+		RELEASE_TARGETS=download-bottlerocket-ami upload-bottlerocket-ami
 	else
+		S3_TARGET_PREREQUISITES?=
 		RELEASE_TARGETS=unsupported-release-target
 	endif
 else
@@ -131,7 +141,7 @@ else
 	RELEASE_TARGETS=unsupported-release-target
 endif
 
-BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml
+BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml projects/$(COMPONENT)/buildspecs/ami.yml
 BUILDSPEC_DEPENDS_ON_OVERRIDE=none
 BUILDSPEC_VARS_KEYS=IMAGE_OS RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_OS_DISTROS SUPPORTED_K8S_VERSIONS
@@ -168,6 +178,12 @@ $(FINAL_RAW_IMAGE_PATH):
 $(FINAL_CLOUDSTACK_IMAGE_PATH):
 	@mkdir -p $(@D)
 	mv *.qcow2 $@
+
+$(FINAL_BOTTLEROCKET_AMI_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
+$(FINAL_BOTTLEROCKET_AMI_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
+$(FINAL_BOTTLEROCKET_AMI_PATH):
+	@mkdir -p $(@D)
+	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ami/*.gz $@
 
 $(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(FINAL_BOTTLEROCKET_OVA_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
@@ -238,6 +254,7 @@ local-build-ova-%: deps-ova setup-packer-configs-ova
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-$*
 
 .PHONY: download-bottlerocket-%
+download-bottlerocket-%: IMAGE_OS=bottlerocket
 download-bottlerocket-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 download-bottlerocket-%: BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 download-bottlerocket-%: $(BOTTLEROCKET_SETUP_TARGET)

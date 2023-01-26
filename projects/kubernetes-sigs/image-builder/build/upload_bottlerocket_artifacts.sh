@@ -32,5 +32,5 @@ if [ $release_availability -ne 0 ]; then
   echo "No Bottlerocket release found for release branch. Terminating silently..."
   exit 0
 fi
-make -C $MAKE_ROOT s3-artifacts-${FORMAT}
+make -C $MAKE_ROOT s3-artifacts-${FORMAT} IMAGE_OS=bottlerocket
 make -C $MAKE_ROOT upload-artifacts ARTIFACTS_PATH=$ARTIFACTS_PATH ARTIFACTS_UPLOAD_PATH=$ARTIFACTS_UPLOAD_PATH IMAGE_FORMAT=$FORMAT IMAGE_OS=bottlerocket
