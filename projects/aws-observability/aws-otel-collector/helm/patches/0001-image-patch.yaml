@@ -1,29 +1,32 @@
-From 2ad508612c52c07a1740cc04e8303199426f70fc Mon Sep 17 00:00:00 2001
-From: "Ostosh, Ivy" <ivyjin215@gmail.com>
-Date: Wed, 16 Nov 2022 18:17:43 -0600
+From 0d3fe6d06c608754d10baa5120c9e98c34f82d78 Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin@amazon.com>
+Date: Fri, 27 Jan 2023 14:53:32 -0600
 Subject: [PATCH] Update image repo
 
 ---
- charts/opentelemetry-collector/templates/_pod.tpl | 2 +-
- charts/opentelemetry-collector/values.schema.json | 7 +++++++
- charts/opentelemetry-collector/values.yaml        | 8 ++++----
- 3 files changed, 12 insertions(+), 5 deletions(-)
+ charts/opentelemetry-collector/templates/_pod.tpl | 4 ++--
+ charts/opentelemetry-collector/values.schema.json | 4 ++++
+ charts/opentelemetry-collector/values.yaml        | 7 ++++---
+ 3 files changed, 10 insertions(+), 5 deletions(-)
 
 diff --git a/charts/opentelemetry-collector/templates/_pod.tpl b/charts/opentelemetry-collector/templates/_pod.tpl
-index 06f661d..02d7ad8 100644
+index 7c600c2..27bec9f 100644
 --- a/charts/opentelemetry-collector/templates/_pod.tpl
 +++ b/charts/opentelemetry-collector/templates/_pod.tpl
-@@ -18,7 +18,7 @@ containers:
-       {{- end }}
-     securityContext:
+@@ -24,9 +24,9 @@ containers:
        {{- toYaml .Values.securityContext | nindent 6 }}
--    image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+       {{- end }}
+     {{- if .Values.image.digest }}
+-    image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
 +    image: "{{ .Values.sourceRegistry }}/{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+     {{- else }}
+-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
++    image: "{{ .Values.sourceRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+     {{- end }}
      imagePullPolicy: {{ .Values.image.pullPolicy }}
      ports:
-       {{- range $key, $port := .Values.ports }}
 diff --git a/charts/opentelemetry-collector/values.schema.json b/charts/opentelemetry-collector/values.schema.json
-index b8e3dc6..07797f1 100644
+index 9a78bbf..f45f363 100644
 --- a/charts/opentelemetry-collector/values.schema.json
 +++ b/charts/opentelemetry-collector/values.schema.json
 @@ -23,6 +23,10 @@
@@ -37,18 +40,8 @@ index b8e3dc6..07797f1 100644
      "nameOverride": {
        "description": "Override name of the chart used in Kubernetes object names.",
        "type": "string"
-@@ -124,6 +128,9 @@
-         "tag": {
-           "type": "string"
-         },
-+        "digest": {
-+          "type": "string"
-+        },
-         "pullPolicy": {
-           "type": "string",
-           "enum": [
 diff --git a/charts/opentelemetry-collector/values.yaml b/charts/opentelemetry-collector/values.yaml
-index 4ef8375..2d4b631 100644
+index e4a8f07..c29e8ef 100644
 --- a/charts/opentelemetry-collector/values.yaml
 +++ b/charts/opentelemetry-collector/values.yaml
 @@ -2,6 +2,7 @@
@@ -59,15 +52,17 @@ index 4ef8375..2d4b631 100644
  nameOverride: ""
  fullnameOverride: ""
  
-@@ -133,15 +134,14 @@ config:
+@@ -136,17 +137,17 @@ config:
  
  image:
    # If you want to use the core image `otel/opentelemetry-collector`, you also need to change `command.name` value to `otelcol`.
 -  repository: otel/opentelemetry-collector-contrib
 +  repository: adot/aws-observability/aws-otel-collector
    pullPolicy: IfNotPresent
--  # Overrides the image tag whose default is the chart appVersion.
--  tag: ""
+   # Overrides the image tag whose default is the chart appVersion.
+   tag: ""
+   # When digest is set to a non-empty value, images will be pulled by digest (regardless of tag value).
+-  digest: ""
 +  digest: {{aws-observability/aws-otel-collector}}
  imagePullSecrets: []
  
