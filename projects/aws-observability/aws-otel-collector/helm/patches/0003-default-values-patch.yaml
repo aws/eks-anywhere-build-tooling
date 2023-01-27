@@ -1,14 +1,29 @@
-From 700d91bf39cd42d5ed8e451394761fd6a1e85bc5 Mon Sep 17 00:00:00 2001
-From: "Ostosh, Ivy" <ivyjin215@gmail.com>
-Date: Wed, 16 Nov 2022 19:34:58 -0600
-Subject: [PATCH] Update values.yaml file
+From e95d120c8fb1f3fe52078a2ae1d3ccca0253eca7 Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin@amazon.com>
+Date: Fri, 27 Jan 2023 14:54:12 -0600
+Subject: [PATCH] Update default values
 
 ---
- charts/opentelemetry-collector/values.yaml | 58 ++--------------------
- 1 file changed, 3 insertions(+), 55 deletions(-)
+ .../values.schema.json                        |  5 +-
+ charts/opentelemetry-collector/values.yaml    | 57 +------------------
+ 2 files changed, 4 insertions(+), 58 deletions(-)
 
+diff --git a/charts/opentelemetry-collector/values.schema.json b/charts/opentelemetry-collector/values.schema.json
+index eedb8e7..f2d7323 100644
+--- a/charts/opentelemetry-collector/values.schema.json
++++ b/charts/opentelemetry-collector/values.schema.json
+@@ -772,8 +772,5 @@
+         }
+       }
+     }
+-  },
+-  "required": [
+-    "mode"
+-  ]
++  }
+ }
 diff --git a/charts/opentelemetry-collector/values.yaml b/charts/opentelemetry-collector/values.yaml
-index af1edde..7a0f9cd 100644
+index 2f7da11..ff37ea3 100644
 --- a/charts/opentelemetry-collector/values.yaml
 +++ b/charts/opentelemetry-collector/values.yaml
 @@ -8,7 +8,7 @@ fullnameOverride: ""
@@ -20,7 +35,7 @@ index af1edde..7a0f9cd 100644
  
  # Handles basic configuration of components that
  # also require k8s modifications to work correctly.
-@@ -61,7 +61,8 @@ configMap:
+@@ -64,7 +64,8 @@ configMap:
  # For example, {{ REDACTED_EMAIL }} becomes {{` {{ REDACTED_EMAIL }} `}}.
  config:
    exporters:
@@ -30,31 +45,31 @@ index af1edde..7a0f9cd 100644
    extensions:
      # The health_check extension is mandatory for this chart.
      # Without the health_check extension the collector will fail the readiness and liveliness probes.
-@@ -73,14 +74,6 @@ config:
+@@ -76,14 +77,6 @@ config:
      # If set to null, will be overridden with values based on k8s resource limits
      memory_limiter: null
    receivers:
 -    jaeger:
 -      protocols:
 -        grpc:
--          endpoint: 0.0.0.0:14250
+-          endpoint: ${MY_POD_IP}:14250
 -        thrift_http:
--          endpoint: 0.0.0.0:14268
+-          endpoint: ${MY_POD_IP}:14268
 -        thrift_compact:
--          endpoint: 0.0.0.0:6831
+-          endpoint: ${MY_POD_IP}:6831
      otlp:
        protocols:
          grpc:
-@@ -95,8 +88,6 @@ config:
+@@ -98,8 +91,6 @@ config:
              static_configs:
                - targets:
                    - ${MY_POD_IP}:8888
 -    zipkin:
--      endpoint: 0.0.0.0:9411
+-      endpoint: ${MY_POD_IP}:9411
    service:
      telemetry:
        metrics:
-@@ -105,14 +96,6 @@ config:
+@@ -108,14 +99,6 @@ config:
        - health_check
        - memory_ballast
      pipelines:
@@ -69,7 +84,7 @@ index af1edde..7a0f9cd 100644
        metrics:
          exporters:
            - logging
-@@ -122,19 +105,8 @@ config:
+@@ -125,16 +108,6 @@ config:
          receivers:
            - otlp
            - prometheus
@@ -85,11 +100,8 @@ index af1edde..7a0f9cd 100644
 -          - zipkin
  
  image:
--  # If you want to use the core image `otel/opentelemetry-collector`, you also need to change `command.name` value to `otelcol`.
-   repository: adot/aws-observability/aws-otel-collector
-   pullPolicy: IfNotPresent
-   digest: {{aws-observability/aws-otel-collector}}
-@@ -209,30 +181,6 @@ ports:
+   # If you want to use the core image `otel/opentelemetry-collector`, you also need to change `command.name` value to `otelcol`.
+@@ -225,30 +198,6 @@ ports:
      servicePort: 4318
      hostPort: 4318
      protocol: TCP
