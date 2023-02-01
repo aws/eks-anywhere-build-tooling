@@ -91,7 +91,7 @@ for i in $(seq 1 $MAX_RETRIES); do
 
     # Create a single EC2 instance with provided instance type and AMI
     # Query the instance ID for use in future commands
-    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text) && break
+    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2") && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
