@@ -3,7 +3,7 @@ GIT_TAG:=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.17"
 
 APPMESH_VERSION:=$(shell cat APPMESH_VERSION)
-IMAGE_BUILD_ARGS=APPMESH_VERSION
+IMAGE_BUILD_ARGS=APPMESH_VERSION COMPILER_IMAGE
 
 REPO=emissary
 REPO_OWNER=emissary-ingress
@@ -18,6 +18,7 @@ IMAGE_NAMES=emissary
 DOCKERFILE_FOLDER=./docker/linux/emissary-image
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-python
+COMPILER_IMAGE_VERSION=3.9
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/emissary-ingress
