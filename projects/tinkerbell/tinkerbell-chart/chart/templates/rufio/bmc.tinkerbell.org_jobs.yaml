@@ -1,27 +1,28 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: bmcjobs.bmc.tinkerbell.org
+  name: jobs.bmc.tinkerbell.org
 spec:
   group: bmc.tinkerbell.org
   names:
     categories:
     - tinkerbell
-    kind: BMCJob
-    listKind: BMCJobList
-    plural: bmcjobs
+    kind: Job
+    listKind: JobList
+    plural: jobs
     shortNames:
-    - bmj
-    singular: bmcjob
+    - j
+    singular: job
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BMCJob is the Schema for the bmcjobs API
+        description: Job is the Schema for the bmcjobs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -36,20 +37,17 @@ spec:
           metadata:
             type: object
           spec:
-            description: BMCJobSpec defines the desired state of BMCJob
+            description: JobSpec defines the desired state of Job
             properties:
-              baseboardManagementRef:
-                description: BaseboardManagementRef represents the BaseboardManagement
-                  resource to execute the job. All the tasks in the job are executed
-                  for the same BaseboardManagement.
+              machineRef:
+                description: MachineRef represents the Machine resource to execute
+                  the job. All the tasks in the job are executed for the same Machine.
                 properties:
                   name:
-                    description: Name is unique within a namespace to reference a
-                      BaseboardManagement resource.
+                    description: Name of the Machine.
                     type: string
                   namespace:
-                    description: Namespace defines the space within which the BaseboardManagement
-                      name must be unique.
+                    description: Namespace the Machine resides in.
                     type: string
                 required:
                 - name
@@ -62,7 +60,7 @@ spec:
                   task fails, job execution stops and sets condition Failed. Condition
                   Completed is set only if all the tasks were successful.
                 items:
-                  description: Task represents the action to be performed. A single
+                  description: Action represents the action to be performed. A single
                     task can only perform one type of action. For example either PowerAction
                     or OneTimeBootDeviceAction.
                   maxProperties: 1
@@ -77,14 +75,11 @@ spec:
                             in the slice is used to set one time boot.
                           items:
                             description: BootDevice represents boot device of the
-                              BaseboardManagement.
+                              Machine.
                             type: string
                           type: array
                         efiBoot:
-                          default: false
-                          description: EFIBoot specifies to EFI boot for the baseboard
-                            management. When true, enables options=efiboot while setting
-                            the boot device. If false, no options are passed.
+                          description: EFIBoot instructs the machine to use EFI boot.
                           type: boolean
                       required:
                       - device
@@ -101,13 +96,14 @@ spec:
                       - reset
                       type: string
                   type: object
+                minItems: 1
                 type: array
             required:
-            - baseboardManagementRef
+            - machineRef
             - tasks
             type: object
           status:
-            description: BMCJobStatus defines the observed state of BMCJob
+            description: JobStatus defines the observed state of Job
             properties:
               completionTime:
                 description: CompletionTime represents time when the job was completed.
@@ -124,11 +120,11 @@ spec:
                         details about last transition.
                       type: string
                     status:
-                      description: Status is the status of the BMCJob condition. Can
+                      description: Status is the status of the Job condition. Can
                         be True or False.
                       type: string
                     type:
-                      description: Type of the BMCJob condition.
+                      description: Type of the Job condition.
                       type: string
                   required:
                   - status
@@ -136,8 +132,8 @@ spec:
                   type: object
                 type: array
               startTime:
-                description: StartTime represents time when the BMCJob controller
-                  started processing a job.
+                description: StartTime represents time when the Job controller started
+                  processing a job.
                 format: date-time
                 type: string
             type: object

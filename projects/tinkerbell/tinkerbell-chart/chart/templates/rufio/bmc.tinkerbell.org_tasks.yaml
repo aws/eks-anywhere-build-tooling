@@ -1,27 +1,28 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: bmctasks.bmc.tinkerbell.org
+  name: tasks.bmc.tinkerbell.org
 spec:
   group: bmc.tinkerbell.org
   names:
     categories:
     - tinkerbell
-    kind: BMCTask
-    listKind: BMCTaskList
-    plural: bmctasks
+    kind: Task
+    listKind: TaskList
+    plural: tasks
     shortNames:
-    - bmt
-    singular: bmctask
+    - t
+    singular: task
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BMCTask is the Schema for the bmctasks API
+        description: Task is the Schema for the Task API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -36,28 +37,27 @@ spec:
           metadata:
             type: object
           spec:
-            description: BMCTaskSpec defines the desired state of BMCTask
+            description: TaskSpec defines the desired state of Task.
             properties:
               connection:
-                description: Connection represents the BaseboardManagement connectivity
-                  information.
+                description: Connection represents the Machine connectivity information.
                 properties:
                   authSecretRef:
                     description: AuthSecretRef is the SecretReference that contains
-                      authentication information of the BaseboardManagement. The Secret
-                      must contain username and password keys.
+                      authentication information of the Machine. The Secret must contain
+                      username and password keys.
                     properties:
                       name:
-                        description: Name is unique within a namespace to reference
+                        description: name is unique within a namespace to reference
                           a secret resource.
                         type: string
                       namespace:
-                        description: Namespace defines the space within which the
+                        description: namespace defines the space within which the
                           secret name must be unique.
                         type: string
                     type: object
                   host:
-                    description: Host is the host IP address or hostname of the BaseboardManagement.
+                    description: Host is the host IP address or hostname of the Machine.
                     minLength: 1
                     type: string
                   insecureTLS:
@@ -65,7 +65,7 @@ spec:
                     type: boolean
                   port:
                     default: 623
-                    description: Port is the port number for connecting with the BaseboardManagement.
+                    description: Port is the port number for connecting with the Machine.
                     type: integer
                 required:
                 - authSecretRef
@@ -86,14 +86,11 @@ spec:
                           for setting one time boot. Currently only the first device
                           in the slice is used to set one time boot.
                         items:
-                          description: BootDevice represents boot device of the BaseboardManagement.
+                          description: BootDevice represents boot device of the Machine.
                           type: string
                         type: array
                       efiBoot:
-                        default: false
-                        description: EFIBoot specifies to EFI boot for the baseboard
-                          management. When true, enables options=efiboot while setting
-                          the boot device. If false, no options are passed.
+                        description: EFIBoot instructs the machine to use EFI boot.
                         type: boolean
                     required:
                     - device
@@ -114,7 +111,7 @@ spec:
             - task
             type: object
           status:
-            description: BMCTaskStatus defines the observed state of BMCTask
+            description: TaskStatus defines the observed state of Task
             properties:
               completionTime:
                 description: CompletionTime represents time when the task was completed.
@@ -131,11 +128,11 @@ spec:
                         details about last transition.
                       type: string
                     status:
-                      description: Status is the status of the BMCTask condition.
-                        Can be True or False.
+                      description: Status is the status of the Task condition. Can
+                        be True or False.
                       type: string
                     type:
-                      description: Type of the BMCTask condition.
+                      description: Type of the Task condition.
                       type: string
                   required:
                   - status
@@ -143,7 +140,7 @@ spec:
                   type: object
                 type: array
               startTime:
-                description: StartTime represents time when the BMCTask started processing.
+                description: StartTime represents time when the Task started processing.
                 format: date-time
                 type: string
             type: object
