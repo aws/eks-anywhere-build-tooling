@@ -34,8 +34,10 @@ CI="${CI:-false}"
 
 if [ "$CODEBUILD_CI" = "true" ]; then
     KEY_NAME="$KEY_NAME-$CODEBUILD_BUILD_ID"
+    CREATOR=$CODEBUILD_BUILD_ID
 elif [ "$CI" = "true" ]; then
     KEY_NAME="$KEY_NAME-$PROW_JOB_ID"
+    CREATOR=$PROW_JOB_ID
 fi
 
 if [ "$IMAGE_FORMAT" != "raw" ] && [ "$IMAGE_FORMAT" != "cloudstack" ]; then
@@ -65,7 +67,7 @@ trap 'if [ -n "$INSTANCE_ID" ]; then terminate_instance $INSTANCE_ID; fi; delete
 # Query and save the key contents into a local file for
 # communicating to EC2 instance via SSH
 if ! aws ec2 wait key-pair-exists --key-names=$KEY_NAME 2>/dev/null ; then
-    aws ec2 create-key-pair --key-name $KEY_NAME --query "KeyMaterial" --output text > $KEY_LOCATION
+    aws ec2 create-key-pair --key-name $KEY_NAME --tag-specifications "ResourceType=key-pair,Tags=[{Key=Creator,Value=$CREATOR}]" --query "KeyMaterial" --output text > $KEY_LOCATION
 fi
 chmod 600 $KEY_LOCATION
 
@@ -91,7 +93,7 @@ for i in $(seq 1 $MAX_RETRIES); do
 
     # Create a single EC2 instance with provided instance type and AMI
     # Query the instance ID for use in future commands
-    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --query "Instances[0].InstanceId" --output text --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2") && break
+    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --tag-specifications "ResourceType=instance,Tags=[{Key=Creator,Value=$CREATOR}]" --query "Instances[0].InstanceId" --output text --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2") && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
