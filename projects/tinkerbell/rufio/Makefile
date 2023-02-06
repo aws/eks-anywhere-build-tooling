@@ -14,13 +14,22 @@ HAS_S3_ARTIFACTS=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
 s3-artifacts: create-manifests
 
 .PHONY: create-manifests
 create-manifests: tarballs
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(GOLANG_VERSION)
 
+FIX_LICENSE_TARGET=$(REPO)/vendor/github.com/bmc-toolbox/common/LICENSE
+
+# Ensure we download the license for the bmc-toolbox/common dependency ahead of gathering licenses.
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSE_TARGET)
+
+$(FIX_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+	dest=$(REPO)/vendor/github.com/bmc-toolbox/common/LICENSE; \
+	mkdir -p $$(dirname $$dest); \
+	wget -q --retry-connrefused -O $$dest \
+		https://raw.githubusercontent.com/bmc-toolbox/common/main/LICENSE;
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
