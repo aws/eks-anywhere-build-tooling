@@ -627,6 +627,7 @@ endif
 
 ifneq ($(IMAGE_NAMES),)
 .PHONY: local-images images
+local-images: clean-job-caches
 local-images: $(LOCAL_IMAGE_TARGETS)
 images: $(IMAGE_TARGETS)
 endif
@@ -635,10 +636,9 @@ endif
 # space is very limited in presubmit jobs, the image builds can push the total used space over the limit.
 # go-build cache and pkg mod cache handled by target above
 # prune is handled by buildkit.sh
-clean-job-caches: $(and $(if $(JOB_TYPE),presubmit),$(if $(PRUNE_BUILDCTL),true)) clean-go-cache clean-repo
+clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUNE_BUILDCTL)),clean-go-cache)
 
 .PHONY: %/images/push %/images/amd64 %/images/arm64
-%/images/push %/images/amd64 %/images/arm64: clean-job-caches
 %/images/push %/images/amd64 %/images/arm64: IMAGE_NAME=$*
 %/images/push %/images/amd64 %/images/arm64: DOCKERFILE_FOLDER?=./docker/linux
 %/images/push %/images/amd64 %/images/arm64: IMAGE_CONTEXT_DIR?=.

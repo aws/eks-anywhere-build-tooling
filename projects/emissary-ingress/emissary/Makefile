@@ -30,12 +30,6 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(GO_MOD_DOWNLOAD_TARGETS): $(AMBASSADOR_VERSION_TARGET)
 
-ifeq ($(JOB_TYPE),presubmit)
-# space is very limited in presubmit jobs, the image builds can push the total used space over the limit
-# after the binaries are built there are ~2GBs of go build/mod cache
-$(call IMAGE_TARGETS_FOR_NAME, emissary): clean-go-cache
-endif
-
 # do not pass our makeflags down to emissary make since there will be unncessary warnings
 $(AMBASSADOR_VERSION_TARGET): MAKEFLAGS=
 $(AMBASSADOR_VERSION_TARGET):
