@@ -749,7 +749,7 @@ release: $(RELEASE_TARGETS)
 %/release-branches/all:
 	@for version in $(SUPPORTED_K8S_VERSIONS) ; do \
 	    if ! [[ "$(SKIPPED_K8S_VERSIONS)" =~ $$version  ]]; then \
-			$(MAKE) $* RELEASE_BRANCH=$$version; \
+			$(MAKE) $* clean-output RELEASE_BRANCH=$$version; \
 		fi \
 	done;
 
