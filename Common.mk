@@ -639,7 +639,7 @@ CLEAN_REPO_IMAGE_NAMES=emissary harbor
 # go-build cache and pkg mod cache handled by target above
 # prune is handled by buildkit.sh
 clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUNE_BUILDCTL)),clean-go-cache)
-clean-job-caches: $(if $(filter $(IMAGE_NAME),$(CLEAN_REPO_IMAGE_NAMES)),clean-repo,))
+clean-job-caches: $(if $(filter $(IMAGE_NAME),$(CLEAN_REPO_IMAGE_NAMES)),clean-repo,)
 
 .PHONY: %/images/push %/images/amd64 %/images/arm64
 %/images/push %/images/amd64 %/images/arm64: IMAGE_NAME=$*
