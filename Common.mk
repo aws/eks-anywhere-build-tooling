@@ -635,7 +635,7 @@ endif
 # space is very limited in presubmit jobs, the image builds can push the total used space over the limit.
 # go-build cache and pkg mod cache handled by target above
 # prune is handled by buildkit.sh
-clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUNE_BUILDCTL)),clean-go-cache clean-repo)
+clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUNE_BUILDCTL)),clean-go-cache)
 
 .PHONY: %/images/push %/images/amd64 %/images/arm64
 %/images/push %/images/amd64 %/images/arm64: IMAGE_NAME=$*
