@@ -632,7 +632,7 @@ images: $(IMAGE_TARGETS)
 endif
 
 # images to run clean-repo on as part of clean-job-caches
-CLEAN_REPO_IMAGE_NAMES=emissary harbor
+CLEAN_REPO_IMAGE_NAMES=emissary harbor-portal
 
 .PHONY: clean-job-caches
 # space is very limited in presubmit jobs, the image builds can push the total used space over the limit.
