@@ -627,7 +627,7 @@ endif
 
 ifneq ($(IMAGE_NAMES),)
 .PHONY: local-images images
-local-images: clean-job-caches $(LOCAL_IMAGE_TARGETS)
+local-images: clean-job-caches clean-repo $(LOCAL_IMAGE_TARGETS)
 images: $(IMAGE_TARGETS)
 endif
 
