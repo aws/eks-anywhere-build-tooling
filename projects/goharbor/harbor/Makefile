@@ -125,7 +125,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 ifeq ($(JOB_TYPE),presubmit)
 # space is very limited in presubmit jobs, the image builds can push the total used space over the limit
 # after the binaries are built there are ~3GBs of go build/mod cache
-$(call IMAGE_TARGETS_FOR_NAME, harbor-portal): clean-go-cache clean-repo
+$(call IMAGE_TARGETS_FOR_NAME, harbor-portal): clean-repo
 endif
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_XEIPUUV_TARGET)
