@@ -1,7 +1,7 @@
-From 4b8c7b3f61ebcfe8bd746dd0fd9d3dcb1200da1d Mon Sep 17 00:00:00 2001
+From 80abe7d3f7559f32caf96652c0853ff832fd0e14 Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Wed, 23 Nov 2022 09:26:28 -0500
-Subject: [PATCH 23/25] Support configuring bottlerocket admin container image
+Subject: [PATCH 22/26] Support configuring bottlerocket admin container image
 
 ---
  .../api/v1alpha4/zz_generated.conversion.go   |  2 +
@@ -40,7 +40,7 @@ index 4c6e516f9..070387806 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 5fc0c8a24..4c5e693ea 100644
+index 2480b3490..9c26c089a 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -83,6 +83,11 @@ type ClusterConfiguration struct {
@@ -55,7 +55,7 @@ index 5fc0c8a24..4c5e693ea 100644
  	// BottlerocketControl holds the image source for control container
  	// This is only for bottlerocket
  	// +optional
-@@ -189,6 +194,13 @@ type BottlerocketBootstrap struct {
+@@ -196,6 +201,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
  
@@ -69,7 +69,7 @@ index 5fc0c8a24..4c5e693ea 100644
  // BottlerocketControl holds the settings of control container for bottlerocket nodes
  // This setting is ONLY for bottlerocket nodes.
  type BottlerocketControl struct {
-@@ -467,6 +479,11 @@ type JoinConfiguration struct {
+@@ -485,6 +497,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -125,7 +125,7 @@ index de1edd185..05c8ed299 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 459cf26f1..d9e946f1e 100644
+index 4721a6f42..7962b210c 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -2364,6 +2364,21 @@ spec:
@@ -150,7 +150,7 @@ index 459cf26f1..d9e946f1e 100644
                    bottlerocketBootstrap:
                      description: BottlerocketBootstrap holds the image source for
                        kubeadm bootstrap container This is only for bottlerocket
-@@ -3124,6 +3139,21 @@ spec:
+@@ -3130,6 +3145,21 @@ spec:
                        schemas to the latest internal value, and may reject unrecognized
                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                      type: string
@@ -173,10 +173,10 @@ index 459cf26f1..d9e946f1e 100644
                      description: BottlerocketBootstrap holds the image source for
                        kubeadm bootstrap container This is only for bottlerocket
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 3c8efabb6..51f378111 100644
+index 61f708c37..519238b38 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -2375,6 +2375,22 @@ spec:
+@@ -2376,6 +2376,22 @@ spec:
                                convert recognized schemas to the latest internal value,
                                and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                              type: string
@@ -199,7 +199,7 @@ index 3c8efabb6..51f378111 100644
                            bottlerocketBootstrap:
                              description: BottlerocketBootstrap holds the image source
                                for kubeadm bootstrap container This is only for bottlerocket
-@@ -3187,6 +3203,22 @@ spec:
+@@ -3196,6 +3212,22 @@ spec:
                                convert recognized schemas to the latest internal value,
                                and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                              type: string
@@ -350,10 +350,10 @@ index caea3a597..1859a4816 100644
  		},
  		{
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index bbf1149a3..714dd8a9e 100644
+index d64f26bab..66ffa6de2 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -453,6 +453,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -468,6 +468,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
  			Pause:                                 scope.Config.Spec.ClusterConfiguration.Pause,
  			BottlerocketBootstrap:                 scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
@@ -361,7 +361,7 @@ index bbf1149a3..714dd8a9e 100644
  			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
  			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
  			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
-@@ -638,6 +639,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -663,6 +664,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
  			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
  			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
@@ -369,7 +369,7 @@ index bbf1149a3..714dd8a9e 100644
  			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
  			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
  			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
-@@ -765,6 +767,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -791,6 +793,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
  			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
  			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
@@ -438,7 +438,7 @@ index eb5597550..f1a56bb26 100644
  		return err
  	}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 8d04a45f1..d52ecd670 100644
+index 158391faa..0cdafa49b 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -2838,6 +2838,22 @@ spec:
@@ -464,7 +464,7 @@ index 8d04a45f1..d52ecd670 100644
                        bottlerocketBootstrap:
                          description: BottlerocketBootstrap holds the image source
                            for kubeadm bootstrap container This is only for bottlerocket
-@@ -3630,6 +3646,22 @@ spec:
+@@ -3637,6 +3653,22 @@ spec:
                            schemas to the latest internal value, and may reject unrecognized
                            values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                          type: string
@@ -488,7 +488,7 @@ index 8d04a45f1..d52ecd670 100644
                          description: BottlerocketBootstrap holds the image source
                            for kubeadm bootstrap container This is only for bottlerocket
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 984575176..922207f47 100644
+index f63c55f7d..f3d549793 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -1446,6 +1446,23 @@ spec:
@@ -515,7 +515,7 @@ index 984575176..922207f47 100644
                                bottlerocketBootstrap:
                                  description: BottlerocketBootstrap holds the image
                                    source for kubeadm bootstrap container This is only
-@@ -2293,6 +2310,23 @@ spec:
+@@ -2300,6 +2317,23 @@ spec:
                                    value, and may reject unrecognized values. More
                                    info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                                  type: string
@@ -540,5 +540,5 @@ index 984575176..922207f47 100644
                                  description: BottlerocketBootstrap holds the image
                                    source for kubeadm bootstrap container This is only
 -- 
-2.37.2
+2.34.1
 

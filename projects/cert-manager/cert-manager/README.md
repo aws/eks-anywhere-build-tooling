@@ -1,5 +1,5 @@
 ## **cert-manager**
-![Version](https://img.shields.io/badge/version-v1.9.1-blue)
+![Version](https://img.shields.io/badge/version-v1.11.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUkphQkhWTUpOOVE1OFVLU0dHQmVFUXZJV0dJaGVLYmtEZHp0aGtDRnJBQUxtaHVqOWp3S0l6d0NlTytqNWpwc2tNTmF6RnNhMTZ3d1J1RXErR0lWcldZPSIsIml2UGFyYW1ldGVyU3BlYyI6IlQyU2lIcVVtU3ozZVZSVTgiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [cert-manager](https://github.com/cert-manager/cert-manager) is a Kubernetes add-on to automate the management and issuance of TLS certificates from various issuing sources, such as [Let’s Encrypt](https://letsencrypt.org), [HashiCorp Vault](https://www.vaultproject.io), [Venafi](https://www.venafi.com/), a simple signing key pair, or self signed. It periodically ensures that certificates are valid and up-to-date, and attempts to renew certificates at an appropriate time before expiry.
@@ -48,8 +48,8 @@ from github during each build, and so we're sure nothing changes in the file eve
    1. Usually we will update cert-manager tag only when updating CAPI tag and if the new CAPI tag uses a new cert-manager tag.
    1. If the updated cert-manager tag introduces a new API version for the cert-manager CRDs, the updated tags of upstream cluster-api providers 
       (including CAPI, CAPBK, KCP, CAPD and CAPV) will already be using the new API version for cert-manager CRs so we won't have to make any changes there.
-   1. But we also use cert-manager in our custom providers like the [etcdadm-bootstrap-provider](https://github.com/mrajashree/etcdadm-bootstrap-provider/tree/v1beta1/config/certmanager)
-   and [etcdadm-controller](https://github.com/mrajashree/etcdadm-controller/tree/v1beta1/config/certmanager) and we should use the same API version for cert-manager in these providers
+   1. But we also use cert-manager in our custom providers like the [etcdadm-bootstrap-provider](https://github.com/aws/etcdadm-bootstrap-provider/tree/v1beta1/config/certmanager)
+   and [etcdadm-controller](https://github.com/aws/etcdadm-controller/tree/v1beta1/config/certmanager) and we should use the same API version for cert-manager in these providers
    as used by the upstream providers. To make the required changes to cert-manager CRs in our providers, checkout the CAPI book's [Provider Implementers](https://cluster-api.sigs.k8s.io/developer/providers/implementers.html)
    section and review the page containing details for upgrading to the desired capi version. 
    1. For instance, when updating CAPI from v1alpha3 to v1beta1, cert-manager tag changed from v1.1.0 to v1.5.3, and upstream CAPI providers made [these](https://cluster-api.sigs.k8s.io/developer/providers/v1alpha3-to-v1alpha4.html#upgrade-cert-manager-to-v110)
@@ -57,8 +57,7 @@ from github during each build, and so we're sure nothing changes in the file eve
    capi version you are updating to.
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
-1. Update the cert-manager.yaml manifest using `make update-cert-manager-manifest` from this directory
-1. Update `manifests/cert-manager.yaml` with file created in `build/cert-manager.yaml`
+1. Update the cert-manager.yaml manifest running `make update-cert-manager-manifest` from this directory. That will download the new manifest and update `manifests/cert-manager.yaml`.
 1. Update checksums and attribution using `make update-attribution-checksums-docker PROJECT=cert-manager/cert-manager` from the root of the repo.
 1. Update the version at the top of this Readme.
 1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.

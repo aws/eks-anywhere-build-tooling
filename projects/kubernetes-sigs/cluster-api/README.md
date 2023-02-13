@@ -1,5 +1,5 @@
 ## **Cluster API**
-![Version](https://img.shields.io/badge/version-v1.2.0-blue)
+![Version](https://img.shields.io/badge/version-v1.3.3-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiQVZ3TDBZZVVXZUZiVmtqLzVoOVcrV2FaMmxRRzJXRmJCRlZtQkNodXdWZ0FrNm0zQ3l5UzNqTkdsQXgwdzc0bTBZc1RIcjBhMUVFbEhIK3d2VDVPek1rPSIsIml2UGFyYW1ldGVyU3BlYyI6IkVuOGJxNXBPZEtDek81Q3giLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Cluster API](https://github.com/kubernetes-sigs/cluster-api) is a Kubernetes sub-project focused on providing declarative APIs and tooling to simplify provisioning, upgrading, and operating multiple Kubernetes clusters. It uses Kubernetes-style APIs and patterns to automate cluster lifecycle management for platform operators. The supporting infrastructure, like virtual machines, networks, load balancers, and VPCs, as well as the Kubernetes cluster configuration are all defined in the same way that application developers operate deploying and managing their workloads. This enables consistent and repeatable cluster deployments across a wide variety of infrastructure environments. Cluster API can be extended to support any infrastructure provider (AWS, Azure, vSphere, etc.) or bootstrap provider (kubeadm is default) as required by the customer.
@@ -18,7 +18,7 @@ You can find the latest versions of these images on ECR Public Gallery.
    Please review carefully and if there are questions about changes necessary to eks-anywhere to support the new version
    and/or automatically update between eks-anywhere version reach out to @jaxesn, @vignesh-goutham or @g-gaston.
 1. Follow these steps for changes to the patches/ folder:
-   1. Checkout the desired tag on our [CAPI fork](https://github.com/mrajashree/cluster-api) and create a new branch.
+   1. Checkout the desired tag on our [CAPI fork](https://github.com/abhay-krishna/cluster-api) and create a new branch.
    1. Review the patches under patches/ folder in this repo. Apply the required patches to the new branch created in the above step.
       1. Run `git am *.patch`
       1. For patches that need some manual changes, you will see a similar error: `Patch failed at *`
