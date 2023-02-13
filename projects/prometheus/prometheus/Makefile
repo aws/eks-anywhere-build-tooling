@@ -11,6 +11,15 @@ BASE_IMAGE_NAME=eks-distro-minimal-base
 SOURCE_PATTERNS=./cmd/prometheus ./cmd/promtool
 # Add additional gobuild flag to embed the web UI in the go binary
 EXTRA_GOBUILD_FLAGS=-tags netgo,builtinassets
+GIT_COMMIT=$(shell git -C $(REPO) rev-parse --short HEAD)
+GIT_BRANCH=$(shell git -C $(REPO) rev-parse --abbrev-ref HEAD)
+BUILD_USER=$(shell id -u -n)
+BUILD_DATE=$(shell git -C $(REPO) show -s --format=format:%cd --date=format:'%Y-%m-%dT%H:%M:%SZ' HEAD)
+EXTRA_GO_LDFLAGS=-X github.com/prometheus/common/version.Version=$(GIT_TAG)	\
+	-X github.com/prometheus/common/version.Revision=$(GIT_COMMIT)	\
+	-X github.com/prometheus/common/version.Branch=$(GIT_BRANCH)	\
+	-X github.com/prometheus/common/version.BuildUser=$(BUILD_USER)	\
+	-X github.com/prometheus/common/version.BuildDate=$(BUILD_DATE)
 WEB_UI_TARGETS=prometheus/web/ui/embed.go
 EXTRA_DOCKER_FILE_TARGETS=$(OUTPUT_DIR)/extra/etc/prometheus/prometheus.yml
 
