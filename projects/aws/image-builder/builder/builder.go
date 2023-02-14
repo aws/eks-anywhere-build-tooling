@@ -42,7 +42,9 @@ func (b *BuildOptions) BuildImage() {
 
 	supportedReleaseBranches := GetSupportedReleaseBranches()
 	if !SliceContains(supportedReleaseBranches, b.ReleaseChannel) {
-		cleanup(buildToolingRepoPath)
+		if codebuild != "true" {
+			cleanup(buildToolingRepoPath)
+		}
 		log.Fatalf("release-channel should be one of %v", supportedReleaseBranches)
 	}
 
