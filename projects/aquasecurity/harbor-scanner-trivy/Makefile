@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.17"
+GOLANG_VERSION?="1.19"
 
 REPO=harbor-scanner-trivy
 REPO_OWNER=aquasecurity
