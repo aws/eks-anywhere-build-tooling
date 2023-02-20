@@ -5,6 +5,7 @@ ARG TARGETARCH
 ARG TARGETOS
 
 COPY _output/bin/eks-anywhere-packages/$TARGETOS-$TARGETARCH/package-manager /package-manager
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
