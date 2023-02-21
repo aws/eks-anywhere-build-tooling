@@ -9,6 +9,7 @@ GO_MOD_NAME="github.com/aws/eks-anywhere-packages/"
 GO_VAR_PREFIX="pkg/config."
 GO_VARS=version=${GIT_TAG} gitHash=${PROJECT_COMMIT_HASH} buildTime=${TIME}
 EXTRA_GO_LDFLAGS=$(foreach v,$(GO_VARS),-X ${GO_MOD_NAME}${GO_VAR_PREFIX}${v})
+PROJECT_DEPENDENCIES=eksd/kubernetes/client
 
 
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
