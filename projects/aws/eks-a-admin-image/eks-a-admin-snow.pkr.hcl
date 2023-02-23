@@ -18,7 +18,7 @@ source "amazon-ebs" "amazonlinux2" {
   region = "us-west-2"
   source_ami_filter {
     filters = {
-      name                = "amzn2-ami-hvm-2*"
+      name                = "amzn2-ami-kernel-5.*-hvm-2*"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
     }
