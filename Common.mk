@@ -79,8 +79,9 @@ SUPPORTED_K8S_VERSIONS:=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_
 SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
-IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker create-ecr-repos,$(MAKECMDGOALS)))
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=build release clean help stop-docker-builder
+IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker,$(MAKECMDGOALS)))
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums
 MAKECMDGOALS_WITHOUT_VAR_VALUE=$(foreach t,$(MAKECMDGOALS),$(if $(findstring var-value-,$(t)),,$(t)))
 ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BRANCH_TARGET))),)
 	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
@@ -591,6 +592,10 @@ attribution: $(and $(filter true,$(HAS_LICENSES)),$(ATTRIBUTION_TARGETS))
 attribution-pr: attribution
 	$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
 
+.PHONY: all-attributions
+all-attributions:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) attribution
+
 #### Tarball Targets
 
 .PHONY: tarballs
@@ -622,6 +627,17 @@ validate-checksums: $(BINARY_TARGETS)
 ifneq ($(and $(strip $(BINARY_TARGETS)), $(filter false, $(SKIP_CHECKSUM_VALIDATION))),)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION)
 endif
+
+.PHONY: attribution-checksums
+attribution-checksums: attribution checksums
+
+.PHONY: all-checksums
+all-checksums:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) checksums
+
+.PHONY: all-attributions-checksums
+all-attributions-checksums:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) "attribution checksums"
 
 #### Image Helpers
 
