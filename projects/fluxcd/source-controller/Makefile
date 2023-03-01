@@ -31,6 +31,11 @@ BUILDSPEC_2_DEPENDS_ON_OVERRIDE=fluxcd_source_controller_linux_amd64 fluxcd_sour
 # since this would clobber the other build's artifacts
 UPLOAD_DO_NOT_DELETE=true
 
+# the checksum periodic job in prow has space issues due to using buildctl to build the arm binary
+# skipping for now in this build until we can improve the job
+BINARY_PLATFORMS?=linux/amd64 linux/arm64
+BINARY_PLATFORMS:=$(if $(findstring periodic,$(JOB_TYPE)),linux/amd64,$(BINARY_PLATFORMS))
+
 include $(BASE_DIRECTORY)/Common.mk
 
 

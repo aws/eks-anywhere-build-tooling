@@ -79,8 +79,9 @@ SUPPORTED_K8S_VERSIONS:=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_
 SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
-IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker create-ecr-repos,$(MAKECMDGOALS)))
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=build release clean help stop-docker-builder
+IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker,$(MAKECMDGOALS)))
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums
 MAKECMDGOALS_WITHOUT_VAR_VALUE=$(foreach t,$(MAKECMDGOALS),$(if $(findstring var-value-,$(t)),,$(t)))
 ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BRANCH_TARGET))),)
 	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
@@ -118,10 +119,12 @@ endif
 #################### BASE IMAGES ###################
 BASE_IMAGE_REPO?=public.ecr.aws/eks-distro-build-tooling
 BASE_IMAGE_NAME?=eks-distro-base
-BASE_IMAGE_TAG_FILE?=$(BASE_DIRECTORY)/$(shell echo $(BASE_IMAGE_NAME) | tr '[:lower:]' '[:upper:]' | tr '-' '_')_TAG_FILE
+COMPILER_IMAGE_VERSION?=
+BASE_IMAGE_TAG_FILE?=$(BASE_DIRECTORY)/$(shell echo $(BASE_IMAGE_NAME) | tr '[:lower:]' '[:upper:]' | tr '-' '_')_$(if $(COMPILER_IMAGE_VERSION),$(COMPILER_IMAGE_VERSION)_,)TAG_FILE
 BASE_IMAGE_TAG?=$(shell cat $(BASE_IMAGE_TAG_FILE))
 BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
+COMPILER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME:eks-distro-minimal-base-%=%):$(BASE_IMAGE_TAG)
 EKS_DISTRO_BASE_IMAGE=$(BASE_IMAGE_REPO)/eks-distro-base:$(shell cat $(BASE_DIRECTORY)/EKS_DISTRO_BASE_TAG_FILE)
 ####################################################
 
@@ -507,7 +510,7 @@ $(REPO)/%ks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(
 
 ifneq ($(REPO),$(HELM_SOURCE_REPOSITORY))
 $(HELM_SOURCE_REPOSITORY):
-	git clone $(HELM_CLONE_URL) $(HELM_SOURCE_REPOSITORY)
+	source $(BUILD_LIB)/common.sh && retry git clone $(HELM_CLONE_URL) $(HELM_SOURCE_REPOSITORY)
 endif
 
 ifneq ($(GIT_TAG),$(HELM_GIT_TAG))
@@ -541,7 +544,9 @@ binaries: $(BINARY_TARGETS)
 
 $(KUSTOMIZE_TARGET):
 	@mkdir -p $(OUTPUT_DIR)
-	curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s $(KUSTOMIZE_VERSION) $(OUTPUT_DIR)
+	source $(BUILD_LIB)/common.sh && retry curl -o /tmp/install_kustomize.sh -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
+	chmod +x /tmp/install_kustomize.sh
+	source $(BUILD_LIB)/common.sh && retry /tmp/install_kustomize.sh $(KUSTOMIZE_VERSION) $(OUTPUT_DIR)
 
 .PHONY: clone-repo
 clone-repo: $(REPO)
@@ -591,6 +596,10 @@ attribution: $(and $(filter true,$(HAS_LICENSES)),$(ATTRIBUTION_TARGETS))
 attribution-pr: attribution
 	$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
 
+.PHONY: all-attributions
+all-attributions:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) attribution
+
 #### Tarball Targets
 
 .PHONY: tarballs
@@ -622,6 +631,17 @@ validate-checksums: $(BINARY_TARGETS)
 ifneq ($(and $(strip $(BINARY_TARGETS)), $(filter false, $(SKIP_CHECKSUM_VALIDATION))),)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION)
 endif
+
+.PHONY: attribution-checksums
+attribution-checksums: attribution checksums
+
+.PHONY: all-checksums
+all-checksums:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) checksums
+
+.PHONY: all-attributions-checksums
+all-attributions-checksums:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) "attribution checksums"
 
 #### Image Helpers
 
