@@ -11,9 +11,8 @@ clone-repo:  ## Clone upstream `source-controller`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `source-controller` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `source-controller` for `linux/amd64`
 _output/bin/source-controller/linux-amd64/source-controller: ## Build `_output/bin/source-controller/linux-amd64/source-controller`
-_output/bin/source-controller/linux-arm64/source-controller: ## Build `_output/bin/source-controller/linux-arm64/source-controller`
 
 ##@ Image Targets
 local-images: ## Builds `source-controller/images/amd64` as oci tars for presumbit validation
