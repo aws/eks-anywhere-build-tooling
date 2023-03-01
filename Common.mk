@@ -508,7 +508,7 @@ $(REPO)/%ks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(
 
 ifneq ($(REPO),$(HELM_SOURCE_REPOSITORY))
 $(HELM_SOURCE_REPOSITORY):
-	git clone $(HELM_CLONE_URL) $(HELM_SOURCE_REPOSITORY)
+	source $(BUILD_LIB)/common.sh && retry git clone $(HELM_CLONE_URL) $(HELM_SOURCE_REPOSITORY)
 endif
 
 ifneq ($(GIT_TAG),$(HELM_GIT_TAG))
