@@ -544,7 +544,7 @@ $(KUSTOMIZE_TARGET):
 	@mkdir -p $(OUTPUT_DIR)
 	source $(BUILD_LIB)/common.sh && retry curl -o /tmp/install_kustomize.sh -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 	chmod +x /tmp/install_kustomize.sh
-        source $(BUILD_LIB)/common.sh && retry /tmp/install_kustomize.sh $(KUSTOMIZE_VERSION) $(OUTPUT_DIR)
+	source $(BUILD_LIB)/common.sh && retry /tmp/install_kustomize.sh $(KUSTOMIZE_VERSION) $(OUTPUT_DIR)
 
 .PHONY: clone-repo
 clone-repo: $(REPO)
