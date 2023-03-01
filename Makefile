@@ -48,8 +48,7 @@ add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_P
 .PHONY: attribution-files-project-%
 attribution-files-project-%:
 	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
-	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) attribution
-	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod $(PROJECT_PATH)/_output,)
+	$(MAKE) -C $(PROJECT_PATH) all-attributions
 
 .PHONY: attribution-files
 attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
@@ -58,16 +57,15 @@ attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 .PHONY: checksum-files-project-%
 checksum-files-project-%:
 	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
-	build/update-attribution-files/make_attribution.sh $(PROJECT_PATH) checksums
-	$(if $(findstring periodic,$(JOB_TYPE)),rm -rf /root/.cache/go-build /home/prow/go/pkg/mod && make -C $(PROJECT_PATH) clean && buildctl prune --all,)
+	$(MAKE) -C $(PROJECT_PATH) all-checksums
 
 .PHONY: update-checksum-files
 update-checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
+	build/lib/update_go_versions.sh
 	build/update-attribution-files/create_pr.sh
 
 .PHONY: update-attribution-files
 update-attribution-files: add-generated-help-block attribution-files
-	build/lib/update_go_versions.sh
 	build/update-attribution-files/create_pr.sh
 
 .PHONY: run-target-in-docker

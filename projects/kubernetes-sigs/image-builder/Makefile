@@ -55,7 +55,7 @@ HAS_LICENSES=false
 SIMPLE_CREATE_TARBALLS=false
 
 # to support a no op attribution target
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=build release clean help binaries checksums attribution release-ami-ubuntu-2004
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution release-ami-ubuntu-2004
 BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 
 FINAL_OVA_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/$(IMAGE_OS).ova
