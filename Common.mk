@@ -79,8 +79,9 @@ SUPPORTED_K8S_VERSIONS:=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_
 SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
-IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker create-ecr-repos,$(MAKECMDGOALS)))
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=build release clean help stop-docker-builder
+IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker,$(MAKECMDGOALS)))
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums
 MAKECMDGOALS_WITHOUT_VAR_VALUE=$(foreach t,$(MAKECMDGOALS),$(if $(findstring var-value-,$(t)),,$(t)))
 ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BRANCH_TARGET))),)
 	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
@@ -118,10 +119,12 @@ endif
 #################### BASE IMAGES ###################
 BASE_IMAGE_REPO?=public.ecr.aws/eks-distro-build-tooling
 BASE_IMAGE_NAME?=eks-distro-base
-BASE_IMAGE_TAG_FILE?=$(BASE_DIRECTORY)/$(shell echo $(BASE_IMAGE_NAME) | tr '[:lower:]' '[:upper:]' | tr '-' '_')_TAG_FILE
+COMPILER_IMAGE_VERSION?=
+BASE_IMAGE_TAG_FILE?=$(BASE_DIRECTORY)/$(shell echo $(BASE_IMAGE_NAME) | tr '[:lower:]' '[:upper:]' | tr '-' '_')_$(if $(COMPILER_IMAGE_VERSION),$(COMPILER_IMAGE_VERSION)_,)TAG_FILE
 BASE_IMAGE_TAG?=$(shell cat $(BASE_IMAGE_TAG_FILE))
 BASE_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME):$(BASE_IMAGE_TAG)
 BUILDER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME)-builder:$(BASE_IMAGE_TAG)
+COMPILER_IMAGE?=$(BASE_IMAGE_REPO)/$(BASE_IMAGE_NAME:eks-distro-minimal-base-%=%):$(BASE_IMAGE_TAG)
 EKS_DISTRO_BASE_IMAGE=$(BASE_IMAGE_REPO)/eks-distro-base:$(shell cat $(BASE_DIRECTORY)/EKS_DISTRO_BASE_TAG_FILE)
 ####################################################
 
@@ -191,7 +194,7 @@ trimap = $(and $(strip $2),$(strip $3),$(strip $4),$(call \
 
 _pos = $(if $(filter $1,$2),$(call _pos,$1,\
        $(call list-rem,$2),x $3),$3)
-pos = $(words $(call _pos,$1,$2))
+pos = $(words $(call _pos,$1,$2,))
 
 # TODO: this exist in the gmsl, https://gmsl.sourceforge.io/
 # look into introducting gmsl for things like this
@@ -402,6 +405,13 @@ CGO_DOCKER_RUN_TIMEOUT?=15m
 DOCKER_RUN_COMMAND?=$(if $(filter true,$(CODEBUILD_CI)),retry_with_timeout $(CGO_DOCKER_RUN_TIMEOUT)) docker run $(shell if [ "$(CODEBUILD_CI)" != "true" ] && [ -t 0 ]; then echo '-it'; fi)
 ####################################################
 
+#################### LOGGING #######################
+DATE_CMD=TZ=utc $(shell if [ "$$(uname -s)" = "Darwin" ] && command -v gdate &> /dev/null; then echo gdate; else echo date; fi)
+DATE_NANO=$(shell if [ "$$(uname -s)" = "Linux" ] || command -v gdate &> /dev/null; then echo %3N; fi)
+TARGET_START_LOG?=$(eval _START_TIME:=$(shell $(DATE_CMD) +%s.$(DATE_NANO)))\\n------------------- $(shell $(DATE_CMD) +"%Y-%m-%dT%H:%M:%S.$(DATE_NANO)%z") Starting target=$@ -------------------
+TARGET_END_LOG?="------------------- `$(DATE_CMD) +'%Y-%m-%dT%H:%M:%S.$(DATE_NANO)%z'` Finished target=$@ duration=`echo $$($(DATE_CMD) +%s.$(DATE_NANO)) - $(_START_TIME) | bc` seconds -------------------\\n"
+####################################################
+
 #################### TARGETS FOR OVERRIDING ########
 BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
 RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
@@ -478,36 +488,44 @@ endif
 #### Source repo + binary Targets
 ifneq ($(REPO_NO_CLONE),true)
 $(REPO):
+	@echo -e $(call TARGET_START_LOG)
 ifneq ($(REPO_SPARSE_CHECKOUT),)
 	source $(BUILD_LIB)/common.sh && retry git clone --depth 1 --filter=blob:none --sparse -b $(GIT_TAG) $(CLONE_URL) $(REPO)
 	git -C $(REPO) sparse-checkout set $(REPO_SPARSE_CHECKOUT) --cone --skip-checks
 else
 	source $(BUILD_LIB)/common.sh && retry git clone $(CLONE_URL) $(REPO)
 endif
+	@echo -e $(call TARGET_END_LOG)
 endif
 
 $(GIT_CHECKOUT_TARGET): | $(REPO)
+	@echo -e $(call TARGET_START_LOG)
 	@rm -f $(REPO)/eks-anywhere-*
 	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
-	git -C $(REPO) checkout -f $(GIT_TAG)
-	touch $@
+	git -C $(REPO) checkout --quiet -f $(GIT_TAG)
+	@touch $@
+	@echo -e $(call TARGET_END_LOG)
 
 $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
+	@echo -e $(call TARGET_START_LOG)
 	git -C $(REPO) config user.email prow@amazonaws.com
 	git -C $(REPO) config user.name "Prow Bot"
-	git -C $(REPO) am --committer-date-is-author-date $(PATCHES_DIR)/*
+	if [ -n "$(PATCHES_DIR)" ]; then git -C $(REPO) am --committer-date-is-author-date $(PATCHES_DIR)/*; fi
 	@touch $@
+	@echo -e $(call TARGET_END_LOG)
 
 
 ## GO mod download targets
 $(REPO)/%ks-anywhere-go-mod-download: REPO_SUBPATH=$(if $(filter e,$*),,$(*:%/e=%))
 $(REPO)/%ks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
+	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/go_mod_download.sh $(MAKE_ROOT) $(REPO) $(GIT_TAG) $(GOLANG_VERSION) "$(REPO_SUBPATH)"
 	@touch $@
+	@echo -e $(call TARGET_END_LOG)
 
 ifneq ($(REPO),$(HELM_SOURCE_REPOSITORY))
 $(HELM_SOURCE_REPOSITORY):
-	git clone $(HELM_CLONE_URL) $(HELM_SOURCE_REPOSITORY)
+	source $(BUILD_LIB)/common.sh && retry git clone $(HELM_CLONE_URL) $(HELM_SOURCE_REPOSITORY)
 endif
 
 ifneq ($(GIT_TAG),$(HELM_GIT_TAG))
@@ -533,7 +551,9 @@ $(OUTPUT_BIN_DIR)/%: SOURCE_PATTERN=$(if $(filter $(BINARY_TARGET),$(BINARY_TARG
 $(OUTPUT_BIN_DIR)/%: OUTPUT_PATH=$(if $(and $(if $(filter false,$(call IS_ONE_WORD,$(BINARY_TARGET_FILES_BUILD_TOGETHER))),$(filter $(BINARY_TARGET),$(BINARY_TARGET_FILES_BUILD_TOGETHER)))),$(@D)/,$@)
 $(OUTPUT_BIN_DIR)/%: GO_MOD_PATH=$($(call GO_MOD_TARGET_FOR_BINARY_VAR_NAME,$(BINARY_TARGET)))
 $(OUTPUT_BIN_DIR)/%: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH))
+	@echo -e $(call TARGET_START_LOG)
 	$(if $(filter true,$(call needs-cgo-builder,$(PLATFORM))),$(call CGO_CREATE_BINARIES_SHELL,$@,$(*D)),$(call SIMPLE_CREATE_BINARIES_SHELL))
+	@echo -e $(call TARGET_END_LOG)
 endif
 
 .PHONY: binaries
@@ -541,7 +561,9 @@ binaries: $(BINARY_TARGETS)
 
 $(KUSTOMIZE_TARGET):
 	@mkdir -p $(OUTPUT_DIR)
-	curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s $(KUSTOMIZE_VERSION) $(OUTPUT_DIR)
+	source $(BUILD_LIB)/common.sh && retry curl -o /tmp/install_kustomize.sh -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
+	chmod +x /tmp/install_kustomize.sh
+	source $(BUILD_LIB)/common.sh && retry /tmp/install_kustomize.sh $(KUSTOMIZE_VERSION) $(OUTPUT_DIR)
 
 .PHONY: clone-repo
 clone-repo: $(REPO)
@@ -571,7 +593,9 @@ $(OUTPUT_DIR)/%ttribution/go-license.csv: BINARY_TARGET=$(if $(filter .,$(*D)),,
 $(OUTPUT_DIR)/%ttribution/go-license.csv: GO_MOD_PATH=$(if $(BINARY_TARGET),$(GO_MOD_TARGET_FOR_BINARY_$(call TO_UPPER,$(BINARY_TARGET))),$(word 1,$(UNIQ_GO_MOD_PATHS)))
 $(OUTPUT_DIR)/%ttribution/go-license.csv: LICENSE_PACKAGE_FILTER=$(GO_MOD_$(subst /,_,$(GO_MOD_PATH))_LICENSE_PACKAGE_FILTER)
 $(OUTPUT_DIR)/%ttribution/go-license.csv: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH))	
+	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/$(BINARY_TARGET) "$(LICENSE_PACKAGE_FILTER)" $(GO_MOD_PATH) $(GOLANG_VERSION) $(LICENSE_THRESHOLD)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: gather-licenses
 gather-licenses: $(GATHER_LICENSES_TARGETS)
@@ -581,47 +605,75 @@ gather-licenses: $(GATHER_LICENSES_TARGETS)
 # if multiple attributions are being generated, the file will be <binary>_ATTRIBUTION.txt and licenses will be stored in _output/<binary>, `%` will equal `<BINARY>_A`
 %TTRIBUTION.txt: LICENSE_OUTPUT_PATH=$(OUTPUT_DIR)$(if $(filter A,$(*F)),,/$(call TO_LOWER,$(*F:%_A=%)))
 %TTRIBUTION.txt: $$(LICENSE_OUTPUT_PATH)/attribution/go-license.csv
+	@echo -e $(call TARGET_START_LOG)
 	@rm -f $(@F)
 	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSE_OUTPUT_PATH) $(@F) $(RELEASE_BRANCH)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: attribution
 attribution: $(and $(filter true,$(HAS_LICENSES)),$(ATTRIBUTION_TARGETS))
 
 .PHONY: attribution-pr
 attribution-pr: attribution
+	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
+	@echo -e $(call TARGET_END_LOG)
+
+.PHONY: all-attributions
+all-attributions:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) attribution
 
 #### Tarball Targets
 
 .PHONY: tarballs
 tarballs: $(LICENSES_TARGETS_FOR_PREREQ)
 ifeq ($(SIMPLE_CREATE_TARBALLS),true)
+	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/simple_create_tarballs.sh $(TAR_FILE_PREFIX) $(MAKE_ROOT)/$(OUTPUT_DIR) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(ARTIFACTS_PATH) $(GIT_HASH)
+	@echo -e $(call TARGET_END_LOG)
 endif
 
 .PHONY: upload-artifacts
 upload-artifacts: s3-artifacts
+	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN) $(UPLOAD_DO_NOT_DELETE)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
+	@echo -e $(call TARGET_START_LOG)
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
 	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION) $(IMAGE_FORMAT) $(IMAGE_OS)
-
+	@echo -e $(call TARGET_END_LOG)
 
 ### Checksum Targets
 
 .PHONY: checksums
 checksums: $(BINARY_TARGETS)
 ifneq ($(strip $(BINARY_TARGETS)),)
+	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
+	@echo -e $(call TARGET_END_LOG)
 endif
 
 .PHONY: validate-checksums
 validate-checksums: $(BINARY_TARGETS)
 ifneq ($(and $(strip $(BINARY_TARGETS)), $(filter false, $(SKIP_CHECKSUM_VALIDATION))),)
+	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION)
+	@echo -e $(call TARGET_END_LOG)
 endif
+
+.PHONY: attribution-checksums
+attribution-checksums: attribution checksums
+
+.PHONY: all-checksums
+all-checksums:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) checksums
+
+.PHONY: all-attributions-checksums
+all-attributions-checksums:
+	$(BASE_DIRECTORY)/build/update-attribution-files/make_attribution.sh projects/$(COMPONENT) "attribution checksums"
 
 #### Image Helpers
 
@@ -658,17 +710,23 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).tar
 
 %/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
+	@echo -e $(call TARGET_START_LOG)
 	$(BUILDCTL)
+	@echo -e $(call TARGET_END_LOG)
 
 %/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
+	@echo -e $(call TARGET_END_LOG)
 
 %/images/arm64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
+	@echo -e $(call TARGET_END_LOG)
 
 ## CGO Targets
 .PHONY: %/cgo/amd64 %/cgo/arm64 prepare-cgo-folder
@@ -763,9 +821,10 @@ release: $(RELEASE_TARGETS)
 
 .PHONY: clean-go-cache
 clean-go-cache:
+	@echo -e $(call TARGET_START_LOG)
 # When go downloads pkg to the module cache, GOPATH/pkg/mod, it removes the write permissions
 # prevent accident modifications since files/checksums are tightly controlled
-# adding the perms neccessary to perform the delete
+# adding the perms necessary to perform the delete
 	@chmod -fR 777 $(GO_MOD_CACHE) &> /dev/null || :
 	$(foreach folder,$(GO_MOD_CACHE) $(GO_BUILD_CACHE),$(if $(wildcard $(folder)),du -hs $(folder) && rm -rf $(folder);,))
 # When building go bins using mods which have been downloaded by go mod download/vendor which will exist in the go_mod_cache
@@ -776,6 +835,7 @@ clean-go-cache:
 # to the go_mod_cache directory. If we clear the go_mod_cache we need to delete the go_mod_download sentinel file
 # so the next time we run build go mods will be redownloaded
 	$(foreach file,$(GO_MOD_DOWNLOAD_TARGETS),$(if $(wildcard $(file)),rm -f $(file);,))
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: clean-repo
 clean-repo:

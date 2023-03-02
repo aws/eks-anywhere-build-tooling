@@ -43,6 +43,12 @@ source "amazon-ebs" "amazonlinux2" {
     delay_seconds = 5
     max_attempts  = 1440
   }
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
 }
 
 build {

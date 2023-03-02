@@ -101,7 +101,11 @@ func WaitFor200(url string, timeout time.Duration) error {
 			tr := &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			}
-			client := &http.Client{Transport: tr}
+			client := &http.Client{
+				Transport: tr,
+				// Each call attempt will have a timeout of 1 minute
+				Timeout: 1 * time.Minute,
+			}
 			resp, err := client.Get(url)
 			if err != nil {
 				fmt.Printf("Error occured while hitting url: %v\n", err)

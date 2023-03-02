@@ -15,6 +15,9 @@ HELM_DESTINATION_REPOSITORY=$(REPO_OWNER)/$(REPO)
 
 include $(BASE_DIRECTORY)/Common.mk
 
+verify:
+	scripts/verify.sh $(BASE_DIRECTORY)/projects/$(HELM_DESTINATION_REPOSITORY)/chart $(GIT_TAG)
+
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

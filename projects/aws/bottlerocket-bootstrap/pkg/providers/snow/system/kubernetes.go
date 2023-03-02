@@ -59,7 +59,11 @@ func (s *Snow) setProviderID() error {
 	if err != nil {
 		errors.Wrap(err, "error getting instance id")
 	}
-	return s.api.SetKubernetesProviderID("aws-snow:////" + id)
+	ip, err := deviceIP()
+	if err != nil {
+		errors.Wrap(err, "error getting device ip")
+	}
+	return s.api.SetKubernetesProviderID(fmt.Sprintf("aws-snow:///%s/%s", ip, id))
 }
 
 func instanceID() (string, error) {
