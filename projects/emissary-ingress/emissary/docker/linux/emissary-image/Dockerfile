@@ -1,9 +1,17 @@
 ARG BASE_IMAGE 
 ARG BUILDER_IMAGE
+ARG COMPILER_IMAGE
 ARG APPMESH_VERSION
 FROM public.ecr.aws/appmesh/aws-appmesh-envoy:$APPMESH_VERSION as envoy
 
-FROM $BUILDER_IMAGE as emissary-builder
+FROM $BUILDER_IMAGE as yum-installer
+
+RUN install_rpm libcap htop && \
+    install_binary /usr/bin/curl /usr/bin/chgrp /usr/bin/chmod && \
+    cleanup "yum-installer"
+
+
+FROM $COMPILER_IMAGE as emissary-builder
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -15,16 +23,15 @@ COPY --from=envoy /usr/bin/envoy /THIRD-PARTY-LICENSES.txt /
 
 WORKDIR /newroot/buildroot
 
-RUN install_rpm libcap htop && \
-    install_binary /usr/bin/curl /usr/bin/chgrp /usr/bin/chmod && \
-    time pip3 install --no-deps -e . && \
-    pip3 install pip-tools==6.3.1 && \
-    pip3 install PyYAML==5.4.1 && \
-    pip3 install orjson==3.6.6 && \
-    mkdir -p /newroot/ambassador/sidecars /newroot/usr/lib/python3.9/site-packages /newroot/usr/local/bin /ambassador /buildroot && \
+RUN set -x && \
+    mkdir -p /newroot/ambassador/sidecars /newroot/usr/lib/python3.9/site-packages /newroot/usr/local/bin /ambassador /buildroot && \ 
+    time pip3 install --user --no-cache-dir --no-deps -e . && \
+    pip3 install --user --no-cache-dir pip-tools==6.3.1 PyYAML==5.4.1 orjson==3.6.6 && \    
+    python3 setup.py install --user && \
     mv /envoy /newroot/usr/local/bin/envoy && \
     mv /THIRD-PARTY-LICENSES.txt /newroot/ENVOY_LICENSES.txt && \
-    cp -r /usr/lib/python3.9/site-packages /newroot/usr/lib/python3.9 && \
+    cp -r /root/.local/lib/python3.9/site-packages /newroot/usr/lib/python3.9 && \
+    cp -r /root/.local/bin /newroot/usr/bin && \
     mkdir -p /newroot/buildroot/manifests/emissary && \
     mv emissary-crds.yaml.in /newroot/buildroot/manifests/emissary/emissary-crds.yaml && \
     ln -sf /buildroot/post_update.py /newroot/ambassador/post_update.py && \
@@ -34,19 +41,18 @@ RUN install_rpm libcap htop && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/watt && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/agent && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/apiext && \
-    ln -sf /newroot/buildroot/* /usr/local/bin/ && \
-    cleanup "emissary"
+    ln -sf /newroot/buildroot/* /usr/local/bin/
 
 FROM $BASE_IMAGE
 
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot HOME=/tmp/ambassador
 
+COPY --from=yum-installer /newroot /
 COPY --from=emissary-builder /newroot /
 
 WORKDIR /buildroot
 
-RUN cd /buildroot && python3 setup.py install && \
-    python3 -m pip uninstall -y pip && \
+RUN set -x && \
     setcap cap_net_bind_service=ei /usr/local/bin/envoy && \
     setcap cap_net_bind_service=p /buildroot/capabilities_wrapper && \
     chgrp -R 0 /ambassador && \

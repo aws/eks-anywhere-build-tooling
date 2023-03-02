@@ -220,22 +220,34 @@ func startEbsInit() *EbsInitControl {
 }
 
 // readFiles walks the filesystem tree and reads all regular files
-// skipping certain folders that contain special files.
 func readFiles() {
 	root := "/.bottlerocket/rootfs/"
-	filepath.WalkDir(root, func(path string, dirEntry fs.DirEntry, err error) error {
-
-		if dirEntry.IsDir() {
-			if dirEntry.Name() == "proc" || dirEntry.Name() == "sys" || dirEntry.Name() == "run" {
-				return filepath.SkipDir
-			}
-		} else {
-			entryInfo, _ := dirEntry.Info()
-			if entryInfo.Mode().IsRegular() {
-				ioutil.ReadFile(path)
-			}
-		}
-		return nil
-	})
+	err := filepath.WalkDir(root, walkDirFunc)
+	if err != nil {
+		message := fmt.Errorf("failed reading files %w", err)
+		fmt.Printf("%s\n", message)
+	}
 	fmt.Printf("All files read \n")
+}
+
+// walkDirFunc is passed to filepath.WalkDir, it does some validations
+// and skips non existing (or deleted/renamed) files and dirs as well as
+// some special dirs
+func walkDirFunc(path string, dirEntry fs.DirEntry, err error) error {
+	if dirEntry == nil {
+		return filepath.SkipDir
+	}
+	if dirEntry.IsDir() {
+		// skip special dirs
+		if dirEntry.Name() == "proc" || dirEntry.Name() == "sys" || dirEntry.Name() == "run" {
+			return filepath.SkipDir
+		}
+	} else {
+		entryInfo, entryInfoError := dirEntry.Info()
+		// check if file exists and is regular
+		if entryInfoError == nil && entryInfo.Mode().IsRegular() {
+			ioutil.ReadFile(path)
+		}
+	}
+	return nil
 }

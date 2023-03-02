@@ -33,6 +33,7 @@ var (
 )
 
 type Network struct {
+	DeviceIP string     `yaml:"deviceIP"`
 	DniCount int        `yaml:"dniCount"`
 	Static   []StaticIP `yaml:"static,omitempty"`
 }
@@ -199,6 +200,15 @@ func currentIP() (string, error) {
 	}
 
 	return "", nil
+}
+
+func deviceIP() (string, error) {
+	network, err := parseNetworkFile()
+	if err != nil {
+		return "", errors.Wrap(err, "error parsing network file")
+	}
+
+	return network.DeviceIP, nil
 }
 
 func httpGet(url string) (string, error) {
