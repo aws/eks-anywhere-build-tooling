@@ -29,19 +29,6 @@ EXCLUDE_FROM_STAGING_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_CGO_TARGET)
-
-$(FIX_LICENSES_CGO_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
-# The cgo dependency github repo doesn't have license however its parent repo does.
-# Hence we need to manually download licenses from parent folder and place it in its
-# respective folder under vendor directory so that it is available for go-licenses to pick up	
-	for package in cgo ; do \
-		dest=$(REPO)/vendor/github.com/pjbgf/sha1cd/$$package/LICENSE.txt; \
-		mkdir -p $$(dirname $$dest); \
-		wget --retry-connrefused -q https://raw.githubusercontent.com/pjbgf/sha1cd/main/LICENSE -O \
-			$$dest; \
-	done;
-
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
