@@ -1,7 +1,7 @@
-From dd40b00df6a640b72c133a880160ae6f1b872ddf Mon Sep 17 00:00:00 2001
+From f39e9414094fb151de24482140b2bad58fdc4888 Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Thu, 5 Jan 2023 14:56:09 -0500
-Subject: [PATCH 23/26] Make bottlerocket admin, control, custom bootstrap
+Subject: [PATCH 23/27] Make bottlerocket admin, control, custom bootstrap
  container images updatable in webhook
 
 ---
@@ -10,7 +10,7 @@ Subject: [PATCH 23/26] Make bottlerocket admin, control, custom bootstrap
  2 files changed, 60 insertions(+)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index 475ec8389..d11063629 100644
+index 74dabaa1b..ba7d4bb69 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 @@ -141,6 +141,9 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
@@ -23,7 +23,7 @@ index 475ec8389..d11063629 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
-@@ -160,6 +163,9 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+@@ -166,6 +169,9 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
  		{spec, kubeadmConfigSpec, joinConfiguration, skipPhases},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
@@ -34,10 +34,10 @@ index 475ec8389..d11063629 100644
  		{spec, kubeadmConfigSpec, postKubeadmCommands},
  		{spec, kubeadmConfigSpec, files},
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-index 7cf158ff9..1b444e83e 100644
+index 8a0c9e93c..ddc48a092 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-@@ -648,6 +648,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -654,6 +654,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
  	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
  
@@ -62,7 +62,7 @@ index 7cf158ff9..1b444e83e 100644
  	updateInitConfigurationSkipPhases := before.DeepCopy()
  	updateInitConfigurationSkipPhases.Spec.KubeadmConfigSpec.InitConfiguration.SkipPhases = []string{"addon/kube-proxy"}
  
-@@ -1008,6 +1026,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1020,6 +1038,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateClusterConfBRBootstrapImage,
  		},
@@ -87,7 +87,7 @@ index 7cf158ff9..1b444e83e 100644
  		{
  			name:      "should allow changes to join configuration pause image",
  			expectErr: false,
-@@ -1020,6 +1056,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1032,6 +1068,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateJoinConfBRBootstrapImage,
  		},
@@ -113,5 +113,5 @@ index 7cf158ff9..1b444e83e 100644
  
  	for _, tt := range tests {
 -- 
-2.34.1
+2.25.1
 
