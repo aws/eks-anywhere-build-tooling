@@ -360,7 +360,6 @@ function retry() {
       if [[ $n -lt $max ]]; then
         ((n++))
         >&2 echo "Command failed. Attempt $n/$max:"
-        delay=$(( delay * 2 ))
         sleep $delay;
       else
         fail "The command has failed after $n attempts."
@@ -384,7 +383,6 @@ function retry_with_timeout() {
         # multiple the numeric part of the timeout by 1.5 and suffix with the last char which is the unit
         TIMEOUT=$((${TIMEOUT:0:-1} * 3/2))${TIMEOUT: -1}
         echo "Command failed. Attempt $n/$max with timeout ${TIMEOUT}:"
-        delay=$(( delay * 2 ))
         sleep $delay;
       else
         fail "The command has failed after $n attempts."
