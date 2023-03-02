@@ -31,7 +31,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_CGO_TARGET)
 
-$(FIX_LICENSES_CGO_TARGET):
+$(FIX_LICENSES_CGO_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The cgo dependency github repo doesn't have license however its parent repo does.
 # Hence we need to manually download licenses from parent folder and place it in its
 # respective folder under vendor directory so that it is available for go-licenses to pick up	
