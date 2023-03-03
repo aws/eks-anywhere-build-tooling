@@ -81,7 +81,7 @@ BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
 IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker,$(MAKECMDGOALS)))
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums update-patch-numbers
 MAKECMDGOALS_WITHOUT_VAR_VALUE=$(foreach t,$(MAKECMDGOALS),$(if $(findstring var-value-,$(t)),,$(t)))
 ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BRANCH_TARGET))),)
 	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
@@ -283,6 +283,8 @@ ADD_TRAILING_CHAR=$(if $(1),$(1)$(2),)
 
 # check if pass variable has length of 1
 IS_ONE_WORD=$(if $(filter 1,$(words $(1))),true,false)
+
+SED_CMD=$(shell if [ "$$(uname -s)" = "Darwin" ] && command -v gsed &> /dev/null; then echo gsed; else echo sed; fi)
 
 ####################################################
 
@@ -514,6 +516,10 @@ $(GIT_PATCH_TARGET): $(GIT_CHECKOUT_TARGET)
 	@touch $@
 	@echo -e $(call TARGET_END_LOG)
 
+ifneq ($(PATCHES_DIR),)
+update-patch-numbers:
+	$(SED_CMD) -i -E "s|PATCH (.*)/[0-9]+|PATCH \1/$(shell ls -1 $(PATCHES_DIR) | wc -l | tr -d ' ')|" $(PATCHES_DIR)/*
+endif
 
 ## GO mod download targets
 $(REPO)/%ks-anywhere-go-mod-download: REPO_SUBPATH=$(if $(filter e,$*),,$(*:%/e=%))
