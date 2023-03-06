@@ -39,6 +39,33 @@ $(FIX_LICENSES_ECRTOKENREFRESHER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 	cp $(REPO)/LICENSE $(REPO)/ecrtokenrefresher/LICENSE
 	mv $(REPO)/ecrtokenrefresher/vendor/github.com/josharian/intern/license.md $(REPO)/ecrtokenrefresher/vendor/github.com/josharian/intern/LICENSE.md
 
+# Build helm chart
+.PHONY: helm/build
+helm/build: $(LICENSES_TARGETS_FOR_PREREQ)
+helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
+helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+	# Pkg controller requires multiple charts. Consider this a temporary work-around (turned too permanent).
+	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) eks-anywhere-packages-migrations charts/eks-anywhere-packages-migrations $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) eks-anywhere-packages-migrations $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
+	$(BUILD_LIB)/helm_replace.sh eks-anywhere-packages-migrations $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) eks-anywhere-packages-migrations
+
+	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) eks-anywhere-packages-crds charts/eks-anywhere-packages-crds $(OUTPUT_DIR)
+	PACKAGE_DEPENDENCIES=eks-anywhere-packages-migrations $(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) eks-anywhere-packages-crds $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
+	$(BUILD_LIB)/helm_replace.sh eks-anywhere-packages-crds $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) eks-anywhere-packages-crds
+
+	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
+	PACKAGE_DEPENDENCIES=eks-anywhere-packages-crds $(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
+	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
+	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
+
+# Build helm chart and push to registry defined in IMAGE_REPO.
+.PHONY: helm/push
+helm/push: helm/build
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) eks-anywhere-packages-crds $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
+	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) eks-anywhere-packages-migrations $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

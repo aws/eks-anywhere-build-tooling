@@ -1,5 +1,5 @@
 ## **replicatedhq/troubleshoot**
-![Version](https://img.shields.io/badge/version-v0.37.1-blue)
+![Version](https://img.shields.io/badge/version-v0.57.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiWlJsdnRmNnRYUjhUV20xaHJYTng2WXVlVXFBbHZPQnpnblh2bzFLYk1VUHAra2VpWFRFNWpMY0ovTC9PWnBBN2JEcDBXcjRSeVoxd3pyWWxQVzQzZFY4PSIsIml2UGFyYW1ldGVyU3BlYyI6IjZxRUdIK2N6TVZNNUdqL0oiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [troubleshoot](https://troubleshoot.sh/) is a kubectl plugin providing diagnostic tools for Kubernetes applications. It provides tools for collecting and analyzing cluster information including deployment statuses, cluster resources, and host logs. 
@@ -16,7 +16,7 @@ The EKS-A diagnostic bundle functionality is built on top of troubleshoot.
    and/or automatically update between eks-anywhere version reach out to @danbudris
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
-   ex: [0.36.0 compared to 0.37.1](https://github.com/replicatedhq/troubleshoot/compare/v0.36.0...v0.37.1). Check the `support-bundle` target for
+   ex: [0.36.0 compared to 0.37.1](https://github.com/replicatedhq/troubleshoot/compare/v0.36.0...v0.57.1). Check the `support-bundle` target for
    any build flag changes, tag changes, dependencies, etc.
 - When proforming significant version upgrades, it is prudent to manually test that the new troubleshoot version 
   works with the existing EKS-A workflow. You can do this using the instructions in the section "Manually Testing Troubleshoot Version Compatibility".
