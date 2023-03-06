@@ -1,6 +1,6 @@
 # avoid finding the local fake git repo by looking one level up when looking for base_directory
 BASE_DIRECTORY:=$(shell git -C .. rev-parse --show-toplevel)
-GOLANG_VERSION?=1.16
+GOLANG_VERSION?=1.20
 
 REPO=bottlerocket-bootstrap
 REPO_OWNER=aws
@@ -22,6 +22,17 @@ HAS_RELEASE_BRANCHES=true
 
 BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
+
+# Go 1.18 and newer automatically embeds vcs information if the go module being built
+# belongs (upwards) to a git repo. In this case, that repo is the buildtooling repo, 
+# which is problematic. Given these binaries are built from different banches,
+# the local dev branhc on PRs and `main` later, the VCS info will change between
+# builds, making builds quite difficult to reproduce. That would require that the presubmits 
+# knew the future commit that might be created if the PR gets merged.
+# Ideally this go module would live on its own repo, so all builds can be undoubtely
+# linked to a particular commit of that repo and become independent from the build tooling repo.
+# As an alternative, we don't include VCS info in the binary.
+EXTRA_GOBUILD_FLAGS=-buildvcs=false
 
 # This project is a bit of odd ball when it comes to using the standard makefile targets
 # - the image builds are release branch aware but the binary is the same across all versions
