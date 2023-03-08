@@ -5,8 +5,8 @@ PROJECT_COMMIT_HASH=$(shell git -C $(REPO) rev-parse --short HEAD)
 TIME=$(shell git -C $(REPO) show -s --format=%ct HEAD)
 GIT_TAG?=$(shell cat GIT_TAG)
 GOLANG_VERSION?="1.19"
-GO_MOD_NAME="github.com/aws/eks-anywhere-packages/"
-GO_VAR_PREFIX="pkg/config."
+GO_MOD_NAME=github.com/aws/eks-anywhere-packages/
+GO_VAR_PREFIX=pkg/config.
 GO_VARS=version=${GIT_TAG} gitHash=${PROJECT_COMMIT_HASH} buildTime=${TIME}
 EXTRA_GO_LDFLAGS=$(foreach v,$(GO_VARS),-X ${GO_MOD_NAME}${GO_VAR_PREFIX}${v})
 PROJECT_DEPENDENCIES=eksd/kubernetes/client
