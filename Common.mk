@@ -405,6 +405,8 @@ SPECIAL_TARGET_SECONDARY=$(strip $(PROJECT_DEPENDENCIES_TARGETS) $(GO_MOD_DOWNLO
 SKIP_CHECKSUM_VALIDATION?=false
 CGO_DOCKER_RUN_TIMEOUT?=15m
 DOCKER_RUN_COMMAND?=$(if $(filter true,$(CODEBUILD_CI)),retry_with_timeout $(CGO_DOCKER_RUN_TIMEOUT)) docker run $(shell if [ "$(CODEBUILD_CI)" != "true" ] && [ -t 0 ]; then echo '-it'; fi)
+PRUNE_BUILDCTL?=false
+GITHUB_TOKEN?=
 ####################################################
 
 #################### LOGGING #######################
@@ -415,7 +417,7 @@ TARGET_END_LOG?="------------------- `$(DATE_CMD) +'%Y-%m-%dT%H:%M:%S.$(DATE_NAN
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
-BUILD_TARGETS?=validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr
+BUILD_TARGETS?=github-rate-limit-pre validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr github-rate-limit-post
 RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
 
@@ -531,22 +533,28 @@ $(REPO)/%ks-anywhere-go-mod-download: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(
 
 ifneq ($(REPO),$(HELM_SOURCE_REPOSITORY))
 $(HELM_SOURCE_REPOSITORY):
+	@echo -e $(call TARGET_START_LOG)
 	source $(BUILD_LIB)/common.sh && retry git clone $(HELM_CLONE_URL) $(HELM_SOURCE_REPOSITORY)
+	@echo -e $(call TARGET_END_LOG)
 endif
 
 ifneq ($(GIT_TAG),$(HELM_GIT_TAG))
 $(HELM_GIT_CHECKOUT_TARGET): | $(HELM_SOURCE_REPOSITORY)
+	@echo -e $(call TARGET_START_LOG)
 	@echo rm -f $(HELM_SOURCE_REPOSITORY)/eks-anywhere-*
 	(cd $(HELM_SOURCE_REPOSITORY) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(HELM_GIT_TAG))
 	git -C $(HELM_SOURCE_REPOSITORY) checkout -f $(HELM_GIT_TAG)
 	touch $@
+	@echo -e $(call TARGET_END_LOG)
 endif
 
 $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
+	@echo -e $(call TARGET_START_LOG)
 	git -C $(HELM_SOURCE_REPOSITORY) config user.email prow@amazonaws.com
 	git -C $(HELM_SOURCE_REPOSITORY) config user.name "Prow Bot"
 	git -C $(HELM_SOURCE_REPOSITORY) am --committer-date-is-author-date $(wildcard $(PROJECT_ROOT)/helm/patches)/*
 	@touch $@
+	@echo -e $(call TARGET_END_LOG)
 
 ifeq ($(SIMPLE_CREATE_BINARIES),true)
 # GO_MOD_TARGET_FOR_BINARY_<binary> variables are created earlier in the makefile when determining which binaries can be built together vs alone
@@ -566,10 +574,15 @@ endif
 binaries: $(BINARY_TARGETS)
 
 $(KUSTOMIZE_TARGET):
+	@echo -e $(call TARGET_START_LOG)
+ifeq ($(GITHUB_TOKEN),)
+	$(warning No GITHUB_TOKEN set, may get rate limited while trying to install kustomize)
+endif
 	@mkdir -p $(OUTPUT_DIR)
 	source $(BUILD_LIB)/common.sh && retry curl -o /tmp/install_kustomize.sh -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 	chmod +x /tmp/install_kustomize.sh
 	source $(BUILD_LIB)/common.sh && retry /tmp/install_kustomize.sh $(KUSTOMIZE_VERSION) $(OUTPUT_DIR)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: clone-repo
 clone-repo: $(REPO)
@@ -781,30 +794,37 @@ binary-builder/cgo/%: USE_DOCKER_FOR_CGO_BUILD=$(shell command -v docker &> /dev
 ## Helm Targets
 .PHONY: helm/pull 
 helm/pull: 
+	@echo -e $(call TARGET_START_LOG)
 	$(BUILD_LIB)/helm_pull.sh $(HELM_PULL_LOCATION) $(HELM_REPO_URL) $(HELM_PULL_NAME) $(REPO) $(HELM_DIRECTORY) $(CHART_VERSION) $(COPY_CRDS)
+	@echo -e $(call TARGET_END_LOG)
 
 # Build helm chart
 .PHONY: helm/build
 helm/build: $(LICENSES_TARGETS_FOR_PREREQ)
 helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
 helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+	@echo -e $(call TARGET_START_LOG)
 	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
 	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
+	@echo -e $(call TARGET_END_LOG)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
 helm/push: helm/build
+	@echo -e $(call TARGET_START_LOG)
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
+	@echo -e $(call TARGET_END_LOG)
 
 ## Fetch Binary Targets
 .PHONY: handle-dependencies 
 handle-dependencies: $(call PROJECT_DEPENDENCIES_TARGETS)
 
 $(BINARY_DEPS_DIR)/linux-%:
+	@echo -e $(call TARGET_START_LOG)
 	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(LATEST) $(RELEASE_BRANCH)
-
+	@echo -e $(call TARGET_END_LOG)
 
 ## Build Targets
 .PHONY: build
@@ -819,7 +839,7 @@ release: $(RELEASE_TARGETS)
 %/release-branches/all:
 	@for version in $(SUPPORTED_K8S_VERSIONS) ; do \
 	    if ! [[ "$(SKIPPED_K8S_VERSIONS)" =~ $$version  ]]; then \
-			$(MAKE) $* clean-output RELEASE_BRANCH=$$version; \
+			$(MAKE) $* $(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),clean-output,) RELEASE_BRANCH=$$version; \
 		fi \
 	done;
 
@@ -937,3 +957,9 @@ create-ecr-repos: $(foreach image,$(IMAGE_NAMES),$(image)/create-ecr-repo) $(if 
 var-value-%:
 	@echo $($*)
 
+.PHONY: github-rate-limit-%
+github-rate-limit-%:
+	@if [[ -n "$(GITHUB_TOKEN)" ]] && [[  "presubmit" == "$(JOB_TYPE)" ]]; then \
+		echo "Current Github rate limits:"; \
+		GH_PAGER='' gh api rate_limit; \
+	fi
