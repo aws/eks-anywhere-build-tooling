@@ -40,12 +40,17 @@ build::common::echo_and_run git status
 
 # Files have already changed, stash to perform rebase
 build::common::echo_and_run git stash
-build::common::echo_and_run retry git fetch upstream
 
 build::common::echo_and_run git checkout $MAIN_BRANCH
-# there will be conflicts before we are on the bots fork at this point
-# -Xtheirs instructs git to favor the changes from the current branch
-build::common::echo_and_run git rebase -Xtheirs upstream/$MAIN_BRANCH
+
+# avoid hitting github limits in presubmits
+if [[ "$JOB_TYPE" == "periodic" ]]; then
+    build::common::echo_and_run retry git fetch upstream
+
+    # there will be conflicts before we are on the bots fork at this point
+    # -Xtheirs instructs git to favor the changes from the current branch
+    build::common::echo_and_run git rebase -Xtheirs upstream/$MAIN_BRANCH
+fi
 
 if [ "$(git stash list)" != "" ]; then
     build::common::echo_and_run git stash pop
