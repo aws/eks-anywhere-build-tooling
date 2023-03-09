@@ -20,7 +20,10 @@ set -o pipefail
 BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
 ALL_PROJECTS="${2?Specify second argument - All projects in repo}"
 STAGING_BUILDSPEC_FILE="${3}"
-SKIP_DEPEND_ON="${4:-}"
+SKIP_DEPEND_ON="${4:-false}"
+EXCLUDE_VAR="${5:-EXCLUDE_FROM_STAGING_BUILDSPEC}"
+BUILDSPECS_VAR="${6:-BUILDSPECS}"
+FAST_FAIL="${7:-true}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
@@ -41,7 +44,7 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 cd $MAKE_ROOT
 
 mkdir -p $(dirname $STAGING_BUILDSPEC_FILE)
-yq eval --null-input '.batch={"fast-fail":true,"build-graph":[]}' > $STAGING_BUILDSPEC_FILE # Creates an empty YAML array
+yq eval --null-input ".batch={\"fast-fail\":$FAST_FAIL,\"build-graph\":[]}" > $STAGING_BUILDSPEC_FILE # Creates an empty YAML array
 
 PROJECTS=(${ALL_PROJECTS// / })
 for project in "${PROJECTS[@]}"; do
@@ -52,7 +55,7 @@ for project in "${PROJECTS[@]}"; do
 
     # TODO: refactor use of release_branch to get git_tag and golang_version in makefile, we should be able to push this to common.mk and avoid needing to pass it here
     RELEASE_BRANCH=$(build::eksd_releases::get_release_branch)
-    if [[ "true" == "$(make --no-print-directory -C $PROJECT_PATH var-value-EXCLUDE_FROM_STAGING_BUILDSPEC RELEASE_BRANCH=$RELEASE_BRANCH)" ]]; then
+    if [[ "true" == "$(make --no-print-directory -C $PROJECT_PATH var-value-$EXCLUDE_VAR RELEASE_BRANCH=$RELEASE_BRANCH)" ]]; then
         continue
     fi
 
@@ -62,7 +65,7 @@ for project in "${PROJECTS[@]}"; do
         CLONE_URL=",\"CLONE_URL\":\"$REPO\""
     fi
 
-    BUILDSPECS=$(make --no-print-directory -C $PROJECT_PATH var-value-BUILDSPECS RELEASE_BRANCH=$RELEASE_BRANCH)
+    BUILDSPECS=$(make --no-print-directory -C $PROJECT_PATH var-value-$BUILDSPECS_VAR RELEASE_BRANCH=$RELEASE_BRANCH)
     SPECS=(${BUILDSPECS// / })
     for (( i=0; i < ${#SPECS[@]}; i++ )); do
         IDENTIFIER="${org//-/_}_${repo//-/_}"

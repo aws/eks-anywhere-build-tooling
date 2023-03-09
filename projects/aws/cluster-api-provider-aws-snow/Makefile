@@ -10,6 +10,8 @@ SIMPLE_CREATE_TARBALLS=false
 HAS_LICENSES=false
 IMAGE_COMPONENT=aws/cluster-api-provider-aws-snow/manager
 
+EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 

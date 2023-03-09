@@ -23,6 +23,8 @@ ORGANIZE_BINARIES_TARGETS=$(addsuffix /eks-a-tools,$(addprefix $(BINARY_DEPS_DIR
 
 REPO_NO_CLONE=true
 
+EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 

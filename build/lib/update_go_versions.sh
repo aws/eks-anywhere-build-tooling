@@ -21,7 +21,7 @@ set -o pipefail
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
-if [[ -z "${JOB_TYPE:-}" ]]; then
+if [[ -z "${JOB_TYPE:-}" ]] && [[ -z "${CODEBUILD_CI:-}" ]]; then
     exit 0
 fi
 

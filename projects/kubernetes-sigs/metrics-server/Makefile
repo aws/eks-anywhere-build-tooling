@@ -30,6 +30,8 @@ HELM_DESTINATION_REPOSITORY=metrics-server/charts/metrics-server
 HELM_IMAGE_LIST=eks-distro/kubernetes-sigs/metrics-server
 HELM_USE_UPSTREAM_IMAGE=true
 
+EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
