@@ -73,6 +73,7 @@ $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_KINDNETD_TARGET)
 s3-artifacts: $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml
 
 images: kind-base-versioned/images/push kind-node/images/push
+create-ecr-repos: kind-node/create-ecr-repo
 
 $(OUTPUT_BIN_DIR)/%/kind: EXTRA_GO_LDFLAGS=-X=sigs.k8s.io/kind/pkg/cmd/kind/version.gitCommit=$(shell git -C $(REPO) rev-list -n 1  "${GIT_TAG}")
 
@@ -118,10 +119,14 @@ kind-node/images/push: IMAGE_TARGET=node
 kind-node/images/push: $(KIND_NODE_BUILD_AMD64_TARGET) $(KIND_NODE_BUILD_ARM64_TARGET) $(ARM_ENV_CONF_TARGET)
 
 $(KIND_BASE_IMAGE_BUILD_ARGS):
+	@echo -e $(call TARGET_START_LOG)
 	build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@ $(LATEST)
+	@echo -e $(call TARGET_END_LOG)
 
 $(KIND_NODE_IMAGE_BUILD_ARGS):
+	@echo -e $(call TARGET_START_LOG)
 	build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) "$(ARTIFACTS_BUCKET)" $(IMAGE_TAG) $(LATEST) $@
+	@echo -e $(call TARGET_END_LOG)
 
 # Tweak the kind/base image to have a hardcode kubeadm config
 # so that during the image pull phase it pulls eks-d images

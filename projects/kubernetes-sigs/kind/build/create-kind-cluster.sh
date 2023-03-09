@@ -51,7 +51,6 @@ apiVersion: kind.x-k8s.io/v1alpha4
 kind: Cluster
 kubeadmConfigPatches:
 - |
-    apiVersion: kubeadm.k8s.io/v1beta2
     kind: ClusterConfiguration
     dns:
         type: CoreDNS

@@ -8,4 +8,7 @@ COPY --chown=root:root _output/bin/kind/$TARGETOS-$TARGETARCH/kindnetd /bin/kind
 COPY _output/kindnetd/LICENSES /KINDNETD_LICENSES
 COPY KINDNETD_ATTRIBUTION.txt /KINDNETD_ATTRIBUTION.txt
 
+# Opt into using the iptables-wrapper script to determine iptables mode
+RUN ["update-alternatives", "--set", "iptables", "/usr/sbin/iptables-wrapper"]
+
 CMD ["/bin/kindnetd"]
