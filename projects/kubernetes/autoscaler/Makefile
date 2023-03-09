@@ -28,6 +28,9 @@ HELM_DIRECTORY=charts/cluster-autoscaler
 HELM_DESTINATION_REPOSITORY=cluster-autoscaler/charts/cluster-autoscaler
 HELM_IMAGE_LIST=kubernetes/autoscaler
 
+BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
+BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
+
 include $(BASE_DIRECTORY)/Common.mk
 
 

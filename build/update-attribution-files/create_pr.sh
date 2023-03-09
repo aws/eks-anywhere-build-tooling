@@ -16,7 +16,7 @@
 set -e
 set -o pipefail
 
-if [[ -z "$JOB_TYPE" ]]; then
+if [[ -z "${JOB_TYPE:-}" ]] && [[ -z "${CODEBUILD_CI:-}" ]]; then
     exit 0
 fi
 
@@ -27,14 +27,22 @@ source $SCRIPT_ROOT/../lib/common.sh
 ORIGIN_ORG="eks-distro-pr-bot"
 UPSTREAM_ORG="aws"
 
-MAIN_BRANCH="${PULL_BASE_REF:-main}"
+MAIN_BRANCH="main"
+
+if [[ -n "${CODEBUILD_SOURCE_VERSION:-}" ]]; then
+    MAIN_BRANCH="$CODEBUILD_SOURCE_VERSION"
+fi
+
+if [[ -n "${PULL_BASE_REF:-}" ]]; then
+    MAIN_BRANCH="$PULL_BASE_REF"
+fi
 
 cd ${SCRIPT_ROOT}/../../
 git config --global push.default current
 git config user.name "EKS Distro PR Bot"
 git config user.email "aws-model-rocket-bots+eksdistroprbot@amazon.com"
-git config remote.origin.url >&- || git remote add origin git@github.com:${ORIGIN_ORG}/eks-anywhere-build-tooling.git
 git config remote.upstream.url >&- || git remote add upstream https://github.com/${UPSTREAM_ORG}/eks-anywhere-build-tooling.git
+git config remote.bot.url >&- || git remote add bot https://github.com/${ORIGIN_ORG}/eks-anywhere-build-tooling.git
 
 build::common::echo_and_run git status
 
@@ -44,8 +52,8 @@ build::common::echo_and_run git stash
 build::common::echo_and_run git checkout $MAIN_BRANCH
 
 # avoid hitting github limits in presubmits
-if [[ "$JOB_TYPE" == "periodic" ]]; then
-    build::common::echo_and_run retry git fetch upstream
+if [[ "${JOB_TYPE:-}" == "periodic" ]] || [[ -n "${CODEBUILD_CI:-}" ]]; then
+    build::common::echo_and_run retry git fetch -q upstream
 
     # there will be conflicts before we are on the bots fork at this point
     # -Xtheirs instructs git to favor the changes from the current branch
@@ -57,12 +65,83 @@ if [ "$(git stash list)" != "" ]; then
     build::common::echo_and_run git status
 fi
 
+function commit_push()
+{
+    local -r pr_branch="$1"
+    local force_push="$2"
+
+    if [[ "$force_push" = "true" ]]; then
+        force_push="-f"
+    else
+        force_push=""
+    fi
+
+    if build::common::echo_and_run git push $force_push -u bot $pr_branch; then
+        return
+    fi
+
+    # Other jobs could be running and updating the same branch, which is expected
+    # attempt to rebase and retry
+    build::common::echo_and_run git fetch -q bot
+    build::common::echo_and_run git branch --set-upstream-to=bot/$pr_branch $pr_branch
+    
+    # rebase succeeded, return 1 to retry the push
+    if build::common::echo_and_run git rebase bot/$pr_branch; then
+        return 1
+    fi
+
+    git status
+    git diff HEAD -- $(git diff --name-only --diff-filter=U)
+
+    # rebase failed with conflict, exit with error
+    exit 1
+}
+
+function pr_create()
+{
+    local -r pr_title="$1"
+    local -r pr_branch="$2"
+    local -r pr_body="$3"
+
+    local -r max_wait=5
+
+    # to try and avoid burning through our rate limit, wait a random amount of time
+    # check for the PR to already exist, if it doesnt, try and create it
+    sleep $((RANDOM % $max_wait))
+
+    local pr_exists=$(GH_PAGER='' gh pr list --json number -H "$pr_branch")
+    if [ "$pr_exists" != "[]" ]; then
+        # already exists
+        echo "PR already exists."
+        return
+    fi
+
+    echo "Creating PR."
+    if gh pr create --title "$pr_title" --body "$pr_body" --base $MAIN_BRANCH; then
+        echo "PR created."
+        return
+    fi
+
+    sleep $((RANDOM % $max_wait))
+
+    pr_exists=$(GH_PAGER='' gh pr list --json number -H "$pr_branch")
+    if [ "$pr_exists" != "[]" ]; then
+        # already exists
+        echo "PR already exists."
+        return
+    fi
+
+    # PR does not exist and creation failed, retry
+    return 1
+}
+
 function pr:create()
 {
     local -r pr_title="$1"
     local -r commit_message="$2"
     local -r pr_branch="$3"
     local -r pr_body="$4"
+    local -r force_push="${5:-true}"
 
     git diff --staged
     local -r files_added=$(git diff --staged --name-only)
@@ -70,21 +149,25 @@ function pr:create()
         return 0
     fi
 
-    git checkout -B $pr_branch
-    git commit -m "$commit_message" || true
+    build::common::echo_and_run git checkout -B $pr_branch
+    build::common::echo_and_run git commit -m "$commit_message" || true
 
-    if [ "$JOB_TYPE" != "periodic" ]; then
+    # need to check a codebuild job "type"
+    if [ "$JOB_TYPE" != "periodic" ] && [[ -z "${CODEBUILD_CI:-}" ]]; then
         return 0
     fi
 
-    ssh-agent bash -c 'ssh-add /secrets/ssh-secrets/ssh-key; ssh -o StrictHostKeyChecking=no git@github.com; git push -u origin $pr_branch -f'
-
-    gh auth login --with-token < /secrets/github-secrets/token
-    local -r pr_exists=$(gh pr list | grep -c "$pr_branch" || true)
-    if [ $pr_exists -eq 0 ]; then
-        echo "Creating PR $pr_title"
-        gh pr create --title "$pr_title" --body "$pr_body" --base $MAIN_BRANCH
+    if [ -f /secrets/github-secrets/token ]; then
+        gh auth login --with-token < /secrets/github-secrets/token
+    else
+        gh auth setup-git
     fi
+
+    gh api rate_limit
+
+    retry commit_push "$pr_branch" "$force_push"
+
+    retry pr_create "$pr_title" "$pr_branch" "$pr_body"    
 }
 
 function pr::create::pr_body(){
@@ -99,10 +182,12 @@ EOF
 )
         ;;
     checksums)
-        pr_body=$(cat <<'EOF'
+        pr_body=$(cat <<EOF
 This PR updates the CHECKSUMS files across all dependency projects if there have been changes.
 
 These files should only be changing due to project GIT_TAG bumps or Golang version upgrades. If changes are for any other reason, please review carefully before merging!
+
+These files were generated using $CODEBUILD_BUILD_IMAGE
 EOF
 )
         ;;
@@ -124,7 +209,7 @@ EOF
         ;;
     esac
     PROW_BUCKET_NAME=$(echo $JOB_SPEC | jq -r ".decoration_config.gcs_configuration.bucket" | awk -F// '{print $NF}')
-    full_pr_body=$(printf "%s\n\nClick [here](https://prow.eks.amazonaws.com/view/s3/$PROW_BUCKET_NAME/logs/$JOB_NAME/$BUILD_ID) to view job logs.\n\n/hold\n\nBy submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice." "$pr_body")
+    full_pr_body=$(printf "%s\n\n/hold\n\nBy submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice." "$pr_body")
 
     printf "$full_pr_body"
 }
@@ -140,11 +225,37 @@ function pr::create::attribution() {
 
 function pr::create::checksums() {
     local -r pr_title="Update CHECKSUMS files"
-    local -r commit_message="[PR BOT] Update CHECKSUMS files"
-    local -r pr_branch="checksums-files-update-$MAIN_BRANCH"
+    local pr_branch="checksums-files-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "checksums")
 
-    pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
+    if [ -n "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}" ]; then
+        pr_branch+="-$CODEBUILD_RESOLVED_SOURCE_VERSION"
+    fi
+
+    # This file is being added as it may have been updated by the last lines of ./build/lib/update_go_versions.sh,
+    # which replaces the go version in this script with the go version(s) in the builder base if they are newer 
+    # when running `make update-checksum-files`
+    git add ./build/lib/install_go_versions.sh
+
+    # stash checksums and attribution and help.mk files
+    git stash --keep-index
+    
+    pr:create "$pr_title" "[PR BOT] Update install_go_versions.sh" "$pr_branch" "$pr_body" "false"
+
+    if [ "$(git stash list)" != "" ]; then
+        build::common::echo_and_run git stash pop
+        build::common::echo_and_run git status
+    fi
+
+    # Add checksum files
+    for FILE in $(find . -type f -name CHECKSUMS); do
+        pr::file:add $FILE
+    done
+
+    local -r changed_files=$(git diff --staged --name-only | grep "^projects" | cut -d '/' -f2- | uniq | tr  '\n' ' ')
+    local -r commit_message="[PR BOT] Update $changed_files"
+ 
+    pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body" "false"
 }
 
 function pr::create::help() {
@@ -169,30 +280,18 @@ function pr::file:add() {
     local -r file="$1"
 
     if git check-ignore -q $FILE; then
-        continue
+        return
     fi
 
     local -r diff="$(git diff --ignore-blank-lines --ignore-all-space $FILE)"
     if [[ -z $diff ]]; then
-        continue
+        return
     fi
 
     git add $file
 }
 
 echo "Adding Checksum files"
-# Add checksum files
-for FILE in $(find . -type f -name CHECKSUMS); do
-    pr::file:add $FILE
-done
-
-# This file is being added as it may have been updated by the last lines of ./build/lib/update_go_versions.sh,
-# which replaces the go version in this script with the go version(s) in the builder base if they are newer 
-# when running `make update-checksum-files`
-git add ./build/lib/install_go_versions.sh
-
-# stash attribution and help.mk files
-git stash --keep-index
 
 pr::create::checksums
 

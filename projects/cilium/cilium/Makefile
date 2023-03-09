@@ -19,6 +19,8 @@ IMAGE_NAMES=
 BUILD_TARGETS=upload-artifacts
 RELEASE_TARGETS=upload-artifacts
 
+EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
