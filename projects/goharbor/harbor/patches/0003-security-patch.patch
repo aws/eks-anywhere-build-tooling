@@ -1,11 +1,11 @@
-From 9ab14fab94e32d488df10e552893483deec200c0 Mon Sep 17 00:00:00 2001
+From 25edcb367cba98a39057537a0e1ebb7461188006 Mon Sep 17 00:00:00 2001
 From: Vincent Ni <kangqini@amazon.com>
 Date: Wed, 1 Mar 2023 18:46:14 -0800
 Subject: [PATCH 3/3] security patch
 
 ---
- src/go.mod                                    |   3 +-
- src/go.sum                                    |   5 +-
+ src/go.mod                                    |   9 +-
+ src/go.sum                                    |  21 +-
  .../github.com/Azure/azure-sdk-for-go/LICENSE | 202 -------------
  .../Azure/azure-sdk-for-go/LICENSE.txt        |  21 ++
  .../github.com/Azure/azure-sdk-for-go/NOTICE  |   5 -
@@ -40,6 +40,18 @@ Subject: [PATCH 3/3] security patch
  .../storage/tableserviceclient.go             |  15 +-
  .../Azure/azure-sdk-for-go/storage/util.go    |  17 +-
  .../Azure/azure-sdk-for-go/version/version.go |  20 +-
+ .../containerd/containerd/content/helpers.go  |  68 +++--
+ .../containerd/content/local/store.go         |   1 -
+ .../containerd/containerd/filters/filter.go   |   1 -
+ .../containerd/containerd/filters/parser.go   |   1 -
+ .../containerd/containerd/filters/quote.go    |   8 +-
+ .../containerd/platforms/defaults_windows.go  |  12 +-
+ .../containerd/platforms/platforms.go         |  38 +--
+ .../containerd/remotes/docker/auth/parse.go   |   3 -
+ .../containerd/remotes/docker/pusher.go       | 163 ++++++++---
+ .../containerd/remotes/docker/resolver.go     |  15 +
+ .../containerd/containerd/remotes/handlers.go |   4 +-
+ .../containerd/containerd/version/version.go  |   2 +-
  src/vendor/github.com/gofrs/uuid/.gitignore   |  15 +
  src/vendor/github.com/gofrs/uuid/.travis.yml  |  22 ++
  .../{satori/go.uuid => gofrs/uuid}/LICENSE    |   0
@@ -49,12 +61,17 @@ Subject: [PATCH 3/3] security patch
  src/vendor/github.com/gofrs/uuid/generator.go | 265 ++++++++++++++++++
  .../{satori/go.uuid => gofrs/uuid}/sql.go     |  37 ++-
  src/vendor/github.com/gofrs/uuid/uuid.go      | 258 +++++++++++++++++
+ .../github.com/pelletier/go-toml/README.md    |   6 +-
+ .../github.com/pelletier/go-toml/SECURITY.md  |  19 ++
+ .../github.com/pelletier/go-toml/marshal.go   |   2 +-
+ .../github.com/pelletier/go-toml/parser.go    |  47 ++--
+ .../github.com/pelletier/go-toml/toml.go      |   2 +-
  .../github.com/satori/go.uuid/.travis.yml     |  23 --
  .../github.com/satori/go.uuid/README.md       |  65 -----
  .../github.com/satori/go.uuid/generator.go    | 239 ----------------
  src/vendor/github.com/satori/go.uuid/uuid.go  | 161 -----------
- src/vendor/modules.txt                        |   9 +-
- 50 files changed, 1057 insertions(+), 1190 deletions(-)
+ src/vendor/modules.txt                        |  15 +-
+ 67 files changed, 1339 insertions(+), 1328 deletions(-)
  delete mode 100644 src/vendor/github.com/Azure/azure-sdk-for-go/LICENSE
  create mode 100644 src/vendor/github.com/Azure/azure-sdk-for-go/LICENSE.txt
  delete mode 100644 src/vendor/github.com/Azure/azure-sdk-for-go/NOTICE
@@ -68,15 +85,25 @@ Subject: [PATCH 3/3] security patch
  create mode 100644 src/vendor/github.com/gofrs/uuid/generator.go
  rename src/vendor/github.com/{satori/go.uuid => gofrs/uuid}/sql.go (74%)
  create mode 100644 src/vendor/github.com/gofrs/uuid/uuid.go
+ create mode 100644 src/vendor/github.com/pelletier/go-toml/SECURITY.md
  delete mode 100644 src/vendor/github.com/satori/go.uuid/.travis.yml
  delete mode 100644 src/vendor/github.com/satori/go.uuid/README.md
  delete mode 100644 src/vendor/github.com/satori/go.uuid/generator.go
  delete mode 100644 src/vendor/github.com/satori/go.uuid/uuid.go
 
 diff --git a/src/go.mod b/src/go.mod
-index 5986daa2d..6c6377b85 100644
+index 5986daa2d..fe96183b7 100644
 --- a/src/go.mod
 +++ b/src/go.mod
+@@ -105,7 +105,7 @@ require (
+ 	github.com/bugsnag/panicwrap v1.2.0 // indirect
+ 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+ 	github.com/cloudflare/cfssl v0.0.0-20190510060611-9c027c93ba9e // indirect
+-	github.com/containerd/containerd v1.6.6 // indirect
++	github.com/containerd/containerd v1.6.19 // indirect
+ 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
+ 	github.com/davecgh/go-spew v1.1.1 // indirect
+ 	github.com/denverdino/aliyungo v0.0.0-20191227032621-df38c6fa730c // indirect
 @@ -129,6 +129,7 @@ require (
  	github.com/go-openapi/jsonpointer v0.19.5 // indirect
  	github.com/go-openapi/jsonreference v0.19.5 // indirect
@@ -85,7 +112,23 @@ index 5986daa2d..6c6377b85 100644
  	github.com/gogo/protobuf v1.3.2 // indirect
  	github.com/golang/protobuf v1.5.2 // indirect
  	github.com/google/btree v1.0.1 // indirect
-@@ -180,7 +181,6 @@ require (
+@@ -162,7 +163,7 @@ require (
+ 	github.com/magiconair/properties v1.8.5 // indirect
+ 	github.com/mailru/easyjson v0.7.6 // indirect
+ 	github.com/mattn/go-runewidth v0.0.9 // indirect
+-	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
++	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+ 	github.com/mitchellh/copystructure v1.2.0 // indirect
+ 	github.com/mitchellh/mapstructure v1.4.3 // indirect
+ 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+@@ -174,13 +175,12 @@ require (
+ 	github.com/morikuni/aec v1.0.0 // indirect
+ 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+ 	github.com/opentracing/opentracing-go v1.2.0 // indirect
+-	github.com/pelletier/go-toml v1.9.3 // indirect
++	github.com/pelletier/go-toml v1.9.5 // indirect
+ 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
+ 	github.com/pmezard/go-difflib v1.0.0 // indirect
  	github.com/prometheus/client_model v0.2.0 // indirect
  	github.com/prometheus/common v0.37.0 // indirect
  	github.com/prometheus/procfs v0.8.0 // indirect
@@ -102,7 +145,7 @@ index 5986daa2d..6c6377b85 100644
  	github.com/docker/distribution => github.com/distribution/distribution v2.8.1+incompatible
  	github.com/goharbor/harbor => ../
 diff --git a/src/go.sum b/src/go.sum
-index 234a2e0f6..295538fe9 100644
+index 234a2e0f6..b5fee6d4b 100644
 --- a/src/go.sum
 +++ b/src/go.sum
 @@ -38,8 +38,8 @@ cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9
@@ -116,7 +159,67 @@ index 234a2e0f6..295538fe9 100644
  github.com/Azure/azure-storage-blob-go v0.14.0/go.mod h1:SMqIBi+SuiQH32bvyjngEewEeXoPfKMgWlBDaYf6fck=
  github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=
  github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=
-@@ -1215,7 +1215,6 @@ github.com/ruudk/golang-pdf417 v0.0.0-20181029194003-1af4ab5afa58/go.mod h1:6lfF
+@@ -98,7 +98,7 @@ github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3/go.mod h1:JP
+ github.com/Microsoft/go-winio v0.4.17-0.20210324224401-5516f17a5958/go.mod h1:JPGBdM1cNvN/6ISo+n8V5iA4v8pBzdOpzfwIujj1a84=
+ github.com/Microsoft/go-winio v0.4.17/go.mod h1:JPGBdM1cNvN/6ISo+n8V5iA4v8pBzdOpzfwIujj1a84=
+ github.com/Microsoft/go-winio v0.5.0/go.mod h1:JPGBdM1cNvN/6ISo+n8V5iA4v8pBzdOpzfwIujj1a84=
+-github.com/Microsoft/go-winio v0.5.1 h1:aPJp2QD7OOrhO5tQXqQoGSJc+DjDtWTGLOmNyAm6FgY=
++github.com/Microsoft/go-winio v0.5.2 h1:a9IhgEQBCUEk6QCdml9CiJGhAws+YwffDHEMp1VMrpA=
+ github.com/Microsoft/hcsshim v0.8.6/go.mod h1:Op3hHsoHPAvb6lceZHDtd9OkTew38wNoXnJs8iY7rUg=
+ github.com/Microsoft/hcsshim v0.8.7-0.20190325164909-8abdbb8205e4/go.mod h1:Op3hHsoHPAvb6lceZHDtd9OkTew38wNoXnJs8iY7rUg=
+ github.com/Microsoft/hcsshim v0.8.7/go.mod h1:OHd7sQqRFrYd3RmSgbgji+ctCwkbq2wbEYNSzOYtcBQ=
+@@ -107,7 +107,7 @@ github.com/Microsoft/hcsshim v0.8.14/go.mod h1:NtVKoYxQuTLx6gEq0L96c9Ju4JbRJ4nY2
+ github.com/Microsoft/hcsshim v0.8.15/go.mod h1:x38A4YbHbdxJtc0sF6oIz+RG0npwSCAvn69iY6URG00=
+ github.com/Microsoft/hcsshim v0.8.16/go.mod h1:o5/SZqmR7x9JNKsW3pu+nqHm0MF8vbA+VxGOoXdC600=
+ github.com/Microsoft/hcsshim v0.8.21/go.mod h1:+w2gRZ5ReXQhFOrvSQeNfhrYB/dg3oDwTOcER2fw4I4=
+-github.com/Microsoft/hcsshim v0.9.3 h1:k371PzBuRrz2b+ebGuI2nVgVhgsVX60jMfSw80NECxo=
++github.com/Microsoft/hcsshim v0.9.7 h1:mKNHW/Xvv1aFH87Jb6ERDzXTJTLPlmzfZ28VBFD/bfg=
+ github.com/Microsoft/hcsshim/test v0.0.0-20201218223536-d3e5debf77da/go.mod h1:5hlzMzRKMLyo42nCZ9oml8AdTlq/0cvIaBv6tK1RehU=
+ github.com/Microsoft/hcsshim/test v0.0.0-20210227013316-43a75bb4edd3/go.mod h1:mw7qgWloBUl75W/gVH3cQszUg1+gUITj7D6NY7ywVnY=
+ github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46/go.mod h1:3wb06e3pkSAbeQ52E9H9iFoQsEEwGN64994WTCIhntQ=
+@@ -267,7 +267,7 @@ github.com/containerd/cgroups v0.0.0-20200710171044-318312a37340/go.mod h1:s5q4S
+ github.com/containerd/cgroups v0.0.0-20200824123100-0b889c03f102/go.mod h1:s5q4SojHctfxANBDvMeIaIovkq29IP48TKAxnhYRxvo=
+ github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68/go.mod h1:ZJeTFisyysqgcCdecO57Dj79RfL0LNeGiFUqLYQRYLE=
+ github.com/containerd/cgroups v1.0.1/go.mod h1:0SJrPIenamHDcZhEcJMNBB85rHcUsw4f25ZfBiPYRkU=
+-github.com/containerd/cgroups v1.0.3 h1:ADZftAkglvCiD44c77s5YmMqaP2pzVCFZvBmAlBdAP4=
++github.com/containerd/cgroups v1.0.4 h1:jN/mbWBEaz+T1pi5OFtnkQ+8qnmEbAr1Oo1FRm5B0dA=
+ github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1/go.mod h1:Tj/on1eG8kiEhd0+fhSDzsPAFESxzBBvdyEgyryXffw=
+ github.com/containerd/console v0.0.0-20181022165439-0650fd9eeb50/go.mod h1:Tj/on1eG8kiEhd0+fhSDzsPAFESxzBBvdyEgyryXffw=
+ github.com/containerd/console v0.0.0-20191206165004-02ecf6a7291e/go.mod h1:8Pf4gM6VEbTNRIT26AyyU7hxdQU3MvAvxVI0sc00XBE=
+@@ -287,8 +287,8 @@ github.com/containerd/containerd v1.5.0-beta.4/go.mod h1:GmdgZd2zA2GYIBZ0w09Zvgq
+ github.com/containerd/containerd v1.5.0-rc.0/go.mod h1:V/IXoMqNGgBlabz3tHD2TWDoTJseu1FGOKuoA4nNb2s=
+ github.com/containerd/containerd v1.5.1/go.mod h1:0DOxVqwDy2iZvrZp2JUx/E+hS0UNTVn7dJnIOwtYR4g=
+ github.com/containerd/containerd v1.5.7/go.mod h1:gyvv6+ugqY25TiXxcZC3L5yOeYgEw0QMhscqVp1AR9c=
+-github.com/containerd/containerd v1.6.6 h1:xJNPhbrmz8xAMDNoVjHy9YHtWwEQNS+CDkcIRh7t8Y0=
+-github.com/containerd/containerd v1.6.6/go.mod h1:ZoP1geJldzCVY3Tonoz7b1IXk8rIX0Nltt5QE4OMNk0=
++github.com/containerd/containerd v1.6.19 h1:F0qgQPrG0P2JPgwpxWxYavrVeXAG0ezUIB9Z/4FTUAU=
++github.com/containerd/containerd v1.6.19/go.mod h1:HZCDMn4v/Xl2579/MvtOC2M206i+JJ6VxFWU/NetrGY=
+ github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
+ github.com/containerd/continuity v0.0.0-20190815185530-f2a389ac0a02/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
+ github.com/containerd/continuity v0.0.0-20191127005431-f65d91d395eb/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
+@@ -983,8 +983,9 @@ github.com/mattn/go-sqlite3 v1.10.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsO
+ github.com/mattn/go-sqlite3 v1.14.6/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A/KQRfk6bU=
+ github.com/mattn/go-sqlite3 v1.14.7 h1:fxWBnXkxfM6sRiuH3bqJ4CfzZojMOLVc0UTsTglEghA=
+ github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
+-github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 h1:I0XW9+e1XWDxdcEniV4rQAIOPUGDq67JSCiRCgGCZLI=
+ github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
++github.com/matttproud/golang_protobuf_extensions v1.0.4 h1:mmDVorXM7PCGKw94cs5zkfA9PSy5pEvNWRP0ET0TIVo=
++github.com/matttproud/golang_protobuf_extensions v1.0.4/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
+ github.com/miekg/dns v1.0.14/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
+ github.com/miekg/pkcs11 v1.0.3/go.mod h1:XsNlhZGX73bx86s2hdc/FuaLm2CPZJemRLMA+WTFxgs=
+ github.com/miekg/pkcs11 v1.1.1 h1:Ugu9pdy6vAYku5DEpVWVFPYnzV+bxB+iRdbuFSu7TvU=
+@@ -1125,8 +1126,9 @@ github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/9
+ github.com/pelletier/go-toml v1.4.0/go.mod h1:PN7xzY2wHTK0K9p34ErDQMlFxa51Fk0OUruD3k1mMwo=
+ github.com/pelletier/go-toml v1.7.0/go.mod h1:vwGMzjaWMwyfHwgIBhI2YUM4fB6nL6lVAvS1LBMMhTE=
+ github.com/pelletier/go-toml v1.8.1/go.mod h1:T2/BmBdy8dvIRq1a/8aqjN41wvWlN4lrapLU/GW4pbc=
+-github.com/pelletier/go-toml v1.9.3 h1:zeC5b1GviRUyKYd6OJPvBU/mcVDVoL1OhT17FCt5dSQ=
+ github.com/pelletier/go-toml v1.9.3/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
++github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
++github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
+ github.com/performancecopilot/speed v3.0.0+incompatible/go.mod h1:/CLtqpZ5gBg1M9iaPbIdPPGyKcA8hKdoy6hAWba7Yac=
+ github.com/peterbourgon/diskv v2.0.1+incompatible h1:UBdAOUP5p4RWqPBg048CAvpKN+vxiaj6gdUUzhl4XmI=
+ github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
+@@ -1215,7 +1217,6 @@ github.com/ruudk/golang-pdf417 v0.0.0-20181029194003-1af4ab5afa58/go.mod h1:6lfF
  github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f/go.mod h1:sm1tb6uqfes/u+d4ooFouqFdy9/2g9QGwK3SQygK0Ts=
  github.com/safchain/ethtool v0.0.0-20190326074333-42ed695e3de8/go.mod h1:Z0q5wiBQGYcxhMZ6gUqHn6pYNLypFAvaL3UvgZLR0U4=
  github.com/samuel/go-zookeeper v0.0.0-20190923202752-2cc03de413da/go.mod h1:gi+0XIa01GRL2eRQVjQkKGqKF3SF9vZR/HnPullcV2E=
@@ -1408,6 +1511,607 @@ index 3eac8bb04..bcfbb15cc 100644
  // Number contains the semantic version of this SDK.
 -const Number = "v37.2.0"
 +const Number = "v68.0.0"
+diff --git a/src/vendor/github.com/containerd/containerd/content/helpers.go b/src/vendor/github.com/containerd/containerd/content/helpers.go
+index 3ec1ffce0..723c31391 100644
+--- a/src/vendor/github.com/containerd/containerd/content/helpers.go
++++ b/src/vendor/github.com/containerd/containerd/content/helpers.go
+@@ -26,10 +26,16 @@ import (
+ 	"time"
+ 
+ 	"github.com/containerd/containerd/errdefs"
++	"github.com/containerd/containerd/log"
+ 	"github.com/opencontainers/go-digest"
+ 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+ )
+ 
++// maxResets is the no.of times the Copy() method can tolerate a reset of the body
++const maxResets = 5
++
++var ErrReset = errors.New("writer has been reset")
++
+ var bufPool = sync.Pool{
+ 	New: func() interface{} {
+ 		buffer := make([]byte, 1<<20)
+@@ -80,7 +86,7 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
+ 			return fmt.Errorf("failed to open writer: %w", err)
+ 		}
+ 
+-		return nil // all ready present
++		return nil // already present
+ 	}
+ 	defer cw.Close()
+ 
+@@ -131,35 +137,63 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
+ // the size or digest is unknown, these values may be empty.
+ //
+ // Copy is buffered, so no need to wrap reader in buffered io.
+-func Copy(ctx context.Context, cw Writer, r io.Reader, size int64, expected digest.Digest, opts ...Opt) error {
++func Copy(ctx context.Context, cw Writer, or io.Reader, size int64, expected digest.Digest, opts ...Opt) error {
+ 	ws, err := cw.Status()
+ 	if err != nil {
+ 		return fmt.Errorf("failed to get status: %w", err)
+ 	}
+-
++	r := or
+ 	if ws.Offset > 0 {
+-		r, err = seekReader(r, ws.Offset, size)
++		r, err = seekReader(or, ws.Offset, size)
+ 		if err != nil {
+ 			return fmt.Errorf("unable to resume write to %v: %w", ws.Ref, err)
+ 		}
+ 	}
+ 
+-	copied, err := copyWithBuffer(cw, r)
+-	if err != nil {
+-		return fmt.Errorf("failed to copy: %w", err)
+-	}
+-	if size != 0 && copied < size-ws.Offset {
+-		// Short writes would return its own error, this indicates a read failure
+-		return fmt.Errorf("failed to read expected number of bytes: %w", io.ErrUnexpectedEOF)
+-	}
+-
+-	if err := cw.Commit(ctx, size, expected, opts...); err != nil {
+-		if !errdefs.IsAlreadyExists(err) {
+-			return fmt.Errorf("failed commit on ref %q: %w", ws.Ref, err)
++	for i := 0; i < maxResets; i++ {
++		if i >= 1 {
++			log.G(ctx).WithField("digest", expected).Debugf("retrying copy due to reset")
++		}
++		copied, err := copyWithBuffer(cw, r)
++		if errors.Is(err, ErrReset) {
++			ws, err := cw.Status()
++			if err != nil {
++				return fmt.Errorf("failed to get status: %w", err)
++			}
++			r, err = seekReader(or, ws.Offset, size)
++			if err != nil {
++				return fmt.Errorf("unable to resume write to %v: %w", ws.Ref, err)
++			}
++			continue
++		}
++		if err != nil {
++			return fmt.Errorf("failed to copy: %w", err)
++		}
++		if size != 0 && copied < size-ws.Offset {
++			// Short writes would return its own error, this indicates a read failure
++			return fmt.Errorf("failed to read expected number of bytes: %w", io.ErrUnexpectedEOF)
++		}
++		if err := cw.Commit(ctx, size, expected, opts...); err != nil {
++			if errors.Is(err, ErrReset) {
++				ws, err := cw.Status()
++				if err != nil {
++					return fmt.Errorf("failed to get status: %w", err)
++				}
++				r, err = seekReader(or, ws.Offset, size)
++				if err != nil {
++					return fmt.Errorf("unable to resume write to %v: %w", ws.Ref, err)
++				}
++				continue
++			}
++			if !errdefs.IsAlreadyExists(err) {
++				return fmt.Errorf("failed commit on ref %q: %w", ws.Ref, err)
++			}
+ 		}
++		return nil
+ 	}
+ 
+-	return nil
++	log.G(ctx).WithField("digest", expected).Errorf("failed to copy after %d retries", maxResets)
++	return fmt.Errorf("failed to copy after %d retries", maxResets)
+ }
+ 
+ // CopyReaderAt copies to a writer from a given reader at for the given
+diff --git a/src/vendor/github.com/containerd/containerd/content/local/store.go b/src/vendor/github.com/containerd/containerd/content/local/store.go
+index 457bbcd0e..f41a92d04 100644
+--- a/src/vendor/github.com/containerd/containerd/content/local/store.go
++++ b/src/vendor/github.com/containerd/containerd/content/local/store.go
+@@ -643,7 +643,6 @@ func (s *store) ingestRoot(ref string) string {
+ // - root: entire ingest directory
+ // - ref: name of the starting ref, must be unique
+ // - data: file where data is written
+-//
+ func (s *store) ingestPaths(ref string) (string, string, string) {
+ 	var (
+ 		fp = s.ingestRoot(ref)
+diff --git a/src/vendor/github.com/containerd/containerd/filters/filter.go b/src/vendor/github.com/containerd/containerd/filters/filter.go
+index cf09d8d9e..e13f2625c 100644
+--- a/src/vendor/github.com/containerd/containerd/filters/filter.go
++++ b/src/vendor/github.com/containerd/containerd/filters/filter.go
+@@ -65,7 +65,6 @@
+ // ```
+ // name==foo,labels.bar
+ // ```
+-//
+ package filters
+ 
+ import (
+diff --git a/src/vendor/github.com/containerd/containerd/filters/parser.go b/src/vendor/github.com/containerd/containerd/filters/parser.go
+index 49182d7b7..32767909b 100644
+--- a/src/vendor/github.com/containerd/containerd/filters/parser.go
++++ b/src/vendor/github.com/containerd/containerd/filters/parser.go
+@@ -45,7 +45,6 @@ field     := quoted | [A-Za-z] [A-Za-z0-9_]+
+ operator  := "==" | "!=" | "~="
+ value     := quoted | [^\s,]+
+ quoted    := <go string syntax>
+-
+ */
+ func Parse(s string) (Filter, error) {
+ 	// special case empty to match all
+diff --git a/src/vendor/github.com/containerd/containerd/filters/quote.go b/src/vendor/github.com/containerd/containerd/filters/quote.go
+index b76aab9b4..5c800ef84 100644
+--- a/src/vendor/github.com/containerd/containerd/filters/quote.go
++++ b/src/vendor/github.com/containerd/containerd/filters/quote.go
+@@ -31,10 +31,10 @@ var errQuoteSyntax = errors.New("quote syntax error")
+ // or character literal represented by the string s.
+ // It returns four values:
+ //
+-//	1) value, the decoded Unicode code point or byte value;
+-//	2) multibyte, a boolean indicating whether the decoded character requires a multibyte UTF-8 representation;
+-//	3) tail, the remainder of the string after the character; and
+-//	4) an error that will be nil if the character is syntactically valid.
++//  1. value, the decoded Unicode code point or byte value;
++//  2. multibyte, a boolean indicating whether the decoded character requires a multibyte UTF-8 representation;
++//  3. tail, the remainder of the string after the character; and
++//  4. an error that will be nil if the character is syntactically valid.
+ //
+ // The second argument, quote, specifies the type of literal being parsed
+ // and therefore which escaped quote character is permitted.
+diff --git a/src/vendor/github.com/containerd/containerd/platforms/defaults_windows.go b/src/vendor/github.com/containerd/containerd/platforms/defaults_windows.go
+index c1aaf72ca..ff9771a60 100644
+--- a/src/vendor/github.com/containerd/containerd/platforms/defaults_windows.go
++++ b/src/vendor/github.com/containerd/containerd/platforms/defaults_windows.go
+@@ -46,10 +46,14 @@ type matchComparer struct {
+ 
+ // Match matches platform with the same windows major, minor
+ // and build version.
+-func (m matchComparer) Match(p imagespec.Platform) bool {
+-	if m.defaults.Match(p) {
+-		// TODO(windows): Figure out whether OSVersion is deprecated.
+-		return strings.HasPrefix(p.OSVersion, m.osVersionPrefix)
++func (m matchComparer) Match(p specs.Platform) bool {
++	match := m.defaults.Match(p)
++
++	if match && p.OS == "windows" {
++		if strings.HasPrefix(p.OSVersion, m.osVersionPrefix) {
++			return true
++		}
++		return p.OSVersion == ""
+ 	}
+ 	return false
+ }
+diff --git a/src/vendor/github.com/containerd/containerd/platforms/platforms.go b/src/vendor/github.com/containerd/containerd/platforms/platforms.go
+index 8f955d036..234309941 100644
+--- a/src/vendor/github.com/containerd/containerd/platforms/platforms.go
++++ b/src/vendor/github.com/containerd/containerd/platforms/platforms.go
+@@ -27,40 +27,40 @@
+ // The vast majority of use cases should simply use the match function with
+ // user input. The first step is to parse a specifier into a matcher:
+ //
+-//   m, err := Parse("linux")
+-//   if err != nil { ... }
++//	m, err := Parse("linux")
++//	if err != nil { ... }
+ //
+ // Once you have a matcher, use it to match against the platform declared by a
+ // component, typically from an image or runtime. Since extracting an images
+ // platform is a little more involved, we'll use an example against the
+ // platform default:
+ //
+-//   if ok := m.Match(Default()); !ok { /* doesn't match */ }
++//	if ok := m.Match(Default()); !ok { /* doesn't match */ }
+ //
+ // This can be composed in loops for resolving runtimes or used as a filter for
+ // fetch and select images.
+ //
+ // More details of the specifier syntax and platform spec follow.
+ //
+-// Declaring Platform Support
++// # Declaring Platform Support
+ //
+ // Components that have strict platform requirements should use the OCI
+ // platform specification to declare their support. Typically, this will be
+ // images and runtimes that should make these declaring which platform they
+ // support specifically. This looks roughly as follows:
+ //
+-//   type Platform struct {
+-//	   Architecture string
+-//	   OS           string
+-//	   Variant      string
+-//   }
++//	  type Platform struct {
++//		   Architecture string
++//		   OS           string
++//		   Variant      string
++//	  }
+ //
+ // Most images and runtimes should at least set Architecture and OS, according
+ // to their GOARCH and GOOS values, respectively (follow the OCI image
+ // specification when in doubt). ARM should set variant under certain
+ // discussions, which are outlined below.
+ //
+-// Platform Specifiers
++// # Platform Specifiers
+ //
+ // While the OCI platform specifications provide a tool for components to
+ // specify structured information, user input typically doesn't need the full
+@@ -77,7 +77,7 @@
+ // where the architecture may be known but a runtime may support images from
+ // different operating systems.
+ //
+-// Normalization
++// # Normalization
+ //
+ // Because not all users are familiar with the way the Go runtime represents
+ // platforms, several normalizations have been provided to make this package
+@@ -85,17 +85,17 @@
+ //
+ // The following are performed for architectures:
+ //
+-//   Value    Normalized
+-//   aarch64  arm64
+-//   armhf    arm
+-//   armel    arm/v6
+-//   i386     386
+-//   x86_64   amd64
+-//   x86-64   amd64
++//	Value    Normalized
++//	aarch64  arm64
++//	armhf    arm
++//	armel    arm/v6
++//	i386     386
++//	x86_64   amd64
++//	x86-64   amd64
+ //
+ // We also normalize the operating system `macos` to `darwin`.
+ //
+-// ARM Support
++// # ARM Support
+ //
+ // To qualify ARM architecture, the Variant field is used to qualify the arm
+ // version. The most common arm version, v7, is represented without the variant
+diff --git a/src/vendor/github.com/containerd/containerd/remotes/docker/auth/parse.go b/src/vendor/github.com/containerd/containerd/remotes/docker/auth/parse.go
+index 223fa2d05..e4529a776 100644
+--- a/src/vendor/github.com/containerd/containerd/remotes/docker/auth/parse.go
++++ b/src/vendor/github.com/containerd/containerd/remotes/docker/auth/parse.go
+@@ -134,9 +134,6 @@ func parseValueAndParams(header string) (value string, params map[string]string)
+ 		}
+ 		var pvalue string
+ 		pvalue, s = expectTokenOrQuoted(s[1:])
+-		if pvalue == "" {
+-			return
+-		}
+ 		pkey = strings.ToLower(pkey)
+ 		params[pkey] = pvalue
+ 		s = skipSpace(s)
+diff --git a/src/vendor/github.com/containerd/containerd/remotes/docker/pusher.go b/src/vendor/github.com/containerd/containerd/remotes/docker/pusher.go
+index c786ad215..bef77fa61 100644
+--- a/src/vendor/github.com/containerd/containerd/remotes/docker/pusher.go
++++ b/src/vendor/github.com/containerd/containerd/remotes/docker/pusher.go
+@@ -24,6 +24,7 @@ import (
+ 	"net/http"
+ 	"net/url"
+ 	"strings"
++	"sync"
+ 	"time"
+ 
+ 	"github.com/containerd/containerd/content"
+@@ -261,27 +262,20 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
+ 
+ 	// TODO: Support chunked upload
+ 
+-	pr, pw := io.Pipe()
+-	respC := make(chan response, 1)
+-	body := io.NopCloser(pr)
++	pushw := newPushWriter(p.dockerBase, ref, desc.Digest, p.tracker, isManifest)
+ 
+ 	req.body = func() (io.ReadCloser, error) {
+-		if body == nil {
+-			return nil, errors.New("cannot reuse body, request must be retried")
+-		}
+-		// Only use the body once since pipe cannot be seeked
+-		ob := body
+-		body = nil
+-		return ob, nil
++		pr, pw := io.Pipe()
++		pushw.setPipe(pw)
++		return io.NopCloser(pr), nil
+ 	}
+ 	req.size = desc.Size
+ 
+ 	go func() {
+-		defer close(respC)
+ 		resp, err := req.doWithRetries(ctx, nil)
+ 		if err != nil {
+-			respC <- response{err: err}
+-			pr.CloseWithError(err)
++			pushw.setError(err)
++			pushw.Close()
+ 			return
+ 		}
+ 
+@@ -290,20 +284,13 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
+ 		default:
+ 			err := remoteserrors.NewUnexpectedStatusErr(resp)
+ 			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
+-			pr.CloseWithError(err)
++			pushw.setError(err)
++			pushw.Close()
+ 		}
+-		respC <- response{Response: resp}
++		pushw.setResponse(resp)
+ 	}()
+ 
+-	return &pushWriter{
+-		base:       p.dockerBase,
+-		ref:        ref,
+-		pipe:       pw,
+-		responseC:  respC,
+-		isManifest: isManifest,
+-		expected:   desc.Digest,
+-		tracker:    p.tracker,
+-	}, nil
++	return pushw, nil
+ }
+ 
+ func getManifestPath(object string, dgst digest.Digest) []string {
+@@ -325,29 +312,89 @@ func getManifestPath(object string, dgst digest.Digest) []string {
+ 	return []string{"manifests", object}
+ }
+ 
+-type response struct {
+-	*http.Response
+-	err error
+-}
+-
+ type pushWriter struct {
+ 	base *dockerBase
+ 	ref  string
+ 
+-	pipe       *io.PipeWriter
+-	responseC  <-chan response
++	pipe *io.PipeWriter
++
++	pipeC     chan *io.PipeWriter
++	respC     chan *http.Response
++	closeOnce sync.Once
++	errC      chan error
++
+ 	isManifest bool
+ 
+ 	expected digest.Digest
+ 	tracker  StatusTracker
+ }
+ 
++func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker StatusTracker, isManifest bool) *pushWriter {
++	// Initialize and create response
++	return &pushWriter{
++		base:       db,
++		ref:        ref,
++		expected:   expected,
++		tracker:    tracker,
++		pipeC:      make(chan *io.PipeWriter, 1),
++		respC:      make(chan *http.Response, 1),
++		errC:       make(chan error, 1),
++		isManifest: isManifest,
++	}
++}
++
++func (pw *pushWriter) setPipe(p *io.PipeWriter) {
++	pw.pipeC <- p
++}
++
++func (pw *pushWriter) setError(err error) {
++	pw.errC <- err
++}
++func (pw *pushWriter) setResponse(resp *http.Response) {
++	pw.respC <- resp
++}
++
+ func (pw *pushWriter) Write(p []byte) (n int, err error) {
+ 	status, err := pw.tracker.GetStatus(pw.ref)
+ 	if err != nil {
+ 		return n, err
+ 	}
++
++	if pw.pipe == nil {
++		p, ok := <-pw.pipeC
++		if !ok {
++			return 0, io.ErrClosedPipe
++		}
++		pw.pipe = p
++	} else {
++		select {
++		case p, ok := <-pw.pipeC:
++			if !ok {
++				return 0, io.ErrClosedPipe
++			}
++			pw.pipe.CloseWithError(content.ErrReset)
++			pw.pipe = p
++
++			// If content has already been written, the bytes
++			// cannot be written and the caller must reset
++			status.Offset = 0
++			status.UpdatedAt = time.Now()
++			pw.tracker.SetStatus(pw.ref, status)
++			return 0, content.ErrReset
++		default:
++		}
++	}
++
+ 	n, err = pw.pipe.Write(p)
++	if errors.Is(err, io.ErrClosedPipe) {
++		// if the pipe is closed, we might have the original error on the error
++		// channel - so we should try and get it
++		select {
++		case err2 := <-pw.errC:
++			err = err2
++		default:
++		}
++	}
+ 	status.Offset += int64(n)
+ 	status.UpdatedAt = time.Now()
+ 	pw.tracker.SetStatus(pw.ref, status)
+@@ -355,13 +402,21 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
+ }
+ 
+ func (pw *pushWriter) Close() error {
+-	status, err := pw.tracker.GetStatus(pw.ref)
+-	if err == nil && !status.Committed {
+-		// Closing an incomplete writer. Record this as an error so that following write can retry it.
+-		status.ErrClosed = errors.New("closed incomplete writer")
+-		pw.tracker.SetStatus(pw.ref, status)
++	// Ensure pipeC is closed but handle `Close()` being
++	// called multiple times without panicking
++	pw.closeOnce.Do(func() {
++		close(pw.pipeC)
++	})
++	if pw.pipe != nil {
++		status, err := pw.tracker.GetStatus(pw.ref)
++		if err == nil && !status.Committed {
++			// Closing an incomplete writer. Record this as an error so that following write can retry it.
++			status.ErrClosed = errors.New("closed incomplete writer")
++			pw.tracker.SetStatus(pw.ref, status)
++		}
++		return pw.pipe.Close()
+ 	}
+-	return pw.pipe.Close()
++	return nil
+ }
+ 
+ func (pw *pushWriter) Status() (content.Status, error) {
+@@ -380,7 +435,7 @@ func (pw *pushWriter) Digest() digest.Digest {
+ 
+ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+ 	// Check whether read has already thrown an error
+-	if _, err := pw.pipe.Write([]byte{}); err != nil && err != io.ErrClosedPipe {
++	if _, err := pw.pipe.Write([]byte{}); err != nil && !errors.Is(err, io.ErrClosedPipe) {
+ 		return fmt.Errorf("pipe error before commit: %w", err)
+ 	}
+ 
+@@ -388,18 +443,40 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
+ 		return err
+ 	}
+ 	// TODO: timeout waiting for response
+-	resp := <-pw.responseC
+-	if resp.err != nil {
+-		return resp.err
++	var resp *http.Response
++	select {
++	case err := <-pw.errC:
++		return err
++	case resp = <-pw.respC:
++		defer resp.Body.Close()
++	case p, ok := <-pw.pipeC:
++		// check whether the pipe has changed in the commit, because sometimes Write
++		// can complete successfully, but the pipe may have changed. In that case, the
++		// content needs to be reset.
++		if !ok {
++			return io.ErrClosedPipe
++		}
++		pw.pipe.CloseWithError(content.ErrReset)
++		pw.pipe = p
++
++		// If content has already been written, the bytes
++		// cannot be written again and the caller must reset
++		status, err := pw.tracker.GetStatus(pw.ref)
++		if err != nil {
++			return err
++		}
++		status.Offset = 0
++		status.UpdatedAt = time.Now()
++		pw.tracker.SetStatus(pw.ref, status)
++		return content.ErrReset
+ 	}
+-	defer resp.Response.Body.Close()
+ 
+ 	// 201 is specified return status, some registries return
+ 	// 200, 202 or 204.
+ 	switch resp.StatusCode {
+ 	case http.StatusOK, http.StatusCreated, http.StatusNoContent, http.StatusAccepted:
+ 	default:
+-		return remoteserrors.NewUnexpectedStatusErr(resp.Response)
++		return remoteserrors.NewUnexpectedStatusErr(resp)
+ 	}
+ 
+ 	status, err := pw.tracker.GetStatus(pw.ref)
+diff --git a/src/vendor/github.com/containerd/containerd/remotes/docker/resolver.go b/src/vendor/github.com/containerd/containerd/remotes/docker/resolver.go
+index 9bbbc2622..709fa028d 100644
+--- a/src/vendor/github.com/containerd/containerd/remotes/docker/resolver.go
++++ b/src/vendor/github.com/containerd/containerd/remotes/docker/resolver.go
+@@ -21,6 +21,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"io"
++	"net"
+ 	"net/http"
+ 	"net/url"
+ 	"path"
+@@ -667,3 +668,17 @@ func responseFields(resp *http.Response) logrus.Fields {
+ 
+ 	return logrus.Fields(fields)
+ }
++
++// IsLocalhost checks if the registry host is local.
++func IsLocalhost(host string) bool {
++	if h, _, err := net.SplitHostPort(host); err == nil {
++		host = h
++	}
++
++	if host == "localhost" {
++		return true
++	}
++
++	ip := net.ParseIP(host)
++	return ip.IsLoopback()
++}
+diff --git a/src/vendor/github.com/containerd/containerd/remotes/handlers.go b/src/vendor/github.com/containerd/containerd/remotes/handlers.go
+index 8bcafb22a..4d91ed2e5 100644
+--- a/src/vendor/github.com/containerd/containerd/remotes/handlers.go
++++ b/src/vendor/github.com/containerd/containerd/remotes/handlers.go
+@@ -257,8 +257,8 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
+ // An example of this kind of content would be a Windows base layer, which is not supposed to be redistributed.
+ //
+ // This is based on the media type of the content:
+-// 	- application/vnd.oci.image.layer.nondistributable
+-// 	- application/vnd.docker.image.rootfs.foreign
++//   - application/vnd.oci.image.layer.nondistributable
++//   - application/vnd.docker.image.rootfs.foreign
+ func SkipNonDistributableBlobs(f images.HandlerFunc) images.HandlerFunc {
+ 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+ 		if images.IsNonDistributable(desc.MediaType) {
+diff --git a/src/vendor/github.com/containerd/containerd/version/version.go b/src/vendor/github.com/containerd/containerd/version/version.go
+index cef635bb9..6bc3ed178 100644
+--- a/src/vendor/github.com/containerd/containerd/version/version.go
++++ b/src/vendor/github.com/containerd/containerd/version/version.go
+@@ -23,7 +23,7 @@ var (
+ 	Package = "github.com/containerd/containerd"
+ 
+ 	// Version holds the complete version number. Filled in at linking time.
+-	Version = "1.6.6+unknown"
++	Version = "1.6.19+unknown"
+ 
+ 	// Revision is filled with the VCS (e.g. git) revision being used to build
+ 	// the program at linking time.
 diff --git a/src/vendor/github.com/gofrs/uuid/.gitignore b/src/vendor/github.com/gofrs/uuid/.gitignore
 new file mode 100644
 index 000000000..666dbbb5b
@@ -2500,6 +3204,144 @@ index 000000000..78aed6e25
 +	}
 +	return u
 +}
+diff --git a/src/vendor/github.com/pelletier/go-toml/README.md b/src/vendor/github.com/pelletier/go-toml/README.md
+index 6c061712b..7399e04bf 100644
+--- a/src/vendor/github.com/pelletier/go-toml/README.md
++++ b/src/vendor/github.com/pelletier/go-toml/README.md
+@@ -25,9 +25,9 @@ and [much faster][v2-bench]. If you only need reading and writing TOML documents
+ (majority of cases), those features are implemented and the API unlikely to
+ change.
+ 
+-The remaining features (Document structure editing and tooling) will be added
+-shortly. While pull-requests are welcome on v1, no active development is
+-expected on it. When v2.0.0 is released, v1 will be deprecated.
++The remaining features will be added shortly. While pull-requests are welcome on
++v1, no active development is expected on it. When v2.0.0 is released, v1 will be
++deprecated.
+ 
+ 👉 [go-toml v2][v2]
+ 
+diff --git a/src/vendor/github.com/pelletier/go-toml/SECURITY.md b/src/vendor/github.com/pelletier/go-toml/SECURITY.md
+new file mode 100644
+index 000000000..b2f21cfc9
+--- /dev/null
++++ b/src/vendor/github.com/pelletier/go-toml/SECURITY.md
+@@ -0,0 +1,19 @@
++# Security Policy
++
++## Supported Versions
++
++Use this section to tell people about which versions of your project are
++currently being supported with security updates.
++
++| Version    | Supported          |
++| ---------- | ------------------ |
++| Latest 2.x | :white_check_mark: |
++| All 1.x    | :x:                |
++| All 0.x    | :x:                |
++
++## Reporting a Vulnerability
++
++Email a vulnerability report to `security@pelletier.codes`. Make sure to include
++as many details as possible to reproduce the vulnerability. This is a
++side-project: I will try to get back to you as quickly as possible, time
++permitting in my personal life. Providing a working patch helps very much!
+diff --git a/src/vendor/github.com/pelletier/go-toml/marshal.go b/src/vendor/github.com/pelletier/go-toml/marshal.go
+index 3443c3545..571273049 100644
+--- a/src/vendor/github.com/pelletier/go-toml/marshal.go
++++ b/src/vendor/github.com/pelletier/go-toml/marshal.go
+@@ -1113,7 +1113,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
+ 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
+ 			}
+ 
+-			if val.Convert(reflect.TypeOf(int(1))).Int() < 0 {
++			if val.Type().Kind() != reflect.Uint64 && val.Convert(reflect.TypeOf(int(1))).Int() < 0 {
+ 				return reflect.ValueOf(nil), fmt.Errorf("%v(%T) is negative so does not fit in %v", tval, tval, mtype.String())
+ 			}
+ 			if reflect.Indirect(reflect.New(mtype)).OverflowUint(val.Convert(reflect.TypeOf(uint64(0))).Uint()) {
+diff --git a/src/vendor/github.com/pelletier/go-toml/parser.go b/src/vendor/github.com/pelletier/go-toml/parser.go
+index f5e1a44fb..b3726d0dd 100644
+--- a/src/vendor/github.com/pelletier/go-toml/parser.go
++++ b/src/vendor/github.com/pelletier/go-toml/parser.go
+@@ -293,42 +293,41 @@ func (p *tomlParser) parseRvalue() interface{} {
+ 		return math.NaN()
+ 	case tokenInteger:
+ 		cleanedVal := cleanupNumberToken(tok.val)
+-		var err error
+-		var val int64
++		base := 10
++		s := cleanedVal
++		checkInvalidUnderscore := numberContainsInvalidUnderscore
+ 		if len(cleanedVal) >= 3 && cleanedVal[0] == '0' {
+ 			switch cleanedVal[1] {
+ 			case 'x':
+-				err = hexNumberContainsInvalidUnderscore(tok.val)
+-				if err != nil {
+-					p.raiseError(tok, "%s", err)
+-				}
+-				val, err = strconv.ParseInt(cleanedVal[2:], 16, 64)
++				checkInvalidUnderscore = hexNumberContainsInvalidUnderscore
++				base = 16
+ 			case 'o':
+-				err = numberContainsInvalidUnderscore(tok.val)
+-				if err != nil {
+-					p.raiseError(tok, "%s", err)
+-				}
+-				val, err = strconv.ParseInt(cleanedVal[2:], 8, 64)
++				base = 8
+ 			case 'b':
+-				err = numberContainsInvalidUnderscore(tok.val)
+-				if err != nil {
+-					p.raiseError(tok, "%s", err)
+-				}
+-				val, err = strconv.ParseInt(cleanedVal[2:], 2, 64)
++				base = 2
+ 			default:
+ 				panic("invalid base") // the lexer should catch this first
+ 			}
+-		} else {
+-			err = numberContainsInvalidUnderscore(tok.val)
+-			if err != nil {
+-				p.raiseError(tok, "%s", err)
+-			}
+-			val, err = strconv.ParseInt(cleanedVal, 10, 64)
++			s = cleanedVal[2:]
+ 		}
++
++		err := checkInvalidUnderscore(tok.val)
+ 		if err != nil {
+ 			p.raiseError(tok, "%s", err)
+ 		}
+-		return val
++
++		var val interface{}
++		val, err = strconv.ParseInt(s, base, 64)
++		if err == nil {
++			return val
++		}
++
++		if s[0] != '-' {
++			if val, err = strconv.ParseUint(s, base, 64); err == nil {
++				return val
++			}
++		}
++		p.raiseError(tok, "%s", err)
+ 	case tokenFloat:
+ 		err := numberContainsInvalidUnderscore(tok.val)
+ 		if err != nil {
+diff --git a/src/vendor/github.com/pelletier/go-toml/toml.go b/src/vendor/github.com/pelletier/go-toml/toml.go
+index 6d82587c4..5541b941f 100644
+--- a/src/vendor/github.com/pelletier/go-toml/toml.go
++++ b/src/vendor/github.com/pelletier/go-toml/toml.go
+@@ -471,7 +471,7 @@ func LoadBytes(b []byte) (tree *Tree, err error) {
+ 			if _, ok := r.(runtime.Error); ok {
+ 				panic(r)
+ 			}
+-			err = errors.New(r.(string))
++			err = fmt.Errorf("%s", r)
+ 		}
+ 	}()
+ 
 diff --git a/src/vendor/github.com/satori/go.uuid/.travis.yml b/src/vendor/github.com/satori/go.uuid/.travis.yml
 deleted file mode 100644
 index 20dd53b8d..000000000
@@ -3013,7 +3855,7 @@ index a2b8e2ca2..000000000
 -	return u
 -}
 diff --git a/src/vendor/modules.txt b/src/vendor/modules.txt
-index df417346b..bf3fdcfdf 100644
+index df417346b..4d23d7c72 100644
 --- a/src/vendor/modules.txt
 +++ b/src/vendor/modules.txt
 @@ -1,7 +1,7 @@
@@ -3025,6 +3867,15 @@ index df417346b..bf3fdcfdf 100644
  ## explicit
  github.com/Azure/azure-sdk-for-go/storage
  github.com/Azure/azure-sdk-for-go/version
+@@ -179,7 +179,7 @@ github.com/cenkalti/backoff/v4
+ github.com/cespare/xxhash/v2
+ # github.com/cloudflare/cfssl v0.0.0-20190510060611-9c027c93ba9e
+ ## explicit
+-# github.com/containerd/containerd v1.6.6
++# github.com/containerd/containerd v1.6.19
+ ## explicit; go 1.17
+ github.com/containerd/containerd/archive/compression
+ github.com/containerd/containerd/content
 @@ -395,6 +395,9 @@ github.com/gocarina/gocsv
  # github.com/gocraft/work v0.5.1
  ## explicit
@@ -3035,6 +3886,24 @@ index df417346b..bf3fdcfdf 100644
  # github.com/gogo/protobuf v1.3.2
  ## explicit; go 1.15
  github.com/gogo/protobuf/proto
+@@ -573,7 +576,7 @@ github.com/mailru/easyjson/jwriter
+ # github.com/mattn/go-runewidth v0.0.9
+ ## explicit; go 1.9
+ github.com/mattn/go-runewidth
+-# github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
++# github.com/matttproud/golang_protobuf_extensions v1.0.4
+ ## explicit; go 1.9
+ github.com/matttproud/golang_protobuf_extensions/pbutil
+ # github.com/miekg/pkcs11 v1.1.1
+@@ -630,7 +633,7 @@ github.com/opencontainers/image-spec/specs-go/v1
+ ## explicit; go 1.14
+ github.com/opentracing/opentracing-go
+ github.com/opentracing/opentracing-go/log
+-# github.com/pelletier/go-toml v1.9.3
++# github.com/pelletier/go-toml v1.9.5
+ ## explicit; go 1.12
+ github.com/pelletier/go-toml
+ # github.com/peterbourgon/diskv v2.0.1+incompatible
 @@ -666,9 +669,6 @@ github.com/robfig/cron
  # github.com/robfig/cron/v3 v3.0.0
  ## explicit; go 1.12
