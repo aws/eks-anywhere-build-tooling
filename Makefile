@@ -17,9 +17,12 @@ PROJECT_PATH_MAP=projects/$(patsubst $(firstword $(subst _, ,$(1)))_%,$(firstwor
 # generate files that are subsequently validated by the CI. If local environments use different 
 # locales to the CI we get unexpected failures that are tricky to debug without knowledge of 
 # locales so we'll explicitly warn here.
-TO_LOWER = $(shell echo $(1) | tr '[:upper:]' '[:lower:]')
+# In a AL2 container image (like builder base), LANG will be empty which is equilvant to posix
+# In a AL2 (or other distro) full instance the LANG will be en-us.UTF-8 which produces different sorts
+# On Mac, LANG will be en-us.UTF-8 but has a fix applied to sort to avoid the difference
 ifeq ($(shell uname -s),Linux)
-  LOCALE := $(call TO_LOWER,$(shell locale | grep LANG | cut -d= -f2 | tr -d '"'))
+  LOCALE:=$(call TO_LOWER,$(shell locale | grep LANG | cut -d= -f2 | tr -d '"'))
+  LOCALE:=$(if $(LOCALE),$(LOCALE),posix)
   ifeq ($(filter c.utf-8 posix,$(LOCALE)),)
     $(warning WARNING: Environment locale set to $(LANG). On Linux systems this may create \
 	non-deterministic behavior when running generation recipes. If the CI fails validation try \
@@ -97,6 +100,7 @@ generate-project-list:
 .PHONY: generate-staging-buildspec
 generate-staging-buildspec:
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/release/staging-build.yml"
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/release/checksums-build.yml" true EXCLUDE_FROM_CHECKSUMS_BUILDSPEC CHECKSUMS_BUILDSPECS false
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_bottlerocket-bootstrap" "$(BASE_DIRECTORY)/projects/aws/bottlerocket-bootstrap/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes_cloud-provider-vsphere" "$(BASE_DIRECTORY)/projects/kubernetes/cloud-provider-vsphere/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes-sigs_kind" "$(BASE_DIRECTORY)/projects/kubernetes-sigs/kind/buildspecs/batch-build.yml" true

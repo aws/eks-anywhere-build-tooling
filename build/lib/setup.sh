@@ -19,7 +19,7 @@ if [ ! -d "/root/.docker" ]; then
     mkdir -p /root/.docker
 fi
 
-mv config/docker-ecr-config.json /root/.docker/config.json
+cp config/docker-ecr-config.json /root/.docker/config.json
 git config ${GIT_CONFIG_SCOPE} credential.helper '!aws codecommit credential-helper $@'
 git config ${GIT_CONFIG_SCOPE} credential.UseHttpPath true
 

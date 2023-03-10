@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -64,17 +63,17 @@ else
 fi
 
 if [ "$CODEBUILD_CI" = "true" ]; then
-    build::common::wait_for_tarball $URL
+    build::common::echo_and_run build::common::wait_for_tarball $URL
 fi
 
 DOWNLOAD_DIR=$(mktemp -d)
 trap "rm -rf $DOWNLOAD_DIR" EXIT
 
-wget -q --retry-connrefused $URL $URL.sha256 -P $DOWNLOAD_DIR
+build::common::echo_and_run wget -q --retry-connrefused $URL $URL.sha256 -P $DOWNLOAD_DIR
 (cd $DOWNLOAD_DIR && sha256sum -c *.sha256)
 
 if [[ $REPO == *.tar.gz ]]; then
-    mv $DOWNLOAD_DIR/*.tar.gz $OUTPUT_DIR_FILE
+    build::common::echo_and_run mv $DOWNLOAD_DIR/*.tar.gz $OUTPUT_DIR_FILE
 else
-    tar xzf $DOWNLOAD_DIR/*.tar.gz -C $OUTPUT_DIR_FILE
+    build::common::echo_and_run tar xzf $DOWNLOAD_DIR/*.tar.gz -C $OUTPUT_DIR_FILE
 fi
