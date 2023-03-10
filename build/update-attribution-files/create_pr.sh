@@ -26,6 +26,7 @@ source $SCRIPT_ROOT/../lib/common.sh
 
 ORIGIN_ORG="eks-distro-pr-bot"
 UPSTREAM_ORG="aws"
+REPO="eks-anywhere-build-tooling"
 
 MAIN_BRANCH="main"
 
@@ -41,8 +42,8 @@ cd ${SCRIPT_ROOT}/../../
 git config --global push.default current
 git config user.name "EKS Distro PR Bot"
 git config user.email "aws-model-rocket-bots+eksdistroprbot@amazon.com"
-git config remote.upstream.url >&- || git remote add upstream https://github.com/${UPSTREAM_ORG}/eks-anywhere-build-tooling.git
-git config remote.bot.url >&- || git remote add bot https://github.com/${ORIGIN_ORG}/eks-anywhere-build-tooling.git
+git config remote.upstream.url >&- || git remote add upstream https://github.com/${UPSTREAM_ORG}/${REPO}.git
+git config remote.bot.url >&- || git remote add bot https://github.com/${ORIGIN_ORG}/${REPO}.git
 
 build::common::echo_and_run git status
 
@@ -157,16 +158,21 @@ function pr:create()
         return 0
     fi
 
-    if [ -f /secrets/github-secrets/token ]; then
-        gh auth login --with-token < /secrets/github-secrets/token
-    else
-        gh auth setup-git
+    if [[ -z "${GITHUB_TOKEN:-}" ]] && [[ ! -f /secrets/github-secrets/token ]]; then
+        echo "Missing GITHUB_TOKEN or /secrets/github-secrets/token, cannot authenticate!"
+        exit 1
     fi
 
+    if [ -f /secrets/github-secrets/token ]; then
+        gh auth login --with-token < /secrets/github-secrets/token
+    fi
+    
+    gh auth setup-git
     gh api rate_limit
 
     retry commit_push "$pr_branch" "$force_push"
-
+    
+    gh repo set-default "${UPSTREAM_ORG}/${REPO}"
     retry pr_create "$pr_title" "$pr_branch" "$pr_body"    
 }
 
