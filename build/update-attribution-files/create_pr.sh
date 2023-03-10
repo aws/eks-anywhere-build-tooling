@@ -24,6 +24,8 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 source $SCRIPT_ROOT/../lib/common.sh
 
+SKIP_PR="${1:-false}"
+
 ORIGIN_ORG="eks-distro-pr-bot"
 UPSTREAM_ORG="aws"
 REPO="eks-anywhere-build-tooling"
@@ -118,7 +120,7 @@ function pr_create()
     fi
 
     echo "Creating PR."
-    if gh pr create --title "$pr_title" --body "$pr_body" --base $MAIN_BRANCH; then
+    if gh pr create --title "$pr_title" --body "$pr_body" --base $MAIN_BRANCH --head $ORIGIN_ORG:$pr_branch; then
         echo "PR created."
         return
     fi
@@ -136,7 +138,7 @@ function pr_create()
     return 1
 }
 
-function pr:create()
+function pr::create()
 {
     local -r pr_title="$1"
     local -r commit_message="$2"
@@ -144,13 +146,15 @@ function pr:create()
     local -r pr_body="$4"
     local -r force_push="${5:-true}"
 
+    build::common::echo_and_run git checkout -B $pr_branch
+
     git diff --staged
     local -r files_added=$(git diff --staged --name-only)
     if [ "$files_added" = "" ]; then
+        echo "No files changed to commit"
         return 0
     fi
 
-    build::common::echo_and_run git checkout -B $pr_branch
     build::common::echo_and_run git commit -m "$commit_message" || true
 
     # need to check a codebuild job "type"
@@ -158,6 +162,16 @@ function pr:create()
         return 0
     fi
 
+    github::auth
+
+    retry commit_push "$pr_branch" "$force_push"
+    
+    if [[ "${SKIP_PR}" == "false" ]]; then
+        retry pr_create "$pr_title" "$pr_branch" "$pr_body"
+    fi  
+}
+
+function github::auth(){
     if [[ -z "${GITHUB_TOKEN:-}" ]] && [[ ! -f /secrets/github-secrets/token ]]; then
         echo "Missing GITHUB_TOKEN or /secrets/github-secrets/token, cannot authenticate!"
         exit 1
@@ -166,14 +180,11 @@ function pr:create()
     if [ -f /secrets/github-secrets/token ]; then
         gh auth login --with-token < /secrets/github-secrets/token
     fi
-    
+
     gh auth setup-git
     gh api rate_limit
-
-    retry commit_push "$pr_branch" "$force_push"
     
     gh repo set-default "${UPSTREAM_ORG}/${REPO}"
-    retry pr_create "$pr_title" "$pr_branch" "$pr_body"    
 }
 
 function pr::create::pr_body(){
@@ -226,7 +237,7 @@ function pr::create::attribution() {
     local -r pr_branch="attribution-files-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "attribution")
 
-    pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
+    pr::create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
 }
 
 function pr::create::checksums() {
@@ -246,7 +257,7 @@ function pr::create::checksums() {
     # stash checksums and attribution and help.mk files
     git stash --keep-index
     
-    pr:create "$pr_title" "[PR BOT] Update install_go_versions.sh" "$pr_branch" "$pr_body" "false"
+    pr::create "$pr_title" "[PR BOT] Update install_go_versions.sh" "$pr_branch" "$pr_body" "false"
 
     if [ "$(git stash list)" != "" ]; then
         build::common::echo_and_run git stash pop
@@ -261,7 +272,14 @@ function pr::create::checksums() {
     local -r changed_files=$(git diff --staged --name-only | grep "^projects" | cut -d '/' -f2- | uniq | tr  '\n' ' ')
     local -r commit_message="[PR BOT] Update $changed_files"
  
-    pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body" "false"
+    pr::create "$pr_title" "$commit_message" "$pr_branch" "$pr_body" "false"
+
+    # in codebuild we run this seperately after all other jobs has finished
+    # in that case there will be no files changed so no commit, but we still want to open the pr
+    if [[ "${SKIP_PR}" == "false" ]]; then
+        github::auth
+        retry pr_create "$pr_title" "$pr_branch" "$pr_body"
+    fi
 }
 
 function pr::create::help() {
@@ -270,7 +288,7 @@ function pr::create::help() {
     local -r pr_branch="help-makefiles-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "makehelp")
 
-    pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
+    pr::create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
 }
 
 function pr::create::go-mod() {
@@ -279,7 +297,7 @@ function pr::create::go-mod() {
     local -r pr_branch="go-mod-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "go-mod")
 
-    pr:create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
+    pr::create "$pr_title" "$commit_message" "$pr_branch" "$pr_body"
 }
 
 function pr::file:add() {
