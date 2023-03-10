@@ -1,0 +1,83 @@
+From 3588c40c0866c198093f9ab5ae39c688466e2f6f Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Tue, 11 Jan 2022 18:37:06 -0800
+Subject: [PATCH 2/14] Install containerd from apt for Ubuntu
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+---
+ images/capi/ansible/roles/containerd/tasks/main.yml | 11 ++++++++++-
+ images/capi/ansible/roles/kubernetes/tasks/main.yml |  4 +++-
+ images/capi/ansible/roles/kubernetes/tasks/url.yml  |  2 +-
+ 3 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/images/capi/ansible/roles/containerd/tasks/main.yml b/images/capi/ansible/roles/containerd/tasks/main.yml
+index 5ae975302..31c35d4c4 100644
+--- a/images/capi/ansible/roles/containerd/tasks/main.yml
++++ b/images/capi/ansible/roles/containerd/tasks/main.yml
+@@ -21,6 +21,11 @@
+ - import_tasks: photon.yml
+   when: ansible_os_family == "VMware Photon OS"
+ 
++- name: Install containerd package for Debian
++  apt:
++    name: containerd
++  when: ansible_os_family == "Debian"
++
+ # TODO(vincepri): Use deb/rpm packages once available.
+ # See https://github.com/containerd/containerd/issues/1508 for context.
+ - name: download containerd
+@@ -29,6 +34,7 @@
+     checksum: "sha256:{{ containerd_sha256 }}"
+     dest: /tmp/containerd.tar.gz
+     mode: 0600
++  when: ansible_os_family != "Debian"
+ 
+ - name: Create a directory if it does not exist
+   file:
+@@ -45,7 +51,9 @@
+     dest: /
+     extra_opts:
+       - --no-overwrite-dir
+-  when: ansible_os_family != "Flatcar"
++  when:
++    - ansible_os_family != "Debian"
++    - ansible_os_family != "Flatcar"
+ 
+ - name: unpack containerd for Flatcar to /opt/bin
+   unarchive:
+@@ -132,3 +140,4 @@
+   file:
+     path: /tmp/containerd.tar.gz
+     state: absent
++  when: ansible_os_family != "Debian"
+diff --git a/images/capi/ansible/roles/kubernetes/tasks/main.yml b/images/capi/ansible/roles/kubernetes/tasks/main.yml
+index 36d973b39..83ed63094 100644
+--- a/images/capi/ansible/roles/kubernetes/tasks/main.yml
++++ b/images/capi/ansible/roles/kubernetes/tasks/main.yml
+@@ -32,7 +32,9 @@
+   - ctr
+   - crictl
+   - critest
+-  when: ansible_os_family != "Flatcar"
++  when:
++    - ansible_os_family != "Debian"
++    - ansible_os_family != "Flatcar"
+ 
+ - import_tasks: url.yml
+   when: kubernetes_source_type == "http" and kubernetes_cni_source_type == "http"
+diff --git a/images/capi/ansible/roles/kubernetes/tasks/url.yml b/images/capi/ansible/roles/kubernetes/tasks/url.yml
+index 4176db434..8aae4002f 100644
+--- a/images/capi/ansible/roles/kubernetes/tasks/url.yml
++++ b/images/capi/ansible/roles/kubernetes/tasks/url.yml
+@@ -22,7 +22,7 @@
+ 
+ - name: Download CNI tarball
+   get_url:
+-    url: "{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_goarch }}-{{ kubernetes_cni_semver }}.tgz"
++    url: "{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_goarch }}-{{ kubernetes_cni_semver }}.tar.gz"
+     checksum: "{{ kubernetes_cni_http_checksum }}"
+     dest: /tmp/cni.tar.gz
+     mode: 0755
+-- 
+2.25.1
+
