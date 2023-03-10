@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
 
 PROJECT_ROOT="$1"
 ARTIFACTS_FOLDER="$2"
@@ -42,23 +44,26 @@ find "$ARTIFACTS_FOLDER" \
      > "$ACTUAL_FILES"
 
 EXPECTED_FILES=$(mktemp)
-export GIT_TAG=$GIT_TAG
-export IMAGE_OS=$IMAGE_OS
+build::common::echo_and_run export GIT_TAG=$GIT_TAG
+build::common::echo_and_run export IMAGE_OS=$IMAGE_OS
 envsubst "\$GIT_TAG:\$IMAGE_OS" \
          < "$EXPECTED_FILES_PATH" \
          > "$EXPECTED_FILES"
 
 if $FAKE_ARM_ARTIFACTS_FOR_VALIDATION; then
+    echo "Faking arm64 artifacts"
     sed -i '/arm64/d' "$EXPECTED_FILES"
 fi
 
 if $FAKE_AMD_BINARIES_FOR_VALIDATION; then
+    echo "Faking amd64 artifacts"
     sed -i '/amd64/d' "$EXPECTED_FILES"
 fi
 
 # The versions of sort found on macOS and Linux can behave
 # differently. That's why we sort each file here and now, to ensure
 # that whatever version is in use, it's consistent.
+echo "diffing $EXPECTED_FILES $ACTUAL_FILES"
 if ! diff -q <(sort "$EXPECTED_FILES") <(sort "$ACTUAL_FILES"); then
     echo "Artifacts directory does not matched expected!"
     diff -y <(sort "$EXPECTED_FILES") <(sort "$ACTUAL_FILES")
