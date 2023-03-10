@@ -60,7 +60,7 @@ endif
 EXCLUDE_FROM_STAGING_BUILDSPEC?=false
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC?=false
 BUILDSPECS?=buildspec.yml
-CHECKSUMS_BUILDSPECS?=checksums-buildspec.yml
+CHECKSUMS_BUILDSPECS?=buildspecs/checksums-buildspec.yml
 BUILDSPEC_VARS_KEYS?=
 BUILDSPEC_VARS_VALUES?=
 ####################################################
