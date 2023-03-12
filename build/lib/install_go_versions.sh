@@ -63,3 +63,4 @@ GOBIN=${GOPATH}/go1.20/bin go install github.com/jaxesn/go-licenses@6800d77c11d0
 
 # 1.16 is the default so symlink it to /go/bin
 ln -sf ${GOPATH}/go1.16/bin/go-licenses ${GOPATH}/bin
+some change
