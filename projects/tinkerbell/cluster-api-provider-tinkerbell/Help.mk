@@ -55,6 +55,6 @@ patch-for-dep-update: ## After bumping dep in go.mod file and updating vendor, g
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `validate-checksums attribution local-images  upload-artifacts attribution-pr`
+build: ## Called via prow presubmit, calls `github-rate-limit-pre validate-checksums attribution local-images  upload-artifacts attribution-pr github-rate-limit-post`
 release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images  upload-artifacts`
 ########### END GENERATED ###########################
