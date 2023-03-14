@@ -24,6 +24,7 @@ SKIP_DEPEND_ON="${4:-false}"
 EXCLUDE_VAR="${5:-EXCLUDE_FROM_STAGING_BUILDSPEC}"
 BUILDSPECS_VAR="${6:-BUILDSPECS}"
 FAST_FAIL="${7:-true}"
+ADD_FINAL_STAGE="${8:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
@@ -47,6 +48,7 @@ mkdir -p $(dirname $STAGING_BUILDSPEC_FILE)
 yq eval --null-input ".batch={\"fast-fail\":$FAST_FAIL,\"build-graph\":[]}" > $STAGING_BUILDSPEC_FILE # Creates an empty YAML array
 
 PROJECTS=(${ALL_PROJECTS// / })
+ALL_PROJECT_IDS=""
 for project in "${PROJECTS[@]}"; do
     org=$(cut -d_ -f1 <<< $project)
     repo=$(cut -d_ -f2- <<< $project)
@@ -156,6 +158,7 @@ for project in "${PROJECTS[@]}"; do
                         fi
                     fi
 
+                    ALL_PROJECT_IDS+="\"$IDENTIFIER\","
                     yq eval -i -P \
                         ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"}}}]" \
                         $STAGING_BUILDSPEC_FILE
@@ -170,6 +173,7 @@ for project in "${PROJECTS[@]}"; do
                     for val2 in "${ARR_2[@]}"; do
                         BUILDSPEC_NAME=$(basename $buildspec .yml)
                         IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}_${val2//-/_}_${BUILDSPEC_NAME//-/_}
+                        ALL_PROJECT_IDS+="\"$IDENTIFIER\","
                         yq eval -i -P \
                             ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"}}}]" \
                             $STAGING_BUILDSPEC_FILE 
@@ -177,6 +181,7 @@ for project in "${PROJECTS[@]}"; do
                 done
             fi
         else
+            ALL_PROJECT_IDS+="\"$IDENTIFIER\","
             yq eval -i -P \
                 ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL}}}]" \
                 $STAGING_BUILDSPEC_FILE 
@@ -184,6 +189,13 @@ for project in "${PROJECTS[@]}"; do
         
     done
 done
+
+if [ -n "${ADD_FINAL_STAGE}" ]; then
+    set -x
+    yq eval -i -P \
+        ".batch.build-graph += [{\"identifier\":\"final_stage\",\"buildspec\":\"$ADD_FINAL_STAGE\",\"depend-on\":[${ALL_PROJECT_IDS%?}]}]" \
+        $STAGING_BUILDSPEC_FILE 
+fi
 
 HEAD_COMMENT=$(cat $BASE_DIRECTORY/hack/boilerplate.yq.txt)
 yq eval -i ". headComment=\"$HEAD_COMMENT\"" $STAGING_BUILDSPEC_FILE # Add a header comment with license verbiage and no-edit warning
