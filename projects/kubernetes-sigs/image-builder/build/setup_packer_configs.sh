@@ -141,7 +141,7 @@ fi
 # remove the throughput field in the upstream Packer config since only gp3 supports
 # specifying throughput
 if [ "$IMAGE_FORMAT" = "ami" ]; then
-    volume_type="$(cat $MAKE_ROOT/packer/ami/ami.json | jq '.volume_type')"
+    volume_type="$(cat $MAKE_ROOT/packer/ami/ami.json | jq -r '.volume_type')"
     if [[ $volume_type != "null" && $volume_type != "gp3" ]]; then
         build::jq::update_in_place ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ami/packer.json "del(.builders[0].launch_block_device_mappings[].throughput)"
     else
