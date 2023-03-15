@@ -67,7 +67,7 @@ helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGE
 	
 	# Credential Provider Package lives in pkg controller repo. Workaround for its sepearate chart
 	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) credential-provider-package credentialproviderpackage/charts/credential-provider-package $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) credential-provider-package $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
+	FORCE_JSON_SCHEMA_FILE=$(PROJECT_ROOT)/helm/credential-provider-package.schema.json $(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) credential-provider-package $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
 	$(BUILD_LIB)/helm_replace.sh credential-provider-package $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) credential-provider-package
 
