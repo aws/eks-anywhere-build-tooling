@@ -33,6 +33,7 @@ CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PACKAGE_DEPENDENCIES=${PACKAGE_DEPENDENCIES:=""}
+FORCE_JSON_SCHEMA_FILE=${FORCE_JSON_SCHEMA_FILE:=""}
 
 #
 # Image tags
@@ -91,6 +92,11 @@ do
     digest: ${IMAGE_SHASUM}
 !
 done
+
+if [ -n "${FORCE_JSON_SCHEMA_FILE}" ]
+then 
+  JSON_SCHEMA_FILE=${FORCE_JSON_SCHEMA_FILE}
+fi
 
 if [ -f ${JSON_SCHEMA_FILE} ]
 then
