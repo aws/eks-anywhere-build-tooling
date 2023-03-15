@@ -61,7 +61,7 @@ if [[ "$STATUS" != "completed" ]]; then
     exit 1
 fi
 
-echo "Image import for ami $AMI_ID succeed"
+echo "Image import for ami $AMI_ID succeeded"
 
 for dst in "${REPLICAS_SPLIT[@]}"
 do
