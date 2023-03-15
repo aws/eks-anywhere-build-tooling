@@ -409,3 +409,10 @@ function build::bottlerocket::check_release_availablilty() {
   fi
   echo $retval
 }
+
+function build::jq::update_in_place() {
+  local json_file=$1
+  local jq_query=$2
+
+  cat $json_file | jq -S ''"$jq_query"'' > $json_file.tmp && mv $json_file.tmp $json_file
+}

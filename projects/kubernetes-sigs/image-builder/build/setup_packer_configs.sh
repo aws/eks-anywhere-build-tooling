@@ -136,3 +136,16 @@ if [ "$IMAGE_FORMAT" = "ova" ] && [ "$IMAGE_OS" = "redhat" ]; then
     cat <<< $(jq --arg httpendpoint "http://$PACKER_HTTP_SERVER_IP:{{ .HTTPPort }}" \
              '.boot_media_path=$httpendpoint' $rhel_ova_config_file) > $rhel_ova_config_file
 fi
+
+# If the image format is AMI and our Packer config specifies a non-gp3 volume, then
+# remove the throughput field in the upstream Packer config since only gp3 supports
+# specifying throughput
+if [ "$IMAGE_FORMAT" = "ami" ]; then
+    volume_type="$(cat $MAKE_ROOT/packer/ami/ami.json | jq '.volume_type')"
+    if [[ $volume_type != "null" && $volume_type != "gp3" ]]; then
+        build::jq::update_in_place ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ami/packer.json "del(.builders[0].launch_block_device_mappings[].throughput)"
+    else
+        build::jq::update_in_place ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ami/packer.json '.builders[0].launch_block_device_mappings[].throughput = "{{ user `throughput` }}"'
+    fi
+fi
+
