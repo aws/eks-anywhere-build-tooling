@@ -251,3 +251,58 @@ func walkDirFunc(path string, dirEntry fs.DirEntry, err error) error {
 	}
 	return nil
 }
+
+// KubeletTlsConfig is a struct that holds cert and private key
+type KubeletTlsConfig struct {
+	KubeletServingCert       string
+	KubeletServingPrivateKey string
+}
+
+// readKubeletTlsConfig loads kubelet serving cert and private key from files
+func readKubeletTlsConfig(reader FileReader) *KubeletTlsConfig {
+	kubeletServingCertFile := "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.crt"
+	kubeletServingPrivateKeyFile := "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.key"
+
+	kubeletTlsConfig := &KubeletTlsConfig{}
+
+	kubeletServingCertContents, err := readAndEncodeFile(kubeletServingCertFile, reader)
+	if err != nil {
+		message := fmt.Errorf("skipping Kubelet TLS configuration: %s %w", kubeletServingCertFile, err)
+		fmt.Printf("%s\n", message)
+		return nil
+	}
+
+	kubeletServingPrivateKeyContents, err := readAndEncodeFile(kubeletServingPrivateKeyFile, reader)
+	if err != nil {
+		message := fmt.Errorf("skipping Kubelet TLS configuration: %s %w", kubeletServingPrivateKeyFile, err)
+		fmt.Printf("%s\n", message)
+		return nil
+	}
+	kubeletTlsConfig.KubeletServingCert = kubeletServingCertContents
+	kubeletTlsConfig.KubeletServingPrivateKey = kubeletServingPrivateKeyContents
+	fmt.Println("Kubelet TLS configuration available")
+	return kubeletTlsConfig
+}
+
+// FileReader is an interface that wraps the ReadFile function.
+type FileReader interface {
+	ReadFile(filename string) ([]byte, error)
+}
+
+// RealFileReader is a struct that implements the FileReader interface
+// using the ioutil.ReadFile function.
+type RealFileReader struct{}
+
+// ReadFile reads the contents of a file using ioutil.ReadFile.
+func (r RealFileReader) ReadFile(filename string) ([]byte, error) {
+	return ioutil.ReadFile(filename)
+}
+
+// readAndEncodeFile reads the contents of a file and encodes them as base64 string
+func readAndEncodeFile(filePath string, reader FileReader) (string, error) {
+	contents, err := reader.ReadFile(filePath)
+	if err == nil {
+		return base64.StdEncoding.EncodeToString(contents), nil
+	}
+	return "", err
+}

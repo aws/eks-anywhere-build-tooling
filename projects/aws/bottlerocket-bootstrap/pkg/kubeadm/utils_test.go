@@ -1,6 +1,11 @@
 package kubeadm
 
-import "testing"
+import (
+	"os"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+)
 
 const localEtcdClusterConf = `'apiServer:
   certSANs:
@@ -108,6 +113,76 @@ func TestIsExternalEtcd(t *testing.T) {
 
 			if gotExternal != tt.wantExternal {
 				t.Fatalf("isExternalEtcd() -> gotExternal = %t, wantExternal = %t", gotExternal, tt.wantExternal)
+			}
+		})
+	}
+}
+
+type mockFileReader func(filename string) ([]byte, error)
+
+func (m mockFileReader) ReadFile(filename string) ([]byte, error) {
+	return m(filename)
+}
+
+func TestReadKubeletTlsConfig(t *testing.T) {
+
+	tests := []struct {
+		testName                 string
+		expectedKubeletTlsConfig *KubeletTlsConfig
+		mockReader               func(t *testing.T) FileReader
+	}{
+		{
+			testName:                 "skip config cert file missing missing",
+			expectedKubeletTlsConfig: nil,
+			mockReader: func(t *testing.T) FileReader {
+				return mockFileReader(func(filename string) ([]byte, error) {
+					t.Helper()
+					if filename == "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.crt" {
+						return nil, os.ErrNotExist
+					} else {
+						return nil, nil
+					}
+				})
+			},
+		},
+		{
+			testName:                 "skip config key file missing missing",
+			expectedKubeletTlsConfig: nil,
+			mockReader: func(t *testing.T) FileReader {
+				return mockFileReader(func(filename string) ([]byte, error) {
+					t.Helper()
+					if filename == "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.key" {
+						return nil, os.ErrNotExist
+					} else {
+						return nil, nil
+					}
+				})
+			},
+		},
+		{
+			testName:                 "success files present",
+			expectedKubeletTlsConfig: &KubeletTlsConfig{KubeletServingCert: "bW9jay1jcnQ=", KubeletServingPrivateKey: "bW9jay1rZXk="},
+			mockReader: func(t *testing.T) FileReader {
+				return mockFileReader(func(filename string) ([]byte, error) {
+					t.Helper()
+					switch filename {
+					case "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.crt":
+						return []byte("mock-crt"), nil
+
+					case "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.key":
+						return []byte("mock-key"), nil
+					}
+					return nil, nil
+				})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			kubeletTlsConfig := readKubeletTlsConfig(tt.mockReader(t))
+			if !cmp.Equal(kubeletTlsConfig, tt.expectedKubeletTlsConfig) {
+				t.Fatalf("%v different from expected %v", kubeletTlsConfig, tt.expectedKubeletTlsConfig)
 			}
 		})
 	}
