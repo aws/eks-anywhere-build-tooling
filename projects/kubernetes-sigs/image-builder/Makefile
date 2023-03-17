@@ -160,45 +160,60 @@ export GOVC_INSECURE?=true
 
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
 $(FAKE_UBUNTU_OVA_PATH):
+	@echo -e $(call TARGET_START_LOG)
 	touch $@
 	touch $(ARTIFACTS_PATH)/ova/ubuntu/packer.log
+	@echo -e $(call TARGET_END_LOG)
 
 $(FAKE_UBUNTU_RAW_PATH):
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(@D)
 	touch $@
+	@echo -e $(call TARGET_END_LOG)
 
 # in the case of BR ova these targets are the same, guard against this to avoid the overwriting target warning
 ifneq ($(FINAL_BOTTLEROCKET_OVA_PATH),$(FINAL_OVA_PATH))
 $(FINAL_OVA_PATH):
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(@D)
 	mv *.ova $@
+	@echo -e $(call TARGET_END_LOG)
 endif
 
 $(FINAL_RAW_IMAGE_PATH):
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(@D)
 	mv *.gz $@
 
 $(FINAL_CLOUDSTACK_IMAGE_PATH):
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(@D)
 	mv *.qcow2 $@
+	@echo -e $(call TARGET_END_LOG)
 
 $(FINAL_BOTTLEROCKET_AMI_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(FINAL_BOTTLEROCKET_AMI_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 $(FINAL_BOTTLEROCKET_AMI_PATH):
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ami/*.gz $@
+	@echo -e $(call TARGET_END_LOG)
 
 $(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(FINAL_BOTTLEROCKET_OVA_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 $(FINAL_BOTTLEROCKET_OVA_PATH):
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ova/*.ova $@
+	@echo -e $(call TARGET_END_LOG)
 
 $(FINAL_BOTTLEROCKET_RAW_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(FINAL_BOTTLEROCKET_RAW_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 $(FINAL_BOTTLEROCKET_RAW_PATH):
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/raw/*.gz $@
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: setup-ami-share
 setup-ami-share:
@@ -207,6 +222,7 @@ setup-ami-share:
 $(BOTTLEROCKET_SETUP_TARGET): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 $(BOTTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
 $(BOTTLEROCKET_SETUP_TARGET):
+	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(BOTTLEROCKET_DOWNLOAD_PATH)
 	# This configuration supports local installations and checksum validations
 	# of root.json file
@@ -215,22 +231,29 @@ $(BOTTLEROCKET_SETUP_TARGET):
 		> $(BOTTLEROCKET_SETUP_TARGET)
 	curl https://cache.bottlerocket.aws/root.json -o $$BOTTLEROCKET_ROOT_JSON_PATH
 	sha512sum -c $(BOTTLEROCKET_SETUP_TARGET)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: deps-%
 deps-%: MAKEFLAGS=
 deps-%: $(GIT_PATCH_TARGET)
+	@echo -e $(call TARGET_START_LOG)
 	$(MAKE) -C $(IMAGE_BUILDER_DIR) deps-$*
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: setup-packer-configs-%
 setup-packer-configs-%:
+	@echo -e $(call TARGET_START_LOG)
 	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: build-ami-ubuntu-2004
 build-ami-ubuntu-2004: MAKEFLAGS=
 build-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
 build-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
 build-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
+	@echo -e $(call TARGET_START_LOG)
 	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) validate-ami-ubuntu-2004
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: release-ami-%
 release-ami-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
@@ -240,70 +263,92 @@ release-ami-%: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami/$(IM
 release-ami-%: EXPORT_AMI_DST=$(AMI_S3_DST)/$(GIT_HASH)
 release-ami-%: LATEST_AMI_S3_URL=$(AMI_S3_DST)/$(LATEST)/ubuntu.raw
 release-ami-%: setup-ami-share
+	@echo -e $(call TARGET_START_LOG)
 	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
 	build/export-ami-to-s3.sh $(RELEASE_BRANCH) $(MANIFEST_OUTPUT) raw $(EXPORT_AMI_DST) $(LATEST_AMI_S3_URL)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: release-ova-%
 release-ova-%:
+	@echo -e $(call TARGET_START_LOG)
 	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: local-build-ova-%
 local-build-ova-%: MAKEFLAGS=
 local-build-ova-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
 local-build-ova-%: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
 local-build-ova-%: deps-ova setup-packer-configs-ova
+	@echo -e $(call TARGET_START_LOG)
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-$*
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: download-bottlerocket-%
 download-bottlerocket-%: IMAGE_OS=bottlerocket
 download-bottlerocket-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
 download-bottlerocket-%: BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 download-bottlerocket-%: $(BOTTLEROCKET_SETUP_TARGET)
+	@echo -e $(call TARGET_START_LOG)
 	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(BOTTLEROCKET_DOWNLOAD_PATH) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: upload-bottlerocket-%
 upload-bottlerocket-%: IMAGE_OS=bottlerocket
 upload-bottlerocket-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/bottlerocket
 upload-bottlerocket-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$*/bottlerocket
 upload-bottlerocket-%:
+	@echo -e $(call TARGET_START_LOG)
 	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: release-image-build-on-metal-%
 release-image-build-on-metal-%: $(GIT_PATCH_TARGET)
+	@echo -e $(call TARGET_START_LOG)
 	build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $* $(IMAGE_FORMAT) $(LATEST)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: build-qemu-rhel-local
 build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
 build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
+	@echo -e $(call TARGET_START_LOG)
 	build/build_qemu_rhel_local.sh $(MAKE_ROOT) $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: local-build-ami-%
 local-build-ami-%: MAKEFLAGS=
 local-build-ami-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
 local-build-ami-%: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
 local-build-ami-%: deps-ami setup-packer-configs-ami
+	@echo -e $(call TARGET_START_LOG)
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ami/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-$*
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: local-build-raw-%
 local-build-raw-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/raw/$(IMAGE_OS)
 local-build-raw-%: deps-raw setup-packer-configs-raw
+	@echo -e $(call TARGET_START_LOG)
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-raw-$*
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: local-build-qemu-%
 local-build-qemu-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
 local-build-qemu-%: deps-qemu setup-packer-configs-qemu
+	@echo -e $(call TARGET_START_LOG)
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/qemu/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-qemu-$*
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: local-build-nutanix-ubuntu-2004
 local-build-nutanix-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/nutanix/$(IMAGE_OS)
 local-build-nutanix-ubuntu-2004: deps-nutanix setup-packer-configs-nutanix
+	@echo -e $(call TARGET_START_LOG)
 	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/nutanix/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-nutanix-ubuntu-2004
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: validate-ubuntu-2004
 validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
@@ -315,21 +360,18 @@ check-env-validation:
 		$(error Environment var TEMPLATE not set. Example: TEMPLATE=<ubuntu.livecd> make ...)
 	endif
 
-.PHONY: s3-artifacts-%
-s3-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/$(IMAGE_OS)
-s3-artifacts-%: $(S3_TARGET_PREREQUISITES)
-	$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$* IMAGE_OS=$(IMAGE_OS)
-
 .PHONY: upload-artifacts-%
 upload-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/$(IMAGE_OS)
 upload-artifacts-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$*/$(IMAGE_OS)
-upload-artifacts-%: s3-artifacts-%
-	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$*
-
+upload-artifacts-%: $(S3_TARGET_PREREQUISITES)
+	@echo -e $(call TARGET_START_LOG)
+	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$* IMAGE_OS=$(IMAGE_OS)
+	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: unsupported-release-target
 unsupported-release-target:
 	@echo "Unsupported combination of image format and image os chosen. Build will quit now..."
+
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

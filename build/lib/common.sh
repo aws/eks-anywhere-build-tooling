@@ -85,18 +85,18 @@ function build::common::upload_artifacts() {
   local -r do_not_delete=$8
   
   if [ "$dry_run" = "true" ]; then
-    aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
-    aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --recursive --dryrun
+    build::common::echo_and_run aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
+    build::common::echo_and_run aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --recursive --dryrun
   else
     # Upload artifacts to s3 
     # 1. To proper path on s3 with buildId-githash
     # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
-    aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read
+    build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read
 
     if [ "$do_not_delete" = "true" ]; then
-      aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --acl public-read
+      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --acl public-read
     else
-      aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read
+      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read
     fi
   fi
 }

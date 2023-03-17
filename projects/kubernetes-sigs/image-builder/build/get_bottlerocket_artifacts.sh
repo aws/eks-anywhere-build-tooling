@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
 
+MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 RELEASE_CHANNEL="${1?Specify first argument - EKS-D release channel}"
 FORMAT="${2?Specify second argument - Image format}"
@@ -61,7 +62,7 @@ OS_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/${FORMAT}
 rm -rf $OS_DOWNLOAD_PATH
 
 # Downloading the TARGET from the Bottlerocket target location using Tuftool
-tuftool download "${OS_DOWNLOAD_PATH}" \
+build::common::echo_and_run tuftool download "${OS_DOWNLOAD_PATH}" \
     --target-name "${TARGET}" \
     --root "${BOTTLEROCKET_DOWNLOAD_PATH}/root.json" \
     --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
@@ -70,7 +71,7 @@ tuftool download "${OS_DOWNLOAD_PATH}" \
 # Post processing for aws and metal variants
 if [[ $VARIANT == "aws" ]] || [[ $VARIANT == "metal" ]]; then
   BOTTLEROCKET_IMG="${TARGET%.lz4}"
-  lz4 --decompress ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
-  gzip ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
+  build::common::echo_and_run lz4 --decompress ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
+  build::common::echo_and_run gzip ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
   rm -f ${OS_DOWNLOAD_PATH}/${TARGET}
 fi
