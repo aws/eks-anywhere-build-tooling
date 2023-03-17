@@ -167,7 +167,7 @@ $(FAKE_UBUNTU_OVA_PATH):
 
 $(FAKE_UBUNTU_RAW_PATH):
 	@echo -e $(call TARGET_START_LOG)
-	@mkdir -p $(@D)
+	mkdir -p $(@D)
 	touch $@
 	@echo -e $(call TARGET_END_LOG)
 
@@ -175,19 +175,19 @@ $(FAKE_UBUNTU_RAW_PATH):
 ifneq ($(FINAL_BOTTLEROCKET_OVA_PATH),$(FINAL_OVA_PATH))
 $(FINAL_OVA_PATH):
 	@echo -e $(call TARGET_START_LOG)
-	@mkdir -p $(@D)
+	mkdir -p $(@D)
 	mv *.ova $@
 	@echo -e $(call TARGET_END_LOG)
 endif
 
 $(FINAL_RAW_IMAGE_PATH):
 	@echo -e $(call TARGET_START_LOG)
-	@mkdir -p $(@D)
+	mkdir -p $(@D)
 	mv *.gz $@
 
 $(FINAL_CLOUDSTACK_IMAGE_PATH):
 	@echo -e $(call TARGET_START_LOG)
-	@mkdir -p $(@D)
+	mkdir -p $(@D)
 	mv *.qcow2 $@
 	@echo -e $(call TARGET_END_LOG)
 
@@ -195,7 +195,7 @@ $(FINAL_BOTTLEROCKET_AMI_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottl
 $(FINAL_BOTTLEROCKET_AMI_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 $(FINAL_BOTTLEROCKET_AMI_PATH):
 	@echo -e $(call TARGET_START_LOG)
-	@mkdir -p $(@D)
+	mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ami/*.gz $@
 	@echo -e $(call TARGET_END_LOG)
 
@@ -203,7 +203,7 @@ $(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottl
 $(FINAL_BOTTLEROCKET_OVA_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 $(FINAL_BOTTLEROCKET_OVA_PATH):
 	@echo -e $(call TARGET_START_LOG)
-	@mkdir -p $(@D)
+	mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ova/*.ova $@
 	@echo -e $(call TARGET_END_LOG)
 
@@ -211,7 +211,7 @@ $(FINAL_BOTTLEROCKET_RAW_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottl
 $(FINAL_BOTTLEROCKET_RAW_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
 $(FINAL_BOTTLEROCKET_RAW_PATH):
 	@echo -e $(call TARGET_START_LOG)
-	@mkdir -p $(@D)
+	mkdir -p $(@D)
 	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/raw/*.gz $@
 	@echo -e $(call TARGET_END_LOG)
 
@@ -223,7 +223,7 @@ $(BOTTLEROCKET_SETUP_TARGET): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottler
 $(BOTTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
 $(BOTTLEROCKET_SETUP_TARGET):
 	@echo -e $(call TARGET_START_LOG)
-	@mkdir -p $(BOTTLEROCKET_DOWNLOAD_PATH)
+	mkdir -p $(BOTTLEROCKET_DOWNLOAD_PATH)
 	# This configuration supports local installations and checksum validations
 	# of root.json file
 	envsubst '$$BOTTLEROCKET_ROOT_JSON_PATH' \
@@ -360,10 +360,15 @@ check-env-validation:
 		$(error Environment var TEMPLATE not set. Example: TEMPLATE=<ubuntu.livecd> make ...)
 	endif
 
+.PHONY: s3-artifacts-%
+s3-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/$(IMAGE_OS)
+s3-artifacts-%: $(S3_TARGET_PREREQUISITES)
+	$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$* IMAGE_OS=$(IMAGE_OS)
+
 .PHONY: upload-artifacts-%
 upload-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/$(IMAGE_OS)
 upload-artifacts-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$*/$(IMAGE_OS)
-upload-artifacts-%: $(S3_TARGET_PREREQUISITES)
+upload-artifacts-%: s3-artifacts-%
 	@echo -e $(call TARGET_START_LOG)
 	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$* IMAGE_OS=$(IMAGE_OS)
 	@echo -e $(call TARGET_END_LOG)
