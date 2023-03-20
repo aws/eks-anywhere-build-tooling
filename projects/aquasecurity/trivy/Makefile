@@ -15,6 +15,7 @@ EXTRA_GO_LDFLAGS=-X main.version=$(VERSION)
 HAS_S3_ARTIFACTS=true
 IMAGE_NAMES=
 
+BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 # modernc.org/mathutil's license is actually mismatched
 # the current version of go-license finds it to match BSD-2 where its
 # really BSD-3.  The library go-liceses uses to determine the type

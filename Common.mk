@@ -63,6 +63,8 @@ BUILDSPECS?=buildspec.yml
 CHECKSUMS_BUILDSPECS?=buildspecs/checksums-buildspec.yml
 BUILDSPEC_VARS_KEYS?=
 BUILDSPEC_VARS_VALUES?=
+BUILDSPEC_PLATFORM?=ARM_CONTAINER
+BUILDSPEC_COMPUTE_TYPE?=BUILD_GENERAL1_SMALL
 ####################################################
 
 #################### GIT ###########################

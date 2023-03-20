@@ -25,6 +25,8 @@ HELM_IMAGE_LIST=cert-manager/cert-manager-cainjector cert-manager/cert-manager-c
 
 HAS_S3_ARTIFACTS=true
 
+BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+
 include $(BASE_DIRECTORY)/Common.mk
 
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver-useradd/images/export
