@@ -62,6 +62,7 @@ HELM_DESTINATION_REPOSITORY=harbor/$(HELM_SOURCE_REPOSITORY)
 HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-log harbor/harbor-exporter harbor/harbor-jobservice harbor/harbor-nginx harbor/harbor-portal harbor/harbor-redis harbor/harbor-registry harbor/harbor-registryctl harbor/harbor-trivy
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
+BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
 include $(BASE_DIRECTORY)/Common.mk
 

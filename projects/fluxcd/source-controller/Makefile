@@ -20,7 +20,7 @@ EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
 # they will not exist in the final eks-a bundle
 HAS_S3_ARTIFACTS?=true
 
-BUILDSPECS=projects/$(COMPONENT)/buildspecs/binaries.yml projects/$(COMPONENT)/buildspecs/images.yml
+BUILDSPECS=buildspecs/binaries.yml projects/$(COMPONENT)/buildspecs/images.yml
 CHECKSUMS_BUILDSPECS=buildspecs/checksums-buildspec.yml
 BUILDSPEC_1_VARS_KEYS=BINARY_PLATFORMS
 BUILDSPEC_1_VARS_VALUES=BINARY_PLATFORMS

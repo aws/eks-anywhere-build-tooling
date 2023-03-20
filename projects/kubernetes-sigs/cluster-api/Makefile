@@ -25,6 +25,7 @@ PROJECT_DEPENDENCIES=eksd/kubernetes/client
 
 HAS_S3_ARTIFACTS=true
 
+BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
 FIX_LICENSES_GO_JSON_TARGET=$(REPO)/vendor/github.com/github.com/ajeddeloh/go-json/LICENSE.txt
 FIX_LICENSES_TEST_CONTAINER_TARGET=$(REPO)/test/infrastructure/docker/LICENSE
