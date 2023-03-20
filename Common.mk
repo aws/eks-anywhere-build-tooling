@@ -959,6 +959,19 @@ create-ecr-repos: $(foreach image,$(IMAGE_NAMES),$(image)/create-ecr-repo) $(if 
 var-value-%:
 	@echo $($*)
 
+.PHONY: check-for-supported-release-branch
+check-for-supported-release-branch:
+	@if [ -d $(MAKE_ROOT)/$(RELEASE_BRANCH) ]; then \
+		echo "Supported version to build"; \
+		exit 0; \
+	elif { [ "false" == "$(BINARIES_ARE_RELEASE_BRANCHED)" ] || [ -z "$(BINARY_TARGET_FILES)" ]; } && [ "true" == "$$(yq e ".releases[] | select(.branch==\"$(RELEASE_BRANCH)\") | has(\"branch\")" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)" ]; then \
+		echo "Supported version to build"; \
+		exit 0; \
+	else \
+		echo "Not a supported version to build"; \
+		exit 1; \
+	fi	
+
 .PHONY: github-rate-limit-%
 github-rate-limit-%:
 	@if [[ -n "$(GITHUB_TOKEN)" ]] && [[  "presubmit" == "$(JOB_TYPE)" ]]; then \

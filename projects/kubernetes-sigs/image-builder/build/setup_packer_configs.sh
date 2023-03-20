@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -39,9 +37,23 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
 source "${MAKE_ROOT}/../../../build/lib/eksa_releases.sh"
 
+function env_and_envsubst()
+{
+    echo -e "\nRunning envsubst with input file $2 saving to $3 with ENV: "
+    local -r env_vars=(${1//:/ })
+    for var in "${env_vars[@]}"; do
+        local var_name=${var:1}
+        echo "$var_name: ${!var_name:-}"
+    done
+    envsubst "$1" < "$2" > "$3"
+}
+
 # Preload release yaml
-build::eksd_releases::load_release_yaml $RELEASE_BRANCH
-build::eksa_releases::load_bundle_manifest $DEV_RELEASE $LATEST_TAG
+echo "Loading EKSD manifest from: $(build::eksd_releases::get_release_yaml_url $RELEASE_BRANCH)"
+build::eksd_releases::load_release_yaml $RELEASE_BRANCH > /dev/null
+
+echo "Loading EKSA manifest from: $(build::eksa_releases::get_eksa_release_manifest_url)"
+build::eksa_releases::load_bundle_manifest $DEV_RELEASE $LATEST_TAG > /dev/null
 
 OUTPUT_CONFIGS="$MAKE_ROOT/_output/$RELEASE_BRANCH/$IMAGE_FORMAT/$IMAGE_OS/config"
 mkdir -p $OUTPUT_CONFIGS
@@ -52,6 +64,7 @@ export CNI_VERSION=$(build::eksd_releases::get_eksd_component_version 'cni-plugi
 
 # Get CNI sha256 to validate cni plugins in image are from eks-d
 # Use sha from manfiest to validate tar and then generate sha from specific binary
+echo "Downloading cni plugins to get shasum of host-device plugin for validation during image building"
 TMP_CNI="$HOME/tmp/eks-image-builder-cni"
 mkdir -p $TMP_CNI
 curl -o $TMP_CNI/cni-plugins.tar.gz "$PLUGINS_ASSET_BASE_URL/$CNI_VERSION/cni-plugins-linux-amd64-$CNI_VERSION.tar.gz"
@@ -61,14 +74,14 @@ tar -zxvf $TMP_CNI/cni-plugins.tar.gz -C $TMP_CNI ./host-device
 export CNI_HOST_DEVICE_SHA256="$(sha256sum $TMP_CNI/host-device | awk -F ' ' '{print $1}')"
 rm -rf $TMP_CNI
 
-envsubst '$CNI_SHA:$PLUGINS_ASSET_BASE_URL:$CNI_VERSION:$CNI_HOST_DEVICE_SHA256' \
-    < "$MAKE_ROOT/packer/config/cni.json.tmpl" \
-    > "$OUTPUT_CONFIGS/cni.json"
+env_and_envsubst '$CNI_SHA:$PLUGINS_ASSET_BASE_URL:$CNI_VERSION:$CNI_HOST_DEVICE_SHA256' \
+    "$MAKE_ROOT/packer/config/cni.json.tmpl" \
+    "$OUTPUT_CONFIGS/cni.json"
 
 export PAUSE_IMAGE=$(build::eksd_releases::get_eksd_kubernetes_image_url 'pause-image' $RELEASE_BRANCH)
-envsubst '$PAUSE_IMAGE:$HTTP_PROXY:$HTTPS_PROXY:$NO_PROXY' \
-    < "$MAKE_ROOT/packer/config/common.json.tmpl" \
-    > "$OUTPUT_CONFIGS/common.json"
+env_and_envsubst '$PAUSE_IMAGE:$HTTP_PROXY:$HTTPS_PROXY:$NO_PROXY' \
+    "$MAKE_ROOT/packer/config/common.json.tmpl" \
+    "$OUTPUT_CONFIGS/common.json"
 
 
 export IMAGE_REPO=$(build::eksd_releases::get_eksd_image_repo $RELEASE_BRANCH)
@@ -86,16 +99,16 @@ export ETCDADM_VERSION='v0.1.5'
 export CRICTL_URL=${CRICTL_URL:-$(build::eksa_releases::get_eksa_component_asset_url 'eksD' 'crictl' $RELEASE_BRANCH $DEV_RELEASE $LATEST_TAG)}
 export CRICTL_SHA256="${CRICTL_SHA256:-$(build::eksa_releases::get_eksa_component_asset_artifact_checksum 'eksD' 'crictl' 'sha256' $RELEASE_BRANCH $DEV_RELEASE $LATEST_TAG)}"
 
-envsubst '$IMAGE_REPO:$KUBERNETES_ASSET_BASE_URL:$KUBERNETES_VERSION:$KUBERNETES_SERIES:$CRICTL_URL:$CRICTL_SHA256:$ETCD_HTTP_SOURCE:$ETCD_VERSION:$ETCDADM_HTTP_SOURCE:$ETCD_SHA256:$ETCDADM_VERSION:$KUBERNETES_FULL_VERSION' \
-    < "$MAKE_ROOT/packer/config/kubernetes.json.tmpl" \
-    > "$OUTPUT_CONFIGS/kubernetes.json"
+env_and_envsubst '$IMAGE_REPO:$KUBERNETES_ASSET_BASE_URL:$KUBERNETES_VERSION:$KUBERNETES_SERIES:$CRICTL_URL:$CRICTL_SHA256:$ETCD_HTTP_SOURCE:$ETCD_VERSION:$ETCDADM_HTTP_SOURCE:$ETCD_SHA256:$ETCDADM_VERSION:$KUBERNETES_FULL_VERSION' \
+    "$MAKE_ROOT/packer/config/kubernetes.json.tmpl" \
+    "$OUTPUT_CONFIGS/kubernetes.json"
 
 ADDITIONAL_PAUSE_IMAGE_VERSION_BASE_URL=$(build::eksd_releases::get_eksd_kubernetes_asset_base_url $ADDITIONAL_PAUSE_IMAGE_FROM)
 ADDITIONAL_PAUSE_KUBERNETES_VERSION=$(build::eksd_releases::get_eksd_component_version "kubernetes" $ADDITIONAL_PAUSE_IMAGE_FROM)
 export ADDITIONAL_PAUSE_IMAGE=$ADDITIONAL_PAUSE_IMAGE_VERSION_BASE_URL/$ADDITIONAL_PAUSE_KUBERNETES_VERSION/bin/linux/amd64/pause.tar
-envsubst '$ADDITIONAL_PAUSE_IMAGE' \
-    < "$MAKE_ROOT/packer/config/additional_components.json.tmpl" \
-    > "$OUTPUT_CONFIGS/additional_components.json"
+env_and_envsubst '$ADDITIONAL_PAUSE_IMAGE' \
+    "$MAKE_ROOT/packer/config/additional_components.json.tmpl" \
+    "$OUTPUT_CONFIGS/additional_components.json"
 
 # Write kubernetes version and the eksd manifest url consumed to output directory
 mkdir -p $OVA_PATH
@@ -103,13 +116,13 @@ echo "$KUBERNETES_VERSION" > "$OVA_PATH"/KUBERNETES_VERSION
 export EKSD_MANIFEST_URL=$(build::eksd_releases::get_release_yaml_url $RELEASE_BRANCH)
 echo "$EKSD_MANIFEST_URL" > "$OVA_PATH"/EKSD_MANIFEST_URL
 
-envsubst '$CNI_VERSION:$ETCD_VERSION:$ETCD_SHA256:$ETCDADM_VERSION:$PAUSE_IMAGE:$CNI_HOST_DEVICE_SHA256' \
-    < "$MAKE_ROOT/packer/config/validate_goss_inline_vars.json.tmpl" \
-    > "$OUTPUT_CONFIGS/validate_goss_inline_vars.json"
+env_and_envsubst '$CNI_VERSION:$ETCD_VERSION:$ETCD_SHA256:$ETCDADM_VERSION:$PAUSE_IMAGE:$CNI_HOST_DEVICE_SHA256' \
+    "$MAKE_ROOT/packer/config/validate_goss_inline_vars.json.tmpl" \
+    "$OUTPUT_CONFIGS/validate_goss_inline_vars.json"
 
-envsubst '$EKSD_NAME' \
-    < "$MAKE_ROOT/packer/config/ovf_custom_properties.json.tmpl" \
-    > "$OUTPUT_CONFIGS/ovf_custom_properties.json"
+env_and_envsubst '$EKSD_NAME' \
+    "$MAKE_ROOT/packer/config/ovf_custom_properties.json.tmpl" \
+    "$OUTPUT_CONFIGS/ovf_custom_properties.json"
 
 # This is the IP address that Packer will create the server on to host the local
 # directory containing the kickstart config
@@ -133,6 +146,20 @@ if [ "$IMAGE_FORMAT" = "ova" ] && [ "$IMAGE_OS" = "redhat" ]; then
     fi
     export PACKER_HTTP_SERVER_IP=$(ip a l $ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
     rhel_ova_config_file="${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova/rhel-8.json"
+    echo "Setting boot_media_path for rhel config to $PACKER_HTTP_SERVER_IP"
     cat <<< $(jq --arg httpendpoint "http://$PACKER_HTTP_SERVER_IP:{{ .HTTPPort }}" \
              '.boot_media_path=$httpendpoint' $rhel_ova_config_file) > $rhel_ova_config_file
 fi
+
+# If the image format is AMI and our Packer config specifies a non-gp3 volume, then
+# remove the throughput field in the upstream Packer config since only gp3 supports
+# specifying throughput
+if [ "$IMAGE_FORMAT" = "ami" ]; then
+    volume_type="$(cat $MAKE_ROOT/packer/ami/ami.json | jq -r '.volume_type')"
+    if [[ $volume_type != "null" && $volume_type != "gp3" ]]; then
+        build::jq::update_in_place ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ami/packer.json "del(.builders[0].launch_block_device_mappings[].throughput)"
+    else
+        build::jq::update_in_place ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ami/packer.json '.builders[0].launch_block_device_mappings[].throughput = "{{ user `throughput` }}"'
+    fi
+fi
+
