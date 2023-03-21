@@ -302,7 +302,15 @@ func (r RealFileReader) ReadFile(filename string) ([]byte, error) {
 func readAndEncodeFile(filePath string, reader FileReader) (string, error) {
 	contents, err := reader.ReadFile(filePath)
 	if err == nil {
+		if string(contents) == "" {
+			return "", errors.New("empty contents")
+		}
 		return base64.StdEncoding.EncodeToString(contents), nil
 	}
 	return "", err
+}
+
+// isEmpty checks if passed sting is empty
+func isEmpty(str string) bool {
+	return len(str) == 0
 }

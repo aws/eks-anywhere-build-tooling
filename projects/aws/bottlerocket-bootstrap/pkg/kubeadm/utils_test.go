@@ -132,7 +132,7 @@ func TestReadKubeletTlsConfig(t *testing.T) {
 		mockReader               func(t *testing.T) FileReader
 	}{
 		{
-			testName:                 "skip config cert file missing missing",
+			testName:                 "skip config cert file missing",
 			expectedKubeletTlsConfig: nil,
 			mockReader: func(t *testing.T) FileReader {
 				return mockFileReader(func(filename string) ([]byte, error) {
@@ -140,13 +140,13 @@ func TestReadKubeletTlsConfig(t *testing.T) {
 					if filename == "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.crt" {
 						return nil, os.ErrNotExist
 					} else {
-						return nil, nil
+						return []byte("mock-key"), nil
 					}
 				})
 			},
 		},
 		{
-			testName:                 "skip config key file missing missing",
+			testName:                 "skip config key file missing",
 			expectedKubeletTlsConfig: nil,
 			mockReader: func(t *testing.T) FileReader {
 				return mockFileReader(func(filename string) ([]byte, error) {
@@ -154,13 +154,41 @@ func TestReadKubeletTlsConfig(t *testing.T) {
 					if filename == "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.key" {
 						return nil, os.ErrNotExist
 					} else {
-						return nil, nil
+						return []byte("mock-cert"), nil
 					}
 				})
 			},
 		},
 		{
-			testName:                 "success files present",
+			testName:                 "skip config cert file empty contents",
+			expectedKubeletTlsConfig: nil,
+			mockReader: func(t *testing.T) FileReader {
+				return mockFileReader(func(filename string) ([]byte, error) {
+					t.Helper()
+					if filename == "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.crt" {
+						return []byte{}, nil
+					} else {
+						return []byte("mock-key"), nil
+					}
+				})
+			},
+		},
+		{
+			testName:                 "skip config key file empty contents",
+			expectedKubeletTlsConfig: nil,
+			mockReader: func(t *testing.T) FileReader {
+				return mockFileReader(func(filename string) ([]byte, error) {
+					t.Helper()
+					if filename == "/.bottlerocket/rootfs/var/lib/kubeadm/pki/kubelet-serving.key" {
+						return []byte{}, nil
+					} else {
+						return []byte("mock-cert"), nil
+					}
+				})
+			},
+		},
+		{
+			testName:                 "success files present with contents",
 			expectedKubeletTlsConfig: &KubeletTlsConfig{KubeletServingCert: "bW9jay1jcnQ=", KubeletServingPrivateKey: "bW9jay1rZXk="},
 			mockReader: func(t *testing.T) FileReader {
 				return mockFileReader(func(filename string) ([]byte, error) {
