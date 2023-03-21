@@ -9,12 +9,11 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `autoscaler`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
-patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `cluster-autoscaler` for `linux/amd64 linux/arm64`
-_output/1-21/bin/autoscaler/linux-amd64/cluster-autoscaler: ## Build `_output/1-21/bin/autoscaler/linux-amd64/cluster-autoscaler`
-_output/1-21/bin/autoscaler/linux-arm64/cluster-autoscaler: ## Build `_output/1-21/bin/autoscaler/linux-arm64/cluster-autoscaler`
+_output/1-26/bin/autoscaler/linux-amd64/cluster-autoscaler: ## Build `_output/1-26/bin/autoscaler/linux-amd64/cluster-autoscaler`
+_output/1-26/bin/autoscaler/linux-arm64/cluster-autoscaler: ## Build `_output/1-26/bin/autoscaler/linux-arm64/cluster-autoscaler`
 
 ##@ Image Targets
 local-images: ## Builds `autoscaler/images/amd64` as oci tars for presumbit validation

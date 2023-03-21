@@ -29,16 +29,16 @@ kindnetd/images/push: ## Builds/pushes `kindnetd/images/push`
 kind-base/images/push: ## Builds/pushes `kind-base/images/push`
 
 ##@ Fetch Binary Targets
-_output/1-21/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/1-21/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/kubernetes/client`
-_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
-_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
-_output/1-21/dependencies/linux-amd64/eksd/cni-plugins: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/cni-plugins`
-_output/1-21/dependencies/linux-arm64/eksd/cni-plugins: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/cni-plugins`
-_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
-_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
-_output/1-21/dependencies/linux-amd64/eksd/etcd/etcd.tar.gz: ## Fetch `_output/1-21/dependencies/linux-amd64/eksd/etcd/etcd.tar.gz`
-_output/1-21/dependencies/linux-arm64/eksd/etcd/etcd.tar.gz: ## Fetch `_output/1-21/dependencies/linux-arm64/eksd/etcd/etcd.tar.gz`
+_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client`
+_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
+_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
+_output/1-26/dependencies/linux-amd64/eksd/cni-plugins: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/cni-plugins`
+_output/1-26/dependencies/linux-arm64/eksd/cni-plugins: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/cni-plugins`
+_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
+_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
+_output/1-26/dependencies/linux-amd64/eksd/etcd/etcd.tar.gz: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/etcd/etcd.tar.gz`
+_output/1-26/dependencies/linux-arm64/eksd/etcd/etcd.tar.gz: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/etcd/etcd.tar.gz`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
