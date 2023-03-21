@@ -1,10 +1,12 @@
-From d86e9701a57099d05748ab48f3cf2e5b4f9bedbc Mon Sep 17 00:00:00 2001
+From 30a1d68ff0795caa5ed32ac766af75fd8eb313d5 Mon Sep 17 00:00:00 2001
 From: jonahjon <jonahjones094@gmail.com>
-Date: Tue, 22 Nov 2022 11:29:05 -0600
-Subject: [PATCH] packages-patch
+Date: Mon, 20 Mar 2023 19:28:28 -0500
+Subject: [PATCH] patching_helm_charts_packages
 
 Signed-off-by: jonahjon <jonahjones094@gmail.com>
 ---
+ Makefile                                      |   12 +-
+ build-aux/prelude_go.mk                       |    2 +-
  charts/crds/.helmignore                       |   23 +
  charts/crds/Chart.yaml                        |    6 +
  charts/crds/README.md                         |   11 +
@@ -14,7 +16,7 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  charts/crds/templates/namespace.yaml          |    6 +
  charts/crds/values.yaml                       |   11 +
  charts/emissary-ingress/.gitignore            |    4 -
- .../{Chart.yaml.in => Chart.yaml}             |   31 +-
+ .../{Chart.yaml.in => Chart.yaml}             |   33 +-
  charts/emissary-ingress/OWNERS                |   10 -
  .../emissary-ingress/ci.in/01-psp-values.yaml |   41 -
  .../emissary-ingress/ci.in/06-hpa-values.yaml |    9 -
@@ -34,9 +36,9 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  .../ci.in/tests/manifests/tls.yaml            |   18 -
  charts/emissary-ingress/readme.tpl            |   87 -
  charts/emissary-ingress/templates/NOTES.txt   |   14 +-
- .../emissary-ingress/templates/_helpers.tpl   |   33 +-
+ .../emissary-ingress/templates/_helpers.tpl   |   17 +-
  .../templates/admin-service.yaml              |    2 +-
- .../templates/ambassador-agent.yaml           |  284 --
+ .../templates/ambassador-agent.yaml           |  270 --
  charts/emissary-ingress/templates/config.yaml |    2 +-
  .../templates/deployment-canary.yaml          |    4 +-
  .../templates/deployment.yaml                 |    6 +-
@@ -53,8 +55,8 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  .../emissary-ingress/templates/service.yaml   |    4 +-
  .../templates/serviceaccount.yaml             |    2 +-
  .../templates/servicemonitor.yaml             |    4 +-
- .../{values.yaml.in => values.yaml}           |   37 +-
- 49 files changed, 4265 insertions(+), 720 deletions(-)
+ .../{values.yaml.in => values.yaml}           |   46 +-
+ 51 files changed, 4275 insertions(+), 705 deletions(-)
  create mode 100644 charts/crds/.helmignore
  create mode 100644 charts/crds/Chart.yaml
  create mode 100644 charts/crds/README.md
@@ -63,7 +65,7 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  create mode 100644 charts/crds/templates/crds.yaml
  create mode 100644 charts/crds/templates/namespace.yaml
  create mode 100644 charts/crds/values.yaml
- rename charts/emissary-ingress/{Chart.yaml.in => Chart.yaml} (56%)
+ rename charts/emissary-ingress/{Chart.yaml.in => Chart.yaml} (54%)
  delete mode 100644 charts/emissary-ingress/OWNERS
  delete mode 100644 charts/emissary-ingress/ci.in/01-psp-values.yaml
  delete mode 100644 charts/emissary-ingress/ci.in/06-hpa-values.yaml
@@ -83,8 +85,44 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  delete mode 100644 charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
  delete mode 100644 charts/emissary-ingress/readme.tpl
  delete mode 100644 charts/emissary-ingress/templates/ambassador-agent.yaml
- rename charts/emissary-ingress/{values.yaml.in => values.yaml} (92%)
+ rename charts/emissary-ingress/{values.yaml.in => values.yaml} (90%)
 
+diff --git a/Makefile b/Makefile
+index 8a2157532..d9bf2d4f6 100644
+--- a/Makefile
++++ b/Makefile
+@@ -19,12 +19,12 @@ _go-version/deps = docker/base-python/Dockerfile
+ _go-version/cmd = sed -En 's,.*https://dl\.google\.com/go/go([0-9a-z.-]*)\.linux-amd64\.tar\.gz.*,\1,p' < $(_go-version/deps)
+ ifneq ($(MAKECMDGOALS),$(OSS_HOME)/build-aux/go-version.txt)
+   $(call _prelude.go.ensure,$(shell $(_go-version/cmd)))
+-  ifneq ($(filter $(shell go env GOROOT),$(subst :, ,$(shell go env GOPATH))),)
+-    $(error Your $$GOPATH (where *your* Go stuff goes) and $$GOROOT (where Go *itself* is installed) are both set to the same directory ($(shell go env GOROOT)); it is remarkable that it has not blown up catastrophically before now)
+-  endif
+-  ifneq ($(foreach gopath,$(subst :, ,$(shell go env GOPATH)),$(filter $(gopath)/%,$(CURDIR))),)
+-    $(error Your emissary.git checkout is inside of your $$GOPATH ($(shell go env GOPATH)); Emissary-ingress uses Go modules and so GOPATH need not be pointed at it (in a post-modules world, the only role of GOPATH is to store the module download cache); and indeed some of the Kubernetes tools will get confused if GOPATH is pointed at it)
+-  endif
++#   ifneq ($(filter $(shell go env GOROOT),$(subst :, ,$(shell go env GOPATH))),)
++#     $(error Your $$GOPATH (where *your* Go stuff goes) and $$GOROOT (where Go *itself* is installed) are both set to the same directory ($(shell go env GOROOT)); it is remarkable that it has not blown up catastrophically before now)
++#   endif
++#   ifneq ($(foreach gopath,$(subst :, ,$(shell go env GOPATH)),$(filter $(gopath)/%,$(CURDIR))),)
++#     $(error Your emissary.git checkout is inside of your $$GOPATH ($(shell go env GOPATH)); Emissary-ingress uses Go modules and so GOPATH need not be pointed at it (in a post-modules world, the only role of GOPATH is to store the module download cache); and indeed some of the Kubernetes tools will get confused if GOPATH is pointed at it)
++#   endif
+ 
+   VERSION := $(or $(VERSION),$(shell go run ./tools/src/goversion))
+   $(if $(filter v3.%,$(VERSION)),\
+diff --git a/build-aux/prelude_go.mk b/build-aux/prelude_go.mk
+index 9547b2ca7..7de3d3244 100644
+--- a/build-aux/prelude_go.mk
++++ b/build-aux/prelude_go.mk
+@@ -75,7 +75,7 @@ _prelude.go.VERSION.ge = $(call _prelude.go.VERSION._ge,$(call _prelude.go.VERSI
+ #
+ # Evaluates to $(TRUE) if `go` is >= the specified version, $(FALSE)
+ # otherwise.
+-_prelude.go.VERSION.HAVE = $(if $(_prelude.go.HAVE),$(call _prelude.go.VERSION.ge,$(_prelude.go.VERSION),$1))
++_prelude.go.VERSION.HAVE = $(TRUE)
+ 
+ #
+ # Building Go programs for use by build-aux
 diff --git a/charts/crds/.helmignore b/charts/crds/.helmignore
 new file mode 100644
 index 000000000..0e8a0eb36
@@ -116,15 +154,15 @@ index 000000000..0e8a0eb36
 +.vscode/
 diff --git a/charts/crds/Chart.yaml b/charts/crds/Chart.yaml
 new file mode 100644
-index 000000000..5b5c4b56a
+index 000000000..9b2691f37
 --- /dev/null
 +++ b/charts/crds/Chart.yaml
 @@ -0,0 +1,6 @@
 +apiVersion: v2
-+appVersion: v3.3.0
++appVersion: v3.5.1
 +description: Emissary CRDs
 +type: application
-+version: 3.3.0-cbf68a7dd53dda13c681af3e19660a5605050839
++version: 3.5.1-d0c301dec3634d263f8957745c8557a39caf8204
 +name: crds
 diff --git a/charts/crds/README.md b/charts/crds/README.md
 new file mode 100644
@@ -4352,16 +4390,17 @@ index d19c5dc9a..42b472400 100644
  /README.md
  
 diff --git a/charts/emissary-ingress/Chart.yaml.in b/charts/emissary-ingress/Chart.yaml
-similarity index 56%
+similarity index 54%
 rename from charts/emissary-ingress/Chart.yaml.in
 rename to charts/emissary-ingress/Chart.yaml
-index b974e5198..82c14cc03 100644
+index b974e5198..4ba0ec57d 100644
 --- a/charts/emissary-ingress/Chart.yaml.in
 +++ b/charts/emissary-ingress/Chart.yaml
 @@ -1,13 +1,8 @@
- apiVersion: v1
+-apiVersion: v1
 -appVersion: @version@
-+appVersion: v3.3.0
++apiVersion: v2
++appVersion: 3.5.1
  description: A Helm chart for Emissary Ingress
 -name: emissary-ingress
 -version: @chartVersion@
@@ -4399,7 +4438,7 @@ index b974e5198..82c14cc03 100644
 +sources:
 +- https://github.com/datawire/ambassador
 +- https://github.com/prometheus/statsd_exporter
-+version: 3.3.0-cbf68a7dd53dda13c681af3e19660a5605050839
++version: 3.5.1-d0c301dec3634d263f8957745c8557a39caf8204
 diff --git a/charts/emissary-ingress/OWNERS b/charts/emissary-ingress/OWNERS
 deleted file mode 100644
 index 42543ecf6..000000000
@@ -4862,7 +4901,7 @@ index dbcfc7c93..b8ecadd70 100644
    kubectl port-forward $POD_NAME 8080:80
  {{- end }}
 diff --git a/charts/emissary-ingress/templates/_helpers.tpl b/charts/emissary-ingress/templates/_helpers.tpl
-index 78dda417b..23bd122ef 100644
+index 35bb75791..23bd122ef 100644
 --- a/charts/emissary-ingress/templates/_helpers.tpl
 +++ b/charts/emissary-ingress/templates/_helpers.tpl
 @@ -78,18 +78,6 @@ disabled if fullImageOverride is present
@@ -4884,32 +4923,15 @@ index 78dda417b..23bd122ef 100644
  {{/*
  Create chart name and version as used by the chart label.
  */}}
-@@ -126,22 +114,7 @@ Define the http port of the Ambassador service
+@@ -125,3 +113,8 @@ Define the http port of the Ambassador service
  {{- end -}}
  {{- end -}}
- 
--{{/*
--Set the image that should be used for the agent.
--Use agent.repository and agent.tag if present,
--Then use fullImageOverride if present,
--Then if the image repository is explicitly set, use "repository:image"
--*/}}
--{{- define "agent.image" -}}
--
--{{- if .Values.agent.image.repository -}}
--    {{- printf "%s:%s" .Values.agent.image.repository .Values.agent.image.tag -}}
--{{- else if .Values.image.fullImageOverride -}}
--    {{- .Values.image.fullImageOverride }}
--{{- else if hasKey .Values.image "repository" -}}
--    {{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
--{{- else -}}
--    {{- printf "%s:%s" "docker.io/emissaryingress/emissary" .Values.image.tag -}}
--{{- end -}}
--
+ {{- end -}}
++
 +{{/* Generate image repository path. */}}
 +{{- define "image.repository.path" -}}
 +{{- .repository }}@{{ .digest -}}
- {{- end -}}
++{{- end -}}
 diff --git a/charts/emissary-ingress/templates/admin-service.yaml b/charts/emissary-ingress/templates/admin-service.yaml
 index 77f628459..6b32df2e8 100644
 --- a/charts/emissary-ingress/templates/admin-service.yaml
@@ -4925,31 +4947,11 @@ index 77f628459..6b32df2e8 100644
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/ambassador-agent.yaml b/charts/emissary-ingress/templates/ambassador-agent.yaml
 deleted file mode 100644
-index 1c06cd360..000000000
+index 4196638a9..000000000
 --- a/charts/emissary-ingress/templates/ambassador-agent.yaml
 +++ /dev/null
-@@ -1,284 +0,0 @@
+@@ -1,270 +0,0 @@
 -{{- if .Values.agent.enabled }}
--{{- $allowAgent := false -}}
--
--  {{- /* This next bit is ugly. */ -}}
--  {{- /* Case 1: "fullImageOverride" means don't bother checking the tag. */ -}}
--  {{- /* Case 2: Otherwise, if it's not a semver-style version number,    */ -}}
--  {{- /*         assume we have a power user and turn the agent on.       */ -}}
--  {{- /* Case 3: Otherwise, it's OSS and we need at least 1.13.0.         */ -}}
--
--{{- if .Values.image.fullImageOverride }}
--  {{- /* Case 1 */ -}}
--  {{- $allowAgent = true }}
--{{- else if not (regexMatch "^\\d+\\.\\d+\\.\\d+$" .Values.image.tag ) }}
--  {{- /* Case 2 above: power user */ -}}
--  {{- $allowAgent = true }}
--{{- else if ne (semver "1.13.0" | (semver .Values.image.tag).Compare) -1 }}
--  {{- /* Case 3 above: OSS 1.13.0+ */ -}}
--  {{- $allowAgent = true }}
--{{- end }}
--
--{{- if $allowAgent }}
 ----
 -apiVersion: v1
 -kind: ServiceAccount
@@ -5154,15 +5156,22 @@ index 1c06cd360..000000000
 -        {{- include "ambassador.labels" . | nindent 8 }}
 -        product: aes
 -    spec:
+-      {{- with .Values.agent.podSecurityContext }}
+-      securityContext:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
 -      serviceAccountName: {{ include "ambassador.fullname" . }}-agent
 -      containers:
 -      - name: agent
--        image: {{ include "agent.image" . }}
--        imagePullPolicy: {{ .Values.image.pullPolicy }}
--        command: [ "agent" ]
+-        image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+-        imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
 -        ports:
 -          - containerPort: 8080
 -            name: http
+-        {{- with .Values.agent.containerSecurityContext }}
+-        securityContext:
+-          {{- toYaml . | nindent 12 }}
+-        {{- end }}
 -        env:
 -        - name: AGENT_NAMESPACE
 -          valueFrom:
@@ -5212,7 +5221,6 @@ index 1c06cd360..000000000
 -    app.kubernetes.io/name: {{ include "ambassador.fullname" . }}-agent
 -    app.kubernetes.io/instance: {{ .Release.Name }}
 -{{- end }}
--{{- end }}
 diff --git a/charts/emissary-ingress/templates/config.yaml b/charts/emissary-ingress/templates/config.yaml
 index cd6184dde..4ba1c911a 100644
 --- a/charts/emissary-ingress/templates/config.yaml
@@ -5227,7 +5235,7 @@ index cd6184dde..4ba1c911a 100644
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/deployment-canary.yaml b/charts/emissary-ingress/templates/deployment-canary.yaml
-index c166d4fb0..604f47d24 100644
+index 4c8094f14..2fa451574 100644
 --- a/charts/emissary-ingress/templates/deployment-canary.yaml
 +++ b/charts/emissary-ingress/templates/deployment-canary.yaml
 @@ -8,7 +8,7 @@ metadata:
@@ -5249,7 +5257,7 @@ index c166d4fb0..604f47d24 100644
            imagePullPolicy: {{ .Values.image.pullPolicy }}
            ports:
 diff --git a/charts/emissary-ingress/templates/deployment.yaml b/charts/emissary-ingress/templates/deployment.yaml
-index 2d06c8127..0eb2745f0 100644
+index 6571eef94..e6d6f75d1 100644
 --- a/charts/emissary-ingress/templates/deployment.yaml
 +++ b/charts/emissary-ingress/templates/deployment.yaml
 @@ -3,7 +3,7 @@ apiVersion: v1
@@ -5328,10 +5336,10 @@ index 033051cc8..671c2444e 100644
    port: 8080
    protocol: HTTP
 diff --git a/charts/emissary-ingress/templates/module.yaml b/charts/emissary-ingress/templates/module.yaml
-index a13d45996..a78f27dc4 100644
+index 619f9859b..8a66c6a60 100644
 --- a/charts/emissary-ingress/templates/module.yaml
 +++ b/charts/emissary-ingress/templates/module.yaml
-@@ -3,7 +3,7 @@ apiVersion: getambassador.io/v2
+@@ -3,7 +3,7 @@ apiVersion: getambassador.io/v3alpha1
  kind: Module
  metadata:
    name: ambassador
@@ -5519,10 +5527,10 @@ index b2c8122a1..8f33136cf 100644
      matchLabels:
        service: ambassador-admin
 diff --git a/charts/emissary-ingress/values.yaml.in b/charts/emissary-ingress/values.yaml
-similarity index 92%
+similarity index 90%
 rename from charts/emissary-ingress/values.yaml.in
 rename to charts/emissary-ingress/values.yaml
-index bb812d760..9e314c2f4 100644
+index 7c509da69..94e66a04b 100644
 --- a/charts/emissary-ingress/values.yaml.in
 +++ b/charts/emissary-ingress/values.yaml
 @@ -2,11 +2,11 @@
@@ -5540,7 +5548,7 @@ index bb812d760..9e314c2f4 100644
  # If true, Create a DaemonSet. By default Deployment controller will be created
  daemonSet: false
  # If true, Create a bare Pod instead of a Deployment or DaemonSet; for
-@@ -143,11 +143,13 @@ security:
+@@ -148,11 +148,13 @@ security:
      #   runAsUser:
      #     rule: MustRunAsNonRoot
  
@@ -5558,7 +5566,7 @@ index bb812d760..9e314c2f4 100644
    # Pod container image pull policy
    pullPolicy: IfNotPresent
  
-@@ -348,7 +350,6 @@ resolvers: # +doc-gen:break
+@@ -357,7 +359,6 @@ resolvers: # +doc-gen:break
  module:
    diagnostics:
      enabled: false
@@ -5566,7 +5574,7 @@ index bb812d760..9e314c2f4 100644
  
  # DEPRECATED: Enabling the prometheus exporter creates a sidecar and configures ambassador to use it
  #
-@@ -384,26 +385,6 @@ prometheusExporter: # +doc-gen:break
+@@ -393,35 +394,6 @@ prometheusExporter: # +doc-gen:break
  # securityContext:
  #   runAsUser: 8888
  
@@ -5587,8 +5595,17 @@ index bb812d760..9e314c2f4 100644
 -  createArgoRBAC: true
 -  image:
 -    # Leave blank to use image.repository and image.tag
--    tag: 3.1.0
--    repository: docker.io/emissaryingress/emissary
+-    tag: 1.0.3
+-    repository: docker.io/ambassador/ambassador-agent
+-    pullPolicy: IfNotPresent
+-
+-  podSecurityContext: {}
+-  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#podsecuritycontext-v1-core
+-  #  runAsUser: 8888
+-
+-  containerSecurityContext: {}
+-  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#securitycontext-v1-core
+-  # allowPrivilegeEscalation: false
 -
  deploymentTool: ''
  
