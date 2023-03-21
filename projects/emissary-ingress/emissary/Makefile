@@ -34,7 +34,7 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(AMBASSADOR_VERSION_TARGET)
 # do not pass our makeflags down to emissary make since there will be unncessary warnings
 $(AMBASSADOR_VERSION_TARGET): MAKEFLAGS=
 $(AMBASSADOR_VERSION_TARGET):
-	@export VERSION="v3.3.0" && export CHART_VERSION=$(CHART_VERSION) && cd emissary && GOPATH=/var && make python/ambassador.version
+	@export VERSION="v3.5.1" && export CHART_VERSION=$(CHART_VERSION) && cd emissary && GOPATH=/var && make python/ambassador.version
 
 # Build helm chart
 .PHONY: helm/build
