@@ -20,7 +20,7 @@ EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
 # they will not exist in the final eks-a bundle
 HAS_S3_ARTIFACTS?=true
 
-BUILDSPECS=projects/$(COMPONENT)/buildspecs/binaries.yml projects/$(COMPONENT)/buildspecs/images.yml
+BUILDSPECS=buildspecs/binaries.yml projects/$(COMPONENT)/buildspecs/images.yml
 CHECKSUMS_BUILDSPECS=buildspecs/checksums-buildspec.yml
 BUILDSPEC_1_VARS_KEYS=BINARY_PLATFORMS
 BUILDSPEC_1_VARS_VALUES=BINARY_PLATFORMS
@@ -87,6 +87,7 @@ fake-binary-prereqs: $(GO_MOD_DOWNLOAD_TARGETS)
 	mkdir -p $(CGO_SOURCE)/linux-amd64/usr/lib64 $(CGO_SOURCE)/linux-arm64/usr/lib64
 	touch $(CGO_SOURCE)/linux-amd64/usr/lib64/libgit2.so $(CGO_SOURCE)/linux-arm64/usr/lib64/libgit2.so
 	
+
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

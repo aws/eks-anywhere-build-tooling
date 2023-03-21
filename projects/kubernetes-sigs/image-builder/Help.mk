@@ -18,10 +18,10 @@ image-builder/images/amd64: ## Builds/pushes `image-builder/images/amd64`
 image-builder/images/push: ## Builds/pushes `image-builder/images/push`
 
 ##@ Fetch Binary Targets
-_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
-_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
-_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-21/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
-_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-21/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
+_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
+_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
+_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
+_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
@@ -42,6 +42,6 @@ patch-for-dep-update: ## After bumping dep in go.mod file and updating vendor, g
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `release-image-build-on-metal-ubuntu fake-ubuntu.gz _output/tar/1-21/raw/ubuntu/ubuntu.gz upload-artifacts-raw download-bottlerocket-raw _output/tar/1-21/raw/bottlerocket/bottlerocket.img.gz upload-bottlerocket-raw build-ami-ubuntu-2004 download-bottlerocket-ami _output/tar/1-21/ami/bottlerocket/bottlerocket.img.gz upload-bottlerocket-ami setup-packer-configs-ova  fake-ubuntu.ova _output/tar/1-21/ova/ubuntu/ubuntu.ova  upload-artifacts-ova download-bottlerocket-ova _output/tar/1-21/ova/bottlerocket/bottlerocket.ova upload-bottlerocket-ova`
+build: ## Called via prow presubmit, calls `release-image-build-on-metal-ubuntu fake-ubuntu.gz _output/tar/1-26/raw/ubuntu/ubuntu.gz upload-artifacts-raw build-ami-ubuntu-2004 setup-packer-configs-ova  fake-ubuntu.ova _output/tar/1-26/ova/ubuntu/ubuntu.ova  upload-artifacts-ova`
 release: ## Called via prow postsubmit + release jobs, calls `release-image-build-on-metal-ubuntu upload-artifacts-raw`
 ########### END GENERATED ###########################

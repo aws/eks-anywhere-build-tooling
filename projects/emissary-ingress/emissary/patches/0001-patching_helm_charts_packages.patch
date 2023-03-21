@@ -1,20 +1,22 @@
-From d86e9701a57099d05748ab48f3cf2e5b4f9bedbc Mon Sep 17 00:00:00 2001
+From 3b69ec490ba07ee10c2ba33d218bf96f5defe46b Mon Sep 17 00:00:00 2001
 From: jonahjon <jonahjones094@gmail.com>
-Date: Tue, 22 Nov 2022 11:29:05 -0600
-Subject: [PATCH] packages-patch
+Date: Tue, 21 Mar 2023 10:31:50 -0500
+Subject: [PATCH] patching_helm_charts_packages
 
 Signed-off-by: jonahjon <jonahjones094@gmail.com>
 ---
+ Makefile                                      |   12 +-
+ build-aux/prelude_go.mk                       |    2 +-
  charts/crds/.helmignore                       |   23 +
  charts/crds/Chart.yaml                        |    6 +
  charts/crds/README.md                         |   11 +
  charts/crds/templates/_helpers.tpl            |    4 +
- charts/crds/templates/apiext.yaml             |  180 +
- charts/crds/templates/crds.yaml               | 3965 +++++++++++++++++
+ charts/crds/templates/apiext.yaml             |  186 +
+ charts/crds/templates/crds.yaml               | 5257 +++++++++++++++++
  charts/crds/templates/namespace.yaml          |    6 +
  charts/crds/values.yaml                       |   11 +
  charts/emissary-ingress/.gitignore            |    4 -
- .../{Chart.yaml.in => Chart.yaml}             |   31 +-
+ .../{Chart.yaml.in => Chart.yaml}             |   33 +-
  charts/emissary-ingress/OWNERS                |   10 -
  .../emissary-ingress/ci.in/01-psp-values.yaml |   41 -
  .../emissary-ingress/ci.in/06-hpa-values.yaml |    9 -
@@ -34,9 +36,9 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  .../ci.in/tests/manifests/tls.yaml            |   18 -
  charts/emissary-ingress/readme.tpl            |   87 -
  charts/emissary-ingress/templates/NOTES.txt   |   14 +-
- .../emissary-ingress/templates/_helpers.tpl   |   33 +-
+ .../emissary-ingress/templates/_helpers.tpl   |   17 +-
  .../templates/admin-service.yaml              |    2 +-
- .../templates/ambassador-agent.yaml           |  284 --
+ .../templates/ambassador-agent.yaml           |  270 -
  charts/emissary-ingress/templates/config.yaml |    2 +-
  .../templates/deployment-canary.yaml          |    4 +-
  .../templates/deployment.yaml                 |    6 +-
@@ -53,8 +55,8 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  .../emissary-ingress/templates/service.yaml   |    4 +-
  .../templates/serviceaccount.yaml             |    2 +-
  .../templates/servicemonitor.yaml             |    4 +-
- .../{values.yaml.in => values.yaml}           |   37 +-
- 49 files changed, 4265 insertions(+), 720 deletions(-)
+ .../{values.yaml.in => values.yaml}           |   46 +-
+ 51 files changed, 5573 insertions(+), 705 deletions(-)
  create mode 100644 charts/crds/.helmignore
  create mode 100644 charts/crds/Chart.yaml
  create mode 100644 charts/crds/README.md
@@ -63,7 +65,7 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  create mode 100644 charts/crds/templates/crds.yaml
  create mode 100644 charts/crds/templates/namespace.yaml
  create mode 100644 charts/crds/values.yaml
- rename charts/emissary-ingress/{Chart.yaml.in => Chart.yaml} (56%)
+ rename charts/emissary-ingress/{Chart.yaml.in => Chart.yaml} (54%)
  delete mode 100644 charts/emissary-ingress/OWNERS
  delete mode 100644 charts/emissary-ingress/ci.in/01-psp-values.yaml
  delete mode 100644 charts/emissary-ingress/ci.in/06-hpa-values.yaml
@@ -83,8 +85,44 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  delete mode 100644 charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
  delete mode 100644 charts/emissary-ingress/readme.tpl
  delete mode 100644 charts/emissary-ingress/templates/ambassador-agent.yaml
- rename charts/emissary-ingress/{values.yaml.in => values.yaml} (92%)
+ rename charts/emissary-ingress/{values.yaml.in => values.yaml} (90%)
 
+diff --git a/Makefile b/Makefile
+index 8a2157532..d9bf2d4f6 100644
+--- a/Makefile
++++ b/Makefile
+@@ -19,12 +19,12 @@ _go-version/deps = docker/base-python/Dockerfile
+ _go-version/cmd = sed -En 's,.*https://dl\.google\.com/go/go([0-9a-z.-]*)\.linux-amd64\.tar\.gz.*,\1,p' < $(_go-version/deps)
+ ifneq ($(MAKECMDGOALS),$(OSS_HOME)/build-aux/go-version.txt)
+   $(call _prelude.go.ensure,$(shell $(_go-version/cmd)))
+-  ifneq ($(filter $(shell go env GOROOT),$(subst :, ,$(shell go env GOPATH))),)
+-    $(error Your $$GOPATH (where *your* Go stuff goes) and $$GOROOT (where Go *itself* is installed) are both set to the same directory ($(shell go env GOROOT)); it is remarkable that it has not blown up catastrophically before now)
+-  endif
+-  ifneq ($(foreach gopath,$(subst :, ,$(shell go env GOPATH)),$(filter $(gopath)/%,$(CURDIR))),)
+-    $(error Your emissary.git checkout is inside of your $$GOPATH ($(shell go env GOPATH)); Emissary-ingress uses Go modules and so GOPATH need not be pointed at it (in a post-modules world, the only role of GOPATH is to store the module download cache); and indeed some of the Kubernetes tools will get confused if GOPATH is pointed at it)
+-  endif
++#   ifneq ($(filter $(shell go env GOROOT),$(subst :, ,$(shell go env GOPATH))),)
++#     $(error Your $$GOPATH (where *your* Go stuff goes) and $$GOROOT (where Go *itself* is installed) are both set to the same directory ($(shell go env GOROOT)); it is remarkable that it has not blown up catastrophically before now)
++#   endif
++#   ifneq ($(foreach gopath,$(subst :, ,$(shell go env GOPATH)),$(filter $(gopath)/%,$(CURDIR))),)
++#     $(error Your emissary.git checkout is inside of your $$GOPATH ($(shell go env GOPATH)); Emissary-ingress uses Go modules and so GOPATH need not be pointed at it (in a post-modules world, the only role of GOPATH is to store the module download cache); and indeed some of the Kubernetes tools will get confused if GOPATH is pointed at it)
++#   endif
+ 
+   VERSION := $(or $(VERSION),$(shell go run ./tools/src/goversion))
+   $(if $(filter v3.%,$(VERSION)),\
+diff --git a/build-aux/prelude_go.mk b/build-aux/prelude_go.mk
+index 9547b2ca7..7de3d3244 100644
+--- a/build-aux/prelude_go.mk
++++ b/build-aux/prelude_go.mk
+@@ -75,7 +75,7 @@ _prelude.go.VERSION.ge = $(call _prelude.go.VERSION._ge,$(call _prelude.go.VERSI
+ #
+ # Evaluates to $(TRUE) if `go` is >= the specified version, $(FALSE)
+ # otherwise.
+-_prelude.go.VERSION.HAVE = $(if $(_prelude.go.HAVE),$(call _prelude.go.VERSION.ge,$(_prelude.go.VERSION),$1))
++_prelude.go.VERSION.HAVE = $(TRUE)
+ 
+ #
+ # Building Go programs for use by build-aux
 diff --git a/charts/crds/.helmignore b/charts/crds/.helmignore
 new file mode 100644
 index 000000000..0e8a0eb36
@@ -116,15 +154,15 @@ index 000000000..0e8a0eb36
 +.vscode/
 diff --git a/charts/crds/Chart.yaml b/charts/crds/Chart.yaml
 new file mode 100644
-index 000000000..5b5c4b56a
+index 000000000..9b2691f37
 --- /dev/null
 +++ b/charts/crds/Chart.yaml
 @@ -0,0 +1,6 @@
 +apiVersion: v2
-+appVersion: v3.3.0
++appVersion: v3.5.1
 +description: Emissary CRDs
 +type: application
-+version: 3.3.0-cbf68a7dd53dda13c681af3e19660a5605050839
++version: 3.5.1-d0c301dec3634d263f8957745c8557a39caf8204
 +name: crds
 diff --git a/charts/crds/README.md b/charts/crds/README.md
 new file mode 100644
@@ -155,10 +193,10 @@ index 000000000..084b6db5f
 +{{- end -}}
 diff --git a/charts/crds/templates/apiext.yaml b/charts/crds/templates/apiext.yaml
 new file mode 100644
-index 000000000..e82616992
+index 000000000..cee6c1874
 --- /dev/null
 +++ b/charts/crds/templates/apiext.yaml
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,186 @@
 +################################################################################
 +# Cluster permissions                                                          #
 +################################################################################
@@ -327,6 +365,12 @@ index 000000000..e82616992
 +              containerPort: 8080
 +            - name: https
 +              containerPort: 8443
++          startupProbe:
++            httpGet:
++              path: /probes/live
++              port: 8080
++            failureThreshold: 10
++            periodSeconds: 3
 +          livenessProbe:
 +            httpGet:
 +              scheme: HTTP
@@ -341,10 +385,10 @@ index 000000000..e82616992
 +      {{- end }}
 diff --git a/charts/crds/templates/crds.yaml b/charts/crds/templates/crds.yaml
 new file mode 100644
-index 000000000..1b71b25ed
+index 000000000..a9c12386d
 --- /dev/null
 +++ b/charts/crds/templates/crds.yaml
-@@ -0,0 +1,3965 @@
+@@ -0,0 +1,5257 @@
 +# GENERATED FILE: edits made by hand will not be preserved.
 +---
 +apiVersion: apiextensions.k8s.io/v1
@@ -379,6 +423,104 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: AuthService is the Schema for the authservices API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: AuthServiceSpec defines the desired state of AuthService
++            properties:
++              add_auth_headers:
++                additionalProperties:
++                  type: string
++                type: object
++              add_linkerd_headers:
++                type: boolean
++              allow_request_body:
++                type: boolean
++              allowed_authorization_headers:
++                items:
++                  type: string
++                type: array
++              allowed_request_headers:
++                items:
++                  type: string
++                type: array
++              auth_service:
++                type: string
++              failure_mode_allow:
++                type: boolean
++              include_body:
++                properties:
++                  allow_partial:
++                    type: boolean
++                  max_bytes:
++                    description: These aren't pointer types because they are required.
++                    type: integer
++                required:
++                - allow_partial
++                - max_bytes
++                type: object
++              path_prefix:
++                type: string
++              proto:
++                enum:
++                - http
++                - grpc
++                type: string
++              protocol_version:
++                enum:
++                - v2
++                - v3
++                type: string
++              status_on_error:
++                description: Why isn't this just an int??
++                properties:
++                  code:
++                    type: integer
++                type: object
++              timeout_ms:
++                type: integer
++              v3CircuitBreakers:
++                items:
++                  properties:
++                    max_connections:
++                      type: integer
++                    max_pending_requests:
++                      type: integer
++                    max_requests:
++                      type: integer
++                    max_retries:
++                      type: integer
++                    priority:
++                      enum:
++                      - default
++                      - high
++                      type: string
++                  type: object
++                type: array
++              v3StatsName:
++                type: string
++            required:
++            - auth_service
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -639,14 +781,6 @@ index 000000000..1b71b25ed
 +        type: object
 +    served: true
 +    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: AuthService is the Schema for the authservices API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
-+    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
 +kind: CustomResourceDefinition
@@ -680,6 +814,37 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: ConsulResolver is the Schema for the ConsulResolver API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: ConsulResolver tells Ambassador to use Consul to resolve
++              services. In addition to the AmbassadorID, it needs information about
++              which Consul server and DC to use.
++            properties:
++              address:
++                type: string
++              datacenter:
++                type: string
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -749,14 +914,6 @@ index 000000000..1b71b25ed
 +            type: object
 +        type: object
 +    served: true
-+    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: ConsulResolver is the Schema for the ConsulResolver API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
 +    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
@@ -791,6 +948,119 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: "DevPortal is the Schema for the DevPortals API \n DevPortal
++          resources specify the `what` and `how` is shown in a DevPortal: \n  1. `what`
++          is in a DevPortal can be controlled with \n     - a `selector`, that can
++          be used for filtering `Mappings`. \n     - a `docs` listing of (services,
++          url) \n  2. `how` is a pointer to some `contents` (a checkout of a Git repository
++          \    with go-templates/markdown/css). \n Multiple `DevPortal`s can exist
++          in the cluster, and the Dev Portal server will show them at different endpoints.
++          A `DevPortal` resource with a special name, `ambassador`, will be used for
++          configuring the default Dev Portal (served at `/docs/` by default)."
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: DevPortalSpec defines the desired state of DevPortal
++            properties:
++              content:
++                description: Content specifies where the content shown in the DevPortal
++                  come from
++                properties:
++                  branch:
++                    type: string
++                  dir:
++                    type: string
++                  url:
++                    type: string
++                type: object
++              default:
++                description: Default must be true when this is the default DevPortal
++                type: boolean
++              docs:
++                description: Docs is a static docs definition
++                items:
++                  description: 'DevPortalDocsSpec is a static documentation definition:
++                    instead of using a Selector for finding documentation for services,
++                    users can provide a static list of <service>:<URL> tuples. These
++                    services will be shown in the Dev Portal with the documentation
++                    obtained from this URL.'
++                  properties:
++                    service:
++                      description: Service is the service being documented
++                      type: string
++                    timeout_ms:
++                      description: Timeout specifies the amount of time devportal
++                        will wait for the downstream service to report an openapi
++                        spec back
++                      type: integer
++                    url:
++                      description: URL is the URL used for obtaining docs
++                      type: string
++                  type: object
++                type: array
++              naming_scheme:
++                description: Describes how to display "services" in the DevPortal.
++                  Default namespace.name
++                enum:
++                - namespace.name
++                - name.prefix
++                type: string
++              preserve_servers:
++                description: Configures this DevPortal to use server definitions from
++                  the openAPI doc instead of rewriting them based on the url used
++                  for the connection.
++                type: boolean
++              search:
++                description: DevPortalSearchSpec allows configuration over search
++                  functionality for the DevPortal
++                properties:
++                  enabled:
++                    type: boolean
++                  type:
++                    description: 'Type of search. "title-only" does a fuzzy search
++                      over openapi and page titles "all-content" will fuzzy search
++                      over all openapi and page content. "title-only" is the default.
++                      warning:  using all-content may incur a larger memory footprint'
++                    enum:
++                    - title-only
++                    - all-content
++                    type: string
++                type: object
++              selector:
++                description: Selector is used for choosing what is shown in the DevPortal
++                properties:
++                  matchLabels:
++                    additionalProperties:
++                      type: string
++                    description: MatchLabels specifies the list of labels that must
++                      be present in Mappings for being present in this DevPortal.
++                    type: object
++                  matchNamespaces:
++                    description: MatchNamespaces is a list of namespaces that will
++                      be included in this DevPortal.
++                    items:
++                      type: string
++                    type: array
++                type: object
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -1024,14 +1294,6 @@ index 000000000..1b71b25ed
 +            type: object
 +        type: object
 +    served: true
-+    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: DevPortal is the Schema for the DevPortals API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
 +    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
@@ -1702,6 +1964,33 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: KubernetesEndpointResolver is the Schema for the kubernetesendpointresolver
++          API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: KubernetesEndpointResolver tells Ambassador to use Kubernetes
++              Endpoints resources to resolve services. It actually has no spec other
++              than the AmbassadorID.
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -1764,15 +2053,6 @@ index 000000000..1b71b25ed
 +            type: object
 +        type: object
 +    served: true
-+    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: KubernetesEndpointResolver is the Schema for the kubernetesendpointresolver
-+          API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
 +    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
@@ -1807,6 +2087,33 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: KubernetesServiceResolver is the Schema for the kubernetesserviceresolver
++          API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: KubernetesServiceResolver tells Ambassador to use Kubernetes
++              Service resources to resolve services. It actually has no spec other
++              than the AmbassadorID.
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -1869,15 +2176,6 @@ index 000000000..1b71b25ed
 +            type: object
 +        type: object
 +    served: true
-+    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: KubernetesServiceResolver is the Schema for the kubernetesserviceresolver
-+          API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
 +    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
@@ -2109,6 +2407,67 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: LogService is the Schema for the logservices API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: LogServiceSpec defines the desired state of LogService
++            properties:
++              driver:
++                enum:
++                - tcp
++                - http
++                type: string
++              driver_config:
++                properties:
++                  additional_log_headers:
++                    items:
++                      properties:
++                        during_request:
++                          type: boolean
++                        during_response:
++                          type: boolean
++                        during_trailer:
++                          type: boolean
++                        header_name:
++                          type: string
++                      type: object
++                    type: array
++                type: object
++              flush_interval_byte_size:
++                type: integer
++              flush_interval_time:
++                type: integer
++              grpc:
++                type: boolean
++              service:
++                type: string
++              v3ProtocolVersion:
++                enum:
++                - v2
++                - v3
++                type: string
++              v3StatsName:
++                type: string
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -2246,14 +2605,6 @@ index 000000000..1b71b25ed
 +        type: object
 +    served: true
 +    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: LogService is the Schema for the logservices API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
-+    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
 +kind: CustomResourceDefinition
@@ -2287,6 +2638,486 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - additionalPrinterColumns:
++    - jsonPath: .spec.host
++      name: Source Host
++      type: string
++    - jsonPath: .spec.prefix
++      name: Source Prefix
++      type: string
++    - jsonPath: .spec.service
++      name: Dest Service
++      type: string
++    - jsonPath: .status.state
++      name: State
++      type: string
++    - jsonPath: .status.reason
++      name: Reason
++      type: string
++    name: v1
++    schema:
++      openAPIV3Schema:
++        description: Mapping is the Schema for the mappings API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: MappingSpec defines the desired state of Mapping
++            properties:
++              add_linkerd_headers:
++                type: boolean
++              add_request_headers:
++                type: object
++                x-kubernetes-preserve-unknown-fields: true
++              add_response_headers:
++                type: object
++                x-kubernetes-preserve-unknown-fields: true
++              allow_upgrade:
++                description: "A case-insensitive list of the non-HTTP protocols to
++                  allow \"upgrading\" to from HTTP via the \"Connection: upgrade\"
++                  mechanism[1].  After the upgrade, Ambassador does not interpret
++                  the traffic, and behaves similarly to how it does for TCPMappings.
++                  \n [1]: https://tools.ietf.org/html/rfc7230#section-6.7 \n For example,
++                  if your upstream service supports WebSockets, you would write \n
++                  \   allow_upgrade:    - websocket \n Or if your upstream service
++                  supports upgrading from HTTP to SPDY (as the Kubernetes apiserver
++                  does for `kubectl exec` functionality), you would write \n    allow_upgrade:
++                  \   - spdy/3.1"
++                items:
++                  type: string
++                type: array
++              auth_context_extensions:
++                additionalProperties:
++                  type: string
++                type: object
++              auto_host_rewrite:
++                type: boolean
++              bypass_auth:
++                type: boolean
++              bypass_error_response_overrides:
++                description: If true, bypasses any `error_response_overrides` set
++                  on the Ambassador module.
++                type: boolean
++              case_sensitive:
++                type: boolean
++              circuit_breakers:
++                items:
++                  properties:
++                    max_connections:
++                      type: integer
++                    max_pending_requests:
++                      type: integer
++                    max_requests:
++                      type: integer
++                    max_retries:
++                      type: integer
++                    priority:
++                      enum:
++                      - default
++                      - high
++                      type: string
++                  type: object
++                type: array
++              cluster_idle_timeout_ms:
++                type: integer
++              cluster_max_connection_lifetime_ms:
++                type: integer
++              cluster_tag:
++                type: string
++              connect_timeout_ms:
++                type: integer
++              cors:
++                properties:
++                  credentials:
++                    type: boolean
++                  max_age:
++                    type: string
++                type: object
++                x-kubernetes-preserve-unknown-fields: true
++              dns_type:
++                type: string
++              docs:
++                description: DocsInfo provides some extra information about the docs
++                  for the Mapping (used by the Dev Portal)
++                properties:
++                  display_name:
++                    type: string
++                  ignored:
++                    type: boolean
++                  path:
++                    type: string
++                  timeout_ms:
++                    type: integer
++                  url:
++                    type: string
++                type: object
++              enable_ipv4:
++                type: boolean
++              enable_ipv6:
++                type: boolean
++              envoy_override:
++                description: UntypedDict is relatively opaque as a Go type, but it
++                  preserves its contents in a roundtrippable way.
++                type: object
++                x-kubernetes-preserve-unknown-fields: true
++              error_response_overrides:
++                description: Error response overrides for this Mapping. Replaces all
++                  of the `error_response_overrides` set on the Ambassador module,
++                  if any.
++                items:
++                  description: A response rewrite for an HTTP error response
++                  properties:
++                    body:
++                      description: The new response body
++                      properties:
++                        content_type:
++                          description: The content type to set on the error response
++                            body when using text_format or text_format_source. Defaults
++                            to 'text/plain'.
++                          type: string
++                        json_format:
++                          additionalProperties:
++                            type: string
++                          description: 'A JSON response with content-type: application/json.
++                            The values can contain format text like in text_format.'
++                          type: object
++                        text_format:
++                          description: A format string representing a text response
++                            body. Content-Type can be set using the `content_type`
++                            field below.
++                          type: string
++                        text_format_source:
++                          description: A format string sourced from a file on the
++                            Ambassador container. Useful for larger response bodies
++                            that should not be placed inline in configuration.
++                          properties:
++                            filename:
++                              description: The name of a file on the Ambassador pod
++                                that contains a format text string.
++                              type: string
++                          type: object
++                      type: object
++                    on_status_code:
++                      description: The status code to match on -- not a pointer because
++                        it's required.
++                      maximum: 599
++                      minimum: 400
++                      type: integer
++                  required:
++                  - body
++                  - on_status_code
++                  type: object
++                minItems: 1
++                type: array
++              grpc:
++                type: boolean
++              headers:
++                type: object
++                x-kubernetes-preserve-unknown-fields: true
++              host:
++                type: string
++              host_redirect:
++                type: boolean
++              host_regex:
++                type: boolean
++              host_rewrite:
++                type: string
++              idle_timeout_ms:
++                type: integer
++              keepalive:
++                properties:
++                  idle_time:
++                    type: integer
++                  interval:
++                    type: integer
++                  probes:
++                    type: integer
++                type: object
++              labels:
++                additionalProperties:
++                  description: A MappingLabelGroupsArray is an array of MappingLabelGroups.
++                    I know, complex.
++                  items:
++                    description: 'A MappingLabelGroup is a single element of a MappingLabelGroupsArray:
++                      a second map, where the key is a human-readable name that identifies
++                      the group.'
++                    maxProperties: 1
++                    minProperties: 1
++                    type: object
++                    x-kubernetes-preserve-unknown-fields: true
++                  type: array
++                description: A DomainMap is the overall Mapping.spec.Labels type.
++                  It maps domains (kind of like namespaces for Mapping labels) to
++                  arrays of label groups.
++                type: object
++              load_balancer:
++                properties:
++                  cookie:
++                    properties:
++                      name:
++                        type: string
++                      path:
++                        type: string
++                      ttl:
++                        type: string
++                    required:
++                    - name
++                    type: object
++                  header:
++                    type: string
++                  policy:
++                    enum:
++                    - round_robin
++                    - ring_hash
++                    - maglev
++                    - least_request
++                    type: string
++                  source_ip:
++                    type: boolean
++                required:
++                - policy
++                type: object
++              method:
++                type: string
++              method_regex:
++                type: boolean
++              modules:
++                items:
++                  description: UntypedDict is relatively opaque as a Go type, but
++                    it preserves its contents in a roundtrippable way.
++                  type: object
++                  x-kubernetes-preserve-unknown-fields: true
++                type: array
++              outlier_detection:
++                type: string
++              path_redirect:
++                description: Path replacement to use when generating an HTTP redirect.
++                  Used with `host_redirect`.
++                type: string
++              precedence:
++                type: integer
++              prefix:
++                type: string
++              prefix_exact:
++                type: boolean
++              prefix_redirect:
++                description: Prefix rewrite to use when generating an HTTP redirect.
++                  Used with `host_redirect`.
++                type: string
++              prefix_regex:
++                type: boolean
++              priority:
++                type: string
++              query_parameters:
++                type: object
++                x-kubernetes-preserve-unknown-fields: true
++              redirect_response_code:
++                description: The response code to use when generating an HTTP redirect.
++                  Defaults to 301. Used with `host_redirect`.
++                enum:
++                - 301
++                - 302
++                - 303
++                - 307
++                - 308
++                type: integer
++              regex_headers:
++                additionalProperties:
++                  type: string
++                type: object
++              regex_query_parameters:
++                additionalProperties:
++                  type: string
++                type: object
++              regex_redirect:
++                description: Prefix regex rewrite to use when generating an HTTP redirect.
++                  Used with `host_redirect`.
++                properties:
++                  pattern:
++                    type: string
++                  substitution:
++                    type: string
++                type: object
++              regex_rewrite:
++                properties:
++                  pattern:
++                    type: string
++                  substitution:
++                    type: string
++                type: object
++              resolver:
++                type: string
++              respect_dns_ttl:
++                type: boolean
++              retry_policy:
++                properties:
++                  num_retries:
++                    type: integer
++                  per_try_timeout:
++                    type: string
++                  retry_on:
++                    enum:
++                    - 5xx
++                    - gateway-error
++                    - connect-failure
++                    - retriable-4xx
++                    - refused-stream
++                    - retriable-status-codes
++                    type: string
++                type: object
++              rewrite:
++                type: string
++              service:
++                type: string
++              shadow:
++                type: boolean
++              timeout_ms:
++                description: The timeout for requests that use this Mapping. Overrides
++                  `cluster_request_timeout_ms` set on the Ambassador Module, if it
++                  exists.
++                type: integer
++              use_websocket:
++                description: 'use_websocket is deprecated, and is equivlaent to setting
++                  `allow_upgrade: ["websocket"]`'
++                type: boolean
++              v3StatsName:
++                type: string
++              v3health_checks:
++                items:
++                  description: HealthCheck specifies settings for performing active
++                    health checking on upstreams
++                  properties:
++                    health_check:
++                      description: Configuration for where the healthcheck request
++                        should be made to
++                      maxProperties: 1
++                      minProperties: 1
++                      properties:
++                        grpc:
++                          description: HealthCheck for gRPC upstreams. Only one of
++                            grpc_health_check or http_health_check may be specified
++                          properties:
++                            authority:
++                              description: The value of the :authority header in the
++                                gRPC health check request. If left empty the upstream
++                                name will be used.
++                              type: string
++                            upstream_name:
++                              description: The upstream name parameter which will
++                                be sent to gRPC service in the health check message
++                              type: string
++                          required:
++                          - upstream_name
++                          type: object
++                        http:
++                          description: HealthCheck for HTTP upstreams. Only one of
++                            http_health_check or grpc_health_check may be specified
++                          properties:
++                            add_request_headers:
++                              additionalProperties:
++                                properties:
++                                  append:
++                                    type: boolean
++                                  v2Representation:
++                                    enum:
++                                    - ""
++                                    - string
++                                    - "null"
++                                    type: string
++                                  value:
++                                    type: string
++                                type: object
++                              type: object
++                            expected_statuses:
++                              items:
++                                description: A range of response statuses from Start
++                                  to End inclusive
++                                properties:
++                                  max:
++                                    description: End of the statuses to include. Must
++                                      be between 100 and 599 (inclusive)
++                                    maximum: 599
++                                    minimum: 100
++                                    type: integer
++                                  min:
++                                    description: Start of the statuses to include.
++                                      Must be between 100 and 599 (inclusive)
++                                    maximum: 599
++                                    minimum: 100
++                                    type: integer
++                                required:
++                                - max
++                                - min
++                                type: object
++                              type: array
++                            hostname:
++                              type: string
++                            path:
++                              type: string
++                            remove_request_headers:
++                              items:
++                                type: string
++                              type: array
++                          required:
++                          - path
++                          type: object
++                      type: object
++                    healthy_threshold:
++                      description: Number of expected responses for the upstream to
++                        be considered healthy. Defaults to 1.
++                      type: integer
++                    interval:
++                      description: Interval between health checks. Defaults to every
++                        5 seconds.
++                      type: string
++                    timeout:
++                      description: Timeout for connecting to the health checking endpoint.
++                        Defaults to 3 seconds.
++                      type: string
++                    unhealthy_threshold:
++                      description: Number of non-expected responses for the upstream
++                        to be considered unhealthy. A single 503 will mark the upstream
++                        as unhealthy regardless of the threshold. Defaults to 2.
++                      type: integer
++                  required:
++                  - health_check
++                  type: object
++                minItems: 1
++                type: array
++              weight:
++                type: integer
++            required:
++            - prefix
++            - service
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++          status:
++            description: MappingStatus defines the observed state of Mapping
++            properties:
++              reason:
++                type: string
++              state:
++                enum:
++                - ""
++                - Inactive
++                - Running
++                type: string
++            type: object
++        type: object
++    served: true
++    storage: false
++    subresources:
++      status: {}
 +  - additionalPrinterColumns:
 +    - jsonPath: .spec.host
 +      name: Source Host
@@ -2641,6 +3472,108 @@ index 000000000..1b71b25ed
 +                type: boolean
 +              v3StatsName:
 +                type: string
++              v3health_checks:
++                items:
++                  description: HealthCheck specifies settings for performing active
++                    health checking on upstreams
++                  properties:
++                    health_check:
++                      description: Configuration for where the healthcheck request
++                        should be made to
++                      maxProperties: 1
++                      minProperties: 1
++                      properties:
++                        grpc:
++                          description: HealthCheck for gRPC upstreams. Only one of
++                            grpc_health_check or http_health_check may be specified
++                          properties:
++                            authority:
++                              description: The value of the :authority header in the
++                                gRPC health check request. If left empty the upstream
++                                name will be used.
++                              type: string
++                            upstream_name:
++                              description: The upstream name parameter which will
++                                be sent to gRPC service in the health check message
++                              type: string
++                          required:
++                          - upstream_name
++                          type: object
++                        http:
++                          description: HealthCheck for HTTP upstreams. Only one of
++                            http_health_check or grpc_health_check may be specified
++                          properties:
++                            add_request_headers:
++                              additionalProperties:
++                                properties:
++                                  append:
++                                    type: boolean
++                                  v2Representation:
++                                    enum:
++                                    - ""
++                                    - string
++                                    - "null"
++                                    type: string
++                                  value:
++                                    type: string
++                                type: object
++                              type: object
++                            expected_statuses:
++                              items:
++                                description: A range of response statuses from Start
++                                  to End inclusive
++                                properties:
++                                  max:
++                                    description: End of the statuses to include. Must
++                                      be between 100 and 599 (inclusive)
++                                    maximum: 599
++                                    minimum: 100
++                                    type: integer
++                                  min:
++                                    description: Start of the statuses to include.
++                                      Must be between 100 and 599 (inclusive)
++                                    maximum: 599
++                                    minimum: 100
++                                    type: integer
++                                required:
++                                - max
++                                - min
++                                type: object
++                              type: array
++                            hostname:
++                              type: string
++                            path:
++                              type: string
++                            remove_request_headers:
++                              items:
++                                type: string
++                              type: array
++                          required:
++                          - path
++                          type: object
++                      type: object
++                    healthy_threshold:
++                      description: Number of expected responses for the upstream to
++                        be considered healthy. Defaults to 1.
++                      type: integer
++                    interval:
++                      description: Interval between health checks. Defaults to every
++                        5 seconds.
++                      type: string
++                    timeout:
++                      description: Timeout for connecting to the health checking endpoint.
++                        Defaults to 3 seconds.
++                      type: string
++                    unhealthy_threshold:
++                      description: Number of non-expected responses for the upstream
++                        to be considered unhealthy. A single 503 will mark the upstream
++                        as unhealthy regardless of the threshold. Defaults to 2.
++                      type: integer
++                  required:
++                  - health_check
++                  type: object
++                minItems: 1
++                type: array
 +              weight:
 +                type: integer
 +            required:
@@ -2910,6 +3843,108 @@ index 000000000..1b71b25ed
 +                additionalProperties:
 +                  type: string
 +                type: object
++              health_checks:
++                items:
++                  description: HealthCheck specifies settings for performing active
++                    health checking on upstreams
++                  properties:
++                    health_check:
++                      description: Configuration for where the healthcheck request
++                        should be made to
++                      maxProperties: 1
++                      minProperties: 1
++                      properties:
++                        grpc:
++                          description: HealthCheck for gRPC upstreams. Only one of
++                            grpc_health_check or http_health_check may be specified
++                          properties:
++                            authority:
++                              description: The value of the :authority header in the
++                                gRPC health check request. If left empty the upstream
++                                name will be used.
++                              type: string
++                            upstream_name:
++                              description: The upstream name parameter which will
++                                be sent to gRPC service in the health check message
++                              type: string
++                          required:
++                          - upstream_name
++                          type: object
++                        http:
++                          description: HealthCheck for HTTP upstreams. Only one of
++                            http_health_check or grpc_health_check may be specified
++                          properties:
++                            add_request_headers:
++                              additionalProperties:
++                                properties:
++                                  append:
++                                    type: boolean
++                                  v2Representation:
++                                    enum:
++                                    - ""
++                                    - string
++                                    - "null"
++                                    type: string
++                                  value:
++                                    type: string
++                                type: object
++                              type: object
++                            expected_statuses:
++                              items:
++                                description: A range of response statuses from Start
++                                  to End inclusive
++                                properties:
++                                  max:
++                                    description: End of the statuses to include. Must
++                                      be between 100 and 599 (inclusive)
++                                    maximum: 599
++                                    minimum: 100
++                                    type: integer
++                                  min:
++                                    description: Start of the statuses to include.
++                                      Must be between 100 and 599 (inclusive)
++                                    maximum: 599
++                                    minimum: 100
++                                    type: integer
++                                required:
++                                - max
++                                - min
++                                type: object
++                              type: array
++                            hostname:
++                              type: string
++                            path:
++                              type: string
++                            remove_request_headers:
++                              items:
++                                type: string
++                              type: array
++                          required:
++                          - path
++                          type: object
++                      type: object
++                    healthy_threshold:
++                      description: Number of expected responses for the upstream to
++                        be considered healthy. Defaults to 1.
++                      type: integer
++                    interval:
++                      description: Interval between health checks. Defaults to every
++                        5 seconds.
++                      type: string
++                    timeout:
++                      description: Timeout for connecting to the health checking endpoint.
++                        Defaults to 3 seconds.
++                      type: string
++                    unhealthy_threshold:
++                      description: Number of non-expected responses for the upstream
++                        to be considered unhealthy. A single 503 will mark the upstream
++                        as unhealthy regardless of the threshold. Defaults to 2.
++                      type: integer
++                  required:
++                  - health_check
++                  type: object
++                minItems: 1
++                type: array
 +              host:
 +                description: "Exact match for the hostname of a request if HostRegex
 +                  is false; regex match for the hostname if HostRegex is true. \n
@@ -3262,14 +4297,6 @@ index 000000000..1b71b25ed
 +    storage: false
 +    subresources:
 +      status: {}
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: Mapping is the Schema for the mappings API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
-+    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
 +kind: CustomResourceDefinition
@@ -3303,6 +4330,38 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: "A Module defines system-wide configuration.  The type of module
++          is controlled by the .metadata.name; valid names are \"ambassador\" or \"tls\".
++          \n https://www.getambassador.io/docs/edge-stack/latest/topics/running/ambassador/#the-ambassador-module
++          https://www.getambassador.io/docs/edge-stack/latest/topics/running/tls/#tls-module-deprecated"
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            properties:
++              config:
++                description: UntypedDict is relatively opaque as a Go type, but it
++                  preserves its contents in a roundtrippable way.
++                type: object
++                x-kubernetes-preserve-unknown-fields: true
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -3381,15 +4440,6 @@ index 000000000..1b71b25ed
 +        type: object
 +    served: true
 +    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: A Module defines system-wide configuration.  The type of module
-+          is controlled by the .metadata.name; valid names are "ambassador" or "tls".
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
-+    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
 +kind: CustomResourceDefinition
@@ -3423,6 +4473,50 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: RateLimitService is the Schema for the ratelimitservices API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: RateLimitServiceSpec defines the desired state of RateLimitService
++            properties:
++              domain:
++                type: string
++              failure_mode_deny:
++                description: FailureModeDeny when set to true, envoy will deny traffic
++                  if it is unable to communicate with the rate limit service.
++                type: boolean
++              protocol_version:
++                enum:
++                - v2
++                - v3
++                type: string
++              service:
++                type: string
++              timeout_ms:
++                type: integer
++              v3StatsName:
++                type: string
++            required:
++            - service
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -3564,14 +4658,6 @@ index 000000000..1b71b25ed
 +        type: object
 +    served: true
 +    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: RateLimitService is the Schema for the ratelimitservices API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
-+    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
 +kind: CustomResourceDefinition
@@ -3605,6 +4691,76 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: TCPMapping is the Schema for the tcpmappings API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: TCPMappingSpec defines the desired state of TCPMapping
++            properties:
++              address:
++                type: string
++              circuit_breakers:
++                items:
++                  properties:
++                    max_connections:
++                      type: integer
++                    max_pending_requests:
++                      type: integer
++                    max_requests:
++                      type: integer
++                    max_retries:
++                      type: integer
++                    priority:
++                      enum:
++                      - default
++                      - high
++                      type: string
++                  type: object
++                type: array
++              cluster_tag:
++                type: string
++              enable_ipv4:
++                type: boolean
++              enable_ipv6:
++                type: boolean
++              host:
++                type: string
++              idle_timeout_ms:
++                description: 'FIXME(lukeshu): Surely this should be an ''int''?'
++                type: string
++              port:
++                description: Port isn't a pointer because it's required.
++                type: integer
++              resolver:
++                type: string
++              service:
++                type: string
++              v3StatsName:
++                type: string
++              weight:
++                type: integer
++            required:
++            - port
++            - service
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -3799,14 +4955,6 @@ index 000000000..1b71b25ed
 +        type: object
 +    served: true
 +    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: TCPMapping is the Schema for the tcpmappings API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
-+    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
 +kind: CustomResourceDefinition
@@ -3840,6 +4988,79 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: TLSContext is the Schema for the tlscontexts API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: TLSContextSpec defines the desired state of TLSContext
++            properties:
++              alpn_protocols:
++                type: string
++              ca_secret:
++                type: string
++              cacert_chain_file:
++                type: string
++              cert_chain_file:
++                type: string
++              cert_required:
++                type: boolean
++              cipher_suites:
++                items:
++                  type: string
++                type: array
++              ecdh_curves:
++                items:
++                  type: string
++                type: array
++              hosts:
++                items:
++                  type: string
++                type: array
++              max_tls_version:
++                enum:
++                - v1.0
++                - v1.1
++                - v1.2
++                - v1.3
++                type: string
++              min_tls_version:
++                enum:
++                - v1.0
++                - v1.1
++                - v1.2
++                - v1.3
++                type: string
++              private_key_file:
++                type: string
++              redirect_cleartext_from:
++                type: integer
++              secret:
++                type: string
++              secret_namespacing:
++                type: boolean
++              sni:
++                type: string
++              v3CRLSecret:
++                type: string
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -3994,14 +5215,6 @@ index 000000000..1b71b25ed
 +        type: object
 +    served: true
 +    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: TLSContext is the Schema for the tlscontexts API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
-+    storage: false
 +---
 +apiVersion: apiextensions.k8s.io/v1
 +kind: CustomResourceDefinition
@@ -4035,6 +5248,135 @@ index 000000000..1b71b25ed
 +  preserveUnknownFields: false
 +  scope: Namespaced
 +  versions:
++  - name: v1
++    schema:
++      openAPIV3Schema:
++        description: TracingService is the Schema for the tracingservices API
++        properties:
++          apiVersion:
++            description: 'APIVersion defines the versioned schema of this representation
++              of an object. Servers should convert recognized schemas to the latest
++              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
++            type: string
++          kind:
++            description: 'Kind is a string value representing the REST resource this
++              object represents. Servers may infer this from the endpoint the client
++              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++            type: string
++          metadata:
++            type: object
++          spec:
++            description: TracingServiceSpec defines the desired state of TracingService
++            properties:
++              config:
++                properties:
++                  access_token_file:
++                    type: string
++                  collector_cluster:
++                    type: string
++                  collector_endpoint:
++                    type: string
++                  collector_endpoint_version:
++                    enum:
++                    - HTTP_JSON_V1
++                    - HTTP_JSON
++                    - HTTP_PROTO
++                    type: string
++                  collector_hostname:
++                    type: string
++                  service_name:
++                    type: string
++                  shared_span_context:
++                    type: boolean
++                  trace_id_128bit:
++                    type: boolean
++                  v3PropagationModes:
++                    items:
++                      enum:
++                      - ENVOY
++                      - LIGHTSTEP
++                      - B3
++                      - TRACE_CONTEXT
++                      type: string
++                    type: array
++                type: object
++              driver:
++                enum:
++                - lightstep
++                - zipkin
++                - datadog
++                - opentelemetry
++                type: string
++              sampling:
++                properties:
++                  client:
++                    type: integer
++                  overall:
++                    type: integer
++                  random:
++                    type: integer
++                type: object
++              service:
++                type: string
++              tag_headers:
++                items:
++                  type: string
++                type: array
++              v3CustomTags:
++                items:
++                  description: TracingCustomTag provides a data structure for capturing
++                    envoy's `type.tracing.v3.CustomTag`
++                  properties:
++                    environment:
++                      description: Environment explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        default_value:
++                          type: string
++                        name:
++                          type: string
++                      required:
++                      - name
++                      type: object
++                    literal:
++                      description: Literal explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        value:
++                          type: string
++                      required:
++                      - value
++                      type: object
++                    request_header:
++                      description: Header explicitly specifies the protocol stack
++                        to set up. Exactly one of Literal, Environment or Header must
++                        be supplied.
++                      properties:
++                        default_value:
++                          type: string
++                        name:
++                          type: string
++                      required:
++                      - name
++                      type: object
++                    tag:
++                      type: string
++                  required:
++                  - tag
++                  type: object
++                type: array
++              v3StatsName:
++                type: string
++            required:
++            - driver
++            - service
++            type: object
++            x-kubernetes-preserve-unknown-fields: true
++        type: object
++    served: true
++    storage: false
 +  - name: v2
 +    schema:
 +      openAPIV3Schema:
@@ -4092,6 +5434,7 @@ index 000000000..1b71b25ed
 +                - lightstep
 +                - zipkin
 +                - datadog
++                - opentelemetry
 +                type: string
 +              sampling:
 +                properties:
@@ -4274,6 +5617,7 @@ index 000000000..1b71b25ed
 +                - lightstep
 +                - zipkin
 +                - datadog
++                - opentelemetry
 +                type: string
 +              sampling:
 +                properties:
@@ -4301,14 +5645,6 @@ index 000000000..1b71b25ed
 +            type: object
 +        type: object
 +    served: true
-+    storage: false
-+  - name: v1
-+    schema:
-+      openAPIV3Schema:
-+        description: TracingService is the Schema for the tracingservices API
-+        type: object
-+        x-kubernetes-preserve-unknown-fields: true
-+    served: false
 +    storage: false
 diff --git a/charts/crds/templates/namespace.yaml b/charts/crds/templates/namespace.yaml
 new file mode 100644
@@ -4352,16 +5688,17 @@ index d19c5dc9a..42b472400 100644
  /README.md
  
 diff --git a/charts/emissary-ingress/Chart.yaml.in b/charts/emissary-ingress/Chart.yaml
-similarity index 56%
+similarity index 54%
 rename from charts/emissary-ingress/Chart.yaml.in
 rename to charts/emissary-ingress/Chart.yaml
-index b974e5198..82c14cc03 100644
+index b974e5198..4ba0ec57d 100644
 --- a/charts/emissary-ingress/Chart.yaml.in
 +++ b/charts/emissary-ingress/Chart.yaml
 @@ -1,13 +1,8 @@
- apiVersion: v1
+-apiVersion: v1
 -appVersion: @version@
-+appVersion: v3.3.0
++apiVersion: v2
++appVersion: 3.5.1
  description: A Helm chart for Emissary Ingress
 -name: emissary-ingress
 -version: @chartVersion@
@@ -4399,7 +5736,7 @@ index b974e5198..82c14cc03 100644
 +sources:
 +- https://github.com/datawire/ambassador
 +- https://github.com/prometheus/statsd_exporter
-+version: 3.3.0-cbf68a7dd53dda13c681af3e19660a5605050839
++version: 3.5.1-d0c301dec3634d263f8957745c8557a39caf8204
 diff --git a/charts/emissary-ingress/OWNERS b/charts/emissary-ingress/OWNERS
 deleted file mode 100644
 index 42543ecf6..000000000
@@ -4862,7 +6199,7 @@ index dbcfc7c93..b8ecadd70 100644
    kubectl port-forward $POD_NAME 8080:80
  {{- end }}
 diff --git a/charts/emissary-ingress/templates/_helpers.tpl b/charts/emissary-ingress/templates/_helpers.tpl
-index 78dda417b..23bd122ef 100644
+index 35bb75791..23bd122ef 100644
 --- a/charts/emissary-ingress/templates/_helpers.tpl
 +++ b/charts/emissary-ingress/templates/_helpers.tpl
 @@ -78,18 +78,6 @@ disabled if fullImageOverride is present
@@ -4884,32 +6221,15 @@ index 78dda417b..23bd122ef 100644
  {{/*
  Create chart name and version as used by the chart label.
  */}}
-@@ -126,22 +114,7 @@ Define the http port of the Ambassador service
+@@ -125,3 +113,8 @@ Define the http port of the Ambassador service
  {{- end -}}
  {{- end -}}
- 
--{{/*
--Set the image that should be used for the agent.
--Use agent.repository and agent.tag if present,
--Then use fullImageOverride if present,
--Then if the image repository is explicitly set, use "repository:image"
--*/}}
--{{- define "agent.image" -}}
--
--{{- if .Values.agent.image.repository -}}
--    {{- printf "%s:%s" .Values.agent.image.repository .Values.agent.image.tag -}}
--{{- else if .Values.image.fullImageOverride -}}
--    {{- .Values.image.fullImageOverride }}
--{{- else if hasKey .Values.image "repository" -}}
--    {{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
--{{- else -}}
--    {{- printf "%s:%s" "docker.io/emissaryingress/emissary" .Values.image.tag -}}
--{{- end -}}
--
+ {{- end -}}
++
 +{{/* Generate image repository path. */}}
 +{{- define "image.repository.path" -}}
 +{{- .repository }}@{{ .digest -}}
- {{- end -}}
++{{- end -}}
 diff --git a/charts/emissary-ingress/templates/admin-service.yaml b/charts/emissary-ingress/templates/admin-service.yaml
 index 77f628459..6b32df2e8 100644
 --- a/charts/emissary-ingress/templates/admin-service.yaml
@@ -4925,31 +6245,11 @@ index 77f628459..6b32df2e8 100644
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/ambassador-agent.yaml b/charts/emissary-ingress/templates/ambassador-agent.yaml
 deleted file mode 100644
-index 1c06cd360..000000000
+index 4196638a9..000000000
 --- a/charts/emissary-ingress/templates/ambassador-agent.yaml
 +++ /dev/null
-@@ -1,284 +0,0 @@
+@@ -1,270 +0,0 @@
 -{{- if .Values.agent.enabled }}
--{{- $allowAgent := false -}}
--
--  {{- /* This next bit is ugly. */ -}}
--  {{- /* Case 1: "fullImageOverride" means don't bother checking the tag. */ -}}
--  {{- /* Case 2: Otherwise, if it's not a semver-style version number,    */ -}}
--  {{- /*         assume we have a power user and turn the agent on.       */ -}}
--  {{- /* Case 3: Otherwise, it's OSS and we need at least 1.13.0.         */ -}}
--
--{{- if .Values.image.fullImageOverride }}
--  {{- /* Case 1 */ -}}
--  {{- $allowAgent = true }}
--{{- else if not (regexMatch "^\\d+\\.\\d+\\.\\d+$" .Values.image.tag ) }}
--  {{- /* Case 2 above: power user */ -}}
--  {{- $allowAgent = true }}
--{{- else if ne (semver "1.13.0" | (semver .Values.image.tag).Compare) -1 }}
--  {{- /* Case 3 above: OSS 1.13.0+ */ -}}
--  {{- $allowAgent = true }}
--{{- end }}
--
--{{- if $allowAgent }}
 ----
 -apiVersion: v1
 -kind: ServiceAccount
@@ -5154,15 +6454,22 @@ index 1c06cd360..000000000
 -        {{- include "ambassador.labels" . | nindent 8 }}
 -        product: aes
 -    spec:
+-      {{- with .Values.agent.podSecurityContext }}
+-      securityContext:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
 -      serviceAccountName: {{ include "ambassador.fullname" . }}-agent
 -      containers:
 -      - name: agent
--        image: {{ include "agent.image" . }}
--        imagePullPolicy: {{ .Values.image.pullPolicy }}
--        command: [ "agent" ]
+-        image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+-        imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
 -        ports:
 -          - containerPort: 8080
 -            name: http
+-        {{- with .Values.agent.containerSecurityContext }}
+-        securityContext:
+-          {{- toYaml . | nindent 12 }}
+-        {{- end }}
 -        env:
 -        - name: AGENT_NAMESPACE
 -          valueFrom:
@@ -5212,7 +6519,6 @@ index 1c06cd360..000000000
 -    app.kubernetes.io/name: {{ include "ambassador.fullname" . }}-agent
 -    app.kubernetes.io/instance: {{ .Release.Name }}
 -{{- end }}
--{{- end }}
 diff --git a/charts/emissary-ingress/templates/config.yaml b/charts/emissary-ingress/templates/config.yaml
 index cd6184dde..4ba1c911a 100644
 --- a/charts/emissary-ingress/templates/config.yaml
@@ -5227,7 +6533,7 @@ index cd6184dde..4ba1c911a 100644
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/deployment-canary.yaml b/charts/emissary-ingress/templates/deployment-canary.yaml
-index c166d4fb0..604f47d24 100644
+index 4c8094f14..2fa451574 100644
 --- a/charts/emissary-ingress/templates/deployment-canary.yaml
 +++ b/charts/emissary-ingress/templates/deployment-canary.yaml
 @@ -8,7 +8,7 @@ metadata:
@@ -5249,7 +6555,7 @@ index c166d4fb0..604f47d24 100644
            imagePullPolicy: {{ .Values.image.pullPolicy }}
            ports:
 diff --git a/charts/emissary-ingress/templates/deployment.yaml b/charts/emissary-ingress/templates/deployment.yaml
-index 2d06c8127..0eb2745f0 100644
+index 6571eef94..e6d6f75d1 100644
 --- a/charts/emissary-ingress/templates/deployment.yaml
 +++ b/charts/emissary-ingress/templates/deployment.yaml
 @@ -3,7 +3,7 @@ apiVersion: v1
@@ -5328,10 +6634,10 @@ index 033051cc8..671c2444e 100644
    port: 8080
    protocol: HTTP
 diff --git a/charts/emissary-ingress/templates/module.yaml b/charts/emissary-ingress/templates/module.yaml
-index a13d45996..a78f27dc4 100644
+index 619f9859b..8a66c6a60 100644
 --- a/charts/emissary-ingress/templates/module.yaml
 +++ b/charts/emissary-ingress/templates/module.yaml
-@@ -3,7 +3,7 @@ apiVersion: getambassador.io/v2
+@@ -3,7 +3,7 @@ apiVersion: getambassador.io/v3alpha1
  kind: Module
  metadata:
    name: ambassador
@@ -5519,10 +6825,10 @@ index b2c8122a1..8f33136cf 100644
      matchLabels:
        service: ambassador-admin
 diff --git a/charts/emissary-ingress/values.yaml.in b/charts/emissary-ingress/values.yaml
-similarity index 92%
+similarity index 90%
 rename from charts/emissary-ingress/values.yaml.in
 rename to charts/emissary-ingress/values.yaml
-index bb812d760..9e314c2f4 100644
+index 7c509da69..94e66a04b 100644
 --- a/charts/emissary-ingress/values.yaml.in
 +++ b/charts/emissary-ingress/values.yaml
 @@ -2,11 +2,11 @@
@@ -5540,7 +6846,7 @@ index bb812d760..9e314c2f4 100644
  # If true, Create a DaemonSet. By default Deployment controller will be created
  daemonSet: false
  # If true, Create a bare Pod instead of a Deployment or DaemonSet; for
-@@ -143,11 +143,13 @@ security:
+@@ -148,11 +148,13 @@ security:
      #   runAsUser:
      #     rule: MustRunAsNonRoot
  
@@ -5558,7 +6864,7 @@ index bb812d760..9e314c2f4 100644
    # Pod container image pull policy
    pullPolicy: IfNotPresent
  
-@@ -348,7 +350,6 @@ resolvers: # +doc-gen:break
+@@ -357,7 +359,6 @@ resolvers: # +doc-gen:break
  module:
    diagnostics:
      enabled: false
@@ -5566,7 +6872,7 @@ index bb812d760..9e314c2f4 100644
  
  # DEPRECATED: Enabling the prometheus exporter creates a sidecar and configures ambassador to use it
  #
-@@ -384,26 +385,6 @@ prometheusExporter: # +doc-gen:break
+@@ -393,35 +394,6 @@ prometheusExporter: # +doc-gen:break
  # securityContext:
  #   runAsUser: 8888
  
@@ -5587,8 +6893,17 @@ index bb812d760..9e314c2f4 100644
 -  createArgoRBAC: true
 -  image:
 -    # Leave blank to use image.repository and image.tag
--    tag: 3.1.0
--    repository: docker.io/emissaryingress/emissary
+-    tag: 1.0.3
+-    repository: docker.io/ambassador/ambassador-agent
+-    pullPolicy: IfNotPresent
+-
+-  podSecurityContext: {}
+-  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#podsecuritycontext-v1-core
+-  #  runAsUser: 8888
+-
+-  containerSecurityContext: {}
+-  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#securitycontext-v1-core
+-  # allowPrivilegeEscalation: false
 -
  deploymentTool: ''
  

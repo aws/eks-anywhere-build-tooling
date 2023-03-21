@@ -28,4 +28,4 @@ wait::for::dockerd
 
 build::docker::retry_pull public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v7.0.0
 
-docker run --privileged --rm public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v7.0.0 --install aarch64
+docker run --privileged --rm public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v7.0.0 --install aarch64,amd64

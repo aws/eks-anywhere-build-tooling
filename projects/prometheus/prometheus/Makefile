@@ -27,6 +27,7 @@ EXTRA_DOCKER_FILE_TARGETS=$(OUTPUT_DIR)/extra/etc/prometheus/prometheus.yml
 FIX_LICENSES_CRONEXPR_TARGET=$(REPO)/vendor/github.com/hashicorp/cronexpr/LICENSE
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
+BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
 HAS_HELM_CHART=true
 HELM_SOURCE_OWNER=prometheus-community
@@ -72,6 +73,7 @@ $(EXTRA_DOCKER_FILE_TARGETS):
 	cp -r prometheus/consoles/* $(OUTPUT_DIR)/extra/usr/share/prometheus/consoles/
 
 	cp prometheus/npm_licenses.tar.bz2 $(OUTPUT_DIR)/npm_licenses.tar.bz2
+
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

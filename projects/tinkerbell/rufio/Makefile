@@ -31,6 +31,7 @@ $(FIX_LICENSE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 	wget -q --retry-connrefused -O $$dest \
 		https://raw.githubusercontent.com/bmc-toolbox/common/main/LICENSE;
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion

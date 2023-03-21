@@ -30,6 +30,7 @@ $(FIX_LICENSES_DENNWC_TARGETS): | $(GO_MOD_DOWNLOAD_TARGETS)
 			$(REPO)/vendor/github.com/dennwc/$$package/LICENSE; \
 	done;
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion

@@ -9,12 +9,11 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `cloud-provider-vsphere`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
-patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `vsphere-cloud-controller-manager` for `linux/amd64 linux/arm64`
-_output/1-21/bin/cloud-provider-vsphere/linux-amd64/vsphere-cloud-controller-manager: ## Build `_output/1-21/bin/cloud-provider-vsphere/linux-amd64/vsphere-cloud-controller-manager`
-_output/1-21/bin/cloud-provider-vsphere/linux-arm64/vsphere-cloud-controller-manager: ## Build `_output/1-21/bin/cloud-provider-vsphere/linux-arm64/vsphere-cloud-controller-manager`
+_output/1-26/bin/cloud-provider-vsphere/linux-amd64/vsphere-cloud-controller-manager: ## Build `_output/1-26/bin/cloud-provider-vsphere/linux-amd64/vsphere-cloud-controller-manager`
+_output/1-26/bin/cloud-provider-vsphere/linux-arm64/vsphere-cloud-controller-manager: ## Build `_output/1-26/bin/cloud-provider-vsphere/linux-arm64/vsphere-cloud-controller-manager`
 
 ##@ Image Targets
 local-images: ## Builds `cloud-provider-vsphere/images/amd64` as oci tars for presumbit validation
