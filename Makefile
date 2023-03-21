@@ -42,7 +42,7 @@ clean: $(addprefix clean-project-, $(ALL_PROJECTS))
 .PHONY: add-generated-help-block-project-%
 add-generated-help-block-project-%:
 	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
-	$(MAKE) add-generated-help-block -C $(PROJECT_PATH) RELEASE_BRANCH=1-21
+	$(MAKE) add-generated-help-block -C $(PROJECT_PATH) RELEASE_BRANCH=1-26
 
 .PHONY: add-generated-help-block
 add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_PROJECTS))

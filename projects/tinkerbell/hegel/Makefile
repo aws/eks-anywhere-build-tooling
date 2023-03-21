@@ -16,6 +16,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(call IMAGE_TARGETS_FOR_NAME, hegel): hegel-useradd/images/export
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
