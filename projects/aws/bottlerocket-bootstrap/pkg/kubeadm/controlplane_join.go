@@ -52,13 +52,23 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error reading the ca data")
 	}
 
-	cmd = exec.Command(utils.ApiclientBinary, "set",
-		"kubernetes.api-server="+apiServer,
-		"kubernetes.cluster-certificate="+b64CA,
-		"kubernetes.cluster-dns-ip="+dns,
-		"kubernetes.bootstrap-token="+token,
+	args := []string{
+		"set",
+		"kubernetes.api-server=" + apiServer,
+		"kubernetes.cluster-certificate=" + b64CA,
+		"kubernetes.cluster-dns-ip=" + dns,
+		"kubernetes.bootstrap-token=" + token,
 		"kubernetes.authentication-mode=tls",
-		"kubernetes.standalone-mode=false")
+		"kubernetes.standalone-mode=false",
+	}
+
+	kubeletTlsConfig := readKubeletTlsConfig(&RealFileReader{})
+	if kubeletTlsConfig != nil {
+		args = append(args, "settings.kubernetes.server-certificate="+kubeletTlsConfig.KubeletServingCert)
+		args = append(args, "settings.kubernetes.server-key="+kubeletTlsConfig.KubeletServingPrivateKey)
+	}
+
+	cmd = exec.Command(utils.ApiclientBinary, args...)
 	if err := cmd.Run(); err != nil {
 		return errors.Wrapf(err, "Error running command: %v", cmd)
 	}

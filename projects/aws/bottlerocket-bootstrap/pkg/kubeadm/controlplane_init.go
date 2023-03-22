@@ -109,13 +109,23 @@ func controlPlaneInit() error {
 		return errors.Wrap(err, "Error getting token")
 	}
 	fmt.Printf("Bootstrap token is: %s\n", token)
-
 	// token string already has escaped quotes
-	cmd = exec.Command(utils.ApiclientBinary, "set", "kubernetes.api-server="+apiServer,
-		"kubernetes.cluster-certificate="+b64CA,
-		"kubernetes.bootstrap-token="+string(token),
+	args := []string{
+		"set",
+		"kubernetes.api-server=" + apiServer,
+		"kubernetes.cluster-certificate=" + b64CA,
+		"kubernetes.bootstrap-token=" + string(token),
 		"kubernetes.authentication-mode=tls",
-		"kubernetes.standalone-mode=false")
+		"kubernetes.standalone-mode=false",
+	}
+
+	kubeletTlsConfig := readKubeletTlsConfig(&RealFileReader{})
+	if kubeletTlsConfig != nil {
+		args = append(args, "settings.kubernetes.server-certificate="+kubeletTlsConfig.KubeletServingCert)
+		args = append(args, "settings.kubernetes.server-key="+kubeletTlsConfig.KubeletServingPrivateKey)
+	}
+
+	cmd = exec.Command(utils.ApiclientBinary, args...)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		fmt.Println(string(out))
