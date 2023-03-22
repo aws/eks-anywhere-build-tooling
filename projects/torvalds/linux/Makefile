@@ -20,6 +20,9 @@ IMAGE_NAMES=
 # this project never builds arm, dont fake it in presubmits
 FAKE_ARM_BINARIES_FOR_VALIDATION=false
 
+# we cant cross build this so must build on an amd instance
+BUILDSPEC_PLATFORM=LINUX_CONTAINER
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
