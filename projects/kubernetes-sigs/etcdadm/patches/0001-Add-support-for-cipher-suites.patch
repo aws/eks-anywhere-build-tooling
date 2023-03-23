@@ -1,7 +1,7 @@
-From 3cbeef92a04c2d09bca28dfbd005080246781196 Mon Sep 17 00:00:00 2001
+From 08f459ac8146df5955582045d662c3c7b0ae97f0 Mon Sep 17 00:00:00 2001
 From: Vivek Koppuru <koppv@amazon.com>
 Date: Wed, 1 Dec 2021 15:51:57 -0800
-Subject: [PATCH] Add support for cipher-suites
+Subject: [PATCH 1/4] Add support for cipher-suites
 
 ---
  apis/config.go         | 4 ++++
@@ -13,12 +13,12 @@ Subject: [PATCH] Add support for cipher-suites
  6 files changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/apis/config.go b/apis/config.go
-index b530110d..7de11c5d 100644
+index 67c1f203..149b55fb 100644
 --- a/apis/config.go
 +++ b/apis/config.go
-@@ -95,6 +95,10 @@ type EtcdAdmConfig struct {
- 	InitSystem InitSystem
- 
+@@ -110,6 +110,10 @@ type EtcdAdmConfig struct {
+ 	// This is a bool, but we use a string because the default value changes across versions.
+ 	EnableV2 string
  	Endpoint string
 +
 +	// CipherSuites is a list of supported TLS cipher suites, mapping to the --cipher-suites flag.
@@ -28,34 +28,34 @@ index b530110d..7de11c5d 100644
  
  // InitSystem represents the different types of init system
 diff --git a/cmd/init.go b/cmd/init.go
-index 835b6c00..2fe20179 100644
+index cb52ae19..819bab37 100644
 --- a/cmd/init.go
 +++ b/cmd/init.go
 @@ -52,6 +52,7 @@ func init() {
  	initCmd.PersistentFlags().StringVar(&etcdAdmConfig.ImageRepository, "image-repository", constants.DefaultImageRepository, "image repository when using kubelet init system")
  	initCmd.PersistentFlags().StringVar(&etcdAdmConfig.DataDir, "data-dir", constants.DefaultDataDir, "etcd data directory")
- 	initCmd.PersistentFlags().StringVar(&etcdAdmConfig.PodSpecDir, "podspec-dir", constants.DefaultPodSpecDir, "kubelet podspec directory")
+ 	initCmd.PersistentFlags().StringVar(&etcdAdmConfig.PodSpecDir, "kubelet-pod-manifest-path", constants.DefaultPodSpecDir, "kubelet podspec directory")
 +	initCmd.PersistentFlags().StringSliceVar(&etcdAdmConfig.CipherSuites, "cipher-suites", etcdAdmConfig.CipherSuites, "optional list of supported TLS cipher suites between server/client and peers, can be multiple comma separated TLS cipher suites")
  
  	runner.registerPhasesAsSubcommands(initCmd)
  }
 diff --git a/cmd/join.go b/cmd/join.go
-index 1be6c6af..97843998 100644
+index 8f2f700c..4ee97a03 100644
 --- a/cmd/join.go
 +++ b/cmd/join.go
-@@ -51,6 +51,7 @@ func init() {
+@@ -50,6 +50,7 @@ func init() {
  	joinCmd.PersistentFlags().StringVar(&etcdAdmConfig.ImageRepository, "image-repository", constants.DefaultImageRepository, "image repository when using kubelet init system")
  	joinCmd.PersistentFlags().StringVar(&etcdAdmConfig.DataDir, "data-dir", constants.DefaultDataDir, "etcd data directory")
- 	joinCmd.PersistentFlags().StringVar(&etcdAdmConfig.PodSpecDir, "podspec-dir", constants.DefaultPodSpecDir, "kubelet podspec directory")
+ 	joinCmd.PersistentFlags().StringVar(&etcdAdmConfig.PodSpecDir, "kubelet-pod-manifest-path", constants.DefaultPodSpecDir, "kubelet podspec directory")
 +	joinCmd.PersistentFlags().StringSliceVar(&etcdAdmConfig.CipherSuites, "cipher-suites", etcdAdmConfig.CipherSuites, "optional list of supported TLS cipher suites between server/client and peers, can be multiple comma separated TLS cipher suites")
  
  	runner.registerPhasesAsSubcommands(joinCmd)
  }
 diff --git a/constants/constants.go b/constants/constants.go
-index e5f6be80..cc8daca1 100644
+index 6f3ec911..e5e421ac 100644
 --- a/constants/constants.go
 +++ b/constants/constants.go
-@@ -134,6 +134,8 @@ ETCD_CERT_FILE={{ .CertFile }}
+@@ -126,6 +126,8 @@ ETCD_CERT_FILE={{ .CertFile }}
  ETCD_KEY_FILE={{ .KeyFile }}
  ETCD_TRUSTED_CA_FILE={{ .TrustedCAFile }}
  
@@ -65,7 +65,7 @@ index e5f6be80..cc8daca1 100644
  ETCD_DATA_DIR={{ .DataDir }}
  ETCD_STRICT_RECONFIG_CHECK=true
 diff --git a/service/diff.go b/service/diff.go
-index 9bcf2e1a..3874c9f3 100644
+index ed1b4e88..f8fea4d3 100644
 --- a/service/diff.go
 +++ b/service/diff.go
 @@ -98,7 +98,8 @@ func DiffVersion(cfg *apis.EtcdAdmConfig) (string, error) {
@@ -101,5 +101,5 @@ index f06e73b6..8beaaadd 100644
  	var b bytes.Buffer
  
 -- 
-2.27.0
+2.39.2
 

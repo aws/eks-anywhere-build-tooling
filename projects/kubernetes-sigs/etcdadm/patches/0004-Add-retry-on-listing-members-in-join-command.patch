@@ -1,17 +1,17 @@
-From 1841c1668306c9a05399090fdaeac5e128d2e374 Mon Sep 17 00:00:00 2001
+From 03acc681722268d38ad3b41109e9848d3245f306 Mon Sep 17 00:00:00 2001
 From: Wonkun Kim <wonkun@amazon.com>
 Date: Fri, 3 Jun 2022 16:25:08 -0500
-Subject: [PATCH] Add retry on listing members in join command
+Subject: [PATCH 4/4] Add retry on listing members in join command
 
 ---
  cmd/join.go | 51 +++++++++++++++++++++++++++++++--------------------
  1 file changed, 31 insertions(+), 20 deletions(-)
 
 diff --git a/cmd/join.go b/cmd/join.go
-index dee7eba9..fa503318 100644
+index 38ab2e17..2c6c06a4 100644
 --- a/cmd/join.go
 +++ b/cmd/join.go
-@@ -132,6 +132,22 @@ func membership() phase {
+@@ -134,6 +134,23 @@ func membership() phase {
  				return nil
  			}
  
@@ -31,17 +31,17 @@ index dee7eba9..fa503318 100644
 +				Jitter:   0.1,
 +			}
 +
- 			var localMember *etcdserverpb.Member
- 			var members []*etcdserverpb.Member
++			var localMember *etcd.Member
+ 			var members []*etcd.Member
  			log.Println("[membership] Checking if this member was added")
-@@ -139,13 +155,23 @@ func membership() phase {
- 			if err != nil {
- 				return fmt.Errorf("error checking membership: %v", err)
+ 			log.Printf("[membership] Generating etcd client with endpoints %s", in.etcdAdmConfig.Endpoints)
+@@ -143,13 +160,22 @@ func membership() phase {
  			}
+ 			defer client.Close()
+ 
 -			ctx, cancel := context.WithTimeout(context.Background(), constants.DefaultEtcdRequestTimeout)
 -			mresp, err := client.MemberList(ctx)
 -			cancel()
-+
 +			err = wait.ExponentialBackoff(opts, func() (bool, error) {
 +				ctx, cancel := context.WithTimeout(context.Background(), constants.DefaultEtcdRequestTimeout)
 +				mresp, err := client.MemberList(ctx)
@@ -63,7 +63,7 @@ index dee7eba9..fa503318 100644
  			localMember, ok := etcd.MemberForPeerURLs(members, in.etcdAdmConfig.InitialAdvertisePeerURLs.StringSlice())
  			if !ok {
  				log.Printf("[membership] Member was not added")
-@@ -153,21 +179,6 @@ func membership() phase {
+@@ -157,21 +183,6 @@ func membership() phase {
  				os.RemoveAll(in.etcdAdmConfig.DataDir)
  				log.Println("[membership] Adding member")
  
@@ -86,5 +86,5 @@ index dee7eba9..fa503318 100644
  					ctx, cancel := context.WithTimeout(context.Background(), constants.DefaultEtcdRequestTimeout)
  					mresp, err := client.MemberAdd(ctx, in.etcdAdmConfig.InitialAdvertisePeerURLs.StringSlice())
 -- 
-2.32.1 (Apple Git-133)
+2.39.2
 

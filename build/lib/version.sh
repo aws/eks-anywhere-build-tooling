@@ -16,7 +16,7 @@ set -o pipefail
 
 version::get_version_vars() {
     local -r repo=$1
-    GIT_RELEASE_TAG=$(git -C $repo describe --abbrev=0 --tags)
+    GIT_RELEASE_TAG=$(git -C $repo describe --match 'v[0-9]*.[0-9]*.[0-9]**' --abbrev=0 --tags)
     GIT_RELEASE_COMMIT=$(git -C $repo rev-list -n 1  "${GIT_RELEASE_TAG}")
 
     GIT_COMMIT=$GIT_RELEASE_COMMIT
