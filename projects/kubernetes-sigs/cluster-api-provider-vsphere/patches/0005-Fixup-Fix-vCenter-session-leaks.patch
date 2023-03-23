@@ -1,0 +1,42 @@
+From 7dcafd4a8dfd59fb7d18599a42233c2ef39b33b3 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Thu, 23 Mar 2023 15:01:55 -0400
+Subject: [PATCH] Fixup patch
+
+---
+ pkg/session/session.go | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
+
+diff --git a/pkg/session/session.go b/pkg/session/session.go
+index f25d2bb0..1a172f37 100644
+--- a/pkg/session/session.go
++++ b/pkg/session/session.go
+@@ -250,24 +250,9 @@ func newManager(ctx context.Context, logger logr.Logger, sessionKey string, clie
+ 	return tags.NewManager(rc), nil
+ }
+ 
+-func (s *Session) GetVersion() (infrav1.VCenterVersion, error) {
+-	svcVersion := s.ServiceContent.About.Version
+-	version, err := semver.New(svcVersion)
+-	if err != nil {
+-		return "", err
+-	}
+-
+-	switch version.Major {
+-	case 6, 7, 8:
+-		return infrav1.NewVCenterVersion(svcVersion), nil
+-	default:
+-		return "", unidentifiedVCenterVersion{version: svcVersion}
+-	}
+-}
+-
+ // Clear is meant to destroy all the cached sessions.
+ func Clear() {
+-	sessionCache.Range(func(key, s any) bool {
++	sessionCache.Range(func(key, s interface{}) bool {
+ 		cachedSession := s.(*Session)
+ 		_ = cachedSession.Logout(context.Background())
+ 		return true
+-- 
+2.37.1 (Apple Git-137.1)
+
