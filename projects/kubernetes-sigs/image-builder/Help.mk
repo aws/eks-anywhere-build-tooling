@@ -42,6 +42,6 @@ patch-for-dep-update: ## After bumping dep in go.mod file and updating vendor, g
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `release-image-build-on-metal-ubuntu fake-ubuntu.gz _output/tar/1-26/raw/ubuntu/ubuntu.gz upload-artifacts-raw build-ami-ubuntu-2004 setup-packer-configs-ova  fake-ubuntu.ova _output/tar/1-26/ova/ubuntu/ubuntu.ova  upload-artifacts-ova`
+build: ## Called via prow presubmit, calls `release-image-build-on-metal-ubuntu fake-ubuntu.gz _output/tar/1-26/raw/ubuntu/ubuntu.gz upload-artifacts-raw download-bottlerocket-raw _output/tar/1-26/raw/bottlerocket/bottlerocket.img.gz upload-bottlerocket-raw build-ami-ubuntu-2004 download-bottlerocket-ami _output/tar/1-26/ami/bottlerocket/bottlerocket.img.gz upload-bottlerocket-ami setup-packer-configs-ova  fake-ubuntu.ova _output/tar/1-26/ova/ubuntu/ubuntu.ova  upload-artifacts-ova download-bottlerocket-ova _output/tar/1-26/ova/bottlerocket/bottlerocket.ova upload-bottlerocket-ova`
 release: ## Called via prow postsubmit + release jobs, calls `release-image-build-on-metal-ubuntu upload-artifacts-raw`
 ########### END GENERATED ###########################
