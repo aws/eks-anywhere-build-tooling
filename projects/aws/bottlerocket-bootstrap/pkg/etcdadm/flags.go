@@ -8,7 +8,7 @@ func buildFlags(repository, version, cipherSuites string) []string {
 		"--image-repository", repository,
 		"--certs-dir", certDir,
 		"--data-dir", dataDir,
-		"--podspec-dir", podSpecDir,
+		"--kubelet-pod-manifest-path", podSpecDir,
 		"--cipher-suites", cipherSuites,
 	}
 }
