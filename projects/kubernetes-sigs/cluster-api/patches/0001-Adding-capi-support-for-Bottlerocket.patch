@@ -1,7 +1,7 @@
-From f402a9776cf9becbcacd6c029ee82b66e7b0d106 Mon Sep 17 00:00:00 2001
+From 91884a60a8f8fceda3140db6e85e294930285187 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Fri, 11 Jun 2021 10:43:09 -0700
-Subject: [PATCH 01/28] Adding capi support for Bottlerocket
+Subject: [PATCH 01/29] Adding capi support for Bottlerocket
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 
@@ -77,7 +77,7 @@ index e1f023426..1c95079f7 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
-index ea29c2945..fea80179b 100644
+index c6af28eef..19643e08c 100644
 --- a/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
 +++ b/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
 @@ -24,12 +24,15 @@ import (
@@ -98,7 +98,7 @@ index ea29c2945..fea80179b 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index dc2bb6087..1c5b2a356 100644
+index 653b4da55..11aa737a7 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -73,6 +73,21 @@ type InitConfiguration struct {
@@ -153,7 +153,7 @@ index dc2bb6087..1c5b2a356 100644
  // ControlPlaneComponent holds settings common to control plane component of the cluster.
  type ControlPlaneComponent struct {
  	// ExtraArgs is an extra set of flags to pass to the control plane component.
-@@ -402,6 +440,21 @@ type ExternalEtcd struct {
+@@ -415,6 +453,21 @@ type ExternalEtcd struct {
  type JoinConfiguration struct {
  	metav1.TypeMeta `json:",inline"`
  
@@ -199,10 +199,10 @@ index fc6ebee0d..079b96fe7 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 1ae748175..79fa4991c 100644
+index f88b1bd00..81eba3f29 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -102,6 +102,21 @@ spec:
+@@ -103,6 +103,21 @@ spec:
                        schemas to the latest internal value, and may reject unrecognized
                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                      type: string
@@ -224,7 +224,7 @@ index 1ae748175..79fa4991c 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -305,6 +320,34 @@ spec:
+@@ -306,6 +321,34 @@ spec:
                            if that's unset.
                          type: string
                      type: object
@@ -259,7 +259,7 @@ index 1ae748175..79fa4991c 100644
                    scheduler:
                      description: Scheduler contains extra settings for the scheduler
                        control plane component
-@@ -494,6 +537,7 @@ spec:
+@@ -495,6 +538,7 @@ spec:
                  description: Format specifies the output format of the bootstrap data
                  enum:
                  - cloud-config
@@ -267,7 +267,7 @@ index 1ae748175..79fa4991c 100644
                  type: string
                initConfiguration:
                  description: InitConfiguration along with ClusterConfiguration are
-@@ -660,6 +704,21 @@ spec:
+@@ -661,6 +705,21 @@ spec:
                        schemas to the latest internal value, and may reject unrecognized
                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                      type: string
@@ -289,7 +289,7 @@ index 1ae748175..79fa4991c 100644
                    caCertPath:
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
-@@ -830,6 +889,34 @@ spec:
+@@ -831,6 +890,34 @@ spec:
                            type: object
                          type: array
                      type: object
@@ -324,7 +324,7 @@ index 1ae748175..79fa4991c 100644
                  type: object
                mounts:
                  description: Mounts specifies a list of mount points to be setup.
-@@ -2083,6 +2170,21 @@ spec:
+@@ -2085,6 +2172,21 @@ spec:
                        schemas to the latest internal value, and may reject unrecognized
                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                      type: string
@@ -346,7 +346,7 @@ index 1ae748175..79fa4991c 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -2289,6 +2391,34 @@ spec:
+@@ -2291,6 +2393,34 @@ spec:
                            if that's unset.
                          type: string
                      type: object
@@ -381,7 +381,7 @@ index 1ae748175..79fa4991c 100644
                    scheduler:
                      description: Scheduler contains extra settings for the scheduler
                        control plane component
-@@ -2478,6 +2608,7 @@ spec:
+@@ -2480,6 +2610,7 @@ spec:
                  enum:
                  - cloud-config
                  - ignition
@@ -389,7 +389,7 @@ index 1ae748175..79fa4991c 100644
                  type: string
                ignition:
                  description: Ignition contains Ignition specific configuration.
-@@ -2694,6 +2825,21 @@ spec:
+@@ -2707,6 +2838,21 @@ spec:
                        schemas to the latest internal value, and may reject unrecognized
                        values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                      type: string
@@ -411,7 +411,7 @@ index 1ae748175..79fa4991c 100644
                    caCertPath:
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
-@@ -2886,6 +3032,34 @@ spec:
+@@ -2910,6 +3056,34 @@ spec:
                            content inline or by referencing a secret.
                          type: string
                      type: object
@@ -447,7 +447,7 @@ index 1ae748175..79fa4991c 100644
                      description: SkipPhases is a list of phases to skip during command
                        execution. The list of phases can be obtained with the "kubeadm
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index b9b33cb1f..9104c41be 100644
+index abad81720..e8ded0c1b 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -111,6 +111,22 @@ spec:
@@ -578,7 +578,7 @@ index b9b33cb1f..9104c41be 100644
                          type: object
                        mounts:
                          description: Mounts specifies a list of mount points to be
-@@ -2075,6 +2168,22 @@ spec:
+@@ -2096,6 +2189,22 @@ spec:
                                convert recognized schemas to the latest internal value,
                                and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                              type: string
@@ -601,7 +601,7 @@ index b9b33cb1f..9104c41be 100644
                            certificatesDir:
                              description: 'CertificatesDir specifies where to store
                                or look for all required certificates. NB: if not provided,
-@@ -2296,6 +2405,36 @@ spec:
+@@ -2317,6 +2426,36 @@ spec:
                                    or to "10.96.0.0/12" if that's unset.
                                  type: string
                              type: object
@@ -638,7 +638,7 @@ index b9b33cb1f..9104c41be 100644
                            scheduler:
                              description: Scheduler contains extra settings for the
                                scheduler control plane component
-@@ -2496,6 +2635,7 @@ spec:
+@@ -2517,6 +2656,7 @@ spec:
                          enum:
                          - cloud-config
                          - ignition
@@ -646,7 +646,7 @@ index b9b33cb1f..9104c41be 100644
                          type: string
                        ignition:
                          description: Ignition contains Ignition specific configuration.
-@@ -2729,6 +2869,22 @@ spec:
+@@ -2762,6 +2902,22 @@ spec:
                                convert recognized schemas to the latest internal value,
                                and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                              type: string
@@ -669,7 +669,7 @@ index b9b33cb1f..9104c41be 100644
                            caCertPath:
                              description: 'CACertPath is the path to the SSL certificate
                                authority used to secure comunications between node
-@@ -2936,6 +3092,36 @@ spec:
+@@ -2981,6 +3137,36 @@ spec:
                                    content inline or by referencing a secret.
                                  type: string
                              type: object
@@ -1152,10 +1152,10 @@ index c2f158f7c..aaf8c5dc0 100644
  	if input.UseExperimentalRetry {
  		input.KubeadmCommand = retriableJoinScriptName
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index d46246b45..1773d2ec6 100644
+index 4376845b1..2ac572c92 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -41,6 +41,7 @@ import (
+@@ -42,6 +42,7 @@ import (
  
  	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
  	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
@@ -1163,7 +1163,7 @@ index d46246b45..1773d2ec6 100644
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/ignition"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/locking"
-@@ -433,6 +434,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -432,6 +433,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  	// injects into config.ClusterConfiguration values from top level object
  	r.reconcileTopLevelObjectSettings(ctx, scope.Cluster, machine, scope.Config)
  
@@ -1210,7 +1210,7 @@ index d46246b45..1773d2ec6 100644
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
  	if err != nil {
  		scope.Error(err, "Failed to marshal cluster configuration")
-@@ -502,6 +543,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -501,6 +542,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  			ControlPlaneInput: controlPlaneInput,
  			Ignition:          scope.Config.Spec.Ignition,
  		})
@@ -1223,7 +1223,7 @@ index d46246b45..1773d2ec6 100644
  	default:
  		bootstrapInitData, err = cloudinit.NewInitControlPlane(controlPlaneInput)
  	}
-@@ -600,6 +647,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -608,6 +655,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  			NodeInput: nodeInput,
  			Ignition:  scope.Config.Spec.Ignition,
  		})
@@ -1243,7 +1243,7 @@ index d46246b45..1773d2ec6 100644
  	default:
  		bootstrapJoinData, err = cloudinit.NewNode(nodeInput)
  	}
-@@ -703,6 +763,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -711,6 +771,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  			ControlPlaneJoinInput: controlPlaneJoinInput,
  			Ignition:              scope.Config.Spec.Ignition,
  		})
@@ -1428,7 +1428,7 @@ index 2eebc2402..e924a4a4b 100644
 +	return out
 +}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index cdb28bee5..1de32be6c 100644
+index e0fb72a10..b8b1a6713 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -178,6 +178,22 @@ spec:
@@ -1627,7 +1627,7 @@ index cdb28bee5..1de32be6c 100644
                      type: string
                    ignition:
                      description: Ignition contains Ignition specific configuration.
-@@ -3171,6 +3311,22 @@ spec:
+@@ -3183,6 +3323,22 @@ spec:
                            schemas to the latest internal value, and may reject unrecognized
                            values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                          type: string
@@ -1650,7 +1650,7 @@ index cdb28bee5..1de32be6c 100644
                        caCertPath:
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
-@@ -3372,6 +3528,36 @@ spec:
+@@ -3396,6 +3552,36 @@ spec:
                                or by referencing a secret.
                              type: string
                          type: object
@@ -1688,10 +1688,10 @@ index cdb28bee5..1de32be6c 100644
                          description: SkipPhases is a list of phases to skip during
                            command execution. The list of phases can be obtained with
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index ef9869f54..2f5e64876 100644
+index 7f38bad11..99b6eab9e 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -1288,6 +1288,24 @@ spec:
+@@ -1309,6 +1309,24 @@ spec:
                                    value, and may reject unrecognized values. More
                                    info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                                  type: string
@@ -1716,7 +1716,7 @@ index ef9869f54..2f5e64876 100644
                                certificatesDir:
                                  description: 'CertificatesDir specifies where to store
                                    or look for all required certificates. NB: if not
-@@ -1517,6 +1535,37 @@ spec:
+@@ -1538,6 +1556,37 @@ spec:
                                        or to "10.96.0.0/12" if that's unset.
                                      type: string
                                  type: object
@@ -1754,7 +1754,7 @@ index ef9869f54..2f5e64876 100644
                                scheduler:
                                  description: Scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -1724,6 +1773,7 @@ spec:
+@@ -1745,6 +1794,7 @@ spec:
                              enum:
                              - cloud-config
                              - ignition
@@ -1762,7 +1762,7 @@ index ef9869f54..2f5e64876 100644
                              type: string
                            ignition:
                              description: Ignition contains Ignition specific configuration.
-@@ -1967,6 +2017,24 @@ spec:
+@@ -2001,6 +2051,24 @@ spec:
                                    value, and may reject unrecognized values. More
                                    info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                                  type: string
@@ -1787,7 +1787,7 @@ index ef9869f54..2f5e64876 100644
                                caCertPath:
                                  description: 'CACertPath is the path to the SSL certificate
                                    authority used to secure comunications between node
-@@ -2183,6 +2251,37 @@ spec:
+@@ -2230,6 +2298,37 @@ spec:
                                        by referencing a secret.
                                      type: string
                                  type: object
@@ -1826,25 +1826,25 @@ index ef9869f54..2f5e64876 100644
                                  description: SkipPhases is a list of phases to skip
                                    during command execution. The list of phases can
 diff --git a/go.mod b/go.mod
-index 35a36659b..f38a24e07 100644
+index e2480d483..4cbc2eb98 100644
 --- a/go.mod
 +++ b/go.mod
 @@ -32,6 +32,7 @@ require (
- 	golang.org/x/net v0.7.0 // indirect
- 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
- 	google.golang.org/grpc v1.47.0
+ 	golang.org/x/net v0.8.0 // indirect
+ 	golang.org/x/oauth2 v0.6.0
+ 	google.golang.org/grpc v1.52.0
 +	gopkg.in/yaml.v2 v2.4.0
- 	k8s.io/api v0.25.0
- 	k8s.io/apiextensions-apiserver v0.25.0
- 	k8s.io/apimachinery v0.25.0
-@@ -140,7 +141,6 @@ require (
+ 	k8s.io/api v0.26.1
+ 	k8s.io/apiextensions-apiserver v0.26.1
+ 	k8s.io/apimachinery v0.26.1
+@@ -133,7 +134,6 @@ require (
  	google.golang.org/protobuf v1.28.1 // indirect
  	gopkg.in/inf.v0 v0.9.1 // indirect
  	gopkg.in/ini.v1 v1.67.0 // indirect
 -	gopkg.in/yaml.v2 v2.4.0 // indirect
  	gopkg.in/yaml.v3 v3.0.1 // indirect
  	k8s.io/cli-runtime v0.25.0 // indirect
- 	k8s.io/kube-openapi v0.0.0-20220803164354-a70c9af30aea
+ 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 -- 
 2.25.1
 

@@ -1,7 +1,7 @@
-From b7c0f326412cdad35e7a2dd37bcbb22aa63e30a9 Mon Sep 17 00:00:00 2001
+From 269b352aea95ba70ad5cdb7bbfd47164a16363e0 Mon Sep 17 00:00:00 2001
 From: Michael Chu <chumich@amazon.com>
 Date: Mon, 28 Feb 2022 09:51:25 -0800
-Subject: [PATCH 15/28] Support configuring bottlerocket control container uri
+Subject: [PATCH 15/29] Support configuring bottlerocket control container uri
 
 Signed-off-by: Michael Chu <chumich@amazon.com>
 ---
@@ -52,10 +52,10 @@ index 125f9356b..90d8a612b 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/api/v1beta1/zz_generated.deepcopy.go b/api/v1beta1/zz_generated.deepcopy.go
-index d583401f6..c3b240da5 100644
+index 49ee41659..5b1f28c0c 100644
 --- a/api/v1beta1/zz_generated.deepcopy.go
 +++ b/api/v1beta1/zz_generated.deepcopy.go
-@@ -334,6 +334,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+@@ -379,6 +379,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
  		*out = new(v1.ObjectReference)
  		**out = **in
  	}
@@ -110,7 +110,7 @@ index 29df78f5c..9027f336f 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-index 2709b853f..8df88b740 100644
+index 0e60d4e59..5c36c5ca4 100644
 --- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
 @@ -100,6 +100,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -244,7 +244,7 @@ index 334d940ca..c5999accd 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index e86403d0e..5701e0424 100644
+index 9676d26a8..8c9dcac00 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -83,6 +83,11 @@ type ClusterConfiguration struct {
@@ -273,7 +273,7 @@ index e86403d0e..5701e0424 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -464,6 +476,11 @@ type JoinConfiguration struct {
+@@ -477,6 +489,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -286,7 +286,7 @@ index e86403d0e..5701e0424 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
-index 66ed326bf..7ac786487 100644
+index a77749836..921e6b0ea 100644
 --- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 @@ -159,12 +159,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -328,10 +328,10 @@ index 66ed326bf..7ac786487 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 427575a57..c564669e1 100644
+index f9d823261..a6bd0ea08 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -117,6 +117,21 @@ spec:
+@@ -118,6 +118,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -353,7 +353,7 @@ index 427575a57..c564669e1 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -731,6 +746,21 @@ spec:
+@@ -732,6 +747,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -375,7 +375,7 @@ index 427575a57..c564669e1 100644
                    caCertPath:
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
-@@ -1221,6 +1251,21 @@ spec:
+@@ -1223,6 +1253,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -397,7 +397,7 @@ index 427575a57..c564669e1 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -1829,6 +1874,21 @@ spec:
+@@ -1831,6 +1876,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -419,7 +419,7 @@ index 427575a57..c564669e1 100644
                    caCertPath:
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
-@@ -2319,6 +2379,21 @@ spec:
+@@ -2321,6 +2381,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -441,7 +441,7 @@ index 427575a57..c564669e1 100644
                    certificatesDir:
                      description: 'CertificatesDir specifies where to store or look
                        for all required certificates. NB: if not provided, this will
-@@ -2986,6 +3061,21 @@ spec:
+@@ -2999,6 +3074,21 @@ spec:
                            the version of the above components during upgrades.
                          type: string
                      type: object
@@ -464,7 +464,7 @@ index 427575a57..c564669e1 100644
                      description: 'CACertPath is the path to the SSL certificate authority
                        used to secure comunications between node and control-plane.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 2ea783dff..abf068747 100644
+index b3d3b1019..ec182fd0f 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -127,6 +127,22 @@ spec:
@@ -559,7 +559,7 @@ index 2ea783dff..abf068747 100644
                            caCertPath:
                              description: 'CACertPath is the path to the SSL certificate
                                authority used to secure comunications between node
-@@ -2328,6 +2392,22 @@ spec:
+@@ -2349,6 +2413,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -582,7 +582,7 @@ index 2ea783dff..abf068747 100644
                            certificatesDir:
                              description: 'CertificatesDir specifies where to store
                                or look for all required certificates. NB: if not provided,
-@@ -3042,6 +3122,22 @@ spec:
+@@ -3075,6 +3155,22 @@ spec:
                                    components during upgrades.
                                  type: string
                              type: object
@@ -675,10 +675,10 @@ index 36c3f67a7..e635308ea 100644
  		for _, noProxy := range config.ProxyConfiguration.NoProxy {
  			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 1cbabcc0e..8cdacbd5a 100644
+index 085ff3460..bc5561a56 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -468,6 +468,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -467,6 +467,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
  			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
  			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
@@ -686,7 +686,7 @@ index 1cbabcc0e..8cdacbd5a 100644
  		}
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -660,6 +661,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -668,6 +669,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
  			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
  			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
@@ -737,7 +737,7 @@ index 408678fe6..cf8d70b03 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
-index 6c54a7c8d..8c8c14ce3 100644
+index c893bd235..700d980fe 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
 @@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -913,7 +913,7 @@ index ff9a01d04..b45040a22 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-index 899217b91..5e8ec2b5c 100644
+index ae1158152..a0d3f763c 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 @@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -1124,7 +1124,7 @@ index 52218880c..a83cdeb61 100644
 +	return out
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
-index 4cc596ea6..1bf115033 100644
+index 42bda5ca0..ea1301706 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
 @@ -83,6 +83,11 @@ type ClusterConfiguration struct {
@@ -1153,7 +1153,7 @@ index 4cc596ea6..1bf115033 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -390,6 +402,11 @@ type JoinConfiguration struct {
+@@ -397,6 +409,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -1166,7 +1166,7 @@ index 4cc596ea6..1bf115033 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index 7b66d673e..a0bebee87 100644
+index 9b0c13356..197c2ef74 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -1536,7 +1536,7 @@ index 96a245420..73c297c82 100644
  			},
  			want:    &bootstrapv1.ClusterConfiguration{},
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index 5882abd06..962a573a0 100644
+index 56b10250d..c5281a30a 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
 @@ -614,7 +614,7 @@ var backupRestoreTests = []struct {
@@ -1563,7 +1563,7 @@ index 5882abd06..962a573a0 100644
  			"Secret_ns2_bar-ca.yaml":                    `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"bar-ca","namespace":"ns2","resourceVersion":"999","uid":"/v1, Kind=Secret, ns2/bar-ca"}}` + "\n",
  			"GenericInfrastructureCluster_ns2_bar.yaml": `{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","metadata":{"creationTimestamp":null,"labels":{"cluster.x-k8s.io/cluster-name":"bar"},"name":"bar","namespace":"ns2","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"bar","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"}],"resourceVersion":"999","uid":"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns2/bar"}}` + "\n",
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 0d9208f46..49e7eb443 100644
+index 4cd9d3355..12d594362 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -194,6 +194,22 @@ spec:
@@ -1681,7 +1681,7 @@ index 0d9208f46..49e7eb443 100644
                        certificatesDir:
                          description: 'CertificatesDir specifies where to store or
                            look for all required certificates. NB: if not provided,
-@@ -3484,6 +3564,22 @@ spec:
+@@ -3496,6 +3576,22 @@ spec:
                                upgrades.
                              type: string
                          type: object
@@ -1705,7 +1705,7 @@ index 0d9208f46..49e7eb443 100644
                          description: 'CACertPath is the path to the SSL certificate
                            authority used to secure comunications between node and
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 735d5a35c..a323bb957 100644
+index 8b68b3056..7e52390fd 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -143,6 +143,23 @@ spec:
@@ -1756,7 +1756,7 @@ index 735d5a35c..a323bb957 100644
                                caCertPath:
                                  description: 'CACertPath is the path to the SSL certificate
                                    authority used to secure comunications between node
-@@ -1430,6 +1464,23 @@ spec:
+@@ -1451,6 +1485,23 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object
@@ -1780,7 +1780,7 @@ index 735d5a35c..a323bb957 100644
                                certificatesDir:
                                  description: 'CertificatesDir specifies where to store
                                    or look for all required certificates. NB: if not
-@@ -2172,6 +2223,23 @@ spec:
+@@ -2206,6 +2257,23 @@ spec:
                                        the above components during upgrades.
                                      type: string
                                  type: object

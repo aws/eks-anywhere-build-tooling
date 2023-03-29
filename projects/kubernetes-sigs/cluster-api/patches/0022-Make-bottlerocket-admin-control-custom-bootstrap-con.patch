@@ -1,7 +1,7 @@
-From 1ab3c840c04c53b7ff5c494caa8104e1937e7611 Mon Sep 17 00:00:00 2001
+From f50ebe66d346be3f7b0dbfabc3546ce51cb7b3d9 Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Thu, 5 Jan 2023 14:56:09 -0500
-Subject: [PATCH 23/28] Make bottlerocket admin, control, custom bootstrap
+Subject: [PATCH 22/29] Make bottlerocket admin, control, custom bootstrap
  container images updatable in webhook
 
 ---
@@ -10,7 +10,7 @@ Subject: [PATCH 23/28] Make bottlerocket admin, control, custom bootstrap
  2 files changed, 60 insertions(+)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index 74dabaa1b..ba7d4bb69 100644
+index 1d0d4abfd..d25eb0c95 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 @@ -141,6 +141,9 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
@@ -34,10 +34,10 @@ index 74dabaa1b..ba7d4bb69 100644
  		{spec, kubeadmConfigSpec, postKubeadmCommands},
  		{spec, kubeadmConfigSpec, files},
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-index 8a0c9e93c..ddc48a092 100644
+index 86c02c2e5..38caa9e1e 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-@@ -654,6 +654,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -659,6 +659,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
  	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
  
@@ -62,7 +62,7 @@ index 8a0c9e93c..ddc48a092 100644
  	updateInitConfigurationSkipPhases := before.DeepCopy()
  	updateInitConfigurationSkipPhases.Spec.KubeadmConfigSpec.InitConfiguration.SkipPhases = []string{"addon/kube-proxy"}
  
-@@ -1020,6 +1038,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1038,6 +1056,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateClusterConfBRBootstrapImage,
  		},
@@ -87,7 +87,7 @@ index 8a0c9e93c..ddc48a092 100644
  		{
  			name:      "should allow changes to join configuration pause image",
  			expectErr: false,
-@@ -1032,6 +1068,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1050,6 +1086,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateJoinConfBRBootstrapImage,
  		},
