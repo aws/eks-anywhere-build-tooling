@@ -18,6 +18,7 @@ PROJECT_ROOT=$(MAKE_ROOT)
 MINIMAL_BASE_IPTABLES_IMAGE_NAME?=eks-distro-minimal-base-iptables
 MINIMAL_BASE_HAPROXY_IMAGE_NAME?=eks-distro-minimal-base-haproxy
 MINIMAL_BASE_KIND_IMAGE_NAME?=eks-distro-minimal-base-kind
+MINIMAL_BASE_KIND_IMAGE_NAME_OS_VERSION=al2023
 
 KIND_BASE_IMAGE_COMPONENT=kubernetes-sigs/kind/base
 KIND_BASE_VERSIONED_IMAGE_COMPONENT=kubernetes-sigs/kind/base
@@ -97,6 +98,7 @@ kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_IPTABLES_IMAGE_NAME)
 # Kind-base
 kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/images/base
 kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
+kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_OS_VERSION=$(MINIMAL_BASE_KIND_IMAGE_NAME_OS_VERSION)
 kind-base/images/% kind-base-versioned/images/%: IMAGE_BUILD_ARGS=CNI_PLUGINS_AMD64_URL CNI_PLUGINS_ARM64_URL CNI_PLUGINS_AMD64_SHA256SUM \
 	CNI_PLUGINS_ARM64_SHA256SUM CRICTL_AMD64_SHA256SUM_URL CRICTL_ARM64_SHA256SUM_URL CRICTL_AMD64_URL CRICTL_ARM64_URL
 
@@ -117,6 +119,7 @@ kind-node/images/push: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
 kind-node/images/push: BASE_IMAGE=$(VERSIONED_BASE_IMAGE)
 # We are fully overriding the base_image above, setting the name is to ensure the builder image is set correctly
 kind-node/images/push: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
+kind-node/images/push: BASE_IMAGE_OS_VERSION=$(MINIMAL_BASE_KIND_IMAGE_NAME_OS_VERSION)
 kind-node/images/push: IMAGE_TAG=$(NODE_IMAGE_TAG)
 kind-node/images/push: LATEST_TAG=$(NODE_IMAGE_LATEST_TAG)
 kind-node/images/push: IMAGE_TARGET=node

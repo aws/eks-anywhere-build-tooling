@@ -1,17 +1,16 @@
-From ecc3a74d1d2736cff560d36ded75595fbd03f2c0 Mon Sep 17 00:00:00 2001
+From 0323b9b3b5d3da55769784e0a00c7526b5840f0f Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Sat, 2 Apr 2022 22:00:37 -0500
 Subject: [PATCH 1/2] Switch to AL2 base image for node image
 
 Signed-off-by: Jackson West <jgw@amazon.com>
-Signed-off-by: Prow Bot <prow@amazonaws.com>
 ---
  images/base/Dockerfile                        | 166 +++++++-----------
  images/base/files/usr/local/bin/clean-install |   9 +-
- 2 files changed, 70 insertions(+), 105 deletions(-)
+ 2 files changed, 69 insertions(+), 106 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index bbc087ad..a1f0f1f3 100644
+index bbc087ad..e4c13a47 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -19,53 +19,25 @@
@@ -231,17 +230,17 @@ index bbc087ad..a1f0f1f3 100644
  # tell systemd that it is in docker (it will check for the container env)
  # https://systemd.io/CONTAINER_INTERFACE/
 diff --git a/images/base/files/usr/local/bin/clean-install b/images/base/files/usr/local/bin/clean-install
-index bfeff602..06de894f 100755
+index bfeff602..f1d714a6 100755
 --- a/images/base/files/usr/local/bin/clean-install
 +++ b/images/base/files/usr/local/bin/clean-install
-@@ -25,10 +25,11 @@ if [ $# = 0 ]; then
+@@ -24,11 +24,10 @@ if [ $# = 0 ]; then
+   echo >&2 "No packages specified"
    exit 1
  fi
- 
+-
 -apt-get update
 -apt-get install -y --no-install-recommends "$@"
 -apt-get clean -y
-+amazon-linux-extras enable docker
 +yum install -y "$@"
 +yum clean all
  rm -rf \
@@ -249,7 +248,7 @@ index bfeff602..06de894f 100755
     /var/cache/debconf/* \
     /var/lib/apt/lists/* \
     /var/log/* \
-@@ -37,4 +38,4 @@ rm -rf \
+@@ -37,4 +36,4 @@ rm -rf \
     /usr/share/doc/* \
     /usr/share/doc-base/* \
     /usr/share/man/* \
