@@ -46,6 +46,7 @@ SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/stan
 # harbor-core has additional ldflags
 BINARY_TARGET_FILES_BUILD_ALONE=harbor-core
 GO_MOD_PATHS=src src src src src src
+GO_MODS_VENDORED=true
 
 TRIVY_VERSION=$(TRIVYVERSION)
 IMAGE_BUILD_ARGS=TRIVY_VERSION
