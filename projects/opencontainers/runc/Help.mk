@@ -15,15 +15,14 @@ binaries: ## Build all binaries: `runc` for `linux/amd64 linux/arm64`
 _output/bin/runc/linux-amd64/runc: ## Build `_output/bin/runc/linux-amd64/runc`
 _output/bin/runc/linux-arm64/runc: ## Build `_output/bin/runc/linux-arm64/runc`
 
-##@ Image Targets
-local-images: ## Builds `runc/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `runc/images/push` to IMAGE_REPO
-runc/images/amd64: ## Builds/pushes `runc/images/amd64`
-runc/images/push: ## Builds/pushes `runc/images/push`
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
+
+##@ Artifact Targets
+tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
+s3-artifacts: # Prepare ARTIFACTS_PATH folder structure with tarballs/manifests/other items to be uploaded to s3
+upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S3
 
 ##@ License Targets
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
@@ -49,6 +48,6 @@ patch-for-dep-update: ## After bumping dep in go.mod file and updating vendor, g
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `github-rate-limit-pre validate-checksums attribution local-images   attribution-pr github-rate-limit-post`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images  `
+build: ## Called via prow presubmit, calls `github-rate-limit-pre validate-checksums attribution   upload-artifacts attribution-pr github-rate-limit-post`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums   upload-artifacts`
 ########### END GENERATED ###########################
