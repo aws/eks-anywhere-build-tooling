@@ -22,6 +22,7 @@ IMAGE_NAMES=
 BUILDSPEC_VARS_KEYS=BINARY_PLATFORMS
 BUILDSPEC_VARS_VALUES=BINARY_PLATFORMS
 BUILDSPEC_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
+BUILDSPEC_DEPENDS_ON_OVERRIDE=opencontainers_runc_linux_amd64 opencontainers_runc_linux_arm64
 
 # Since we build the arm and amd binaries on difference instances in codebuild
 # we do not want to delete missing files when s3 sync-ing from local to the bucket
