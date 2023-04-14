@@ -28,7 +28,16 @@ BUILDSPEC_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
 # since this would clobber the other build's artifacts
 UPLOAD_DO_NOT_DELETE=true
 
+PROJECT_DEPENDENCIES=eksa/opencontainers/runc
+SIMPLE_CREATE_TARBALLS=false
+
 include $(BASE_DIRECTORY)/Common.mk
+
+.PHONY: tarballs
+tarballs: $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
+	@echo -e $(call TARGET_START_LOG)
+	build/create_tarballs.sh $(TAR_FILE_PREFIX) $(MAKE_ROOT)/$(OUTPUT_DIR) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(ARTIFACTS_PATH) $(GIT_HASH) $(MAKE_ROOT)/$(BINARY_DEPS_DIR)
+	@echo -e $(call TARGET_END_LOG)
 
 
 ########### DO NOT EDIT #############################
