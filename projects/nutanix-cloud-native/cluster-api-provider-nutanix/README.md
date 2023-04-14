@@ -1,5 +1,5 @@
 ## **Cluster API Provider for Nutanix**
-![Version](https://img.shields.io/badge/version-v1.1.3-blue)
+![Version](https://img.shields.io/badge/version-v1.2.1-blue)
 
 The [Cluster API Provider for Nutanix (CAPX)](https://github.com/nutanix-cloud-native/cluster-api-provider-nutanix) is a the implementation of Cluster API for Nutanix.
 
