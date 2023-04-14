@@ -82,14 +82,16 @@ for project in "${PROJECTS[@]}"; do
         DEPEND_ON=""
         # something other than empty string since some overrides are empty strings
         PROJECT_DEPENDENCIES="false"
-        for var in "BUILDSPEC_DEPENDS_ON_OVERRIDE" "BUILDSPEC_$((( $i + 1 )))_DEPENDS_ON_OVERRIDE"; do
+        for var in "BUILDSPEC_$((( $i + 1 )))_DEPENDS_ON_OVERRIDE" "BUILDSPEC_DEPENDS_ON_OVERRIDE"; do
             BUILDSPEC_DEPENDS_ON="$(make_var $PROJECT_PATH $var)"
             HARDCODED_DEP="false"
             if [[ "none" = "$BUILDSPEC_DEPENDS_ON" ]]; then
                 PROJECT_DEPENDENCIES=""
+                break
             elif [[ -n "$BUILDSPEC_DEPENDS_ON" ]]; then
                 HARDCODED_DEP="true"
                 PROJECT_DEPENDENCIES=$BUILDSPEC_DEPENDS_ON
+                break
             fi
         done
 
