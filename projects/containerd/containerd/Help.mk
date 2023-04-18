@@ -23,6 +23,10 @@ _output/bin/containerd/linux-arm64/containerd-shim-runc-v1: ## Build `_output/bi
 _output/bin/containerd/linux-arm64/containerd-shim-runc-v2: ## Build `_output/bin/containerd/linux-arm64/containerd-shim-runc-v2`
 _output/bin/containerd/linux-arm64/ctr: ## Build `_output/bin/containerd/linux-arm64/ctr`
 
+##@ Fetch Binary Targets
+_output/dependencies/linux-amd64/eksa/opencontainers/runc: ## Fetch `_output/dependencies/linux-amd64/eksa/opencontainers/runc`
+_output/dependencies/linux-arm64/eksa/opencontainers/runc: ## Fetch `_output/dependencies/linux-arm64/eksa/opencontainers/runc`
+
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
