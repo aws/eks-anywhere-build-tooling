@@ -1,0 +1,33 @@
+From 7a48902091a82b588086e6c3c81a27e1846ae029 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Wed, 19 Apr 2023 12:28:28 -0500
+Subject: [PATCH] Patch haproxy maxconn value to avoid ulimit issue
+
+EKS-A uses haproxy 2.5 which errors if the maxconn value
+requires more FDs than allowed by the ulimit setting of docker.
+100k maxconn is too high for the default ulimit on an al2 node.
+
+Signed-off-by: Prow Bot <prow@amazonaws.com>
+---
+ images/haproxy/haproxy.cfg | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/images/haproxy/haproxy.cfg b/images/haproxy/haproxy.cfg
+index aa9796ae..18647828 100755
+--- a/images/haproxy/haproxy.cfg
++++ b/images/haproxy/haproxy.cfg
+@@ -16,7 +16,10 @@
+ # kind will rewrite this config at runtime
+ global
+     # limit memory usage to approximately 18 MB
+-    maxconn 100000
++    # EKS-A Change to 10k instead of 100k to avoid needing to raise default
++    # ulimits on al2 nodes and 10k seems like a reasonable default for
++    # our use cases
++    maxconn 10000
+ 
+ frontend controlPlane
+     bind 0.0.0.0:6443
+-- 
+2.39.2
+
