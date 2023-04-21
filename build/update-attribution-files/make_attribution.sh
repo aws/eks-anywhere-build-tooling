@@ -45,6 +45,7 @@ function build::attribution::generate(){
 # Some projects have specific folders for different kubernetes release
 # dynamically find all versions to avoid having to update with every release
 RELEASE_FOLDER=$(find $PROJECT_ROOT -type d -maxdepth 1 -name "1-*")
+SUPPORTED_RELEASE_BRANCHES=$(cat $MAKE_ROOT/release/SUPPORTED_RELEASE_BRANCHES)
 
 if [ -z "${RELEASE_FOLDER}" ]; then
     build::attribution::generate
@@ -53,6 +54,13 @@ else
     LAST_RELEASE_BRANCH=""
     for release_folder in $PROJECT_ROOT/1-*/ ; do
         release=$(basename $release_folder)
+
+        # if release is no longer a supported release branch, skip it
+        if [[ ! "$SUPPORTED_RELEASE_BRANCHES" == *"$release"* ]]; then
+            echo "Skipping $release, no longer supported"
+            continue
+        fi
+
         # some projects have release folders but no git_tag since they do not build binaries
         if [ ! -f $PROJECT_ROOT/$release/GIT_TAG ]; then
             continue

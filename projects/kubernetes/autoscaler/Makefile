@@ -35,9 +35,10 @@ include $(BASE_DIRECTORY)/Common.mk
 
 
 $(GO_MOD_DOWNLOAD_TARGETS): remove-cloud-providers
+attributions: remove-cloud-providers
 
 .PHONY: remove-cloud-providers
-remove-cloud-providers:
+remove-cloud-providers: $(GIT_PATCH_TARGET)
 	cd ./autoscaler/cluster-autoscaler/cloudprovider && ls . | grep -v -e builder -e clusterapi -e mocks -e test -e .go | xargs rm -rf
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
