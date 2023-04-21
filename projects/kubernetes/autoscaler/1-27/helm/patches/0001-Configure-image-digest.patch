@@ -1,0 +1,46 @@
+From 0496a2c2d6dcdbb11a1ceb24cd36d5d288da0167 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Thu, 15 Sep 2022 10:30:11 -0400
+Subject: [PATCH] Configure image digest
+
+---
+ charts/cluster-autoscaler/templates/deployment.yaml | 2 +-
+ charts/cluster-autoscaler/values.yaml               | 8 +++++---
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/charts/cluster-autoscaler/templates/deployment.yaml b/charts/cluster-autoscaler/templates/deployment.yaml
+index 2801a8ce9..bbd22d27f 100644
+--- a/charts/cluster-autoscaler/templates/deployment.yaml
++++ b/charts/cluster-autoscaler/templates/deployment.yaml
+@@ -44,7 +44,7 @@ spec:
+       {{- end }}
+       containers:
+         - name: {{ template "cluster-autoscaler.name" . }}
+-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
++          image: "{{ .Values.image.sourceRegistry }}/{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+           command:
+             - ./cluster-autoscaler
+diff --git a/charts/cluster-autoscaler/values.yaml b/charts/cluster-autoscaler/values.yaml
+index 1a4c1bcf3..2dea5c0d2 100644
+--- a/charts/cluster-autoscaler/values.yaml
++++ b/charts/cluster-autoscaler/values.yaml
+@@ -230,10 +230,12 @@ extraVolumeMounts: []
+ fullnameOverride: ""
+ 
+ image:
++  # image.sourceRegistry -- Image registry
++  sourceRegistry: public.ecr.aws
+   # image.repository -- Image repository
+-  repository: k8s.gcr.io/autoscaling/cluster-autoscaler
+-  # image.tag -- Image tag
+-  tag: v1.23.0
++  repository: kubernetes/autoscaler
++  # image.digest -- Image digest
++  digest: {{kubernetes/autoscaler}}
+   # image.pullPolicy -- Image pull policy
+   pullPolicy: IfNotPresent
+   ## Optionally specify an array of imagePullSecrets.
+-- 
+2.30.1 (Apple Git-130)
+
