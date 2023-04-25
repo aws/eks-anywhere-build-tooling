@@ -1,0 +1,26 @@
+From 294df00eb3b4ec394863b633b96e262619f74960 Mon Sep 17 00:00:00 2001
+From: Aravind Ramalingam <ramaliar@amazon.com>
+Date: Tue, 25 Apr 2023 14:33:09 -0700
+Subject: [PATCH] Adding Using() to select bmc-lib drivers for client
+
+---
+ controllers/bmc_client.go | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/controllers/bmc_client.go b/controllers/bmc_client.go
+index 9dfd819..2519cca 100644
+--- a/controllers/bmc_client.go
++++ b/controllers/bmc_client.go
+@@ -37,6 +37,9 @@ func NewBMCClientFactoryFunc(ctx context.Context) BMCClientFactoryFunc {
+ 	return func(ctx context.Context, hostIP, port, username, password string) (BMCClient, error) {
+ 		client := bmclib.NewClient(hostIP, port, username, password)
+ 
++		using := client.Registry.Using
++		client.Registry.Drivers = append(using("redfish"), using("ipmi")...)
++
+ 		// TODO (pokearu): Make an option
+ 		client.Registry.Drivers = client.Registry.PreferDriver("gofish")
+ 		if err := client.Open(ctx); err != nil {
+-- 
+2.34.1
+
