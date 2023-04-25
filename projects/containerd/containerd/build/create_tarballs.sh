@@ -28,6 +28,7 @@ BINARY_DEPS_DIR="$8"
 
 LICENSES_PATH="$OUTPUT_DIR/LICENSES"
 ATTRIBUTION_PATH="$OUTPUT_DIR/ATTRIBUTION.txt"
+REPO_PATH="containerd"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
@@ -42,11 +43,12 @@ function build::simple::tarball() {
     TAR_FILE="${TAR_FILE_PREFIX}-${OS}-${ARCH}-${TAG}.tar.gz"
     TAR_STAGING_DIR="${OUTPUT_BIN_DIR}/${OS}-${ARCH}/tar-staging"
 
-    build::common::echo_and_run mkdir -p ${TAR_STAGING_DIR}/usr/local/bin ${TAR_STAGING_DIR}/sbin
+    build::common::echo_and_run mkdir -p ${TAR_STAGING_DIR}/usr/local/bin ${TAR_STAGING_DIR}/sbin ${TAR_STAGING_DIR}/etc/systemd/system
 		build::common::echo_and_run find ${OUTPUT_BIN_DIR}/${OS}-${ARCH} -not -type d -execdir cp "{}" ${TAR_STAGING_DIR}/usr/local/bin ";"
     build::common::echo_and_run cp $ATTRIBUTION_PATH ${TAR_STAGING_DIR}/usr/local/bin/CONTAINERD_ATTRIBUTION.txt
     build::common::echo_and_run cp ${BINARY_DEPS_DIR}/${OS}-${ARCH}/eksa/opencontainers/runc/runc ${TAR_STAGING_DIR}/sbin
     build::common::echo_and_run cp ${BINARY_DEPS_DIR}/${OS}-${ARCH}/eksa/opencontainers/runc/ATTRIBUTION.txt ${TAR_STAGING_DIR}/sbin/RUNC_ATTRIBUTION.txt
+    build::common::echo_and_run cp ${REPO_PATH}/containerd.service ${TAR_STAGING_DIR}/etc/systemd/system
 
     build::common::create_tarball ${TAR_PATH}/${TAR_FILE} ${TAR_STAGING_DIR} .
 
