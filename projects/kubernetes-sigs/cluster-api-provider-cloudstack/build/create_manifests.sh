@@ -35,6 +35,7 @@ cd $REPO
 
 KUBE_RBAC_PROXY_IMAGE_OVERRIDE=${IMAGE_REPO}/brancz/kube-rbac-proxy:latest
 sed -i 's,image: .*,image: '"${KUBE_RBAC_PROXY_IMAGE_OVERRIDE}"',' ./config/default-with-metrics-port/manager_auth_proxy_patch.yaml
+yq -i '.spec.template.spec.tolerations = [{"effect": "NoSchedule", "key": "node-role.kubernetes.io/master"}, {"effect": "NoSchedule", "key": "node-role.kubernetes.io/control-plane"}]' ./config/manager/manager.yaml
 
 make release-manifests-metrics-port \
   RELEASE_DIR="out" \

@@ -36,6 +36,7 @@ cd $REPO
 sed -i'' -e 's@newName: .*@newName: '"${IMAGE_REPO}/nutanix-cloud-native/cluster-api-provider-nutanix"'@' config/manager/kustomization.yaml
 sed -i'' -e 's@newTag: .*@newTag: '"${IMAGE_TAG}"'@' config/manager/kustomization.yaml
 sed -i'' -e 's@image: .*@image: '"${IMAGE_REPO}/brancz/kube-rbac-proxy:latest"'@' config/default/manager_auth_proxy_patch.yaml
+yq -i 'select(.kind != "Deployment") as $others | select(.kind == "Deployment") as $deployment | $deployment.spec.template.spec.tolerations = [{"effect": "NoSchedule", "key": "node-role.kubernetes.io/master"}, {"effect": "NoSchedule", "key": "node-role.kubernetes.io/control-plane"}] | ($others, $deployment)' config/manager/manager.yaml
 
 make release-manifests \
   RELEASE_DIR="out" \
