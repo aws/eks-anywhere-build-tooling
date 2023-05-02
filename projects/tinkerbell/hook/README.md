@@ -1,5 +1,5 @@
 ## **Hook**
-![Version](https://img.shields.io/badge/version-03a67729d895635fe3c612e4feca3400b9336cc9-blue)
+![Version](https://img.shields.io/badge/version-9d54933a03f2f4c06322969b06caa18702d17f66-blue)
 
 [Hook](https://github.com/tinkerbell/hook) is the Tinkerbell Installation Environment for bare-metal. It runs in-memory, installs operating system, and handles deprovisioning.
 
