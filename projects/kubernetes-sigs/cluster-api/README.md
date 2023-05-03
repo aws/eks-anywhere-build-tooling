@@ -1,5 +1,5 @@
 ## **Cluster API**
-![Version](https://img.shields.io/badge/version-v1.3.4-blue)
+![Version](https://img.shields.io/badge/version-v1.4.2-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiQVZ3TDBZZVVXZUZiVmtqLzVoOVcrV2FaMmxRRzJXRmJCRlZtQkNodXdWZ0FrNm0zQ3l5UzNqTkdsQXgwdzc0bTBZc1RIcjBhMUVFbEhIK3d2VDVPek1rPSIsIml2UGFyYW1ldGVyU3BlYyI6IkVuOGJxNXBPZEtDek81Q3giLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Cluster API](https://github.com/kubernetes-sigs/cluster-api) is a Kubernetes sub-project focused on providing declarative APIs and tooling to simplify provisioning, upgrading, and operating multiple Kubernetes clusters. It uses Kubernetes-style APIs and patterns to automate cluster lifecycle management for platform operators. The supporting infrastructure, like virtual machines, networks, load balancers, and VPCs, as well as the Kubernetes cluster configuration are all defined in the same way that application developers operate deploying and managing their workloads. This enables consistent and repeatable cluster deployments across a wide variety of infrastructure environments. Cluster API can be extended to support any infrastructure provider (AWS, Azure, vSphere, etc.) or bootstrap provider (kubeadm is default) as required by the customer.
@@ -35,7 +35,7 @@ You can find the latest versions of these images on ECR Public Gallery.
    Based on this we updated the manifest generation targets in create_manifests.sh to use the targets in the main Makefile.
 1. Check the golang version by checking [this file](https://github.com/kubernetes-sigs/cluster-api/blob/main/.github/workflows/release.yml#L26) Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
-1. Check default CAPI [cert-manager version]((https://github.com/kubernetes-sigs/cluster-api/blob/main/cmd/clusterctl/client/config/cert_manager_client.go#L30)) for the CAPI tag, if it has changed, then update cert-manager.
-1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
+1. Check default CAPI [cert-manager version]((https://github.com/kubernetes-sigs/cluster-api/blob/main/cmd/clusterctl/client/config/cert_manager_client.go#L32)) for the CAPI tag, if it has changed, then update cert-manager.
+1. Update checksums and attribution using `make update-attribution-checksums-docker`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

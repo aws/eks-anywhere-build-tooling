@@ -1,4 +1,4 @@
-From de5b1a1e979c2c8eb76a9a41c2ddacbcada657ff Mon Sep 17 00:00:00 2001
+From 0de1838fb631aff5ba0292e64e9bbc095d91a6bd Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/29] Add unstacked etcd support
@@ -306,10 +306,10 @@ index 6d88b5891..c65e8691a 100644
  		}
  	}
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 4874c59b3..329f042ba 100644
+index 1db2d4d4f..c5d92a3cf 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -169,6 +169,45 @@ spec:
+@@ -168,6 +168,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -355,7 +355,7 @@ index 4874c59b3..329f042ba 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -261,6 +300,15 @@ spec:
+@@ -260,6 +299,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -371,7 +371,7 @@ index 4874c59b3..329f042ba 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -431,6 +479,45 @@ spec:
+@@ -430,6 +478,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -417,7 +417,7 @@ index 4874c59b3..329f042ba 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -648,6 +735,15 @@ spec:
+@@ -647,6 +734,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -433,7 +433,7 @@ index 4874c59b3..329f042ba 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -821,6 +917,45 @@ spec:
+@@ -820,6 +916,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -479,7 +479,7 @@ index 4874c59b3..329f042ba 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -1476,6 +1611,15 @@ spec:
+@@ -1475,6 +1610,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -496,10 +496,10 @@ index 4874c59b3..329f042ba 100644
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
 diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
-index ce89a490a..b523b4a6a 100644
+index d0f5a7d10..8e714c119 100644
 --- a/config/rbac/role.yaml
 +++ b/config/rbac/role.yaml
-@@ -42,6 +42,21 @@ rules:
+@@ -41,6 +41,21 @@ rules:
    - get
    - list
    - watch
@@ -552,10 +552,10 @@ index 50cce2e04..f07738674 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageTag"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "imageRepository"},
 diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
-index edf8324f3..657fc1c90 100644
+index ec2334e96..5c7e70401 100644
 --- a/controlplane/kubeadm/config/rbac/role.yaml
 +++ b/controlplane/kubeadm/config/rbac/role.yaml
-@@ -70,3 +70,12 @@ rules:
+@@ -69,3 +69,12 @@ rules:
    - patch
    - update
    - watch
@@ -569,7 +569,7 @@ index edf8324f3..657fc1c90 100644
 +  - update
 +  - watch
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index 03919fb86..d2ca63e7f 100644
+index 882073d27..97ac5bde7 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -19,6 +19,9 @@ package controllers
@@ -1121,10 +1121,10 @@ index 2b5721693..9d13518f7 100644
  
  	g.Expect(actual).To(Equal(expected))
 diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 89ac0a2df..03f5eabe1 100644
+index 796b6c764..2f5b4d66e 100644
 --- a/internal/controllers/machine/machine_controller_noderef.go
 +++ b/internal/controllers/machine/machine_controller_noderef.go
-@@ -61,6 +61,11 @@ func (r *Reconciler) reconcileNode(ctx context.Context, cluster *clusterv1.Clust
+@@ -57,6 +57,11 @@ func (r *Reconciler) reconcileNode(ctx context.Context, cluster *clusterv1.Clust
  		return ctrl.Result{}, nil
  	}
  
