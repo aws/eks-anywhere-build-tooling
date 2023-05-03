@@ -1,4 +1,4 @@
-From efbddedebccb2849a03f54b0c18d7af213a72f1a Mon Sep 17 00:00:00 2001
+From de5b1a1e979c2c8eb76a9a41c2ddacbcada657ff Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/29] Add unstacked etcd support
@@ -86,12 +86,12 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  .../cluster/cluster_controller_test.go        | 134 ++++++++++++++++
  .../machine/machine_controller_noderef.go     |   5 +
  .../machine/machine_controller_phases.go      | 115 ++++++++++++++
- .../controllers/dockermachine_controller.go   |  27 ++--
+ .../controllers/dockermachine_controller.go   |  35 +++--
  util/collections/machine_filters.go           |  26 ++++
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 25 files changed, 803 insertions(+), 19 deletions(-)
+ 25 files changed, 810 insertions(+), 20 deletions(-)
 
 diff --git a/api/v1alpha3/cluster_types.go b/api/v1alpha3/cluster_types.go
 index 259eba198..1ab45528a 100644
@@ -1277,10 +1277,16 @@ index 83c493afc..03806a1b7 100644
  	var failureDomain string
  	err = util.UnstructuredUnmarshalField(infraConfig, &failureDomain, "spec", "failureDomain")
 diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-index 58b426e51..72967724c 100644
+index 58b426e51..9beedc5af 100644
 --- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 +++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-@@ -364,19 +364,22 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -360,23 +360,27 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+ 	// set to true after a control plane machine has a node ref. If we would requeue here in this case, the
+ 	// Machine will never get a node ref as ProviderID is required to set the node ref, so we would get a deadlock.
+ 	if cluster.Spec.ControlPlaneRef != nil &&
+-		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) {
++		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) &&
++		!isEtcdMachine(machine) {
  		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
  	}
  
@@ -1295,7 +1301,7 @@ index 58b426e51..72967724c 100644
 -		if errors.As(err, &docker.ContainerNotRunningError{}) {
 -			return ctrl.Result{}, errors.Wrap(err, "failed to patch the Kubernetes node with the machine providerID")
 +	// In case of an etcd cluster, there is no concept of kubernetes node. So we can generate the node Provider ID and set it on machine spec directly
-+	if _, ok := machine.Labels[clusterv1.MachineEtcdClusterLabelName]; !ok {
++	if !isEtcdMachine(machine) {
 +		// Usually a cloud provider will do this, but there is no docker-cloud provider.
 +		// Requeue if there is an error, as this is likely momentary load balancer
 +		// state changes during control plane provisioning.
@@ -1315,6 +1321,15 @@ index 58b426e51..72967724c 100644
  	}
  	// Set ProviderID so the Cluster API Machine Controller can pull it
  	providerID := externalMachine.ProviderID()
+@@ -530,3 +534,8 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
+ 	}
+ 	return nil
+ }
++
++func isEtcdMachine(machine *clusterv1.Machine) bool {
++	_, ok := machine.Labels[clusterv1.MachineEtcdClusterLabelName]
++	return ok
++}
 diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
 index d85661012..009071cd8 100644
 --- a/util/collections/machine_filters.go
@@ -1404,5 +1419,5 @@ index e6737ab7a..00da78f90 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.25.1
+2.34.1
 
