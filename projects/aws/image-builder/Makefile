@@ -1,6 +1,6 @@
 # avoid finding the local fake git repo by looking one level up when looking for base_directory
 BASE_DIRECTORY:=$(shell git -C .. rev-parse --show-toplevel)
-GOLANG_VERSION?=1.18
+GOLANG_VERSION?=1.20
 GIT_TAG:=$(shell cat GIT_TAG)
 
 REPO=image-builder
