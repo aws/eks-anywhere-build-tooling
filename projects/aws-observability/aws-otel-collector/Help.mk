@@ -14,6 +14,17 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 helm/build: ## Build helm chart
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
+##@ Run in Docker Targets
+run-all-attributions-in-docker: ## Run `all-attributions` in docker builder container
+run-all-attributions-checksums-in-docker: ## Run `all-attributions-checksums` in docker builder container
+run-all-checksums-in-docker: ## Run `all-checksums` in docker builder container
+run-attribution-in-docker: ## Run `attribution` in docker builder container
+run-attribution-checksums-in-docker: ## Run `attribution-checksums` in docker builder container
+run-binaries-in-docker: ## Run `binaries` in docker builder container
+run-checksums-in-docker: ## Run `checksums` in docker builder container
+run-clean-in-docker: ## Run `clean` in docker builder container
+run-clean-go-cache-in-docker: ## Run `clean-go-cache` in docker builder container
+
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-repo: ## Removes source directory
@@ -24,7 +35,6 @@ add-generated-help-block: ## Add or update generated help block to document proj
 
 ##@Update Helpers
 run-target-in-docker: ## Run `MAKE_TARGET` using builder base docker container
-update-attribution-checksums-docker: ## Update attribution and checksums using the builder base docker container
 stop-docker-builder: ## Clean up builder base docker container
 generate: ## Update UPSTREAM_PROJECTS.yaml
 update-go-mods: ## Update locally checked-in go sum to assist in vuln scanning

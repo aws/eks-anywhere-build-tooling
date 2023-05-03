@@ -83,7 +83,8 @@ SUPPORTED_K8S_VERSIONS:=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_
 SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
-IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter binaries attribution checksums update-attribution-checksums-docker,$(MAKECMDGOALS)))
+UNRELEASE_BRANCH_BINARY_TARGETS=binaries attribution checksums
+IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter $(UNRELEASE_BRANCH_BINARY_TARGETS) $(foreach target,$(UNRELEASE_BRANCH_BINARY_TARGETS),run-$(target)-in-docker),$(MAKECMDGOALS)))
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums update-patch-numbers
 MAKECMDGOALS_WITHOUT_VAR_VALUE=$(foreach t,$(MAKECMDGOALS),$(if $(findstring var-value-,$(t)),,$(t)))
@@ -409,8 +410,11 @@ KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 SPECIAL_TARGET_SECONDARY=$(strip $(PROJECT_DEPENDENCIES_TARGETS) $(GO_MOD_DOWNLOAD_TARGETS))
 SKIP_CHECKSUM_VALIDATION?=false
+IN_DOCKER_TARGETS=all-attributions all-attributions-checksums all-checksums attribution attribution-checksums binaries checksums clean clean-go-cache
 CGO_DOCKER_RUN_TIMEOUT?=15m
 DOCKER_RUN_COMMAND?=$(if $(filter true,$(CODEBUILD_CI)),retry_with_timeout $(CGO_DOCKER_RUN_TIMEOUT)) docker run $(shell if [ "$(CODEBUILD_CI)" != "true" ] && [ -t 0 ]; then echo '-it'; fi)
+DOCKER_RUN_BASE_DIRECTORY?=$(BASE_DIRECTORY)
+DOCKER_RUN_GO_MOD_CACHE?=$(GO_MOD_CACHE)
 PRUNE_BUILDCTL?=false
 GITHUB_TOKEN?=
 ####################################################
@@ -467,8 +471,8 @@ endef
 define CGO_DOCKER
 	source $(BUILD_LIB)/common.sh && build::docker::retry_pull --platform $(IMAGE_PLATFORMS) $(BUILDER_IMAGE); \
 	$(DOCKER_RUN_COMMAND) --rm -w /eks-anywhere-build-tooling/projects/$(COMPONENT) $(DOCKER_USE_ID_FOR_LINUX) \
-		--mount type=bind,source=$(BASE_DIRECTORY),target=/eks-anywhere-build-tooling \
-		--mount type=bind,source=$(GO_MOD_CACHE),target=/mod-cache \
+		--mount type=bind,source=$(DOCKER_RUN_BASE_DIRECTORY),target=/eks-anywhere-build-tooling \
+		--mount type=bind,source=$(DOCKER_RUN_GO_MOD_CACHE),target=/mod-cache \
 		-e GOPROXY=$(GOPROXY) -e GOMODCACHE=/mod-cache \
 		--platform $(IMAGE_PLATFORMS) \
 		--init $(BUILDER_IMAGE) make $(CGO_TARGET) BINARY_PLATFORMS=$(IMAGE_PLATFORMS)
@@ -898,7 +902,7 @@ add-generated-help-block:
 	$(BUILD_LIB)/generate_help_body.sh $(MAKE_ROOT) "$(BINARY_TARGET_FILES)" "$(BINARY_PLATFORMS)" "${BINARY_TARGETS}" \
 		$(REPO) $(if $(PATCHES_DIR),true,false) "$(LOCAL_IMAGE_TARGETS)" "$(IMAGE_TARGETS)" "$(BUILD_TARGETS)" "$(RELEASE_TARGETS)" \
 		"$(HAS_S3_ARTIFACTS)" "$(HAS_LICENSES)" "$(REPO_NO_CLONE)" "$(PROJECT_DEPENDENCIES_TARGETS)" \
-		"$(HAS_HELM_CHART)"
+		"$(HAS_HELM_CHART)" "$(IN_DOCKER_TARGETS)"
 
 ## --------------------------------------
 ## Update Helpers
@@ -907,11 +911,7 @@ add-generated-help-block:
 
 .PHONY: run-target-in-docker
 run-target-in-docker: # Run `MAKE_TARGET` using builder base docker container
-	$(BUILD_LIB)/run_target_docker.sh $(COMPONENT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" $(ARTIFACTS_BUCKET)
-
-.PHONY: update-attribution-checksums-docker
-update-attribution-checksums-docker: # Update attribution and checksums using the builder base docker container
-	$(BUILD_LIB)/update_checksum_docker.sh $(COMPONENT) $(IMAGE_REPO) $(RELEASE_BRANCH)
+	$(BUILD_LIB)/run_target_docker.sh $(COMPONENT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" "$(ARTIFACTS_BUCKET)" "$(BASE_DIRECTORY)" "$(GO_MOD_CACHE)"
 
 .PHONY: stop-docker-builder
 stop-docker-builder: # Clean up builder base docker container
@@ -982,3 +982,15 @@ github-rate-limit-%:
 		echo "Current Github rate limits:"; \
 		GH_PAGER='' gh api rate_limit; \
 	fi
+
+## --------------------------------------
+## Docker Helpers
+## --------------------------------------
+# $1 - target
+define RUN_IN_DOCKER_TARGET
+.PHONY: run-$(1)-in-docker
+run-$(1)-in-docker: MAKE_TARGET=$(1)
+run-$(1)-in-docker: run-target-in-docker
+endef
+
+$(foreach target,$(IN_DOCKER_TARGETS),$(eval $(call RUN_IN_DOCKER_TARGET,$(target))))
