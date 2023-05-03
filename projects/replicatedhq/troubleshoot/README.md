@@ -1,5 +1,5 @@
 ## **replicatedhq/troubleshoot**
-![Version](https://img.shields.io/badge/version-v0.57.1-blue)
+![Version](https://img.shields.io/badge/version-v0.62.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiWlJsdnRmNnRYUjhUV20xaHJYTng2WXVlVXFBbHZPQnpnblh2bzFLYk1VUHAra2VpWFRFNWpMY0ovTC9PWnBBN2JEcDBXcjRSeVoxd3pyWWxQVzQzZFY4PSIsIml2UGFyYW1ldGVyU3BlYyI6IjZxRUdIK2N6TVZNNUdqL0oiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [troubleshoot](https://troubleshoot.sh/) is a kubectl plugin providing diagnostic tools for Kubernetes applications. It provides tools for collecting and analyzing cluster information including deployment statuses, cluster resources, and host logs. 
@@ -18,7 +18,7 @@ The EKS-A diagnostic bundle functionality is built on top of troubleshoot.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
    ex: [0.36.0 compared to 0.37.1](https://github.com/replicatedhq/troubleshoot/compare/v0.36.0...v0.57.1). Check the `support-bundle` target for
    any build flag changes, tag changes, dependencies, etc.
-- When proforming significant version upgrades, it is prudent to manually test that the new troubleshoot version 
+- When performing significant version upgrades, it is prudent to manually test that the new troubleshoot version 
   works with the existing EKS-A workflow. You can do this using the instructions in the section "Manually Testing Troubleshoot Version Compatibility".
 
 1. Verify the golang version has not changed. The version specified in `go.mod` and the `Makefile` is kept up-to-date.
@@ -33,7 +33,7 @@ The EKS-A diagnostic bundle functionality is built on top of troubleshoot.
    - The make target `make binaries` will generate linux and darwin binaries for Troubleshoot, outputting them to `./_output/bin/troubleshoot`
    - For more options, see [the Development documentation](https://github.com/aws/eks-anywhere-build-tooling/blob/main/docs/development/building-locally.md)
 1. add the `support-bundle` binary for your platform to your path
-1. set the env var `MR_TOOLS_DISABLE=false`, so that the EKS-A commands will use local binaries
+1. set the env var `MR_TOOLS_DISABLE=true`, so that the EKS-A commands will use local binaries
 1. test the following commands against an existing EKS-A cluster:
 ```bash
 export MR_TOOLS_DISABLE=true
