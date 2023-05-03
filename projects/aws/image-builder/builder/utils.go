@@ -7,12 +7,22 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	releasev1 "github.com/aws/eks-anywhere/release/api/v1alpha1"
+	"sigs.k8s.io/yaml"
 )
 
 func cloneRepo(cloneUrl, destination string) error {
-	log.Print("Cloning eks-anywhere-build-tooling...")
+	log.Println("Cloning eks-anywhere-build-tooling...")
 	cloneRepoCommandSequence := fmt.Sprintf("git clone %s %s", cloneUrl, destination)
 	cmd := exec.Command("bash", "-c", cloneRepoCommandSequence)
+	return execCommandWithStreamOutput(cmd)
+}
+
+func checkoutRepo(gitRoot, commit string) error {
+	log.Println("Checking out commit %s for build...", commit)
+	checkoutRepoCommandSequence := fmt.Sprintf("git -C %s checkout %s", gitRoot, commit)
+	cmd := exec.Command("bash", "-c", checkoutRepoCommandSequence)
 	return execCommandWithStreamOutput(cmd)
 }
 
@@ -94,7 +104,24 @@ func execCommand(cmd *exec.Cmd) (string, error) {
 	commandOutputStr := strings.TrimSpace(string(commandOutput))
 
 	if err != nil {
-		return "", fmt.Errorf("failed to run command: %v", err)
+		return commandOutputStr, fmt.Errorf("failed to run command: %v", err)
 	}
 	return commandOutputStr, nil
+}
+
+func getGitCommitFromBundle(repoPath string) (string, error) {
+	log.Println("Getting git commit from bundle")
+	loadBundleManifestCommandSequence := fmt.Sprintf("source %s/build/lib/eksa_releases.sh && build::eksa_releases::load_bundle_manifest", repoPath, repoPath)
+	cmd := exec.Command("bash", "-c", fmt.Sprintf("%s", loadBundleManifestCommandSequence))
+	commandOut, err := execCommand(cmd)
+	if err != nil {
+		return commandOut, err
+	}
+
+	bundles := &releasev1.Bundles{}
+	if err = yaml.Unmarshal([]byte(commandOut), bundles); err != nil {
+		return "", fmt.Errorf("failed to unmarshal bundles manifest: %v", err)
+	}
+
+	return bundles.Spec.VersionsBundles[0].EksD.GitCommit, nil
 }
