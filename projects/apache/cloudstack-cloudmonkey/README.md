@@ -26,6 +26,6 @@ The `eks-a` tool invokes cloudmonkey to perform validations on templates, fetchi
    any build flag changes, tag changes, dependencies, etc. Check that the manifest target has not changed, this is called
    from our Makefile.
 1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.
-1. Update checksums and attribution using `make update-attribution-checksums-docker`.
+1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

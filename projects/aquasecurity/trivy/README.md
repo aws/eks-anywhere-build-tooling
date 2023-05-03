@@ -11,6 +11,6 @@
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes. Check the `build` target for any build flag changes, tag changes, dependencies, etc. Check that the manifest target has not changed, this is called from our Makefile.
 1. Check the `go.mod` file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in Makefile to match the version upstream.
-1. Update checksums and attribution using make `update-attribution-checksums-docker`.
+1. Update checksums and attribution using make `run-attribution-checksums-in-docker`.
 1. Update the version at the top of this `README`.
 1. Run `make generate` to update the `UPSTREAM_PROJECTS.yaml` file.

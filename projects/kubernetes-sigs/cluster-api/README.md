@@ -36,6 +36,6 @@ You can find the latest versions of these images on ECR Public Gallery.
 1. Check the golang version by checking [this file](https://github.com/kubernetes-sigs/cluster-api/blob/main/.github/workflows/release.yml#L26) Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
 1. Check default CAPI [cert-manager version]((https://github.com/kubernetes-sigs/cluster-api/blob/main/cmd/clusterctl/client/config/cert_manager_client.go#L30)) for the CAPI tag, if it has changed, then update cert-manager.
-1. Update checksums and attribution using `make update-attribution-checksums-docker`.
+1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

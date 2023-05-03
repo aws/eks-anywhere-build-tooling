@@ -75,10 +75,6 @@ update-attribution-files: add-generated-help-block attribution-files
 run-target-in-docker:
 	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" $(ARTIFACTS_BUCKET)
 
-.PHONY: update-attribution-checksums-docker
-update-attribution-checksums-docker:
-	build/lib/update_checksum_docker.sh $(PROJECT) $(IMAGE_REPO) $(RELEASE_BRANCH)
-
 .PHONY: stop-docker-builder
 stop-docker-builder:
 	docker rm -f -v eks-a-builder
