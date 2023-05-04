@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.18"
+GOLANG_VERSION?="1.20"
 
 REPO=kustomize-controller
 REPO_OWNER=fluxcd
