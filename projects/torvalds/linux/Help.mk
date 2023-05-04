@@ -11,8 +11,8 @@ clone-repo:  ## Clone upstream `linux`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `` for `darwin/arm64`
-_output/bin/linux/darwin-arm64/tools/bootconfig: ## Build `_output/bin/linux/darwin-arm64/tools/bootconfig`
+binaries: ## Build all binaries: `` for `linux/amd64`
+_output/bin/linux/linux-amd64/tools/bootconfig: ## Build `_output/bin/linux/linux-amd64/tools/bootconfig`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
