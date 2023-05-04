@@ -1,7 +1,7 @@
-From 25581d87c75ed248fa3c91986652428924333069 Mon Sep 17 00:00:00 2001
+From b85161d2d56fadb1f477a138286147a4e6c7e72b Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
-Subject: [PATCH 03/28] Unstacked etcd and controlplane upgrade
+Subject: [PATCH 03/29] Unstacked etcd and controlplane upgrade
 
 Rename controlplane upgrade annotation variable
 
@@ -63,10 +63,10 @@ index 58ef4a74e..1c7d411bd 100644
  
  // MachineAddressType describes a valid MachineAddress type.
 diff --git a/api/v1beta1/common_types.go b/api/v1beta1/common_types.go
-index 113c4e95f..7aa6b0a7e 100644
+index 947ce108c..a557464fc 100644
 --- a/api/v1beta1/common_types.go
 +++ b/api/v1beta1/common_types.go
-@@ -131,6 +131,9 @@ const (
+@@ -142,6 +142,9 @@ const (
  	// will receive the resulting object.
  	TopologyDryRunAnnotation = "topology.cluster.x-k8s.io/dry-run"
  
@@ -77,10 +77,10 @@ index 113c4e95f..7aa6b0a7e 100644
  	// The practical effect of this is that the capi "replica" count should be passively derived from the number of observed infra machines,
  	// instead of being a source of truth for eventual consistency.
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index c07821049..736f92ffa 100644
+index 7e0fd392a..5b6443c78 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
-@@ -313,3 +313,32 @@ func GetExternalEtcdEndpoints(externalEtcd *unstructured.Unstructured) (string,
+@@ -254,3 +254,32 @@ func GetExternalEtcdEndpoints(externalEtcd *unstructured.Unstructured) (string,
  
  	return endpoints, found, nil
  }
@@ -152,10 +152,10 @@ index e9870d34c..adc1b2a0a 100644
  
  const (
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index 95afea544..cd395473e 100644
+index 97ac5bde7..b04913e91 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
-@@ -182,12 +182,35 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -196,12 +196,35 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  		sort.Strings(currentEtcdEndpoints)
  		currentKCPEndpoints := kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints
  		if !reflect.DeepEqual(currentEtcdEndpoints, currentKCPEndpoints) {
@@ -191,7 +191,7 @@ index 95afea544..cd395473e 100644
  	}
  
  	// Add finalizer first if not exist to avoid the race condition between init and delete
-@@ -414,6 +437,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, cluster *
+@@ -419,6 +442,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, cluster *
  		// NOTE: we are checking the condition already exists in order to avoid to set this condition at the first
  		// reconciliation/before a rolling upgrade actually starts.
  		if conditions.Has(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition) {
@@ -235,7 +235,7 @@ index a3c0a6f8e..cde7f6ba0 100644
  		if err := workloadCluster.UpdateAPIServerInKubeadmConfigMap(ctx, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer, parsedVersion); err != nil {
  			return ctrl.Result{}, errors.Wrap(err, "failed to update api server in the kubeadm config map")
 diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
-index 99f3fc1b3..64983adb3 100644
+index 7ffacda66..971773b81 100644
 --- a/controlplane/kubeadm/internal/workload_cluster.go
 +++ b/controlplane/kubeadm/internal/workload_cluster.go
 @@ -109,6 +109,7 @@ type WorkloadCluster interface {
@@ -274,10 +274,10 @@ index 3b3662a29..6c814656e 100644
  // Removing the last remaining member of the cluster is not supported.
  func (w *Workload) RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error {
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index ddc16c281..35e43fe33 100644
+index 9572a8ebd..7f2a32379 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
-@@ -333,10 +333,12 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv
+@@ -355,10 +355,12 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv
  			}
  			return ctrl.Result{}, err
  		}
@@ -295,5 +295,5 @@ index ddc16c281..35e43fe33 100644
  	}
  
 -- 
-2.25.1
+2.34.1
 

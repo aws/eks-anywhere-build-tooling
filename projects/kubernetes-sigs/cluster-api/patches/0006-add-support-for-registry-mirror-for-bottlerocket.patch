@@ -1,7 +1,7 @@
-From d23c6c108687e294f8b7803d27393f9dc6e87a74 Mon Sep 17 00:00:00 2001
+From f352490511db0b7552a21a171fa9890c17420e9c Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhnvp@amazon.com>
 Date: Tue, 21 Sep 2021 08:57:56 -0700
-Subject: [PATCH 06/28] add support for registry mirror for bottlerocket
+Subject: [PATCH 06/29] add support for registry mirror for bottlerocket
 
 ---
  api/v1alpha2/zz_generated.conversion.go       | 1007 +++++++++++++++++
@@ -1032,7 +1032,7 @@ index 000000000..68299ede9
 +	return autoConvert_v1alpha3_ObjectMeta_To_v1alpha2_ObjectMeta(in, out, s)
 +}
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 1c5b2a356..e86403d0e 100644
+index 11aa737a7..9676d26a8 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -88,6 +88,11 @@ type ClusterConfiguration struct {
@@ -1063,7 +1063,7 @@ index 1c5b2a356..e86403d0e 100644
  // ControlPlaneComponent holds settings common to control plane component of the cluster.
  type ControlPlaneComponent struct {
  	// ExtraArgs is an extra set of flags to pass to the control plane component.
-@@ -455,6 +469,11 @@ type JoinConfiguration struct {
+@@ -468,6 +482,11 @@ type JoinConfiguration struct {
  	// +optional
  	Proxy ProxyConfiguration `json:"proxy,omitempty"`
  
@@ -1076,7 +1076,7 @@ index 1c5b2a356..e86403d0e 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 79fa4991c..88f20281f 100644
+index f62440f04..2d7edbb00 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -348,6 +348,18 @@ spec:
@@ -1117,7 +1117,7 @@ index 79fa4991c..88f20281f 100644
                  type: object
                mounts:
                  description: Mounts specifies a list of mount points to be setup.
-@@ -2419,6 +2443,18 @@ spec:
+@@ -2420,6 +2444,18 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -1136,7 +1136,7 @@ index 79fa4991c..88f20281f 100644
                    scheduler:
                      description: Scheduler contains extra settings for the scheduler
                        control plane component
-@@ -3060,6 +3096,18 @@ spec:
+@@ -3083,6 +3119,18 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -1156,10 +1156,10 @@ index 79fa4991c..88f20281f 100644
                      description: SkipPhases is a list of phases to skip during command
                        execution. The list of phases can be obtained with the "kubeadm
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 9104c41be..a533dbf5b 100644
+index 7ea88b30a..3c038ca69 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -373,6 +373,19 @@ spec:
+@@ -372,6 +372,19 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -1179,7 +1179,7 @@ index 9104c41be..a533dbf5b 100644
                            scheduler:
                              description: Scheduler contains extra settings for the
                                scheduler control plane component
-@@ -977,6 +990,19 @@ spec:
+@@ -976,6 +989,19 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -1199,7 +1199,7 @@ index 9104c41be..a533dbf5b 100644
                          type: object
                        mounts:
                          description: Mounts specifies a list of mount points to be
-@@ -2435,6 +2461,19 @@ spec:
+@@ -2455,6 +2481,19 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -1219,7 +1219,7 @@ index 9104c41be..a533dbf5b 100644
                            scheduler:
                              description: Scheduler contains extra settings for the
                                scheduler control plane component
-@@ -3122,6 +3161,19 @@ spec:
+@@ -3166,6 +3205,19 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -1328,10 +1328,10 @@ index d35016276..f127ec4f1 100644
  
  	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 1773d2ec6..65a6edad8 100644
+index 2ac572c92..b1fb19751 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -472,6 +472,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -471,6 +471,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
  		}
@@ -1341,7 +1341,7 @@ index 1773d2ec6..65a6edad8 100644
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
-@@ -655,6 +658,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -663,6 +666,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
  		}
@@ -1351,7 +1351,7 @@ index 1773d2ec6..65a6edad8 100644
  		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -771,6 +777,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -779,6 +785,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
  		}
@@ -1445,10 +1445,10 @@ index e924a4a4b..71e769f0f 100644
 +	return out
 +}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 1de32be6c..5034d6da9 100644
+index 5ecc2a7ac..02ed12715 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -433,6 +433,19 @@ spec:
+@@ -432,6 +432,19 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -1468,7 +1468,7 @@ index 1de32be6c..5034d6da9 100644
                        scheduler:
                          description: Scheduler contains extra settings for the scheduler
                            control plane component
-@@ -1024,6 +1037,19 @@ spec:
+@@ -1023,6 +1036,19 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -1488,7 +1488,7 @@ index 1de32be6c..5034d6da9 100644
                      type: object
                    mounts:
                      description: Mounts specifies a list of mount points to be setup.
-@@ -2889,6 +2915,19 @@ spec:
+@@ -2888,6 +2914,19 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -1508,7 +1508,7 @@ index 1de32be6c..5034d6da9 100644
                        scheduler:
                          description: Scheduler contains extra settings for the scheduler
                            control plane component
-@@ -3558,6 +3597,19 @@ spec:
+@@ -3581,6 +3620,19 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -1529,10 +1529,10 @@ index 1de32be6c..5034d6da9 100644
                          description: SkipPhases is a list of phases to skip during
                            command execution. The list of phases can be obtained with
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 2f5e64876..90e736d9a 100644
+index 783336527..14f83216d 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -1566,6 +1566,19 @@ spec:
+@@ -1586,6 +1586,19 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -1552,7 +1552,7 @@ index 2f5e64876..90e736d9a 100644
                                scheduler:
                                  description: Scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -2282,6 +2295,19 @@ spec:
+@@ -2328,6 +2341,19 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -1573,5 +1573,5 @@ index 2f5e64876..90e736d9a 100644
                                  description: SkipPhases is a list of phases to skip
                                    during command execution. The list of phases can
 -- 
-2.25.1
+2.34.1
 

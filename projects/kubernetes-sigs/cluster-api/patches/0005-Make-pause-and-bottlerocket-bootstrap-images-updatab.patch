@@ -1,17 +1,17 @@
-From 7bff4f7c6505a3175a18758a28474df0a4969e8d Mon Sep 17 00:00:00 2001
+From 1eb47a24bdbc1e43d4c15e5ee734c38a644d4fbb Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Tue, 31 Aug 2021 15:56:28 +0000
-Subject: [PATCH 05/28] Make pause and bottlerocket bootstrap images updatable
+Subject: [PATCH 05/29] Make pause and bottlerocket bootstrap images updatable
  in validation webhook
 
 cr: https://code.amazon.com/reviews/CR-56335855
 ---
- .../v1beta1/kubeadm_control_plane_webhook.go  |  4 +++
- .../kubeadm_control_plane_webhook_test.go     | 36 +++++++++++++++++++
- 2 files changed, 40 insertions(+)
+ .../v1beta1/kubeadm_control_plane_webhook.go  |  4 ++
+ .../kubeadm_control_plane_webhook_test.go     | 37 +++++++++++++++++++
+ 2 files changed, 41 insertions(+)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index f59286273..a378b9b1e 100644
+index f07738674..263bda967 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 @@ -139,6 +139,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
@@ -33,10 +33,10 @@ index f59286273..a378b9b1e 100644
  		{spec, kubeadmConfigSpec, postKubeadmCommands},
  		{spec, kubeadmConfigSpec, files},
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-index ee20890ed..8a0c9e93c 100644
+index 6ae774051..86c02c2e5 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-@@ -642,6 +642,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -647,6 +647,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  		Directory: "/tmp/patches",
  	}
  
@@ -55,9 +55,9 @@ index ee20890ed..8a0c9e93c 100644
  	updateInitConfigurationSkipPhases := before.DeepCopy()
  	updateInitConfigurationSkipPhases.Spec.KubeadmConfigSpec.InitConfiguration.SkipPhases = []string{"addon/kube-proxy"}
  
-@@ -996,6 +1008,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
- 			before:                validIgnitionConfigurationBefore,
- 			kcp:                   validIgnitionConfigurationAfter,
+@@ -1014,6 +1026,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before:                before,
+ 			kcp:                   switchFromCloudInitToIgnition,
  		},
 +		{
 +			name:      "should allow changes to cluster configuration pause image",
@@ -86,6 +86,14 @@ index ee20890ed..8a0c9e93c 100644
  	}
  
  	for _, tt := range tests {
+@@ -1192,6 +1228,7 @@ func TestValidateVersion(t *testing.T) {
+ 		})
+ 	}
+ }
++
+ func TestKubeadmControlPlaneValidateUpdateAfterDefaulting(t *testing.T) {
+ 	before := &KubeadmControlPlane{
+ 		ObjectMeta: metav1.ObjectMeta{
 -- 
-2.25.1
+2.34.1
 
