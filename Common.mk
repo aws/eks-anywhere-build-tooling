@@ -40,6 +40,9 @@ endif
 CODEBUILD_CI?=false
 CI?=false
 JOB_TYPE?=
+INCLUDE_OUTPUT_IN_PROW_ARTIFACTS?=false
+# prow artifacts location env var
+ARTIFACTS?=
 CODEBUILD_BUILD_IMAGE?=
 CLONE_URL?=$(call GET_CLONE_URL,$(REPO_OWNER),$(REPO))
 #HELM_CLONE_URL=$(call GET_CLONE_URL,$(HELM_SOURCE_OWNER),$(HELM_SOURCE_REPOSITORY))
@@ -345,12 +348,10 @@ GO_MOD_DOWNLOAD_TARGETS?=$(foreach path, $(UNIQ_GO_MOD_PATHS), $(call GO_MOD_DOW
 VENDOR_UPDATE_SCRIPT?=
 #### CGO ############
 CGO_CREATE_BINARIES?=false
-CGO_SOURCE=$(OUTPUT_DIR)/source
 IS_ON_BUILDER_BASE?=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
 BUILDER_PLATFORM?=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
 needs-cgo-builder=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter-out $(1),$(BUILDER_PLATFORM)),true,))
 USE_DOCKER_FOR_CGO_BUILD?=false
-DOCKER_USE_ID_FOR_LINUX=$(shell if [ "$$(uname -s)" = "Linux" ] && [ -n "$${USER:-}" ]; then echo "-u $$(id -u $${USER}):$$(id -g $${USER})"; fi)
 GO_MOD_CACHE=$(shell source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) > /dev/null 2>&1 && go env GOMODCACHE)
 GO_BUILD_CACHE=$(shell source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) > /dev/null 2>&1 && go env GOCACHE)
 CGO_TARGET?=
@@ -411,10 +412,6 @@ GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 SPECIAL_TARGET_SECONDARY=$(strip $(PROJECT_DEPENDENCIES_TARGETS) $(GO_MOD_DOWNLOAD_TARGETS))
 SKIP_CHECKSUM_VALIDATION?=false
 IN_DOCKER_TARGETS=all-attributions all-attributions-checksums all-checksums attribution attribution-checksums binaries checksums clean clean-go-cache
-CGO_DOCKER_RUN_TIMEOUT?=15m
-DOCKER_RUN_COMMAND?=$(if $(filter true,$(CODEBUILD_CI)),retry_with_timeout $(CGO_DOCKER_RUN_TIMEOUT)) docker run $(shell if [ "$(CODEBUILD_CI)" != "true" ] && [ -t 0 ]; then echo '-it'; fi)
-DOCKER_RUN_BASE_DIRECTORY?=$(BASE_DIRECTORY)
-DOCKER_RUN_GO_MOD_CACHE?=$(GO_MOD_CACHE)
 PRUNE_BUILDCTL?=false
 GITHUB_TOKEN?=
 ####################################################
@@ -469,13 +466,7 @@ endef
 # This will occansionally stall out in codebuild for an unknown reason
 # retry after a configurable timeout
 define CGO_DOCKER
-	source $(BUILD_LIB)/common.sh && build::docker::retry_pull --platform $(IMAGE_PLATFORMS) $(BUILDER_IMAGE); \
-	$(DOCKER_RUN_COMMAND) --rm -w /eks-anywhere-build-tooling/projects/$(COMPONENT) $(DOCKER_USE_ID_FOR_LINUX) \
-		--mount type=bind,source=$(DOCKER_RUN_BASE_DIRECTORY),target=/eks-anywhere-build-tooling \
-		--mount type=bind,source=$(DOCKER_RUN_GO_MOD_CACHE),target=/mod-cache \
-		-e GOPROXY=$(GOPROXY) -e GOMODCACHE=/mod-cache \
-		--platform $(IMAGE_PLATFORMS) \
-		--init $(BUILDER_IMAGE) make $(CGO_TARGET) BINARY_PLATFORMS=$(IMAGE_PLATFORMS)
+	$(BUILD_LIB)/run_target_docker.sh $(COMPONENT) $(CGO_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" "$(ARTIFACTS_BUCKET)" "$(BASE_DIRECTORY)" "$(GO_MOD_CACHE)" true "$(IMAGE_PLATFORMS)"
 endef
 
 define SIMPLE_CREATE_BINARIES_SHELL
@@ -663,7 +654,7 @@ ifeq ($(SIMPLE_CREATE_TARBALLS),true)
 endif
 
 .PHONY: upload-artifacts
-upload-artifacts: s3-artifacts
+upload-artifacts: s3-artifacts upload-output-to-prow-artifacts-s3-artifacts
 	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN) $(UPLOAD_DO_NOT_DELETE)
 	@echo -e $(call TARGET_END_LOG)
@@ -674,6 +665,12 @@ s3-artifacts: tarballs
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
 	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION) $(IMAGE_FORMAT) $(IMAGE_OS)
 	@echo -e $(call TARGET_END_LOG)
+
+.PHONY: upload-output-to-prow-artifacts-%
+upload-output-to-prow-artifacts-%:
+	@if [[ "$(JOB_TYPE)" == "presubmit" ]] && [[ "$(INCLUDE_OUTPUT_IN_PROW_ARTIFACTS)" == "true" ]]; then \
+		cp -rf $(OUTPUT_DIR) $(ARTIFACTS); \
+	fi
 
 ### Checksum Targets
 
@@ -686,7 +683,7 @@ ifneq ($(strip $(BINARY_TARGETS)),)
 endif
 
 .PHONY: validate-checksums
-validate-checksums: $(BINARY_TARGETS)
+validate-checksums: $(BINARY_TARGETS) upload-output-to-prow-artifacts-validate-checksums
 ifneq ($(and $(strip $(BINARY_TARGETS)), $(filter false, $(SKIP_CHECKSUM_VALIDATION))),)
 	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION)
@@ -758,33 +755,22 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 	@echo -e $(call TARGET_END_LOG)
 
 ## CGO Targets
-.PHONY: %/cgo/amd64 %/cgo/arm64 prepare-cgo-folder
-
-# .git folder needed so git properly finds the root of the repo
-prepare-cgo-folder:
-	@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/
-	rsync -rm  --exclude='.git/***' \
-		--exclude='***/_output/***' --exclude='projects/$(COMPONENT)/$(REPO)/***' \
-		--include='projects/$(COMPONENT)/***' --include='*/' --exclude='projects/***'  \
-		$(BASE_DIRECTORY)/ $(CGO_SOURCE)/eks-anywhere-build-tooling/
-	@mkdir -p $(OUTPUT_BIN_DIR)/$(subst /,-,$(IMAGE_PLATFORMS))
-	@mkdir -p $(CGO_SOURCE)/eks-anywhere-build-tooling/.git/{refs,objects}
-	@cp $(BASE_DIRECTORY)/.git/HEAD $(CGO_SOURCE)/eks-anywhere-build-tooling/.git
+.PHONY: %/cgo/amd64 %/cgo/arm64
 
 %/cgo/amd64 %/cgo/arm64: IMAGE_OUTPUT_TYPE?=local
 %/cgo/amd64 %/cgo/arm64: DOCKERFILE_FOLDER?=$(BUILD_LIB)/docker/linux/cgo
 %/cgo/amd64 %/cgo/arm64: IMAGE_NAME=binary-builder
 %/cgo/amd64 %/cgo/arm64: IMAGE_BUILD_ARGS?=GOPROXY COMPONENT
-%/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=$(CGO_SOURCE)
+%/cgo/amd64 %/cgo/arm64: IMAGE_CONTEXT_DIR?=.
 %/cgo/amd64 %/cgo/arm64: BUILDER_IMAGE=$(CURRENT_BUILDER_BASE_IMAGE)
 
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
 
-%/cgo/amd64: prepare-cgo-folder
+%/cgo/amd64:
 	$(if $(filter true, $(USE_DOCKER_FOR_CGO_BUILD)),$(CGO_DOCKER),$(BUILDCTL))
 
-%/cgo/arm64: prepare-cgo-folder
+%/cgo/arm64:
 	$(if $(filter true, $(USE_DOCKER_FOR_CGO_BUILD)),$(CGO_DOCKER),$(BUILDCTL))
 
 # As an attempt to see if using docker is more stable for cgo builds in Codebuild

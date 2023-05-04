@@ -71,10 +71,6 @@ update-checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
 update-attribution-files: add-generated-help-block attribution-files
 	build/update-attribution-files/create_pr.sh
 
-.PHONY: run-target-in-docker
-run-target-in-docker:
-	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" $(ARTIFACTS_BUCKET)
-
 .PHONY: stop-docker-builder
 stop-docker-builder:
 	docker rm -f -v eks-a-builder

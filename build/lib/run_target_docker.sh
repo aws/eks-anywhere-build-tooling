@@ -22,45 +22,78 @@ TARGET="$2"
 IMAGE_REPO="${3:-}"
 RELEASE_BRANCH="${4:-}"
 ARTIFACTS_BUCKET="${5:-$ARTIFACTS_BUCKET}"
-
-# Since we may actually be running docker in docker here for cgo builds
-# we need to have the host path base_dir and go_mod_cache
-BASE_DIRECTORY_OVERRIDE="${6:-}"
-GO_MOD_CACHE_OVERRIDE="${7:-}"
+BASE_DIRECTORY="${6:-}"
+GO_MOD_CACHE="${7:-}"
+REMOVE="${8:-false}"
+PLATFORM="${9:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 source "${SCRIPT_ROOT}/common.sh"
 
-echo "****************************************************************"
-echo "A docker container with the name eks-a-builder will be launched."
-echo "It will be left running to support running consecutive runs."
-echo "Run 'make stop-docker-builder' when you are done to stop it."
-echo "****************************************************************"
+# Since we may actually be running docker in docker here for cgo builds
+# we need to have the host path base_dir and go_mod_cache and netrc
+DOCKER_RUN_BASE_DIRECTORY="${DOCKER_RUN_BASE_DIRECTORY:-$BASE_DIRECTORY}"
+DOCKER_RUN_GO_MOD_CACHE="${DOCKER_RUN_GO_MOD_CACHE:-$GO_MOD_CACHE}"
 
-if ! docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
-	build::docker::retry_pull public.ecr.aws/eks-distro-build-tooling/builder-base:latest
+MAKE_VARS="IMAGE_REPO=$IMAGE_REPO ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET"
+
+function remove_container()
+{
+	docker rm -vf $CONTAINER_ID
+}
+
+SKIP_RUN="false"
+NAME=""
+if [[ "$REMOVE" == "false" ]]; then
+	echo "****************************************************************"
+	echo "A docker container with the name eks-a-builder will be launched."
+	echo "It will be left running to support running consecutive runs."
+	echo "Run 'make stop-docker-builder' when you are done to stop it."
+	echo "****************************************************************"
+
+	NAME="--name eks-a-builder"
+
+	if docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
+		SKIP_RUN="true"
+		CONTAINER_ID="eks-a-builder"
+	fi
+else
+	trap "remove_container" EXIT
+fi
+
+IMAGE="public.ecr.aws/eks-distro-build-tooling/builder-base:latest"
+PLATFORM_ARG=""
+
+if [[ -n "$PLATFORM" ]]; then
+	DIGEST=$(docker buildx imagetools inspect --raw public.ecr.aws/eks-distro-build-tooling/builder-base:latest | jq -r ".manifests[] | select(.platform.architecture == \"${PLATFORM#linux/}\") | .digest")
+	IMAGE="public.ecr.aws/eks-distro-build-tooling/builder-base@$DIGEST"
+	PLATFORM_ARG="--platform $PLATFORM"
+	MAKE_VARS=" BINARY_PLATFORMS=$PLATFORM"
+fi
+
+if [[ "$SKIP_RUN" == "false" ]]; then
+	build::docker::retry_pull $IMAGE
 
 	NETRC=""
 	if [ -f $HOME/.netrc ]; then
-		NETRC="--mount type=bind,source=$HOME/.netrc,target=/root/.netrc"
+		DOCKER_RUN_NETRC="${DOCKER_RUN_NETRC:-$HOME/.netrc}"
+		NETRC="--mount type=bind,source=$DOCKER_RUN_NETRC,target=/root/.netrc"
+	else
+		DOCKER_RUN_NETRC=""
 	fi
 
-	# on a linux host, the uid needs to match the host user otherwise
-	# git will complain about user permissions on the repo, when go
-	# goes to figure out the vcs information
-	USER_ID=""
-	if [ "$(uname -s)" = "Linux" ] && [ -n "${USER:-}" ]; then
-		USER_ID="-u $(id -u ${USER}):$(id -g ${USER})"
-	fi
-
-	docker run -d --name eks-a-builder --privileged $NETRC $USER_ID \
-		--mount type=bind,source=$MAKE_ROOT,target=/eks-anywhere-build-tooling \
+	mkdir -p $DOCKER_RUN_GO_MOD_CACHE
+	CONTAINER_ID=$(build::common::echo_and_run docker run -d $NAME --privileged $NETRC $PLATFORM_ARG \
+		--mount type=bind,source=$DOCKER_RUN_BASE_DIRECTORY,target=/eks-anywhere-build-tooling \
+		--mount type=bind,source=$DOCKER_RUN_GO_MOD_CACHE,target=/mod-cache \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		-e GOPROXY=${GOPROXY:-} --entrypoint sleep \
-		public.ecr.aws/eks-distro-build-tooling/builder-base:latest infinity
+		-e GOPROXY=${GOPROXY:-} -e GOMODCACHE=/mod-cache -e DOCKER_RUN_BASE_DIRECTORY=$DOCKER_RUN_BASE_DIRECTORY -e DOCKER_RUN_GO_MOD_CACHE=$DOCKER_RUN_GO_MOD_CACHE -e DOCKER_RUN_NETRC=$DOCKER_RUN_NETRC \
+		--entrypoint sleep $IMAGE infinity)
+
+	docker exec -it $CONTAINER_ID git config --global --add safe.directory /eks-anywhere-build-tooling
 fi
 
-docker exec -e RELEASE_BRANCH=$RELEASE_BRANCH -e DOCKER_RUN_BASE_DIRECTORY=$BASE_DIRECTORY_OVERRIDE -e DOCKER_RUN_GO_MOD_CACHE=$GO_MOD_CACHE_OVERRIDE -it eks-a-builder \
-	make $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT IMAGE_REPO=$IMAGE_REPO ARTIFACTS_BUCKET=$ARTIFACTS_BUCKET
+
+build::common::echo_and_run docker exec -e RELEASE_BRANCH=$RELEASE_BRANCH -it $CONTAINER_ID \
+	make $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT $MAKE_VARS
