@@ -34,12 +34,14 @@ DST_BUCKET_NAME=${DST_BUCKET_PATH%%/*}
 DST_PATH=${DST_BUCKET_PATH#"$DST_BUCKET_NAME/"}
 
 EXPORTED_IMAGE_PREFIX="$DST_PATH"
+EXPORTED_IMAGE_KEY="${EXPORTED_IMAGE_PREFIX}${EXPORT_TASK_ID}.${IMAGE_FORMAT}"
 
 EXPORT_RESPONSE=$(aws ec2 export-image --disk-image-format $IMAGE_FORMAT --s3-export-location S3Bucket=$DST_BUCKET_NAME,S3Prefix=$EXPORTED_IMAGE_PREFIX --image-id $AMI_ID)
 echo $EXPORT_RESPONSE
 
 EXPORT_TASK_ID=$(echo $EXPORT_RESPONSE | jq -r '.ExportImageTaskId')
-EXPORTED_IMAGE_LOCATION="s3://${DST_BUCKET_NAME}/${EXPORTED_IMAGE_PREFIX}${EXPORT_TASK_ID}.${IMAGE_FORMAT}"
+EXPORTED_IMAGE_LOCATION="s3://${DST_BUCKET_NAME}/${EXPORTED_IMAGE_KEY}"
+EXPORTED_IMAGE_URL="https://${DST_BUCKET_NAME}.s3.amazonaws.com/${EXPORTED_IMAGE_KEY}"
 
 FINAL_STATUSES=(completed deleted)
 STATUS=$(echo $EXPORT_RESPONSE | jq -r '.Status')
@@ -63,8 +65,12 @@ fi
 
 echo "Image import for ami $AMI_ID succeeded"
 
+aws s3api put-object-acl --bucket $DST_BUCKET_NAME --key $EXPORTED_IMAGE_KEY --acl public-read
+EXPORTED_IMAGE_SHA256=$(curl -s $EXPORTED_IMAGE_URL | sha256sum | cut -d" " -f1)
 for dst in "${REPLICAS_SPLIT[@]}"
 do
   echo "Copying exported image to $dst"
-  aws s3 cp --no-progress --acl public-read $EXPORTED_IMAGE_LOCATION $dst 
+  aws s3 cp --no-progress --acl public-read $EXPORTED_IMAGE_LOCATION $dst
+  echo -n "$EXPORTED_IMAGE_SHA256  $(basename $dst)" > $(basename $dst).sha256
+  aws s3 cp --no-progress --acl public-read $(basename $dst).sha256 $dst.sha256
 done
