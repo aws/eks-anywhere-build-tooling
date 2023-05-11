@@ -21,6 +21,7 @@ source "amazon-ebs" "amazonlinux2" {
       name                = "amzn2-ami-kernel-5.*-hvm-2*"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
+      architecture        = "x86_64"
     }
     most_recent = true
     owners      = ["amazon"]
