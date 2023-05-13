@@ -14,19 +14,20 @@ import (
 )
 
 var (
-	bo                   = &builder.BuildOptions{}
-	vSphereConfigFile    string
-	baremetalConfigFile  string
-	nutanixConfigFile    string
-	cloudstackConfigFile string
-	amiConfigFile        string
-	err                  error
+	bo                        = &builder.BuildOptions{}
+	vSphereConfigFile         string
+	baremetalConfigFile       string
+	nutanixConfigFile         string
+	cloudstackConfigFile      string
+	amiConfigFile             string
+	additionalFilesConfigFile string
+	err                       error
 )
 
 var buildCmd = &cobra.Command{
-	Use:   "build --os <image os> --hypervisor <target hypervisor>",
+	Use:   "build --os <image os> --hypervisor <target hypervisor> --release-channel <EKS-D Release channel>",
 	Short: "Build EKS Anywhere Node Image",
-	Long:  "This command is used to build EKS Anywhere node images",
+	Long:  "This command is used to build EKS Anywhere node images corresponding to different hypervisors.",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Creating builder config")
 		err = ValidateInputs(bo)
@@ -41,12 +42,13 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().StringVar(&bo.Os, "os", "", "Operating system to use for EKS-A node image")
 	buildCmd.Flags().StringVar(&bo.OsVersion, "os-version", "", "Operating system version to use for EKS-A node image. Can be 20.04 or 22.04 for Ubuntu or 8 for Redhat. ")
-	buildCmd.Flags().StringVar(&bo.Hypervisor, "hypervisor", "", "Target hypervisor EKS-A node image")
+	buildCmd.Flags().StringVar(&bo.Hypervisor, "hypervisor", "", "Target hypervisor for EKS-A node image")
 	buildCmd.Flags().StringVar(&baremetalConfigFile, "baremetal-config", "", "Path to Baremetal Config file")
 	buildCmd.Flags().StringVar(&vSphereConfigFile, "vsphere-config", "", "Path to vSphere Config file")
 	buildCmd.Flags().StringVar(&nutanixConfigFile, "nutanix-config", "", "Path to Nutanix Config file")
 	buildCmd.Flags().StringVar(&cloudstackConfigFile, "cloudstack-config", "", "Path to CloudStack Config file")
 	buildCmd.Flags().StringVar(&amiConfigFile, "ami-config", "", "Path to AMI Config file")
+	buildCmd.Flags().StringVar(&additionalFilesConfigFile, "files-config", "", "Path to Config file specifying additional files to be copied into EKS-A node image")
 	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-27", "EKS-D Release channel for node image. Can be 1-23, 1-24, 1-25, 1-26 or 1-27")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA and Raw builds.")
@@ -132,11 +134,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 	} else {
 		configPath, err = filepath.Abs(configPath)
 		if err != nil {
-			return fmt.Errorf("Error converting %s config file path to absolute path", bo.Hypervisor)
+			return fmt.Errorf("Error converting %s config file path to absolute path: %v", bo.Hypervisor, err)
 		}
 		config, err := ioutil.ReadFile(configPath)
 		if err != nil {
-			return fmt.Errorf("Error reading %s config file", bo.Hypervisor)
+			return fmt.Errorf("Error reading %s config file: %v", bo.Hypervisor, err)
 		}
 		switch bo.Hypervisor {
 		case builder.VSphere:
@@ -203,8 +205,6 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				AMIRegions:          builder.DefaultAMIBuildRegion,
 				AWSRegion:           builder.DefaultAMIBuildRegion,
 				BuilderInstanceType: builder.DefaultAMIBuilderInstanceType,
-				CustomRole:          "true",
-				AnsibleExtraVars:    builder.DefaultAMIAnsibleExtraVars,
 				ManifestOutput:      builder.DefaultAMIManifestOutput,
 				RootDeviceName:      builder.DefaultAMIRootDeviceName,
 				VolumeSize:          builder.DefaultAMIVolumeSize,
@@ -213,20 +213,48 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = json.Unmarshal(config, amiConfig); err != nil {
 				return err
 			}
-			if amiConfig.CustomRole == "true" {
-				if (amiConfig.CustomRoleNameList == nil && amiConfig.CustomRoleNames == "") ||
-					(amiConfig.CustomRoleNameList != nil && amiConfig.CustomRoleNames != "") {
-					log.Fatalf("Exactly one of \"custom_role_name_list\" or \"custom_role_names\" must be provided")
-				}
-
-				if amiConfig.CustomRoleNameList != nil {
-					amiConfig.CustomRoleNames = strings.Join(amiConfig.CustomRoleNameList, " ")
-					amiConfig.CustomRoleNameList = nil
-				}
-			}
 
 			bo.AMIConfig = amiConfig
+			bo.FilesConfig = &builder.AdditionalFilesConfig{
+				FilesAnsibleConfig: builder.FilesAnsibleConfig{
+					CustomRole:       "true",
+					CustomRoleNames:  builder.DefaultAMICustomRoleNames,
+					AnsibleExtraVars: builder.DefaultAMIAnsibleExtraVars,
+				},
+				FileVars: builder.FileVars{
+					AdditionalFiles: "true",
+					AdditionalFilesList: []builder.File{
+						{
+							Source:      "",
+							Destination: "",
+							Owner:       "",
+							Group:       "",
+							Mode:        0,
+						},
+						{
+							Source:      "",
+							Destination: "",
+							Owner:       "",
+							Group:       "",
+							Mode:        0,
+						},
+					},
+				},
+			}
 		}
+	}
+
+	if additionalFilesConfigFile != "" {
+		filesConfig, err := ioutil.ReadFile(additionalFilesConfigFile)
+		if err != nil {
+			return fmt.Errorf("Error reading additional files config path: %v", err)
+		}
+
+		if err = json.Unmarshal(filesConfig, &bo.FilesConfig); err != nil {
+			return err
+		}
+
+		bo.FilesConfig.ProcessAdditionalFiles()
 	}
 
 	return nil

@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/aws/eks-anywhere/release v0.0.0-20230510212526-797a56720581
+	github.com/ghodss/yaml v1.0.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.0

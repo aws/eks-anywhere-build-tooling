@@ -7,13 +7,15 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/ghodss/yaml"
 )
 
 const (
 	buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
 )
 
-var codebuild = os.Getenv("CODEBUILD_CI")
+var codebuild = os.Getenv(codebuildCIEnvVar)
 
 func (b *BuildOptions) BuildImage() {
 	// Clone build tooling repo
@@ -46,7 +48,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 		log.Printf("Checked out eks-anywhere-build-tooling repo at commit %s\n", gitCommitFromBundle)
 	} else {
-		buildToolingRepoPath = os.Getenv("CODEBUILD_SRC_DIR")
+		buildToolingRepoPath = os.Getenv(codebuildSourceDirectoryEnvVar)
 		log.Println("Using repo checked out from code commit")
 	}
 
@@ -58,20 +60,43 @@ func (b *BuildOptions) BuildImage() {
 		log.Fatalf("release-channel should be one of %v", supportedReleaseBranches)
 	}
 
-	imageBuilderProjectPath := filepath.Join(buildToolingRepoPath, "projects/kubernetes-sigs/image-builder")
-	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, "image-builder/images/capi")
+	imageBuilderProjectPath := filepath.Join(buildToolingRepoPath, imageBuilderProjectDirectory)
+	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, imageBuilderCAPIDirectory)
 	var outputArtifactPath string
 	var outputImageGlob []string
-	commandEnvVars := []string{fmt.Sprintf("RELEASE_BRANCH=%s", b.ReleaseChannel)}
+	commandEnvVars := []string{fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel)}
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n Firmware: %s\n", b.Os, b.OsVersion, b.Hypervisor, b.Firmware)
+	if b.FilesConfig != nil {
+		filesAnsibleConfig, err := json.Marshal(b.FilesConfig.FilesAnsibleConfig)
+		if err != nil {
+			log.Fatalf("Error marshalling files ansible config data")
+		}
+
+		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, packerAdditionalFilesConfigFile), filesAnsibleConfig, 0o644)
+		if err != nil {
+			log.Fatalf("Error writing additional files config in Packer ansible directory: %v", err)
+		}
+
+		additionalFileVars, err := yaml.Marshal(b.FilesConfig.FileVars)
+		if err != nil {
+			log.Fatalf("Error marshalling additional files files list")
+		}
+
+		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, packerAdditionalFilesList), additionalFileVars, 0o644)
+		if err != nil {
+			log.Fatalf("Error writing additional files config in Packer ansible directory")
+		}
+
+		commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerAdditionalFilesConfigFileEnvVar, packerAdditionalFilesConfigFile))
+	}
 	if b.Hypervisor == VSphere {
 		// Read and set the vsphere connection data
 		vsphereConfigData, err := json.Marshal(b.VsphereConfig)
 		if err != nil {
 			log.Fatalf("Error marshalling vsphere config data")
 		}
-		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, "packer/ova/vsphere.json"), vsphereConfigData, 0o644)
+		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, packerVSphereConfigFile), vsphereConfigData, 0o644)
 		if err != nil {
 			log.Fatalf("Error writing vsphere config file to packer")
 		}
@@ -87,8 +112,8 @@ func (b *BuildOptions) BuildImage() {
 		case RedHat:
 			buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
-				fmt.Sprintf("RHSM_USERNAME=%s", b.VsphereConfig.RhelUsername),
-				fmt.Sprintf("RHSM_PASSWORD=%s", b.VsphereConfig.RhelPassword),
+				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.VsphereConfig.RhelUsername),
+				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.VsphereConfig.RhelPassword),
 			)
 		}
 
@@ -106,7 +131,7 @@ func (b *BuildOptions) BuildImage() {
 
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == Baremetal {
-		baremetalConfigFile := filepath.Join(imageBuilderProjectPath, "packer/config/baremetal.json")
+		baremetalConfigFile := filepath.Join(imageBuilderProjectPath, packerBaremetalConfigFile)
 		if b.BaremetalConfig != nil {
 			baremetalConfigData, err := json.Marshal(b.BaremetalConfig)
 			if err != nil {
@@ -125,12 +150,12 @@ func (b *BuildOptions) BuildImage() {
 		case RedHat:
 			buildCommand = fmt.Sprintf("make -C %s local-build-raw-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
-				fmt.Sprintf("RHSM_USERNAME=%s", b.BaremetalConfig.RhelUsername),
-				fmt.Sprintf("RHSM_PASSWORD=%s", b.BaremetalConfig.RhelPassword),
+				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.BaremetalConfig.RhelUsername),
+				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.BaremetalConfig.RhelPassword),
 			)
 		}
 		if b.BaremetalConfig != nil {
-			commandEnvVars = append(commandEnvVars, fmt.Sprintf("PACKER_RAW_VAR_FILES=%s", baremetalConfigFile))
+			commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerTypeVarFilesEnvVar, baremetalConfigFile))
 		}
 
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
@@ -156,7 +181,7 @@ func (b *BuildOptions) BuildImage() {
 		if err != nil {
 			log.Fatalf("Error marshalling nutanix config data")
 		}
-		err = ioutil.WriteFile(filepath.Join(upstreamImageBuilderProjectPath, "packer/nutanix/nutanix.json"), nutanixConfigData, 0o644)
+		err = ioutil.WriteFile(filepath.Join(upstreamImageBuilderProjectPath, packerNutanixConfigFile), nutanixConfigData, 0o644)
 		if err != nil {
 			log.Fatalf("Error writing nutanix config file to packer: %v", err)
 		}
@@ -170,7 +195,7 @@ func (b *BuildOptions) BuildImage() {
 		log.Printf("Image Build Successful\n Please find the image uploaded under Nutanix Image Service with name %s\n", b.NutanixConfig.ImageName)
 	} else if b.Hypervisor == CloudStack {
 		// Create config file
-		cloudstackConfigFile := filepath.Join(imageBuilderProjectPath, "packer/config/cloudstack.json")
+		cloudstackConfigFile := filepath.Join(imageBuilderProjectPath, packerCloudStackConfigFile)
 
 		// Assign ansible user var for cloudstack provider
 		b.CloudstackConfig.AnsibleUserVars = "provider=cloudstack"
@@ -192,12 +217,12 @@ func (b *BuildOptions) BuildImage() {
 			outputImageGlobPattern = "output/rhel-*/rhel-*"
 			buildCommand = fmt.Sprintf("make -C %s local-build-cloudstack-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
-				fmt.Sprintf("RHSM_USERNAME=%s", b.CloudstackConfig.RhelUsername),
-				fmt.Sprintf("RHSM_PASSWORD=%s", b.CloudstackConfig.RhelPassword),
+				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.CloudstackConfig.RhelUsername),
+				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.CloudstackConfig.RhelPassword),
 			)
 		}
 		if b.CloudstackConfig != nil {
-			commandEnvVars = append(commandEnvVars, fmt.Sprintf("PACKER_CLOUDSTACK_VAR_FILES=%s", cloudstackConfigFile))
+			commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerTypeVarFilesEnvVar, cloudstackConfigFile))
 		}
 
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
@@ -212,7 +237,7 @@ func (b *BuildOptions) BuildImage() {
 
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.qcow2", b.Os))
 	} else if b.Hypervisor == AMI {
-		amiConfigFile := filepath.Join(imageBuilderProjectPath, "packer/ami/ami.json")
+		amiConfigFile := filepath.Join(imageBuilderProjectPath, packerAMIConfigFile)
 
 		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
 		if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {

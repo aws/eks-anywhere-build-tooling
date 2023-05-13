@@ -43,8 +43,8 @@ type BuildOptions struct {
 	NutanixConfig    *NutanixConfig
 	CloudstackConfig *CloudstackConfig
 	AMIConfig        *AMIConfig
+	FilesConfig      *AdditionalFilesConfig
 	ReleaseChannel   string
-	artifactsBucket  string
 	Force            bool
 	Firmware         string
 }
@@ -65,12 +65,14 @@ type VsphereConfig struct {
 	VsphereLibraryName string `json:"vsphere_library_name"`
 	Username           string `json:"username"`
 	Password           string `json:"password"`
+	AdditionalFiles    []File `json:"files"`
 	IsoConfig
 	RhelConfig
 	ExtraPackagesConfig
 }
 
 type BaremetalConfig struct {
+	AdditionalFiles []File `json:"files"`
 	IsoConfig
 	RhelConfig
 	ExtraPackagesConfig
@@ -108,20 +110,17 @@ type NutanixConfig struct {
 }
 
 type AMIConfig struct {
-	AMIFilterName       string   `json:"ami_filter_name"`
-	AMIFilterOwners     string   `json:"ami_filter_owners"`
-	AMIRegions          string   `json:"ami_regions"`
-	AWSRegion           string   `json:"aws_region"`
-	AnsibleExtraVars    string   `json:"ansible_extra_vars"`
-	BuilderInstanceType string   `json:"builder_instance_type"`
-	CustomRole          string   `json:"custom_role"`
-	CustomRoleNameList  []string `json:"custom_role_name_list,omitempty"`
-	CustomRoleNames     string   `json:"custom_role_names"`
-	ManifestOutput      string   `json:"manifest_output"`
-	RootDeviceName      string   `json:"root_device_name"`
-	SubnetID            string   `json:"subnet_id"`
-	VolumeSize          string   `json:"volume_size"`
-	VolumeType          string   `json:"volume_type"`
+	AMIFilterName       string `json:"ami_filter_name"`
+	AMIFilterOwners     string `json:"ami_filter_owners"`
+	AMIRegions          string `json:"ami_regions"`
+	AWSRegion           string `json:"aws_region"`
+	BuilderInstanceType string `json:"builder_instance_type"`
+	ManifestOutput      string `json:"manifest_output"`
+	RootDeviceName      string `json:"root_device_name"`
+	SubnetID            string `json:"subnet_id"`
+	VolumeSize          string `json:"volume_size"`
+	VolumeType          string `json:"volume_type"`
+	
 	ExtraPackagesConfig
 }
 
