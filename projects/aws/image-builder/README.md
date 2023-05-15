@@ -14,11 +14,11 @@ Supported OSes
 * ubuntu
 
 Supported Release Channels
+* 1-27
 * 1-26
 * 1-25
 * 1-24
 * 1-23
-* 1-22
 
 ### Building Node Images for vSphere
 
