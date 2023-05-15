@@ -71,10 +71,6 @@ update-checksum-files: $(addprefix checksum-files-project-, $(ALL_PROJECTS))
 update-attribution-files: add-generated-help-block attribution-files
 	build/update-attribution-files/create_pr.sh
 
-.PHONY: run-target-in-docker
-run-target-in-docker:
-	build/lib/run_target_docker.sh $(PROJECT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" $(ARTIFACTS_BUCKET)
-
 .PHONY: stop-docker-builder
 stop-docker-builder:
 	docker rm -f -v eks-a-builder
@@ -100,7 +96,6 @@ generate-staging-buildspec:
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_bottlerocket-bootstrap" "$(BASE_DIRECTORY)/projects/aws/bottlerocket-bootstrap/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes_cloud-provider-vsphere" "$(BASE_DIRECTORY)/projects/kubernetes/cloud-provider-vsphere/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes-sigs_kind" "$(BASE_DIRECTORY)/projects/kubernetes-sigs/kind/buildspecs/batch-build.yml" true
-	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "fluxcd_source-controller" "$(BASE_DIRECTORY)/projects/fluxcd/source-controller/buildspecs/batch-build.yml" false
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "containerd_containerd" "$(BASE_DIRECTORY)/projects/containerd/containerd/buildspecs/batch-build.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "opencontainers_runc" "$(BASE_DIRECTORY)/projects/opencontainers/runc/buildspecs/batch-build.yml" true
 
