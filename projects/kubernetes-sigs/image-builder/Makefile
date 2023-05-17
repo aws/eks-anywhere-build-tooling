@@ -307,7 +307,7 @@ upload-bottlerocket-%:
 .PHONY: release-image-build-on-metal-%
 release-image-build-on-metal-%: $(GIT_PATCH_TARGET)
 	@echo -e $(call TARGET_START_LOG)
-	build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $* $(IMAGE_FORMAT) $(LATEST)
+	build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $* $(IMAGE_FORMAT) $(LATEST) $(ARTIFACTS_PATH)/$(IMAGE_FORMAT)/$*
 	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: build-qemu-rhel-local

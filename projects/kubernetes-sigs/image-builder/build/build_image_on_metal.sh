@@ -28,6 +28,7 @@ KEY_NAME="${6?Specify sixth argument - Key name to associate with instance}"
 IMAGE_OS="${7?Specify seventh argument - Raw build target name}"
 IMAGE_FORMAT="${8?Specify eight argument - Image format}"
 LATEST="${9?Specify the ninth argument - Latest tag}"
+ARTIFACTS_PATH="${10?Specify the tenth argument - Artifacts path}"
 
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 CI="${CI:-false}"
@@ -49,6 +50,7 @@ REPO_NAME=$(basename $REPO_ROOT)
 KEY_LOCATION=$REPO_ROOT/$PROJECT_PATH/$KEY_NAME.pem
 REMOTE_HOME_DIR="/home/ubuntu"
 REMOTE_PROJECT_PATH=$REMOTE_HOME_DIR/$REPO_NAME/$PROJECT_PATH
+REMOTE_ARTIFACTS_PATH=$REMOTE_HOME_DIR/$PROJECT_PATH/artifacts
 SSH_OPTS="-i $KEY_LOCATION -o StrictHostKeyChecking=no -o ConnectTimeout=120"
 
 terminate_instance() {
@@ -127,7 +129,7 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=/home/ubuntu/$PROJECT_PATH/artifacts $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH $IMAGE_FORMAT $ARTIFACTS_BUCKET $LATEST"
+SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=$REMOTE_ARTIFACTS_PATH $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH $IMAGE_FORMAT $ARTIFACTS_BUCKET $LATEST"
 if [[ "$IMAGE_OS" == "redhat" ]]; then
   SSH_COMMANDS="export RHSM_USERNAME='$RHSM_USERNAME' RHSM_PASSWORD='$RHSM_PASSWORD'; $SSH_COMMANDS"
 fi
@@ -140,3 +142,4 @@ if [[ "$IMAGE_FORMAT" == "cloudstack" ]]; then
   OUTPUT_IMAGE_BLOB="*.qcow2"
 fi
 scp $SSH_OPTS $REMOTE_HOST:$REMOTE_HOME_DIR/$OUTPUT_IMAGE_BLOB $REPO_ROOT/$PROJECT_PATH/
+scp $SSH_OPTS $REMOTE_HOST:$REMOTE_ARTIFACTS_PATH/$IMAGE_FORMAT/$IMAGE_OS/{EKSD_MANIFEST_URL,KUBERNETES_VERSION} $ARTIFACTS_PATH
