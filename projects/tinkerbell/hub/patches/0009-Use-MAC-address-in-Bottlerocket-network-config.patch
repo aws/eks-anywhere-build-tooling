@@ -1,0 +1,47 @@
+From a5d8410a200c7dd52714b511c9e39748c5391dc5 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Thu, 18 May 2023 22:47:28 -0600
+Subject: [PATCH] Use MAC address in Bottlerocket network config:
+
+Since Bottlerocket v1.11.0 we can use the MAC
+address to define the network config. This will
+make the network config more flexible across
+hardware.
+
+Signed-off-by: Jacob Weinstock <jakobweinstock@gmail.com>
+---
+ actions/writefile/v1/main.go | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/actions/writefile/v1/main.go b/actions/writefile/v1/main.go
+index 07e816a..db393fe 100644
+--- a/actions/writefile/v1/main.go
++++ b/actions/writefile/v1/main.go
+@@ -45,12 +45,12 @@ type Info struct {
+ 
+ var bottlerocketNetTOMLTemplate = `# Version is required, it will change as we support
+ # additional settings
+-version = 2
++version = 3
+ 
+-[{{ .IFName }}.static4]
++["{{ .IFName }}".static4]
+ addresses = ["{{ ToString .IPAddr }}"]
+ 
+-[[{{ .IFName }}.route]]
++[["{{ .IFName }}".route]]
+ to = "default"
+ via = "{{ ToString .Gateway }}"
+ route-metric = 100
+@@ -238,7 +238,7 @@ func main() {
+ 			log.Fatal(err, " IFName=", ifn)
+ 		}
+ 		i := translate(d)
+-		i.IFName = os.Getenv("IFNAME")
++		i.IFName = d.ClientHWAddr.String()
+ 		contents, err = doTemplating(bottlerocketNetTOMLTemplate, i)
+ 		if err != nil {
+ 			log.Fatal(err)
+-- 
+2.39.2
+
