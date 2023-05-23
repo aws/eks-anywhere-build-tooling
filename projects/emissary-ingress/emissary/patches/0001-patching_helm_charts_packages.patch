@@ -1,6 +1,6 @@
-From 3b69ec490ba07ee10c2ba33d218bf96f5defe46b Mon Sep 17 00:00:00 2001
+From 6de85e380155655a35b5850fa6683aa75e01fcf2 Mon Sep 17 00:00:00 2001
 From: jonahjon <jonahjones094@gmail.com>
-Date: Tue, 21 Mar 2023 10:31:50 -0500
+Date: Mon, 22 May 2023 17:28:40 -0500
 Subject: [PATCH] patching_helm_charts_packages
 
 Signed-off-by: jonahjon <jonahjones094@gmail.com>
@@ -38,7 +38,6 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  charts/emissary-ingress/templates/NOTES.txt   |   14 +-
  .../emissary-ingress/templates/_helpers.tpl   |   17 +-
  .../templates/admin-service.yaml              |    2 +-
- .../templates/ambassador-agent.yaml           |  270 -
  charts/emissary-ingress/templates/config.yaml |    2 +-
  .../templates/deployment-canary.yaml          |    4 +-
  .../templates/deployment.yaml                 |    6 +-
@@ -55,8 +54,8 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  .../emissary-ingress/templates/service.yaml   |    4 +-
  .../templates/serviceaccount.yaml             |    2 +-
  .../templates/servicemonitor.yaml             |    4 +-
- .../{values.yaml.in => values.yaml}           |   46 +-
- 51 files changed, 5573 insertions(+), 705 deletions(-)
+ .../{values.yaml.in => values.yaml}           |   51 +-
+ 50 files changed, 5573 insertions(+), 440 deletions(-)
  create mode 100644 charts/crds/.helmignore
  create mode 100644 charts/crds/Chart.yaml
  create mode 100644 charts/crds/README.md
@@ -84,11 +83,10 @@ Signed-off-by: jonahjon <jonahjones094@gmail.com>
  delete mode 100644 charts/emissary-ingress/ci.in/tests/manifests/helm2-values.yaml
  delete mode 100644 charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
  delete mode 100644 charts/emissary-ingress/readme.tpl
- delete mode 100644 charts/emissary-ingress/templates/ambassador-agent.yaml
- rename charts/emissary-ingress/{values.yaml.in => values.yaml} (90%)
+ rename charts/emissary-ingress/{values.yaml.in => values.yaml} (89%)
 
 diff --git a/Makefile b/Makefile
-index 8a2157532..d9bf2d4f6 100644
+index ba986e954..b0daa056a 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -19,12 +19,12 @@ _go-version/deps = docker/base-python/Dockerfile
@@ -154,15 +152,15 @@ index 000000000..0e8a0eb36
 +.vscode/
 diff --git a/charts/crds/Chart.yaml b/charts/crds/Chart.yaml
 new file mode 100644
-index 000000000..9b2691f37
+index 000000000..5341adee3
 --- /dev/null
 +++ b/charts/crds/Chart.yaml
 @@ -0,0 +1,6 @@
 +apiVersion: v2
-+appVersion: v3.5.1
++appVersion: v3.6.0
 +description: Emissary CRDs
 +type: application
-+version: 3.5.1-d0c301dec3634d263f8957745c8557a39caf8204
++version: 3.6.0-d0c301dec3634d263f8957745c8557a39caf8204
 +name: crds
 diff --git a/charts/crds/README.md b/charts/crds/README.md
 new file mode 100644
@@ -5691,14 +5689,14 @@ diff --git a/charts/emissary-ingress/Chart.yaml.in b/charts/emissary-ingress/Cha
 similarity index 54%
 rename from charts/emissary-ingress/Chart.yaml.in
 rename to charts/emissary-ingress/Chart.yaml
-index b974e5198..4ba0ec57d 100644
+index b974e5198..c58248d85 100644
 --- a/charts/emissary-ingress/Chart.yaml.in
 +++ b/charts/emissary-ingress/Chart.yaml
 @@ -1,13 +1,8 @@
 -apiVersion: v1
 -appVersion: @version@
 +apiVersion: v2
-+appVersion: 3.5.1
++appVersion: 3.6.0
  description: A Helm chart for Emissary Ingress
 -name: emissary-ingress
 -version: @chartVersion@
@@ -5736,7 +5734,7 @@ index b974e5198..4ba0ec57d 100644
 +sources:
 +- https://github.com/datawire/ambassador
 +- https://github.com/prometheus/statsd_exporter
-+version: 3.5.1-d0c301dec3634d263f8957745c8557a39caf8204
++version: 3.6.0-d0c301dec3634d263f8957745c8557a39caf8204
 diff --git a/charts/emissary-ingress/OWNERS b/charts/emissary-ingress/OWNERS
 deleted file mode 100644
 index 42543ecf6..000000000
@@ -6243,282 +6241,6 @@ index 77f628459..6b32df2e8 100644
    labels:
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
-diff --git a/charts/emissary-ingress/templates/ambassador-agent.yaml b/charts/emissary-ingress/templates/ambassador-agent.yaml
-deleted file mode 100644
-index 4196638a9..000000000
---- a/charts/emissary-ingress/templates/ambassador-agent.yaml
-+++ /dev/null
-@@ -1,270 +0,0 @@
--{{- if .Values.agent.enabled }}
-----
--apiVersion: v1
--kind: ServiceAccount
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent
--  namespace: {{ include "ambassador.namespace" . }}
--  labels:
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--{{- if .Values.docker.useImagePullSecret }}
--imagePullSecrets:
--- name: {{ .Values.docker.imagePullSecretName }}
--{{- end }}
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: RoleBinding
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-config
--  namespace: {{ include "ambassador.namespace" . }}
--  labels:
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--roleRef:
--  apiGroup: rbac.authorization.k8s.io
--  kind: Role
--  name: {{ include "ambassador.fullname" . }}-agent-config
--subjects:
--- kind: ServiceAccount
--  name: {{ include "ambassador.fullname" . }}-agent
--  namespace: {{ include "ambassador.namespace" . }}
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: Role
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-config
--  namespace: {{ include "ambassador.namespace" . }}
--  labels:
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--rules:
--- apiGroups: [""]
--  resources: [ "configmaps" ]
--  verbs: [ "get", "list", "watch" ]
--- apiGroups: [""]
--  resources: [ "secrets"]
--  verbs: [ "get", "create", "delete", "patch", "watch"]
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRoleBinding
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent
--  labels:
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--roleRef:
--  apiGroup: rbac.authorization.k8s.io
--  kind: ClusterRole
--  name: {{ include "ambassador.fullname" . }}-agent
--subjects:
--- kind: ServiceAccount
--  name: {{ include "ambassador.fullname" . }}-agent
--  namespace: {{ include "ambassador.namespace" . }}
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRole
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent
--  labels:
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--aggregationRule:
--  clusterRoleSelectors:
--  - matchLabels:
--      rbac.getambassador.io/role-group: {{ include "ambassador.rbacName" . }}-agent
--rules: []
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRole
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-pods
--  labels:
--    rbac.getambassador.io/role-group: {{ include "ambassador.rbacName" . }}-agent
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--rules:
--- apiGroups: [""]
--  resources: [ "pods"]
--  verbs: [ "get", "list", "watch" ]
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRole
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-deployments
--  labels:
--    rbac.getambassador.io/role-group: {{ include "ambassador.rbacName" . }}-agent
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--rules:
--- apiGroups: ["apps", "extensions"]
--  resources: [ "deployments" ]
--  verbs: [ "get", "list", "watch" ]
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRole
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-endpoints
--  labels:
--    rbac.getambassador.io/role-group: {{ include "ambassador.rbacName" . }}-agent
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--rules:
--- apiGroups: [""]
--  resources: [ "endpoints" ]
--  verbs: [ "get", "list", "watch" ]
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRole
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-configmaps
--  labels:
--    rbac.getambassador.io/role-group: {{ include "ambassador.rbacName" . }}-agent
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--rules:
--- apiGroups: [""]
--  resources: [ "configmaps" ]
--  verbs: [ "get", "list", "watch" ]
-----
--{{- if .Values.agent.createArgoRBAC }}
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRole
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-rollouts
--  labels:
--    rbac.getambassador.io/role-group: {{ include "ambassador.rbacName" . }}-agent
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--rules:
--- apiGroups: ["argoproj.io"]
--  resources: [ "rollouts", "rollouts/status" ]
--  verbs: [ "get", "list", "watch", "patch" ]
-----
--apiVersion: rbac.authorization.k8s.io/v1
--kind: ClusterRole
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-applications
--  labels:
--    rbac.getambassador.io/role-group: {{ include "ambassador.rbacName" . }}-agent
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--rules:
--- apiGroups: ["argoproj.io"]
--  resources: [ "applications" ]
--  verbs: [ "get", "list", "watch" ]
--{{- end }}
--{{ if ne .Values.agent.cloudConnectToken "" }}
-----
--apiVersion: v1
--kind: ConfigMap
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent-cloud-token
--  namespace: {{ include "ambassador.namespace" . }}
--  labels:
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent-cloud-token
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--data:
--  CLOUD_CONNECT_TOKEN: {{ .Values.agent.cloudConnectToken }}
--{{ end }}
--
-----
--apiVersion: apps/v1
--kind: Deployment
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent
--  namespace: {{ include "ambassador.namespace" . }}
--  labels:
--    app.kubernetes.io/name: {{ include "ambassador.fullname" . }}-agent
--    {{- include "ambassador.labels" . | nindent 4 }}
--    product: aes
--spec:
--  replicas: 1
--  selector:
--    matchLabels:
--      app.kubernetes.io/name: {{ include "ambassador.fullname" . }}-agent
--      app.kubernetes.io/instance: {{ .Release.Name }}
--  template:
--    metadata:
--      labels:
--        app.kubernetes.io/name: {{ include "ambassador.fullname" . }}-agent
--        {{- include "ambassador.labels" . | nindent 8 }}
--        product: aes
--    spec:
--      {{- with .Values.agent.podSecurityContext }}
--      securityContext:
--        {{- toYaml . | nindent 8 }}
--      {{- end }}
--      serviceAccountName: {{ include "ambassador.fullname" . }}-agent
--      containers:
--      - name: agent
--        image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
--        imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
--        ports:
--          - containerPort: 8080
--            name: http
--        {{- with .Values.agent.containerSecurityContext }}
--        securityContext:
--          {{- toYaml . | nindent 12 }}
--        {{- end }}
--        env:
--        - name: AGENT_NAMESPACE
--          valueFrom:
--            fieldRef:
--              fieldPath: metadata.namespace
--        - name: AGENT_CONFIG_RESOURCE_NAME
--          value: {{ include "ambassador.fullname" . }}-agent-cloud-token
--        - name: RPC_CONNECTION_ADDRESS
--          value: {{ .Values.agent.rpcAddress }}
--        - name: AES_SNAPSHOT_URL
--          value: "http://{{ include "ambassador.fullname" . }}-admin.{{ include "ambassador.namespace" . }}:{{ .Values.adminService.snapshotPort }}/snapshot-external"
--        - name: AES_REPORT_DIAGNOSTICS_TO_CLOUD
--          value: {{ .Values.agent.reportDiagnostics | quote }}
--        - name: AES_DIAGNOSTICS_URL
--          value: "http://{{ include "ambassador.fullname" . }}-admin.{{ include "ambassador.namespace" . }}:{{ .Values.adminService.port }}/ambassador/v0/diag/?json=true"
--  {{ if .Values.progressDeadlines }}
--  {{ if hasKey .Values.progressDeadlines "agent" }}
--  progressDeadlineSeconds: {{ .Values.progressDeadlines.agent }}
--  {{- end }}
--  {{- end }}
-----
--apiVersion: v1
--kind: Service
--metadata:
--  name: {{ include "ambassador.fullname" . }}-agent
--  namespace: {{ include "ambassador.namespace" . }}
--  labels:
--    {{- if ne .Values.deploymentTool "getambassador.io" }}
--    app.kubernetes.io/name: {{ include "ambassador.name" . }}-agent
--    app.kubernetes.io/part-of: {{ .Release.Name }}
--    helm.sh/chart: {{ include "ambassador.chart" . }}
--    app.kubernetes.io/instance: {{ .Release.Name }}
--    {{- if .Values.deploymentTool }}
--    app.kubernetes.io/managed-by: {{ .Values.deploymentTool }}
--    {{- else }}
--    app.kubernetes.io/managed-by: {{ .Release.Service }}
--    {{- end }}
--    {{- end }}
--    product: aes
--spec:
--  ports:
--    - port: 80
--      targetPort: http
--      protocol: TCP
--      name: http
--  selector:
--    app.kubernetes.io/name: {{ include "ambassador.fullname" . }}-agent
--    app.kubernetes.io/instance: {{ .Release.Name }}
--{{- end }}
 diff --git a/charts/emissary-ingress/templates/config.yaml b/charts/emissary-ingress/templates/config.yaml
 index cd6184dde..4ba1c911a 100644
 --- a/charts/emissary-ingress/templates/config.yaml
@@ -6599,10 +6321,10 @@ index c15802767..633a607ce 100644
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/hpa.yaml b/charts/emissary-ingress/templates/hpa.yaml
-index f72ccc002..bd1a07e7a 100644
+index a9fdb2ce0..38a6f3f29 100644
 --- a/charts/emissary-ingress/templates/hpa.yaml
 +++ b/charts/emissary-ingress/templates/hpa.yaml
-@@ -3,7 +3,7 @@ apiVersion: autoscaling/v2beta2
+@@ -3,7 +3,7 @@ apiVersion: autoscaling/v2{{- if semverCompare "<1.23" .Capabilities.KubeVersion
  kind: HorizontalPodAutoscaler
  metadata:
    name: {{ include "ambassador.fullname" . }}
@@ -6724,10 +6446,10 @@ index b177db0d7..cdcf282ca 100644
  {{- end }}
  
 diff --git a/charts/emissary-ingress/templates/resolvers.yaml b/charts/emissary-ingress/templates/resolvers.yaml
-index 349fe51a3..9dc2b1aff 100644
+index 53633ee88..7ecb2fc97 100644
 --- a/charts/emissary-ingress/templates/resolvers.yaml
 +++ b/charts/emissary-ingress/templates/resolvers.yaml
-@@ -4,7 +4,7 @@ apiVersion: getambassador.io/v2
+@@ -4,7 +4,7 @@ apiVersion: getambassador.io/v3alpha1
  kind: KubernetesEndpointResolver
  metadata:
    name: {{ .Values.resolvers.endpoint.name }}
@@ -6736,7 +6458,7 @@ index 349fe51a3..9dc2b1aff 100644
    labels:
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
-@@ -19,7 +19,7 @@ apiVersion: getambassador.io/v2
+@@ -20,7 +20,7 @@ apiVersion: getambassador.io/v3alpha1
  kind: ConsulResolver
  metadata:
    name: {{ .Values.resolvers.consul.name }}
@@ -6825,10 +6547,10 @@ index b2c8122a1..8f33136cf 100644
      matchLabels:
        service: ambassador-admin
 diff --git a/charts/emissary-ingress/values.yaml.in b/charts/emissary-ingress/values.yaml
-similarity index 90%
+similarity index 89%
 rename from charts/emissary-ingress/values.yaml.in
 rename to charts/emissary-ingress/values.yaml
-index 7c509da69..94e66a04b 100644
+index 3b7ed1b6b..94e66a04b 100644
 --- a/charts/emissary-ingress/values.yaml.in
 +++ b/charts/emissary-ingress/values.yaml
 @@ -2,11 +2,11 @@
@@ -6872,7 +6594,7 @@ index 7c509da69..94e66a04b 100644
  
  # DEPRECATED: Enabling the prometheus exporter creates a sidecar and configures ambassador to use it
  #
-@@ -393,35 +394,6 @@ prometheusExporter: # +doc-gen:break
+@@ -393,40 +394,6 @@ prometheusExporter: # +doc-gen:break
  # securityContext:
  #   runAsUser: 8888
  
@@ -6904,6 +6626,11 @@ index 7c509da69..94e66a04b 100644
 -  containerSecurityContext: {}
 -  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#securitycontext-v1-core
 -  # allowPrivilegeEscalation: false
+-
+-  nodeSelector: {}
+-  tolerations: []
+-  affinity: {}
+-
 -
  deploymentTool: ''
  

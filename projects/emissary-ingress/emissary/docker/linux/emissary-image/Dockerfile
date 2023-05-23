@@ -26,7 +26,7 @@ WORKDIR /newroot/buildroot
 RUN set -x && \
     mkdir -p /newroot/ambassador/sidecars /newroot/usr/lib/python3.9/site-packages /newroot/usr/local/bin /ambassador /buildroot && \ 
     time pip3 install --user --no-cache-dir --no-deps -e . && \
-    pip3 install --user --no-cache-dir pip-tools==6.3.1 PyYAML==5.4.1 orjson==3.6.6 && \    
+    pip3 install --user --no-cache-dir pip-tools==6.12.1 PyYAML==6.0 orjson==3.8.10 && \ 
     python3 setup.py install --user && \
     mv /envoy /newroot/usr/local/bin/envoy && \
     mv /THIRD-PARTY-LICENSES.txt /newroot/ENVOY_LICENSES.txt && \
