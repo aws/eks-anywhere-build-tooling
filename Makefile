@@ -10,14 +10,14 @@ RELEASE_BRANCH?=
 GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 ALL_PROJECTS=$(shell $(BUILD_LIB)/all_projects.sh $(BASE_DIRECTORY))
 
-# $1 - project name using _ as seperator, ex: rancher_local-path-provisoner
+# $1 - project name using _ as separator, ex: rancher_local-path-provisoner
 PROJECT_PATH_MAP=projects/$(patsubst $(firstword $(subst _, ,$(1)))_%,$(firstword $(subst _, ,$(1)))/%,$(1))
 
 # Locale settings impact file ordering in ls or shell file expansion. The file order is used to
 # generate files that are subsequently validated by the CI. If local environments use different 
 # locales to the CI we get unexpected failures that are tricky to debug without knowledge of 
 # locales so we'll explicitly warn here.
-# In a AL2 container image (like builder base), LANG will be empty which is equilvant to posix
+# In a AL2 container image (like builder base), LANG will be empty which is equivalent to posix
 # In a AL2 (or other distro) full instance the LANG will be en-us.UTF-8 which produces different sorts
 # On Mac, LANG will be en-us.UTF-8 but has a fix applied to sort to avoid the difference
 ifeq ($(shell uname -s),Linux)
