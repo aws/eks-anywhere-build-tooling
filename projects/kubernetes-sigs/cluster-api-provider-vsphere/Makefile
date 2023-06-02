@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.17"
+GOLANG_VERSION?="1.19"
 
 REPO=cluster-api-provider-vsphere
 REPO_OWNER=kubernetes-sigs
@@ -14,7 +14,7 @@ IMAGE_COMPONENT=kubernetes-sigs/cluster-api-provider-vsphere/release/manager
 
 HAS_S3_ARTIFACTS=true
 
-FIX_LICENSES_VM_OPERATOR_TARGET=$(REPO)/vendor/github.com/vmware-tanzu/vm-operator/external/tanzu-topology/api/v1alpha1/LICENSE.txt
+FIX_LICENSES_VM_OPERATOR_TARGET=$(REPO)/vendor/github.com/vmware-tanzu/vm-operator/api/v1alpha1/LICENSE.txt $(REPO)/vendor/github.com/vmware-tanzu/vm-operator/external/tanzu-topology/api/v1alpha1/LICENSE.txt
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -36,6 +36,8 @@ $(FIX_LICENSES_VM_OPERATOR_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 		wget --retry-connrefused -q https://raw.githubusercontent.com/vmware-tanzu/vm-operator/main/LICENSE.txt -O \
 			$(REPO)/vendor/github.com/vmware-tanzu/vm-operator/external/$$package/api/v1alpha1/LICENSE.txt; \
 	done;
+	wget --retry-connrefused -q https://raw.githubusercontent.com/vmware-tanzu/vm-operator/main/LICENSE.txt -O \
+			$(REPO)/vendor/github.com/vmware-tanzu/vm-operator/api/v1alpha1/LICENSE.txt
 
 
 ########### DO NOT EDIT #############################
