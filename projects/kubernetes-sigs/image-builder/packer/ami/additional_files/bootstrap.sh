@@ -16,15 +16,20 @@ echo "127.0.0.1   $(hostname)" >>/etc/hosts
 NETWORK_CONFIG_PATH=/tmp/network.yaml
 NETPLAN_CONFIG_PATH=/etc/netplan/config.yaml
 
+# dynamically get default network interface name using mac address
+TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+DEFAULT_MAC=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -v http://169.254.169.254/latest/meta-data/mac)
+DEFAULT_NETWORK=$(ip -br link | grep $DEFAULT_MAC | awk '{print $1}')
+
 # configure DNI
 DNI_COUNT=$(grep -E "dniCount" $NETWORK_CONFIG_PATH | awk '{print $2}')
-DNI_LIST=$(ip -br link | grep -Ev 'lo|ens3' | awk '{print $1}')
+DNI_LIST=$(ip -br link | grep -Ev "$DEFAULT_NETWORK|lo" | awk '{print $1}')
 while [ -z "$DNI_LIST" ] || [[ $(echo "$DNI_LIST" | wc -l) != "$DNI_COUNT" ]]
 do
   # creating DNI is a separate api call, which has some delays
   log::info "DNI is not ready, retrying"
   sleep 5
-  DNI_LIST=$(ip -br link | grep -Ev 'lo|ens3' | awk '{print $1}')
+  DNI_LIST=$(ip -br link | grep -Ev "$DEFAULT_NETWORK|lo" | awk '{print $1}')
 done
 log::info "Using DNI: $DNI_LIST"
 
@@ -37,7 +42,7 @@ network:
     version: 2
     renderer: networkd
     ethernets:
-        ens3:
+        $DEFAULT_NETWORK:
             routes:
                 - to: 169.254.169.254
                   via: $DEFAULT_GATEWAY
@@ -45,7 +50,7 @@ EOF
 
 METRIC=0
 INDEX=1
-for DNI in $(ip -br link | grep -Ev 'lo|ens3' | awk '{print $1}')
+for DNI in $DNI_LIST
 do
 MAC=$(ip -br link | grep -E "$DNI" |  awk '{print $3}')
 if ! grep -q "static" "$NETWORK_CONFIG_PATH"
@@ -93,14 +98,14 @@ done
 netplan --debug apply
 
 sleep 5
-DNI_IP_LIST=$(ip route show | grep -Ev 'default|lo|ens3'  | awk '{print $9}' | sort | uniq)
+DNI_IP_LIST=$(ip route show | grep -Ev "$DEFAULT_NETWORK|default|lo"  | awk '{print $9}' | sort | uniq)
 while [ -z "$DNI_IP_LIST" ] || [[ $(echo "$DNI_IP_LIST" | wc -l) != "$DNI_COUNT" ]]
 do
     # if ip is not ready in 5 s, need to retry netplan apply
     log::info "IP is not ready, retrying"
     netplan --debug apply
     sleep 5
-    DNI_IP_LIST=$(ip route show | grep -Ev 'default|lo|ens3' | awk '{print $9}' | sort | uniq)
+    DNI_IP_LIST=$(ip route show | grep -Ev "$DEFAULT_NETWORK|default|lo" | awk '{print $9}' | sort | uniq)
 done
 log::info "IP leased: $DNI_IP_LIST"
 
