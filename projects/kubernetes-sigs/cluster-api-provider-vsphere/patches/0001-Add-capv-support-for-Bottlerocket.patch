@@ -1,14 +1,31 @@
-From 58b37427fc8d2c3f9240fabd738d1812450536a2 Mon Sep 17 00:00:00 2001
-From: Rajashree Mandaogane <mandaor@amazon.com>
-Date: Wed, 1 Dec 2021 10:07:41 -0800
-Subject: [PATCH 1/3] Adding capv support for Bottlerocket
+From fb0bfa769beeec613a6e046f255bb8dce477045d Mon Sep 17 00:00:00 2001
+From: Taylor Neyland <tneyla@amazon.com>
+Date: Tue, 6 Jun 2023 16:56:24 -0500
+Subject: [PATCH] Add capv support for Bottlerocket
 
-Signed-off-by: Prow Bot <prow@amazonaws.com>
 ---
- .../capi-upgrades/v1alpha3/cluster-template.yaml                | 2 ++
- .../capi-upgrades/v1alpha4/cluster-template.yaml                | 2 ++
- 2 files changed, 4 insertions(+)
+ pkg/services/govmomi/vcenter/clone.go                         | 4 ++--
+ .../capi-upgrades/v1alpha3/cluster-template.yaml              | 2 ++
+ .../capi-upgrades/v1alpha4/cluster-template.yaml              | 2 ++
+ 3 files changed, 6 insertions(+), 2 deletions(-)
 
+diff --git a/pkg/services/govmomi/vcenter/clone.go b/pkg/services/govmomi/vcenter/clone.go
+index 999f9846..09fe9c39 100644
+--- a/pkg/services/govmomi/vcenter/clone.go
++++ b/pkg/services/govmomi/vcenter/clone.go
+@@ -60,10 +60,10 @@ func Clone(ctx *context.VMContext, bootstrapData []byte, format bootstrapv1.Form
+ 	if len(bootstrapData) > 0 {
+ 		ctx.Logger.Info("applied bootstrap data to VM clone spec")
+ 		switch format {
+-		case bootstrapv1.CloudConfig:
+-			extraConfig.SetCloudInitUserData(bootstrapData)
+ 		case bootstrapv1.Ignition:
+ 			extraConfig.SetIgnitionUserData(bootstrapData)
++		default:
++			extraConfig.SetCloudInitUserData(bootstrapData)
+ 		}
+ 	}
+ 	if ctx.VSphereVM.Spec.CustomVMXKeys != nil {
 diff --git a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml b/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml
 index 69fe199b..73fbb0bb 100644
 --- a/test/e2e/data/infrastructure-vsphere/capi-upgrades/v1alpha3/cluster-template.yaml
@@ -50,5 +67,5 @@ index 96ca172b..01394e65 100644
  apiVersion: cluster.x-k8s.io/v1alpha4
  kind: MachineDeployment
 -- 
-2.35.1
+2.39.1
 
