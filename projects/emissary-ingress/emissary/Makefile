@@ -18,6 +18,8 @@ IMAGE_NAMES=emissary
 DOCKERFILE_FOLDER=./docker/linux/emissary-image
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-python
+BASE_IMAGE_OS_VERSION=al2023
+
 COMPILER_IMAGE_VERSION=3.9
 
 HAS_HELM_CHART=true
