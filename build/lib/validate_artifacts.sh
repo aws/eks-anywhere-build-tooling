@@ -37,10 +37,15 @@ if [ -n "$IMAGE_FORMAT" ]; then
   fi
 fi
 
+REALPATH=realpath
+if which grealpath &>/dev/null; then
+    REALPATH=grealpath
+fi
+
 ACTUAL_FILES=$(mktemp)
 find "$ARTIFACTS_FOLDER" \
      -type f \
-     -exec realpath --relative-base="$ARTIFACTS_FOLDER" {} \; \
+     -exec $REALPATH --relative-base="$ARTIFACTS_FOLDER" {} \; \
      > "$ACTUAL_FILES"
 
 EXPECTED_FILES=$(mktemp)
