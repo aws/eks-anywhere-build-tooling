@@ -1,5 +1,5 @@
 ## **cloud-provider-aws**
-![Version](https://img.shields.io/badge/version-v1.27.0-blue)
+![Version](https://img.shields.io/badge/version-v1.27.1-blue)
 
 The AWS credential provider is a binary that is executed by kubelet to provide credentials for images in ECR. Refer to the [credential provider extraction Kubernetes Enhancement Proposals (KEP)](https://github.com/kubernetes/enhancements/tree/master/keps/sig-cloud-provider/2133-out-of-tree-credential-provider) for more details.
 
