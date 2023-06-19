@@ -35,6 +35,17 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error cloning build tooling repo")
 		}
 		log.Println("Cloned eks-anywhere-build-tooling repo")
+
+		gitCommitFromBundle, err := getGitCommitFromBundle(buildToolingRepoPath)
+		if err != nil {
+			log.Fatalf("Error getting git commit from bundle: %v", err)
+		}
+
+		err = checkoutRepo(buildToolingRepoPath, gitCommitFromBundle)
+		if err != nil {
+			log.Fatalf("Error checking out build tooling repo at commit %s", gitCommitFromBundle)
+		}
+		log.Printf("Checked out eks-anywhere-build-tooling repo at commit %s\n", gitCommitFromBundle)
 	} else {
 		buildToolingRepoPath = os.Getenv("CODEBUILD_SRC_DIR")
 		log.Println("Using repo checked out from code commit")
