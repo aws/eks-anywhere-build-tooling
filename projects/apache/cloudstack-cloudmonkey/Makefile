@@ -6,7 +6,6 @@ REPO=cloudstack-cloudmonkey
 REPO_OWNER=apache
 
 BINARY_TARGET_FILES=cmk
-SOURCE_PATTERNS=./cmk.go
 
 HAS_S3_ARTIFACTS=true
 
