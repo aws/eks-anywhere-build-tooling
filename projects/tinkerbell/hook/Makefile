@@ -52,7 +52,7 @@ s3-artifacts: $(CREATE_HOOK_FILES)
 $(CREATE_HOOK_FILES): tarballs
 # Modify the linuxkit config file hook/hook.yaml to point to IMAGE_REPO.
 # Upstream make target `dist` is triggered to perform linuxkit build and generate OSIE files ().
-	source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.16" && make dist IMAGE_REPO=$(IMAGE_REPO) LATEST_TAG=$(LATEST_TAG) -C $(REPO)
+	source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.19" && make dist IMAGE_REPO=$(IMAGE_REPO) LATEST_TAG=$(LATEST_TAG) -C $(REPO)
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
 	cp $(REPO)/out/sha-*/rel/vmlinuz-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
 	cp $(REPO)/out/sha-*/rel/initramfs-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
