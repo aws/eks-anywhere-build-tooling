@@ -1,12 +1,11 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.16"
+GOLANG_VERSION?="1.20"
 
 REPO=cloudstack-cloudmonkey
 REPO_OWNER=apache
 
 BINARY_TARGET_FILES=cmk
-SOURCE_PATTERNS=./cmk.go
 
 HAS_S3_ARTIFACTS=true
 
