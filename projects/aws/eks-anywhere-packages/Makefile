@@ -11,6 +11,9 @@ GO_VARS=version=${GIT_TAG} gitHash=${PROJECT_COMMIT_HASH} buildTime=${TIME}
 EXTRA_GO_LDFLAGS=$(foreach v,$(GO_VARS),-X ${GO_MOD_NAME}${GO_VAR_PREFIX}${v})
 PROJECT_DEPENDENCIES=eksd/kubernetes/client eksa/aws/rolesanywhere-credential-helper eksa/kubernetes/cloud-provider-aws
 
+HAS_RELEASE_BRANCHES=true
+BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
+BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
 
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 GO_MOD_PATHS=. ecrtokenrefresher credentialproviderpackage
