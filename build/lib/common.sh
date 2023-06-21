@@ -286,13 +286,15 @@ function build::common::get_latest_eksa_asset_url() {
   local -r releasebranch=${6-}
 
   s3artifactfolder=$s3downloadpath
-  if [ -z "${releasebranch}" ]; then
-    projectwithreleasebranch=$project
-  else
-    projectwithreleasebranch=$project/$releasebranch
 
+  projectwithreleasebranch=$project
+  # If not able to find git_tag w/o specifying a branch, update projectwithreleasebranch and git_tag to use a branch.
+  git_tag=$(cat $BUILD_ROOT/../../projects/${projectwithreleasebranch}/GIT_TAG || echo "invalid")
+  if [ "$git_tag" = "invalid" ]; then
+    projectwithreleasebranch=$project/$releasebranch
+    git_tag=$(cat $BUILD_ROOT/../../projects/${projectwithreleasebranch}/GIT_TAG)
   fi
-  git_tag=$(cat $BUILD_ROOT/../../projects/${projectwithreleasebranch}/GIT_TAG)
+  
   if [ "$gitcommitoverride" = "true" ]; then
     commit_hash=$(echo $s3downloadpath | cut -d- -f2)
     git_tag=$(git show $commit_hash:projects/${projectwithreleasebranch}/GIT_TAG)
