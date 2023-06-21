@@ -50,10 +50,10 @@ else
 fi
 
 if [[ $PRODUCT = 'eksd' ]]; then
+    if [ -z "${RELEASE_BRANCH}" ]; then
+        RELEASE_BRANCH="$(build::eksd_releases::get_release_branch)"
+    fi
     if [[ $REPO_OWNER = 'kubernetes' ]]; then
-        if [ -z "${RELEASE_BRANCH}" ]; then
-            RELEASE_BRANCH="$(build::eksd_releases::get_release_branch)"
-        fi
         TARBALL="kubernetes-$REPO-linux-$ARCH.tar.gz"
         URL=$(build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL $RELEASE_BRANCH $ARCH)
         # these tarballs will extra with the kubernetes/{client,server} folders
