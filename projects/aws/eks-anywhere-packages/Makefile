@@ -4,10 +4,6 @@ BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 PROJECT_COMMIT_HASH=$(shell git -C $(REPO) rev-parse --short HEAD)
 TIME=$(shell git -C $(REPO) show -s --format=%ct HEAD)
 GIT_TAG?=$(shell cat GIT_TAG)
-GIT_HASH?=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
-IMAGE_TAG=v$(RELEASE_BRANCH)-$(subst v,,$(GIT_TAG))-$(GIT_HASH)
-HELM_TAG=v$(RELEASE_BRANCH)-$(subst v,,$(GIT_TAG))-$(GIT_HASH)
-
 GOLANG_VERSION?="1.19"
 GO_MOD_NAME=github.com/aws/eks-anywhere-packages/
 GO_VAR_PREFIX=pkg/config.
