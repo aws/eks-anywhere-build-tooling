@@ -25,7 +25,7 @@ BINARY_DEPS_DIR="$1"
 DEP="$2"
 ARTIFACTS_BUCKET="$3"
 LATEST_TAG="$4"
-RELEASE_BRANCH="${5-$(build::eksd_releases::get_release_branch)}"
+RELEASE_BRANCH="${5-}"
 
 DEP=${DEP#"$BINARY_DEPS_DIR"}
 OS_ARCH="$(cut -d '/' -f1 <<< ${DEP})"
@@ -51,6 +51,9 @@ fi
 
 if [[ $PRODUCT = 'eksd' ]]; then
     if [[ $REPO_OWNER = 'kubernetes' ]]; then
+        if [ -z "${RELEASE_BRANCH}" ]; then
+            RELEASE_BRANCH="$(build::eksd_releases::get_release_branch)"
+        fi
         TARBALL="kubernetes-$REPO-linux-$ARCH.tar.gz"
         URL=$(build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL $RELEASE_BRANCH $ARCH)
         # these tarballs will extra with the kubernetes/{client,server} folders
@@ -59,7 +62,7 @@ if [[ $PRODUCT = 'eksd' ]]; then
         URL=$(build::eksd_releases::get_eksd_component_url $REPO_OWNER $RELEASE_BRANCH $ARCH)
     fi
 else
-    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $S3_ARTIFACTS_FOLDER $GIT_COMMIT_OVERRIDE)
+    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $S3_ARTIFACTS_FOLDER $GIT_COMMIT_OVERRIDE $RELEASE_BRANCH)
 fi
 
 if [ "$CODEBUILD_CI" = "true" ]; then

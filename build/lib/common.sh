@@ -283,24 +283,31 @@ function build::common::get_latest_eksa_asset_url() {
   local -r arch=${3-amd64}
   local -r s3downloadpath=${4-latest}
   local -r gitcommitoverride=${5-false}
+  local -r releasebranch=${6-}
 
   s3artifactfolder=$s3downloadpath
-  git_tag=$(cat $BUILD_ROOT/../../projects/${project}/GIT_TAG)
+  if [ -z "${releasebranch}" ]; then
+    projectwithreleasebranch=$project
+  else
+    projectwithreleasebranch=$project/$releasebranch
+
+  fi
+  git_tag=$(cat $BUILD_ROOT/../../projects/${projectwithreleasebranch}/GIT_TAG)
   if [ "$gitcommitoverride" = "true" ]; then
     commit_hash=$(echo $s3downloadpath | cut -d- -f2)
-    git_tag=$(git show $commit_hash:projects/${project}/GIT_TAG)
+    git_tag=$(git show $commit_hash:projects/${projectwithreleasebranch}/GIT_TAG)
     s3artifactfolder=$s3downloadpath/artifacts
   fi
 
   local -r tar_file_prefix=$(MAKEFLAGS= make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
  
-  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
+  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$projectwithreleasebranch/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
 
   local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $url)
   if [[ "$http_code" == "200" ]]; then 
     echo "$url"
   else
-    echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$project/latest/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
+    echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$projectwithreleasebranch/latest/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
   fi
 }
 
