@@ -5,8 +5,8 @@ ARG TARGETARCH
 ARG TARGETOS
 
 COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/aws/rolesanywhere-credential-helper/aws_signing_helper /eksa-binaries/
-COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes/cloud-provider-aws/1-25/ecr-credential-provider /eksa-binaries/1-25
-COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes/cloud-provider-aws/1-26/ecr-credential-provider /eksa-binaries/1-26
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes/cloud-provider-aws/1-25/ecr-credential-provider /eksa-binaries/1-25/ecr-credential-provider
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes/cloud-provider-aws/1-26/ecr-credential-provider /eksa-binaries/1-26/ecr-credential-provider
 COPY _output/bin/eks-anywhere-packages/$TARGETOS-$TARGETARCH/credentialprovider /
 COPY _output/LICENSES /LICENSES
 COPY CREDENTIALPROVIDER_ATTRIBUTION.txt /ATTRIBUTION.txt
