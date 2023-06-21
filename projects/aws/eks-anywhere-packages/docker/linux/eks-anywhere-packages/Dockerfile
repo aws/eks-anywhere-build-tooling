@@ -3,10 +3,9 @@ FROM $BASE_IMAGE
 
 ARG TARGETARCH
 ARG TARGETOS
-ARG RELEASE_BRANCH
 
 COPY _output/bin/eks-anywhere-packages/$TARGETOS-$TARGETARCH/package-manager /package-manager
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/client/bin/kubectl /usr/local/bin/kubectl
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -25,24 +24,26 @@ BINARY_DEPS_DIR="$1"
 DEP="$2"
 ARTIFACTS_BUCKET="$3"
 LATEST_TAG="$4"
-RELEASE_BRANCH="${5-}"
+RELEASE_BRANCH="${5-$(build::eksd_releases::get_release_branch)}"
 
 DEP=${DEP#"$BINARY_DEPS_DIR"}
 OS_ARCH="$(cut -d '/' -f1 <<< ${DEP})"
 PRODUCT=$(cut -d '/' -f2 <<< ${DEP})
 REPO_OWNER=$(cut -d '/' -f3 <<< ${DEP})
 REPO=$(cut -d '/' -f4 <<< ${DEP})
-S3_ARTIFACTS_FOLDER_OVERRIDE=$(cut -d '/' -f5 <<< ${DEP})
+
+RELEASE_BRANCH_OVERRIDE=$(cut -d '/' -f5 <<< ${DEP})
+RELEASE_BRANCH=${RELEASE_BRANCH_OVERRIDE:-$RELEASE_BRANCH}
+
 ARCH="$(cut -d '-' -f2 <<< ${OS_ARCH})"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
-S3_ARTIFACTS_FOLDER=${S3_ARTIFACTS_FOLDER_OVERRIDE:-$LATEST_TAG}
-GIT_COMMIT_OVERRIDE=false
-if [ -n "$S3_ARTIFACTS_FOLDER_OVERRIDE" ]; then
-    GIT_COMMIT_OVERRIDE=true
+OUTPUT_DIR_FILE=$BINARY_DEPS_DIR/linux-$ARCH/$PRODUCT/$REPO_OWNER/$REPO
+
+if [[ -n "$RELEASE_BRANCH_OVERRIDE" ]]; then
+    OUTPUT_DIR_FILE+=/$RELEASE_BRANCH_OVERRIDE
 fi
 
-OUTPUT_DIR_FILE=$BINARY_DEPS_DIR/linux-$ARCH/$PRODUCT/$REPO_OWNER/$REPO
 if [[ $REPO == *.tar.gz ]]; then
     mkdir -p $(dirname $OUTPUT_DIR_FILE)
 else
@@ -50,9 +51,6 @@ else
 fi
 
 if [[ $PRODUCT = 'eksd' ]]; then
-    if [ -z "${RELEASE_BRANCH}" ]; then
-        RELEASE_BRANCH="$(build::eksd_releases::get_release_branch)"
-    fi
     if [[ $REPO_OWNER = 'kubernetes' ]]; then
         TARBALL="kubernetes-$REPO-linux-$ARCH.tar.gz"
         URL=$(build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL $RELEASE_BRANCH $ARCH)
@@ -62,7 +60,7 @@ if [[ $PRODUCT = 'eksd' ]]; then
         URL=$(build::eksd_releases::get_eksd_component_url $REPO_OWNER $RELEASE_BRANCH $ARCH)
     fi
 else
-    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $S3_ARTIFACTS_FOLDER $GIT_COMMIT_OVERRIDE $RELEASE_BRANCH)
+    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $LATEST_TAG $RELEASE_BRANCH)
 fi
 
 if [ "$CODEBUILD_CI" = "true" ]; then
