@@ -3,6 +3,7 @@ FROM $BASE_IMAGE
 
 ARG TARGETARCH
 ARG TARGETOS
+ARG RELEASE_BRANCH
 
 COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aws/rolesanywhere-credential-helper/aws_signing_helper /eksa-binaries/
 COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes/cloud-provider-aws/ecr-credential-provider /eksa-binaries/
