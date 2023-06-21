@@ -15,6 +15,15 @@ HAS_RELEASE_BRANCHES=true
 BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
 
+# This project is a bit of odd ball when it comes to using the standard makefile targets
+# - the image builds are release branch aware but the binary is the same across all versions
+
+# force binaries to go to non-release branch bin folder
+BINARIES_ARE_RELEASE_BRANCHED=false
+
+# do not look for checksums in release branch folder, instead use project root
+PROJECT_ROOT=$(MAKE_ROOT)
+
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 GO_MOD_PATHS=. ecrtokenrefresher credentialproviderpackage
 
