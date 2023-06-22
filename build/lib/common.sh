@@ -282,8 +282,7 @@ function build::common::get_latest_eksa_asset_url() {
   local -r project=$2
   local -r arch=${3-amd64}
   local -r s3downloadpath=${4-latest}
-  local -r gitcommitoverride=${5-false}
-  local -r releasebranch=${6-}
+  local -r releasebranch=${5-}
 
   s3artifactfolder=$s3downloadpath
 
@@ -293,13 +292,7 @@ function build::common::get_latest_eksa_asset_url() {
   if [ "$git_tag" = "invalid" ]; then
     projectwithreleasebranch=$project/$releasebranch
     git_tag=$(cat $BUILD_ROOT/../../projects/${projectwithreleasebranch}/GIT_TAG)
-  fi
-  
-  if [ "$gitcommitoverride" = "true" ]; then
-    commit_hash=$(echo $s3downloadpath | cut -d- -f2)
-    git_tag=$(git show $commit_hash:projects/${projectwithreleasebranch}/GIT_TAG)
-    s3artifactfolder=$s3downloadpath/artifacts
-  fi
+  fi  
 
   local -r tar_file_prefix=$(MAKEFLAGS= make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
  
