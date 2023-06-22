@@ -18,7 +18,18 @@ IMAGE_NAMES=csi-driver csi-syncer
 
 OUTPUT_FILES_TARGET=$(OUTPUT_DIR)/files
 
+# we are no longer build this project since the version of go is 
+# no longer supported in our builder base
+# this is being removed in the next release
+BUILD_TARGETS=force-success
+RELEASE_TARGETS=force-success
+
 include $(BASE_DIRECTORY)/Common.mk
+
+
+.PHONY: force-success
+force-success:
+	@echo "Skipping builds of vsphere-csi"
 
 csi-driver/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-csi
 
