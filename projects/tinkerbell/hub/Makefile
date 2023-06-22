@@ -33,8 +33,17 @@ PROJECT_DEPENDENCIES=eksa/torvalds/linux
 
 FIX_LICENSES=$(foreach path,$(GO_MOD_PATHS),$(REPO)/$(path)/LICENSE)
 
+# we are no longer build this project since the version of go is 
+# no longer supported in our builder base
+# this is being removed in the next release
+BUILD_TARGETS=force-success
+RELEASE_TARGETS=force-success
+
 include $(BASE_DIRECTORY)/Common.mk
 
+.PHONY: force-success
+force-success:
+	@echo "Skipping builds of tinkerbell/hub"
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
 
