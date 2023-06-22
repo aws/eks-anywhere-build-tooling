@@ -21,6 +21,8 @@ OUTPUT_FILES_TARGET=$(OUTPUT_DIR)/files
 # we are no longer build this project since the version of go is 
 # no longer supported in our builder base
 # this is being removed in the next release
+EXCLUDE_FROM_STAGING_BUILDSPEC=true
+EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 BUILD_TARGETS=force-success
 RELEASE_TARGETS=force-success
 
