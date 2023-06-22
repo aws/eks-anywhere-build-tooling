@@ -37,8 +37,8 @@ setupgo() {
 setupgo "${GOLANG116_VERSION:-1.16.15}"
 setupgo "${GOLANG117_VERSION:-1.17.13}"
 setupgo "${GOLANG118_VERSION:-1.18.10}"
-setupgo "${GOLANG119_VERSION:-1.19.9}"
-setupgo "${GOLANG120_VERSION:-1.20.4}"
+setupgo "${GOLANG119_VERSION:-1.19.10}"
+setupgo "${GOLANG120_VERSION:-1.20.5}"
 
 build::common::use_go_version "1.16"
 GOBIN=${GOPATH}/go1.16/bin go install github.com/jaxesn/go-licenses@4497a2a38565e4e6ad095ea8117c25ecd622d0cc
