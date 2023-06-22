@@ -12,8 +12,8 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `ecr-credential-provider` for `linux/amd64 linux/arm64`
-_output/1-27/bin/cloud-provider-aws/linux-amd64/ecr-credential-provider: ## Build `_output/1-27/bin/cloud-provider-aws/linux-amd64/ecr-credential-provider`
-_output/1-27/bin/cloud-provider-aws/linux-arm64/ecr-credential-provider: ## Build `_output/1-27/bin/cloud-provider-aws/linux-arm64/ecr-credential-provider`
+_output/1-26/bin/cloud-provider-aws/linux-amd64/ecr-credential-provider: ## Build `_output/1-26/bin/cloud-provider-aws/linux-amd64/ecr-credential-provider`
+_output/1-26/bin/cloud-provider-aws/linux-arm64/ecr-credential-provider: ## Build `_output/1-26/bin/cloud-provider-aws/linux-arm64/ecr-credential-provider`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
