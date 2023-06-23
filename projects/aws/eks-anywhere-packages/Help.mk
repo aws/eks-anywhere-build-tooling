@@ -34,12 +34,14 @@ helm/build: ## Build helm chart
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Fetch Binary Targets
-_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client`
-_output/1-26/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper`
-_output/1-26/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper`
-_output/1-26/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws`
-_output/1-26/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws`
+_output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
+_output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper`
+_output/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper`
+_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-25: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-25`
+_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-25: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-25`
+_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-26: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-26`
+_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-26: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-26`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
