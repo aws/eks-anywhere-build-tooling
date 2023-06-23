@@ -1,0 +1,28 @@
+From 9935e57fc9fb02b2af061f1de7ea9976c1b6ab17 Mon Sep 17 00:00:00 2001
+From: Chris Doherty <chris.doherty4@gmail.com>
+Date: Fri, 23 Jun 2023 09:18:26 -0500
+Subject: [PATCH] Handle non-200 status codes from metadata service
+
+---
+ actions/writefile/v1/main.go | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/actions/writefile/v1/main.go b/actions/writefile/v1/main.go
+index db393fe..954a45e 100644
+--- a/actions/writefile/v1/main.go
++++ b/actions/writefile/v1/main.go
+@@ -205,6 +205,11 @@ func main() {
+ 			}
+ 			defer resp.Body.Close()
+ 
++			// Ensure non-200 responses are considered an error and move to the next metadata server.
++			if resp.StatusCode != http.StatusOK {
++				continue
++			}
++
+ 			respBody, err := ioutil.ReadAll(resp.Body)
+ 			if err != nil {
+ 				log.Warnf("Error reading HTTP GET response body: %v", err)
+-- 
+2.34.1
+
