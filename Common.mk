@@ -380,7 +380,7 @@ PROJECT_DEPENDENCIES?=
 HANDLE_DEPENDENCIES_TARGET=handle-dependencies
 ####################################################
 
-#################### LICENSES ######################
+#################### LICENSES ###################### 
 HAS_LICENSES?=true
 ATTRIBUTION_TARGETS?=$(call pairmap,ATTRIBUTION_TARGET_FROM_BINARY_GO_MOD,$(BINARY_TARGET_FILES),$(GO_MOD_PATHS))
 GATHER_LICENSES_TARGETS?=$(call pairmap,LICENSE_TARGET_FROM_BINARY_GO_MOD,$(BINARY_TARGET_FILES),$(GO_MOD_PATHS))
