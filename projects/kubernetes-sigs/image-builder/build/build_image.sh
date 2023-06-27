@@ -21,13 +21,21 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/build/setup_image_builder_cli.sh"
 
 image_os="${1?Specify the first argument - image os}"
-release_channel="${2?Specify the second argument - release channel}"
-image_format="${3?Specify the third argument - image format}"
-artifacts_bucket=${4-$ARTIFACTS_BUCKET}
-latest=${5-latest}
+image_os_version="${2?Specify the second argument - image os version}"
+release_channel="${3?Specify the third argument - release channel}"
+image_format="${4?Specify the fourth argument - image format}"
+artifacts_bucket=${5-$ARTIFACTS_BUCKET}
+latest=${6-latest}
 
 # Download and setup latest image-builder cli
-image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket 'amd64' $latest
+image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket 'amd64' 'jackson-test-build' # $latest
+
+image_os_version_arg=""
+if [[ "$image_os" == "ubuntu" ]]; then
+  image_os_version_arg="--os-version ${image_os_version:0:2}.${image_os_version:2:2}"
+elif [[ "$image_os" == "redhat" ]]; then
+  image_os_version_arg="--os-version $image_os_version"
+fi
 
 image_builder_config_file="${HOME}/image_builder_config_file"
 redhat_config_file="${HOME}/redhat_config_file"
@@ -53,17 +61,18 @@ if [[ $image_format == "ova" ]]; then
     image_builder_config_file=$vsphere_config_file
   fi
 
-  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os --vsphere-config $image_builder_config_file --release-channel $release_channel
+  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os $image_os_version_arg --vsphere-config $image_builder_config_file --release-channel $release_channel
 elif [[ $image_format == "raw" ]]; then
   # Run image-builder cli
   if [[ $image_os == "ubuntu" ]]; then
-    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel
+    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel
+    echo "done with image builder"
   elif [[ $image_os == "redhat" ]]; then
     echo "Creating baremetal config"
     echo "$(jq --arg extra_rpms "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm" \
       '. += {"extra_rpms": $extra_rpms}' $redhat_config_file)" > $image_builder_config_file
 
-    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os --release-channel $release_channel --baremetal-config $image_builder_config_file
+    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel --baremetal-config $image_builder_config_file
   fi
 elif [[ $image_format == "cloudstack" ]]; then
   if [[ $image_os != "redhat" ]]; then
@@ -73,7 +82,7 @@ elif [[ $image_format == "cloudstack" ]]; then
 
   echo "Creating cloudstack config"
   image_builder_config_file=$redhat_config_file
-  "${HOME}"/image-builder build --hypervisor cloudstack --os $image_os --release-channel $release_channel --cloudstack-config $image_builder_config_file
+  "${HOME}"/image-builder build --hypervisor cloudstack --os $image_os $image_os_version_arg --release-channel $release_channel --cloudstack-config $image_builder_config_file
 elif [[ $image_format == "ami" ]]; then
   if [[ $image_os != "ubuntu" ]]; then
     echo "AMI builds do not support any non-ubuntu os"
@@ -87,5 +96,5 @@ elif [[ $image_format == "ami" ]]; then
     --arg ansible_extra_vars "@$MAKE_ROOT/packer/ami/ansible_extra_vars.yaml" \
     --arg manifest_output "$MANIFEST_OUTPUT" \
     '{"ami_filter_owners": $ami_filter_owners, "custom_role_names": $custom_role_names, "ansible_extra_vars": $ansible_extra_vars, "manifest_output": $manifest_output}' > $image_builder_config_file
-  "${HOME}"/image-builder build --hypervisor ami --os $image_os --release-channel $release_channel --ami-config $image_builder_config_file
+  "${HOME}"/image-builder build --hypervisor ami --os $image_os $image_os_version_arg --release-channel $release_channel --ami-config $image_builder_config_file
 fi

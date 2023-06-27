@@ -25,6 +25,8 @@ OVA_PATH="${5? Specify fifth argument - ova output path}"
 ADDITIONAL_PAUSE_IMAGE_FROM="${6? Specify sixth argument - additional pause image}"
 LATEST_TAG="${7? Specify seventh argument - latest tag}"
 IMAGE_BUILDER_DIR="${8? Specify eighth argument - image-builder directory}"
+IMAGE_OS_DIR="${9? Specify ninth argument - image-os-dir}"
+IMAGE_OS_VERSION="${10? Specify tenth argument - image-os-version}"
 
 CI="${CI:-false}"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
@@ -55,7 +57,7 @@ build::eksd_releases::load_release_yaml $RELEASE_BRANCH > /dev/null
 echo "Loading EKSA manifest from: $(build::eksa_releases::get_eksa_release_manifest_url $DEV_RELEASE $LATEST_TAG)"
 build::eksa_releases::load_bundle_manifest $DEV_RELEASE $LATEST_TAG > /dev/null
 
-OUTPUT_CONFIGS="$MAKE_ROOT/_output/$RELEASE_BRANCH/$IMAGE_FORMAT/$IMAGE_OS/config"
+OUTPUT_CONFIGS="$MAKE_ROOT/_output/$RELEASE_BRANCH/$IMAGE_FORMAT/$IMAGE_OS_DIR/config"
 mkdir -p $OUTPUT_CONFIGS
 
 export CNI_SHA="sha256:$(build::eksd_releases::get_eksd_component_sha 'cni-plugins' $RELEASE_BRANCH)"
@@ -134,29 +136,38 @@ env_and_envsubst '$EKSD_NAME' \
 
 # This is the IP address that Packer will create the server on to host the local
 # directory containing the kickstart config
-if [ "$IMAGE_FORMAT" = "ova" ] && [ "$IMAGE_OS" = "redhat" ]; then
+if [ "$IMAGE_FORMAT" = "ova" ] && \
+    ( [ "$IMAGE_OS" = "redhat" ] || ( [ "$IMAGE_OS" = "ubuntu" ] && [ "$IMAGE_OS_VERSION" != "2004" ] )  ); then
+    echo "Finding correct interface for packer temporary http server"
     ACTIVE_INTERFACE=""
     if [ "$(uname -s)" = "Linux" ]; then
         INTERFACES=($(ls /sys/class/net))
         for interface in "${INTERFACES[@]}"; do
             if [ "$interface" = "eth0" ] || [ "$interface" = "en0" ] || [ "$interface" = "eno1" ]; then
                 ACTIVE_INTERFACE=$interface
+                echo "Found interface: $interface"
                 break
             fi
         done
+        HTTP_SERVER_IP=$(ip a l $ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
     elif [ "$(uname -s)" = "Darwin" ]; then
         ACTIVE_INTERFACE="en0"
+        HTTP_SERVER_IP=$(ifconfig $ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
     fi
+    
     if [ -z $ACTIVE_INTERFACE ]; then
         echo "ACTIVE_INTERFACE cannot be an empty string. Please check your network configuration
         and set an appropriate value for ACTIVE_INTERFACE"
         exit 1
     fi
-    export PACKER_HTTP_SERVER_IP=$(ip a l $ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
-    rhel_ova_config_file="${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova/rhel-8.json"
-    echo "Setting boot_media_path for rhel config to $PACKER_HTTP_SERVER_IP"
-    cat <<< $(jq --arg httpendpoint "http://$PACKER_HTTP_SERVER_IP:{{ .HTTPPort }}" \
-             '.boot_media_path=$httpendpoint' $rhel_ova_config_file) > $rhel_ova_config_file
+
+    PACKER_HTTP_SERVER_IP=${PACKER_HTTP_SERVER_IP:-$HTTP_SERVER_IP}
+    if [ -z $PACKER_HTTP_SERVER_IP ]; then
+        echo "PACKER_HTTP_SERVER_IP cannot be automatically determined.  Please export PACKER_HTTP_SERVER_IP=<Current Host's IP>"
+        exit 1
+    fi
+
+    find ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova -type f -name '*.json' | xargs sed -i "s/{{ .HTTPIP }}/$PACKER_HTTP_SERVER_IP/g"
 fi
 
 # If the image format is AMI and our Packer config specifies a non-gp3 volume, then

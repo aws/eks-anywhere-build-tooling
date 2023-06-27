@@ -26,9 +26,11 @@ AMI_ID="${4?Specify fourth argument - AMI ID to create instance}"
 INSTANCE_TYPE="${5?Specify fifth argument - Instance type to create}"
 KEY_NAME="${6?Specify sixth argument - Key name to associate with instance}"
 IMAGE_OS="${7?Specify seventh argument - Raw build target name}"
-IMAGE_FORMAT="${8?Specify eight argument - Image format}"
-LATEST="${9?Specify the ninth argument - Latest tag}"
-ARTIFACTS_PATH="${10?Specify the tenth argument - Artifacts path}"
+IMAGE_OS_VERSION="${8?Specify eight argument - Raw build target name}"
+IMAGE_FORMAT="${9?Specify ninth argument - Image format}"
+LATEST="${10?Specify the tenth argument - Latest tag}"
+ARTIFACTS_PATH="${11?Specify the eleventh argument - Artifacts path}"
+BRANCH_NAME="${12?Specify the twelveth argument - Branch Name}"
 
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 CI="${CI:-false}"
@@ -129,13 +131,13 @@ if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; export IMAGE_OS=$IMAGE_OS IMAGE_FORMAT=$IMAGE_FORMAT; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=$REMOTE_ARTIFACTS_PATH $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $RELEASE_BRANCH $IMAGE_FORMAT $ARTIFACTS_BUCKET $LATEST"
+SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; export IMAGE_OS=$IMAGE_OS IMAGE_OS_VERSION=$IMAGE_OS_VERSION IMAGE_FORMAT=$IMAGE_FORMAT; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=$REMOTE_ARTIFACTS_PATH $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $IMAGE_OS_VERSION $RELEASE_BRANCH $IMAGE_FORMAT $ARTIFACTS_BUCKET $LATEST"
 if [[ "$IMAGE_OS" == "redhat" ]]; then
   SSH_COMMANDS="export RHSM_USERNAME='$RHSM_USERNAME' RHSM_PASSWORD='$RHSM_PASSWORD'; $SSH_COMMANDS"
 fi
 
 ssh $SSH_OPTS $REMOTE_HOST $SSH_COMMANDS
-
+echo "done with ssh command"
 # Copy built raw image from the instance back into the CI build environment
 OUTPUT_IMAGE_BLOB="*.gz"
 OUTPUT_IMAGE_FORMAT=$IMAGE_FORMAT
@@ -145,4 +147,4 @@ if [[ "$IMAGE_FORMAT" == "cloudstack" ]]; then
 fi
 mkdir -p $ARTIFACTS_PATH
 scp $SSH_OPTS $REMOTE_HOST:$REMOTE_HOME_DIR/$OUTPUT_IMAGE_BLOB $REPO_ROOT/$PROJECT_PATH/
-scp $SSH_OPTS $REMOTE_HOST:$REMOTE_ARTIFACTS_PATH/$RELEASE_BRANCH/$OUTPUT_IMAGE_FORMAT/$IMAGE_OS/{EKSD_MANIFEST_URL,KUBERNETES_VERSION} $ARTIFACTS_PATH
+scp $SSH_OPTS $REMOTE_HOST:$REMOTE_ARTIFACTS_PATH/$RELEASE_BRANCH/$IMAGE_OS/$IMAGE_OS_VERSION/$OUTPUT_IMAGE_FORMAT/{EKSD_MANIFEST_URL,KUBERNETES_VERSION,packer.log} $ARTIFACTS_PATH

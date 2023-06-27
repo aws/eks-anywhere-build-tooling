@@ -10,8 +10,10 @@ RAW_IMAGE_BUILD_AMI?=ami-095413544ce52437d
 RAW_IMAGE_BUILD_INSTANCE_TYPE?=t2.micro
 RAW_IMAGE_BUILD_KEY_NAME?=raw-image-build
 
-FULL_OUTPUT_DIR=
-export BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
+FULL_OUTPUT_DIR?=$(MAKE_ROOT)/$(OUTPUT_DIR)/$(IMAGE_FORMAT)/$(IMAGE_OS_DIR)
+BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/downloads
+ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$(IMAGE_FORMAT)/$(IMAGE_OS_DIR)
+ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$(IMAGE_OS_DIR)/$(IMAGE_FORMAT)
 
 RHSM_USERNAME?=
 RHSM_PASSWORD?=
@@ -31,7 +33,11 @@ PACKER_OVA_CONF_FILE=$(MAKE_ROOT)/packer/ova/vsphere.json
 PACKER_OVA_VAR_FILES=$(MAKE_ROOT)/packer/ova/vsphere-library.json
 PACKER_OVA_VAR_FILES+=$(PACKER_OVA_CONF_FILE)
 
-PACKER_TYPE_VAR_FILES?=
+PACKER_RAW_VAR_FILES?=
+PACKER_CLOUDSTACK_VAR_FILES?=
+PACKER_NUTANIX_VAR_FILES?=
+
+PACKER_TYPE_VAR_FILES?=$(PACKER_$(call TO_UPPER,$(IMAGE_FORMAT))_VAR_FILES)
 PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(FULL_OUTPUT_DIR)/config/common.json $(FULL_OUTPUT_DIR)/config/cni.json $(FULL_OUTPUT_DIR)/config/additional_components.json $(PACKER_TYPE_VAR_FILES)
 
 # Kubeadm hardcodes the version of the pause image it pulls, even tho containerd config
@@ -56,92 +62,119 @@ HAS_LICENSES=false
 SIMPLE_CREATE_TARBALLS=false
 
 # to support a no op attribution target
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution release-ami-ubuntu-2004
-BOTTLEROCKET_SETUP_TARGET=$(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution
 
-FINAL_OVA_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/$(IMAGE_OS).ova
-FINAL_RAW_IMAGE_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/$(IMAGE_OS).gz
-FINAL_CLOUDSTACK_IMAGE_PATH=$(ARTIFACTS_PATH)/cloudstack/$(IMAGE_OS)/$(IMAGE_OS).qcow2
-FINAL_BOTTLEROCKET_AMI_PATH=$(ARTIFACTS_PATH)/ami/bottlerocket/bottlerocket.img.gz
-FINAL_BOTTLEROCKET_OVA_PATH=$(ARTIFACTS_PATH)/ova/bottlerocket/bottlerocket.ova
-FINAL_BOTTLEROCKET_RAW_PATH=$(ARTIFACTS_PATH)/raw/bottlerocket/bottlerocket.img.gz
-FAKE_UBUNTU_OVA_PATH=fake-ubuntu.ova
-FAKE_UBUNTU_RAW_PATH=fake-ubuntu.gz
-BOTTLEROCKET_AMI_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ami-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
-BOTTLEROCKET_OVA_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).ova-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
-BOTTLEROCKET_RAW_RELEASE_VERSION=$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES)
+IMAGE_OS_DIR=$(IMAGE_OS)/$(IMAGE_OS_VERSION)
+IMAGE_OS_WITH_VER=$(IMAGE_OS)-$(IMAGE_OS_VERSION)
+
+OVA_FORMAT_EXT=ova
+RAW_FORMAT_EXT=gz
+AMI_FORMAT_EXT=gz
+CLOUDSTACK_FORMAT_EXT=qcow2
+
+# $1- image_format
+# $2 - image_os
+EXT_FROM_FORMAT=$(if $(and $(filter bottlerocket,$2),$(filter-out ova,$1)),img.,)$($(call TO_UPPER,$1)_FORMAT_EXT)
+
+# $1 - target to convert
+# upstream targets for ova are named slightly different
+# we have tried to standardize on redhat vs rhel, but upstream uses rhel
+# we are explcitly using cloudstack but upstream this is just a qemu build
+# for raw ubuntu builds we always build the efi variant
+# ex: validate-raw-ubuntu-2004, build-raw-ubuntu-2004
+CONVERT_TO_UPSTREAM_TARGET=$(strip \
+	$(eval _NEW_TARGET:=$1) \
+	$(eval _NEW_TARGET:=$(subst validate-ova-,validate-node-ova-local-,$(_NEW_TARGET))) \
+	$(eval _NEW_TARGET:=$(subst build-ova-,build-node-ova-vsphere-,$(_NEW_TARGET))) \
+	$(eval _NEW_TARGET:=$(subst -redhat-,-rhel-,$(_NEW_TARGET))) \
+	$(eval _NEW_TARGET:=$(subst -cloudstack-,-qemu-,$(_NEW_TARGET))) \
+	$(eval _NEW_TARGET:=$(if $(findstring raw-ubuntu,$(_NEW_TARGET)),$(_NEW_TARGET)-efi,$(_NEW_TARGET))) \
+	$(_NEW_TARGET) \
+)
+
+# ex: $(ARTIFACTS_PATH)/ubuntu/2004/ova/ubuntu.ova, $(ARTIFACTS_PATH)/bottlerocket/1/raw/bottlerocket.img.gz
+FINAL_IMAGE_DIR=$(ARTIFACTS_PATH)/$(IMAGE_OS_DIR)/$(IMAGE_FORMAT)
+FINAL_IMAGE_PATH=$(FINAL_IMAGE_DIR)/$(IMAGE_OS).$(call EXT_FROM_FORMAT,$(IMAGE_FORMAT),$(IMAGE_OS))
+
+BOTTLEROCKET_AMI_RELEASE_VERSION=$(and $(RELEASE_BRANCH),$(shell yq e ".$(RELEASE_BRANCH).ami-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES))
+BOTTLEROCKET_OVA_RELEASE_VERSION=$(and $(RELEASE_BRANCH),$(shell yq e ".$(RELEASE_BRANCH).ova-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES))
+BOTTLEROCKET_RAW_RELEASE_VERSION=$(and $(RELEASE_BRANCH),$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES))
 
 IMAGE_OS?=ubuntu
-IMAGE_FORMAT?=raw
-BUILD_AMI_TARGETS=build-ami-ubuntu-2004
-BUILD_OVA_TARGETS=setup-packer-configs-ova  $(FAKE_UBUNTU_OVA_PATH) $(FINAL_OVA_PATH)  upload-artifacts-ova
-BUILD_RAW_TARGETS=setup-packer-configs-raw release-image-build-on-metal-ubuntu $(FAKE_UBUNTU_RAW_PATH) $(FINAL_RAW_IMAGE_PATH) upload-artifacts-raw
+IMAGE_OS_VERSION?=$(DEFAULT_$(call TO_UPPER,$(IMAGE_OS))_VERSION)
+IMAGE_FORMAT?=ova
+IMAGE_FORMATS_AVAIL=ami cloudstack nutanix ova raw
+
+###################### BUILD TARGETS ##############################
+# build targets only run validation, they do not actually do an image build
+# snow node images
+BUILD_AMI_TARGETS=build-ami-ubuntu-2004 build-ami-ubuntu-2204
+
+# $1 - image-format
+# $2 - image-os-with-ver
+FAKE_IMAGE_PATH_FROM_OS_WITH_VER=fake-$2-$1.$(call EXT_FROM_FORMAT,$(1),$(word 2,$(subst -, ,$2)))
+
+# vsphere node images
+# packer/ova/vsphere.json needs to exist for the validation, but can be empty
+BUILD_OVA_TARGETS=packer/ova/vsphere.json $(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-ova-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,ova,$(os)) upload-artifacts-ova-$(os))
+
+# only running release-raw-ubuntu-2004 on presubmit here since we are just validating the instance creation and do not need to run for every OS
+# tinkerbell/bare metal node images
+BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) release-raw-ubuntu-2004
+
+# cloud stack node images
+BUILD_CLOUDSTACK_TARGETS=build-cloudstack-redhat-8 $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,cloudstack,redhat-8) upload-artifacts-cloudstack-redhat-8
+
+# nutanix node images
+BUILD_NUTANIX_TARGETS=build-nutanix-ubuntu-2004 build-nutanix-ubuntu-2204
+
 ifneq ($(BOTTLEROCKET_AMI_RELEASE_VERSION),null)
-	BUILD_AMI_TARGETS+=download-bottlerocket-ami $(FINAL_BOTTLEROCKET_AMI_PATH) upload-bottlerocket-ami
+	BUILD_AMI_TARGETS+=upload-bottlerocket-1-ami
 endif
 ifneq ($(BOTTLEROCKET_RAW_RELEASE_VERSION),null)
-	BUILD_RAW_TARGETS+=download-bottlerocket-raw $(FINAL_BOTTLEROCKET_RAW_PATH) upload-bottlerocket-raw
+	BUILD_RAW_TARGETS+=upload-bottlerocket-1-raw
 endif
 ifneq ($(BOTTLEROCKET_OVA_RELEASE_VERSION),null)
-	BUILD_OVA_TARGETS+=download-bottlerocket-ova $(FINAL_BOTTLEROCKET_OVA_PATH) upload-bottlerocket-ova
+	BUILD_OVA_TARGETS+=upload-bottlerocket-1-ova
 endif
 
-BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS)
-ifeq ($(IMAGE_FORMAT),ova)
-	ifeq ($(IMAGE_OS),ubuntu)
-		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH)
-		RELEASE_TARGETS=release-ova-$(IMAGE_OS) upload-artifacts-ova
-	else ifeq ($(IMAGE_OS),bottlerocket)
-		S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_OVA_PATH)
-		RELEASE_TARGETS=download-bottlerocket-ova upload-bottlerocket-ova
-	else ifeq ($(IMAGE_OS),redhat)
-		S3_TARGET_PREREQUISITES=$(FINAL_OVA_PATH)
-		RELEASE_TARGETS=release-ova-$(IMAGE_OS) upload-artifacts-ova
-	else
-		S3_TARGET_PREREQUISITES?=
-		RELEASE_TARGETS=unsupported-release-target
-	endif
-else ifeq ($(IMAGE_FORMAT),raw)
-	ifeq ($(IMAGE_OS),ubuntu)
-		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
-		RELEASE_TARGETS=release-image-build-on-metal-$(IMAGE_OS) upload-artifacts-raw
-	else ifeq ($(IMAGE_OS),bottlerocket)
-		ifneq ($(RELEASE_BRANCH),1-20)
-			S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_RAW_PATH)
-			RELEASE_TARGETS=download-bottlerocket-raw upload-bottlerocket-raw
-		else
-			S3_TARGET_PREREQUISITES?=
-			RELEASE_TARGETS=unsupported-release-target
-		endif
-	else ifeq ($(IMAGE_OS),redhat)
-		S3_TARGET_PREREQUISITES=$(FINAL_RAW_IMAGE_PATH)
-		RELEASE_TARGETS=release-image-build-on-metal-$(IMAGE_OS) upload-artifacts-raw
-	else
-		S3_TARGET_PREREQUISITES?=
-		RELEASE_TARGETS=unsupported-release-target
-	endif
-else ifeq ($(IMAGE_FORMAT),cloudstack)
-	ifeq ($(IMAGE_OS),redhat)
-		S3_TARGET_PREREQUISITES=$(FINAL_CLOUDSTACK_IMAGE_PATH)
-		RELEASE_TARGETS=release-image-build-on-metal-$(IMAGE_OS) upload-artifacts-cloudstack
-	else
-		S3_TARGET_PREREQUISITES?=
-		RELEASE_TARGETS=unsupported-release-target
-	endif
-else ifeq ($(IMAGE_FORMAT),ami)
-	ifeq ($(IMAGE_OS),ubuntu)
-		RELEASE_TARGETS=release-ami-$(IMAGE_OS)
-	else ifeq ($(IMAGE_OS),bottlerocket)
-		S3_TARGET_PREREQUISITES=$(FINAL_BOTTLEROCKET_AMI_PATH)
-		RELEASE_TARGETS=download-bottlerocket-ami upload-bottlerocket-ami
-	else
-		S3_TARGET_PREREQUISITES?=
-		RELEASE_TARGETS=unsupported-release-target
-	endif
+BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS) $(BUILD_CLOUDSTACK_TARGETS) $(BUILD_NUTANIX_TARGETS)
+#####################################################################
+
+###################### RELEASE TARGETS ##############################
+
+# These targets do trigger real image builds or an error if the combination of OS to FORMAT is invalid
+# The `release` target is called via codebuild with env vars (IMAGE_FORMAT, IMAGE_OS) to define what to actually call
+# vs calling the targets specifically, this is so we can use on buildspec
+# This blocks uses these env vars to determine what target to call
+
+ALLOWED_OVA_OS=ubuntu bottlerocket redhat
+ALLOWED_RAW_OS=ubuntu bottlerocket redhat
+ALLOWED_CLOUDSTACK_OS=redhat
+ALLOWED_AMI_OS=ubuntu bottlerocket
+ALLOWED_NUTANIX_OS=ubuntu
+
+ALLOWED_UBUNTU_VERSIONS=2004 2204
+DEFAULT_UBUNTU_VERSION=2004
+
+ALLOWED_REDHAT_VERSIONS=8
+DEFAULT_REDHAT_VERSION=8
+
+ALLOWED_BOTTLEROCKET_VERSIONS=1
+DEFAULT_BOTTLEROCKET_VERSION=1
+
+# run image os/format validation before running release target(s)
+RELEASE_TARGETS=validate-supported-image-all
+# For bottlerocket the upload target has a prereq of the download target
+# since in "build" we only run validation and fake the actual built image file
+# the other OS builds needs to run the release- target before running upload-artifacts
+ifeq ($(IMAGE_OS),bottlerocket)
+	RELEASE_TARGETS+= upload-bottlerocket-1-$(IMAGE_FORMAT)
 else
-	S3_TARGET_PREREQUISITES?=
-	RELEASE_TARGETS=unsupported-release-target
+	RELEASE_TARGETS+= release-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER) upload-artifacts-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)
 endif
+
+#####################################################################
 
 BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml projects/$(COMPONENT)/buildspecs/ami.yml
 BUILDSPEC_DEPENDS_ON_OVERRIDE=none
@@ -153,206 +186,200 @@ EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 
 PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm eksa/kubernetes-sigs/cri-tools
 
+DEBUG?=0
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
 export PATH:=$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
 export GOVC_INSECURE?=true
 
-# Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
-$(FAKE_UBUNTU_OVA_PATH):
-	@echo -e $(call TARGET_START_LOG)
-	touch $@
-	touch $(ARTIFACTS_PATH)/ova/ubuntu/packer.log
-	@echo -e $(call TARGET_END_LOG)
-
-$(FAKE_UBUNTU_RAW_PATH):
-	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(@D)
-	touch $@
-	@echo -e $(call TARGET_END_LOG)
-
-# in the case of BR ova these targets are the same, guard against this to avoid the overwriting target warning
-ifneq ($(FINAL_BOTTLEROCKET_OVA_PATH),$(FINAL_OVA_PATH))
-$(FINAL_OVA_PATH):
-	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(@D)
-	mv *.ova $@
-	@echo -e $(call TARGET_END_LOG)
-endif
-
-$(FINAL_RAW_IMAGE_PATH):
-	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(@D)
-	mv *.gz $@
-
-$(FINAL_CLOUDSTACK_IMAGE_PATH):
-	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(@D)
-	mv *.qcow2 $@
-	@echo -e $(call TARGET_END_LOG)
-
-$(FINAL_BOTTLEROCKET_AMI_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
-$(FINAL_BOTTLEROCKET_AMI_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
-$(FINAL_BOTTLEROCKET_AMI_PATH):
-	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(@D)
-	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ami/*.gz $@
-	@echo -e $(call TARGET_END_LOG)
-
-$(FINAL_BOTTLEROCKET_OVA_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
-$(FINAL_BOTTLEROCKET_OVA_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
-$(FINAL_BOTTLEROCKET_OVA_PATH):
-	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(@D)
-	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/ova/*.ova $@
-	@echo -e $(call TARGET_END_LOG)
-
-$(FINAL_BOTTLEROCKET_RAW_PATH): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
-$(FINAL_BOTTLEROCKET_RAW_PATH): BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
-$(FINAL_BOTTLEROCKET_RAW_PATH):
-	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(@D)
-	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/raw/*.gz $@
-	@echo -e $(call TARGET_END_LOG)
-
+######################## DEPS #################################
 .PHONY: setup-ami-share
 setup-ami-share:
+	@echo -e $(call TARGET_START_LOG)
 	jq -n '{"ami_users": "$(DEV_ACCOUNTS)", "ami_groups": "", "snapshot_users": "$(DEV_ACCOUNTS)", "snapshot_groups": ""}' > $(PACKER_AMI_SHARE_FILE)
-
-$(BOTTLEROCKET_SETUP_TARGET): FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
-$(BOTTLEROCKET_SETUP_TARGET): export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
-$(BOTTLEROCKET_SETUP_TARGET):
-	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(BOTTLEROCKET_DOWNLOAD_PATH)
-	# This configuration supports local installations and checksum validations
-	# of root.json file
-	envsubst '$$BOTTLEROCKET_ROOT_JSON_PATH' \
-		< $(MAKE_ROOT)/bottlerocket-root-json-checksum \
-		> $(BOTTLEROCKET_SETUP_TARGET)
-	curl https://cache.bottlerocket.aws/root.json -o $$BOTTLEROCKET_ROOT_JSON_PATH
-	sha512sum -c $(BOTTLEROCKET_SETUP_TARGET)
-	@echo -e $(call TARGET_END_LOG)
-
-.PHONY: deps-%
-deps-%: MAKEFLAGS=
-deps-%: $(GIT_PATCH_TARGET)
-	@echo -e $(call TARGET_START_LOG)
-	$(MAKE) -C $(IMAGE_BUILDER_DIR) deps-$*
 	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: setup-packer-configs-%
-setup-packer-configs-%:
+setup-packer-configs-%: $(GIT_PATCH_TARGET)
 	@echo -e $(call TARGET_START_LOG)
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $* $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(ARTIFACTS_PATH)/$*/$(IMAGE_OS) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR)
+	build/setup_packer_configs.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(FINAL_IMAGE_DIR) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR) $(IMAGE_OS_DIR) $(IMAGE_OS_VERSION)
 	@echo -e $(call TARGET_END_LOG)
 
-.PHONY: build-ami-ubuntu-2004
-build-ami-ubuntu-2004: MAKEFLAGS=
-build-ami-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
-build-ami-ubuntu-2004: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
-build-ami-ubuntu-2004: setup-ami-share deps-ami setup-packer-configs-ami
+##############################################################
+
+########################### FAKE TARGETS ###############################
+# Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
+# ex: fake-ubuntu-2004-raw.gz
+fake-%: PACKER_LOG_PATH=$(ARTIFACTS_PATH)/$(subst -,/,$(basename $(*F)))/packer.log
+fake-%:
 	@echo -e $(call TARGET_START_LOG)
-	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) validate-ami-ubuntu-2004
+	touch $(@)
+	touch $(PACKER_LOG_PATH)
 	@echo -e $(call TARGET_END_LOG)
 
-.PHONY: release-ami-%
-release-ami-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
+packer/ova/vsphere.json:
+	echo "{}" > $@
+
+########################################################################
+
+######################## BOTTLEROCKET #######################
+$(ARTIFACTS_PATH)/bottlerocket/% upload-bottlerocket-%: IMAGE_OS=bottlerocket
+
+#$ ex: $(ARTIFACTS_PATH)/bottlerocket/1/raw/bottlerocket.img.gz, $(ARTIFACTS_PATH)/bottlerocket/1/ova/bottlerocket.ova
+$(ARTIFACTS_PATH)/bottlerocket/%: IMAGE_OS_VERSION=$(word 1,$(subst /, ,$(*D)))
+$(ARTIFACTS_PATH)/bottlerocket/%: IMAGE_FORMAT=$(word 2,$(subst /, ,$(*D)))
+$(ARTIFACTS_PATH)/bottlerocket/%: export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
+$(ARTIFACTS_PATH)/bottlerocket/%:
+	@echo -e $(call TARGET_START_LOG)
+	mkdir -p $(@D) $(BOTTLEROCKET_DOWNLOAD_PATH)
+	# This configuration supports local installations and checksum validations of root.json file
+	envsubst '$$BOTTLEROCKET_ROOT_JSON_PATH' \
+		< $(MAKE_ROOT)/bottlerocket-root-json-checksum \
+		> $(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
+	curl https://cache.bottlerocket.aws/root.json -o $$BOTTLEROCKET_ROOT_JSON_PATH
+	sha512sum -c $(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
+	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(BOTTLEROCKET_DOWNLOAD_PATH) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
+	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/$(IMAGE_FORMAT)/*$(suffix $(@F)) $@
+	@echo -e $(call TARGET_END_LOG)
+
+# ex: upload-bottlerocket-1-ova, upload-bottlerocket-1-raw
+upload-bottlerocket-%: IMAGE_OS_VERSION=$(word 1,$(subst -, ,$*))
+upload-bottlerocket-%: IMAGE_FORMAT=$(word 2,$(subst -, ,$*))
+upload-bottlerocket-%: $$(FINAL_IMAGE_PATH)
+	@echo -e $(call TARGET_START_LOG)
+	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) $(IMAGE_OS_VERSION)
+	@echo -e $(call TARGET_END_LOG)
+###############################################################
+
+########################### FINAL TARGETS ##############################
+# Moves packer produced file which is in the repo root to final location in artifacts_path
+# $(ARTIFACTS_PATH)/ubuntu/2004/raw/ubuntu.gz
+$(ARTIFACTS_PATH)/%:
+	@echo -e $(call TARGET_START_LOG)
+	mkdir -p $(@D)
+	mv *$(suffix $(@F)) $(@)
+	@echo -e $(call TARGET_END_LOG)
+
+#######################################################################
+
+######################## VALIDATE ###########################
+# ex: build-ova-ubuntu-2004, build-raw-redhat-8
+build-%: MAKEFLAGS=
+build-%: IMAGE_FORMAT=$(word 1,$(subst -, ,$*))
+build-%: IMAGE_OS=$(word 2,$(subst -, ,$*))
+build-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
+build-%: validate-supported-image-% setup-packer-configs-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,)
+	@echo -e $(call TARGET_START_LOG)	
+	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,validate-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER))
+	@echo -e $(call TARGET_END_LOG)
+#########################################################
+
+######################## IMAGE BUILDER TARGETS #######################
+# these targets end up calling the image-builder cli via the build_image.sh script
+# this is to try and match customer usage of image-builder cli as close as possible during our CI builds
+# the image-builder cli will end up calling the local-* targts
+
+# These targets all end with <os>-<os-version>
+# ex: release-ami-ubuntu-2004, release-ova-redhat-8
+release-ami-% release-ova-% release-image-build-on-metal-%: IMAGE_OS=$(word 1,$(subst -, ,$*))
+release-ami-% release-ova-% release-image-build-on-metal-%: IMAGE_OS_VERSION=$(word 2,$(subst -, ,$*))
+
+release-ami-%: IMAGE_FORMAT=ami
 release-ami-%: export MANIFEST_OUTPUT=$(FULL_OUTPUT_DIR)/manifest.json
 release-ami-%: EXPORT_AMI_BUCKET?=$(ARTIFACTS_BUCKET)
-release-ami-%: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami/$(IMAGE_OS)
+release-ami-%: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami/$(IMAGE_OS_DIR)
 release-ami-%: EXPORT_AMI_DST=$(AMI_S3_DST)/$(GIT_HASH)
 release-ami-%: LATEST_AMI_S3_URL=$(AMI_S3_DST)/$(LATEST)/ubuntu.raw
-release-ami-%: setup-ami-share
+release-ami-%: validate-supported-image-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,)
 	@echo -e $(call TARGET_START_LOG)
-	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
+	build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
 	build/export-ami-to-s3.sh $(RELEASE_BRANCH) $(MANIFEST_OUTPUT) raw $(EXPORT_AMI_DST) $(LATEST_AMI_S3_URL)
 	@echo -e $(call TARGET_END_LOG)
 
-.PHONY: release-ova-%
-release-ova-%:
+release-ova-%: IMAGE_FORMAT=ova
+release-ova-%: validate-supported-image-%
 	@echo -e $(call TARGET_START_LOG)
-	build/build_image.sh $* $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
+	build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
 	@echo -e $(call TARGET_END_LOG)
 
-.PHONY: local-build-ova-%
-local-build-ova-%: MAKEFLAGS=
-local-build-ova-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ova/$(IMAGE_OS)
-local-build-ova-%: PACKER_TYPE_VAR_FILES=$(PACKER_OVA_VAR_FILES)
-local-build-ova-%: deps-ova setup-packer-configs-ova
+release-raw-%: IMAGE_FORMAT=raw
+release-raw-%: release-image-build-on-metal-%
+	@echo Done building $@
+
+release-cloudstack-%: IMAGE_FORMAT=cloudstack
+release-cloudstack-%: release-image-build-on-metal-%
+	@echo Done building $@
+
+# used for cloudstack and raw
+# clone the repo first since its scp'd to the temporary instance which runs kvm
+release-image-build-on-metal-%: IMAGE_FORMAT?=raw
+release-image-build-on-metal-%: validate-supported-image-% $(GIT_PATCH_TARGET)
 	@echo -e $(call TARGET_START_LOG)
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ova/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+	build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $(IMAGE_OS) $(IMAGE_OS_VERSION) $(IMAGE_FORMAT) $(LATEST) $(FINAL_IMAGE_DIR) $(BRANCH_NAME)
+	@echo -e $(call TARGET_END_LOG)
+
+#######################################################################
+
+# These targets all end with <image format>-<os>-<os-version>
+# ex: local-build-ami-ubuntu-2004, s3-artifacts-ova-ubuntu-2004, upload-artifacts-ova-ubuntu-2004
+local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_FORMAT=$(word 1,$(subst -, ,$*))
+local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS=$(word 2,$(subst -, ,$*))
+local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
+
+######################## IMAGE BUILDER CLI TARGETS #######################
+# OVF_CUSTOM_PROPERTIES is only for ova, but should be ok to passed since its ignored by other builds
+local-build-%: MAKEFLAGS=
+local-build-%: validate-supported-image-% setup-packer-configs-%
+	@echo -e $(call TARGET_START_LOG)
+	if [[ "$(DEBUG)" == "1" ]]; then \
+		touch $(FINAL_IMAGE_DIR)/packer.log; \
+		tail -f $(FINAL_IMAGE_DIR)/packer.log & \
+	fi
+	DEBUG=$(DEBUG) PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(FINAL_IMAGE_DIR)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-node-ova-vsphere-$*
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,build-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER))
 	@echo -e $(call TARGET_END_LOG)
 
-.PHONY: download-bottlerocket-%
-download-bottlerocket-%: IMAGE_OS=bottlerocket
-download-bottlerocket-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/bottlerocket
-download-bottlerocket-%: BOTTLEROCKET_DOWNLOAD_PATH=$(FULL_OUTPUT_DIR)/bottlerocket/downloads
-download-bottlerocket-%: $(BOTTLEROCKET_SETUP_TARGET)
+#######################################################################
+
+######################## ARTIFACT TARGETS #############################
+s3-artifacts-%: $$(FINAL_IMAGE_PATH)
 	@echo -e $(call TARGET_START_LOG)
-	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(BOTTLEROCKET_DOWNLOAD_PATH) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
+	$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
 	@echo -e $(call TARGET_END_LOG)
 
-.PHONY: upload-bottlerocket-%
-upload-bottlerocket-%: IMAGE_OS=bottlerocket
-upload-bottlerocket-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/bottlerocket
-upload-bottlerocket-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$*/bottlerocket
-upload-bottlerocket-%:
+upload-artifacts-%: s3-artifacts-%
 	@echo -e $(call TARGET_START_LOG)
-	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $* $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT)
+	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
 	@echo -e $(call TARGET_END_LOG)
 
-.PHONY: release-image-build-on-metal-%
-release-image-build-on-metal-%: $(GIT_PATCH_TARGET)
-	@echo -e $(call TARGET_START_LOG)
-	build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $* $(IMAGE_FORMAT) $(LATEST) $(ARTIFACTS_PATH)/$(IMAGE_FORMAT)/$*
-	@echo -e $(call TARGET_END_LOG)
+#######################################################################
 
-.PHONY: build-qemu-rhel-local
-build-qemu-rhel-local: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
-build-qemu-rhel-local: deps-qemu setup-packer-configs-qemu
-	@echo -e $(call TARGET_START_LOG)
-	build/build_qemu_rhel_local.sh $(MAKE_ROOT) $(BASE_IMAGE) $(IMAGE_BUILDER_DIR) "$(PACKER_VAR_FILES)"
-	@echo -e $(call TARGET_END_LOG)
+.PHONY: validate-supported-image-%
+validate-supported-image-%:
+	@if [[ "$(IMAGE_FORMAT)" == "" ]]; then \
+		echo "IMAGE_FORMAT is required"; \
+		exit 1; \
+	elif [[ "$(IMAGE_OS)" == "" ]]; then \
+		echo "IMAGE_OS is required"; \
+		exit 1; \
+	elif [[ "$(IMAGE_OS_VERSION)" == "" ]]; then \
+		echo "IMAGE_OS_VERSION is required"; \
+		exit 1; \
+	elif [[ "$(ALLOWED_$(call TO_UPPER,$(IMAGE_FORMAT))_OS)" != *"$(IMAGE_OS)"* ]]; then \
+		echo "Unsupported combination of image format ($(IMAGE_FORMAT)) and image os ($(IMAGE_OS)) chosen. Build will quit now..."; \
+		exit 1; \
+	elif [[ "$(ALLOWED_$(call TO_UPPER,$(IMAGE_OS))_VERSIONS)" != *"$(IMAGE_OS_VERSION)"* ]]; then \
+		echo "Unsupported combination of image os ($(IMAGE_OS)) and image os version ($(IMAGE_OS_VERSION)) chosen. Build will quit now..."; \
+		exit 1; \
+	fi
 
-.PHONY: local-build-ami-%
-local-build-ami-%: MAKEFLAGS=
-local-build-ami-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/ami/$(IMAGE_OS)
-local-build-ami-%: PACKER_TYPE_VAR_FILES=$(PACKER_AMI_VAR_FILES)
-local-build-ami-%: deps-ami setup-packer-configs-ami
-	@echo -e $(call TARGET_START_LOG)
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/ami/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-ami-$*
-	@echo -e $(call TARGET_END_LOG)
+######################## LOCAL HELPERS ####################################
 
-.PHONY: local-build-raw-%
-local-build-raw-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/raw/$(IMAGE_OS)
-local-build-raw-%: deps-raw setup-packer-configs-raw
-	@echo -e $(call TARGET_START_LOG)
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/raw/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-raw-$*
-	@echo -e $(call TARGET_END_LOG)
-
-.PHONY: local-build-qemu-%
-local-build-qemu-%: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/qemu/$(IMAGE_OS)
-local-build-qemu-%: deps-qemu setup-packer-configs-qemu
-	@echo -e $(call TARGET_START_LOG)
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/qemu/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-qemu-$*
-	@echo -e $(call TARGET_END_LOG)
-
-.PHONY: local-build-nutanix-ubuntu-2004
-local-build-nutanix-ubuntu-2004: FULL_OUTPUT_DIR=$(MAKE_ROOT)/$(OUTPUT_DIR)/nutanix/$(IMAGE_OS)
-local-build-nutanix-ubuntu-2004: deps-nutanix setup-packer-configs-nutanix
-	@echo -e $(call TARGET_START_LOG)
-	PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(ARTIFACTS_PATH)/nutanix/$(IMAGE_OS)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) build-nutanix-ubuntu-2004
-	@echo -e $(call TARGET_END_LOG)
-
-.PHONY: validate-ubuntu-2004
-validate-ubuntu-2004: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
+.PHONY: validate-ubuntu-%
+validate-ubuntu-%: check-env-validation $(GIT_PATCH_TARGET) setup-packer-configs-ova
 	sh validate/validate.sh $(FULL_OUTPUT_DIR)/config/validate_goss_inline_vars.json
 
 .PHONY: check-env-validation
@@ -360,23 +387,61 @@ check-env-validation:
 	ifndef TEMPLATE
 		$(error Environment var TEMPLATE not set. Example: TEMPLATE=<ubuntu.livecd> make ...)
 	endif
+############################################################################
 
-.PHONY: s3-artifacts-%
-s3-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/$(IMAGE_OS)
-s3-artifacts-%: $(S3_TARGET_PREREQUISITES)
-	$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$* IMAGE_OS=$(IMAGE_OS)
+######################## TEMP BACK COMPAT ####################################
 
-.PHONY: upload-artifacts-%
-upload-artifacts-%: ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$*/$(IMAGE_OS)
-upload-artifacts-%: ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$*/$(IMAGE_OS)
-upload-artifacts-%: s3-artifacts-%
-	@echo -e $(call TARGET_START_LOG)
-	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$* IMAGE_OS=$(IMAGE_OS)
-	@echo -e $(call TARGET_END_LOG)
+.PHONY: local-build-ova-rhel-8
+local-build-ova-rhel-8: local-build-ova-redhat-8
+	@echo Done building $@
 
-.PHONY: unsupported-release-target
-unsupported-release-target:
-	@echo "Unsupported combination of image format and image os chosen. Build will quit now..."
+.PHONY: local-build-raw-rhel-8
+local-build-raw-rhel-8: local-build-raw-redhat-8
+	@echo Done building $@
+
+.PHONY: local-build-qemu-rhel-8
+local-build-qemu-rhel-8: local-build-cloudstack-redhat-8
+	@echo Done building $@
+
+.PHONY: local-build-raw-ubuntu-2004-efi
+local-build-raw-ubuntu-2004-efi: local-build-raw-ubuntu-2004
+	@echo Done building $@
+
+############################################################################
+## --------------------------------------
+## Document dynamic targets
+## --------------------------------------
+
+build-ami-ubuntu-2004:
+build-ami-ubuntu-2204:
+release-ami-ubuntu-2004:
+release-ami-ubuntu-2204:
+
+build-nutanix-ubuntu-2004:
+build-nutanix-ubuntu-2204:
+release-nutanix-ubuntu-2004:
+release-nutanix-ubuntu-2204:
+
+build-ova-ubuntu-2004:
+build-ova-ubuntu-2204:
+build-ova-redhat-8:
+release-ova-ubuntu-2004:
+release-ova-ubuntu-2204:
+release-ova-redhat-8:
+
+build-raw-ubuntu-2004:
+build-raw-ubuntu-2204:
+build-raw-redhat-8:
+release-raw-ubuntu-2004:
+release-raw-ubuntu-2204:
+release-raw-redhat-8:
+
+build-cloudstack-redhat-8:
+release-cloudstack-redhat-8:
+
+upload-bottlerocket-1-ova:
+upload-bottlerocket-1-raw:
+upload-bottlerocket-1-ami:
 
 
 ########### DO NOT EDIT #############################

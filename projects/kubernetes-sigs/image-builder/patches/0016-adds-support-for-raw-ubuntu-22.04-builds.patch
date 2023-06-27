@@ -1,0 +1,315 @@
+From 91daaa82f64c7c0a80c63b739f2a01c54640873d Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Fri, 16 Jun 2023 15:27:15 -0500
+Subject: [PATCH 16/17] adds support for raw ubuntu 22.04 builds
+
+---
+ images/capi/Makefile                          |   6 +-
+ .../raw/linux/ubuntu/http/22.04.efi/meta-data |   0
+ .../raw/linux/ubuntu/http/22.04.efi/user-data | 113 ++++++++++++++++++
+ .../raw/linux/ubuntu/http/22.04/meta-data     |   0
+ .../raw/linux/ubuntu/http/22.04/user-data     |  92 ++++++++++++++
+ .../capi/packer/raw/raw-ubuntu-2204-efi.json  |  13 ++
+ images/capi/packer/raw/raw-ubuntu-2204.json   |  12 ++
+ 7 files changed, 235 insertions(+), 1 deletion(-)
+ create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data
+ create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
+ create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04/meta-data
+ create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04/user-data
+ create mode 100644 images/capi/packer/raw/raw-ubuntu-2204-efi.json
+ create mode 100644 images/capi/packer/raw/raw-ubuntu-2204.json
+
+diff --git a/images/capi/Makefile b/images/capi/Makefile
+index 0226a7e53..4f90365aa 100644
+--- a/images/capi/Makefile
++++ b/images/capi/Makefile
+@@ -353,7 +353,7 @@ OSC_BUILD_NAMES 			?=	osc-ubuntu-2004
+ QEMU_BUILD_NAMES			?=	qemu-ubuntu-1804 qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-centos-7 qemu-ubuntu-2004-efi qemu-rhel-8 qemu-rockylinux-8 qemu-flatcar
+ QEMU_KUBEVIRT_BUILD_NAMES	:= $(addprefix kubevirt-,$(QEMU_BUILD_NAMES))
+ 
+-RAW_BUILD_NAMES                        ?=      raw-ubuntu-1804 raw-ubuntu-2004 raw-ubuntu-2004-efi raw-flatcar raw-rhel-8
++RAW_BUILD_NAMES                        ?=      raw-ubuntu-1804 raw-ubuntu-2004 raw-ubuntu-2004-efi raw-ubuntu-2204 raw-ubuntu-2204-efi raw-flatcar raw-rhel-8
+ VBOX_BUILD_NAMES			?=      vbox-windows-2019
+ 
+ POWERVS_BUILD_NAMES         ?= powervs-centos-8
+@@ -743,6 +743,8 @@ build-raw-flatcar: ## Builds Flatcar RAW image
+ build-raw-ubuntu-1804: ## Builds Ubuntu 18.04 RAW image
+ build-raw-ubuntu-2004: ## Builds Ubuntu 20.04 RAW image
+ build-raw-ubuntu-2004-efi: ## Builds Ubuntu 20.04 RAW image that EFI boots
++build-raw-ubuntu-2204: ## Builds Ubuntu 22.04 RAW image
++build-raw-ubuntu-2204-efi: ## Builds Ubuntu 22.04 RAW image that EFI boots
+ build-raw-rhel-8: ## Builds RHEL 8 RAW image
+ build-raw-all: $(RAW_BUILD_TARGETS) ## Builds all RAW images
+ 
+@@ -876,6 +878,8 @@ validate-raw-flatcar: ## Validates Flatcar RAW image packer config
+ validate-raw-ubuntu-1804: ## Validates Ubuntu 18.04 RAW image packer config
+ validate-raw-ubuntu-2004: ## Validates Ubuntu 20.04 RAW image packer config
+ validate-raw-ubuntu-2004-efi: ## Validates Ubuntu 20.04 RAW EFI image packer config
++validate-raw-ubuntu-2204: ## Validates Ubuntu 22.04 RAW image packer config
++validate-raw-ubuntu-2204-efi: ## Validates Ubuntu 22.04 RAW EFI image packer config
+ validate-raw-rhel-8: ## Validates RHEL 8 RAW image packer config
+ validate-raw-all: $(RAW_VALIDATE_TARGETS) ## Validates all RAW Packer config
+ 
+diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
+new file mode 100644
+index 000000000..8b699a18a
+--- /dev/null
++++ b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
+@@ -0,0 +1,113 @@
++#cloud-config
++# Copyright 2022 The Kubernetes Authors.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++
++# For more information on how autoinstall is configured, please refer to
++# https://ubuntu.com/server/docs/install/autoinstall-reference
++autoinstall:
++  version: 1
++  # Disable ssh server during installation, otherwise packer tries to connect and exceed max attempts
++  early-commands:
++    - systemctl stop ssh
++  # Configure the locale
++  locale: en_US.UTF-8
++  keyboard:
++    layout: us
++  # For more information on how partitioning is configured,
++  # please refer to https://curtin.readthedocs.io/en/latest/topics/storage.html.
++  storage:
++    swap:
++      size: 0
++    grub:
++      reorder_uefi: false
++      replace_linux_default: false
++    config:
++    - ptable: gpt
++      path: /dev/sda
++      wipe: superblock-recursive
++      preserve: false
++      name: ''
++      grub_device: false
++      type: disk
++      id: disk-sda
++    - device: disk-sda
++      # Create EFI partition of 512MB same as in Ubuntu 20.04
++      size: 536870912
++      wipe: superblock
++      flag: boot
++      number: 1
++      preserve: false
++      grub_device: true
++      type: partition
++      id: partition-0
++    - fstype: fat32
++      volume: partition-0
++      preserve: false
++      type: format
++      id: format-0
++    - device: disk-sda
++      size: -1
++      wipe: superblock
++      flag: ''
++      number: 2
++      preserve: false
++      grub_device: false
++      type: partition
++      id: partition-1
++    - fstype: ext4
++      volume: partition-1
++      preserve: false
++      type: format
++      id: format-1
++    - path: /
++      device: format-1
++      type: mount
++      id: mount-1
++    - path: /boot/efi
++      device: format-0
++      type: mount
++      id: mount-0
++  updates: "all"
++  ssh:
++    install-server: true
++    allow-pw: true
++
++  # Create the default user.
++  # Ensures the "builder" user doesn't require a password to use sudo.
++  user-data:
++    users:
++      - name: builder
++        # openssl passwd -6 -stdin <<< builder
++        passwd: $6$xyz$UtXVazU08Q5b8AW.TJ3MPYZglyXa3Ttf2RCel8MCUPlEYO1evWxeWBhZ2QqivU/Ij4tqYAxMCqc2ujEM4dMSe1
++        groups: [adm, cdrom, dip, plugdev, lxd, sudo]
++        lock-passwd: false
++        sudo: ALL=(ALL) NOPASSWD:ALL
++        shell: /bin/bash
++
++  # This command runs after all other steps; it:
++  # 1. Disables swapfiles
++  # 2. Removes the existing swapfile
++  # 3. Removes the swapfile entry from /etc/fstab
++  # 4. Removes snapd, https://bugs.launchpad.net/subiquity/+bug/1946609
++  # 5. Cleans up any packages that are no longer required
++  # 6. Removes the cached list of packages
++  late-commands:
++    - curtin in-target --target=/target -- swapoff -a
++    - curtin in-target --target=/target -- rm -f /swap.img
++    - curtin in-target --target=/target -- sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
++    - chroot /target apt-get purge -y snapd
++    - curtin in-target --target=/target -- apt-get purge --auto-remove -y
++    - curtin in-target --target=/target -- apt-get clean
++    - curtin in-target --target=/target -- rm -rf /var/lib/apt/lists/*
+diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04/meta-data b/images/capi/packer/raw/linux/ubuntu/http/22.04/meta-data
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data b/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data
+new file mode 100644
+index 000000000..e2838e3c4
+--- /dev/null
++++ b/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data
+@@ -0,0 +1,92 @@
++#cloud-config
++# Copyright 2022 The Kubernetes Authors.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++
++# For more information on how autoinstall is configured, please refer to
++# https://ubuntu.com/server/docs/install/autoinstall-reference
++autoinstall:
++  version: 1
++  # Disable ssh server during installation, otherwise packer tries to connect and exceed max attempts
++  early-commands:
++    - systemctl stop ssh
++  # Configure the locale
++  locale: en_US.UTF-8
++  keyboard:
++    layout: us
++  # Create a single-partition with no swap space. Kubernetes
++  # really dislikes the idea of anyone else managing memory.
++  # For more information on how partitioning is configured,
++  # please refer to https://curtin.readthedocs.io/en/latest/topics/storage.html.
++  storage:
++    swap:
++      size: 0
++    grub:
++      replace_linux_default: false
++    config:
++      - type: disk
++        id: disk-0
++        size: largest
++        grub_device: true
++        preserve: false
++        ptable: msdos
++        wipe: superblock
++      - type: partition
++        id: partition-0
++        device: disk-0
++        size: -1
++        number: 1
++        preserve: false
++        flag: boot
++      - type: format
++        id: format-0
++        volume: partition-0
++        fstype: ext4
++        preserve: false
++      - type: mount
++        id: mount-0
++        device: format-0
++        path: /
++  updates: 'all'
++  ssh:
++    install-server: true
++    allow-pw: true
++
++  # Create the default user.
++  # Ensures the "builder" user doesn't require a password to use sudo.
++  user-data:
++    users:
++      - name: builder
++        # openssl passwd -6 -stdin <<< builder
++        passwd: $6$xyz$UtXVazU08Q5b8AW.TJ3MPYZglyXa3Ttf2RCel8MCUPlEYO1evWxeWBhZ2QqivU/Ij4tqYAxMCqc2ujEM4dMSe1
++        groups: [adm, cdrom, dip, plugdev, lxd, sudo]
++        lock-passwd: false
++        sudo: ALL=(ALL) NOPASSWD:ALL
++        shell: /bin/bash
++
++  # This command runs after all other steps; it:
++  # 1. Disables swapfiles
++  # 2. Removes the existing swapfile
++  # 3. Removes the swapfile entry from /etc/fstab
++  # 4. Removes snapd, https://bugs.launchpad.net/subiquity/+bug/1946609
++  # 5. Cleans up any packages that are no longer required
++  # 6. Removes the cached list of packages
++  late-commands:
++    - curtin in-target --target=/target -- swapoff -a
++    - curtin in-target --target=/target -- rm -f /swap.img
++    - curtin in-target --target=/target -- sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
++    - chroot /target apt-get purge -y snapd
++    - curtin in-target --target=/target -- apt-get purge --auto-remove -y
++    - curtin in-target --target=/target -- apt-get clean
++    - curtin in-target --target=/target -- rm -rf /var/lib/apt/lists/*
+diff --git a/images/capi/packer/raw/raw-ubuntu-2204-efi.json b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
+new file mode 100644
+index 000000000..7d2f921c5
+--- /dev/null
++++ b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
+@@ -0,0 +1,13 @@
++{
++  "boot_command_prefix": "c<wait>linux /casper/vmlinuz --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/22.04.efi/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
++  "build_name": "ubuntu-2204",
++  "build_target": "raw",
++  "distro_name": "ubuntu",
++  "firmware": "OVMF.fd",
++  "guest_os_type": "ubuntu-64",
++  "iso_checksum": "5e38b55d57d94ff029719342357325ed3bda38fa80054f9330dc789cd2d43931",
++  "iso_checksum_type": "sha256",
++  "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.2-live-server-amd64.iso",
++  "os_display_name": "Ubuntu 22.04",
++  "shutdown_command": "shutdown -P now"
++  }
+diff --git a/images/capi/packer/raw/raw-ubuntu-2204.json b/images/capi/packer/raw/raw-ubuntu-2204.json
+new file mode 100644
+index 000000000..38e827ef1
+--- /dev/null
++++ b/images/capi/packer/raw/raw-ubuntu-2204.json
+@@ -0,0 +1,12 @@
++{
++  "boot_command_prefix": "c<wait>linux /casper/vmlinuz --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/22.04/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
++  "build_name": "ubuntu-2204",
++  "build_target": "raw",
++  "distro_name": "ubuntu",  
++  "guest_os_type": "ubuntu-64",
++  "iso_checksum": "5e38b55d57d94ff029719342357325ed3bda38fa80054f9330dc789cd2d43931",
++  "iso_checksum_type": "sha256",
++  "iso_url": "https://releases.ubuntu.com/22.04/ubuntu-22.04.2-live-server-amd64.iso",
++  "os_display_name": "Ubuntu 22.04",
++  "shutdown_command": "shutdown -P now"
++  }
+-- 
+2.39.2
+

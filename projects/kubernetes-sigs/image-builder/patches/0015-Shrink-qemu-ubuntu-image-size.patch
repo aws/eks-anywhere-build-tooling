@@ -1,0 +1,116 @@
+From 5d7f131e2ed7190f3cb9c2a7f82b2d2a5ba25845 Mon Sep 17 00:00:00 2001
+From: Roman Hros <roman.hros@dnation.cloud>
+Date: Mon, 5 Jun 2023 16:29:45 +0200
+Subject: [PATCH 15/17] Shrink qemu ubuntu image size
+
+Use fstrim command at the end of sysprep role
+
+It frees all unused storage, so 'qemu-img convert' command at the end of packer execution can shrink the image size
+
+Also remove snapd and repair autoinstall late-commands
+
+Signed-off-by: Roman Hros <roman.hros@dnation.cloud>
+---
+ .../capi/ansible/roles/sysprep/tasks/main.yml |  7 +++++++
+ .../ova/linux/ubuntu/http/22.04.efi/user-data | 19 ++++++++++++-------
+ .../ova/linux/ubuntu/http/22.04/user-data     | 19 ++++++++++++-------
+ 3 files changed, 31 insertions(+), 14 deletions(-)
+
+diff --git a/images/capi/ansible/roles/sysprep/tasks/main.yml b/images/capi/ansible/roles/sysprep/tasks/main.yml
+index 0114e934d..cf070d92a 100644
+--- a/images/capi/ansible/roles/sysprep/tasks/main.yml
++++ b/images/capi/ansible/roles/sysprep/tasks/main.yml
+@@ -199,6 +199,7 @@
+     state: "{{ item.state }}"
+     path: "{{ item.path }}"
+   loop:
++  - { path: /swap.img, state: absent }
+   - { path: /swapfile, state: absent }
+   - { path: /mnt/resource/swapfile, state: absent }
+   when: ansible_memory_mb.swap.total != 0
+@@ -236,6 +237,12 @@
+     path: /usr/share/oem/config.ign
+   when: ansible_os_family == "Flatcar"
+ 
++- name: fstrim
++  systemd:
++    name: fstrim.service
++    state: started
++  when: ansible_os_family == "Debian"
++
+ - name: start ssh
+   systemd:
+     name: ssh
+diff --git a/images/capi/packer/ova/linux/ubuntu/http/22.04.efi/user-data b/images/capi/packer/ova/linux/ubuntu/http/22.04.efi/user-data
+index 5230c4679..095d9cef3 100644
+--- a/images/capi/packer/ova/linux/ubuntu/http/22.04.efi/user-data
++++ b/images/capi/packer/ova/linux/ubuntu/http/22.04.efi/user-data
+@@ -27,6 +27,8 @@ autoinstall:
+   # For more information on how partitioning is configured,
+   # please refer to https://curtin.readthedocs.io/en/latest/topics/storage.html.
+   storage:
++    swap:
++      size: 0
+     grub:
+       reorder_uefi: false
+       replace_linux_default: false
+@@ -99,11 +101,14 @@ autoinstall:
+   # 1. Disables swapfiles
+   # 2. Removes the existing swapfile
+   # 3. Removes the swapfile entry from /etc/fstab
+-  # 4. Cleans up any packages that are no longer required
+-  # 5. Removes the cached list of packages
++  # 4. Removes snapd, https://bugs.launchpad.net/subiquity/+bug/1946609
++  # 5. Cleans up any packages that are no longer required
++  # 6. Removes the cached list of packages
+   late-commands:
+-    - swapoff -a
+-    - rm -f /swapfile
+-    - sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
+-    - apt-get purge --auto-remove -y
+-    - rm -rf /var/lib/apt/lists/*
++    - curtin in-target --target=/target -- swapoff -a
++    - curtin in-target --target=/target -- rm -f /swap.img
++    - curtin in-target --target=/target -- sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
++    - chroot /target apt-get purge -y snapd
++    - curtin in-target --target=/target -- apt-get purge --auto-remove -y
++    - curtin in-target --target=/target -- apt-get clean
++    - curtin in-target --target=/target -- rm -rf /var/lib/apt/lists/*
+diff --git a/images/capi/packer/ova/linux/ubuntu/http/22.04/user-data b/images/capi/packer/ova/linux/ubuntu/http/22.04/user-data
+index 24bdce560..fdcb56c26 100644
+--- a/images/capi/packer/ova/linux/ubuntu/http/22.04/user-data
++++ b/images/capi/packer/ova/linux/ubuntu/http/22.04/user-data
+@@ -30,6 +30,8 @@ autoinstall:
+   # For more information on how partitioning is configured,
+   # please refer to https://curtin.readthedocs.io/en/latest/topics/storage.html.
+   storage:
++    swap:
++      size: 0
+     grub:
+       replace_linux_default: false
+     config:
+@@ -79,11 +81,14 @@ autoinstall:
+   # 1. Disables swapfiles
+   # 2. Removes the existing swapfile
+   # 3. Removes the swapfile entry from /etc/fstab
+-  # 4. Cleans up any packages that are no longer required
+-  # 5. Removes the cached list of packages
++  # 4. Removes snapd, https://bugs.launchpad.net/subiquity/+bug/1946609
++  # 5. Cleans up any packages that are no longer required
++  # 6. Removes the cached list of packages
+   late-commands:
+-    - swapoff -a
+-    - rm -f /swapfile
+-    - sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
+-    - apt-get purge --auto-remove -y
+-    - rm -rf /var/lib/apt/lists/*
++    - curtin in-target --target=/target -- swapoff -a
++    - curtin in-target --target=/target -- rm -f /swap.img
++    - curtin in-target --target=/target -- sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
++    - chroot /target apt-get purge -y snapd
++    - curtin in-target --target=/target -- apt-get purge --auto-remove -y
++    - curtin in-target --target=/target -- apt-get clean
++    - curtin in-target --target=/target -- rm -rf /var/lib/apt/lists/*
+-- 
+2.39.2
+
