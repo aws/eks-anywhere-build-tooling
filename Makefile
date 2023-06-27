@@ -103,7 +103,7 @@ generate-staging-buildspec:
 generate: generate-project-list generate-staging-buildspec
 
 .PHONY: validate-generated
-validate-generated: generate
+validate-generated: generate validate-eksd-releases
 	@if [ "$$(git status --porcelain -- UPSTREAM_PROJECTS.yaml release/staging-build.yml release/checksums-build.yml **/batch-build.yml | wc -l)" -gt 0 ]; then \
 		echo "Error: Generated files, UPSTREAM_PROJECTS.yaml release/staging-build.yml release/checksums-build.yml batch-build.yml, do not match expected. Please run `make generate` to update"; \
 		git diff -- UPSTREAM_PROJECTS.yaml release/staging-build.yml release/checksums-build.yml **/batch-build.yml; \
@@ -118,3 +118,7 @@ check-project-path-exists:
 	else \
 		echo "true"; \
 	fi
+
+.PHONY: validate-eksd-releases
+validate-eksd-releases:
+	build/lib/validate_eksd_releases.sh
