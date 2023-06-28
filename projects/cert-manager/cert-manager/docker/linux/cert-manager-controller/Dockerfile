@@ -6,8 +6,8 @@ ARG TARGETOS
 
 COPY _output/files/cert-manager-controller /
 COPY _output/bin/cert-manager/$TARGETOS-$TARGETARCH/cert-manager-controller /usr/bin/cert-manager
-COPY _output/LICENSES /LICENSES
-COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+COPY _output/cert-manager-controller/LICENSES /LICENSES
+COPY CERT_MANAGER_CONTROLLER_ATTRIBUTION.txt /ATTRIBUTION.txt
 
 USER 1000
 ENTRYPOINT ["/usr/bin/cert-manager"]

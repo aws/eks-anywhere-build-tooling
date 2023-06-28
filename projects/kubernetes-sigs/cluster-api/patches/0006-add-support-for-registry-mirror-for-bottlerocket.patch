@@ -1,7 +1,7 @@
-From f352490511db0b7552a21a171fa9890c17420e9c Mon Sep 17 00:00:00 2001
+From dfca7fb3ee791f73c0da24c538c6f15c309be761 Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhnvp@amazon.com>
 Date: Tue, 21 Sep 2021 08:57:56 -0700
-Subject: [PATCH 06/30] add support for registry mirror for bottlerocket
+Subject: [PATCH 06/33] add support for registry mirror for bottlerocket
 
 ---
  api/v1alpha2/zz_generated.conversion.go       | 1007 +++++++++++++++++
@@ -1076,10 +1076,10 @@ index 11aa737a7..9676d26a8 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index f62440f04..2d7edbb00 100644
+index c9a3c1cea..15413b5dc 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -348,6 +348,18 @@ spec:
+@@ -349,6 +349,18 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -1098,7 +1098,7 @@ index f62440f04..2d7edbb00 100644
                    scheduler:
                      description: Scheduler contains extra settings for the scheduler
                        control plane component
-@@ -917,6 +929,18 @@ spec:
+@@ -918,6 +930,18 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -1117,7 +1117,7 @@ index f62440f04..2d7edbb00 100644
                  type: object
                mounts:
                  description: Mounts specifies a list of mount points to be setup.
-@@ -2420,6 +2444,18 @@ spec:
+@@ -2422,6 +2446,18 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -1136,7 +1136,7 @@ index f62440f04..2d7edbb00 100644
                    scheduler:
                      description: Scheduler contains extra settings for the scheduler
                        control plane component
-@@ -3083,6 +3119,18 @@ spec:
+@@ -3085,6 +3121,18 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -1156,10 +1156,10 @@ index f62440f04..2d7edbb00 100644
                      description: SkipPhases is a list of phases to skip during command
                        execution. The list of phases can be obtained with the "kubeadm
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 7ea88b30a..3c038ca69 100644
+index 348bc8362..b4f286dd6 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -372,6 +372,19 @@ spec:
+@@ -373,6 +373,19 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -1179,7 +1179,7 @@ index 7ea88b30a..3c038ca69 100644
                            scheduler:
                              description: Scheduler contains extra settings for the
                                scheduler control plane component
-@@ -976,6 +989,19 @@ spec:
+@@ -977,6 +990,19 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -1199,7 +1199,7 @@ index 7ea88b30a..3c038ca69 100644
                          type: object
                        mounts:
                          description: Mounts specifies a list of mount points to be
-@@ -2455,6 +2481,19 @@ spec:
+@@ -2457,6 +2483,19 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -1219,7 +1219,7 @@ index 7ea88b30a..3c038ca69 100644
                            scheduler:
                              description: Scheduler contains extra settings for the
                                scheduler control plane component
-@@ -3166,6 +3205,19 @@ spec:
+@@ -3168,6 +3207,19 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -1445,10 +1445,10 @@ index e924a4a4b..71e769f0f 100644
 +	return out
 +}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 5ecc2a7ac..02ed12715 100644
+index f7418dfa5..a552a9b25 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -432,6 +432,19 @@ spec:
+@@ -433,6 +433,19 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -1468,7 +1468,7 @@ index 5ecc2a7ac..02ed12715 100644
                        scheduler:
                          description: Scheduler contains extra settings for the scheduler
                            control plane component
-@@ -1023,6 +1036,19 @@ spec:
+@@ -1024,6 +1037,19 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -1488,7 +1488,7 @@ index 5ecc2a7ac..02ed12715 100644
                      type: object
                    mounts:
                      description: Mounts specifies a list of mount points to be setup.
-@@ -2888,6 +2914,19 @@ spec:
+@@ -2890,6 +2916,19 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -1508,7 +1508,7 @@ index 5ecc2a7ac..02ed12715 100644
                        scheduler:
                          description: Scheduler contains extra settings for the scheduler
                            control plane component
-@@ -3581,6 +3620,19 @@ spec:
+@@ -3583,6 +3622,19 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -1529,10 +1529,10 @@ index 5ecc2a7ac..02ed12715 100644
                          description: SkipPhases is a list of phases to skip during
                            command execution. The list of phases can be obtained with
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 783336527..14f83216d 100644
+index 5a1623e9f..5410d4145 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -1586,6 +1586,19 @@ spec:
+@@ -1587,6 +1587,19 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -1552,7 +1552,7 @@ index 783336527..14f83216d 100644
                                scheduler:
                                  description: Scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -2328,6 +2341,19 @@ spec:
+@@ -2329,6 +2342,19 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -1573,5 +1573,5 @@ index 783336527..14f83216d 100644
                                  description: SkipPhases is a list of phases to skip
                                    during command execution. The list of phases can
 -- 
-2.34.1
+2.39.2
 

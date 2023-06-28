@@ -6,8 +6,8 @@ ARG TARGETOS
 
 COPY _output/files/cert-manager-cainjector /
 COPY _output/bin/cert-manager/$TARGETOS-$TARGETARCH/cert-manager-cainjector /usr/bin/cainjector
-COPY _output/LICENSES /LICENSES
-COPY ATTRIBUTION.txt /ATTRIBUTION.txt
+COPY _output/cert-manager-cainjector/LICENSES /LICENSES
+COPY CERT_MANAGER_CAINJECTOR_ATTRIBUTION.txt /ATTRIBUTION.txt
 
 USER 1000
 ENTRYPOINT ["/usr/bin/cainjector"]

@@ -25,8 +25,8 @@ BINARY_PLATFORMS="$5"
 TAR_PATH="$6"
 GIT_HASH="$7"
 
-LICENSES_PATH="$OUTPUT_DIR/LICENSES"
-ATTRIBUTION_PATH="$OUTPUT_DIR/ATTRIBUTION.txt"
+LICENSES_PATHS=($(find $OUTPUT_DIR -type d -name "LICENSES"))
+ATTRIBUTION_PATHS=($(find $OUTPUT_DIR -type f -name "ATTRIBUTION.txt"))
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
@@ -40,8 +40,12 @@ function build::simple::tarball() {
     ARCH="$(cut -d '/' -f2 <<< ${platform})"
     TAR_FILE="${TAR_FILE_PREFIX}-${OS}-${ARCH}-${TAG}.tar.gz"
 
-    build::common::echo_and_run cp -rf $LICENSES_PATH ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/ 
-    build::common::echo_and_run cp $ATTRIBUTION_PATH ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/ 
+    for path in "${LICENSES_PATHS[@]}"; do
+      build::common::echo_and_run cp -rf $path ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/
+    done
+    for path in "${ATTRIBUTION_PATHS[@]}"; do
+      build::common::echo_and_run cp $path ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/
+    done
     build::common::create_tarball ${TAR_PATH}/${TAR_FILE} ${OUTPUT_BIN_DIR}/${OS}-${ARCH} .
   done
   echo $GIT_HASH > $TAR_PATH/githash
