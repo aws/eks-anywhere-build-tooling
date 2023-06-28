@@ -1,7 +1,7 @@
-From 0de1838fb631aff5ba0292e64e9bbc095d91a6bd Mon Sep 17 00:00:00 2001
+From c6be4ee2bee26d4385054c18654d91d941431a42 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 02/30] Add unstacked etcd support
+Subject: [PATCH 02/33] Add unstacked etcd support
 
 Unstacked etcd: API and config changes
 
@@ -94,7 +94,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  25 files changed, 810 insertions(+), 20 deletions(-)
 
 diff --git a/api/v1alpha3/cluster_types.go b/api/v1alpha3/cluster_types.go
-index 259eba198..1ab45528a 100644
+index 66dd8458a..503de063a 100644
 --- a/api/v1alpha3/cluster_types.go
 +++ b/api/v1alpha3/cluster_types.go
 @@ -55,6 +55,11 @@ type ClusterSpec struct {
@@ -158,7 +158,7 @@ index 3c0b6195e..4120ef162 100644
 +	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
 +)
 diff --git a/api/v1alpha3/machine_types.go b/api/v1alpha3/machine_types.go
-index 6d634181c..ce86caa5f 100644
+index 9b4fa2a13..5b62c87cf 100644
 --- a/api/v1alpha3/machine_types.go
 +++ b/api/v1alpha3/machine_types.go
 @@ -30,7 +30,10 @@ const (
@@ -174,7 +174,7 @@ index 6d634181c..ce86caa5f 100644
  
  	// MachineSetLabelName is the label set on machines if they're controlled by MachineSet.
 diff --git a/api/v1alpha4/cluster_types.go b/api/v1alpha4/cluster_types.go
-index 68fe23414..26020c365 100644
+index 254b2874b..00d19fac8 100644
 --- a/api/v1alpha4/cluster_types.go
 +++ b/api/v1alpha4/cluster_types.go
 @@ -56,6 +56,11 @@ type ClusterSpec struct {
@@ -306,10 +306,10 @@ index 6d88b5891..c65e8691a 100644
  		}
  	}
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 1db2d4d4f..c5d92a3cf 100644
+index 2ede29e3c..85dddbba1 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -168,6 +168,45 @@ spec:
+@@ -169,6 +169,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -355,7 +355,7 @@ index 1db2d4d4f..c5d92a3cf 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -260,6 +299,15 @@ spec:
+@@ -261,6 +300,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -371,7 +371,7 @@ index 1db2d4d4f..c5d92a3cf 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -430,6 +478,45 @@ spec:
+@@ -432,6 +480,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -417,7 +417,7 @@ index 1db2d4d4f..c5d92a3cf 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -647,6 +734,15 @@ spec:
+@@ -649,6 +736,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -433,7 +433,7 @@ index 1db2d4d4f..c5d92a3cf 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -820,6 +916,45 @@ spec:
+@@ -822,6 +918,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -479,7 +479,7 @@ index 1db2d4d4f..c5d92a3cf 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -1475,6 +1610,15 @@ spec:
+@@ -1477,6 +1612,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -569,7 +569,7 @@ index ec2334e96..5c7e70401 100644
 +  - update
 +  - watch
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index 882073d27..97ac5bde7 100644
+index b9ca684b8..277cd2e09 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -19,6 +19,9 @@ package controllers
@@ -631,7 +631,7 @@ index 882073d27..97ac5bde7 100644
  	// Add finalizer first if not exist to avoid the race condition between init and delete
  	if !controllerutil.ContainsFinalizer(kcp, controlplanev1.KubeadmControlPlaneFinalizer) {
  		controllerutil.AddFinalizer(kcp, controlplanev1.KubeadmControlPlaneFinalizer)
-@@ -462,6 +493,15 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, clu
+@@ -465,6 +496,15 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, clu
  	}
  	ownedMachines := allMachines.Filter(collections.OwnedMachines(kcp))
  
@@ -1121,10 +1121,10 @@ index 2b5721693..9d13518f7 100644
  
  	g.Expect(actual).To(Equal(expected))
 diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 796b6c764..2f5b4d66e 100644
+index 2df5c4da4..b52daff5c 100644
 --- a/internal/controllers/machine/machine_controller_noderef.go
 +++ b/internal/controllers/machine/machine_controller_noderef.go
-@@ -57,6 +57,11 @@ func (r *Reconciler) reconcileNode(ctx context.Context, cluster *clusterv1.Clust
+@@ -56,6 +56,11 @@ func (r *Reconciler) reconcileNode(ctx context.Context, cluster *clusterv1.Clust
  		return ctrl.Result{}, nil
  	}
  
@@ -1133,7 +1133,7 @@ index 796b6c764..2f5b4d66e 100644
 +		return ctrl.Result{}, nil
 +	}
 +
- 	providerID, err := noderefutil.NewProviderID(*machine.Spec.ProviderID)
+ 	remoteClient, err := r.Tracker.GetClient(ctx, util.ObjectKey(cluster))
  	if err != nil {
  		return ctrl.Result{}, err
 diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
@@ -1419,5 +1419,5 @@ index e6737ab7a..00da78f90 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.34.1
+2.39.2
 
