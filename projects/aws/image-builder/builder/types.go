@@ -49,18 +49,20 @@ type VsphereConfig struct {
 	Password           string `json:"password"`
 	IsoConfig
 	RhelConfig
+	ExtraPackagesConfig
 }
 
 type BaremetalConfig struct {
-	ExtraRpms string `json:"extra_rpms,omitempty"`
 	IsoConfig
 	RhelConfig
+	ExtraPackagesConfig
 }
 
 type CloudstackConfig struct {
 	AnsibleUserVars string `json:"ansible_user_vars"`
 	IsoConfig
 	RhelConfig
+	ExtraPackagesConfig
 }
 
 type IsoConfig struct {
@@ -84,6 +86,7 @@ type NutanixConfig struct {
 	NutanixUserName   string `json:"nutanix_username"`
 	NutanixPassword   string `json:"nutanix_password"`
 	NutanixSubnetName string `json:"nutanix_subnet_name"`
+	ExtraPackagesConfig
 }
 
 type AMIConfig struct {
@@ -101,4 +104,11 @@ type AMIConfig struct {
 	SubnetID            string   `json:"subnet_id"`
 	VolumeSize          string   `json:"volume_size"`
 	VolumeType          string   `json:"volume_type"`
+	ExtraPackagesConfig
+}
+
+type ExtraPackagesConfig struct {
+	ExtraDebs  string `json:"extra_debs,omitempty"`
+	ExtraRepos string `json:"extra_repos,omitempty"`
+	ExtraRpms  string `json:"extra_rpms,omitempty"`
 }
