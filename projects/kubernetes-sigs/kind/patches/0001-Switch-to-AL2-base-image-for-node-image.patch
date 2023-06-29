@@ -1,15 +1,15 @@
-From 4ab6d004353eb6d717e4904b7eeeeec14f28a8ce Mon Sep 17 00:00:00 2001
+From fc6ed013f61ce370ea9bb89d972c70acae247aa9 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 29 Jun 2023 00:56:53 -0700
 Subject: [PATCH 1/3] Switch to AL2 base image for node image
 
 ---
- images/base/Dockerfile                        | 242 +++++++-----------
+ images/base/Dockerfile                        | 231 +++++++-----------
  images/base/files/usr/local/bin/clean-install |  10 +-
- 2 files changed, 100 insertions(+), 152 deletions(-)
+ 2 files changed, 99 insertions(+), 142 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index eb3f95ad..97be4110 100644
+index eb3f95ad..0ab8ab87 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -17,11 +17,27 @@
@@ -52,41 +52,31 @@ index eb3f95ad..97be4110 100644
 -      conntrack iptables iproute2 ethtool util-linux mount ebtables kmod \
 -      libseccomp2 pigz fuse-overlayfs \
 -      nfs-common open-iscsi \
--      bash ca-certificates curl jq procps \
-+      conntrack iptables iproute ethtool socat util-linux ebtables kmod \
++      conntrack iptables iproute ethtool util-linux ebtables kmod \
 +      libseccomp pigz \
-+      bash ca-certificates curl rsync \
 +      nfs-utils \
-+      containerd which tar procps hostname jq lockdev sudo \
+       bash ca-certificates curl jq procps \
++      containerd  hostname lockdev rsync sudo tar which \
      && find /lib/systemd/system/sysinit.target.wants/ -name "systemd-tmpfiles-setup.service" -delete \
      && rm -f /lib/systemd/system/multi-user.target.wants/* \
      && rm -f /etc/systemd/system/*.wants/* \
-@@ -82,150 +99,83 @@ RUN echo "Installing Packages ..." \
-     && rm -f /lib/systemd/system/sockets.target.wants/*udev* \
+@@ -83,148 +100,90 @@ RUN echo "Installing Packages ..." \
      && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
      && rm -f /lib/systemd/system/basic.target.wants/* \
--    && echo "ReadKMsg=no" >> /etc/systemd/journald.conf \
+     && echo "ReadKMsg=no" >> /etc/systemd/journald.conf \
 -    && ln -s "$(which systemd)" /sbin/init
++    # already set on al23
++    # && ln -s "$(which systemd)" /sbin/init    
 +    # avoid runaway agetty processes most likely due to al2 being based on older centos 7
-+    && systemctl mask getty@tty1.service \
-+    && echo "ReadKMsg=no" >> /etc/systemd/journald.conf
++    # leaving for now, but al23 may not be affected by this issue
++    && systemctl mask getty@tty1.service
++    
  
--RUN echo "Enabling services ... " \
--    && systemctl enable kubelet.service \
-+RUN echo "Enabling kubelet ... " \
-+    && systemctl enable kubelet.service
-+
-+RUN echo "Enabling containerd ..." \
-+    && ctr oci spec \
-+        | jq '.hooks.createContainer[.hooks.createContainer| length] |= . + {"path": "/usr/local/bin/mount-product-files"}' \
-+        | jq 'del(.process.rlimits)' \
-+        > /etc/containerd/cri-base.json \
-+    && containerd --version \
-+    && runc --version \
+ RUN echo "Enabling services ... " \
+     && systemctl enable kubelet.service \
      && systemctl enable containerd.service \
--    && systemctl enable undo-mount-hacks.service
-+    && cp /usr/lib/systemd/system/containerd.service /etc/systemd/system/containerd.service
-+
+     && systemctl enable undo-mount-hacks.service
+ 
 +RUN echo "Installing crictl ..." \   
 +    && curl -sSL --retry 5 --output /tmp/crictl.${TARGETARCH}.tgz "${CRICTL_URL}" \
 +    && echo "$(curl $CRICTL_SHA256SUM_URL | cut -d ' ' -f1)  /tmp/crictl.${TARGETARCH}.tgz" | tee /tmp/crictl.sha256 \
@@ -94,7 +84,7 @@ index eb3f95ad..97be4110 100644
 +    && rm -f /tmp/crictl.sha256 \
 +    && tar -C /usr/local/bin -xzvf /tmp/crictl.${TARGETARCH}.tgz \
 +    && rm -rf /tmp/crictl.${TARGETARCH}.tgz 
- 
++
  RUN echo "Ensuring /etc/kubernetes/manifests" \
      && mkdir -p /etc/kubernetes/manifests
  
@@ -104,31 +94,7 @@ index eb3f95ad..97be4110 100644
 -# platform and only the files needed for building
 -# We will copy the built binaries from later stages to the final stage(s)
 -FROM --platform=$BUILDPLATFORM $BASE_IMAGE as go-build
-+RUN echo "Adjusting systemd-tmpfiles timer" \
-+    && sed -i /usr/lib/systemd/system/systemd-tmpfiles-clean.timer -e 's#OnBootSec=.*#OnBootSec=1min#'
-+
-+# These targets are basing off the "pushed" verison of the image above which is BUILDER_IMAGE
-+# the final base will be eks-distro-base, with the contents from the above copied
-+# into it to simulate "scratch" but from one of standard bases
-+
-+FROM $BUILDER_IMAGE as base-versioned-amd64
-+
-+ARG CNI_PLUGINS_AMD64_URL
-+ARG CNI_PLUGINS_AMD64_SHA256SUM
-+ARG CNI_PLUGINS_URL=${CNI_PLUGINS_AMD64_URL}
-+ARG CNI_PLUGINS_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM}
-+
-+
-+FROM $BUILDER_IMAGE as base-versioned-arm64
-+
-+ARG CNI_PLUGINS_ARM64_URL
-+ARG CNI_PLUGINS_ARM64_SHA256SUM
-+ARG CNI_PLUGINS_URL=${CNI_PLUGINS_ARM64_URL}
-+ARG CNI_PLUGINS_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM}
-+
-+FROM base-versioned-$TARGETARCH as base-versioned-intermediate
-+
- COPY --chmod=0755 files/usr/local/bin/* /usr/local/bin/
+-COPY --chmod=0755 files/usr/local/bin/* /usr/local/bin/
 -COPY --chmod=0755 scripts/third_party/gimme/gimme /usr/local/bin/
 -COPY --chmod=0755 scripts/target-cc /usr/local/bin/
 -# tools needed at build-time only
@@ -226,11 +192,16 @@ index eb3f95ad..97be4110 100644
 -COPY --from=build-containerd /containerd/bin/containerd /usr/local/bin/
 -COPY --from=build-containerd /containerd/bin/ctr /usr/local/bin/
 -COPY --from=build-containerd /containerd/bin/containerd-shim-runc-v2 /usr/local/bin/
--RUN ctr oci spec \
--        | jq '.hooks.createContainer[.hooks.createContainer| length] |= . + {"path": "/kind/bin/mount-product-files.sh"}' \
--        | jq 'del(.process.rlimits)' \
--        > /etc/containerd/cri-base.json \
--    && containerd --version
++# this was removed upstream when they switched to debian
++# keeping since this unit exists in al23
++RUN echo "Adjusting systemd-tmpfiles timer" \
++    && sed -i /usr/lib/systemd/system/systemd-tmpfiles-clean.timer -e 's#OnBootSec=.*#OnBootSec=1min#'
++
+ RUN ctr oci spec \
+         | jq '.hooks.createContainer[.hooks.createContainer| length] |= . + {"path": "/kind/bin/mount-product-files.sh"}' \
+         | jq 'del(.process.rlimits)' \
+         > /etc/containerd/cri-base.json \
+     && containerd --version
 -COPY --from=build-containerd /_LICENSES/* /LICENSES/
 -# copy over runc build and install
 -COPY --from=build-runc /runc/runc /usr/local/sbin/runc
@@ -254,7 +225,32 @@ index eb3f95ad..97be4110 100644
 -FROM scratch
 -COPY --from=build / /
 -# add metadata, must be done after the squashing
--# first tell systemd that it is in docker (it will check for the container env)
++
++# force use of al23 provided containerd.service config
++RUN cp /usr/lib/systemd/system/containerd.service /etc/systemd/system/containerd.service
++
++# These targets are basing off the "pushed" verison of the image above which is BUILDER_IMAGE
++# the final base will be eks-distro-base, with the contents from the above copied
++# into it to simulate "scratch" but from one of standard bases
++
++FROM $BUILDER_IMAGE as base-versioned-amd64
++
++ARG CNI_PLUGINS_AMD64_URL
++ARG CNI_PLUGINS_AMD64_SHA256SUM
++ARG CNI_PLUGINS_URL=${CNI_PLUGINS_AMD64_URL}
++ARG CNI_PLUGINS_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM}
++
++
++FROM $BUILDER_IMAGE as base-versioned-arm64
++
++ARG CNI_PLUGINS_ARM64_URL
++ARG CNI_PLUGINS_ARM64_SHA256SUM
++ARG CNI_PLUGINS_URL=${CNI_PLUGINS_ARM64_URL}
++ARG CNI_PLUGINS_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM}
++
++FROM base-versioned-$TARGETARCH as base-versioned-intermediate
++
++COPY --chmod=0755 files/usr/local/bin/* /usr/local/bin/
 +COPY --chmod=0644 files/etc/* /etc
 +
 +RUN echo "Installing CNI plugin binaries ..." \
@@ -278,10 +274,11 @@ index eb3f95ad..97be4110 100644
 +
 +COPY --from=base-versioned-intermediate / /
 +
-+# tell systemd that it is in docker (it will check for the container env)
++
++
+ # first tell systemd that it is in docker (it will check for the container env)
  # https://systemd.io/CONTAINER_INTERFACE/
  ENV container docker
- # systemd exits on SIGRTMIN+3, not SIGTERM (which re-executes it)
 diff --git a/images/base/files/usr/local/bin/clean-install b/images/base/files/usr/local/bin/clean-install
 index b0b861c3..f1d714a6 100755
 --- a/images/base/files/usr/local/bin/clean-install
@@ -309,5 +306,5 @@ index b0b861c3..f1d714a6 100755
 -   /usr/share/local/*
 +   /usr/share/local/* || true
 -- 
-2.39.2
+2.40.1
 
