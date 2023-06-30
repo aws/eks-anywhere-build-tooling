@@ -167,7 +167,11 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
         exit 1
     fi
 
-    find ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova -type f -name '*.json' | xargs sed -i "s/{{ .HTTPIP }}/$PACKER_HTTP_SERVER_IP/g"
+    SED=sed
+    if [ "$(uname -s)" = "Darwin" ]; then
+      SED=gsed
+    fi
+    find ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova -type f -name '*.json' | xargs $SED -i "s/{{ .HTTPIP }}/$PACKER_HTTP_SERVER_IP/g"
 fi
 
 # If the image format is AMI and our Packer config specifies a non-gp3 volume, then
