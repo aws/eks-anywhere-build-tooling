@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 const (
@@ -65,7 +64,7 @@ func (b *BuildOptions) BuildImage() {
 	var outputImageGlob []string
 	commandEnvVars := []string{fmt.Sprintf("RELEASE_BRANCH=%s", b.ReleaseChannel)}
 
-	log.Printf("Initiating Image Build\n Image OS: %s\n Hypervisor: %s\n", b.Os, b.Hypervisor)
+	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n", b.Os, b.OsVersion, b.Hypervisor)
 	if b.Hypervisor == VSphere {
 		// Read and set the vsphere connection data
 		vsphereConfigData, err := json.Marshal(b.VsphereConfig)
@@ -80,9 +79,9 @@ func (b *BuildOptions) BuildImage() {
 		var buildCommand string
 		switch b.Os {
 		case Ubuntu:
-			buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-2004", imageBuilderProjectPath)
+			buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
 		case RedHat:
-			buildCommand = fmt.Sprintf("make -C %s local-build-ova-rhel-8", imageBuilderProjectPath)
+			buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("RHSM_USERNAME=%s", b.VsphereConfig.RhelUsername),
 				fmt.Sprintf("RHSM_PASSWORD=%s", b.VsphereConfig.RhelPassword),
@@ -115,43 +114,19 @@ func (b *BuildOptions) BuildImage() {
 			}
 		}
 
-		if b.Os == Ubuntu {
-			// Patch firmware config for tool
-			upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
-			if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
-				log.Fatalf("Error executing upstream patch command")
-			}
-
-			ubuntuEfiConfigPath := filepath.Join(upstreamImageBuilderProjectPath, "packer/raw/raw-ubuntu-2004-efi.json")
-			ubuntuEfiConfigFileData, err := os.ReadFile(ubuntuEfiConfigPath)
-			if err != nil {
-				log.Fatalf("Error reading ubuntu efi config file: %v", err)
-			}
-			ubuntuEfiConfigFileString := string(ubuntuEfiConfigFileData)
-			// This comes from our patch for AL2 on CodeBuild Image Builder
-			ubuntuPatchedEfiConfig := strings.ReplaceAll(ubuntuEfiConfigFileString, "/usr/share/edk2/ovmf/OVMF_CODE.fd", "OVMF.fd")
-			if err := os.Remove(ubuntuEfiConfigPath); err != nil {
-				log.Fatalf("Error removing the old ubuntu efi config file: %v", err)
-			}
-			if err := os.WriteFile(ubuntuEfiConfigPath, []byte(ubuntuPatchedEfiConfig), 0o644); err != nil {
-				log.Fatalf("Error writing the new ubuntu efi config file: %v", err)
-			}
-			log.Println("Patched upstream firmware config file")
-		}
-
 		var buildCommand string
 		switch b.Os {
 		case Ubuntu:
-			buildCommand = fmt.Sprintf("make -C %s local-build-raw-ubuntu-2004-efi", imageBuilderProjectPath)
+			buildCommand = fmt.Sprintf("make -C %s local-build-raw-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
 		case RedHat:
-			buildCommand = fmt.Sprintf("make -C %s local-build-raw-rhel-8", imageBuilderProjectPath)
+			buildCommand = fmt.Sprintf("make -C %s local-build-raw-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("RHSM_USERNAME=%s", b.BaremetalConfig.RhelUsername),
 				fmt.Sprintf("RHSM_PASSWORD=%s", b.BaremetalConfig.RhelPassword),
 			)
 		}
 		if b.BaremetalConfig != nil {
-			commandEnvVars = append(commandEnvVars, fmt.Sprintf("PACKER_TYPE_VAR_FILES=%s", baremetalConfigFile))
+			commandEnvVars = append(commandEnvVars, fmt.Sprintf("PACKER_RAW_VAR_FILES=%s", baremetalConfigFile))
 		}
 
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
@@ -182,7 +157,7 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error writing nutanix config file to packer: %v", err)
 		}
 
-		buildCommand := fmt.Sprintf("make -C %s local-build-nutanix-ubuntu-2004", imageBuilderProjectPath)
+		buildCommand := fmt.Sprintf("make -C %s local-build-nutanix-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for nutanix hypervisor: %v", err)
@@ -211,14 +186,14 @@ func (b *BuildOptions) BuildImage() {
 		switch b.Os {
 		case RedHat:
 			outputImageGlobPattern = "output/rhel-*/rhel-*"
-			buildCommand = fmt.Sprintf("make -C %s local-build-qemu-rhel-8", imageBuilderProjectPath)
+			buildCommand = fmt.Sprintf("make -C %s local-build-cloudstack-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("RHSM_USERNAME=%s", b.CloudstackConfig.RhelUsername),
 				fmt.Sprintf("RHSM_PASSWORD=%s", b.CloudstackConfig.RhelPassword),
 			)
 		}
 		if b.CloudstackConfig != nil {
-			commandEnvVars = append(commandEnvVars, fmt.Sprintf("PACKER_TYPE_VAR_FILES=%s", cloudstackConfigFile))
+			commandEnvVars = append(commandEnvVars, fmt.Sprintf("PACKER_CLOUDSTACK_VAR_FILES=%s", cloudstackConfigFile))
 		}
 
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
@@ -252,7 +227,7 @@ func (b *BuildOptions) BuildImage() {
 			}
 		}
 
-		buildCommand := fmt.Sprintf("make -C %s local-build-ami-ubuntu-2004", imageBuilderProjectPath)
+		buildCommand := fmt.Sprintf("make -C %s local-build-ami-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for AMI hypervisor: %v", err)

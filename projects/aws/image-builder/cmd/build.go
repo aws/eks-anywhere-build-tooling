@@ -40,13 +40,14 @@ var buildCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().StringVar(&bo.Os, "os", "", "Operating system to use for EKS-A node image")
+	buildCmd.Flags().StringVar(&bo.OsVersion, "os-version", "", "Operating system version to use for EKS-A node image. Can be 20.04 or 22.04 for Ubuntu or 8 for Redhat. ")
 	buildCmd.Flags().StringVar(&bo.Hypervisor, "hypervisor", "", "Target hypervisor EKS-A node image")
 	buildCmd.Flags().StringVar(&baremetalConfigFile, "baremetal-config", "", "Path to Baremetal Config file")
 	buildCmd.Flags().StringVar(&vSphereConfigFile, "vsphere-config", "", "Path to vSphere Config file")
 	buildCmd.Flags().StringVar(&nutanixConfigFile, "nutanix-config", "", "Path to Nutanix Config file")
 	buildCmd.Flags().StringVar(&cloudstackConfigFile, "cloudstack-config", "", "Path to CloudStack Config file")
 	buildCmd.Flags().StringVar(&amiConfigFile, "ami-config", "", "Path to AMI Config file")
-	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-23", "EKS-D Release channel for node image. Can be 1-20, 1-21, 1-22 or 1-23")
+	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-27", "EKS-D Release channel for node image. Can be 1-23, 1-24, 1-25, 1-26 or 1-27")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
 		log.Fatalf("Error marking flag as required: %v", err)
@@ -72,6 +73,20 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		log.Fatal(err.Error())
 	}
 
+	if bo.Os == builder.Ubuntu && bo.OsVersion == "" {
+		// maintain previous default
+		bo.OsVersion = "20.04"
+	}
+
+	if bo.Os == builder.RedHat && bo.OsVersion == "" {
+		// maintain previous default
+		bo.OsVersion = "8"
+	}
+
+	if err = validateOSVersion(bo.Os, bo.OsVersion); err != nil {
+		log.Fatal(err.Error())
+	}
+
 	configPath := ""
 	switch bo.Hypervisor {
 	case builder.VSphere:
@@ -87,6 +102,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 	}
 	bo.Os = strings.ToLower(bo.Os)
 	bo.Hypervisor = strings.ToLower(bo.Hypervisor)
+
+	if bo.OsVersion != "" {
+		// From this point forward use 2004 instead of 20.04 for Ubuntu versions to upstream image-builder
+		bo.OsVersion = strings.ReplaceAll(bo.OsVersion, ".", "")
+	}
 
 	if configPath == "" {
 		if bo.Hypervisor == builder.VSphere ||
@@ -158,8 +178,13 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			}
 		case builder.AMI:
 			// Default configuration for AMI builds
+			amiFilter := builder.DefaultUbuntu2004AMIFilterName
+			if bo.OsVersion == "2204" {
+				amiFilter = builder.DefaultUbuntu2204AMIFilterName
+			}
+
 			amiConfig := &builder.AMIConfig{
-				AMIFilterName:       builder.DefaultUbuntuAMIFilterName,
+				AMIFilterName:       amiFilter,
 				AMIFilterOwners:     builder.DefaultUbuntuAMIFilterOwners,
 				AMIRegions:          builder.DefaultAMIBuildRegion,
 				AWSRegion:           builder.DefaultAMIBuildRegion,
@@ -234,4 +259,20 @@ func validateSupportedHypervisors(hypervisor string) error {
 		return nil
 	}
 	return fmt.Errorf("%s is not supported yet. Please select one of %s", hypervisor, strings.Join(builder.SupportedHypervisors, ","))
+}
+
+func validateOSVersion(os string, osVersion string) error {
+	if os != builder.RedHat && os != builder.Ubuntu {
+		return fmt.Errorf("%s is not a supported OS.", os)
+	}
+
+	if os == builder.Ubuntu && !builder.SliceContains(builder.SupportedUbuntuVersions,osVersion) {
+		return fmt.Errorf("%s is not a supported version of Ubuntu. Please select one of %s", osVersion, strings.Join(builder.SupportedUbuntuVersions, ","))
+	}
+
+	if os == builder.RedHat && !builder.SliceContains(builder.SupportedRedHatVersions,osVersion) {
+		return fmt.Errorf("%s is not a supported version of Redhat. Please select one of %s", osVersion, strings.Join(builder.SupportedRedHatVersions, ","))
+	}
+
+	return nil
 }

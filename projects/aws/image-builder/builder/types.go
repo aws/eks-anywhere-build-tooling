@@ -18,8 +18,18 @@ var SupportedHypervisors = []string{
 	AMI,
 }
 
+var SupportedUbuntuVersions = []string{
+	"20.04",
+	"22.04",
+}
+
+var SupportedRedHatVersions = []string{
+	"8",	
+}
+
 type BuildOptions struct {
 	Os               string
+	OsVersion		 string
 	Hypervisor       string
 	VsphereConfig    *VsphereConfig
 	BaremetalConfig  *BaremetalConfig

@@ -40,6 +40,8 @@ clean-extra:
 
 clean: clean-extra
 
+unit-test:
+	go test ./...
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

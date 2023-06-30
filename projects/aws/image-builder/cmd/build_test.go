@@ -93,3 +93,72 @@ func TestValidateOSHypervisorCombinations(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateOSVersionCombinations(t *testing.T) {
+	testCases := []struct {
+		testName     string
+		buildOptions builder.BuildOptions
+		wantErr      string
+	}{
+		{
+			testName: "Ubuntu 20.04",
+			buildOptions: builder.BuildOptions{				
+				Os:         "ubuntu",
+				OsVersion: "20.04",
+			},
+			wantErr: "",
+		},
+		{
+			testName: "Ubuntu 22.04",
+			buildOptions: builder.BuildOptions{				
+				Os:         "ubuntu",
+				OsVersion: "22.04",
+			},			
+			wantErr: "",
+		},
+		{
+			testName: "Ubuntu 24.04",
+			buildOptions: builder.BuildOptions{				
+				Os:         "ubuntu",
+				OsVersion: "24.04",
+			},
+			wantErr: "24.04 is not a supported version of Ubuntu. Please select one of 20.04,22.04",
+		},
+		{
+			testName: "Redhat 8",
+			buildOptions: builder.BuildOptions{				
+				Os:         "redhat",
+				OsVersion: "8",
+			},
+			wantErr: "",
+		},
+		{
+			testName: "Redhat 9",
+			buildOptions: builder.BuildOptions{				
+				Os:         "redhat",
+				OsVersion: "9",
+			},
+			wantErr: "9 is not a supported version of Redhat. Please select one of 8",
+		},
+		{
+			testName: "Rockylinux 1",
+			buildOptions: builder.BuildOptions{				
+				Os:         "rocky",
+				OsVersion: "1",
+			},
+			wantErr: "rocky is not a supported OS.",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.testName, func(t *testing.T) {
+			err := validateOSVersion(tt.buildOptions.Os, tt.buildOptions.OsVersion)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)				
+			} else {
+				assert.NotNil(t, err)
+				assert.Equal(t, tt.wantErr, err.Error())
+			}
+		})
+	}
+}
