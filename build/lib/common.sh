@@ -413,23 +413,3 @@ function build::jq::update_in_place() {
 
   cat $json_file | jq -S ''"$jq_query"'' > $json_file.tmp && mv $json_file.tmp $json_file
 }
-
-function build::common::copy_if_source_destination_different() {
-  local source=$1
-  local destination=$2
-
-  source_inode=$(stat -c %i $source)
-  destination_inode=""
-  if [ -d $destination ] && [ -e $destination/$(basename $source) ]; then
-    destination_inode=$(stat -c %i $destination/$(basename $source))
-  elif [ -f $destination ] && [ -e $destination ]; then
-    destination_inode=$(stat -c %i $destination)
-  fi
-
-  if [ -n "$destination_inode" ] && [ "$source_inode" = "$destination_inode" ]; then
-    echo "Source and destination are the same file"
-    exit 0
-  fi
-
-  cp -rf $source $destination
-}
