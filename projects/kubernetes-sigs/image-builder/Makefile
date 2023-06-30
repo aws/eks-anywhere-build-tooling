@@ -171,7 +171,8 @@ RELEASE_TARGETS=validate-supported-image-all
 ifeq ($(IMAGE_OS),bottlerocket)
 	RELEASE_TARGETS+= upload-bottlerocket-1-$(IMAGE_FORMAT)
 else
-	RELEASE_TARGETS+= release-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER) upload-artifacts-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)
+# for ami builds they are automatically uploaded during the ami export to s3 process, skip the upload target
+	RELEASE_TARGETS+= release-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER) $(if $(filter ami,$(IMAGE_FORMAT)),,upload-artifacts-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER))
 endif
 
 #####################################################################
@@ -292,7 +293,7 @@ release-ami-%: EXPORT_AMI_BUCKET?=$(ARTIFACTS_BUCKET)
 release-ami-%: AMI_S3_DST=$(EXPORT_AMI_BUCKET)/$(ARTIFACTS_UPLOAD_PATH)/ami/$(IMAGE_OS_DIR)
 release-ami-%: EXPORT_AMI_DST=$(AMI_S3_DST)/$(GIT_HASH)
 release-ami-%: LATEST_AMI_S3_URL=$(AMI_S3_DST)/$(LATEST)/ubuntu.raw
-release-ami-%: validate-supported-image-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,)
+release-ami-%: validate-supported-image-% setup-ami-share
 	@echo -e $(call TARGET_START_LOG)
 	build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
 	build/export-ami-to-s3.sh $(RELEASE_BRANCH) $(MANIFEST_OUTPUT) raw $(EXPORT_AMI_DST) $(LATEST_AMI_S3_URL)
