@@ -23,13 +23,13 @@ DEFAULT_NETWORK=$(ip -br link | grep $DEFAULT_MAC | awk '{print $1}')
 
 # configure DNI
 DNI_COUNT=$(grep -E "dniCount" $NETWORK_CONFIG_PATH | awk '{print $2}')
-DNI_LIST=$(ip -br link | grep -Ev "$DEFAULT_NETWORK|lo" | awk '{print $1}')
+DNI_LIST=$(ip -br link | grep -Ev "$DEFAULT_NETWORK|lo" | awk '{print $1}' | sed 's/^\([^0-9]*\)\([0-9][0-9]*\)/\2   \1\2/' | sort -n | awk '{print $2}')
 while [ -z "$DNI_LIST" ] || [[ $(echo "$DNI_LIST" | wc -l) != "$DNI_COUNT" ]]
 do
   # creating DNI is a separate api call, which has some delays
   log::info "DNI is not ready, retrying"
   sleep 5
-  DNI_LIST=$(ip -br link | grep -Ev "$DEFAULT_NETWORK|lo" | awk '{print $1}')
+  DNI_LIST=$(ip -br link | grep -Ev "$DEFAULT_NETWORK|lo" | awk '{print $1}' | sed 's/^\([^0-9]*\)\([0-9][0-9]*\)/\2   \1\2/' | sort -n | awk '{print $2}')
 done
 log::info "Using DNI: $DNI_LIST"
 
