@@ -9,8 +9,10 @@ GO_MOD_NAME=github.com/aws/eks-anywhere-packages/
 GO_VAR_PREFIX=pkg/config.
 GO_VARS=version=${GIT_TAG} gitHash=${PROJECT_COMMIT_HASH} buildTime=${TIME}
 EXTRA_GO_LDFLAGS=$(foreach v,$(GO_VARS),-X ${GO_MOD_NAME}${GO_VAR_PREFIX}${v})
-PROJECT_DEPENDENCIES=eksd/kubernetes/client eksa/aws/rolesanywhere-credential-helper eksa/kubernetes/cloud-provider-aws
 
+# cloud-provider-aws build for 1-25 works for all version <= 1.25 and the 1-26 build works for 1.26+
+# including both to avoid needing to make packages controller release branch specific
+PROJECT_DEPENDENCIES=eksd/kubernetes/client eksa/aws/rolesanywhere-credential-helper eksa/kubernetes/cloud-provider-aws/1-25 eksa/kubernetes/cloud-provider-aws/1-26
 
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 GO_MOD_PATHS=. ecrtokenrefresher credentialproviderpackage
