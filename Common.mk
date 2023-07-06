@@ -969,9 +969,9 @@ github-rate-limit-%:
 		GH_PAGER='' gh api rate_limit; \
 	fi
 
-## --------------------------------------
+## ---------------------------------------
 ## Docker Helpers
-## --------------------------------------
+## ---------------------------------------
 # $1 - target
 define RUN_IN_DOCKER_TARGET
 .PHONY: run-$(1)-in-docker
