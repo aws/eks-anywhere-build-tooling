@@ -41,10 +41,10 @@ function build::simple::tarball() {
     TAR_FILE="${TAR_FILE_PREFIX}-${OS}-${ARCH}-${TAG}.tar.gz"
 
     for path in "${LICENSE_PATHS[@]}"; do
-      build::common::echo_and_run cp -rf $path ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/
+      build::common::echo_and_run build::common::copy_if_source_destination_different $path ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/
     done
     for path in "${ATTRIBUTION_PATHS[@]}"; do
-      build::common::echo_and_run cp $path ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/
+      build::common::echo_and_run build::common::copy_if_source_destination_different $path ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/
     done
     build::common::create_tarball ${TAR_PATH}/${TAR_FILE} ${OUTPUT_BIN_DIR}/${OS}-${ARCH} .
   done
