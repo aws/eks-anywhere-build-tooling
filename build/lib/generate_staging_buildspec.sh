@@ -120,12 +120,18 @@ for project in "${PROJECTS[@]}"; do
                 fi
                 DEP_ORG="$(cut -d/ -f2 <<< $dep)"
                 DEP_REPO="$(cut -d/ -f3 <<< $dep)"
-                DEPEND_ON+="\"${DEP_ORG//-/_}_${DEP_REPO//-/_}\","
+                DEP_RELEASE_BRANCH="$(cut -d/ -f4 <<< $dep)"
 
                 if [ ! -d $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO ]; then
                     echo "Non-existent project dependency: $dep!!!"
                     exit 1
                 fi
+
+                DEP_IDENTIFIER=${DEP_ORG//-/_}_${DEP_REPO//-/_}
+                if [ -n "${DEP_RELEASE_BRANCH}" ]; then
+                    DEP_IDENTIFIER=${DEP_ORG//-/_}_${DEP_REPO//-/_}_${DEP_RELEASE_BRANCH//[-\/]/_}
+                fi
+                DEPEND_ON+="\"${DEP_IDENTIFIER}\","
             done
         fi
 
