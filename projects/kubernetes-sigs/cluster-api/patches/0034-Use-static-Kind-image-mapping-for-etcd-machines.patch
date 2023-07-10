@@ -1,0 +1,123 @@
+From 73fca1316bd5b74e45c215baadb42161743ab7c6 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Sun, 9 Jul 2023 23:06:37 -0700
+Subject: [PATCH 34/34] Use static Kind image mapping for etcd machines
+
+---
+ .../docker/exp/internal/docker/nodepool.go    |  2 +-
+ .../controllers/dockermachine_controller.go   | 12 ++----
+ .../docker/internal/docker/machine.go         | 39 +++++++++++++------
+ 3 files changed, 32 insertions(+), 21 deletions(-)
+
+diff --git a/test/infrastructure/docker/exp/internal/docker/nodepool.go b/test/infrastructure/docker/exp/internal/docker/nodepool.go
+index acf8ee88b..de8d0eb4b 100644
+--- a/test/infrastructure/docker/exp/internal/docker/nodepool.go
++++ b/test/infrastructure/docker/exp/internal/docker/nodepool.go
+@@ -219,7 +219,7 @@ func (np *NodePool) addMachine(ctx context.Context) error {
+ 		}
+ 	}
+ 
+-	if err := externalMachine.Create(ctx, np.dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, np.machinePool.Spec.Template.Spec.Version, labels, np.dockerMachinePool.Spec.Template.ExtraMounts); err != nil {
++	if err := externalMachine.Create(ctx, np.dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, np.machinePool.Spec.Template.Spec.Version, labels, np.dockerMachinePool.Spec.Template.ExtraMounts, false); err != nil {
+ 		return errors.Wrapf(err, "failed to create docker machine with instance name %s", instanceName)
+ 	}
+ 	return nil
+diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
+index 9beedc5af..e31b7b2af 100644
+--- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
++++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
+@@ -252,7 +252,8 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+ 	if !externalMachine.Exists() {
+ 		// NOTE: FailureDomains don't mean much in CAPD since it's all local, but we are setting a label on
+ 		// each container, so we can check placement.
+-		if err := externalMachine.Create(ctx, dockerMachine.Spec.CustomImage, role, machine.Spec.Version, docker.FailureDomainLabel(machine.Spec.FailureDomain), dockerMachine.Spec.ExtraMounts); err != nil {
++		isEtcdMachine := util.IsEtcdMachine(machine)
++		if err := externalMachine.Create(ctx, dockerMachine.Spec.CustomImage, role, machine.Spec.Version, docker.FailureDomainLabel(machine.Spec.FailureDomain), dockerMachine.Spec.ExtraMounts, isEtcdMachine); err != nil {
+ 			return ctrl.Result{}, errors.Wrap(err, "failed to create worker DockerMachine")
+ 		}
+ 	}
+@@ -361,12 +362,12 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+ 	// Machine will never get a node ref as ProviderID is required to set the node ref, so we would get a deadlock.
+ 	if cluster.Spec.ControlPlaneRef != nil &&
+ 		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) &&
+-		!isEtcdMachine(machine) {
++		!util.IsEtcdMachine(machine) {
+ 		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+ 	}
+ 
+ 	// In case of an etcd cluster, there is no concept of kubernetes node. So we can generate the node Provider ID and set it on machine spec directly
+-	if !isEtcdMachine(machine) {
++	if !util.IsEtcdMachine(machine) {
+ 		// Usually a cloud provider will do this, but there is no docker-cloud provider.
+ 		// Requeue if there is an error, as this is likely momentary load balancer
+ 		// state changes during control plane provisioning.
+@@ -534,8 +535,3 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
+ 	}
+ 	return nil
+ }
+-
+-func isEtcdMachine(machine *clusterv1.Machine) bool {
+-	_, ok := machine.Labels[clusterv1.MachineEtcdClusterLabelName]
+-	return ok
+-}
+diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
+index 90caebeff..505739202 100644
+--- a/test/infrastructure/docker/internal/docker/machine.go
++++ b/test/infrastructure/docker/internal/docker/machine.go
+@@ -192,26 +192,41 @@ func (m *Machine) ContainerImage() string {
+ }
+ 
+ // Create creates a docker container hosting a Kubernetes node.
+-func (m *Machine) Create(ctx context.Context, image string, role string, version *string, labels map[string]string, mounts []infrav1.Mount) error {
++func (m *Machine) Create(ctx context.Context, image string, role string, version *string, labels map[string]string, mounts []infrav1.Mount, isEtcdMachine bool) error {
+ 	log := ctrl.LoggerFrom(ctx)
+ 
+ 	// Create if not exists.
+ 	if m.container == nil {
+ 		var err error
+ 
+-		// Get the KindMapping for the target K8s version.
+-		// NOTE: The KindMapping allows to select the most recent kindest/node image available, if any, as well as
+-		// provide info about the mode to be used when starting the kindest/node image itself.
+-		if version == nil {
+-			return errors.New("cannot create a DockerMachine for a nil version")
+-		}
++		var kindMapping kind.Mapping
++
++		// External etcd machines do not set a version field in the machine.Spec.Version.
++		// So we are setting a static Kind Mapping with an arbitrary Kubernetes version
++		// and the latest mode. The arbitrary version does not matter since we pass in a
++		// custom Kind node image which will override the Kind image constructed using the
++		// version
++		if isEtcdMachine {
++			kindMapping = kind.Mapping{
++				KubernetesVersion: semver.MustParse("1.27.3"),
++				Mode: kind.Mode0_20,
++				Image: image,
++			}
++		} else {
++			// Get the KindMapping for the target K8s version.
++			// NOTE: The KindMapping allows to select the most recent kindest/node image available, if any, as well as
++			// provide info about the mode to be used when starting the kindest/node image itself.
++			if version == nil {
++					return errors.New("cannot create a DockerMachine for a nil version")
++			}
+ 
+-		semVer, err := semver.Parse(strings.TrimPrefix(*version, "v"))
+-		if err != nil {
+-			return errors.Wrap(err, "failed to parse DockerMachine version")
+-		}
++			semVer, err := semver.Parse(strings.TrimPrefix(*version, "v"))
++			if err != nil {
++				return errors.Wrap(err, "failed to parse DockerMachine version")
++			}
+ 
+-		kindMapping := kind.GetMapping(semVer, image)
++			kindMapping = kind.GetMapping(semVer, image)
++		}
+ 
+ 		switch role {
+ 		case constants.ControlPlaneNodeRoleValue:
+-- 
+2.39.2
+
