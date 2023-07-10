@@ -21,7 +21,7 @@ function build::eksa_releases::load_bundle_manifest() {
   local -r dev_release=${1-false}
   local -r latest=${2-latest}
   local -r echo=${3-true}
-  oldopt=$-
+  oldopt="$(set +o)"
   set +o nounset
   set +x
 
@@ -37,7 +37,7 @@ function build::eksa_releases::load_bundle_manifest() {
   if $echo; then
     echo "${BUNDLE_MANIFEST[$bundle_manifest_key]}"
   fi
-  set -$oldopt
+  set -vx; eval "$oldopt"
 }
 
 function build::eksa_releases::get_eksa_component_asset_url() {
@@ -71,7 +71,7 @@ function build::eksa_releases::get_eksa_component_asset_path() {
   local -r dev_release=${3-false}
   local -r latest=${4-main}
 
-  oldopt=$-
+  oldopt="$(set +o)"
   set +x
 
   # Get latest bundle manifest url
@@ -82,7 +82,7 @@ function build::eksa_releases::get_eksa_component_asset_path() {
 
   echo "$bundle_manifest" | yq e "$query" -
 
-  set -$oldopt
+  set -vx; eval "$oldopt"
 }
 
 function build::eksa_releases::get_eksa_release_manifest_url() {
