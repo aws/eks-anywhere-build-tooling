@@ -1,5 +1,5 @@
 ## **Source Controller**
-![Version](https://img.shields.io/badge/version-v1.0.0-rc.5-blue)
+![Version](https://img.shields.io/badge/version-v1.0.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiS1ZJY3BFVGg0a21PUmpDVWM2T0pnc2VxV25uYWt5aGJjQktVSURIVnBsd0VBUmljSlUxTVNyeG5pSzhFbXNaMkdiUGdBRWU5L2plMG9ldVFxcHhrYjd3PSIsIml2UGFyYW1ldGVyU3BlYyI6IjgybDlDK2ZHLzJQVmNZNFoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [source-controller](https://github.com/fluxcd/source-controller) is a Kubernetes operator specialized in artifacts acquisition from external sources such as Git, Helm repositories and S3 buckets. The controller watches for `Source` objects in a cluster and acts on them. It was designed with the goal of offloading the sources' registration, authentication, verification and resource-fetching to a dedicated controller.
