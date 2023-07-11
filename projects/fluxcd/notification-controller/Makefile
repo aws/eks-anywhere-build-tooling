@@ -8,7 +8,6 @@ REPO_OWNER=fluxcd
 BINARY_TARGET_FILES=notification-controller
 
 FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/notification-controller/api/LICENSE
-FIX_LICENSES_K0KUBUN_TARGET=$(REPO)/vendor/github.com/k0kubun/pp/LICENSE.txt
 
 BASE_IMAGE_NAME=eks-distro-minimal-base
 
