@@ -20,7 +20,7 @@ func cloneRepo(cloneUrl, destination string) error {
 }
 
 func checkoutRepo(gitRoot, commit string) error {
-	log.Println("Checking out commit %s for build...", commit)
+	log.Printf("Checking out commit %s for build...\n", commit)
 	checkoutRepoCommandSequence := fmt.Sprintf("git -C %s checkout %s", gitRoot, commit)
 	cmd := exec.Command("bash", "-c", checkoutRepoCommandSequence)
 	return execCommandWithStreamOutput(cmd)

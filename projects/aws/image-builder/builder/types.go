@@ -8,6 +8,8 @@ const (
 	Nutanix    string = "nutanix"
 	CloudStack string = "cloudstack"
 	AMI        string = "ami"
+	EFI        string = "efi"
+	BIOS       string = "bios"
 )
 
 var SupportedHypervisors = []string{
@@ -27,6 +29,11 @@ var SupportedRedHatVersions = []string{
 	"8",	
 }
 
+var SupportedFirmwares = []string{
+	BIOS,
+	EFI,
+}
+
 type BuildOptions struct {
 	Os               string
 	OsVersion		 string
@@ -39,6 +46,7 @@ type BuildOptions struct {
 	ReleaseChannel   string
 	artifactsBucket  string
 	Force            bool
+	Firmware         string
 }
 
 type VsphereConfig struct {
