@@ -37,7 +37,7 @@ function build::eksa_releases::load_bundle_manifest() {
   if $echo; then
     echo "${BUNDLE_MANIFEST[$bundle_manifest_key]}"
   fi
-  set -vx; eval "$oldopt"
+  eval "$oldopt"
 }
 
 function build::eksa_releases::get_eksa_component_asset_url() {
@@ -82,7 +82,7 @@ function build::eksa_releases::get_eksa_component_asset_path() {
 
   echo "$bundle_manifest" | yq e "$query" -
 
-  set -vx; eval "$oldopt"
+  eval "$oldopt"
 }
 
 function build::eksa_releases::get_eksa_release_manifest_url() {
