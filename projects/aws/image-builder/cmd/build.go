@@ -49,6 +49,7 @@ func init() {
 	buildCmd.Flags().StringVar(&amiConfigFile, "ami-config", "", "Path to AMI Config file")
 	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-27", "EKS-D Release channel for node image. Can be 1-23, 1-24, 1-25, 1-26 or 1-27")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
+	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA and Raw builds.")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
 		log.Fatalf("Error marking flag as required: %v", err)
 	}
@@ -85,6 +86,19 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 
 	if err = validateOSVersion(bo.Os, bo.OsVersion); err != nil {
 		log.Fatal(err.Error())
+	}
+
+	if err = validateFirmware(bo.Firmware, bo.Os, bo.Hypervisor); err != nil {
+		log.Fatal(err.Error())
+	}
+
+	// Setting default to bios for everything but ubuntu raw since that defaults to efi
+	if bo.Firmware == "" {
+		if bo.Os == builder.Ubuntu && bo.Hypervisor == builder.Baremetal {
+			bo.Firmware = builder.EFI
+		} else {
+			bo.Firmware = builder.BIOS
+		}		
 	}
 
 	configPath := ""
@@ -272,6 +286,26 @@ func validateOSVersion(os string, osVersion string) error {
 
 	if os == builder.RedHat && !builder.SliceContains(builder.SupportedRedHatVersions,osVersion) {
 		return fmt.Errorf("%s is not a supported version of Redhat. Please select one of %s", osVersion, strings.Join(builder.SupportedRedHatVersions, ","))
+	}
+
+	return nil
+}
+
+func validateFirmware(firmware string, os string, hypervisor string) error {
+	if firmware == "" {
+		return nil
+	}
+
+	if !builder.SliceContains(builder.SupportedFirmwares,firmware) {
+		return fmt.Errorf("%s is not a firmware. Please select one of %s", firmware, strings.Join(builder.SupportedFirmwares, ","))
+	}
+
+	if firmware == builder.EFI && (os != builder.Ubuntu || !builder.SliceContains([]string{builder.VSphere, builder.Baremetal}, hypervisor)) {
+		return fmt.Errorf("EFI firmware is only supported for Ubuntu OVA and Raw builds.")
+	}
+
+	if firmware == builder.BIOS && os == builder.Ubuntu && hypervisor == builder.Baremetal {
+		return fmt.Errorf("Ubuntu Raw builds only support EFI firmware.")
 	}
 
 	return nil

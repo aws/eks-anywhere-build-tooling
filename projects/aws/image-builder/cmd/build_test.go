@@ -162,3 +162,78 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateFirmware(t *testing.T) {
+	testCases := []struct {
+		testName     string
+		buildOptions builder.BuildOptions
+		wantErr      string
+	}{
+		{
+			testName: "Ubuntu ova with efi",
+			buildOptions: builder.BuildOptions{				
+				Os:         "ubuntu",
+				Hypervisor: "vsphere",
+				Firmware: "efi",
+			},
+			wantErr: "",
+		},
+		{
+			testName: "Ubuntu raw with efi",
+			buildOptions: builder.BuildOptions{				
+				Os:         "ubuntu",
+				Hypervisor: "baremetal",
+				Firmware: "efi",
+			},
+			wantErr: "",
+		},
+		{
+			testName: "Ubuntu raw with bios",
+			buildOptions: builder.BuildOptions{				
+				Os:         "ubuntu",
+				Hypervisor: "baremetal",
+				Firmware: "bios",
+			},
+			wantErr: "Ubuntu Raw builds only support EFI firmware.",
+		},
+		{
+			testName: "Redhat raw with efi",
+			buildOptions: builder.BuildOptions{				
+				Os:         "redhat",
+				Hypervisor: "baremetal",
+				Firmware: "efi",
+			},
+			wantErr: "EFI firmware is only supported for Ubuntu OVA and Raw builds.",
+		},
+		{
+			testName: "Redhat raw with no bios",
+			buildOptions: builder.BuildOptions{				
+				Os:         "redhat",
+				Hypervisor: "baremetal",
+				Firmware: "",
+			},
+			wantErr: "",
+		},
+		{
+			testName: "Redhat raw with bad firmware",
+			buildOptions: builder.BuildOptions{				
+				Os:         "redhat",
+				Hypervisor: "baremetal",
+				Firmware: "bad",
+			},
+			wantErr: "bad is not a firmware. Please select one of bios,efi",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.testName, func(t *testing.T) {
+			err := validateFirmware(tt.buildOptions.Firmware, tt.buildOptions.Os, tt.buildOptions.Hypervisor)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)				
+			} else {
+				assert.NotNil(t, err)
+				assert.Equal(t, tt.wantErr, err.Error())
+			}
+		})
+	}
+}

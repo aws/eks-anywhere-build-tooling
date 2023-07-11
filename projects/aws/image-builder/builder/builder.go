@@ -64,7 +64,7 @@ func (b *BuildOptions) BuildImage() {
 	var outputImageGlob []string
 	commandEnvVars := []string{fmt.Sprintf("RELEASE_BRANCH=%s", b.ReleaseChannel)}
 
-	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n", b.Os, b.OsVersion, b.Hypervisor)
+	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n Firmware: %s\n", b.Os, b.OsVersion, b.Hypervisor, b.Firmware)
 	if b.Hypervisor == VSphere {
 		// Read and set the vsphere connection data
 		vsphereConfigData, err := json.Marshal(b.VsphereConfig)
@@ -79,7 +79,11 @@ func (b *BuildOptions) BuildImage() {
 		var buildCommand string
 		switch b.Os {
 		case Ubuntu:
-			buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
+			if b.Firmware == EFI {
+				buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s-efi", imageBuilderProjectPath, b.OsVersion)
+			} else {
+				buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
+			}
 		case RedHat:
 			buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
