@@ -1,0 +1,168 @@
+From 7e94c59c14b030d8a602b3026d08b98e0362fbb0 Mon Sep 17 00:00:00 2001
+From: "https://github.com/helm/helm/pull/10408" <lixin20101023@gmail.com>
+Date: Mon, 29 Nov 2021 16:53:43 +0800
+Subject: [PATCH 1/3] Push to insecure OCI registry
+
+Signed-off-by: acool@amazon.com
+---
+ cmd/helm/push.go       |  5 ++++-
+ pkg/action/pull.go     |  7 +++++++
+ pkg/action/push.go     | 16 +++++++++++++++-
+ pkg/registry/client.go | 32 ++++++++++++++++++++++++++++++++
+ 4 files changed, 58 insertions(+), 2 deletions(-)
+
+diff --git a/cmd/helm/push.go b/cmd/helm/push.go
+index b1e3e60a..6d2a4c6b 100644
+--- a/cmd/helm/push.go
++++ b/cmd/helm/push.go
+@@ -39,6 +39,7 @@ type registryPushOptions struct {
+ 	keyFile               string
+ 	caFile                string
+ 	insecureSkipTLSverify bool
++	plainHTTP             bool
+ }
+ 
+ func newPushCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
+@@ -77,7 +78,8 @@ func newPushCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
+ 			client := action.NewPushWithOpts(action.WithPushConfig(cfg),
+ 				action.WithTLSClientConfig(o.certFile, o.keyFile, o.caFile),
+ 				action.WithInsecureSkipTLSVerify(o.insecureSkipTLSverify),
+-				action.WithPushOptWriter(out))
++				action.WithPushOptWriter(out),
++				action.WithPlainHTTP(o.plainHTTP))
+ 			client.Settings = settings
+ 			output, err := client.Run(chartRef, remote)
+ 			if err != nil {
+@@ -93,6 +95,7 @@ func newPushCmd(cfg *action.Configuration, out io.Writer) *cobra.Command {
+ 	f.StringVar(&o.keyFile, "key-file", "", "identify registry client using this SSL key file")
+ 	f.StringVar(&o.caFile, "ca-file", "", "verify certificates of HTTPS-enabled servers using this CA bundle")
+ 	f.BoolVar(&o.insecureSkipTLSverify, "insecure-skip-tls-verify", false, "skip tls certificate checks for the chart upload")
++	f.BoolVar(&o.plainHTTP, "plain-http", false, "use plain http and not https to connect oci registry")
+ 
+ 	return cmd
+ }
+diff --git a/pkg/action/pull.go b/pkg/action/pull.go
+index 37ff144d..a7672008 100644
+--- a/pkg/action/pull.go
++++ b/pkg/action/pull.go
+@@ -45,6 +45,7 @@ type Pull struct {
+ 	VerifyLater bool
+ 	UntarDir    string
+ 	DestDir     string
++	PlainHTTP   bool
+ 	cfg         *Configuration
+ }
+ 
+@@ -80,6 +81,12 @@ func (p *Pull) SetRegistryClient(client *registry.Client) {
+ func (p *Pull) Run(chartRef string) (string, error) {
+ 	var out strings.Builder
+ 
++	if p.InsecureSkipTLSverify || p.PlainHTTP {
++		if err := p.cfg.RegistryClient.WithResolver(p.InsecureSkipTLSverify, p.PlainHTTP); err != nil {
++			return out.String(), err
++		}
++	}
++
+ 	c := downloader.ChartDownloader{
+ 		Out:     &out,
+ 		Keyring: p.Keyring,
+diff --git a/pkg/action/push.go b/pkg/action/push.go
+index 89200640..f456cf98 100644
+--- a/pkg/action/push.go
++++ b/pkg/action/push.go
+@@ -37,6 +37,7 @@ type Push struct {
+ 	caFile                string
+ 	insecureSkipTLSverify bool
+ 	out                   io.Writer
++	plainHTTP             bool
+ }
+ 
+ // PushOpt is a type of function that sets options for a push action.
+@@ -65,13 +66,20 @@ func WithInsecureSkipTLSVerify(insecureSkipTLSVerify bool) PushOpt {
+ 	}
+ }
+ 
+-// WithOptWriter sets the registryOut field on the push configuration object.
++// WithPushOptWriter sets the registryOut field on the push configuration object.
+ func WithPushOptWriter(out io.Writer) PushOpt {
+ 	return func(p *Push) {
+ 		p.out = out
+ 	}
+ }
+ 
++// WithPlainHTTP determines if connection to the OCI registry happens via HTTP or HTTPS.
++func WithPlainHTTP(plainHTTP bool) PushOpt {
++	return func(p *Push) {
++		p.plainHTTP = plainHTTP
++	}
++}
++
+ // NewPushWithOpts creates a new push, with configuration options.
+ func NewPushWithOpts(opts ...PushOpt) *Push {
+ 	p := &Push{}
+@@ -85,6 +93,12 @@ func NewPushWithOpts(opts ...PushOpt) *Push {
+ func (p *Push) Run(chartRef string, remote string) (string, error) {
+ 	var out strings.Builder
+ 
++	if p.insecureSkipTLSverify || p.plainHTTP {
++		if err := p.cfg.RegistryClient.WithResolver(p.insecureSkipTLSverify, p.plainHTTP); err != nil {
++			return out.String(), err
++		}
++	}
++
+ 	c := uploader.ChartUploader{
+ 		Out:     &out,
+ 		Pushers: pusher.All(p.Settings),
+diff --git a/pkg/registry/client.go b/pkg/registry/client.go
+index f9569b62..1afcdd0e 100644
+--- a/pkg/registry/client.go
++++ b/pkg/registry/client.go
+@@ -18,6 +18,7 @@ package registry // import "helm.sh/helm/v3/pkg/registry"
+ 
+ import (
+ 	"context"
++	"crypto/tls"
+ 	"encoding/json"
+ 	"fmt"
+ 	"io"
+@@ -177,6 +178,37 @@ func ClientOptHTTPClient(httpClient *http.Client) ClientOption {
+ 	}
+ }
+ 
++func (c *Client) newResolver(insecure, plainHTTP bool) (remotes.Resolver, error) {
++	headers := http.Header{}
++	headers.Set("User-Agent", version.GetUserAgent())
++	opts := []auth.ResolverOption{auth.WithResolverHeaders(headers)}
++
++	if insecure {
++		httpClient := http.DefaultClient
++		httpClient.Transport = &http.Transport{
++			TLSClientConfig: &tls.Config{
++				InsecureSkipVerify: true,
++			},
++			Proxy: http.ProxyFromEnvironment,
++		}
++		opts = append(opts, auth.WithResolverClient(httpClient))
++	}
++	if plainHTTP {
++		opts = append(opts, auth.WithResolverPlainHTTP())
++	}
++
++	return c.authorizer.ResolverWithOpts(opts...)
++}
++
++func (c *Client) WithResolver(insecure, plainHTTP bool) error {
++	resolver, err := c.newResolver(insecure, plainHTTP)
++	if err != nil {
++		return err
++	}
++	c.resolver = resolver
++	return nil
++}
++
+ type (
+ 	// LoginOption allows specifying various settings on login
+ 	LoginOption func(*loginOperation)
+-- 
+2.39.2
+
