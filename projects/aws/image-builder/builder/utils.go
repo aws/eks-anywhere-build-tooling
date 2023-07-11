@@ -111,7 +111,7 @@ func execCommand(cmd *exec.Cmd) (string, error) {
 
 func getGitCommitFromBundle(repoPath string) (string, error) {
 	log.Println("Getting git commit from bundle")
-	loadBundleManifestCommandSequence := fmt.Sprintf("source %s/build/lib/eksa_releases.sh && build::eksa_releases::load_bundle_manifest", repoPath)
+	loadBundleManifestCommandSequence := fmt.Sprintf("source %s/build/lib/eksa_releases.sh && build::eksa_releases::load_bundle_manifest %s", repoPath, os.Getenv("EKSA_USE_DEV_RELEASE"))
 	cmd := exec.Command("bash", "-c", fmt.Sprintf("%s", loadBundleManifestCommandSequence))
 	commandOut, err := execCommand(cmd)
 	if err != nil {
