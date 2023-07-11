@@ -10,10 +10,14 @@ RAW_IMAGE_BUILD_AMI?=ami-095413544ce52437d
 RAW_IMAGE_BUILD_INSTANCE_TYPE?=t2.micro
 RAW_IMAGE_BUILD_KEY_NAME?=raw-image-build
 
+# in the case of ubuntu ova builds we support either default bios or efi mode, for efi we put in a different output folder: $(ARTIFACTS_PATH)/ubuntu/2004/ova/efi/ubuntu.ova
+# Note: raw ubuntu builds are always efi and are not in a seperate sub folder
+FIRMWARE_PATH_SUFFIX=$(if $(and $(IMAGE_OS_FIRMWARE),$(filter $(IMAGE_OS)-$(IMAGE_FORMAT),$(ALLOWED_EFI_OS_FORMATS))),/efi,)
+
 FULL_OUTPUT_DIR?=$(MAKE_ROOT)/$(OUTPUT_DIR)/$(IMAGE_FORMAT)/$(IMAGE_OS_DIR)
 BOTTLEROCKET_DOWNLOAD_PATH?=$(FULL_OUTPUT_DIR)/downloads
-ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$(IMAGE_FORMAT)/$(IMAGE_OS_DIR)
-ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$(IMAGE_OS_DIR)/$(IMAGE_FORMAT)
+ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT=$(ARTIFACTS_UPLOAD_PATH)/$(IMAGE_FORMAT)/$(IMAGE_OS_DIR)$(FIRMWARE_PATH_SUFFIX)
+ARTIFACTS_PATH_IMAGE_FORMAT=$(ARTIFACTS_PATH)/$(IMAGE_OS_DIR)/$(IMAGE_FORMAT)$(FIRMWARE_PATH_SUFFIX)
 
 RHSM_USERNAME?=
 RHSM_PASSWORD?=
@@ -93,7 +97,7 @@ CONVERT_TO_UPSTREAM_TARGET=$(strip \
 )
 
 # ex: $(ARTIFACTS_PATH)/ubuntu/2004/ova/ubuntu.ova, $(ARTIFACTS_PATH)/bottlerocket/1/raw/bottlerocket.img.gz
-FINAL_IMAGE_DIR=$(ARTIFACTS_PATH)/$(IMAGE_OS_DIR)/$(IMAGE_FORMAT)
+FINAL_IMAGE_DIR=$(ARTIFACTS_PATH)/$(IMAGE_OS_DIR)/$(IMAGE_FORMAT)$(FIRMWARE_PATH_SUFFIX)
 FINAL_IMAGE_PATH=$(FINAL_IMAGE_DIR)/$(IMAGE_OS).$(call EXT_FROM_FORMAT,$(IMAGE_FORMAT),$(IMAGE_OS))
 
 BOTTLEROCKET_AMI_RELEASE_VERSION=$(and $(RELEASE_BRANCH),$(shell yq e ".$(RELEASE_BRANCH).ami-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES))
@@ -104,6 +108,7 @@ IMAGE_OS?=ubuntu
 IMAGE_OS_VERSION?=$(DEFAULT_$(call TO_UPPER,$(IMAGE_OS))_VERSION)
 IMAGE_FORMAT?=ova
 IMAGE_FORMATS_AVAIL=ami cloudstack nutanix ova raw
+IMAGE_OS_FIRMWARE?=
 
 ###################### BUILD TARGETS ##############################
 # build targets only run validation, they do not actually do an image build
@@ -112,11 +117,13 @@ BUILD_AMI_TARGETS=build-ami-ubuntu-2004 build-ami-ubuntu-2204
 
 # $1 - image-format
 # $2 - image-os-with-ver
-FAKE_IMAGE_PATH_FROM_OS_WITH_VER=fake-$2-$1.$(call EXT_FROM_FORMAT,$(1),$(word 2,$(subst -, ,$2)))
+# ex: ova, ubuntu-2204
+FAKE_IMAGE_PATH_FROM_OS_WITH_VER=fake-$2-$1.$(call EXT_FROM_FORMAT,$(1),$(word 1,$(subst -, ,$2)))
 
 # vsphere node images
 # packer/ova/vsphere.json needs to exist for the validation, but can be empty
 BUILD_OVA_TARGETS=packer/ova/vsphere.json $(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-ova-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,ova,$(os)) upload-artifacts-ova-$(os))
+BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload-artifacts-ova-ubuntu-2004-efi build-ova-ubuntu-2204-efi fake-ubuntu-2204-ova-efi.ova upload-artifacts-ova-ubuntu-2204-efi
 
 # only running release-raw-ubuntu-2004 on presubmit here since we are just validating the instance creation and do not need to run for every OS
 # tinkerbell/bare metal node images
@@ -162,6 +169,8 @@ DEFAULT_REDHAT_VERSION=8
 
 ALLOWED_BOTTLEROCKET_VERSIONS=1
 DEFAULT_BOTTLEROCKET_VERSION=1
+
+ALLOWED_EFI_OS_FORMATS=ubuntu-ova
 
 # run image os/format validation before running release target(s)
 RELEASE_TARGETS=validate-supported-image-all
@@ -212,7 +221,7 @@ setup-packer-configs-%: $(GIT_PATCH_TARGET)
 
 ########################### FAKE TARGETS ###############################
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
-# ex: fake-ubuntu-2004-raw.gz
+# ex: fake-ubuntu-2004-raw.gz,fake-ubuntu-2004-ova-efi.ova
 fake-%: PACKER_LOG_PATH=$(ARTIFACTS_PATH)/$(subst -,/,$(basename $(*F)))/packer.log
 fake-%:
 	@echo -e $(call TARGET_START_LOG)
@@ -266,14 +275,15 @@ $(ARTIFACTS_PATH)/%:
 #######################################################################
 
 ######################## VALIDATE ###########################
-# ex: build-ova-ubuntu-2004, build-raw-redhat-8
+# ex: build-ova-ubuntu-2004, build-raw-redhat-8, build-ova-ubuntu-2004-efi
 build-%: MAKEFLAGS=
 build-%: IMAGE_FORMAT=$(word 1,$(subst -, ,$*))
 build-%: IMAGE_OS=$(word 2,$(subst -, ,$*))
 build-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
+build-%: IMAGE_OS_FIRMWARE=$(word 4,$(subst -, ,$*))
 build-%: validate-supported-image-% setup-packer-configs-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,)
 	@echo -e $(call TARGET_START_LOG)	
-	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,validate-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER))
+	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,validate-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
 	@echo -e $(call TARGET_END_LOG)
 #########################################################
 
@@ -286,6 +296,7 @@ build-%: validate-supported-image-% setup-packer-configs-% $(if $(filter ami,$(I
 # ex: release-ami-ubuntu-2004, release-ova-redhat-8
 release-ami-% release-ova-% release-image-build-on-metal-%: IMAGE_OS=$(word 1,$(subst -, ,$*))
 release-ami-% release-ova-% release-image-build-on-metal-%: IMAGE_OS_VERSION=$(word 2,$(subst -, ,$*))
+release-ami-% release-ova-% release-image-build-on-metal-%: IMAGE_OS_FIRMWARE=$(word 3,$(subst -, ,$*))
 
 release-ami-%: IMAGE_FORMAT=ami
 release-ami-%: export MANIFEST_OUTPUT=$(FULL_OUTPUT_DIR)/manifest.json
@@ -302,7 +313,7 @@ release-ami-%: validate-supported-image-% setup-ami-share
 release-ova-%: IMAGE_FORMAT=ova
 release-ova-%: validate-supported-image-%
 	@echo -e $(call TARGET_START_LOG)
-	build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST)
+	build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST) $(IMAGE_OS_FIRMWARE)
 	@echo -e $(call TARGET_END_LOG)
 
 release-raw-%: IMAGE_FORMAT=raw
@@ -323,11 +334,12 @@ release-image-build-on-metal-%: validate-supported-image-% $(GIT_PATCH_TARGET)
 
 #######################################################################
 
-# These targets all end with <image format>-<os>-<os-version>
-# ex: local-build-ami-ubuntu-2004, s3-artifacts-ova-ubuntu-2004, upload-artifacts-ova-ubuntu-2004
+# These targets all end with <image format>-<os>-<os-version><optional -efi>
+# ex: local-build-ami-ubuntu-2004, s3-artifacts-ova-ubuntu-2004, upload-artifacts-ova-ubuntu-2004, upload-artifacts-ova-ubuntu-2004-efi
 local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_FORMAT=$(word 1,$(subst -, ,$*))
 local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS=$(word 2,$(subst -, ,$*))
 local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
+local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS_FIRMWARE=$(word 4,$(subst -, ,$*))
 
 ######################## IMAGE BUILDER CLI TARGETS #######################
 # OVF_CUSTOM_PROPERTIES is only for ova, but should be ok to passed since its ignored by other builds
@@ -340,7 +352,7 @@ local-build-%: validate-supported-image-% setup-packer-configs-%
 	fi
 	DEBUG=$(DEBUG) PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(FINAL_IMAGE_DIR)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
-		$(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,build-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER))
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,build-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
 	@echo -e $(call TARGET_END_LOG)
 
 #######################################################################
@@ -374,6 +386,12 @@ validate-supported-image-%:
 		exit 1; \
 	elif [[ "$(ALLOWED_$(call TO_UPPER,$(IMAGE_OS))_VERSIONS)" != *"$(IMAGE_OS_VERSION)"* ]]; then \
 		echo "Unsupported combination of image os ($(IMAGE_OS)) and image os version ($(IMAGE_OS_VERSION)) chosen. Build will quit now..."; \
+		exit 1; \
+	elif  [ -n "$(IMAGE_OS_FIRMWARE)" ] && [[ "$(IMAGE_OS_FIRMWARE)" != "efi" ]]; then \
+		echo "efi is the only supported custom firmware"; \
+		exit 1; \
+	elif [ -n "$(IMAGE_OS_FIRMWARE)" ] && [[ "$(ALLOWED_EFI_OS_FORMATS)" != *"$(IMAGE_OS)-$(IMAGE_FORMAT)" ]]; then \
+		echo "EFI is only supported for Ubuntu OVAs"; \
 		exit 1; \
 	fi
 
@@ -425,6 +443,8 @@ release-nutanix-ubuntu-2204:
 
 build-ova-ubuntu-2004:
 build-ova-ubuntu-2204:
+build-ova-ubuntu-2004-efi:
+build-ova-ubuntu-2204-efi:
 build-ova-redhat-8:
 release-ova-ubuntu-2004:
 release-ova-ubuntu-2204:

@@ -26,9 +26,10 @@ release_channel="${3?Specify the third argument - release channel}"
 image_format="${4?Specify the fourth argument - image format}"
 artifacts_bucket=${5-$ARTIFACTS_BUCKET}
 latest=${6-latest}
+firmware=${7-}
 
 # Download and setup latest image-builder cli
-image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket 'amd64' 'jackson-test-build' # $latest
+image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket 'amd64' $latest
 
 image_os_version_arg=""
 if [[ "$image_os" == "ubuntu" ]]; then
@@ -61,7 +62,12 @@ if [[ $image_format == "ova" ]]; then
     image_builder_config_file=$vsphere_config_file
   fi
 
-  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os $image_os_version_arg --vsphere-config $image_builder_config_file --release-channel $release_channel
+  firmware_arg=""
+  if [ -n "$firmware" ] && [[ "$image_os" == "ubuntu" ]]; then
+    firmware_arg="--firmware $firmware"
+  fi
+
+  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os $image_os_version_arg --vsphere-config $image_builder_config_file --release-channel $release_channel $firmware_arg
 elif [[ $image_format == "raw" ]]; then
   # Run image-builder cli
   if [[ $image_os == "ubuntu" ]]; then
