@@ -1,6 +1,7 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.19"
+GOLANG_VERSION:=$(shell cat GOLANG_VERSION)
+
 REGISTRYVERSION=2.8.1-patch-redis
 NOTARYVERSION=v0.6.1
 TRIVYVERSION=v0.37.3

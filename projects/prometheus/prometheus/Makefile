@@ -1,8 +1,7 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
 HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
-GOLANG_VERSION?="1.18"
-
+GOLANG_VERSION:=$(shell cat GOLANG_VERSION)
 REPO=prometheus
 REPO_OWNER=prometheus
 

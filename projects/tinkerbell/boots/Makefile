@@ -1,7 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.18"
-
+GOLANG_VERSION:=$(shell cat GOLANG_VERSION)
 REPO=boots
 REPO_OWNER=tinkerbell
 

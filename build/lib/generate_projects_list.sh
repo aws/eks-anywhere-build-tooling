@@ -62,14 +62,15 @@ for org_path in projects/*; do
             git_tags=$(find projects/$org/$repo -type f -name "GIT_TAG" | sort)
             for file in $git_tags; do
                 tag=$(cat $file)
-                if [ $repo = "cilium" ]; then
-                    yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"tag\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
+                golang_version="N/A"
+                golang_version_file=$(dirname $file)/GOLANG_VERSION
+                if [ -f $golang_version_file ]; then
+                    golang_version="$(cat $golang_version_file)"
+                fi
+                if [[ $tag =~ ^[0-9a-f]{7,40}$ ]]; then
+                    yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"commit\": \"$tag\", \"go_version\": \"$golang_version\"}]" $UPSTREAM_PROJECTS_FILE
                 else
-                    if [ "$(git ls-remote --tags https://github.com/$org/$repo | awk '{print $2}' | grep $tag || true)" ]; then
-                        yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"tag\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
-                    else
-                        yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"commit\": \"$tag\"}]" $UPSTREAM_PROJECTS_FILE
-                    fi
+                    yq eval -i -P ".projects[$org_count].repos[$repo_count].versions += [{\"tag\": \"$tag\", \"go_version\": \"$golang_version\"}]" $UPSTREAM_PROJECTS_FILE
                 fi
             done
             repo_count+=1

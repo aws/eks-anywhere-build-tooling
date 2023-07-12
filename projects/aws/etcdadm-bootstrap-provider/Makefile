@@ -1,7 +1,6 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION?="1.19"
-
+GOLANG_VERSION:=$(shell cat GOLANG_VERSION)
 REPO=etcdadm-bootstrap-provider
 REPO_OWNER=aws
 
