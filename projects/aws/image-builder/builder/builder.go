@@ -33,7 +33,7 @@ func (b *BuildOptions) BuildImage() {
 	if codebuild != "true" {
 		err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
 		if err != nil {
-			log.Fatalf("Error cloning build tooling repo")
+			log.Fatalf("Error cloning build tooling repo: %v", err)
 		}
 		log.Println("Cloned eks-anywhere-build-tooling repo")
 
@@ -44,7 +44,7 @@ func (b *BuildOptions) BuildImage() {
 
 		err = checkoutRepo(buildToolingRepoPath, gitCommitFromBundle)
 		if err != nil {
-			log.Fatalf("Error checking out build tooling repo at commit %s", gitCommitFromBundle)
+			log.Fatalf("Error checking out build tooling repo at commit %s: %v", gitCommitFromBundle, err)
 		}
 		log.Printf("Checked out eks-anywhere-build-tooling repo at commit %s\n", gitCommitFromBundle)
 	} else {
@@ -70,22 +70,22 @@ func (b *BuildOptions) BuildImage() {
 	if b.FilesConfig != nil {
 		filesAnsibleConfig, err := json.Marshal(b.FilesConfig.FilesAnsibleConfig)
 		if err != nil {
-			log.Fatalf("Error marshalling files ansible config data")
+			log.Fatalf("Error marshalling files ansible config data: %v", err)
 		}
 
 		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, packerAdditionalFilesConfigFile), filesAnsibleConfig, 0o644)
 		if err != nil {
-			log.Fatalf("Error writing additional files config in Packer ansible directory: %v", err)
+			log.Fatalf("Error writing additional files config file to Packer directory: %v", err)
 		}
 
 		additionalFileVars, err := yaml.Marshal(b.FilesConfig.FileVars)
 		if err != nil {
-			log.Fatalf("Error marshalling additional files files list")
+			log.Fatalf("Error marshalling additional files list: %v", err)
 		}
 
 		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, packerAdditionalFilesList), additionalFileVars, 0o644)
 		if err != nil {
-			log.Fatalf("Error writing additional files config in Packer ansible directory")
+			log.Fatalf("Error writing additional files config in Packer ansible directory: %v", err)
 		}
 
 		commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerAdditionalFilesConfigFileEnvVar, packerAdditionalFilesConfigFile))
@@ -94,11 +94,11 @@ func (b *BuildOptions) BuildImage() {
 		// Read and set the vsphere connection data
 		vsphereConfigData, err := json.Marshal(b.VsphereConfig)
 		if err != nil {
-			log.Fatalf("Error marshalling vsphere config data")
+			log.Fatalf("Error marshalling vsphere config data: %v", err)
 		}
 		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, packerVSphereConfigFile), vsphereConfigData, 0o644)
 		if err != nil {
-			log.Fatalf("Error writing vsphere config file to packer")
+			log.Fatalf("Error writing vsphere config file to packer: %v", err)
 		}
 
 		var buildCommand string
@@ -135,11 +135,11 @@ func (b *BuildOptions) BuildImage() {
 		if b.BaremetalConfig != nil {
 			baremetalConfigData, err := json.Marshal(b.BaremetalConfig)
 			if err != nil {
-				log.Fatalf("Error marshalling baremetal config data")
+				log.Fatalf("Error marshalling baremetal config data: %v", err)
 			}
 			err = ioutil.WriteFile(baremetalConfigFile, baremetalConfigData, 0o644)
 			if err != nil {
-				log.Fatalf("Error writing baremetal config file to packer")
+				log.Fatalf("Error writing baremetal config file to packer: %v", err)
 			}
 		}
 
@@ -173,13 +173,13 @@ func (b *BuildOptions) BuildImage() {
 		// Patch firmware config for tool
 		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
 		if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
-			log.Fatalf("Error executing upstream patch command")
+			log.Fatalf("Error executing upstream patch command: %v", err)
 		}
 
 		// Read and set the nutanix connection data
 		nutanixConfigData, err := json.Marshal(b.NutanixConfig)
 		if err != nil {
-			log.Fatalf("Error marshalling nutanix config data")
+			log.Fatalf("Error marshalling nutanix config data: %v", err)
 		}
 		err = ioutil.WriteFile(filepath.Join(upstreamImageBuilderProjectPath, packerNutanixConfigFile), nutanixConfigData, 0o644)
 		if err != nil {
@@ -202,11 +202,11 @@ func (b *BuildOptions) BuildImage() {
 		if b.CloudstackConfig != nil {
 			cloudstackConfigData, err := json.Marshal(b.CloudstackConfig)
 			if err != nil {
-				log.Fatalf("Error marshalling cloudstack config data")
+				log.Fatalf("Error marshalling cloudstack config data: %v", err)
 			}
 			err = ioutil.WriteFile(cloudstackConfigFile, cloudstackConfigData, 0o644)
 			if err != nil {
-				log.Fatalf("Error writing cloudstack config file to packer")
+				log.Fatalf("Error writing cloudstack config file to packer: %v", err)
 			}
 		}
 
@@ -247,12 +247,12 @@ func (b *BuildOptions) BuildImage() {
 		if b.AMIConfig != nil {
 			amiConfigData, err := json.Marshal(b.AMIConfig)
 			if err != nil {
-				log.Fatalf("Error marshalling AMI config data")
+				log.Fatalf("Error marshalling AMI config data: %v", err)
 			}
 
 			err = ioutil.WriteFile(amiConfigFile, amiConfigData, 0o644)
 			if err != nil {
-				log.Fatalf("Error writing AMI config file to packer")
+				log.Fatalf("Error writing AMI config file to packer: %v", err)
 			}
 		}
 
@@ -268,7 +268,7 @@ func (b *BuildOptions) BuildImage() {
 		log.Println("Moving artifacts from build directory to current working directory")
 		err = os.Rename(outputImageGlob[0], outputArtifactPath)
 		if err != nil {
-			log.Fatalf("Error moving output file to current working directory")
+			log.Fatalf("Error moving output file to current working directory: %v", err)
 		}
 	}
 

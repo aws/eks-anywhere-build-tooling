@@ -22,7 +22,7 @@ const (
 	packerUbuntuRawEFIConfigFile    string = "packer/raw/raw-ubuntu-2004-efi.json"
 	OVMFCodeFile                    string = "/usr/share/edk2/ovmf/OVMF_CODE.fd"
 	packerNutanixConfigFile         string = "packer/nutanix/nutanix.json"
-	packerCloudStackConfigFile      string = "packer/qemu/cloudstack.json"
+	packerCloudStackConfigFile      string = "packer/config/cloudstack.json"
 	packerAMIConfigFile             string = "packer/ami/ami.json"
 
 	// Environment variables
