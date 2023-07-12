@@ -70,7 +70,7 @@ func GetSupportedReleaseBranches() []string {
 func getBuildToolingPath(cwd string) string {
 	buildToolingRepoPath := filepath.Join(cwd, "eks-anywhere-build-tooling")
 	if codebuild == "true" {
-		buildToolingRepoPath = os.Getenv("CODEBUILD_SRC_DIR")
+		buildToolingRepoPath = os.Getenv(codebuildSourceDirectoryEnvVar)
 	}
 	return buildToolingRepoPath
 }
