@@ -1,0 +1,77 @@
+From 6a6de45f94484bc2c8dbf683676973e9188112f9 Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Wed, 12 Jul 2023 11:03:41 -0500
+Subject: [PATCH] Support pulling etcd from EKS-D
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+---
+ binary/etcd.go         | 20 +++++++++++++++++++-
+ constants/constants.go |  2 +-
+ 2 files changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/binary/etcd.go b/binary/etcd.go
+index ebecc2db..f28f060c 100644
+--- a/binary/etcd.go
++++ b/binary/etcd.go
+@@ -21,6 +21,7 @@ import (
+ 	"io/ioutil"
+ 	"os"
+ 	"os/exec"
++	"path"
+ 	"path/filepath"
+ 	"runtime"
+ 	"strings"
+@@ -104,19 +105,36 @@ func Download(releaseURL, version, locationDir string) error {
+ 	}
+ 
+ 	url := downloadURL(releaseURL, version)
++	// get will download from any complete url and will rename downloaded binary to etcd name format
++	// upstream uses. This will also be the format `func InstallFromCache` expects.
+ 	if err := get(url, archive); err != nil {
+ 		return fmt.Errorf("unable to download etcd: %s", err)
+ 	}
+ 	return nil
+ }
+ 
++// releaseFile will always provide the etcd file name format upstream and image-builder uses
+ func releaseFile(version string) string {
+ 	return fmt.Sprintf("etcd-v%s-linux-%s.tar.gz", version, runtime.GOARCH)
+ }
+ 
+ func downloadURL(releaseURL, version string) string {
+ 	// FIXME use url.ResolveReference to join
+-	return fmt.Sprintf("%s/v%s/%s", releaseURL, version, releaseFile(version))
++	// check if release URL is full path to tar.gz file
++	if isFullEtcdReleaseUrl(releaseURL) {
++		return releaseURL
++	}
++
++	// returns with etcd file name format eks-d uses, this patched version of etcdadm will not support pulling from github
++	return fmt.Sprintf("%s/v%s/etcd-linux-%s-v%s.tar.gz", releaseURL, version, runtime.GOARCH, version)
++}
++
++func isFullEtcdReleaseUrl(releaseURL string) bool {
++	releaseUrlBase := path.Base(releaseURL)
++	if filepath.Ext(releaseUrlBase) == ".gz" {
++		return true
++	}
++	return false
+ }
+ 
+ // InstallFromCache method installs the binaries from cache directory
+diff --git a/constants/constants.go b/constants/constants.go
+index 6f3ec911..f2d35a75 100644
+--- a/constants/constants.go
++++ b/constants/constants.go
+@@ -23,7 +23,7 @@ const (
+ 	DefaultVersion    = "3.5.7"
+ 	DefaultInstallDir = "/opt/bin/"
+ 
+-	DefaultReleaseURL      = "https://github.com/coreos/etcd/releases/download"
++	DefaultReleaseURL      = "https://distro.eks.amazonaws.com/kubernetes-1-27/releases/7/artifacts/etcd"
+ 	DefaultImageRepository = "quay.io/coreos/etcd"
+ 	DefaultCertificateDir  = "/etc/etcd/pki"
+ 
+-- 
+2.37.1 (Apple Git-137.1)
+
