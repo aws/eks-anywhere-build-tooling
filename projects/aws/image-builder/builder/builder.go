@@ -73,7 +73,8 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error marshalling files ansible config data: %v", err)
 		}
 
-		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, packerAdditionalFilesConfigFile), filesAnsibleConfig, 0o644)
+		additionalFilesConfigFile := filepath.Join(imageBuilderProjectPath, packerAdditionalFilesConfigFile)
+		err = ioutil.WriteFile(additionalFilesConfigFile, filesAnsibleConfig, 0o644)
 		if err != nil {
 			log.Fatalf("Error writing additional files config file to Packer directory: %v", err)
 		}
@@ -88,7 +89,7 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error writing additional files config in Packer ansible directory: %v", err)
 		}
 
-		commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerAdditionalFilesConfigFileEnvVar, packerAdditionalFilesConfigFile))
+		commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerAdditionalFilesConfigFileEnvVar, additionalFilesConfigFile))
 	}
 	if b.Hypervisor == VSphere {
 		// Read and set the vsphere connection data
