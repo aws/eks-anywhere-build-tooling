@@ -13,7 +13,7 @@ ALL_PROJECTS=$(shell $(BUILD_LIB)/all_projects.sh $(BASE_DIRECTORY))
 # $1 - project name using _ as separator, ex: rancher_local-path-provisoner
 PROJECT_PATH_MAP=projects/$(patsubst $(firstword $(subst _, ,$(1)))_%,$(firstword $(subst _, ,$(1)))/%,$(1))
 
-# Locale settings impact file ordering in ls or shell file expansion. The file order is used to
+# Locale settings impact file ordering in ls or shell file expansion. The file order is used to 
 # generate files that are subsequently validated by the CI. If local environments use different 
 # locales to the CI we get unexpected failures that are tricky to debug without knowledge of 
 # locales so we'll explicitly warn here.
