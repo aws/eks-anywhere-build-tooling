@@ -1,0 +1,112 @@
+From b1d69b87ea150387e738af951ef4723a8f2c040a Mon Sep 17 00:00:00 2001
+From: Taylor Neyland <tneyla@amazon.com>
+Date: Wed, 19 Jul 2023 12:51:30 -0500
+Subject: [PATCH 18/18] Disable UDP offload service for Redhat and Ubuntu
+
+---
+ .../system/disable-udp-offload-redhat.service  | 15 +++++++++++++++
+ .../system/disable-udp-offload-ubuntu.service  | 15 +++++++++++++++
+ .../roles/providers/tasks/vmware-redhat.yml    | 18 ++++++++++++++++++
+ .../roles/providers/tasks/vmware-ubuntu.yml    | 17 +++++++++++++++++
+ 4 files changed, 65 insertions(+)
+ create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-redhat.service
+ create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-ubuntu.service
+
+diff --git a/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-redhat.service b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-redhat.service
+new file mode 100644
+index 000000000..d445e4763
+--- /dev/null
++++ b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-redhat.service
+@@ -0,0 +1,15 @@
++[Unit]
++Description=Disables UDP offload
++After=NetworkManager-wait-online.service
++# Block manual interactions with this service
++RefuseManualStart=true
++RefuseManualStop=true
++
++[Service]
++Type=oneshot
++ExecStart=/usr/sbin/ethtool -K eth0 tx-udp_tnl-segmentation off
++ExecStart=/usr/sbin/ethtool -K eth0 tx-udp_tnl-csum-segmentation off
++RemainAfterExit=true
++
++[Install]
++WantedBy=multi-user.target
+diff --git a/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-ubuntu.service b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-ubuntu.service
+new file mode 100644
+index 000000000..7f5d50a8e
+--- /dev/null
++++ b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-ubuntu.service
+@@ -0,0 +1,15 @@
++[Unit]
++Description=Disables UDP offload for Ubuntu
++After=systemd-networkd-wait-online.service
++# Block manual interactions with this service
++RefuseManualStart=true
++RefuseManualStop=true
++
++[Service]
++Type=oneshot
++ExecStart=/usr/sbin/ethtool -K eth0 tx-udp_tnl-segmentation off
++ExecStart=/usr/sbin/ethtool -K eth0 tx-udp_tnl-csum-segmentation off
++RemainAfterExit=true
++
++[Install]
++WantedBy=network-online.target
+\ No newline at end of file
+diff --git a/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml b/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
+index 0047e90a7..616098859 100644
+--- a/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
++++ b/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
+@@ -49,3 +49,21 @@
+   file:
+     path:  /tmp/cloud-init-vmware.sh
+     state: absent
++
++- name: Create service disable udp offload
++  copy:
++    src: files/etc/systemd/system/disable-udp-offload-redhat.service
++    dest: /etc/systemd/system/disable-udp-offload-redhat.service
++    owner: root
++    group: root
++    mode: 0644
++  when: ansible_os_family != "Flatcar"
++
++- name: Enable disable-udp-offload-redhat.service
++  systemd:
++    name: disable-udp-offload-redhat.service
++    daemon_reload: yes
++    enabled: True
++    state: stopped
++  when: ansible_os_family != "Flatcar"
++  
+\ No newline at end of file
+diff --git a/images/capi/ansible/roles/providers/tasks/vmware-ubuntu.yml b/images/capi/ansible/roles/providers/tasks/vmware-ubuntu.yml
+index 8a63b50ce..392a6fc4e 100644
+--- a/images/capi/ansible/roles/providers/tasks/vmware-ubuntu.yml
++++ b/images/capi/ansible/roles/providers/tasks/vmware-ubuntu.yml
+@@ -51,3 +51,20 @@
+     content: |
+       datasource: VMware
+   when: ansible_distribution_version is version('22.04', '>=')
++
++- name: Create service disable udp offload
++  copy:
++    src: files/etc/systemd/system/disable-udp-offload-ubuntu.service
++    dest: /etc/systemd/system/disable-udp-offload-ubuntu.service
++    owner: root
++    group: root
++    mode: 0644
++  when: ansible_distribution_version is version('22.04', '>=')
++
++- name: Enable disable-udp-offload-ubuntu.service
++  systemd:
++    name: disable-udp-offload-ubuntu.service
++    daemon_reload: yes
++    enabled: True
++    state: stopped
++  when: ansible_distribution_version is version('22.04', '>=')
+-- 
+2.39.1
+
