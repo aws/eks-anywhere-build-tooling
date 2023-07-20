@@ -1,0 +1,1064 @@
+From c6271862a80236401260b5e185c33f8da17e27fd Mon Sep 17 00:00:00 2001
+From: fabriziopandini <fpandini@vmware.com>
+Date: Thu, 22 Jun 2023 14:46:14 +0100
+Subject: [PATCH 35/36] automatically set kubelet args for CAPD
+
+(cherry picked from commit 8b15bc070b263b7b73d50a0a7b7ed8d20b120fc8)
+---
+ bootstrap/kubeadm/types/utils.go              |  23 ++-
+ bootstrap/kubeadm/types/utils_test.go         | 118 ++++++++++++++
+ .../commands/alpha-topology-plan.md           |  18 +--
+ .../src/tasks/bootstrap/kubeadm-bootstrap.md  |  13 +-
+ .../tasks/experimental-features/ignition.md   |  12 ++
+ .../main/bases/cluster-with-kcp.yaml          |  12 +-
+ .../infrastructure-docker/main/bases/md.yaml  |   6 +-
+ .../infrastructure-docker/main/bases/mp.yaml  |   5 +-
+ .../cluster-template-ignition/ignition.yaml   |  21 +++
+ .../step1/cluster-with-cp0.yaml               |  12 +-
+ .../cluster-with-kcp.yaml                     |  10 +-
+ .../mp-cgroupfs.yaml                          |   3 +-
+ .../clusterclass-quick-start-runtimesdk.yaml  |  22 +--
+ .../main/clusterclass-quick-start.yaml        |  22 +--
+ test/go.mod                                   |   1 -
+ .../docker/internal/docker/machine.go         |   2 +-
+ .../cloudinit/{kindadapter.go => adapter.go}  |  13 +-
+ .../{kindadapter_test.go => adapter_test.go}  |   4 +-
+ .../internal/provisioning/cloudinit/runcmd.go |   3 +-
+ .../provisioning/cloudinit/runcmd_test.go     |   5 +-
+ .../provisioning/cloudinit/unknown.go         |   3 +-
+ .../provisioning/cloudinit/unknown_test.go    |   4 +-
+ .../provisioning/cloudinit/writefiles.go      |  74 ++++++++-
+ .../provisioning/cloudinit/writefiles_test.go | 147 ++++++++++++++++++
+ .../templates/clusterclass-quick-start.yaml   |  22 +--
+ 25 files changed, 442 insertions(+), 133 deletions(-)
+ rename test/infrastructure/docker/internal/provisioning/cloudinit/{kindadapter.go => adapter.go} (86%)
+ rename test/infrastructure/docker/internal/provisioning/cloudinit/{kindadapter_test.go => adapter_test.go} (98%)
+
+diff --git a/bootstrap/kubeadm/types/utils.go b/bootstrap/kubeadm/types/utils.go
+index 020d3002d..0ee8c23bb 100644
+--- a/bootstrap/kubeadm/types/utils.go
++++ b/bootstrap/kubeadm/types/utils.go
+@@ -181,6 +181,26 @@ func UnmarshalClusterStatus(yaml string) (*bootstrapv1.ClusterStatus, error) {
+ 	return obj, nil
+ }
+ 
++// UnmarshalInitConfiguration tries to translate a Kubeadm API yaml back to the InitConfiguration type.
++// NOTE: The yaml could be any of the known formats for the kubeadm InitConfiguration type.
++func UnmarshalInitConfiguration(yaml string) (*bootstrapv1.InitConfiguration, error) {
++	obj := &bootstrapv1.InitConfiguration{}
++	if err := unmarshalFromVersions(yaml, initConfigurationVersionTypeMap, obj); err != nil {
++		return nil, err
++	}
++	return obj, nil
++}
++
++// UnmarshalJoinConfiguration tries to translate a Kubeadm API yaml back to the JoinConfiguration type.
++// NOTE: The yaml could be any of the known formats for the kubeadm JoinConfiguration type.
++func UnmarshalJoinConfiguration(yaml string) (*bootstrapv1.JoinConfiguration, error) {
++	obj := &bootstrapv1.JoinConfiguration{}
++	if err := unmarshalFromVersions(yaml, joinConfigurationVersionTypeMap, obj); err != nil {
++		return nil, err
++	}
++	return obj, nil
++}
++
+ func unmarshalFromVersions(yaml string, kubeadmAPIVersions map[schema.GroupVersion]conversion.Convertible, capiObj conversion.Hub) error {
+ 	// For each know kubeadm API version
+ 	for gv, obj := range kubeadmAPIVersions {
+@@ -192,7 +212,8 @@ func unmarshalFromVersions(yaml string, kubeadmAPIVersions map[schema.GroupVersi
+ 			return errors.Wrapf(err, "failed to build scheme for kubeadm types conversions")
+ 		}
+ 
+-		if _, _, err := codecs.UniversalDeserializer().Decode([]byte(yaml), &gvk, kubeadmObj); err == nil {
++		_, _, err = codecs.UniversalDeserializer().Decode([]byte(yaml), &gvk, kubeadmObj)
++		if err == nil {
+ 			// If conversion worked, then converts the kubeadmObj (spoke) back to the Cluster API ClusterConfiguration type (hub).
+ 			if err := kubeadmObj.(conversion.Convertible).ConvertTo(capiObj); err != nil {
+ 				return errors.Wrapf(err, "failed to convert kubeadm types to Cluster API types")
+diff --git a/bootstrap/kubeadm/types/utils_test.go b/bootstrap/kubeadm/types/utils_test.go
+index 73c297c82..dfbbc0839 100644
+--- a/bootstrap/kubeadm/types/utils_test.go
++++ b/bootstrap/kubeadm/types/utils_test.go
+@@ -600,3 +600,121 @@ func TestUnmarshalClusterStatus(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestUnmarshalInitConfiguration(t *testing.T) {
++	type args struct {
++		yaml string
++	}
++	tests := []struct {
++		name    string
++		args    args
++		want    *bootstrapv1.InitConfiguration
++		wantErr bool
++	}{
++		{
++			name: "Parses a v1beta1 kubeadm configuration",
++			args: args{
++				yaml: "apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
++					"kind: InitConfiguration\n" +
++					"localAPIEndpoint: {}\n" +
++					"nodeRegistration: {}\n",
++			},
++			want:    &bootstrapv1.InitConfiguration{},
++			wantErr: false,
++		},
++		{
++			name: "Parses a v1beta2 kubeadm configuration",
++			args: args{
++				yaml: "apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
++					"kind: InitConfiguration\n" +
++					"localAPIEndpoint: {}\n" +
++					"nodeRegistration: {}\n",
++			},
++			want:    &bootstrapv1.InitConfiguration{},
++			wantErr: false,
++		},
++		{
++			name: "Parses a v1beta3 kubeadm configuration",
++			args: args{
++				yaml: "apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
++					"kind: InitConfiguration\n" +
++					"localAPIEndpoint: {}\n" +
++					"nodeRegistration: {}\n",
++			},
++			want:    &bootstrapv1.InitConfiguration{},
++			wantErr: false,
++		},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			g := NewWithT(t)
++
++			got, err := UnmarshalInitConfiguration(tt.args.yaml)
++			if tt.wantErr {
++				g.Expect(err).To(HaveOccurred())
++				return
++			}
++			g.Expect(err).ToNot(HaveOccurred())
++			g.Expect(got).To(Equal(tt.want), cmp.Diff(tt.want, got))
++		})
++	}
++}
++
++func TestUnmarshalJoinConfiguration(t *testing.T) {
++	type args struct {
++		yaml string
++	}
++	tests := []struct {
++		name    string
++		args    args
++		want    *bootstrapv1.JoinConfiguration
++		wantErr bool
++	}{
++		{
++			name: "Parses a v1beta1 kubeadm configuration",
++			args: args{
++				yaml: "apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
++					"caCertPath: \"\"\n" +
++					"discovery: {}\n" +
++					"kind: JoinConfiguration\n",
++			},
++			want:    &bootstrapv1.JoinConfiguration{},
++			wantErr: false,
++		},
++		{
++			name: "Parses a v1beta2 kubeadm configuration",
++			args: args{
++				yaml: "apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
++					"caCertPath: \"\"\n" +
++					"discovery: {}\n" +
++					"kind: JoinConfiguration\n",
++			},
++			want:    &bootstrapv1.JoinConfiguration{},
++			wantErr: false,
++		},
++		{
++			name: "Parses a v1beta3 kubeadm configuration",
++			args: args{
++				yaml: "apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
++					"caCertPath: \"\"\n" +
++					"discovery: {}\n" +
++					"kind: JoinConfiguration\n",
++			},
++			want:    &bootstrapv1.JoinConfiguration{},
++			wantErr: false,
++		},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			g := NewWithT(t)
++
++			got, err := UnmarshalJoinConfiguration(tt.args.yaml)
++			if tt.wantErr {
++				g.Expect(err).To(HaveOccurred())
++				return
++			}
++			g.Expect(err).ToNot(HaveOccurred())
++			g.Expect(got).To(Equal(tt.want), cmp.Diff(tt.want, got))
++		})
++	}
++}
+diff --git a/docs/book/src/clusterctl/commands/alpha-topology-plan.md b/docs/book/src/clusterctl/commands/alpha-topology-plan.md
+index 3f95b01f4..530cacb6d 100644
+--- a/docs/book/src/clusterctl/commands/alpha-topology-plan.md
++++ b/docs/book/src/clusterctl/commands/alpha-topology-plan.md
+@@ -132,17 +132,9 @@ spec:
+           apiServer:
+             certSANs: [ localhost, 127.0.0.1 ]
+         initConfiguration:
+-          nodeRegistration:
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              cgroup-driver: cgroupfs
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+         joinConfiguration:
+-          nodeRegistration:
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              cgroup-driver: cgroupfs
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+ ---
+ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+ kind: DockerMachineTemplate
+@@ -174,10 +166,7 @@ spec:
+   template:
+     spec:
+       joinConfiguration:
+-        nodeRegistration:
+-          kubeletExtraArgs:
+-            cgroup-driver: cgroupfs
+-            eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++        nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+ ```
+ 
+ </details>
+@@ -485,4 +474,3 @@ If only one cluster is affected or if a Cluster is in the input it defaults as t
+ Namespace used for objects with missing namespaces in the input.
+ 
+ If not provided, the namespace defined in kubeconfig is used. If a kubeconfig is not available the value `default` is used.
+-
+diff --git a/docs/book/src/tasks/bootstrap/kubeadm-bootstrap.md b/docs/book/src/tasks/bootstrap/kubeadm-bootstrap.md
+index 82f2f3b47..ac736c9d3 100644
+--- a/docs/book/src/tasks/bootstrap/kubeadm-bootstrap.md
++++ b/docs/book/src/tasks/bootstrap/kubeadm-bootstrap.md
+@@ -42,9 +42,7 @@ metadata:
+   name: my-control-plane1-config
+ spec:
+   initConfiguration:
+-    nodeRegistration:
+-      kubeletExtraArgs:
+-        eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+   clusterConfiguration:
+     controllerManager:
+       extraArgs:
+@@ -119,8 +117,7 @@ metadata:
+ spec:
+   initConfiguration:
+     nodeRegistration:
+-      kubeletExtraArgs:
+-        eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+   clusterConfiguration:
+     controllerManager:
+       extraArgs:
+@@ -136,8 +133,7 @@ metadata:
+ spec:
+   joinConfiguration:
+     nodeRegistration:
+-      kubeletExtraArgs:
+-        eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+     controlPlane: {}
+ ```
+ 
+@@ -150,8 +146,7 @@ metadata:
+ spec:
+   joinConfiguration:
+     nodeRegistration:
+-      kubeletExtraArgs:
+-        eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+ ```
+ 
+ ### Bootstrap Orchestration
+diff --git a/docs/book/src/tasks/experimental-features/ignition.md b/docs/book/src/tasks/experimental-features/ignition.md
+index 3689c11fe..5557f35d3 100644
+--- a/docs/book/src/tasks/experimental-features/ignition.md
++++ b/docs/book/src/tasks/experimental-features/ignition.md
+@@ -10,6 +10,18 @@ This initial implementation uses Ignition **v2** and was tested with **Flatcar C
+ 
+ </aside>
+ 
++<aside class="note warning">
++
++<h1>Note</h1>
++
++If using ignition with CAPD you should take care of setting `kubeletExtraArgs` for the `kindest/node` image in use,
++because default CAPD templates do not include anymore those settings since when the cloud-init shim for CAPD is automatically taking care of this.
++An example of how to set `kubeletExtraArgs` for the `kindest/node` can be found under `cluster-api/test/e2e/data/infrastructure-docker/main/cluster-template-ignition`.
++
++Hopefully, this will be automated for Ignition too in a future release.
++
++</aside>
++
+ This guide explains how to deploy an AWS workload cluster using Ignition.
+ 
+ ## Prerequisites
+diff --git a/test/e2e/data/infrastructure-docker/main/bases/cluster-with-kcp.yaml b/test/e2e/data/infrastructure-docker/main/bases/cluster-with-kcp.yaml
+index 424fec415..300791672 100644
+--- a/test/e2e/data/infrastructure-docker/main/bases/cluster-with-kcp.yaml
++++ b/test/e2e/data/infrastructure-docker/main/bases/cluster-with-kcp.yaml
+@@ -85,15 +85,7 @@ spec:
+         # host.docker.internal is required by kubetest when running on MacOS because of the way ports are proxied.
+         certSANs: [localhost, 127.0.0.1, 0.0.0.0, host.docker.internal]
+     initConfiguration:
+-      nodeRegistration:
+-        criSocket: unix:///var/run/containerd/containerd.sock
+-        kubeletExtraArgs:
+-          eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-          fail-swap-on: "false"
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+     joinConfiguration:
+-      nodeRegistration:
+-        criSocket: unix:///var/run/containerd/containerd.sock
+-        kubeletExtraArgs:
+-          eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-          fail-swap-on: "false"
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+   version: "${KUBERNETES_VERSION}"
+diff --git a/test/e2e/data/infrastructure-docker/main/bases/md.yaml b/test/e2e/data/infrastructure-docker/main/bases/md.yaml
+index ec060fba7..5d42a2cf5 100644
+--- a/test/e2e/data/infrastructure-docker/main/bases/md.yaml
++++ b/test/e2e/data/infrastructure-docker/main/bases/md.yaml
+@@ -23,11 +23,7 @@ spec:
+   template:
+     spec:
+       joinConfiguration:
+-        nodeRegistration:
+-          criSocket: unix:///var/run/containerd/containerd.sock
+-          kubeletExtraArgs:
+-            eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-            fail-swap-on: "false"
++        nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+ ---
+ # MachineDeployment object
+ apiVersion: cluster.x-k8s.io/v1beta1
+diff --git a/test/e2e/data/infrastructure-docker/main/bases/mp.yaml b/test/e2e/data/infrastructure-docker/main/bases/mp.yaml
+index 823d829b3..11ca197c8 100644
+--- a/test/e2e/data/infrastructure-docker/main/bases/mp.yaml
++++ b/test/e2e/data/infrastructure-docker/main/bases/mp.yaml
+@@ -44,7 +44,4 @@ metadata:
+   name: "${CLUSTER_NAME}-mp-0-config"
+ spec:
+   joinConfiguration:
+-    nodeRegistration:
+-      kubeletExtraArgs:
+-        eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
+-        fail-swap-on: "false"
++    nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+diff --git a/test/e2e/data/infrastructure-docker/main/cluster-template-ignition/ignition.yaml b/test/e2e/data/infrastructure-docker/main/cluster-template-ignition/ignition.yaml
+index 11f07f4ce..664757819 100644
+--- a/test/e2e/data/infrastructure-docker/main/cluster-template-ignition/ignition.yaml
++++ b/test/e2e/data/infrastructure-docker/main/cluster-template-ignition/ignition.yaml
+@@ -5,6 +5,20 @@ metadata:
+ spec:
+   kubeadmConfigSpec:
+     format: ignition
++    initConfiguration:
++      nodeRegistration:
++        # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
++        criSocket: unix:///var/run/containerd/containerd.sock
++        kubeletExtraArgs:
++          eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++          fail-swap-on: "false"
++    joinConfiguration:
++      nodeRegistration:
++        # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
++        criSocket: unix:///var/run/containerd/containerd.sock
++        kubeletExtraArgs:
++          eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++          fail-swap-on: "false"
+ ---
+ apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+ kind: KubeadmConfigTemplate
+@@ -24,3 +38,10 @@ spec:
+                   contents:
+                     inline: Howdy!
+                   mode: 0644
++      joinConfiguration:
++        nodeRegistration:
++          # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
++          criSocket: unix:///var/run/containerd/containerd.sock
++          kubeletExtraArgs:
++            eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++            fail-swap-on: "false"
+diff --git a/test/e2e/data/infrastructure-docker/main/cluster-template-kcp-adoption/step1/cluster-with-cp0.yaml b/test/e2e/data/infrastructure-docker/main/cluster-template-kcp-adoption/step1/cluster-with-cp0.yaml
+index b58b2100e..2e4d63f22 100644
+--- a/test/e2e/data/infrastructure-docker/main/cluster-template-kcp-adoption/step1/cluster-with-cp0.yaml
++++ b/test/e2e/data/infrastructure-docker/main/cluster-template-kcp-adoption/step1/cluster-with-cp0.yaml
+@@ -45,17 +45,9 @@ spec:
+     apiServer:
+       certSANs: [localhost, 127.0.0.1]
+   initConfiguration:
+-    nodeRegistration:
+-      criSocket: unix:///var/run/containerd/containerd.sock
+-      kubeletExtraArgs:
+-        eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-        fail-swap-on: "false"
++    nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+   joinConfiguration:
+-    nodeRegistration:
+-      criSocket: unix:///var/run/containerd/containerd.sock
+-      kubeletExtraArgs:
+-        eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-        fail-swap-on: "false"
++    nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+ ---
+ # cp0 Machine
+ apiVersion: cluster.x-k8s.io/v1beta1
+diff --git a/test/e2e/data/infrastructure-docker/main/cluster-template-kcp-remediation/cluster-with-kcp.yaml b/test/e2e/data/infrastructure-docker/main/cluster-template-kcp-remediation/cluster-with-kcp.yaml
+index b0785358b..dfeaccfc1 100644
+--- a/test/e2e/data/infrastructure-docker/main/cluster-template-kcp-remediation/cluster-with-kcp.yaml
++++ b/test/e2e/data/infrastructure-docker/main/cluster-template-kcp-remediation/cluster-with-kcp.yaml
+@@ -59,15 +59,9 @@ spec:
+         # host.docker.internal is required by kubetest when running on MacOS because of the way ports are proxied.
+         certSANs: [localhost, 127.0.0.1, 0.0.0.0, host.docker.internal]
+     initConfiguration:
+-      nodeRegistration:
+-        kubeletExtraArgs:
+-          eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-          fail-swap-on: "false"
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+     joinConfiguration:
+-      nodeRegistration:
+-        kubeletExtraArgs:
+-          eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-          fail-swap-on: "false"
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+     files:
+     - path: /wait-signal.sh
+       content: |
+diff --git a/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-cgroupfs.yaml b/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-cgroupfs.yaml
+index 26b5aed01..35a955c8b 100644
+--- a/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-cgroupfs.yaml
++++ b/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-cgroupfs.yaml
+@@ -5,10 +5,9 @@ metadata:
+   name: "${CLUSTER_NAME}-mp-0-config-cgroupfs"
+ spec:
+   joinConfiguration:
++    # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+     nodeRegistration:
+       kubeletExtraArgs:
+         # We have to pin the cgroupDriver to cgroupfs as kubeadm >=1.21 defaults to systemd
+         # kind will implement systemd support in: https://github.com/kubernetes-sigs/kind/issues/1726
+         cgroup-driver: cgroupfs
+-        eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
+-        fail-swap-on: "false"
+diff --git a/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start-runtimesdk.yaml b/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start-runtimesdk.yaml
+index 5e8cb62ce..e6ac76b57 100644
+--- a/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start-runtimesdk.yaml
++++ b/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start-runtimesdk.yaml
+@@ -92,19 +92,9 @@ spec:
+             # host.docker.internal is required by kubetest when running on MacOS because of the way ports are proxied.
+             certSANs: [localhost, 127.0.0.1, 0.0.0.0, host.docker.internal]
+         initConfiguration:
+-          nodeRegistration:
+-            # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-              fail-swap-on: "false"
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+         joinConfiguration:
+-          nodeRegistration:
+-            # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-              fail-swap-on: "false"
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+ ---
+ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+ kind: DockerMachineTemplate
+@@ -136,10 +126,4 @@ spec:
+   template:
+     spec:
+       joinConfiguration:
+-        nodeRegistration:
+-          # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-          criSocket: unix:///var/run/containerd/containerd.sock
+-          kubeletExtraArgs:
+-            eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-            fail-swap-on: "false"
+-
++        nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+diff --git a/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start.yaml b/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start.yaml
+index 647b9bbe5..d455f8bc4 100644
+--- a/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start.yaml
++++ b/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start.yaml
+@@ -370,19 +370,13 @@ spec:
+             # host.docker.internal is required by kubetest when running on MacOS because of the way ports are proxied.
+             certSANs: [localhost, 127.0.0.1, 0.0.0.0, host.docker.internal]
+         initConfiguration:
+-          nodeRegistration:
+-            # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
++          nodeRegistration: # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
++            kubeletExtraArgs: # required for the cgroup-driver patch to work
+               eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-              fail-swap-on: "false"
+         joinConfiguration:
+-          nodeRegistration:
+-            # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
++          nodeRegistration: # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
++            kubeletExtraArgs: # required for the cgroup-driver patch to work
+               eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-              fail-swap-on: "false"
+ ---
+ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+ kind: DockerMachineTemplate
+@@ -441,10 +435,6 @@ spec:
+         BootstrapConfigTemplate.machineDeployment.template.annotation: "BootstrapConfigTemplate.machineDeployment.template.annotationValue"
+     spec:
+       joinConfiguration:
+-        nodeRegistration:
+-          # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-          criSocket: unix:///var/run/containerd/containerd.sock
+-          kubeletExtraArgs:
++        nodeRegistration: # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
++          kubeletExtraArgs: # required for the cgroup-driver patch to work
+             eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-            fail-swap-on: "false"
+-
+diff --git a/test/go.mod b/test/go.mod
+index 9405337f1..e31d1ebca 100644
+--- a/test/go.mod
++++ b/test/go.mod
+@@ -64,7 +64,6 @@ require (
+ 	github.com/golang/protobuf v1.5.3 // indirect
+ 	github.com/google/cel-go v0.12.6 // indirect
+ 	github.com/google/gnostic v0.6.9 // indirect
+-	github.com/google/go-cmp v0.5.9 // indirect
+ 	github.com/google/go-github/v48 v48.2.0 // indirect
+ 	github.com/google/go-querystring v1.1.0 // indirect
+ 	github.com/google/gofuzz v1.2.0 // indirect
+diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
+index 66872e496..202e11630 100644
+--- a/test/infrastructure/docker/internal/docker/machine.go
++++ b/test/infrastructure/docker/internal/docker/machine.go
+@@ -378,7 +378,7 @@ func (m *Machine) ExecBootstrap(ctx context.Context, data string, format bootstr
+ 
+ 	switch format {
+ 	case bootstrapv1.CloudConfig:
+-		commands, err = cloudinit.RawCloudInitToProvisioningCommands(cloudConfig)
++		commands, err = cloudinit.RawCloudInitToProvisioningCommands(cloudConfig, kindMapping)
+ 	case bootstrapv1.Ignition:
+ 		commands, err = ignition.RawIgnitionToProvisioningCommands(cloudConfig)
+ 	default:
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/kindadapter.go b/test/infrastructure/docker/internal/provisioning/cloudinit/adapter.go
+similarity index 86%
+rename from test/infrastructure/docker/internal/provisioning/cloudinit/kindadapter.go
+rename to test/infrastructure/docker/internal/provisioning/cloudinit/adapter.go
+index d19daf751..646d2ca5b 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/kindadapter.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/adapter.go
+@@ -26,6 +26,7 @@ import (
+ 	"sigs.k8s.io/yaml"
+ 
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning"
++	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ )
+ 
+ const (
+@@ -49,19 +50,19 @@ func (a *actionFactory) action(name string) action {
+ }
+ 
+ type action interface {
+-	Unmarshal(userData []byte) error
++	Unmarshal(userData []byte, mapping kind.Mapping) error
+ 	Commands() ([]provisioning.Cmd, error)
+ }
+ 
+ // RawCloudInitToProvisioningCommands converts a cloudconfig to a list of commands to run in sequence on the node.
+-func RawCloudInitToProvisioningCommands(config []byte) ([]provisioning.Cmd, error) {
++func RawCloudInitToProvisioningCommands(config []byte, mapping kind.Mapping) ([]provisioning.Cmd, error) {
+ 	// validate cloudConfigScript is a valid yaml, as required by the cloud config specification
+ 	if err := yaml.Unmarshal(config, &map[string]interface{}{}); err != nil {
+ 		return nil, errors.Wrapf(err, "cloud-config is not valid yaml")
+ 	}
+ 
+ 	// parse the cloud config yaml into a slice of cloud config actions.
+-	actions, err := getActions(config)
++	actions, err := getActions(config, mapping)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -80,7 +81,7 @@ func RawCloudInitToProvisioningCommands(config []byte) ([]provisioning.Cmd, erro
+ 
+ // getActions parses the cloud config yaml into a slice of actions to run.
+ // Parsing manually is required because the order of the cloud config's actions must be maintained.
+-func getActions(userData []byte) ([]action, error) {
++func getActions(userData []byte, mapping kind.Mapping) ([]action, error) {
+ 	actionRegEx := regexp.MustCompile(`^[a-zA-Z_]*:`)
+ 	lines := make([]string, 0)
+ 	actions := make([]action, 0)
+@@ -97,7 +98,7 @@ func getActions(userData []byte) ([]action, error) {
+ 			// converts the file fragment scanned up to now into the current action, if any
+ 			if act != nil {
+ 				actionBlock := strings.Join(lines, "\n")
+-				if err := act.Unmarshal([]byte(actionBlock)); err != nil {
++				if err := act.Unmarshal([]byte(actionBlock), mapping); err != nil {
+ 					return nil, errors.WithStack(err)
+ 				}
+ 				actions = append(actions, act)
+@@ -115,7 +116,7 @@ func getActions(userData []byte) ([]action, error) {
+ 	// converts the last file fragment scanned into the current action, if any
+ 	if act != nil {
+ 		actionBlock := strings.Join(lines, "\n")
+-		if err := act.Unmarshal([]byte(actionBlock)); err != nil {
++		if err := act.Unmarshal([]byte(actionBlock), mapping); err != nil {
+ 			return nil, errors.WithStack(err)
+ 		}
+ 		actions = append(actions, act)
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/kindadapter_test.go b/test/infrastructure/docker/internal/provisioning/cloudinit/adapter_test.go
+similarity index 98%
+rename from test/infrastructure/docker/internal/provisioning/cloudinit/kindadapter_test.go
+rename to test/infrastructure/docker/internal/provisioning/cloudinit/adapter_test.go
+index 2c33f0289..4810655ac 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/kindadapter_test.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/adapter_test.go
+@@ -19,9 +19,11 @@ package cloudinit
+ import (
+ 	"testing"
+ 
++	"github.com/blang/semver"
+ 	. "github.com/onsi/gomega"
+ 
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning"
++	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ )
+ 
+ func TestRealUseCase(t *testing.T) {
+@@ -141,7 +143,7 @@ write_files:
+ 		{Cmd: "chmod", Args: []string{"0640", "/run/kubeadm/kubeadm.yaml"}},
+ 	}
+ 
+-	commands, err := RawCloudInitToProvisioningCommands(cloudData)
++	commands, err := RawCloudInitToProvisioningCommands(cloudData, kind.Mapping{KubernetesVersion: semver.MustParse("1.13.6")})
+ 
+ 	g.Expect(err).NotTo(HaveOccurred())
+ 	g.Expect(commands).To(HaveLen(len(expectedCmds)))
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/runcmd.go b/test/infrastructure/docker/internal/provisioning/cloudinit/runcmd.go
+index 9b0127085..6d8bdab06 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/runcmd.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/runcmd.go
+@@ -23,6 +23,7 @@ import (
+ 	"sigs.k8s.io/yaml"
+ 
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning"
++	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ )
+ 
+ // runCmd defines parameters of a shell command that is equivalent to an action found in the cloud init rundcmd module.
+@@ -35,7 +36,7 @@ func newRunCmdAction() action {
+ }
+ 
+ // Unmarshal the runCmd.
+-func (a *runCmd) Unmarshal(userData []byte) error {
++func (a *runCmd) Unmarshal(userData []byte, _ kind.Mapping) error {
+ 	if err := yaml.Unmarshal(userData, a); err != nil {
+ 		return errors.Wrapf(err, "error parsing run_cmd action: %s", userData)
+ 	}
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/runcmd_test.go b/test/infrastructure/docker/internal/provisioning/cloudinit/runcmd_test.go
+index 1afb666a0..c30e951f9 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/runcmd_test.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/runcmd_test.go
+@@ -22,6 +22,7 @@ import (
+ 	. "github.com/onsi/gomega"
+ 
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning"
++	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ )
+ 
+ func TestRunCmdUnmarshal(t *testing.T) {
+@@ -32,7 +33,7 @@ runcmd:
+ - [ ls, -l, / ]
+ - "ls -l /"`
+ 	r := runCmd{}
+-	err := r.Unmarshal([]byte(cloudData))
++	err := r.Unmarshal([]byte(cloudData), kind.Mapping{})
+ 	g.Expect(err).NotTo(HaveOccurred())
+ 	g.Expect(r.Cmds).To(HaveLen(2))
+ 
+@@ -94,7 +95,7 @@ runcmd:
+ - kubeadm init --config=/run/kubeadm/kubeadm.yaml
+ - [ kubeadm, join, --config=/run/kubeadm/kubeadm-controlplane-join-config.yaml ]`
+ 	r := runCmd{}
+-	err := r.Unmarshal([]byte(cloudData))
++	err := r.Unmarshal([]byte(cloudData), kind.Mapping{})
+ 	g.Expect(err).NotTo(HaveOccurred())
+ 	g.Expect(r.Cmds).To(HaveLen(2))
+ 
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/unknown.go b/test/infrastructure/docker/internal/provisioning/cloudinit/unknown.go
+index cb5af5ff4..ec4799ab8 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/unknown.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/unknown.go
+@@ -22,6 +22,7 @@ import (
+ 	"github.com/pkg/errors"
+ 
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning"
++	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ )
+ 
+ type unknown struct {
+@@ -34,7 +35,7 @@ func newUnknown(module string) action {
+ }
+ 
+ // Unmarshal will unmarshal unknown actions and slurp the value.
+-func (u *unknown) Unmarshal(data []byte) error {
++func (u *unknown) Unmarshal(data []byte, _ kind.Mapping) error {
+ 	// try unmarshalling to a slice of strings
+ 	var s1 []string
+ 	if err := json.Unmarshal(data, &s1); err != nil {
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/unknown_test.go b/test/infrastructure/docker/internal/provisioning/cloudinit/unknown_test.go
+index bafc255a3..ba678a6dc 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/unknown_test.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/unknown_test.go
+@@ -20,6 +20,8 @@ import (
+ 	"testing"
+ 
+ 	. "github.com/onsi/gomega"
++
++	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ )
+ 
+ func TestUnknown_Run(t *testing.T) {
+@@ -40,6 +42,6 @@ func TestUnknown_Unmarshal(t *testing.T) {
+ 	expected := []string{"test 1", "test 2", "test 3"}
+ 	input := `["test 1", "test 2", "test 3"]`
+ 
+-	g.Expect(u.Unmarshal([]byte(input))).To(Succeed())
++	g.Expect(u.Unmarshal([]byte(input), kind.Mapping{})).To(Succeed())
+ 	g.Expect(u.lines).To(Equal(expected))
+ }
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles.go b/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles.go
+index c7fdb6aa3..d75847625 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles.go
+@@ -28,11 +28,15 @@ import (
+ 	"github.com/pkg/errors"
+ 	"sigs.k8s.io/yaml"
+ 
++	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
++	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types"
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning"
++	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ )
+ 
+ const (
+ 	kubeadmInitPath          = "/run/kubeadm/kubeadm.yaml"
++	kubeadmJoinPath          = "/run/kubeadm/kubeadm-join-config.yaml"
+ 	kubeproxyComponentConfig = `
+ ---
+ apiVersion: kubeproxy.config.k8s.io/v1alpha1
+@@ -62,13 +66,81 @@ func newWriteFilesAction() action {
+ 	return &writeFilesAction{}
+ }
+ 
+-func (a *writeFilesAction) Unmarshal(userData []byte) error {
++func (a *writeFilesAction) Unmarshal(userData []byte, kindMapping kind.Mapping) error {
+ 	if err := yaml.Unmarshal(userData, a); err != nil {
+ 		return errors.Wrapf(err, "error parsing write_files action: %s", userData)
+ 	}
++	for i, f := range a.Files {
++		if f.Path == kubeadmInitPath {
++			// NOTE: in case of join the kubeadmConfigFile contains both the ClusterConfiguration and the InitConfiguration
++			contentSplit := strings.Split(f.Content, "---\n")
++
++			if len(contentSplit) != 3 {
++				return errors.Errorf("invalid kubeadm config file, unable to parse it")
++			}
++			initConfiguration, err := kubeadmtypes.UnmarshalInitConfiguration(contentSplit[2])
++			if err != nil {
++				return errors.Wrapf(err, "failed to parse init configuration")
++			}
++
++			fixNodeRegistration(&initConfiguration.NodeRegistration, kindMapping.Mode)
++
++			contentSplit[2], err = kubeadmtypes.MarshalInitConfigurationForVersion(initConfiguration, kindMapping.KubernetesVersion)
++			if err != nil {
++				return errors.Wrapf(err, "failed to marshal init configuration")
++			}
++			a.Files[i].Content = strings.Join(contentSplit, "---\n")
++		}
++		if f.Path == kubeadmJoinPath {
++			// NOTE: in case of join the kubeadmConfigFile contains only the join Configuration
++			joinConfiguration, err := kubeadmtypes.UnmarshalJoinConfiguration(f.Content)
++			if err != nil {
++				return errors.Wrapf(err, "failed to parse join configuration")
++			}
++
++			fixNodeRegistration(&joinConfiguration.NodeRegistration, kindMapping.Mode)
++
++			a.Files[i].Content, err = kubeadmtypes.MarshalJoinConfigurationForVersion(joinConfiguration, kindMapping.KubernetesVersion)
++			if err != nil {
++				return errors.Wrapf(err, "failed to marshal join configuration")
++			}
++		}
++	}
+ 	return nil
+ }
+ 
++// fixNodeRegistration sets node registration for running Kubernetes/kubelet in docker.
++// NOTE: we add those values if they do not exists; user can set those flags to different values to disable automatic fixing.
++// NOTE: if there will be use case for it, we might investigate better ways to disable automatic fixing.
++func fixNodeRegistration(nodeRegistration *bootstrapv1.NodeRegistrationOptions, kindMode kind.Mode) {
++	if nodeRegistration.CRISocket == "" {
++		// NOTE: self-hosted cluster have to mount the Docker socket.
++		// On those nodes we have the Docker and the containerd socket and then kubeadm
++		// wouldn't know which one to use unless we are explicit about it.
++		nodeRegistration.CRISocket = "unix:///var/run/containerd/containerd.sock"
++	}
++
++	if nodeRegistration.KubeletExtraArgs == nil {
++		nodeRegistration.KubeletExtraArgs = map[string]string{}
++	}
++
++	if _, ok := nodeRegistration.KubeletExtraArgs["eviction-hard"]; !ok {
++		nodeRegistration.KubeletExtraArgs["eviction-hard"] = "nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%"
++	}
++	if _, ok := nodeRegistration.KubeletExtraArgs["fail-swap-on"]; !ok {
++		nodeRegistration.KubeletExtraArgs["fail-swap-on"] = "false"
++	}
++
++	if kindMode != kind.Mode0_19 {
++		if _, ok := nodeRegistration.KubeletExtraArgs["cgroup-root"]; !ok {
++			nodeRegistration.KubeletExtraArgs["cgroup-root"] = "/kubelet"
++		}
++		if _, ok := nodeRegistration.KubeletExtraArgs["runtime-cgroups"]; !ok {
++			nodeRegistration.KubeletExtraArgs["runtime-cgroups"] = "/system.slice/containerd.service"
++		}
++	}
++}
++
+ // Commands return a list of commands to run on the node.
+ // Each command defines the parameters of a shell command necessary to generate a file replicating the cloud-init write_files module.
+ func (a *writeFilesAction) Commands() ([]provisioning.Cmd, error) {
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles_test.go b/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles_test.go
+index e3e7fd3c2..23ebe3f33 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles_test.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles_test.go
+@@ -21,9 +21,12 @@ import (
+ 	"compress/gzip"
+ 	"testing"
+ 
++	"github.com/blang/semver"
++	"github.com/google/go-cmp/cmp"
+ 	. "github.com/onsi/gomega"
+ 
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning"
++	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ )
+ 
+ func TestWriteFiles(t *testing.T) {
+@@ -98,6 +101,150 @@ func TestWriteFiles(t *testing.T) {
+ 	}
+ }
+ 
++func TestFixKubeletArgs(t *testing.T) {
++	var useCases = []struct {
++		name            string
++		files           []byte
++		mapping         kind.Mapping
++		expectedContent []string
++	}{
++		{
++			name: "Fix kubelet args for kind 1.19 mode",
++			files: []byte(`
++write_files:
++- content: |
++    ---
++    ClusterConfiguration...
++    ---
++    apiVersion: kubeadm.k8s.io/v1beta1
++    kind: InitConfiguration
++    nodeRegistration:
++      criSocket: unix:///var/run/containerd/containerd.sock
++      kubeletExtraArgs:
++        cloud-provider: aws
++  owner: root:root
++  path: /run/kubeadm/kubeadm.yaml
++  permissions: '0640'
++- content: |
++    ---
++    apiVersion: kubeadm.k8s.io/v1beta1
++    kind: JoinConfiguration
++    nodeRegistration:
++      criSocket: unix:///var/run/containerd/containerd.sock
++      kubeletExtraArgs:
++        cloud-provider: aws
++  path: /run/kubeadm/kubeadm-join-config.yaml
++  owner: root:root
++  permissions: '0640'
++`),
++			mapping: kind.Mapping{KubernetesVersion: semver.MustParse("1.28.3"), Mode: kind.Mode0_19},
++			expectedContent: []string{
++				`---
++ClusterConfiguration...
++---
++apiVersion: kubeadm.k8s.io/v1beta3
++kind: InitConfiguration
++localAPIEndpoint: {}
++nodeRegistration:
++  criSocket: unix:///var/run/containerd/containerd.sock
++  kubeletExtraArgs:
++    cloud-provider: aws
++    eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    fail-swap-on: "false"
++  taints: null
++`,
++				`apiVersion: kubeadm.k8s.io/v1beta3
++discovery: {}
++kind: JoinConfiguration
++nodeRegistration:
++  criSocket: unix:///var/run/containerd/containerd.sock
++  kubeletExtraArgs:
++    cloud-provider: aws
++    eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    fail-swap-on: "false"
++  taints: null
++`,
++			},
++		},
++		{
++			name: "Fix kubelet args for kind 1.20 mode",
++			files: []byte(`
++write_files:
++- content: |
++    ---
++    ClusterConfiguration...
++    ---
++    apiVersion: kubeadm.k8s.io/v1beta1
++    kind: InitConfiguration
++    nodeRegistration:
++      criSocket: unix:///var/run/containerd/containerd.sock
++      kubeletExtraArgs:
++        cloud-provider: aws
++  owner: root:root
++  path: "/run/kubeadm/kubeadm.yaml"
++  permissions: '0640'
++- content: |
++    ---
++    apiVersion: kubeadm.k8s.io/v1beta1
++    kind: JoinConfiguration
++    nodeRegistration:
++      criSocket: unix:///var/run/containerd/containerd.sock
++      kubeletExtraArgs:
++        cloud-provider: aws
++  path: "/run/kubeadm/kubeadm-join-config.yaml"
++  owner: root:root
++  permissions: '0640'
++`),
++			mapping: kind.Mapping{KubernetesVersion: semver.MustParse("1.28.3"), Mode: kind.Mode0_20},
++			expectedContent: []string{
++				`---
++ClusterConfiguration...
++---
++apiVersion: kubeadm.k8s.io/v1beta3
++kind: InitConfiguration
++localAPIEndpoint: {}
++nodeRegistration:
++  criSocket: unix:///var/run/containerd/containerd.sock
++  kubeletExtraArgs:
++    cgroup-root: /kubelet
++    cloud-provider: aws
++    eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    fail-swap-on: "false"
++    runtime-cgroups: /system.slice/containerd.service
++  taints: null
++`,
++				`apiVersion: kubeadm.k8s.io/v1beta3
++discovery: {}
++kind: JoinConfiguration
++nodeRegistration:
++  criSocket: unix:///var/run/containerd/containerd.sock
++  kubeletExtraArgs:
++    cgroup-root: /kubelet
++    cloud-provider: aws
++    eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    fail-swap-on: "false"
++    runtime-cgroups: /system.slice/containerd.service
++  taints: null
++`,
++			},
++		},
++	}
++
++	for _, rt := range useCases {
++		t.Run(rt.name, func(t *testing.T) {
++			g := NewWithT(t)
++
++			w := writeFilesAction{}
++			err := w.Unmarshal(rt.files, rt.mapping)
++			g.Expect(err).ToNot(HaveOccurred())
++
++			for i, x := range rt.expectedContent {
++				g.Expect(w.Files[i].Content).To(Equal(x), cmp.Diff(w.Files[i].Content, x))
++			}
++		})
++	}
++}
++
+ func TestFixContent(t *testing.T) {
+ 	v := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+ 	gv, _ := gZipData([]byte(v))
+diff --git a/test/infrastructure/docker/templates/clusterclass-quick-start.yaml b/test/infrastructure/docker/templates/clusterclass-quick-start.yaml
+index db1ddcb4f..af5559c8c 100644
+--- a/test/infrastructure/docker/templates/clusterclass-quick-start.yaml
++++ b/test/infrastructure/docker/templates/clusterclass-quick-start.yaml
+@@ -286,19 +286,9 @@ spec:
+             # host.docker.internal is required by kubetest when running on MacOS because of the way ports are proxied.
+             certSANs: [localhost, 127.0.0.1, 0.0.0.0, host.docker.internal]
+         initConfiguration:
+-          nodeRegistration:
+-            # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-              fail-swap-on: "false"
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+         joinConfiguration:
+-          nodeRegistration:
+-            # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-              fail-swap-on: "false"
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+ ---
+ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+ kind: DockerMachineTemplate
+@@ -330,10 +320,4 @@ spec:
+   template:
+     spec:
+       joinConfiguration:
+-        nodeRegistration:
+-          # We have to set the criSocket to containerd as kubeadm defaults to docker runtime if both containerd and docker sockets are found
+-          criSocket: unix:///var/run/containerd/containerd.sock
+-          kubeletExtraArgs:
+-            eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+-            fail-swap-on: "false"
+-
++        nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+-- 
+2.39.2
+
