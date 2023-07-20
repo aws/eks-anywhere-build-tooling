@@ -1,0 +1,111 @@
+From 1eb1248e4cdb4d18d22a82cef691d005ef89c0f8 Mon Sep 17 00:00:00 2001
+From: Cavaughn Browne <cxbrowne@amazon.com>
+Date: Thu, 20 Jul 2023 11:05:49 -0500
+Subject: [PATCH 34/34] allow registry mirror configurations to be mutable for
+ BR
+
+---
+ .../v1beta1/kubeadm_control_plane_webhook.go  |  2 +
+ .../kubeadm_control_plane_webhook_test.go     | 45 +++++++++++++++++++
+ 2 files changed, 47 insertions(+)
+
+diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
+index d206fbc19..87b401070 100644
+--- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
++++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
+@@ -160,6 +160,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, controllerManager, "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler, "*"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "registryMirror", "*"},
+ 		{spec, kubeadmConfigSpec, initConfiguration, nodeRegistration},
+ 		{spec, kubeadmConfigSpec, initConfiguration, nodeRegistration, "*"},
+ 		{spec, kubeadmConfigSpec, initConfiguration, patches, directory},
+@@ -174,6 +175,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketSettings", "*"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "registryMirror", "*"},
+ 		{spec, kubeadmConfigSpec, preKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, postKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, files},
+diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
+index 38caa9e1e..45eb1976e 100644
+--- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
++++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
+@@ -302,6 +302,10 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 							ImageTag:        "1.6.5",
+ 						},
+ 					},
++					RegistryMirror: bootstrapv1.RegistryMirrorConfiguration{
++						Endpoint: "https://1.1.1.1:1111",
++						CACert:   "test-cert",
++					},
+ 				},
+ 				JoinConfiguration: &bootstrapv1.JoinConfiguration{
+ 					Discovery: bootstrapv1.Discovery{
+@@ -312,6 +316,10 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 					NodeRegistration: bootstrapv1.NodeRegistrationOptions{
+ 						Name: "test",
+ 					},
++					RegistryMirror: bootstrapv1.RegistryMirrorConfiguration{
++						Endpoint: "https://1.1.1.1:1111",
++						CACert:   "test-cert",
++					},
+ 				},
+ 				PreKubeadmCommands: []string{
+ 					"test", "foo",
+@@ -699,6 +707,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 		{"/var/lib/testdir", "/var/lib/etcd/data"},
+ 	}
+ 
++	validUpdateClusterConfigRegistryMirrorCACert := before.DeepCopy()
++	validUpdateClusterConfigRegistryMirrorCACert.Spec.KubeadmConfigSpec.ClusterConfiguration.RegistryMirror.CACert = "foo:bar"
++
++	validUpdateJoinConfigRegistryMirrorCACert := before.DeepCopy()
++	validUpdateJoinConfigRegistryMirrorCACert.Spec.KubeadmConfigSpec.JoinConfiguration.RegistryMirror.CACert = "foo:bar"
++
++	validUpdateClusterConfigRegistryMirrorEndpoint := before.DeepCopy()
++	validUpdateClusterConfigRegistryMirrorEndpoint.Spec.KubeadmConfigSpec.ClusterConfiguration.RegistryMirror.Endpoint = "https://0.0.0.0:6443"
++
++	validUpdateJoinConfigRegistryMirrorEndpoint := before.DeepCopy()
++	validUpdateJoinConfigRegistryMirrorEndpoint.Spec.KubeadmConfigSpec.JoinConfiguration.RegistryMirror.Endpoint = "https://0.0.0.0:6443"
++
+ 	tests := []struct {
+ 		name                  string
+ 		enableIgnitionFeature bool
+@@ -1104,6 +1124,31 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before:    before,
+ 			kcp:       validUpdateJoinConfBRCustomBootstrapContainers,
+ 		},
++		{
++			name:      "should allow changes to join configuration registry mirror caCert",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfigRegistryMirrorCACert,
++		},
++		{
++			name:      "should allow changes to join configuration registry mirror endpoint",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfigRegistryMirrorEndpoint,
++		},
++		{
++			name:      "should allow changes to cluster configuration registry mirror caCert",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfigRegistryMirrorCACert,
++		},
++
++		{
++			name:      "should allow changes to cluster configuration registry mirror endpoint",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfigRegistryMirrorEndpoint,
++		},
+ 	}
+ 
+ 	for _, tt := range tests {
+-- 
+2.40.0
+
