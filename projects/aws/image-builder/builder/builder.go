@@ -68,25 +68,43 @@ func (b *BuildOptions) BuildImage() {
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n Firmware: %s\n", b.Os, b.OsVersion, b.Hypervisor, b.Firmware)
 	if b.FilesConfig != nil {
+		additionalFilesList := filepath.Join(imageBuilderProjectPath, packerAdditionalFilesList)
+		additionalFilesCustomRole := filepath.Join(imageBuilderProjectPath, ansibleAdditionalFilesCustomRole)
+		b.FilesConfig.FilesAnsibleConfig.CustomRoleNames = additionalFilesCustomRole
+		b.FilesConfig.FilesAnsibleConfig.AnsibleExtraVars = fmt.Sprintf("@%s", additionalFilesList)
+
+		log.Println("Marshaling files ansible config to JSON")
 		filesAnsibleConfig, err := json.Marshal(b.FilesConfig.FilesAnsibleConfig)
 		if err != nil {
 			log.Fatalf("Error marshalling files ansible config data: %v", err)
 		}
 
 		additionalFilesConfigFile := filepath.Join(imageBuilderProjectPath, packerAdditionalFilesConfigFile)
+		log.Printf("Writing files ansible config to Packer config directory: %s", additionalFilesConfigFile)
 		err = ioutil.WriteFile(additionalFilesConfigFile, filesAnsibleConfig, 0o644)
 		if err != nil {
-			log.Fatalf("Error writing additional files config file to Packer directory: %v", err)
+			log.Fatalf("Error writing additional files config file to Packer config directory: %v", err)
 		}
 
+		log.Println("Marshaling additional files list to YAML")
+		if b.AMIConfig != nil {
+			for index, file := range b.FilesConfig.AdditionalFilesList {
+				for _, defaultFile := range DefaultAMIAdditionalFiles {
+					if file == defaultFile {
+						b.FilesConfig.AdditionalFilesList[index].Source = filepath.Join(imageBuilderProjectPath, b.FilesConfig.AdditionalFilesList[index].Source)
+					}
+				}
+			}
+		}
 		additionalFileVars, err := yaml.Marshal(b.FilesConfig.FileVars)
 		if err != nil {
 			log.Fatalf("Error marshalling additional files list: %v", err)
 		}
 
-		err = ioutil.WriteFile(filepath.Join(imageBuilderProjectPath, packerAdditionalFilesList), additionalFileVars, 0o644)
+		log.Printf("Writing additional files list to Packer ansible directory: %s", additionalFilesList)
+		err = ioutil.WriteFile(additionalFilesList, additionalFileVars, 0o644)
 		if err != nil {
-			log.Fatalf("Error writing additional files config in Packer ansible directory: %v", err)
+			log.Fatalf("Error writing additional files list to Packer ansible directory: %v", err)
 		}
 
 		commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerAdditionalFilesConfigFileEnvVar, additionalFilesConfigFile))
@@ -246,6 +264,9 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		if b.AMIConfig != nil {
+			if b.AMIConfig.ManifestOutput == DefaultAMIManifestOutput {
+				b.AMIConfig.ManifestOutput = filepath.Join(cwd, b.AMIConfig.ManifestOutput)
+			}
 			amiConfigData, err := json.Marshal(b.AMIConfig)
 			if err != nil {
 				log.Fatalf("Error marshalling AMI config data: %v", err)
