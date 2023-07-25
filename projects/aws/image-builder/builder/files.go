@@ -32,9 +32,26 @@ func (afc *AdditionalFilesConfig) ProcessAdditionalFiles() {
 	if len(afc.FileVars.AdditionalFilesList) != 0 {
 		afc.FileVars.AdditionalFiles = "true"
 		afc.FilesAnsibleConfig.CustomRole = "true"
-		afc.FilesAnsibleConfig.CustomRoleNames = DefaultAMICustomRoleNames
-		if afc.FilesAnsibleConfig.AnsibleExtraVars == "" {
-			afc.FilesAnsibleConfig.AnsibleExtraVars = DefaultAMIAnsibleExtraVars
+	}
+}
+
+func SameFilesProvided(a, b []File) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	m := make(map[File]int, len(a))
+	for _, v := range a {
+		m[v]++
+	}
+	for _, v := range b {
+		if _, ok := m[v]; !ok {
+			return false
+		}
+		m[v] -= 1
+		if m[v] == 0 {
+			delete(m, v)
 		}
 	}
+	return len(m) == 0
 }
