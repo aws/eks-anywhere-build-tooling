@@ -102,48 +102,48 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 	}{
 		{
 			testName: "Ubuntu 20.04",
-			buildOptions: builder.BuildOptions{				
-				Os:         "ubuntu",
+			buildOptions: builder.BuildOptions{
+				Os:        "ubuntu",
 				OsVersion: "20.04",
 			},
 			wantErr: "",
 		},
 		{
 			testName: "Ubuntu 22.04",
-			buildOptions: builder.BuildOptions{				
-				Os:         "ubuntu",
+			buildOptions: builder.BuildOptions{
+				Os:        "ubuntu",
 				OsVersion: "22.04",
-			},			
+			},
 			wantErr: "",
 		},
 		{
 			testName: "Ubuntu 24.04",
-			buildOptions: builder.BuildOptions{				
-				Os:         "ubuntu",
+			buildOptions: builder.BuildOptions{
+				Os:        "ubuntu",
 				OsVersion: "24.04",
 			},
 			wantErr: "24.04 is not a supported version of Ubuntu. Please select one of 20.04,22.04",
 		},
 		{
 			testName: "Redhat 8",
-			buildOptions: builder.BuildOptions{				
-				Os:         "redhat",
+			buildOptions: builder.BuildOptions{
+				Os:        "redhat",
 				OsVersion: "8",
 			},
 			wantErr: "",
 		},
 		{
 			testName: "Redhat 9",
-			buildOptions: builder.BuildOptions{				
-				Os:         "redhat",
+			buildOptions: builder.BuildOptions{
+				Os:        "redhat",
 				OsVersion: "9",
 			},
 			wantErr: "9 is not a supported version of Redhat. Please select one of 8",
 		},
 		{
 			testName: "Rockylinux 1",
-			buildOptions: builder.BuildOptions{				
-				Os:         "rocky",
+			buildOptions: builder.BuildOptions{
+				Os:        "rocky",
 				OsVersion: "1",
 			},
 			wantErr: "rocky is not a supported OS.",
@@ -154,7 +154,7 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 		t.Run(tt.testName, func(t *testing.T) {
 			err := validateOSVersion(tt.buildOptions.Os, tt.buildOptions.OsVersion)
 			if tt.wantErr == "" {
-				assert.NoError(t, err)				
+				assert.NoError(t, err)
 			} else {
 				assert.NotNil(t, err)
 				assert.Equal(t, tt.wantErr, err.Error())
@@ -171,55 +171,55 @@ func TestValidateFirmware(t *testing.T) {
 	}{
 		{
 			testName: "Ubuntu ova with efi",
-			buildOptions: builder.BuildOptions{				
+			buildOptions: builder.BuildOptions{
 				Os:         "ubuntu",
 				Hypervisor: "vsphere",
-				Firmware: "efi",
+				Firmware:   "efi",
 			},
 			wantErr: "",
 		},
 		{
 			testName: "Ubuntu raw with efi",
-			buildOptions: builder.BuildOptions{				
+			buildOptions: builder.BuildOptions{
 				Os:         "ubuntu",
 				Hypervisor: "baremetal",
-				Firmware: "efi",
+				Firmware:   "efi",
 			},
 			wantErr: "",
 		},
 		{
 			testName: "Ubuntu raw with bios",
-			buildOptions: builder.BuildOptions{				
+			buildOptions: builder.BuildOptions{
 				Os:         "ubuntu",
 				Hypervisor: "baremetal",
-				Firmware: "bios",
+				Firmware:   "bios",
 			},
 			wantErr: "Ubuntu Raw builds only support EFI firmware.",
 		},
 		{
 			testName: "Redhat raw with efi",
-			buildOptions: builder.BuildOptions{				
+			buildOptions: builder.BuildOptions{
 				Os:         "redhat",
 				Hypervisor: "baremetal",
-				Firmware: "efi",
+				Firmware:   "efi",
 			},
 			wantErr: "EFI firmware is only supported for Ubuntu OVA and Raw builds.",
 		},
 		{
 			testName: "Redhat raw with no bios",
-			buildOptions: builder.BuildOptions{				
+			buildOptions: builder.BuildOptions{
 				Os:         "redhat",
 				Hypervisor: "baremetal",
-				Firmware: "",
+				Firmware:   "",
 			},
 			wantErr: "",
 		},
 		{
 			testName: "Redhat raw with bad firmware",
-			buildOptions: builder.BuildOptions{				
+			buildOptions: builder.BuildOptions{
 				Os:         "redhat",
 				Hypervisor: "baremetal",
-				Firmware: "bad",
+				Firmware:   "bad",
 			},
 			wantErr: "bad is not a firmware. Please select one of bios,efi",
 		},
@@ -229,7 +229,7 @@ func TestValidateFirmware(t *testing.T) {
 		t.Run(tt.testName, func(t *testing.T) {
 			err := validateFirmware(tt.buildOptions.Firmware, tt.buildOptions.Os, tt.buildOptions.Hypervisor)
 			if tt.wantErr == "" {
-				assert.NoError(t, err)				
+				assert.NoError(t, err)
 			} else {
 				assert.NotNil(t, err)
 				assert.Equal(t, tt.wantErr, err.Error())
