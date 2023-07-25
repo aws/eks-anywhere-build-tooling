@@ -9,8 +9,6 @@ const (
 	DefaultAMIRootDeviceName       string = "/dev/sda1"
 	DefaultAMIVolumeSize           string = "25"
 	DefaultAMIVolumeType           string = "gp3"
-	DefaultAMICustomRoleNames      string = "projects/kubernetes-sigs/image-builder/ansible/roles/load_additional_files"
-	DefaultAMIAnsibleExtraVars     string = "projects/kubernetes-sigs/image-builder/packer/config/additional_files.yaml"
 	DefaultAMIManifestOutput       string = "manifest.json"
 
 	imageBuilderProjectDirectory     string = "projects/kubernetes-sigs/image-builder"
@@ -38,14 +36,14 @@ const (
 
 var DefaultAMIAdditionalFiles = []File{
 	{
-		Source:      "projects/kubernetes-sigs/image-builder/packer/ami/additional_files/bootstrap.sh",
+		Source:      "packer/ami/additional_files/bootstrap.sh",
 		Destination: "/etc/eks/",
 		Owner:       "root",
 		Group:       "root",
 		Mode:        744,
 	},
 	{
-		Source:      "projects/kubernetes-sigs/image-builder/packer/ami/additional_files/logging.sh",
+		Source:      "packer/ami/additional_files/logging.sh",
 		Destination: "/etc/eks/",
 		Owner:       "root",
 		Group:       "root",
