@@ -1,0 +1,720 @@
+From f26113d861f9362da45c2757d96006f3e9fd4e4e Mon Sep 17 00:00:00 2001
+From: fabriziopandini <fpandini@vmware.com>
+Date: Mon, 26 Jun 2023 20:03:16 +0100
+Subject: [PATCH 36/36] drop cgroup-driver patch
+
+(cherry picked from commit 0b0695bd30aaec88b28929c5e586638f3fcc9514)
+---
+ Makefile                                      |   1 -
+ .../topology-test/existing-my-cluster.yaml    |  12 +-
+ .../existing-my-second-cluster.yaml           |  12 +-
+ .../topology-test/my-cluster-class.yaml       |  16 +--
+ .../new-clusterclass-and-cluster.yaml         |  23 +---
+ test/e2e/cluster_upgrade_test.go              |  27 +---
+ test/e2e/config/docker.yaml                   |   1 -
+ .../kustomization.yaml                        |   6 -
+ .../mp-cgroupfs.yaml                          |  13 --
+ .../mp-default-cgroupfs.yaml                  |  10 --
+ .../main/clusterclass-quick-start.yaml        |  44 +------
+ .../handlers/topologymutation/handler.go      |   4 +
+ test/framework/machinepool_helpers.go         |  19 ---
+ test/go.mod                                   |   1 +
+ .../provisioning/cloudinit/writefiles.go      |  24 +++-
+ .../provisioning/cloudinit/writefiles_test.go | 124 ++++++++++++++++++
+ .../templates/clusterclass-quick-start.yaml   |  66 ----------
+ 17 files changed, 162 insertions(+), 241 deletions(-)
+ delete mode 100644 test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/kustomization.yaml
+ delete mode 100644 test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-cgroupfs.yaml
+ delete mode 100644 test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-default-cgroupfs.yaml
+
+diff --git a/Makefile b/Makefile
+index 3f96aca97..936bd0cf7 100644
+--- a/Makefile
++++ b/Makefile
+@@ -509,7 +509,6 @@ generate-e2e-templates-main: $(KUSTOMIZE)
+ 	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/main/cluster-template-machine-pool --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/main/cluster-template-machine-pool.yaml
+ 	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/main/cluster-template-node-drain --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/main/cluster-template-node-drain.yaml
+ 	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/main/cluster-template-upgrades --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/main/cluster-template-upgrades.yaml
+-	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/main/cluster-template-upgrades-cgroupfs --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/main/cluster-template-upgrades-cgroupfs.yaml
+ 	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/main/cluster-template-upgrades-runtimesdk --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/main/cluster-template-upgrades-runtimesdk.yaml
+ 	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/main/cluster-template-kcp-scale-in --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/main/cluster-template-kcp-scale-in.yaml
+ 	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/main/cluster-template-ipv6 --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/main/cluster-template-ipv6.yaml
+diff --git a/cmd/clusterctl/client/cluster/assets/topology-test/existing-my-cluster.yaml b/cmd/clusterctl/client/cluster/assets/topology-test/existing-my-cluster.yaml
+index 656ba64e8..719ec90df 100644
+--- a/cmd/clusterctl/client/cluster/assets/topology-test/existing-my-cluster.yaml
++++ b/cmd/clusterctl/client/cluster/assets/topology-test/existing-my-cluster.yaml
+@@ -87,18 +87,10 @@ spec:
+       scheduler: {}
+     initConfiguration:
+       localAPIEndpoint: {}
+-      nodeRegistration:
+-        criSocket: unix:///var/run/containerd/containerd.sock
+-        kubeletExtraArgs:
+-          cgroup-driver: cgroupfs
+-          eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+     joinConfiguration:
+       discovery: {}
+-      nodeRegistration:
+-        criSocket: unix:///var/run/containerd/containerd.sock
+-        kubeletExtraArgs:
+-          cgroup-driver: cgroupfs
+-          eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+   machineTemplate:
+     infrastructureRef:
+       apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+diff --git a/cmd/clusterctl/client/cluster/assets/topology-test/existing-my-second-cluster.yaml b/cmd/clusterctl/client/cluster/assets/topology-test/existing-my-second-cluster.yaml
+index a09de8274..91911a12f 100644
+--- a/cmd/clusterctl/client/cluster/assets/topology-test/existing-my-second-cluster.yaml
++++ b/cmd/clusterctl/client/cluster/assets/topology-test/existing-my-second-cluster.yaml
+@@ -88,18 +88,10 @@ spec:
+       scheduler: {}
+     initConfiguration:
+       localAPIEndpoint: {}
+-      nodeRegistration:
+-        criSocket: unix:///var/run/containerd/containerd.sock
+-        kubeletExtraArgs:
+-          cgroup-driver: cgroupfs
+-          eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+     joinConfiguration:
+       discovery: {}
+-      nodeRegistration:
+-        criSocket: unix:///var/run/containerd/containerd.sock
+-        kubeletExtraArgs:
+-          cgroup-driver: cgroupfs
+-          eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++      nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+   machineTemplate:
+     infrastructureRef:
+       apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+diff --git a/cmd/clusterctl/client/cluster/assets/topology-test/my-cluster-class.yaml b/cmd/clusterctl/client/cluster/assets/topology-test/my-cluster-class.yaml
+index a01e1d2ef..00f05db0e 100644
+--- a/cmd/clusterctl/client/cluster/assets/topology-test/my-cluster-class.yaml
++++ b/cmd/clusterctl/client/cluster/assets/topology-test/my-cluster-class.yaml
+@@ -55,21 +55,9 @@ spec:
+           apiServer:
+             certSANs: [ localhost, 127.0.0.1 ]
+         initConfiguration:
+-          nodeRegistration:
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              # We have to pin the cgroupDriver to cgroupfs as kubeadm >=1.21 defaults to systemd
+-              # kind will implement systemd support in: https://github.com/kubernetes-sigs/kind/issues/1726
+-              cgroup-driver: cgroupfs
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+         joinConfiguration:
+-          nodeRegistration:
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              # We have to pin the cgroupDriver to cgroupfs as kubeadm >=1.21 defaults to systemd
+-              # kind will implement systemd support in: https://github.com/kubernetes-sigs/kind/issues/1726
+-              cgroup-driver: cgroupfs
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+       version: v1.21.2
+ ---
+ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+diff --git a/cmd/clusterctl/client/cluster/assets/topology-test/new-clusterclass-and-cluster.yaml b/cmd/clusterctl/client/cluster/assets/topology-test/new-clusterclass-and-cluster.yaml
+index bf04ec881..d21d22245 100644
+--- a/cmd/clusterctl/client/cluster/assets/topology-test/new-clusterclass-and-cluster.yaml
++++ b/cmd/clusterctl/client/cluster/assets/topology-test/new-clusterclass-and-cluster.yaml
+@@ -95,21 +95,9 @@ spec:
+           apiServer:
+             certSANs: [ localhost, 127.0.0.1 ]
+         initConfiguration:
+-          nodeRegistration:
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              # We have to pin the cgroupDriver to cgroupfs as kubeadm >=1.21 defaults to systemd
+-              # kind will implement systemd support in: https://github.com/kubernetes-sigs/kind/issues/1726
+-              cgroup-driver: cgroupfs
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+         joinConfiguration:
+-          nodeRegistration:
+-            criSocket: unix:///var/run/containerd/containerd.sock
+-            kubeletExtraArgs:
+-              # We have to pin the cgroupDriver to cgroupfs as kubeadm >=1.21 defaults to systemd
+-              # kind will implement systemd support in: https://github.com/kubernetes-sigs/kind/issues/1726
+-              cgroup-driver: cgroupfs
+-              eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++          nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+       version: v1.21.2
+ ---
+ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+@@ -146,12 +134,7 @@ spec:
+   template:
+     spec:
+       joinConfiguration:
+-        nodeRegistration:
+-          kubeletExtraArgs:
+-            # We have to pin the cgroupDriver to cgroupfs as kubeadm >=1.21 defaults to systemd
+-            # kind will implement systemd support in: https://github.com/kubernetes-sigs/kind/issues/1726
+-            cgroup-driver: cgroupfs
+-            eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
++        nodeRegistration: {} # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+ 
+ ---
+ apiVersion: cluster.x-k8s.io/v1beta1
+diff --git a/test/e2e/cluster_upgrade_test.go b/test/e2e/cluster_upgrade_test.go
+index 31d177f53..96c2cb932 100644
+--- a/test/e2e/cluster_upgrade_test.go
++++ b/test/e2e/cluster_upgrade_test.go
+@@ -20,44 +20,19 @@ limitations under the License.
+ package e2e
+ 
+ import (
+-	"github.com/blang/semver"
+ 	. "github.com/onsi/ginkgo/v2"
+-	. "github.com/onsi/gomega"
+ 	"k8s.io/utils/pointer"
+ )
+ 
+ var _ = Describe("When upgrading a workload cluster using ClusterClass and testing K8S conformance [Conformance] [K8s-Upgrade] [ClusterClass]", func() {
+ 	ClusterUpgradeConformanceSpec(ctx, func() ClusterUpgradeConformanceSpecInput {
+-		// "upgrades" is the same as the "topology" flavor but with an additional MachinePool.
+-		flavor := pointer.String("upgrades")
+-		// For KubernetesVersionUpgradeFrom < v1.24 we have to use upgrades-cgroupfs flavor.
+-		// This is because kind and CAPD only support:
+-		// * cgroupDriver cgroupfs for Kubernetes < v1.24
+-		// * cgroupDriver systemd for Kubernetes >= v1.24.
+-		// Notes:
+-		// * We always use a ClusterClass-based cluster-template for the upgrade test
+-		// * The ClusterClass will automatically adjust the cgroupDriver for KCP and MDs.
+-		// * We have to handle the MachinePool ourselves
+-		// * The upgrades-cgroupfs flavor uses an MP which is pinned to cgroupfs
+-		// * During the upgrade UpgradeMachinePoolAndWait automatically drops the cgroupfs pinning
+-		//   when the target version is >= v1.24.
+-		// We can remove this as soon as we don't test upgrades from Kubernetes < v1.24 anymore with CAPD
+-		// or MachinePools are supported in ClusterClass.
+-		version, err := semver.ParseTolerant(e2eConfig.GetVariable(KubernetesVersionUpgradeFrom))
+-		Expect(err).ToNot(HaveOccurred(), "Invalid argument, KUBERNETES_VERSION_UPGRADE_FROM is not a valid version")
+-		if version.LT(semver.MustParse("1.24.0")) {
+-			// "upgrades-cgroupfs" is the same as the "topology" flavor but with an additional MachinePool
+-			// with pinned cgroupDriver to cgroupfs.
+-			flavor = pointer.String("upgrades-cgroupfs")
+-		}
+-
+ 		return ClusterUpgradeConformanceSpecInput{
+ 			E2EConfig:             e2eConfig,
+ 			ClusterctlConfigPath:  clusterctlConfigPath,
+ 			BootstrapClusterProxy: bootstrapClusterProxy,
+ 			ArtifactFolder:        artifactFolder,
+ 			SkipCleanup:           skipCleanup,
+-			Flavor:                flavor,
++			Flavor:                pointer.String("upgrades"),
+ 		}
+ 	})
+ })
+diff --git a/test/e2e/config/docker.yaml b/test/e2e/config/docker.yaml
+index 632ab90b7..c6f2c60ad 100644
+--- a/test/e2e/config/docker.yaml
++++ b/test/e2e/config/docker.yaml
+@@ -267,7 +267,6 @@ providers:
+     - sourcePath: "../data/infrastructure-docker/main/cluster-template-machine-pool.yaml"
+     - sourcePath: "../data/infrastructure-docker/main/cluster-template-node-drain.yaml"
+     - sourcePath: "../data/infrastructure-docker/main/cluster-template-upgrades.yaml"
+-    - sourcePath: "../data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs.yaml"
+     - sourcePath: "../data/infrastructure-docker/main/cluster-template-upgrades-runtimesdk.yaml"
+     - sourcePath: "../data/infrastructure-docker/main/cluster-template-kcp-scale-in.yaml"
+     - sourcePath: "../data/infrastructure-docker/main/cluster-template-ipv6.yaml"
+diff --git a/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/kustomization.yaml b/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/kustomization.yaml
+deleted file mode 100644
+index f89cca44d..000000000
+--- a/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/kustomization.yaml
++++ /dev/null
+@@ -1,6 +0,0 @@
+-resources:
+-  - ../cluster-template-upgrades
+-  - mp-cgroupfs.yaml
+-
+-patches:
+-- ./mp-default-cgroupfs.yaml
+diff --git a/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-cgroupfs.yaml b/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-cgroupfs.yaml
+deleted file mode 100644
+index 35a955c8b..000000000
+--- a/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-cgroupfs.yaml
++++ /dev/null
+@@ -1,13 +0,0 @@
+-# KubeadmConfigTemplate referenced by the MachinePool for cgroupfs
+-apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+-kind: KubeadmConfig
+-metadata:
+-  name: "${CLUSTER_NAME}-mp-0-config-cgroupfs"
+-spec:
+-  joinConfiguration:
+-    # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+-    nodeRegistration:
+-      kubeletExtraArgs:
+-        # We have to pin the cgroupDriver to cgroupfs as kubeadm >=1.21 defaults to systemd
+-        # kind will implement systemd support in: https://github.com/kubernetes-sigs/kind/issues/1726
+-        cgroup-driver: cgroupfs
+diff --git a/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-default-cgroupfs.yaml b/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-default-cgroupfs.yaml
+deleted file mode 100644
+index 08d825254..000000000
+--- a/test/e2e/data/infrastructure-docker/main/cluster-template-upgrades-cgroupfs/mp-default-cgroupfs.yaml
++++ /dev/null
+@@ -1,10 +0,0 @@
+-apiVersion: cluster.x-k8s.io/v1beta1
+-kind: MachinePool
+-metadata:
+-  name: "${CLUSTER_NAME}-mp-0"
+-spec:
+-  template:
+-    spec:
+-      bootstrap:
+-        configRef:
+-          name: "${CLUSTER_NAME}-mp-0-config-cgroupfs"
+\ No newline at end of file
+diff --git a/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start.yaml b/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start.yaml
+index d455f8bc4..bd4d580f1 100644
+--- a/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start.yaml
++++ b/test/e2e/data/infrastructure-docker/main/clusterclass-quick-start.yaml
+@@ -114,44 +114,6 @@ spec:
+         valueFrom:
+           template: |
+             imageRepository: {{ .lbImageRepository }}
+-  # We have to pin the cgroupDriver to cgroupfs for Kubernetes < v1.24 because kind does not support systemd for those versions, but kubeadm >= 1.21 defaults to systemd.
+-  - name: cgroupDriver-controlPlane
+-    description: |
+-      Sets the cgroupDriver to cgroupfs if a Kubernetes version < v1.24 is referenced.
+-      This is required because kind and the node images do not support the default
+-      systemd cgroupDriver for kubernetes < v1.24.
+-    enabledIf: '{{ semverCompare "<= v1.23" .builtin.controlPlane.version }}'
+-    definitions:
+-    - selector:
+-        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+-        kind: KubeadmControlPlaneTemplate
+-        matchResources:
+-          controlPlane: true
+-      jsonPatches:
+-      - op: add
+-        path: "/spec/template/spec/kubeadmConfigSpec/initConfiguration/nodeRegistration/kubeletExtraArgs/cgroup-driver"
+-        value: cgroupfs
+-      - op: add
+-        path: "/spec/template/spec/kubeadmConfigSpec/joinConfiguration/nodeRegistration/kubeletExtraArgs/cgroup-driver"
+-        value: cgroupfs
+-  - name: cgroupDriver-machineDeployment
+-    description: |
+-      Sets the cgroupDriver to cgroupfs if a Kubernetes version < v1.24 is referenced.
+-      This is required because kind and the node images do not support the default
+-      systemd cgroupDriver for kubernetes < v1.24.
+-    enabledIf: '{{ semverCompare "<= v1.23" .builtin.machineDeployment.version }}'
+-    definitions:
+-    - selector:
+-        apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+-        kind: KubeadmConfigTemplate
+-        matchResources:
+-          machineDeploymentClass:
+-            names:
+-            - '*-worker'
+-      jsonPatches:
+-      - op: add
+-        path: "/spec/template/spec/joinConfiguration/nodeRegistration/kubeletExtraArgs/cgroup-driver"
+-        value: cgroupfs
+   - name: etcdImageTag
+     description: "Sets tag to use for the etcd image in the KubeadmControlPlane."
+     definitions:
+@@ -371,11 +333,11 @@ spec:
+             certSANs: [localhost, 127.0.0.1, 0.0.0.0, host.docker.internal]
+         initConfiguration:
+           nodeRegistration: # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+-            kubeletExtraArgs: # required for the cgroup-driver patch to work
++            kubeletExtraArgs: # having a not empty kubeletExtraArgs is required for the externalCloudProvider patch to work
+               eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+         joinConfiguration:
+           nodeRegistration: # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+-            kubeletExtraArgs: # required for the cgroup-driver patch to work
++            kubeletExtraArgs: # having a not empty kubeletExtraArgs is required for the externalCloudProvider patch to work
+               eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+ ---
+ apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+@@ -436,5 +398,5 @@ spec:
+     spec:
+       joinConfiguration:
+         nodeRegistration: # node registration parameters are automatically injected by CAPD according to the kindest/node image in use.
+-          kubeletExtraArgs: # required for the cgroup-driver patch to work
++          kubeletExtraArgs: # having a not empty kubeletExtraArgs is required for the externalCloudProvider to work
+             eviction-hard: 'nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%'
+diff --git a/test/extension/handlers/topologymutation/handler.go b/test/extension/handlers/topologymutation/handler.go
+index d0f822fa8..1cae18815 100644
+--- a/test/extension/handlers/topologymutation/handler.go
++++ b/test/extension/handlers/topologymutation/handler.go
+@@ -138,6 +138,8 @@ func patchDockerClusterTemplate(_ context.Context, dockerClusterTemplate *infrav
+ // to work with older kind images.
+ // It also sets the RolloutStrategy.RollingUpdate.MaxSurge if the kubeadmControlPlaneMaxSurge is provided.
+ // NOTE: RolloutStrategy.RollingUpdate.MaxSurge patch is not required for any special reason, it is used for testing the patch machinery itself.
++// NOTE: cgroupfs patch is not required anymore after the introduction of the automatic setting kubeletExtraArgs for CAPD, however we keep it
++// as example of version aware patches.
+ func patchKubeadmControlPlaneTemplate(ctx context.Context, kcpTemplate *controlplanev1.KubeadmControlPlaneTemplate, templateVariables map[string]apiextensionsv1.JSON) error {
+ 	log := ctrl.LoggerFrom(ctx)
+ 
+@@ -203,6 +205,8 @@ func patchKubeadmControlPlaneTemplate(ctx context.Context, kcpTemplate *controlp
+ // patchKubeadmConfigTemplate patches the ControlPlaneTemplate.
+ // Only for the templates linked to the default-worker MachineDeployment class, It sets KubeletExtraArgs["cgroup-driver"]
+ // to cgroupfs for Kubernetes < 1.24; this patch is required for tests to work with older kind images.
++// NOTE: cgroupfs patch is not required anymore after the introduction of the automatic setting kubeletExtraArgs for CAPD, however we keep it
++// as example of version aware patches.
+ func patchKubeadmConfigTemplate(ctx context.Context, k *bootstrapv1.KubeadmConfigTemplate, templateVariables map[string]apiextensionsv1.JSON) error {
+ 	log := ctrl.LoggerFrom(ctx)
+ 
+diff --git a/test/framework/machinepool_helpers.go b/test/framework/machinepool_helpers.go
+index 1952e1d7a..07e71fac5 100644
+--- a/test/framework/machinepool_helpers.go
++++ b/test/framework/machinepool_helpers.go
+@@ -19,10 +19,8 @@ package framework
+ import (
+ 	"context"
+ 	"fmt"
+-	"strings"
+ 	"time"
+ 
+-	"github.com/blang/semver"
+ 	. "github.com/onsi/ginkgo/v2"
+ 	. "github.com/onsi/gomega"
+ 	"github.com/pkg/errors"
+@@ -151,23 +149,6 @@ func UpgradeMachinePoolAndWait(ctx context.Context, input UpgradeMachinePoolAndW
+ 		// Upgrade to new Version.
+ 		mp.Spec.Template.Spec.Version = &input.UpgradeVersion
+ 
+-		// Drop "-cgroupfs" suffix from BootstrapConfig ref name, i.e. we switch from a
+-		// BootstrapConfig with pinned cgroupfs cgroupDriver to the regular BootstrapConfig.
+-		// This is a workaround for CAPD, because kind and CAPD only support:
+-		// * cgroupDriver cgroupfs for Kubernetes < v1.24
+-		// * cgroupDriver systemd for Kubernetes >= v1.24.
+-		// We can remove this as soon as we don't test upgrades from Kubernetes < v1.24 anymore with CAPD
+-		// or MachinePools are supported in ClusterClass.
+-		if mp.Spec.Template.Spec.InfrastructureRef.Kind == "DockerMachinePool" {
+-			version, err := semver.ParseTolerant(input.UpgradeVersion)
+-			Expect(err).ToNot(HaveOccurred(), fmt.Sprintf("Failed to parse UpgradeVersion %q", input.UpgradeVersion))
+-			if version.GTE(semver.MustParse("1.24.0")) && strings.HasSuffix(mp.Spec.Template.Spec.Bootstrap.ConfigRef.Name, "-cgroupfs") {
+-				mp.Spec.Template.Spec.Bootstrap.ConfigRef.Name = strings.TrimSuffix(mp.Spec.Template.Spec.Bootstrap.ConfigRef.Name, "-cgroupfs")
+-				// We have to set DataSecretName to nil, so the secret of the new bootstrap ConfigRef gets picked up.
+-				mp.Spec.Template.Spec.Bootstrap.DataSecretName = nil
+-			}
+-		}
+-
+ 		Eventually(func() error {
+ 			return patchHelper.Patch(ctx, mp)
+ 		}, retryableOperationTimeout, retryableOperationInterval).Should(Succeed(), "Failed to patch the new Kubernetes version to Machine Pool %s", klog.KObj(mp))
+diff --git a/test/go.mod b/test/go.mod
+index e31d1ebca..2670ef7ae 100644
+--- a/test/go.mod
++++ b/test/go.mod
+@@ -10,6 +10,7 @@ require (
+ 	github.com/docker/go-connections v0.4.0
+ 	github.com/flatcar/ignition v0.36.2
+ 	github.com/go-logr/logr v1.2.3
++	github.com/google/go-cmp v0.5.9
+ 	github.com/onsi/ginkgo/v2 v2.9.2
+ 	github.com/onsi/gomega v1.27.5
+ 	github.com/pkg/errors v0.9.1
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles.go b/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles.go
+index d75847625..6e31a29f9 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles.go
+@@ -25,6 +25,7 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 
++	"github.com/blang/semver"
+ 	"github.com/pkg/errors"
+ 	"sigs.k8s.io/yaml"
+ 
+@@ -32,6 +33,7 @@ import (
+ 	kubeadmtypes "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types"
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning"
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
++	"sigs.k8s.io/cluster-api/util/version"
+ )
+ 
+ const (
+@@ -48,6 +50,11 @@ conntrack:
+ `
+ )
+ 
++var (
++	cgroupDriverCgroupfs            = "cgroupfs"
++	cgroupDriverPatchVersionCeiling = semver.Version{Major: 1, Minor: 24}
++)
++
+ // writeFilesAction defines a list of files that should be written to a node.
+ type writeFilesAction struct {
+ 	Files []files `json:"write_files,"`
+@@ -83,7 +90,7 @@ func (a *writeFilesAction) Unmarshal(userData []byte, kindMapping kind.Mapping)
+ 				return errors.Wrapf(err, "failed to parse init configuration")
+ 			}
+ 
+-			fixNodeRegistration(&initConfiguration.NodeRegistration, kindMapping.Mode)
++			fixNodeRegistration(&initConfiguration.NodeRegistration, kindMapping)
+ 
+ 			contentSplit[2], err = kubeadmtypes.MarshalInitConfigurationForVersion(initConfiguration, kindMapping.KubernetesVersion)
+ 			if err != nil {
+@@ -98,7 +105,7 @@ func (a *writeFilesAction) Unmarshal(userData []byte, kindMapping kind.Mapping)
+ 				return errors.Wrapf(err, "failed to parse join configuration")
+ 			}
+ 
+-			fixNodeRegistration(&joinConfiguration.NodeRegistration, kindMapping.Mode)
++			fixNodeRegistration(&joinConfiguration.NodeRegistration, kindMapping)
+ 
+ 			a.Files[i].Content, err = kubeadmtypes.MarshalJoinConfigurationForVersion(joinConfiguration, kindMapping.KubernetesVersion)
+ 			if err != nil {
+@@ -112,7 +119,7 @@ func (a *writeFilesAction) Unmarshal(userData []byte, kindMapping kind.Mapping)
+ // fixNodeRegistration sets node registration for running Kubernetes/kubelet in docker.
+ // NOTE: we add those values if they do not exists; user can set those flags to different values to disable automatic fixing.
+ // NOTE: if there will be use case for it, we might investigate better ways to disable automatic fixing.
+-func fixNodeRegistration(nodeRegistration *bootstrapv1.NodeRegistrationOptions, kindMode kind.Mode) {
++func fixNodeRegistration(nodeRegistration *bootstrapv1.NodeRegistrationOptions, kindMapping kind.Mapping) {
+ 	if nodeRegistration.CRISocket == "" {
+ 		// NOTE: self-hosted cluster have to mount the Docker socket.
+ 		// On those nodes we have the Docker and the containerd socket and then kubeadm
+@@ -131,7 +138,10 @@ func fixNodeRegistration(nodeRegistration *bootstrapv1.NodeRegistrationOptions,
+ 		nodeRegistration.KubeletExtraArgs["fail-swap-on"] = "false"
+ 	}
+ 
+-	if kindMode != kind.Mode0_19 {
++	if kindMapping.Mode != kind.Mode0_19 {
++		// kindest/node images generated by modo 0.20 and greater require to use CgroupnsMode = "private" when running images;
++		// following settings are complementary to this change.
++
+ 		if _, ok := nodeRegistration.KubeletExtraArgs["cgroup-root"]; !ok {
+ 			nodeRegistration.KubeletExtraArgs["cgroup-root"] = "/kubelet"
+ 		}
+@@ -139,6 +149,12 @@ func fixNodeRegistration(nodeRegistration *bootstrapv1.NodeRegistrationOptions,
+ 			nodeRegistration.KubeletExtraArgs["runtime-cgroups"] = "/system.slice/containerd.service"
+ 		}
+ 	}
++
++	if version.Compare(kindMapping.KubernetesVersion, cgroupDriverPatchVersionCeiling) == -1 {
++		// kubeadm for Kubernetes version <= 1.23 defaults to cgroup-driver=cgroupfs; following settings makes kubelet
++		// to run consistently with what kubeadm expects.
++		nodeRegistration.KubeletExtraArgs["cgroup-driver"] = cgroupDriverCgroupfs
++	}
+ }
+ 
+ // Commands return a list of commands to run on the node.
+diff --git a/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles_test.go b/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles_test.go
+index 23ebe3f33..6346b3ccc 100644
+--- a/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles_test.go
++++ b/test/infrastructure/docker/internal/provisioning/cloudinit/writefiles_test.go
+@@ -225,6 +225,130 @@ nodeRegistration:
+     fail-swap-on: "false"
+     runtime-cgroups: /system.slice/containerd.service
+   taints: null
++`,
++			},
++		},
++		{
++			name: "Fix kubelet args for kind 1.19 mode with K8s version <= 1.23",
++			files: []byte(`
++write_files:
++- content: |
++    ---
++    ClusterConfiguration...
++    ---
++    apiVersion: kubeadm.k8s.io/v1beta1
++    kind: InitConfiguration
++    nodeRegistration:
++      criSocket: unix:///var/run/containerd/containerd.sock
++      kubeletExtraArgs:
++        cloud-provider: aws
++  owner: root:root
++  path: /run/kubeadm/kubeadm.yaml
++  permissions: '0640'
++- content: |
++    ---
++    apiVersion: kubeadm.k8s.io/v1beta1
++    kind: JoinConfiguration
++    nodeRegistration:
++      criSocket: unix:///var/run/containerd/containerd.sock
++      kubeletExtraArgs:
++        cloud-provider: aws
++  path: /run/kubeadm/kubeadm-join-config.yaml
++  owner: root:root
++  permissions: '0640'
++`),
++			mapping: kind.Mapping{KubernetesVersion: semver.MustParse("1.23.3"), Mode: kind.Mode0_19},
++			expectedContent: []string{
++				`---
++ClusterConfiguration...
++---
++apiVersion: kubeadm.k8s.io/v1beta3
++kind: InitConfiguration
++localAPIEndpoint: {}
++nodeRegistration:
++  criSocket: unix:///var/run/containerd/containerd.sock
++  kubeletExtraArgs:
++    cgroup-driver: cgroupfs
++    cloud-provider: aws
++    eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    fail-swap-on: "false"
++  taints: null
++`,
++				`apiVersion: kubeadm.k8s.io/v1beta3
++discovery: {}
++kind: JoinConfiguration
++nodeRegistration:
++  criSocket: unix:///var/run/containerd/containerd.sock
++  kubeletExtraArgs:
++    cgroup-driver: cgroupfs
++    cloud-provider: aws
++    eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    fail-swap-on: "false"
++  taints: null
++`,
++			},
++		},
++		{
++			name: "Fix kubelet args for kind 1.20 mode with K8s version <= 1.23",
++			files: []byte(`
++write_files:
++- content: |
++    ---
++    ClusterConfiguration...
++    ---
++    apiVersion: kubeadm.k8s.io/v1beta1
++    kind: InitConfiguration
++    nodeRegistration:
++      criSocket: unix:///var/run/containerd/containerd.sock
++      kubeletExtraArgs:
++        cloud-provider: aws
++  owner: root:root
++  path: "/run/kubeadm/kubeadm.yaml"
++  permissions: '0640'
++- content: |
++    ---
++    apiVersion: kubeadm.k8s.io/v1beta1
++    kind: JoinConfiguration
++    nodeRegistration:
++      criSocket: unix:///var/run/containerd/containerd.sock
++      kubeletExtraArgs:
++        cloud-provider: aws
++  path: "/run/kubeadm/kubeadm-join-config.yaml"
++  owner: root:root
++  permissions: '0640'
++`),
++			mapping: kind.Mapping{KubernetesVersion: semver.MustParse("1.23.3"), Mode: kind.Mode0_20},
++			expectedContent: []string{
++				`---
++ClusterConfiguration...
++---
++apiVersion: kubeadm.k8s.io/v1beta3
++kind: InitConfiguration
++localAPIEndpoint: {}
++nodeRegistration:
++  criSocket: unix:///var/run/containerd/containerd.sock
++  kubeletExtraArgs:
++    cgroup-driver: cgroupfs
++    cgroup-root: /kubelet
++    cloud-provider: aws
++    eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    fail-swap-on: "false"
++    runtime-cgroups: /system.slice/containerd.service
++  taints: null
++`,
++				`apiVersion: kubeadm.k8s.io/v1beta3
++discovery: {}
++kind: JoinConfiguration
++nodeRegistration:
++  criSocket: unix:///var/run/containerd/containerd.sock
++  kubeletExtraArgs:
++    cgroup-driver: cgroupfs
++    cgroup-root: /kubelet
++    cloud-provider: aws
++    eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
++    fail-swap-on: "false"
++    runtime-cgroups: /system.slice/containerd.service
++  taints: null
+ `,
+ 			},
+ 		},
+diff --git a/test/infrastructure/docker/templates/clusterclass-quick-start.yaml b/test/infrastructure/docker/templates/clusterclass-quick-start.yaml
+index af5559c8c..f3cc62e67 100644
+--- a/test/infrastructure/docker/templates/clusterclass-quick-start.yaml
++++ b/test/infrastructure/docker/templates/clusterclass-quick-start.yaml
+@@ -94,44 +94,6 @@ spec:
+         path: "/spec/template/spec/kubeadmConfigSpec/clusterConfiguration/imageRepository"
+         valueFrom:
+           variable: imageRepository
+-  # We have to pin the cgroupDriver to cgroupfs for Kubernetes < v1.24 because kind does not support systemd for those versions, but kubeadm >= 1.21 defaults to systemd.
+-  - name: cgroupDriver-controlPlane
+-    description: |
+-      Sets the cgroupDriver to cgroupfs if a Kubernetes version < v1.24 is referenced.
+-      This is required because kind and the node images do not support the default
+-      systemd cgroupDriver for kubernetes < v1.24.
+-    enabledIf: '{{ semverCompare "<= v1.23" .builtin.controlPlane.version }}'
+-    definitions:
+-    - selector:
+-        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+-        kind: KubeadmControlPlaneTemplate
+-        matchResources:
+-          controlPlane: true
+-      jsonPatches:
+-      - op: add
+-        path: "/spec/template/spec/kubeadmConfigSpec/initConfiguration/nodeRegistration/kubeletExtraArgs/cgroup-driver"
+-        value: cgroupfs
+-      - op: add
+-        path: "/spec/template/spec/kubeadmConfigSpec/joinConfiguration/nodeRegistration/kubeletExtraArgs/cgroup-driver"
+-        value: cgroupfs
+-  - name: cgroupDriver-machineDeployment
+-    description: |
+-      Sets the cgroupDriver to cgroupfs if a Kubernetes version < v1.24 is referenced.
+-      This is required because kind and the node images do not support the default
+-      systemd cgroupDriver for kubernetes < v1.24.
+-    enabledIf: '{{ semverCompare "<= v1.23" .builtin.machineDeployment.version }}'
+-    definitions:
+-    - selector:
+-        apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+-        kind: KubeadmConfigTemplate
+-        matchResources:
+-          machineDeploymentClass:
+-            names:
+-            - default-worker
+-      jsonPatches:
+-      - op: add
+-        path: "/spec/template/spec/joinConfiguration/nodeRegistration/kubeletExtraArgs/cgroup-driver"
+-        value: cgroupfs
+   - name: etcdImageTag
+     description: "Sets tag to use for the etcd image in the KubeadmControlPlane."
+     definitions:
+@@ -188,34 +150,6 @@ spec:
+         valueFrom:
+           template: |
+             kindest/node:{{ .builtin.controlPlane.version | replace "+" "_" }}
+-  - name: replaceImage-v1.23.17-machineDeployment
+-    description: "Sets the container image for MD DockerMachineTemplates using Kubernetes v1.23.17."
+-    enabledIf: '{{ semverCompare "v1.23.17" .builtin.machineDeployment.version }}'
+-    definitions:
+-      - selector:
+-          apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+-          kind: DockerMachineTemplate
+-          matchResources:
+-            machineDeploymentClass:
+-              names:
+-                - default-worker
+-        jsonPatches:
+-          - op: add
+-            path: "/spec/template/spec/customImage"
+-            value: "kindest/node:v1.23.17@sha256:f77f8cf0b30430ca4128cc7cfafece0c274a118cd0cdb251049664ace0dee4ff"
+-  - name: replaceImage-v1.23.17-controlPlane
+-    description: "Sets the container image for CP DockerMachineTemplates using Kubernetes v1.23.17."
+-    enabledIf: '{{ semverCompare "v1.23.17" .builtin.controlPlane.version }}'
+-    definitions:
+-      - selector:
+-          apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+-          kind: DockerMachineTemplate
+-          matchResources:
+-            controlPlane: true
+-        jsonPatches:
+-          - op: add
+-            path: "/spec/template/spec/customImage"
+-            value: "kindest/node:v1.23.17@sha256:f77f8cf0b30430ca4128cc7cfafece0c274a118cd0cdb251049664ace0dee4ff"
+   - name: podSecurityStandard
+     description: "Adds an admission configuration for PodSecurity to the kube-apiserver."
+     definitions:
+-- 
+2.39.2
+
