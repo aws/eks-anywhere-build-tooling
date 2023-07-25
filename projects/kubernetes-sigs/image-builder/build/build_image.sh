@@ -98,9 +98,7 @@ elif [[ $image_format == "ami" ]]; then
   echo "Creating AMI config"
   jq --null-input \
     --arg ami_filter_owners "099720109477" \
-    --arg custom_role_names "$MAKE_ROOT/ansible/roles/load_additional_files" \
-    --arg ansible_extra_vars "@$MAKE_ROOT/packer/ami/ansible_extra_vars.yaml" \
     --arg manifest_output "$MANIFEST_OUTPUT" \
-    '{"ami_filter_owners": $ami_filter_owners, "custom_role_names": $custom_role_names, "ansible_extra_vars": $ansible_extra_vars, "manifest_output": $manifest_output}' > $image_builder_config_file
+    '{"ami_filter_owners": $ami_filter_owners, "manifest_output": $manifest_output}' > $image_builder_config_file
   "${HOME}"/image-builder build --hypervisor ami --os $image_os $image_os_version_arg --release-channel $release_channel --ami-config $image_builder_config_file
 fi
