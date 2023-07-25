@@ -28,8 +28,7 @@ BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
 FIX_LICENSES_GO_JSON_TARGET=$(REPO)/vendor/github.com/github.com/ajeddeloh/go-json/LICENSE.txt
 FIX_LICENSES_TEST_CONTAINER_TARGET=$(REPO)/test/infrastructure/docker/LICENSE
-FIX_LICENSES_TEST_DOCKER_TARGET=$(REPO)/test/infrastructure/container/LICENSE
-FIX_LICENSES_TEST_KIND_TARGET=$(REPO)/test/infrastructure/kind/LICENSE
+FIX_LICENSES_TEST_DOCKER_TARGET=$(REPO)/test/infrastructure/container/LICENSE 
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -38,7 +37,7 @@ $(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=
 
 s3-artifacts: create-manifests
 
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET) $(FIX_LICENSES_TEST_CONTAINER_TARGET) $(FIX_LICENSES_TEST_DOCKER_TARGET) $(FIX_LICENSES_TEST_KIND_TARGET)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET) $(FIX_LICENSES_TEST_CONTAINER_TARGET) $(FIX_LICENSES_TEST_DOCKER_TARGET)
 
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
 
@@ -55,18 +54,14 @@ $(FIX_LICENSES_GO_JSON_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 			$(REPO)/vendor/github.com/ajeddeloh/go-json/LICENSE.txt;
 
 $(FIX_LICENSES_TEST_CONTAINER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
-# CAPD pulls in a dep in test/infrastructure/container which does not have a LICENSE file and go-licenses does look it up
+# capd pulls in a dep in test/infra/container which does not have a LICENSE file and go-licenses does look up
 # We use capi license instead
 	cp $(REPO)/LICENSE $@
 
 $(FIX_LICENSES_TEST_DOCKER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
-# CAPD is a separate module but it doesn't have its own license, it inherits the one at the REPO top level.
+# capd is a separate module but it doesn't have its own license, it inherits the one at the REPO top level. 
 	cp $(REPO)/LICENSE $@
 
-$(FIX_LICENSES_TEST_KIND_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
-# CAPD pulls in a dep in test/infrstructure/kind which does not have a LICENSE file and go-licenses does look it up
-# We use capi license instead
-	cp $(REPO)/LICENSE $@
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

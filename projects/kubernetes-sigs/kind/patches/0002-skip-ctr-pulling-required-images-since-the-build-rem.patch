@@ -1,19 +1,19 @@
-From 314187ac127a4e8a190e62b9788a7940efbbb6f0 Mon Sep 17 00:00:00 2001
+From 2a6b966caf858c5683660b644b7c2ee914e4e533 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Sat, 2 Apr 2022 22:01:04 -0500
-Subject: [PATCH 2/3] skip ctr pulling required images since the build removes
+Subject: [PATCH 2/2] skip ctr pulling required images since the build removes
  them anyway
 
 Signed-off-by: Jackson West <jgw@amazon.com>
 ---
- pkg/build/nodeimage/buildcontext.go | 36 +++++++++++++++--------------
- 1 file changed, 19 insertions(+), 17 deletions(-)
+ pkg/build/nodeimage/buildcontext.go | 48 +++++++++++++++--------------
+ 1 file changed, 25 insertions(+), 23 deletions(-)
 
 diff --git a/pkg/build/nodeimage/buildcontext.go b/pkg/build/nodeimage/buildcontext.go
-index fed540dc..7815c87f 100644
+index ecbaf6b1..6922a23a 100644
 --- a/pkg/build/nodeimage/buildcontext.go
 +++ b/pkg/build/nodeimage/buildcontext.go
-@@ -258,23 +258,25 @@ func (c *buildContext) prePullImagesAndWriteManifests(bits kube.Bits, parsedVers
+@@ -257,29 +257,31 @@ func (c *buildContext) prePullImagesAndWriteManifests(bits kube.Bits, parsedVers
  		}
  	}()
  
@@ -22,11 +22,17 @@ index fed540dc..7815c87f 100644
 -		image := image // https://golang.org/doc/faq#closures_and_goroutines
 -		fns = append(fns, func() error {
 -			if !builtImages.Has(image) {
--				if err = importer.Pull(image, dockerBuildOsAndArch(c.arch)); err != nil {
--					c.logger.Warnf("Failed to pull %s with error: %v", image, err)
--					runE := exec.RunErrorForError(err)
--					c.logger.Warn(string(runE.Output))
--				}
+-				/*
+-					TODO: show errors when we have real errors. See comments in
+-					importer implementation
+-					err := importer.Pull(image, dockerBuildOsAndArch(c.arch))
+-					if err != nil {
+-						c.logger.Warnf("Failed to pull %s with error: %v", image, err)
+-						runE := exec.RunErrorForError(err)
+-						c.logger.Warn(string(runE.Output))
+-					}
+-				*/
+-				_ = importer.Pull(image, dockerBuildOsAndArch(c.arch))
 -			}
 -			return nil
 -		})
@@ -41,11 +47,17 @@ index fed540dc..7815c87f 100644
 +	// 	image := image // https://golang.org/doc/faq#closures_and_goroutines
 +	// 	fns = append(fns, func() error {
 +	// 		if !builtImages.Has(image) {
-+	// 			if err = importer.Pull(image, dockerBuildOsAndArch(c.arch)); err != nil {
-+	// 				c.logger.Warnf("Failed to pull %s with error: %v", image, err)
-+	// 				runE := exec.RunErrorForError(err)
-+	// 				c.logger.Warn(string(runE.Output))
-+	// 			}
++	// 			/*
++	// 				TODO: show errors when we have real errors. See comments in
++	// 				importer implementation
++	// 				err := importer.Pull(image, dockerBuildOsAndArch(c.arch))
++	// 				if err != nil {
++	// 					c.logger.Warnf("Failed to pull %s with error: %v", image, err)
++	// 					runE := exec.RunErrorForError(err)
++	// 					c.logger.Warn(string(runE.Output))
++	// 				}
++	// 			*/
++	// 			_ = importer.Pull(image, dockerBuildOsAndArch(c.arch))
 +	// 		}
 +	// 		return nil
 +	// 	})
