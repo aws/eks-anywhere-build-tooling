@@ -26,7 +26,7 @@ var SupportedUbuntuVersions = []string{
 }
 
 var SupportedRedHatVersions = []string{
-	"8",	
+	"8",
 }
 
 var SupportedFirmwares = []string{
@@ -36,7 +36,7 @@ var SupportedFirmwares = []string{
 
 type BuildOptions struct {
 	Os               string
-	OsVersion		 string
+	OsVersion        string
 	Hypervisor       string
 	VsphereConfig    *VsphereConfig
 	BaremetalConfig  *BaremetalConfig
@@ -120,7 +120,7 @@ type AMIConfig struct {
 	SubnetID            string `json:"subnet_id"`
 	VolumeSize          string `json:"volume_size"`
 	VolumeType          string `json:"volume_type"`
-	
+
 	ExtraPackagesConfig
 }
 

@@ -100,7 +100,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			bo.Firmware = builder.EFI
 		} else {
 			bo.Firmware = builder.BIOS
-		}		
+		}
 	}
 
 	configPath := ""
@@ -216,29 +216,9 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 
 			bo.AMIConfig = amiConfig
 			bo.FilesConfig = &builder.AdditionalFilesConfig{
-				FilesAnsibleConfig: builder.FilesAnsibleConfig{
-					CustomRole:       "true",
-					CustomRoleNames:  builder.DefaultAMICustomRoleNames,
-					AnsibleExtraVars: builder.DefaultAMIAnsibleExtraVars,
-				},
 				FileVars: builder.FileVars{
-					AdditionalFiles: "true",
-					AdditionalFilesList: []builder.File{
-						{
-							Source:      "",
-							Destination: "",
-							Owner:       "",
-							Group:       "",
-							Mode:        0,
-						},
-						{
-							Source:      "",
-							Destination: "",
-							Owner:       "",
-							Group:       "",
-							Mode:        0,
-						},
-					},
+					AdditionalFiles:     "true",
+					AdditionalFilesList: builder.DefaultAMIAdditionalFiles,
 				},
 			}
 		}
@@ -255,6 +235,9 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		}
 
 		bo.FilesConfig.ProcessAdditionalFiles()
+		if bo.AMIConfig != nil && !builder.SameFilesProvided(bo.FilesConfig.AdditionalFilesList, builder.DefaultAMIAdditionalFiles) {
+			bo.FilesConfig.AdditionalFilesList = append(bo.FilesConfig.AdditionalFilesList, builder.DefaultAMIAdditionalFiles...)
+		}
 	}
 
 	return nil
@@ -308,11 +291,11 @@ func validateOSVersion(os string, osVersion string) error {
 		return fmt.Errorf("%s is not a supported OS.", os)
 	}
 
-	if os == builder.Ubuntu && !builder.SliceContains(builder.SupportedUbuntuVersions,osVersion) {
+	if os == builder.Ubuntu && !builder.SliceContains(builder.SupportedUbuntuVersions, osVersion) {
 		return fmt.Errorf("%s is not a supported version of Ubuntu. Please select one of %s", osVersion, strings.Join(builder.SupportedUbuntuVersions, ","))
 	}
 
-	if os == builder.RedHat && !builder.SliceContains(builder.SupportedRedHatVersions,osVersion) {
+	if os == builder.RedHat && !builder.SliceContains(builder.SupportedRedHatVersions, osVersion) {
 		return fmt.Errorf("%s is not a supported version of Redhat. Please select one of %s", osVersion, strings.Join(builder.SupportedRedHatVersions, ","))
 	}
 
@@ -324,7 +307,7 @@ func validateFirmware(firmware string, os string, hypervisor string) error {
 		return nil
 	}
 
-	if !builder.SliceContains(builder.SupportedFirmwares,firmware) {
+	if !builder.SliceContains(builder.SupportedFirmwares, firmware) {
 		return fmt.Errorf("%s is not a firmware. Please select one of %s", firmware, strings.Join(builder.SupportedFirmwares, ","))
 	}
 
