@@ -106,12 +106,12 @@ func controlPlaneJoin() error {
 		localApiServerReadinessEndpoint = "https://localhost:6443/healthz"
 	}
 
-	err = utils.WaitFor200(localApiServerReadinessEndpoint, 30*time.Second)
+	err = utils.WaitFor200(localApiServerReadinessEndpoint, 5*time.Minute)
 	if err != nil {
 		return err
 	}
 
-	err = utils.WaitFor200(string(apiServer)+"/healthz", 30*time.Second)
+	err = utils.WaitFor200(string(apiServer)+"/healthz", 5*time.Minute)
 	if err != nil {
 		return err
 	}

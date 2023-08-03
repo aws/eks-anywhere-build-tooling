@@ -86,14 +86,14 @@ func controlPlaneInit() error {
 	}
 
 	// Wait for Kubernetes API server to come up.
-	err = utils.WaitFor200(localApiServerReadinessEndpoint, 30*time.Second)
+	err = utils.WaitFor200(localApiServerReadinessEndpoint, 5*time.Minute)
 	if err != nil {
 		return err
 	}
 
 	// If the api advertise url is different than localhost, like when using kube-vip, make
 	// sure it is accessible
-	err = utils.WaitFor200(string(apiServer)+"/healthz", 30*time.Second)
+	err = utils.WaitFor200(string(apiServer)+"/healthz", 5*time.Minute)
 	if err != nil {
 		return err
 	}
