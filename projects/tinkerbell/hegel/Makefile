@@ -11,6 +11,8 @@ SOURCE_PATTERNS=./cmd/hegel
 
 IMAGE_USERADD_USER_NAME=tinkerbell
 
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 $(call IMAGE_TARGETS_FOR_NAME, hegel): hegel-useradd/images/export

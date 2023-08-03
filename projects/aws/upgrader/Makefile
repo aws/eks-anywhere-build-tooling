@@ -8,6 +8,7 @@ GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".releases[] | select(.branch==\"${RELEA
 HAS_RELEASE_BRANCHES=true
 
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 # for the staging buildspec generation
 BUILDSPEC_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 kubernetes_sigs_cri_tools
 

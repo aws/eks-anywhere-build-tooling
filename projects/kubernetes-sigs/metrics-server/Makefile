@@ -33,6 +33,7 @@ HELM_USE_UPSTREAM_IMAGE=true
 HELM_CHART_NAMES=metrics-server/charts/metrics-server
 
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 

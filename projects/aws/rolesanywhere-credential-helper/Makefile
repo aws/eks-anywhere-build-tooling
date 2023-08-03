@@ -9,6 +9,7 @@ SOURCE_PATTERNS=./cmd/aws_signing_helper
 EXTRA_GO_LDFLAGS=-X k8s.io/component-base/version.gitVersion=$(GIT_TAG)
 
 HAS_S3_ARTIFACTS=true
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 IMAGE_NAMES=
 

@@ -13,6 +13,8 @@ GITREV?=$(shell git -C $(REPO) rev-parse --short HEAD)
 
 EXTRA_GO_LDFLAGS=-X main.GitRev=${GITREV}
 
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 

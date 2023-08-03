@@ -11,6 +11,7 @@ HAS_LICENSES=false
 IMAGE_COMPONENT=aws/cluster-api-provider-aws-snow/manager
 
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
