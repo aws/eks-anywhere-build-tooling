@@ -20,7 +20,7 @@ func (b *BuildOptions) BuildImage() {
 	// Clone build tooling repo
 	cwd, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("error retrieving current working directory: %v", err)
+		log.Fatalf("Error retrieving current working directory: %v", err)
 	}
 	buildToolingRepoPath := getBuildToolingPath(cwd)
 
