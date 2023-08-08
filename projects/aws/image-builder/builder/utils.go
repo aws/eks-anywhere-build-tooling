@@ -126,7 +126,10 @@ func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
 
 	var eksAReleaseVersion, bundleManifestUrl string
 	var foundRelease bool
-	if bo.EKSAReleaseVersion != "" {
+	if os.Getenv(eksaUseDevReleaseEnvVar) == "true" {
+		eksAReleaseVersion = devEksaReleaseVersion
+		log.Printf("EKSA_USE_DEV_RELEASE set to true, using EKS-A dev release version: %s", eksAReleaseVersion)
+	} else if bo.EKSAReleaseVersion != "" {
 		eksAReleaseVersion = bo.EKSAReleaseVersion
 		log.Printf("EKS-A release version provided: %s", eksAReleaseVersion)
 	} else if eksaVersion != "" {
@@ -196,13 +199,17 @@ func readFileFromURL(url string) ([]byte, error) {
 }
 
 func getEksAReleasesManifestURL() string {
-	eksAReleasesManifestURL := "https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml"
+	eksAReleasesManifestURL := prodEksaReleaseManifestURL
 	if codebuild == "true" {
 		branchName := os.Getenv(branchNameEnvVar)
-		if branchName == "main" {
-			eksAReleasesManifestURL = "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/eks-a-release.yaml"
+		if branchName == mainBranch {
+			eksAReleasesManifestURL = devEksaReleaseManifestURL
 		} else {
 			eksAReleasesManifestURL = fmt.Sprintf("https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/%s/eks-a-release.yaml", branchName)
+		}
+	} else {
+		if os.Getenv(eksaUseDevReleaseEnvVar) == "true" {
+			eksAReleasesManifestURL = devEksaReleaseManifestURL
 		}
 	}
 
