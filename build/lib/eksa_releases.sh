@@ -36,7 +36,7 @@ function build::eksa_releases::load_bundle_manifest() {
     # dev EKS-A releases manifest and so the yq search will fail. Hence if are running in dev, we append
     # a wildcard build metadata to the EKSA_RELEASE_VERSION var that will make it pass the yq select check.
     EKSA_RELEASE_VERSION="${EKSA_RELEASE_VERSION:-}"
-    local -r eksa_release_version=${EKSA_RELEASE_VERSION:-$(echo "$release_manifest" | yq e ".spec.latestVersion" -)}
+    local eksa_release_version=${EKSA_RELEASE_VERSION:-$(echo "$release_manifest" | yq e ".spec.latestVersion" -)}
     if [ $dev_release = true ] && [ -n "$EKSA_RELEASE_VERSION" ]; then
       eksa_release_version="$eksa_release_version+build.*"
     fi
