@@ -25,6 +25,8 @@ const (
 	packerNutanixConfigFile          string = "packer/nutanix/nutanix.json"
 	packerCloudStackConfigFile       string = "packer/config/cloudstack.json"
 	packerAMIConfigFile              string = "packer/ami/ami.json"
+	prodEksaReleaseManifestURL       string = "https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml"
+	devEksaReleaseManifestURL        string = "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/eks-a-release.yaml"
 
 	// Environment variables
 	branchNameEnvVar                      string = "BRANCH_NAME"
@@ -36,6 +38,11 @@ const (
 	rhelUsernameEnvVar                    string = "RHSM_USERNAME"
 	rhelPasswordEnvVar                    string = "RHSM_PASSWORD"
 	packerTypeVarFilesEnvVar              string = "PACKER_TYPE_VAR_FILES"
+	eksaUseDevReleaseEnvVar               string = "EKSA_USE_DEV_RELEASE"
+
+	// Miscellaneous
+	mainBranch            string = "main"
+	devEksaReleaseVersion string = "v0.0.0-dev"
 )
 
 var DefaultAMIAdditionalFiles = []File{
