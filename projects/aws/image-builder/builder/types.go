@@ -35,18 +35,19 @@ var SupportedFirmwares = []string{
 }
 
 type BuildOptions struct {
-	Os               string
-	OsVersion        string
-	Hypervisor       string
-	VsphereConfig    *VsphereConfig
-	BaremetalConfig  *BaremetalConfig
-	NutanixConfig    *NutanixConfig
-	CloudstackConfig *CloudstackConfig
-	AMIConfig        *AMIConfig
-	FilesConfig      *AdditionalFilesConfig
-	ReleaseChannel   string
-	Force            bool
-	Firmware         string
+	Os                 string
+	OsVersion          string
+	Hypervisor         string
+	VsphereConfig      *VsphereConfig
+	BaremetalConfig    *BaremetalConfig
+	NutanixConfig      *NutanixConfig
+	CloudstackConfig   *CloudstackConfig
+	AMIConfig          *AMIConfig
+	FilesConfig        *AdditionalFilesConfig
+	ReleaseChannel     string
+	Force              bool
+	Firmware           string
+	EKSAReleaseVersion string
 }
 
 type VsphereConfig struct {

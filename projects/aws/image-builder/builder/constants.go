@@ -11,6 +11,8 @@ const (
 	DefaultAMIVolumeType           string = "gp3"
 	DefaultAMIManifestOutput       string = "manifest.json"
 
+	// Paths and URLs
+	buildToolingRepoUrl              string = "https://github.com/aws/eks-anywhere-build-tooling.git"
 	imageBuilderProjectDirectory     string = "projects/kubernetes-sigs/image-builder"
 	imageBuilderCAPIDirectory        string = "image-builder/images/capi"
 	packerAdditionalFilesConfigFile  string = "packer/config/files.json"
@@ -25,9 +27,11 @@ const (
 	packerAMIConfigFile              string = "packer/ami/ami.json"
 
 	// Environment variables
+	branchNameEnvVar                      string = "BRANCH_NAME"
 	codebuildCIEnvVar                     string = "CODEBUILD_CI"
 	codebuildSourceDirectoryEnvVar        string = "CODEBUILD_SRC_DIR"
 	releaseBranchEnvVar                   string = "RELEASE_BRANCH"
+	eksAReleaseVersionEnvVar              string = "EKSA_RELEASE_VERSION"
 	packerAdditionalFilesConfigFileEnvVar string = "PACKER_ADDITIONAL_FILES_VAR_FILES"
 	rhelUsernameEnvVar                    string = "RHSM_USERNAME"
 	rhelPasswordEnvVar                    string = "RHSM_PASSWORD"

@@ -30,8 +30,17 @@ function build::eksa_releases::load_bundle_manifest() {
     local -r release_manifest_url=$(build::eksa_releases::get_eksa_release_manifest_url $dev_release $latest)
     local -r release_manifest=$(curl -s --retry 5 $release_manifest_url)
 
-    local -r latest_version=$(echo "$release_manifest" | yq e ".spec.latestVersion" -)
-    local -r bundle_manifest_url=$(echo "$release_manifest" | yq e ".spec.releases[] | select(.version == \"$latest_version\") .bundleManifestUrl" -)
+    # The EKSA_RELEASE_VERSION variable is set only when this script is run from the image-builder CLI.
+    # When running the image-builder CLI in dev, the EKSA_RELEASE_VERSION will be set to a dev version
+    # such as v0.0.0-dev, but without the build metadata. This incomplete version is not available in the
+    # dev EKS-A releases manifest and so the yq search will fail. Hence if are running in dev, we append
+    # a wildcard build metadata to the EKSA_RELEASE_VERSION var that will make it pass the yq select check.
+    EKSA_RELEASE_VERSION="${EKSA_RELEASE_VERSION:-}"
+    local eksa_release_version=${EKSA_RELEASE_VERSION:-$(echo "$release_manifest" | yq e ".spec.latestVersion" -)}
+    if [ $dev_release = true ] && [ -n "$EKSA_RELEASE_VERSION" ]; then
+      eksa_release_version="$eksa_release_version+build.*"
+    fi
+    local -r bundle_manifest_url=$(echo "$release_manifest" | yq e ".spec.releases[] | select(.version == \"$eksa_release_version\") .bundleManifestUrl" -)
     BUNDLE_MANIFEST[$bundle_manifest_key]=$(curl -s --retry 5 "$bundle_manifest_url" | yq)
   fi
   if $echo; then

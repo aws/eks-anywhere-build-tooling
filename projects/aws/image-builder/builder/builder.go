@@ -11,11 +11,10 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-const (
-	buildToolingRepoUrl = "https://github.com/aws/eks-anywhere-build-tooling.git"
+var (
+	eksaVersion string
+	codebuild   = os.Getenv(codebuildCIEnvVar)
 )
-
-var codebuild = os.Getenv(codebuildCIEnvVar)
 
 func (b *BuildOptions) BuildImage() {
 	// Clone build tooling repo
@@ -30,17 +29,16 @@ func (b *BuildOptions) BuildImage() {
 		cleanup(buildToolingRepoPath)
 	}
 
+	gitCommitFromBundle, detectedEksaVersion, err := b.getGitCommitFromBundle()
+	if err != nil {
+		log.Fatalf("Error getting git commit from bundle: %v", err)
+	}
 	if codebuild != "true" {
 		err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
 		if err != nil {
 			log.Fatalf("Error cloning build tooling repo: %v", err)
 		}
 		log.Println("Cloned eks-anywhere-build-tooling repo")
-
-		gitCommitFromBundle, err := getGitCommitFromBundle(buildToolingRepoPath)
-		if err != nil {
-			log.Fatalf("Error getting git commit from bundle: %v", err)
-		}
 
 		err = checkoutRepo(buildToolingRepoPath, gitCommitFromBundle)
 		if err != nil {
@@ -64,7 +62,7 @@ func (b *BuildOptions) BuildImage() {
 	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, imageBuilderCAPIDirectory)
 	var outputArtifactPath string
 	var outputImageGlob []string
-	commandEnvVars := []string{fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel)}
+	commandEnvVars := []string{fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel), fmt.Sprintf("%s=%s", eksAReleaseVersionEnvVar, detectedEksaVersion)}
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n Firmware: %s\n", b.Os, b.OsVersion, b.Hypervisor, b.Firmware)
 	if b.FilesConfig != nil {
