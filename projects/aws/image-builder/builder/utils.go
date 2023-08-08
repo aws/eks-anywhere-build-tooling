@@ -2,11 +2,14 @@ package builder
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	releasev1 "github.com/aws/eks-anywhere/release/api/v1alpha1"
 	"sigs.k8s.io/yaml"
@@ -109,19 +112,99 @@ func execCommand(cmd *exec.Cmd) (string, error) {
 	return commandOutputStr, nil
 }
 
-func getGitCommitFromBundle(repoPath string) (string, error) {
-	log.Println("Getting git commit from bundle")
-	loadBundleManifestCommandSequence := fmt.Sprintf("source %s/build/lib/eksa_releases.sh && build::eksa_releases::load_bundle_manifest %s", repoPath, os.Getenv("EKSA_USE_DEV_RELEASE"))
-	cmd := exec.Command("bash", "-c", fmt.Sprintf("%s", loadBundleManifestCommandSequence))
-	commandOut, err := execCommand(cmd)
+func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
+	eksAReleasesManifestURL := getEksAReleasesManifestURL()
+	releasesManifestContents, err := readFileFromURL(eksAReleasesManifestURL)
 	if err != nil {
-		return commandOut, err
+		return "", "", err
+	}
+
+	releases := &releasev1.Release{}
+	if err = yaml.Unmarshal(releasesManifestContents, releases); err != nil {
+		return "", "", fmt.Errorf("failed to unmarshal release manifest from [%s]: %v", eksAReleasesManifestURL, err)
+	}
+
+	var eksAReleaseVersion, bundleManifestUrl string
+	var foundRelease bool
+	if bo.EKSAReleaseVersion != "" {
+		eksAReleaseVersion = bo.EKSAReleaseVersion
+		log.Printf("EKS-A release version provided: %s", eksAReleaseVersion)
+	} else if eksaVersion != "" {
+		eksAReleaseVersion = eksaVersion
+		log.Printf("No EKS-A release version provided, defaulting to EKS-A version configured at build time: %s", eksAReleaseVersion)
+	} else {
+		eksAReleaseVersion = releases.Spec.LatestVersion
+		log.Printf("No EKS-A release version provided, defaulting to latest EKS-A version: %s", eksAReleaseVersion)
+	}
+
+	for _, r := range releases.Spec.Releases {
+		if r.Version == eksAReleaseVersion {
+			foundRelease = true
+			bundleManifestUrl = r.BundleManifestUrl
+			break
+		} else {
+			if codebuild == "true" {
+				if strings.Contains(r.Version, eksAReleaseVersion) {
+					foundRelease = true
+					bundleManifestUrl = r.BundleManifestUrl
+					break
+				}
+			}
+		}
+	}
+	if !foundRelease {
+		return "", "", fmt.Errorf("version %s is not a valid EKS-A release", eksAReleaseVersion)
+	}
+	log.Printf("Fetching git commit from bundle manifest: %s", bundleManifestUrl)
+
+	bundleManifestContents, err := readFileFromURL(bundleManifestUrl)
+	if err != nil {
+		return "", "", err
 	}
 
 	bundles := &releasev1.Bundles{}
-	if err = yaml.Unmarshal([]byte(commandOut), bundles); err != nil {
-		return "", fmt.Errorf("failed to unmarshal bundles manifest: %v", err)
+	if err = yaml.Unmarshal(bundleManifestContents, bundles); err != nil {
+		return "", "", fmt.Errorf("failed to unmarshal bundles manifest from [%s]: %v", bundleManifestUrl, err)
 	}
 
-	return bundles.Spec.VersionsBundles[0].EksD.GitCommit, nil
+	return bundles.Spec.VersionsBundles[0].EksD.GitCommit, eksAReleaseVersion, nil
+}
+
+func readFileFromURL(url string) ([]byte, error) {
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating http GET request for downloading file: %v", err)
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSHandshakeTimeout = 60 * time.Second
+	client := &http.Client{
+		Transport: transport,
+	}
+	resp, err := client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed reading file from URL [%s]: %v", url, err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed reading contents of URL body [%s]: %v", url, err)
+	}
+
+	return data, nil
+}
+
+func getEksAReleasesManifestURL() string {
+	eksAReleasesManifestURL := "https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml"
+	if codebuild == "true" {
+		branchName := os.Getenv(branchNameEnvVar)
+		if branchName == "main" {
+			eksAReleasesManifestURL = "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/eks-a-release.yaml"
+		} else {
+			eksAReleasesManifestURL = fmt.Sprintf("https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/%s/eks-a-release.yaml", branchName)
+		}
+	}
+
+	return eksAReleasesManifestURL
 }

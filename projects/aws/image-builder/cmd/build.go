@@ -52,6 +52,7 @@ func init() {
 	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-27", "EKS-D Release channel for node image. Can be 1-23, 1-24, 1-25, 1-26 or 1-27")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA and Raw builds.")
+	buildCmd.Flags().StringVar(&bo.EKSAReleaseVersion, "eksa-release", "", "The EKS-A CLI version to build images for")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
 		log.Fatalf("Error marking flag as required: %v", err)
 	}
@@ -286,7 +287,7 @@ func validateSupportedHypervisors(hypervisor string) error {
 	return fmt.Errorf("%s is not supported yet. Please select one of %s", hypervisor, strings.Join(builder.SupportedHypervisors, ","))
 }
 
-func validateOSVersion(os string, osVersion string) error {
+func validateOSVersion(os, osVersion string) error {
 	if os != builder.RedHat && os != builder.Ubuntu {
 		return fmt.Errorf("%s is not a supported OS.", os)
 	}
@@ -302,7 +303,7 @@ func validateOSVersion(os string, osVersion string) error {
 	return nil
 }
 
-func validateFirmware(firmware string, os string, hypervisor string) error {
+func validateFirmware(firmware, os, hypervisor string) error {
 	if firmware == "" {
 		return nil
 	}
