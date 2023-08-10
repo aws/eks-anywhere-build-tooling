@@ -30,6 +30,7 @@ IMAGE_OS_VERSION="${10? Specify tenth argument - image-os-version}"
 
 CI="${CI:-false}"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
+EKSA_USE_DEV_RELEASE="${EKSA_USE_DEV_RELEASE:-false}"
 DEV_RELEASE=false
 if [[ $CI == true || $CODEBUILD_CI == true || $EKSA_USE_DEV_RELEASE == true ]]; then
   DEV_RELEASE=true
