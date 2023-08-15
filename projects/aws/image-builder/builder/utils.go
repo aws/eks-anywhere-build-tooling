@@ -146,7 +146,7 @@ func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
 			bundleManifestUrl = r.BundleManifestUrl
 			break
 		} else {
-			if codebuild == "true" {
+			if codebuild == "true" || os.Getenv(eksaUseDevReleaseEnvVar) == "true" {
 				if strings.Contains(r.Version, eksAReleaseVersion) {
 					foundRelease = true
 					bundleManifestUrl = r.BundleManifestUrl
