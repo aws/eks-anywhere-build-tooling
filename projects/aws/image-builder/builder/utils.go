@@ -117,7 +117,7 @@ func execCommand(cmd *exec.Cmd) (string, error) {
 }
 
 func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
-	eksAReleasesManifestURL := GetEksAReleasesManifestURL()
+	eksAReleasesManifestURL := getEksAReleasesManifestURL()
 	releasesManifestContents, err := readFileFromURL(eksAReleasesManifestURL)
 	if err != nil {
 		return "", "", err
