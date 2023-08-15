@@ -8,8 +8,8 @@ REPO_OWNER=aws
 EKS_ANYWHERE_CLONE_URL=https://github.com/aws/eks-anywhere.git
 EKS_ANYWHERE_REPO=eks-anywhere
 EKS_ANYWHERE_REPO_SPARSE_CHECKOUT=release/triggers/bundle-release/development/CLI_MAX_VERSION
-EKS_ANYWHERE_BRANCH=$(or $(BRANCH_NAME),$(PULL_BASE_REF),main)
-EKS_ANYWHERE_EMBED_VERSION=v0.0.0-dev$(if $(filter main,$(EKS_ANYWHERE_BRANCH)),,-$(EKS_ANYWHERE_BRANCH))
+EKS_ANYWHERE_EMBED_VERSION=v0.0.0-dev$(if $(filter main,$(BRANCH_NAME)),,-$(BRANCH_NAME))
+EKS_ANYWHERE_RELEASE_MANIFEST_URL=https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/$(if $(filter $(BRANCH_NAME),main),,$(BRANCH_NAME)/)eks-a-release.yaml
 
 BINARY_TARGET_FILES=image-builder
 GO_MOD_PATHS=..
@@ -22,7 +22,9 @@ SKIP_CHECKSUM_VALIDATION=true
 GIT_CHECKOUT_TARGET=main.go
 FAKE_GIT_REPO_TARGET=.git
 
-EXTRA_GO_LDFLAGS=-X github.com/aws/eks-anywhere-build-tooling/image-builder/cmd.version=$(GIT_TAG) -X github.com/aws/eks-anywhere-build-tooling/image-builder/builder.eksaVersion=$(EKS_ANYWHERE_EMBED_VERSION)
+EXTRA_GO_LDFLAGS=-X github.com/aws/eks-anywhere-build-tooling/image-builder/cmd.version=$(GIT_TAG) \
+	-X github.com/aws/eks-anywhere-build-tooling/image-builder/builder.eksaVersion=$(EKS_ANYWHERE_EMBED_VERSION) \
+	-X github.com/aws/eks-anywhere-build-tooling/image-builder/builder.eksaReleaseManifest=$(EKS_ANYWHERE_RELEASE_MANIFEST_URL)
 
 # Go 1.18 automatically embeds vcs information if there is a .git folder in the current path
 # this makes builds not reproducible due a sync timestamp 
@@ -33,12 +35,13 @@ include $(BASE_DIRECTORY)/Common.mk
 
 $(REPO):
 	@mkdir $@
-	source $(BUILD_LIB)/common.sh && retry git clone --depth 1 --filter=blob:none --sparse -b $(EKS_ANYWHERE_BRANCH) $(EKS_ANYWHERE_CLONE_URL) $(EKS_ANYWHERE_REPO)
+	source $(BUILD_LIB)/common.sh && retry git clone --depth 1 --filter=blob:none --sparse -b $(BRANCH_NAME) $(EKS_ANYWHERE_CLONE_URL) $(EKS_ANYWHERE_REPO)
 	git -C $(EKS_ANYWHERE_REPO) sparse-checkout set $(EKS_ANYWHERE_REPO_SPARSE_CHECKOUT) --cone --skip-checks
 
 ifeq ($(CODEBUILD_CI),true)
 ifneq ($(shell echo $(CODEBUILD_BUILD_ID) | grep "aws-staging-bundle-build"),)
 $(BINARY_TARGETS): EKS_ANYWHERE_EMBED_VERSION=$(shell cat $(EKS_ANYWHERE_REPO)/$(EKS_ANYWHERE_REPO_SPARSE_CHECKOUT))
+$(BINARY_TARGETS): EKS_ANYWHERE_RELEASE_MANIFEST_URL=https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml
 endif
 endif
 

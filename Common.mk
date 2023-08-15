@@ -23,17 +23,19 @@ IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazo
 ####################################################
 
 #################### LATEST TAG ####################
-# codebuild
+# ensure local execution uses the 'main' or 'release-X' branch bundle
+# similiar to https://github.com/aws/eks-anywhere/blob/main/Makefile#L32
+# codebuild var
 BRANCH_NAME?=main
-# prow
-PULL_BASE_REF?=main
+ifneq ($(PULL_BASE_REF),) # PULL_BASE_REF originates from prow
+	BRANCH_NAME=$(PULL_BASE_REF)
+endif
+
 LATEST=latest
 ifneq ($(BRANCH_NAME),main)
 	LATEST=$(BRANCH_NAME)
 endif
-ifneq ($(PULL_BASE_REF),main)
-	LATEST=$(PULL_BASE_REF)
-endif
+
 ####################################################
 
 #################### CODEBUILD #####################
