@@ -98,7 +98,9 @@ function build::eksa_releases::get_eksa_release_manifest_url() {
   local -r dev_release=${1-false}
   local -r latest=${2-latest}
 
-  if [[ $dev_release == false ]]; then
+  if [[ -n "${EKSA_RELEASE_MANIFEST_URL:-}" ]]; then
+    echo "${EKSA_RELEASE_MANIFEST_URL}"
+  elif [[ $dev_release == false ]]; then
     echo "https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml"
   elif [[ $latest == "latest" ]]; then
     echo "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/eks-a-release.yaml"
