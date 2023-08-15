@@ -1,0 +1,36 @@
+From 5c7b24fde808e5c175df6ff9f1286b49a0f156a9 Mon Sep 17 00:00:00 2001
+From: Chris Doherty <chris.doherty4@gmail.com>
+Date: Tue, 15 Aug 2023 13:34:34 -0500
+Subject: [PATCH] Ensure content is specified before writing file
+
+---
+ actions/writefile/v1/main.go | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/actions/writefile/v1/main.go b/actions/writefile/v1/main.go
+index 954a45e..bf9f4ac 100644
+--- a/actions/writefile/v1/main.go
++++ b/actions/writefile/v1/main.go
+@@ -259,6 +259,10 @@ func main() {
+ 		}
+ 	}
+ 
++	if contents == "" {
++		log.Fatal("No content. Either the CONTENTS env var was not set or a data retrieval action failed.")
++	}
++
+ 	// If bootconfig is set, contents will be empty and will serve as output initrd file provided
+ 	// to bootconfig tool
+ 	fqFilePath := filepath.Join(mountAction, filePath)
+@@ -292,7 +296,7 @@ func main() {
+ }
+ 
+ func appendToUserData(contents string, filePath string) error {
+-	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
++	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+ 	if err != nil {
+ 		return err
+ 	}
+-- 
+2.40.1
+
