@@ -50,6 +50,10 @@ func executeMakeBuildCommand(buildCommand string, envVars ...string) error {
 }
 
 func cleanup(buildToolingDir string) {
+	if codebuild == "true" {
+		return
+	}
+
 	log.Print("Cleaning up cache build files")
 	err := os.RemoveAll(buildToolingDir)
 	if err != nil {
@@ -113,7 +117,7 @@ func execCommand(cmd *exec.Cmd) (string, error) {
 }
 
 func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
-	eksAReleasesManifestURL := getEksAReleasesManifestURL()
+	eksAReleasesManifestURL := GetEksAReleasesManifestURL()
 	releasesManifestContents, err := readFileFromURL(eksAReleasesManifestURL)
 	if err != nil {
 		return "", "", err
@@ -145,13 +149,18 @@ func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
 			foundRelease = true
 			bundleManifestUrl = r.BundleManifestUrl
 			break
-		} else {
-			if codebuild == "true" {
-				if strings.Contains(r.Version, eksAReleaseVersion) {
-					foundRelease = true
-					bundleManifestUrl = r.BundleManifestUrl
-					break
-				}
+		}
+	}
+
+	if !foundRelease {
+		// if release was not found, this is probably a dev release version which we need
+		// to use a prefix match to find since the version in the release.yaml
+		// will be v0.0.0-dev+build.7423
+		for _, r := range releases.Spec.Releases {
+			if strings.Contains(r.Version, eksAReleaseVersion) {
+				foundRelease = true
+				bundleManifestUrl = r.BundleManifestUrl
+				break
 			}
 		}
 	}
@@ -199,19 +208,24 @@ func readFileFromURL(url string) ([]byte, error) {
 }
 
 func getEksAReleasesManifestURL() string {
-	eksAReleasesManifestURL := prodEksaReleaseManifestURL
-	if codebuild == "true" {
-		branchName := os.Getenv(branchNameEnvVar)
-		if branchName == mainBranch {
-			eksAReleasesManifestURL = devEksaReleaseManifestURL
-		} else {
-			eksAReleasesManifestURL = fmt.Sprintf("https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/%s/eks-a-release.yaml", branchName)
+	if os.Getenv(eksaUseDevReleaseEnvVar) != "true" {
+		if eksaReleaseManifest != "" {
+			return eksaReleaseManifest
 		}
-	} else {
-		if os.Getenv(eksaUseDevReleaseEnvVar) == "true" {
-			eksAReleasesManifestURL = devEksaReleaseManifestURL
-		}
+		
+		return prodEksaReleaseManifestURL
 	}
+		
+	// using a dev release, allow branch_name env var to
+	// override manifest url
+	branchName, ok := os.LookupEnv(branchNameEnvVar)
+	if !ok {
+		branchName = mainBranch
+	}		
 
-	return eksAReleasesManifestURL
+	if branchName != mainBranch {
+		return fmt.Sprintf(devBranchEksaReleaseManifestURL, branchName)		
+	} 
+	
+	return devEksaReleaseManifestURL	
 }

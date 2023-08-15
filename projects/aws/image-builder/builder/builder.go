@@ -13,6 +13,7 @@ import (
 
 var (
 	eksaVersion string
+	eksaReleaseManifest string
 	codebuild   = os.Getenv(codebuildCIEnvVar)
 )
 
@@ -24,11 +25,11 @@ func (b *BuildOptions) BuildImage() {
 	}
 	buildToolingRepoPath := getBuildToolingPath(cwd)
 
-	if b.Force && codebuild != "true" {
+	if b.Force {
 		// Clean up build tooling repo in cwd
 		cleanup(buildToolingRepoPath)
 	}
-
+	
 	gitCommitFromBundle, detectedEksaVersion, err := b.getGitCommitFromBundle()
 	if err != nil {
 		log.Fatalf("Error getting git commit from bundle: %v", err)
@@ -52,9 +53,7 @@ func (b *BuildOptions) BuildImage() {
 
 	supportedReleaseBranches := GetSupportedReleaseBranches()
 	if !SliceContains(supportedReleaseBranches, b.ReleaseChannel) {
-		if codebuild != "true" {
-			cleanup(buildToolingRepoPath)
-		}
+		cleanup(buildToolingRepoPath)
 		log.Fatalf("release-channel should be one of %v", supportedReleaseBranches)
 	}
 
@@ -62,7 +61,11 @@ func (b *BuildOptions) BuildImage() {
 	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, imageBuilderCAPIDirectory)
 	var outputArtifactPath string
 	var outputImageGlob []string
-	commandEnvVars := []string{fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel), fmt.Sprintf("%s=%s", eksAReleaseVersionEnvVar, detectedEksaVersion)}
+	commandEnvVars := []string{
+		fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel), 
+		fmt.Sprintf("%s=%s", eksAReleaseVersionEnvVar, detectedEksaVersion),
+		fmt.Sprintf("%s=%s", eksAReleaseManifestURLEnvVar, GetEksAReleasesManifestURL()),
+	}
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n Firmware: %s\n", b.Os, b.OsVersion, b.Hypervisor, b.Firmware)
 	if b.FilesConfig != nil {
@@ -292,9 +295,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 	}
 
-	if codebuild != "true" {
-		cleanup(buildToolingRepoPath)
-	}
-
+	cleanup(buildToolingRepoPath)
+	
 	log.Print("Build Successful. Output artifacts located at current working directory\n")
 }

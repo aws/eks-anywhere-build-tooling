@@ -27,13 +27,15 @@ const (
 	packerAMIConfigFile              string = "packer/ami/ami.json"
 	prodEksaReleaseManifestURL       string = "https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml"
 	devEksaReleaseManifestURL        string = "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/eks-a-release.yaml"
-
+	devBranchEksaReleaseManifestURL  string = "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/%s/eks-a-release.yaml"
+	
 	// Environment variables
 	branchNameEnvVar                      string = "BRANCH_NAME"
 	codebuildCIEnvVar                     string = "CODEBUILD_CI"
 	codebuildSourceDirectoryEnvVar        string = "CODEBUILD_SRC_DIR"
 	releaseBranchEnvVar                   string = "RELEASE_BRANCH"
 	eksAReleaseVersionEnvVar              string = "EKSA_RELEASE_VERSION"
+	eksAReleaseManifestURLEnvVar          string = "EKSA_RELEASE_MANIFEST_URL"
 	packerAdditionalFilesConfigFileEnvVar string = "PACKER_ADDITIONAL_FILES_VAR_FILES"
 	rhelUsernameEnvVar                    string = "RHSM_USERNAME"
 	rhelPasswordEnvVar                    string = "RHSM_PASSWORD"
