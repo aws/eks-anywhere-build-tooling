@@ -64,7 +64,7 @@ func (b *BuildOptions) BuildImage() {
 	commandEnvVars := []string{
 		fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel), 
 		fmt.Sprintf("%s=%s", eksAReleaseVersionEnvVar, detectedEksaVersion),
-		fmt.Sprintf("%s=%s", eksAReleaseManifestURLEnvVar, GetEksAReleasesManifestURL()),
+		fmt.Sprintf("%s=%s", eksAReleaseManifestURLEnvVar, getEksAReleasesManifestURL()),
 	}
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n Firmware: %s\n", b.Os, b.OsVersion, b.Hypervisor, b.Firmware)
