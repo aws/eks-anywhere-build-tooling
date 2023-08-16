@@ -28,8 +28,9 @@ IMAGE_BUILDER_DIR="${8? Specify eighth argument - image-builder directory}"
 
 CI="${CI:-false}"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
+EKSA_USE_DEV_RELEASE="${EKSA_USE_DEV_RELEASE:-false}"
 DEV_RELEASE=false
-if [[ $CI == true || $CODEBUILD_CI == true ]]; then
+if [[ $CI == true || $CODEBUILD_CI == true || $EKSA_USE_DEV_RELEASE == true ]]; then
   DEV_RELEASE=true
 fi
 
