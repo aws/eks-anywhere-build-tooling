@@ -1,0 +1,189 @@
+From d4d08cedc601c13d08cb78a664d26a8251fde297 Mon Sep 17 00:00:00 2001
+From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
+Date: Wed, 16 Aug 2023 19:58:01 -0700
+Subject: [PATCH 35/36] Add support for external etcd machines in Kind mapper
+
+---
+ .../docker/exp/internal/docker/nodepool.go    |  4 +-
+ .../controllers/dockermachine_controller.go   | 13 ++--
+ .../docker/internal/docker/machine.go         | 69 +++++++++++++------
+ 3 files changed, 54 insertions(+), 32 deletions(-)
+
+diff --git a/test/infrastructure/docker/exp/internal/docker/nodepool.go b/test/infrastructure/docker/exp/internal/docker/nodepool.go
+index 1a46d283a..9e1705cac 100644
+--- a/test/infrastructure/docker/exp/internal/docker/nodepool.go
++++ b/test/infrastructure/docker/exp/internal/docker/nodepool.go
+@@ -219,7 +219,7 @@ func (np *NodePool) addMachine(ctx context.Context) error {
+ 		}
+ 	}
+ 
+-	if err := externalMachine.Create(ctx, np.dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, np.machinePool.Spec.Template.Spec.Version, labels, np.dockerMachinePool.Spec.Template.ExtraMounts); err != nil {
++	if err := externalMachine.Create(ctx, np.dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, np.machinePool.Spec.Template.Spec.Version, labels, np.dockerMachinePool.Spec.Template.ExtraMounts, false); err != nil {
+ 		return errors.Wrapf(err, "failed to create docker machine with instance name %s", instanceName)
+ 	}
+ 	return nil
+@@ -301,7 +301,7 @@ func (np *NodePool) reconcileMachine(ctx context.Context, machine *docker.Machin
+ 			}
+ 
+ 			// Run the bootstrap script. Simulates cloud-init/Ignition.
+-			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, np.machinePool.Spec.Template.Spec.Version, np.dockerMachinePool.Spec.Template.CustomImage); err != nil {
++			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, np.machinePool.Spec.Template.Spec.Version, np.dockerMachinePool.Spec.Template.CustomImage, false); err != nil {
+ 				return ctrl.Result{}, errors.Wrapf(err, "failed to exec DockerMachinePool instance bootstrap for instance named %s", machine.Name())
+ 			}
+ 			// Check for bootstrap success
+diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
+index decaafda4..00cbe0d39 100644
+--- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
++++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
+@@ -252,7 +252,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+ 	if !externalMachine.Exists() {
+ 		// NOTE: FailureDomains don't mean much in CAPD since it's all local, but we are setting a label on
+ 		// each container, so we can check placement.
+-		if err := externalMachine.Create(ctx, dockerMachine.Spec.CustomImage, role, machine.Spec.Version, docker.FailureDomainLabel(machine.Spec.FailureDomain), dockerMachine.Spec.ExtraMounts); err != nil {
++		if err := externalMachine.Create(ctx, dockerMachine.Spec.CustomImage, role, machine.Spec.Version, docker.FailureDomainLabel(machine.Spec.FailureDomain), dockerMachine.Spec.ExtraMounts, util.IsEtcdMachine(machine)); err != nil {
+ 			return ctrl.Result{}, errors.Wrap(err, "failed to create worker DockerMachine")
+ 		}
+ 	}
+@@ -332,7 +332,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+ 			}()
+ 
+ 			// Run the bootstrap script. Simulates cloud-init/Ignition.
+-			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, machine.Spec.Version, dockerMachine.Spec.CustomImage); err != nil {
++			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, machine.Spec.Version, dockerMachine.Spec.CustomImage, util.IsEtcdMachine(machine)); err != nil {
+ 				conditions.MarkFalse(dockerMachine, infrav1.BootstrapExecSucceededCondition, infrav1.BootstrapFailedReason, clusterv1.ConditionSeverityWarning, "Repeating bootstrap")
+ 				return ctrl.Result{}, errors.Wrap(err, "failed to exec DockerMachine bootstrap")
+ 			}
+@@ -361,12 +361,12 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+ 	// Machine will never get a node ref as ProviderID is required to set the node ref, so we would get a deadlock.
+ 	if cluster.Spec.ControlPlaneRef != nil &&
+ 		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) &&
+-		!isEtcdMachine(machine) {
++		!util.IsEtcdMachine(machine) {
+ 		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+ 	}
+ 
+ 	// In case of an etcd cluster, there is no concept of kubernetes node. So we can generate the node Provider ID and set it on machine spec directly
+-	if !isEtcdMachine(machine) {
++	if !util.IsEtcdMachine(machine) {
+ 		// Usually a cloud provider will do this, but there is no docker-cloud provider.
+ 		// Requeue if there is an error, as this is likely momentary load balancer
+ 		// state changes during control plane provisioning.
+@@ -534,8 +534,3 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
+ 	}
+ 	return nil
+ }
+-
+-func isEtcdMachine(machine *clusterv1.Machine) bool {
+-	_, ok := machine.Labels[clusterv1.MachineEtcdClusterLabelName]
+-	return ok
+-}
+diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
+index 12bda2cb2..d36e122ca 100644
+--- a/test/infrastructure/docker/internal/docker/machine.go
++++ b/test/infrastructure/docker/internal/docker/machine.go
+@@ -47,6 +47,7 @@ import (
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning/ignition"
+ 	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
+ 	"sigs.k8s.io/cluster-api/util/patch"
++	versionutil "sigs.k8s.io/cluster-api/util/version"
+ )
+ 
+ type nodeCreator interface {
+@@ -192,23 +193,35 @@ func (m *Machine) ContainerImage() string {
+ }
+ 
+ // Create creates a docker container hosting a Kubernetes node.
+-func (m *Machine) Create(ctx context.Context, image string, role string, version *string, labels map[string]string, mounts []infrav1.Mount) error {
++func (m *Machine) Create(ctx context.Context, image string, role string, version *string, labels map[string]string, mounts []infrav1.Mount, isEtcdMachine bool) error {
+ 	log := ctrl.LoggerFrom(ctx)
+ 
+ 	// Create if not exists.
+ 	if m.container == nil {
+ 		var err error
++		var semVer semver.Version
++
++		// External etcd machines do not set a version field in the machine.Spec.Version.
++		// So we are parsing the Kubernetes semantic version from the Kind node tag and
++		// using that to get the Kind Mapping.
++		if isEtcdMachine {
++			nodeImageTag := strings.Split(image, ":")[1]
++			semVer, err = versionutil.ParseMajorMinorPatch(nodeImageTag)
++			if err != nil {
++				return errors.Wrap(err, "failed to parse semantic version from image tag")
++			}
++		} else {
++			// Parse the semver from the Spec.Version if not nil and get the KindMapping using the semver.
++			// NOTE: The KindMapping allows to select the most recent kindest/node image available, if any, as well as
++			// provide info about the mode to be used when starting the kindest/node image itself.
++			if version == nil {
++				return errors.New("cannot create a DockerMachine for a nil version")
++			}
+ 
+-		// Get the KindMapping for the target K8s version.
+-		// NOTE: The KindMapping allows to select the most recent kindest/node image available, if any, as well as
+-		// provide info about the mode to be used when starting the kindest/node image itself.
+-		if version == nil {
+-			return errors.New("cannot create a DockerMachine for a nil version")
+-		}
+-
+-		semVer, err := semver.Parse(strings.TrimPrefix(*version, "v"))
+-		if err != nil {
+-			return errors.Wrap(err, "failed to parse DockerMachine version")
++			semVer, err = semver.Parse(strings.TrimPrefix(*version, "v"))
++			if err != nil {
++				return errors.Wrap(err, "failed to parse DockerMachine version")
++			}
+ 		}
+ 
+ 		kindMapping := kind.GetMapping(semVer, image)
+@@ -320,23 +333,37 @@ func (m *Machine) PreloadLoadImages(ctx context.Context, images []string) error
+ }
+ 
+ // ExecBootstrap runs bootstrap on a node, this is generally `kubeadm <init|join>`.
+-func (m *Machine) ExecBootstrap(ctx context.Context, data string, format bootstrapv1.Format, version *string, image string) error {
++func (m *Machine) ExecBootstrap(ctx context.Context, data string, format bootstrapv1.Format, version *string, image string, isEtcdMachine bool) error {
+ 	log := ctrl.LoggerFrom(ctx)
+ 
+ 	if m.container == nil {
+ 		return errors.New("unable to set ExecBootstrap. the container hosting this machine does not exists")
+ 	}
+ 
+-	// Get the kindMapping for the target K8s version.
+-	// NOTE: The kindMapping allows to select the most recent kindest/node image available, if any, as well as
+-	// provide info about the mode to be used when starting the kindest/node image itself.
+-	if version == nil {
+-		return errors.New("cannot create a DockerMachine for a nil version")
+-	}
++	var err error
++	var semVer semver.Version
+ 
+-	semVer, err := semver.Parse(strings.TrimPrefix(*version, "v"))
+-	if err != nil {
+-		return errors.Wrap(err, "failed to parse DockerMachine version")
++	// External etcd machines do not set a version field in the machine.Spec.Version.
++	// So we are parsing the Kubernetes semantic version from the Kind node tag and
++	// using that to get the Kind Mapping.
++	if isEtcdMachine {
++		nodeImageTag := strings.Split(image, ":")[1]
++		semVer, err = versionutil.ParseMajorMinorPatch(nodeImageTag)
++		if err != nil {
++			return errors.Wrap(err, "failed to parse semantic version from image tag")
++		}
++	} else {
++		// Parse the semver from the Spec.Version if not nil and get the KindMapping using the semver.
++		// NOTE: The KindMapping allows to select the most recent kindest/node image available, if any, as well as
++		// provide info about the mode to be used when starting the kindest/node image itself.
++		if version == nil {
++			return errors.New("cannot create a DockerMachine for a nil version")
++		}
++
++		semVer, err = semver.Parse(strings.TrimPrefix(*version, "v"))
++		if err != nil {
++			return errors.Wrap(err, "failed to parse DockerMachine version")
++		}
+ 	}
+ 
+ 	kindMapping := kind.GetMapping(semVer, image)
+-- 
+2.40.1
+
