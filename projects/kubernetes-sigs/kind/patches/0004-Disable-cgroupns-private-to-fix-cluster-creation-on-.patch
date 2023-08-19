@@ -1,0 +1,26 @@
+From 00cfd713adb67782d7d0a013b4be5a4a61232425 Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Sat, 19 Aug 2023 09:21:55 -0500
+Subject: [PATCH] Disable cgroupns=private to fix cluster creation on AL2
+
+---
+ pkg/cluster/internal/providers/docker/provision.go | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/pkg/cluster/internal/providers/docker/provision.go b/pkg/cluster/internal/providers/docker/provision.go
+index 6c644a36..351c023b 100644
+--- a/pkg/cluster/internal/providers/docker/provision.go
++++ b/pkg/cluster/internal/providers/docker/provision.go
+@@ -171,7 +171,8 @@ func commonArgs(cluster string, cfg *config.Cluster, networkName string, nodeNam
+ 		// this is the default with cgroups v2 but not with cgroups v1, unless
+ 		// overridden in the daemon --default-cgroupns-mode
+ 		// https://github.com/docker/cli/pull/3699#issuecomment-1191675788
+-		"--cgroupns=private",
++		// AWS: Seems to cause issues on AL2 nodes
++		//"--cgroupns=private",
+ 	}
+ 
+ 	// enable IPv6 if necessary
+-- 
+2.40.1
+
