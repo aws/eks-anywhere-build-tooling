@@ -34,6 +34,15 @@ elif [[ "$image_os" == "redhat" ]]; then
   image_os_version_arg="--os-version $image_os_version"
 fi
 
+if [ ! -f "${HOME}/image-builder" ]; then
+  ARCH="arm64"
+  if [[ "$(uname -m)" == "x86_64" ]]; then
+    ARCH="amd64"
+  fi
+
+  cp "$MAKE_ROOT/../../aws/image-builder/_output/bin/image-builder/linux-$ARCH/image-builder" "${HOME}" 
+fi
+
 image_builder_config_file="${HOME}/image_builder_config_file"
 redhat_config_file="${HOME}/redhat_config_file"
 if [[ $image_os == "redhat" ]]; then
