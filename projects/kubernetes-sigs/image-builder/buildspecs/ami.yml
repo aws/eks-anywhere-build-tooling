@@ -5,6 +5,8 @@ run-as: imagebuilder
 env:
   variables:
     HOME: "/home/imagebuilder"
+    CLI_FOLDER: "projects/aws/image-builder"
+    GOPATH: "/home/imagebuilder/go"
 
 phases:
   pre_build:
@@ -14,4 +16,5 @@ phases:
 
   build:
     commands:
+      - make binaries -C $CLI_FOLDER && cp $CLI_FOLDER/_output/bin/image-builder/linux-$(go env GOARCH)/image-builder $HOME
       - if make check-for-supported-release-branch -C $PROJECT_PATH; then make release IMAGE_OS=$IMAGE_OS IMAGE_FORMAT=ami RELEASE_BRANCH=$RELEASE_BRANCH -C $PROJECT_PATH; fi

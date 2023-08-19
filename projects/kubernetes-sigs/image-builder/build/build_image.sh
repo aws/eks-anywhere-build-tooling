@@ -18,7 +18,6 @@ set -o errexit
 set -o nounset
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-source "${MAKE_ROOT}/build/setup_image_builder_cli.sh"
 
 image_os="${1?Specify the first argument - image os}"
 image_os_version="${2?Specify the second argument - image os version}"
@@ -27,9 +26,6 @@ image_format="${4?Specify the fourth argument - image format}"
 artifacts_bucket=${5-$ARTIFACTS_BUCKET}
 latest=${6-latest}
 firmware=${7-}
-
-# Download and setup latest image-builder cli
-image_build::common::download_latest_dev_image_builder_cli "${HOME}" $artifacts_bucket 'amd64' $latest
 
 image_os_version_arg=""
 if [[ "$image_os" == "ubuntu" ]]; then
