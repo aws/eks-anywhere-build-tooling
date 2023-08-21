@@ -252,7 +252,8 @@ $(ARTIFACTS_PATH)/bottlerocket/%:
 	curl https://cache.bottlerocket.aws/root.json -o $$BOTTLEROCKET_ROOT_JSON_PATH
 	sha512sum -c $(BOTTLEROCKET_DOWNLOAD_PATH)/bottlerocket-root-json-checksum
 	build/get_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(BOTTLEROCKET_DOWNLOAD_PATH) $(PROJECT_PATH)/$(RELEASE_BRANCH) $(LATEST_TAG)
-	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/$(IMAGE_FORMAT)/*$(suffix $(@F)) $@
+	mv $(BOTTLEROCKET_DOWNLOAD_PATH)/$(IMAGE_FORMAT)/*$(suffix $(@F)) $@	
+	echo $$(source $(BUILD_LIB)/common.sh && build::eksd_releases::get_release_yaml_url $(RELEASE_BRANCH)) > $(@D)/EKSD_MANIFEST_URL
 	@echo -e $(call TARGET_END_LOG)
 
 # ex: upload-bottlerocket-1-ova, upload-bottlerocket-1-raw
