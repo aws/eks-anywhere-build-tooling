@@ -1,4 +1,4 @@
-From 11745451f5cf785f7a45aecdf0fca870d22811ff Mon Sep 17 00:00:00 2001
+From f5a8eaed8568cbacc9154bc73f30435b306c479c Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/36] Add unstacked etcd support
@@ -84,7 +84,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  .../controllers/cluster/cluster_controller.go |  89 ++++++++++-
  .../cluster/cluster_controller_phases.go      | 108 +++++++++++++
  .../cluster/cluster_controller_test.go        | 134 ++++++++++++++++
- .../machine/machine_controller_noderef.go     |  10 +-
+ .../machine/machine_controller_noderef.go     |   8 +
  .../machine_controller_noderef_test.go        |  43 ++++++
  .../machine/machine_controller_phases.go      | 115 ++++++++++++++
  .../controllers/dockermachine_controller.go   |  35 +++--
@@ -92,7 +92,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 26 files changed, 857 insertions(+), 21 deletions(-)
+ 26 files changed, 856 insertions(+), 20 deletions(-)
 
 diff --git a/api/v1alpha3/cluster_types.go b/api/v1alpha3/cluster_types.go
 index 66dd8458a..503de063a 100644
@@ -1122,10 +1122,10 @@ index 2b5721693..9d13518f7 100644
  
  	g.Expect(actual).To(Equal(expected))
 diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 2df5c4da4..1f74abd2d 100644
+index 2df5c4da4..6e6b4b677 100644
 --- a/internal/controllers/machine/machine_controller_noderef.go
 +++ b/internal/controllers/machine/machine_controller_noderef.go
-@@ -49,12 +49,20 @@ func (r *Reconciler) reconcileNode(ctx context.Context, cluster *clusterv1.Clust
+@@ -49,6 +49,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, cluster *clusterv1.Clust
  		return ctrl.Result{}, err
  	}
  
@@ -1140,13 +1140,6 @@ index 2df5c4da4..1f74abd2d 100644
  	// Check that the Machine has a valid ProviderID.
  	if machine.Spec.ProviderID == nil || *machine.Spec.ProviderID == "" {
  		log.Info("Waiting for infrastructure provider to report spec.providerID", machine.Spec.InfrastructureRef.Kind, klog.KRef(machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name))
- 		conditions.MarkFalse(machine, clusterv1.MachineNodeHealthyCondition, clusterv1.WaitingForNodeRefReason, clusterv1.ConditionSeverityInfo, "")
- 		return ctrl.Result{}, nil
--	}
-+	}
- 
- 	remoteClient, err := r.Tracker.GetClient(ctx, util.ObjectKey(cluster))
- 	if err != nil {
 diff --git a/internal/controllers/machine/machine_controller_noderef_test.go b/internal/controllers/machine/machine_controller_noderef_test.go
 index d1e35459f..540521c38 100644
 --- a/internal/controllers/machine/machine_controller_noderef_test.go
@@ -1488,5 +1481,5 @@ index e6737ab7a..00da78f90 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.39.2
+2.40.1
 
