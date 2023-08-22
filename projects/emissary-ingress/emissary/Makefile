@@ -8,6 +8,7 @@ REPO=emissary
 REPO_OWNER=emissary-ingress
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
+SKIP_ON_RELEASE_BRANCH=true
 BINARY_TARGET_FILES=busyambassador capabilities_wrapper example-envoy-metrics-sink k8sregistryctl kat-client kat-server
 SOURCE_PATTERNS=./cmd/busyambassador ./cmd/capabilities_wrapper ./cmd/example-envoy-metrics-sink ./cmd/k8sregistryctl ./cmd/kat-client ./cmd/kat-server
 

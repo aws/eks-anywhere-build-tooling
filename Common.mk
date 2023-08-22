@@ -37,6 +37,7 @@ ifneq ($(BRANCH_NAME),main)
 	LATEST=$(BRANCH_NAME)
 endif
 
+SKIP_ON_RELEASE_BRANCH?=false
 ####################################################
 
 #################### CODEBUILD #####################
@@ -964,6 +965,13 @@ check-for-supported-release-branch:
 		echo "Not a supported version to build"; \
 		exit 1; \
 	fi	
+
+.PHONY: check-for-release-branch-skip
+check-for-release-branch-skip:
+	@if [ "$(BRANCH_NAME)" != "main" ] && [ "$(SKIP_ON_RELEASE_BRANCH)" = "true" ]; then \
+		echo "Skipping build on release branch"; \
+		exit 1; \
+	fi
 
 .PHONY: github-rate-limit-%
 github-rate-limit-%:

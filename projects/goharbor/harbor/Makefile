@@ -66,6 +66,8 @@ HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-log harbor/har
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
 BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
+SKIP_ON_RELEASE_BRANCH=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
