@@ -56,7 +56,7 @@ PROJECT_DEPENDENCIES=eksa/distribution/distribution eksa/aquasecurity/trivy eksa
 
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 
-HAS_HELM_CHART=true
+HAS_HELM_CHART?=true
 
 HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
 HELM_SOURCE_REPOSITORY=harbor-helm
@@ -148,6 +148,10 @@ $(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 			$$dest; \
 	done;
 
+PHONY: combine-images
+combine-images: IMAGE_BUILD_ARGS=IMAGE
+combine-images: DOCKERFILE_FOLDER=./docker/linux/combine
+combine-images: images
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
