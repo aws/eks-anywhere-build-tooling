@@ -21,6 +21,7 @@ HELM_DESTINATION_REPOSITORY=metallb/metallb
 HELM_IMAGE_LIST=metallb/controller metallb/speaker
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
+SKIP_ON_RELEASE_BRANCH=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
