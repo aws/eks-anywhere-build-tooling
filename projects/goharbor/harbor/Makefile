@@ -40,7 +40,7 @@ PKG_PATH=github.com/goharbor/harbor/src/pkg
 GITCOMMIT=$(shell git -C $(REPO) rev-parse --short=8 HEAD)
 RELEASEVERSION=$(shell cat $(REPO)/VERSION)
 
-IMAGE_NAMES=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-jobservice harbor-registry harbor-registryctl harbor-redis harbor-exporter harbor-trivy
+IMAGE_NAMES?=harbor-db harbor-portal harbor-core harbor-log harbor-nginx harbor-jobservice harbor-registry harbor-registryctl harbor-redis harbor-exporter harbor-trivy
 
 BINARY_TARGET_FILES=harbor-core harbor-jobservice harbor-registryctl harbor-migrate-patch harbor-migrate harbor-exporter
 SOURCE_PATTERNS=./core ./jobservice ./registryctl ./cmd/migrate-patch ./cmd/standalone-db-migrator ./cmd/exporter
@@ -74,6 +74,7 @@ include $(BASE_DIRECTORY)/Common.mk
 harbor-nginx/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx
 harbor-portal/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx
 harbor-redis/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
+combine/images/push: IMAGE_BUILD_ARGS=IMAGE
 
 $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 
