@@ -1,5 +1,9 @@
 version: 0.2
 
+env:
+  variables:
+    CLI_FOLDER: "projects/aws/image-builder"
+
 phases:
   pre_build:
     commands:
@@ -7,5 +11,5 @@ phases:
       - git config --global credential.UseHttpPath true
 
   build:
-    commands:
-      - if make check-for-supported-release-branch -C $PROJECT_PATH; then make release IMAGE_OS=$IMAGE_OS IMAGE_FORMAT=raw RELEASE_BRANCH=$RELEASE_BRANCH -C $PROJECT_PATH; fi
+    commands:      
+      - if make check-for-supported-release-branch -C $PROJECT_PATH && make check-for-release-branch-skip -C $PROJECT_PATH; then make binaries -C $CLI_FOLDER && make release IMAGE_OS=$IMAGE_OS IMAGE_FORMAT=raw RELEASE_BRANCH=$RELEASE_BRANCH -C $PROJECT_PATH; fi

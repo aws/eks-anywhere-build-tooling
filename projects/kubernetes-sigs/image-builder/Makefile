@@ -199,6 +199,8 @@ PROJECT_DEPENDENCIES=eksa/kubernetes-sigs/etcdadm eksa/kubernetes-sigs/cri-tools
 
 DEBUG?=0
 
+SKIP_ON_RELEASE_BRANCH=$(if $(filter bottlerocket,$(IMAGE_OS)),false,true)
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
