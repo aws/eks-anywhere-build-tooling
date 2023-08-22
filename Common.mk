@@ -381,7 +381,7 @@ GOBUILD_COMMAND?=build
 ############### BINARIES DEPS ######################
 BINARY_DEPS_DIR?=$(OUTPUT_DIR)/dependencies
 PROJECT_DEPENDENCIES?=
-HANDLE_DEPENDENCIES_TARGET=handle-dependencies
+HANDLE_DEPENDENCIES_TARGET?=handle-dependencies
 ####################################################
 
 #################### LICENSES ######################
@@ -389,7 +389,7 @@ HAS_LICENSES?=true
 ATTRIBUTION_TARGETS?=$(call pairmap,ATTRIBUTION_TARGET_FROM_BINARY_GO_MOD,$(BINARY_TARGET_FILES),$(GO_MOD_PATHS))
 GATHER_LICENSES_TARGETS?=$(call pairmap,LICENSE_TARGET_FROM_BINARY_GO_MOD,$(BINARY_TARGET_FILES),$(GO_MOD_PATHS))
 LICENSES_OUTPUT_DIR?=$(OUTPUT_DIR)
-LICENSES_TARGETS_FOR_PREREQ=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSES_TARGETS) \
+LICENSES_TARGETS_FOR_PREREQ?=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSES_TARGETS) \
 	$(foreach target,$(ATTRIBUTION_TARGETS),_output/$(target)),)
 # .9 is the default if nothing is passed to go-licenses
 # allow override on a per project basis for super specific cases
