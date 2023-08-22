@@ -151,13 +151,12 @@ IMAGE_NAMES?=$(REPO)
 
 # This tag is overwritten in the prow job to point to the upstream git tag and this repo's commit hash
 IMAGE_TAG?=$(GIT_TAG)-$(GIT_HASH)
-IMAGE_TAG_SUFFIX?=
 # For projects with multiple containers this is defined to override the default
 # ex: CLUSTER_API_CONTROLLER_IMAGE_COMPONENT
 IMAGE_COMPONENT_VARIABLE=$(call TO_UPPER,$(IMAGE_NAME))_IMAGE_COMPONENT
 IMAGE_REPO_COMPONENT=$(call IF_OVERRIDE_VARIABLE,$(IMAGE_COMPONENT_VARIABLE),$(IMAGE_COMPONENT))
-IMAGE=$(IMAGE_REPO)/$(IMAGE_REPO_COMPONENT):$(IMAGE_TAG)$(IMAGE_TAG_SUFFIX)
-LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))$(IMAGE_TAG_SUFFIX)
+IMAGE=$(IMAGE_REPO)/$(IMAGE_REPO_COMPONENT):$(IMAGE_TAG)
+LATEST_IMAGE=$(IMAGE:$(lastword $(subst :, ,$(IMAGE)))=$(LATEST_TAG))
 
 IMAGE_USERADD_USER_ID?=1000
 IMAGE_USERADD_USER_NAME?=
@@ -382,7 +381,7 @@ GOBUILD_COMMAND?=build
 ############### BINARIES DEPS ######################
 BINARY_DEPS_DIR?=$(OUTPUT_DIR)/dependencies
 PROJECT_DEPENDENCIES?=
-HANDLE_DEPENDENCIES_TARGET?=handle-dependencies
+HANDLE_DEPENDENCIES_TARGET=handle-dependencies
 ####################################################
 
 #################### LICENSES ######################
@@ -390,7 +389,7 @@ HAS_LICENSES?=true
 ATTRIBUTION_TARGETS?=$(call pairmap,ATTRIBUTION_TARGET_FROM_BINARY_GO_MOD,$(BINARY_TARGET_FILES),$(GO_MOD_PATHS))
 GATHER_LICENSES_TARGETS?=$(call pairmap,LICENSE_TARGET_FROM_BINARY_GO_MOD,$(BINARY_TARGET_FILES),$(GO_MOD_PATHS))
 LICENSES_OUTPUT_DIR?=$(OUTPUT_DIR)
-LICENSES_TARGETS_FOR_PREREQ?=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSES_TARGETS) \
+LICENSES_TARGETS_FOR_PREREQ=$(if $(filter true,$(HAS_LICENSES)),$(GATHER_LICENSES_TARGETS) \
 	$(foreach target,$(ATTRIBUTION_TARGETS),_output/$(target)),)
 # .9 is the default if nothing is passed to go-licenses
 # allow override on a per project basis for super specific cases
