@@ -15,6 +15,7 @@
 
 # Key for bundles manifest is environment/latest
 # example key = "dev/release-1.20"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 declare -A BUNDLE_MANIFEST=()
 
 function build::eksa_releases::load_bundle_manifest() {
@@ -89,7 +90,17 @@ function build::eksa_releases::get_eksa_component_asset_path() {
 
   local query=".spec.versionsBundles[] | select(.kubeVersion == \"$kube_version\") $path"
 
-  echo "$bundle_manifest" | yq e "$query" -
+  asset_path=$(echo "$bundle_manifest" | yq e "$query" -)
+  # If the query returns empty, then it is possible this is a release branch that has not been added to the
+  # bundle yet, so we fall back to retrieving the URL from the previous release branch section of the bundle.
+  if [ -z "$asset_path" ]; then
+    if [[ $release_branch == $(tail -n 1 $REPO_ROOT/release/SUPPORTED_RELEASE_BRANCHES) ]]; then
+      prev_kube_version="1.$(($(cut -d. -f2 <<< $kube_version) - 1))"
+      query=".spec.versionsBundles[] | select(.kubeVersion == \"$prev_kube_version\") $path"
+      asset_path=$(echo "$bundle_manifest" | yq e "$query" -)
+    fi
+  fi
+  echo $asset_path
 
   eval "$oldopt"
 }

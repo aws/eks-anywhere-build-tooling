@@ -100,14 +100,26 @@ export ETCDADM_HTTP_SOURCE=${ETCDADM_HTTP_SOURCE:-$(build::eksa_releases::get_ek
 export ETCDADM_VERSION='v0.1.5'
 export CRICTL_URL=${CRICTL_URL:-$(build::eksa_releases::get_eksa_component_asset_url 'eksD' 'crictl' $RELEASE_BRANCH $DEV_RELEASE $LATEST_TAG)}
 export CRICTL_SHA256="${CRICTL_SHA256:-$(build::eksa_releases::get_eksa_component_asset_artifact_checksum 'eksD' 'crictl' 'sha256' $RELEASE_BRANCH $DEV_RELEASE $LATEST_TAG)}"
-
 export CONTAINERD_URL=${CONTAINERD_URL:-$(build::eksa_releases::get_eksa_component_asset_url 'eksD' 'containerd' $RELEASE_BRANCH $DEV_RELEASE $LATEST_TAG)}
 export CONTAINERD_SHA256="${CONTAINERD_SHA256:-$(build::eksa_releases::get_eksa_component_asset_artifact_checksum 'eksD' 'containerd' 'sha256' $RELEASE_BRANCH $DEV_RELEASE $LATEST_TAG)}"
-# TEMP - workaround released image-builders using the main branch
-# remove this before next release and after patch image builder to use specific release tag instead of main
-if [[ "$CONTAINERD_URL" == "null" ]]; then
-    export CONTAINERD_URL="https://github.com/containerd/containerd/releases/download/v1.6.19/cri-containerd-cni-1.6.19-linux-amd64.tar.gz"
-    export CONTAINERD_SHA256="0457907ec410c2172829f6d1808f43fd2b83395a242bcb677cfe26320df13d5d"
+
+EMPTY_URL=false
+URL_RETURNED_NOT_OK_STATUS=false
+EKSA_BINARY_URLS=(CRICTL_URL CONTAINERD_URL ETCDADM_HTTP_SOURCE)
+for url in ${EKSA_BINARY_URLS[@]}; do
+    if [ -z "${!url}" ]; then
+        EMPTY_URL=true
+        echo "$url is empty"
+    else
+        http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" ${!url})
+        if [[ "$http_code" != "200" ]]; then 
+            URL_RETURNED_NOT_OK_STATUS=true
+            echo "$url returned non-200 HTTP status"
+        fi
+    fi
+done
+if [[ $EMPTY_URL == "true" || $URL_RETURNED_NOT_OK_STATUS == "true" ]]; then
+    exit 1
 fi
 
 env_and_envsubst '$IMAGE_REPO:$KUBERNETES_ASSET_BASE_URL:$KUBERNETES_VERSION:$KUBERNETES_SERIES:$CRICTL_URL:$CRICTL_SHA256:$CONTAINERD_URL:$CONTAINERD_SHA256:$ETCD_HTTP_SOURCE:$ETCD_VERSION:$ETCDADM_HTTP_SOURCE:$ETCD_SHA256:$ETCDADM_VERSION:$KUBERNETES_FULL_VERSION' \
