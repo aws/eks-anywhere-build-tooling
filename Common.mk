@@ -38,6 +38,10 @@ ifneq ($(BRANCH_NAME),main)
 endif
 
 SKIP_ON_RELEASE_BRANCH?=false
+
+# for some projects like the BR image build, we do not always have
+# the artifacts avialable upstrea when adding a new kube version
+NOT_SUPPORTED_RELEASE_BRANCH_CONFIGURATION?=false
 ####################################################
 
 #################### CODEBUILD #####################
@@ -956,7 +960,10 @@ var-value-%:
 
 .PHONY: check-for-supported-release-branch
 check-for-supported-release-branch:
-	@if [ -d $(MAKE_ROOT)/$(RELEASE_BRANCH) ]; then \
+	@if [ "$(NOT_SUPPORTED_RELEASE_BRANCH_CONFIGURATION)" == "true" ]; then \
+		echo "Not a supported version to build"; \
+		exit 1;	\
+	elif [ -d $(MAKE_ROOT)/$(RELEASE_BRANCH) ]; then \
 		echo "Supported version to build"; \
 		exit 0; \
 	elif { [ "false" == "$(BINARIES_ARE_RELEASE_BRANCHED)" ] || [ -z "$(BINARY_TARGET_FILES)" ]; } && [ "true" == "$$(yq e ".releases[] | select(.branch==\"$(RELEASE_BRANCH)\") | has(\"branch\")" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)" ]; then \
