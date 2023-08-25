@@ -1,0 +1,1450 @@
+From 53faf56cbe3e13111fd494770921e3e4065da779 Mon Sep 17 00:00:00 2001
+From: Abhinav Pandey <abhinavmpandey08@gmail.com>
+Date: Thu, 2 Mar 2023 10:18:07 -0800
+Subject: [PATCH 28/37] Add bottlerocket k8s settings support
+
+Signed-off-by: Abhinav Pandey <abhinavmpandey08@gmail.com>
+---
+ api/v1beta1/zz_generated.openapi.go           |  22 +
+ .../api/v1alpha4/zz_generated.conversion.go   |   2 +
+ .../kubeadm/api/v1beta1/kubeadm_types.go      |  30 +
+ .../api/v1beta1/zz_generated.deepcopy.go      |  55 ++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  52 ++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  54 ++
+ .../internal/bottlerocket/bootstrap.go        |  21 +-
+ .../internal/bottlerocket/bootstrap_test.go   | 534 ++++++++++++------
+ .../internal/bottlerocket/bottlerocket.go     |  36 +-
+ .../controllers/kubeadmconfig_controller.go   |   4 +-
+ .../zz_generated.conversion.go                |   2 +
+ .../zz_generated.conversion.go                |   2 +
+ .../zz_generated.conversion.go                |   2 +
+ .../api/v1alpha3/zz_generated.deepcopy.go     |   2 +-
+ .../api/v1alpha4/zz_generated.deepcopy.go     |   2 +-
+ .../v1beta1/kubeadm_control_plane_webhook.go  |   2 +
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  52 ++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  56 ++
+ 18 files changed, 741 insertions(+), 189 deletions(-)
+
+diff --git a/api/v1beta1/zz_generated.openapi.go b/api/v1beta1/zz_generated.openapi.go
+index e97701dcf..ec3381651 100644
+--- a/api/v1beta1/zz_generated.openapi.go
++++ b/api/v1beta1/zz_generated.openapi.go
+@@ -716,6 +716,12 @@ func schema_sigsk8sio_cluster_api_api_v1beta1_ClusterSpec(ref common.ReferenceCa
+ 							Ref:         ref("k8s.io/api/core/v1.ObjectReference"),
+ 						},
+ 					},
++					"managedExternalEtcdRef": {
++						SchemaProps: spec.SchemaProps{
++							Description: "ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details for provisioning an external etcd cluster",
++							Ref:         ref("k8s.io/api/core/v1.ObjectReference"),
++						},
++					},
+ 					"infrastructureRef": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "InfrastructureRef is a reference to a provider-specific resource that holds the details for provisioning infrastructure for a cluster in said provider.",
+@@ -816,6 +822,22 @@ func schema_sigsk8sio_cluster_api_api_v1beta1_ClusterStatus(ref common.Reference
+ 							Format:      "int64",
+ 						},
+ 					},
++					"managedExternalEtcdInitialized": {
++						SchemaProps: spec.SchemaProps{
++							Description: "ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller, so remaining etcd members can lookup the address to join the cluster",
++							Default:     false,
++							Type:        []string{"boolean"},
++							Format:      "",
++						},
++					},
++					"managedExternalEtcdReady": {
++						SchemaProps: spec.SchemaProps{
++							Description: "ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned",
++							Default:     false,
++							Type:        []string{"boolean"},
++							Format:      "",
++						},
++					},
+ 				},
+ 			},
+ 		},
+diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
+index 7af108f9e..43971cb70 100644
+--- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
+@@ -730,6 +730,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+ 	out.ClusterName = in.ClusterName
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+@@ -1137,6 +1138,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+ 	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+index 409d724b3..b3814c089 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+@@ -185,6 +185,31 @@ type ClusterConfiguration struct {
+ 	// This is only for bottlerocket.
+ 	// +optional
+ 	BottlerocketCustomBootstrapContainers []BottlerocketBootstrapContainer `json:"bottlerocketCustomBootstrapContainers,omitempty"`
++
++	// Bottlerocket holds configuration for certain bottlerocket settings.
++	// This is only for bottlerocket.
++	// +optional
++	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
++}
++
++// BottlerocketSettings define bottlerocket settings that can be configured on bottlerocket nodes.
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketSettings struct {
++	// Kubernetes holds the kubernetes settings for bottlerocket nodes.
++	Kubernetes *BottlerocketKubernetesSettings `json:"kubernetes,omitempty"`
++}
++
++// BottlerocketKubernetesSettings holds the settings for kubernetes on bottlerocket nodes.
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketKubernetesSettings struct {
++	// MaxPods defines the maximum number of pods that can run on a node.
++	MaxPods int `json:"maxPods,omitempty"`
++
++	// AllowedUnsafeSysctls defines the list of unsafe sysctls that can be set on a node.
++	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
++
++	// ClusterDNSIPs defines IP addresses of the DNS servers.
++	ClusterDNSIPs []string `json:"clusterDNSIPs,omitempty"`
+ }
+ 
+ // Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
+@@ -573,6 +598,11 @@ type JoinConfiguration struct {
+ 	// This is only for bottlerocket.
+ 	// +optional
+ 	BottlerocketCustomBootstrapContainers []BottlerocketBootstrapContainer `json:"bottlerocketCustomBootstrapContainers,omitempty"`
++
++	// Bottlerocket holds configuration for certain bottlerocket settings.
++	// This is only for bottlerocket.
++	// +optional
++	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
+ }
+ 
+ // BottlerocketHostContainer describes a host image for Bottlerocket
+diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
+index 12b57078d..400e2c343 100644
+--- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
+@@ -223,6 +223,51 @@ func (in *BottlerocketHostContainer) DeepCopy() *BottlerocketHostContainer {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketKubernetesSettings) DeepCopyInto(out *BottlerocketKubernetesSettings) {
++	*out = *in
++	if in.AllowedUnsafeSysctls != nil {
++		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++	if in.ClusterDNSIPs != nil {
++		in, out := &in.ClusterDNSIPs, &out.ClusterDNSIPs
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketKubernetesSettings.
++func (in *BottlerocketKubernetesSettings) DeepCopy() *BottlerocketKubernetesSettings {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketKubernetesSettings)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketSettings) DeepCopyInto(out *BottlerocketSettings) {
++	*out = *in
++	if in.Kubernetes != nil {
++		in, out := &in.Kubernetes, &out.Kubernetes
++		*out = new(BottlerocketKubernetesSettings)
++		(*in).DeepCopyInto(*out)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketSettings.
++func (in *BottlerocketSettings) DeepCopy() *BottlerocketSettings {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketSettings)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+@@ -256,6 +301,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 		*out = make([]BottlerocketBootstrapContainer, len(*in))
+ 		copy(*out, *in)
+ 	}
++	if in.Bottlerocket != nil {
++		in, out := &in.Bottlerocket, &out.Bottlerocket
++		*out = new(BottlerocketSettings)
++		(*in).DeepCopyInto(*out)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterConfiguration.
+@@ -685,6 +735,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 		*out = make([]BottlerocketBootstrapContainer, len(*in))
+ 		copy(*out, *in)
+ 	}
++	if in.Bottlerocket != nil {
++		in, out := &in.Bottlerocket, &out.Bottlerocket
++		*out = new(BottlerocketSettings)
++		(*in).DeepCopyInto(*out)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index 388e41cfd..c26623a66 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -2367,6 +2367,32 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocket:
++                    description: Bottlerocket holds configuration for certain bottlerocket
++                      settings. This is only for bottlerocket.
++                    properties:
++                      kubernetes:
++                        description: Kubernetes holds the kubernetes settings for
++                          bottlerocket nodes.
++                        properties:
++                          allowedUnsafeSysctls:
++                            description: AllowedUnsafeSysctls defines the list of
++                              unsafe sysctls that can be set on a node.
++                            items:
++                              type: string
++                            type: array
++                          clusterDNSIPs:
++                            description: ClusterDNSIPs defines IP addresses of the
++                              DNS servers.
++                            items:
++                              type: string
++                            type: array
++                          maxPods:
++                            description: MaxPods defines the maximum number of pods
++                              that can run on a node.
++                            type: integer
++                        type: object
++                    type: object
+                   bottlerocketAdmin:
+                     description: BottlerocketAdmin holds the image source for admin
+                       container This is only for bottlerocket
+@@ -3159,6 +3185,32 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocket:
++                    description: Bottlerocket holds configuration for certain bottlerocket
++                      settings. This is only for bottlerocket.
++                    properties:
++                      kubernetes:
++                        description: Kubernetes holds the kubernetes settings for
++                          bottlerocket nodes.
++                        properties:
++                          allowedUnsafeSysctls:
++                            description: AllowedUnsafeSysctls defines the list of
++                              unsafe sysctls that can be set on a node.
++                            items:
++                              type: string
++                            type: array
++                          clusterDNSIPs:
++                            description: ClusterDNSIPs defines IP addresses of the
++                              DNS servers.
++                            items:
++                              type: string
++                            type: array
++                          maxPods:
++                            description: MaxPods defines the maximum number of pods
++                              that can run on a node.
++                            type: integer
++                        type: object
++                    type: object
+                   bottlerocketAdmin:
+                     description: BottlerocketAdmin holds the image source for admin
+                       container This is only for bottlerocket
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 67a8e8111..40dda4464 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -2398,6 +2398,33 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocket:
++                            description: Bottlerocket holds configuration for certain
++                              bottlerocket settings. This is only for bottlerocket.
++                            properties:
++                              kubernetes:
++                                description: Kubernetes holds the kubernetes settings
++                                  for bottlerocket nodes.
++                                properties:
++                                  allowedUnsafeSysctls:
++                                    description: AllowedUnsafeSysctls defines the
++                                      list of unsafe sysctls that can be set on a
++                                      node.
++                                    items:
++                                      type: string
++                                    type: array
++                                  clusterDNSIPs:
++                                    description: ClusterDNSIPs defines IP addresses
++                                      of the DNS servers.
++                                    items:
++                                      type: string
++                                    type: array
++                                  maxPods:
++                                    description: MaxPods defines the maximum number
++                                      of pods that can run on a node.
++                                    type: integer
++                                type: object
++                            type: object
+                           bottlerocketAdmin:
+                             description: BottlerocketAdmin holds the image source
+                               for admin container This is only for bottlerocket
+@@ -3246,6 +3273,33 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocket:
++                            description: Bottlerocket holds configuration for certain
++                              bottlerocket settings. This is only for bottlerocket.
++                            properties:
++                              kubernetes:
++                                description: Kubernetes holds the kubernetes settings
++                                  for bottlerocket nodes.
++                                properties:
++                                  allowedUnsafeSysctls:
++                                    description: AllowedUnsafeSysctls defines the
++                                      list of unsafe sysctls that can be set on a
++                                      node.
++                                    items:
++                                      type: string
++                                    type: array
++                                  clusterDNSIPs:
++                                    description: ClusterDNSIPs defines IP addresses
++                                      of the DNS servers.
++                                    items:
++                                      type: string
++                                    type: array
++                                  maxPods:
++                                    description: MaxPods defines the maximum number
++                                      of pods that can run on a node.
++                                    type: integer
++                                type: object
++                            type: object
+                           bottlerocketAdmin:
+                             description: BottlerocketAdmin holds the image source
+                               for admin container This is only for bottlerocket
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index 9cf4a909a..e5926de86 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -10,8 +10,17 @@ standalone-mode = true
+ authentication-mode = "tls"
+ server-tls-bootstrap = false
+ pod-infra-container-image = "{{.PauseContainerSource}}"
+-{{- if (ne .ProviderId "")}}
+-provider-id = "{{.ProviderId}}"
++{{- if (ne .ProviderID "")}}
++provider-id = "{{.ProviderID}}"
++{{- end -}}
++{{- if .AllowedUnsafeSysctls }}
++allowed-unsafe-sysctls = [{{stringsJoin .AllowedUnsafeSysctls ", " }}]
++{{- end -}}
++{{- if .ClusterDNSIPs }}
++cluster-dns-ip = [{{stringsJoin .ClusterDNSIPs ", " }}]
++{{- end -}}
++{{- if .MaxPods }}
++max-pods = {{.MaxPods}}
+ {{- end -}}
+ {{- end -}}
+ `
+@@ -20,8 +29,8 @@ provider-id = "{{.ProviderId}}"
+ [settings.host-containers.{{.Name}}]
+ enabled = true
+ superpowered = {{.Superpowered}}
+-{{- if (ne (imageUrl .ImageMeta) "")}}
+-source = "{{imageUrl .ImageMeta}}"
++{{- if (ne (imageURL .ImageMeta) "")}}
++source = "{{imageURL .ImageMeta}}"
+ {{- end -}}
+ {{- if (ne .UserData "")}}
+ user-data = "{{.UserData}}"
+@@ -40,8 +49,8 @@ user-data = "{{.UserData}}"
+ [settings.bootstrap-containers.{{.Name}}]
+ essential = {{.Essential}}
+ mode = "{{.Mode}}"
+-{{- if (ne (imageUrl .ImageMeta) "")}}
+-source = "{{imageUrl .ImageMeta}}"
++{{- if (ne (imageURL .ImageMeta) "")}}
++source = "{{imageURL .ImageMeta}}"
+ {{- end -}}
+ {{- if (ne .UserData "")}}
+ user-data = "{{.UserData}}"
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+index dd0422007..3463a2769 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+@@ -4,273 +4,471 @@ import (
+ 	"testing"
+ 
+ 	. "github.com/onsi/gomega"
++	corev1 "k8s.io/api/core/v1"
+ 
+ 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
+ )
+ 
+-const userDataFullSetting = `
++const (
++	minimalUserData = `
+ [settings.host-containers.admin]
+ enabled = true
+ superpowered = true
+-source = "REPO:TAG"
+-user-data = "B64USERDATA"
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
+ [settings.host-containers.kubeadm-bootstrap]
+ enabled = true
+ superpowered = true
+-source = "REPO:TAG"
+-user-data = "B64USERDATA"
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
+ 
+ [settings.kubernetes]
+ cluster-domain = "cluster.local"
+ standalone-mode = true
+ authentication-mode = "tls"
+ server-tls-bootstrap = false
+-pod-infra-container-image = "PAUSE"
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
+ provider-id = "PROVIDERID"
+ 
+ [settings.network]
+-hostname = ""
+-https-proxy = "PROXY"
+-no-proxy = []
++hostname = "hostname"`
+ 
+-[settings.bootstrap-containers.BOOTSTRAP]
+-essential = false
+-mode = "MODE"
+-user-data = "B64USERDATA"
++	nodeLabelslUserData = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
++provider-id = "PROVIDERID"
++
++[settings.network]
++hostname = "hostname"
++[settings.kubernetes.node-labels]
++"KEY1" = "VAL1"
++"KEY2" = "VAL2"
++"KEY3" = "VAL3"
++`
++
++	taintsUserData = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
++provider-id = "PROVIDERID"
++
++[settings.network]
++hostname = "hostname"
++[settings.kubernetes.node-taints]
++"KEY1" = ["VAL1:NoSchedule"]
++`
++
++	proxyUserData = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
++provider-id = "PROVIDERID"
++
++[settings.network]
++hostname = "hostname"
++https-proxy = "HTTPS_PROXY"
++no-proxy = ["no_proxy1","no_proxy2","no_proxy3"]`
++
++	registryMirrorUserData = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
++provider-id = "PROVIDERID"
++
++[settings.network]
++hostname = "hostname"
+ [settings.container-registry.mirrors]
+-"public.ecr.aws" = ["https://REGISTRYENDPOINT"]
++"public.ecr.aws" = ["https://REGISTRY_ENDPOINT"]
+ [settings.pki.registry-mirror-ca]
+-data = "REGISTRYCA"
++data = "UkVHSVNUUllfQ0E="
++trusted=true`
++
++	registryMirrorAndAuthUserData = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
++provider-id = "PROVIDERID"
++
++[settings.network]
++hostname = "hostname"
++[settings.container-registry.mirrors]
++"public.ecr.aws" = ["https://REGISTRY_ENDPOINT"]
++[settings.pki.registry-mirror-ca]
++data = "UkVHSVNUUllfQ0E="
+ trusted=true
+ [[settings.container-registry.credentials]]
+ registry = "public.ecr.aws"
+ username = "admin"
+ password = "pass"
+ [[settings.container-registry.credentials]]
+-registry = "REGISTRYENDPOINT"
++registry = "REGISTRY_ENDPOINT"
+ username = "admin"
+-password = "pass"
+-[settings.kubernetes.node-labels]
+-KEY=VAR
+-[settings.kubernetes.node-taints]
+-KEY=VAR
++password = "pass"`
++
++	ntpUserData = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
++provider-id = "PROVIDERID"
++
++[settings.network]
++hostname = "hostname"
+ [settings.ntp]
+ time-servers = ["1.2.3.4", "time-a.capi.com", "time-b.capi.com"]`
+ 
+-const userDataNoAdminImage = `
++	kubernetesSettingsUserData = `
+ [settings.host-containers.admin]
+ enabled = true
+ superpowered = true
+-user-data = "B64USERDATA"
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
+ [settings.host-containers.kubeadm-bootstrap]
+ enabled = true
+ superpowered = true
+-source = "REPO:TAG"
+-user-data = "B64USERDATA"
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
+ 
+ [settings.kubernetes]
+ cluster-domain = "cluster.local"
+ standalone-mode = true
+ authentication-mode = "tls"
+ server-tls-bootstrap = false
+-pod-infra-container-image = "PAUSE"
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
+ provider-id = "PROVIDERID"
++allowed-unsafe-sysctls = ["net.core.somaxconn", "net.ipv4.ip_local_port_range"]
++cluster-dns-ip = ["1.2.3.4", "4.3.2.1"]
++max-pods = 100
+ 
+ [settings.network]
+-hostname = ""
+-https-proxy = "PROXY"
+-no-proxy = []
+-
+-[settings.bootstrap-containers.BOOTSTRAP]
+-essential = false
+-mode = "MODE"
+-user-data = "B64USERDATA"
+-[settings.container-registry.mirrors]
+-"public.ecr.aws" = ["https://REGISTRYENDPOINT"]
+-[settings.pki.registry-mirror-ca]
+-data = "REGISTRYCA"
+-trusted=true
+-[settings.kubernetes.node-labels]
+-KEY=VAR
+-[settings.kubernetes.node-taints]
+-KEY=VAR`
++hostname = "hostname"`
+ 
+-const userDataWithHostname = `
++	customBootstrapUserData = `
+ [settings.host-containers.admin]
+ enabled = true
+ superpowered = true
+-source = "REPO:TAG"
+-user-data = "B64USERDATA"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
+ [settings.host-containers.kubeadm-bootstrap]
+ enabled = true
+ superpowered = true
+-source = "REPO:TAG"
+-user-data = "B64USERDATA"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
+ 
+ [settings.kubernetes]
+ cluster-domain = "cluster.local"
+ standalone-mode = true
+ authentication-mode = "tls"
+ server-tls-bootstrap = false
+-pod-infra-container-image = "PAUSE"
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
+ provider-id = "PROVIDERID"
+ 
+ [settings.network]
+ hostname = "hostname"
+-https-proxy = "PROXY"
+-no-proxy = []
+ 
+ [settings.bootstrap-containers.BOOTSTRAP]
+ essential = false
+ mode = "MODE"
+-user-data = "B64USERDATA"
+-[settings.container-registry.mirrors]
+-"public.ecr.aws" = ["https://REGISTRYENDPOINT"]
+-[settings.pki.registry-mirror-ca]
+-data = "REGISTRYCA"
+-trusted=true
+-[settings.kubernetes.node-labels]
+-KEY=VAR
+-[settings.kubernetes.node-taints]
+-KEY=VAR`
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "BOOTSTRAP_B6_4USERDATA"`
++)
++
++var (
++	brAdmin = bootstrapv1.BottlerocketAdmin{
++		ImageMeta: bootstrapv1.ImageMeta{
++			ImageRepository: "ADMIN_REPO",
++			ImageTag:        "ADMIN_TAG",
++		},
++	}
++
++	brBootstrap = bootstrapv1.BottlerocketBootstrap{
++		ImageMeta: bootstrapv1.ImageMeta{
++			ImageRepository: "BOOTSTRAP_REPO",
++			ImageTag:        "BOOTSTRAP_TAG",
++		},
++	}
++
++	users = []bootstrapv1.User{
++		{
++			Name:              "ec2-user",
++			SSHAuthorizedKeys: []string{"ssh-rsa AAA..."},
++		},
++	}
++
++	bootstrapContainers = []bootstrapv1.BottlerocketBootstrapContainer{
++		{
++			Name: "BOOTSTRAP",
++			Mode: "MODE",
++			ImageMeta: bootstrapv1.ImageMeta{
++				ImageRepository: "BOOTSTRAP_REPO",
++				ImageTag:        "BOOTSTRAP_TAG",
++			},
++			UserData: "BOOTSTRAP_B6_4USERDATA",
++		},
++	}
++
++	pause = bootstrapv1.Pause{
++		ImageMeta: bootstrapv1.ImageMeta{
++			ImageRepository: "PAUSE_REPO",
++			ImageTag:        "PAUSE_TAG",
++		},
++	}
++)
+ 
+-func TestGenerateUserData(t *testing.T) {
++func TestGetBottlerocketNodeUserData(t *testing.T) {
+ 	g := NewWithT(t)
++	hostname := "hostname"
++	brBootstrapUserdata := []byte("BOTTLEROCKET_BOOTSTRAP_USERDATA")
+ 
+ 	testcases := []struct {
+ 		name   string
+-		input  *BottlerocketSettingsInput
++		config *BottlerocketConfig
+ 		output string
+ 	}{
+ 		{
+-			name: "full settings",
+-			input: &BottlerocketSettingsInput{
+-				PauseContainerSource:   "PAUSE",
+-				HTTPSProxyEndpoint:     "PROXY",
+-				RegistryMirrorEndpoint: "REGISTRYENDPOINT",
+-				RegistryMirrorCACert:   "REGISTRYCA",
+-				NodeLabels:             "KEY=VAR",
+-				Taints:                 "KEY=VAR",
+-				ProviderId:             "PROVIDERID",
+-				RegistryMirrorUsername: "admin",
+-				RegistryMirrorPassword: "pass",
+-				NTPServers: []string{
+-					"\"1.2.3.4\"",
+-					"\"time-a.capi.com\"",
+-					"\"time-b.capi.com\"",
++			name: "minimal settings",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: map[string]string{
++					"provider-id": "PROVIDERID",
+ 				},
+-				HostContainers: []bootstrapv1.BottlerocketHostContainer{
+-					{
+-						Name:         "admin",
+-						Superpowered: true,
+-						ImageMeta: bootstrapv1.ImageMeta{
+-							ImageRepository: "REPO",
+-							ImageTag:        "TAG",
+-						},
+-						UserData: "B64USERDATA",
+-					},
+-					{
+-						Name:         "kubeadm-bootstrap",
+-						Superpowered: true,
+-						ImageMeta: bootstrapv1.ImageMeta{
+-							ImageRepository: "REPO",
+-							ImageTag:        "TAG",
+-						},
+-						UserData: "B64USERDATA",
+-					},
++			},
++			output: minimalUserData,
++		},
++		{
++			name: "with node labels",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: map[string]string{
++					"node-labels": "KEY1=VAL1,KEY2=VAL2,KEY3=VAL3",
++					"provider-id": "PROVIDERID",
++				},
++			},
++			output: nodeLabelslUserData,
++		},
++		{
++			name: "with taints",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: map[string]string{
++					"provider-id": "PROVIDERID",
+ 				},
+-				BootstrapContainers: []bootstrapv1.BottlerocketBootstrapContainer{
++				Taints: []corev1.Taint{
+ 					{
+-						Name:     "BOOTSTRAP",
+-						Mode:     "MODE",
+-						UserData: "B64USERDATA",
++						Key:    "KEY1",
++						Value:  "VAL1",
++						Effect: corev1.TaintEffectNoSchedule,
+ 					},
+ 				},
+ 			},
+-			output: userDataFullSetting,
++			output: taintsUserData,
+ 		},
+ 		{
+-			name: "no admin image meta",
+-			input: &BottlerocketSettingsInput{
+-				PauseContainerSource:   "PAUSE",
+-				HTTPSProxyEndpoint:     "PROXY",
+-				RegistryMirrorEndpoint: "REGISTRYENDPOINT",
+-				RegistryMirrorCACert:   "REGISTRYCA",
+-				NodeLabels:             "KEY=VAR",
+-				Taints:                 "KEY=VAR",
+-				ProviderId:             "PROVIDERID",
+-				HostContainers: []bootstrapv1.BottlerocketHostContainer{
+-					{
+-						Name:         "admin",
+-						Superpowered: true,
+-						ImageMeta:    bootstrapv1.ImageMeta{},
+-						UserData:     "B64USERDATA",
+-					},
+-					{
+-						Name:         "kubeadm-bootstrap",
+-						Superpowered: true,
+-						ImageMeta: bootstrapv1.ImageMeta{
+-							ImageRepository: "REPO",
+-							ImageTag:        "TAG",
+-						},
+-						UserData: "B64USERDATA",
+-					},
++			name: "with proxy",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: map[string]string{
++					"provider-id": "PROVIDERID",
+ 				},
+-				BootstrapContainers: []bootstrapv1.BottlerocketBootstrapContainer{
+-					{
+-						Name:     "BOOTSTRAP",
+-						Mode:     "MODE",
+-						UserData: "B64USERDATA",
+-					},
++				ProxyConfiguration: bootstrapv1.ProxyConfiguration{
++					HTTPSProxy: "HTTPS_PROXY",
++					NoProxy:    []string{"no_proxy1", "no_proxy2", "no_proxy3"},
+ 				},
+ 			},
+-			output: userDataNoAdminImage,
++			output: proxyUserData,
+ 		},
+ 		{
+-			name: "with hostname settings",
+-			input: &BottlerocketSettingsInput{
+-				PauseContainerSource:   "PAUSE",
+-				HTTPSProxyEndpoint:     "PROXY",
+-				RegistryMirrorEndpoint: "REGISTRYENDPOINT",
+-				RegistryMirrorCACert:   "REGISTRYCA",
+-				NodeLabels:             "KEY=VAR",
+-				Taints:                 "KEY=VAR",
+-				ProviderId:             "PROVIDERID",
+-				Hostname:               "hostname",
+-				HostContainers: []bootstrapv1.BottlerocketHostContainer{
+-					{
+-						Name:         "admin",
+-						Superpowered: true,
+-						ImageMeta: bootstrapv1.ImageMeta{
+-							ImageRepository: "REPO",
+-							ImageTag:        "TAG",
++			name: "with registry mirror",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: map[string]string{
++					"provider-id": "PROVIDERID",
++				},
++				RegistryMirrorConfiguration: bootstrapv1.RegistryMirrorConfiguration{
++					Endpoint: "REGISTRY_ENDPOINT",
++					CACert:   "REGISTRY_CA",
++				},
++			},
++			output: registryMirrorUserData,
++		},
++		{
++			name: "with registry mirror and auth",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: map[string]string{
++					"provider-id": "PROVIDERID",
++				},
++				RegistryMirrorConfiguration: bootstrapv1.RegistryMirrorConfiguration{
++					Endpoint: "REGISTRY_ENDPOINT",
++					CACert:   "REGISTRY_CA",
++				},
++				RegistryMirrorCredentials: RegistryMirrorCredentials{
++					Username: "admin",
++					Password: "pass",
++				},
++			},
++			output: registryMirrorAndAuthUserData,
++		},
++		{
++			name: "with ntp servers",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: map[string]string{
++					"provider-id": "PROVIDERID",
++				},
++				NTPServers: []string{
++					"1.2.3.4",
++					"time-a.capi.com",
++					"time-b.capi.com",
++				},
++			},
++			output: ntpUserData,
++		},
++		{
++			name: "with kubernetes settings",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: map[string]string{
++					"provider-id": "PROVIDERID",
++				},
++				BottlerocketSettings: &bootstrapv1.BottlerocketSettings{
++					Kubernetes: &bootstrapv1.BottlerocketKubernetesSettings{
++						MaxPods: 100,
++						ClusterDNSIPs: []string{
++							"1.2.3.4",
++							"4.3.2.1",
+ 						},
+-						UserData: "B64USERDATA",
+-					},
+-					{
+-						Name:         "kubeadm-bootstrap",
+-						Superpowered: true,
+-						ImageMeta: bootstrapv1.ImageMeta{
+-							ImageRepository: "REPO",
+-							ImageTag:        "TAG",
++						AllowedUnsafeSysctls: []string{
++							"net.core.somaxconn",
++							"net.ipv4.ip_local_port_range",
+ 						},
+-						UserData: "B64USERDATA",
+ 					},
+ 				},
+-				BootstrapContainers: []bootstrapv1.BottlerocketBootstrapContainer{
+-					{
+-						Name:     "BOOTSTRAP",
+-						Mode:     "MODE",
+-						UserData: "B64USERDATA",
+-					},
++			},
++			output: kubernetesSettingsUserData,
++		},
++		{
++			name: "with custom bootstrap containers",
++			config: &BottlerocketConfig{
++				Pause: pause,
++				KubeletExtraArgs: map[string]string{
++					"provider-id": "PROVIDERID",
+ 				},
++				BottlerocketCustomBootstrapContainers: bootstrapContainers,
++				Hostname:                              hostname,
+ 			},
+-			output: userDataWithHostname,
++			output: customBootstrapUserData,
+ 		},
+ 	}
+ 	for _, testcase := range testcases {
+ 		t.Run(testcase.name, func(t *testing.T) {
+-			b, err := generateNodeUserData("TestBottlerocketInit", bottlerocketNodeInitSettingsTemplate, testcase.input)
++			b, err := getBottlerocketNodeUserData(brBootstrapUserdata, users, testcase.config)
+ 			g.Expect(err).NotTo(HaveOccurred())
+ 			g.Expect(string(b)).To(Equal(testcase.output))
+ 		})
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index e2611c1ca..f21247061 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -8,11 +8,10 @@ import (
+ 	"strings"
+ 	"text/template"
+ 
+-	corev1 "k8s.io/api/core/v1"
+-	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
+-
+ 	"github.com/pkg/errors"
+ 	"gopkg.in/yaml.v2"
++	corev1 "k8s.io/api/core/v1"
++	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
+ )
+ 
+ const (
+@@ -22,11 +21,13 @@ const (
+ `
+ )
+ 
++// BottlerocketConfig is the Bottlerocket configuration for a machine.
+ type BottlerocketConfig struct {
+ 	Pause                                 bootstrapv1.Pause
+ 	BottlerocketBootstrap                 bootstrapv1.BottlerocketBootstrap
+ 	BottlerocketAdmin                     bootstrapv1.BottlerocketAdmin
+ 	BottlerocketControl                   bootstrapv1.BottlerocketControl
++	BottlerocketSettings                  *bootstrapv1.BottlerocketSettings
+ 	ProxyConfiguration                    bootstrapv1.ProxyConfiguration
+ 	RegistryMirrorConfiguration           bootstrapv1.RegistryMirrorConfiguration
+ 	KubeletExtraArgs                      map[string]string
+@@ -38,6 +39,7 @@ type BottlerocketConfig struct {
+ 	RegistryMirrorCredentials
+ }
+ 
++// BottlerocketSettingsInput is the input for the Bottlerocket settings template.
+ type BottlerocketSettingsInput struct {
+ 	PauseContainerSource   string
+ 	HTTPSProxyEndpoint     string
+@@ -49,17 +51,22 @@ type BottlerocketSettingsInput struct {
+ 	NodeLabels             string
+ 	NTPServers             []string
+ 	Taints                 string
+-	ProviderId             string
++	ProviderID             string
+ 	Hostname               string
++	AllowedUnsafeSysctls   []string
++	ClusterDNSIPs           []string
++	MaxPods                int
+ 	HostContainers         []bootstrapv1.BottlerocketHostContainer
+ 	BootstrapContainers    []bootstrapv1.BottlerocketBootstrapContainer
+ }
+ 
++// HostPath holds the path and type of a host path volume.
+ type HostPath struct {
+ 	Path string
+ 	Type string
+ }
+ 
++// RegistryMirrorCredentials holds registry mirror credentials to be configured on bottlerocket nodes.
+ type RegistryMirrorCredentials struct {
+ 	Username string
+ 	Password string
+@@ -100,7 +107,7 @@ func generateAdminContainerUserData(kind string, tpl string, data interface{}) (
+ 	return out.Bytes(), nil
+ }
+ 
+-func imageUrl(containerLocation bootstrapv1.ImageMeta) string {
++func imageURL(containerLocation bootstrapv1.ImageMeta) string {
+ 	if containerLocation.ImageRepository != "" && containerLocation.ImageTag != "" {
+ 		return fmt.Sprintf("%s:%s", containerLocation.ImageRepository, containerLocation.ImageTag)
+ 	}
+@@ -110,7 +117,7 @@ func imageUrl(containerLocation bootstrapv1.ImageMeta) string {
+ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, error) {
+ 	tm := template.New(kind).Funcs(template.FuncMap{
+ 		"stringsJoin": strings.Join,
+-		"imageUrl":    imageUrl,
++		"imageURL":    imageURL,
+ 	})
+ 	if _, err := tm.Parse(hostContainerTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse hostContainerSettings %s template", kind)
+@@ -208,7 +215,7 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 		RegistryMirrorEndpoint: config.RegistryMirrorConfiguration.Endpoint,
+ 		NodeLabels:             parseNodeLabels(config.KubeletExtraArgs["node-labels"]), // empty string if it does not exist
+ 		Taints:                 parseTaints(config.Taints),                              // empty string if it does not exist
+-		ProviderId:             config.KubeletExtraArgs["provider-id"],
++		ProviderID:             config.KubeletExtraArgs["provider-id"],
+ 		Hostname:               config.Hostname,
+ 		HostContainers:         hostContainers,
+ 		BootstrapContainers:    config.BottlerocketCustomBootstrapContainers,
+@@ -231,12 +238,17 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 			bottlerocketInput.NTPServers = append(bottlerocketInput.NTPServers, strconv.Quote(ntp))
+ 		}
+ 	}
+-
+-	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
+-	if err != nil {
+-		return nil, err
++	if config.BottlerocketSettings != nil && config.BottlerocketSettings.Kubernetes != nil {
++		bottlerocketInput.MaxPods = config.BottlerocketSettings.Kubernetes.MaxPods
++		for _, sysctl := range config.BottlerocketSettings.Kubernetes.AllowedUnsafeSysctls {
++			bottlerocketInput.AllowedUnsafeSysctls = append(bottlerocketInput.AllowedUnsafeSysctls, strconv.Quote(sysctl))
++		}
++		for _, ip := range config.BottlerocketSettings.Kubernetes.ClusterDNSIPs {
++			bottlerocketInput.ClusterDNSIPs = append(bottlerocketInput.ClusterDNSIPs, strconv.Quote(ip))
++		}
+ 	}
+-	return bottlerocketNodeUserData, nil
++
++	return generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
+ }
+ 
+ // bottlerocket configuration accepts taints in the format
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 448fbb70b..c5895224d 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -476,6 +476,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
++			BottlerocketSettings:                  scope.Config.Spec.ClusterConfiguration.Bottlerocket,
+ 			Hostname:                              machine.Name,
+ 		}
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+@@ -500,7 +501,6 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		if scope.Config.Spec.NTP != nil && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
+ 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
+ 		}
+-
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
+@@ -698,6 +698,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
++			BottlerocketSettings:                  scope.Config.Spec.JoinConfiguration.Bottlerocket,
+ 			Hostname:                              machine.Name,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+@@ -843,6 +844,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
++			BottlerocketSettings:                  scope.Config.Spec.JoinConfiguration.Bottlerocket,
+ 			Hostname:                              machine.Name,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
+index de60d4d01..d07a9dff3 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
+@@ -564,6 +564,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfigur
+ 	out.ClusterName = in.ClusterName
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+@@ -863,6 +864,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
+ 	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+index 8b6475592..8b1acbb57 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+@@ -564,6 +564,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfigur
+ 	out.ClusterName = in.ClusterName
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+@@ -875,6 +876,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
+ 	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index 4584e6266..c613bdd12 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -568,6 +568,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
+ 	out.ClusterName = in.ClusterName
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+@@ -867,6 +868,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+ 	out.Patches = (*Patches)(unsafe.Pointer(in.Patches))
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/controlplane/kubeadm/api/v1alpha3/zz_generated.deepcopy.go b/controlplane/kubeadm/api/v1alpha3/zz_generated.deepcopy.go
+index b7eb40eef..485769c62 100644
+--- a/controlplane/kubeadm/api/v1alpha3/zz_generated.deepcopy.go
++++ b/controlplane/kubeadm/api/v1alpha3/zz_generated.deepcopy.go
+@@ -23,7 +23,7 @@ package v1alpha3
+ 
+ import (
+ 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+-	"k8s.io/apimachinery/pkg/runtime"
++	runtime "k8s.io/apimachinery/pkg/runtime"
+ 	"k8s.io/apimachinery/pkg/util/intstr"
+ 	apiv1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
+ )
+diff --git a/controlplane/kubeadm/api/v1alpha4/zz_generated.deepcopy.go b/controlplane/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
+index 8acd51a25..bcff12e91 100644
+--- a/controlplane/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
++++ b/controlplane/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
+@@ -23,7 +23,7 @@ package v1alpha4
+ 
+ import (
+ 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+-	"k8s.io/apimachinery/pkg/runtime"
++	runtime "k8s.io/apimachinery/pkg/runtime"
+ 	"k8s.io/apimachinery/pkg/util/intstr"
+ 	apiv1alpha4 "sigs.k8s.io/cluster-api/api/v1alpha4"
+ )
+diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
+index d25eb0c95..d206fbc19 100644
+--- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
++++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
+@@ -144,6 +144,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketAdmin", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketControl", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketCustomBootstrapContainers"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketSettings", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
+@@ -172,6 +173,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketAdmin", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketSettings", "*"},
+ 		{spec, kubeadmConfigSpec, preKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, postKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, files},
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 8e1d920b2..077d7493a 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -2839,6 +2839,32 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocket:
++                        description: Bottlerocket holds configuration for certain
++                          bottlerocket settings. This is only for bottlerocket.
++                        properties:
++                          kubernetes:
++                            description: Kubernetes holds the kubernetes settings
++                              for bottlerocket nodes.
++                            properties:
++                              allowedUnsafeSysctls:
++                                description: AllowedUnsafeSysctls defines the list
++                                  of unsafe sysctls that can be set on a node.
++                                items:
++                                  type: string
++                                type: array
++                              clusterDNSIPs:
++                                description: ClusterDNSIPs defines IP addresses of
++                                  the DNS servers.
++                                items:
++                                  type: string
++                                type: array
++                              maxPods:
++                                description: MaxPods defines the maximum number of
++                                  pods that can run on a node.
++                                type: integer
++                            type: object
++                        type: object
+                       bottlerocketAdmin:
+                         description: BottlerocketAdmin holds the image source for
+                           admin container This is only for bottlerocket
+@@ -3666,6 +3692,32 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocket:
++                        description: Bottlerocket holds configuration for certain
++                          bottlerocket settings. This is only for bottlerocket.
++                        properties:
++                          kubernetes:
++                            description: Kubernetes holds the kubernetes settings
++                              for bottlerocket nodes.
++                            properties:
++                              allowedUnsafeSysctls:
++                                description: AllowedUnsafeSysctls defines the list
++                                  of unsafe sysctls that can be set on a node.
++                                items:
++                                  type: string
++                                type: array
++                              clusterDNSIPs:
++                                description: ClusterDNSIPs defines IP addresses of
++                                  the DNS servers.
++                                items:
++                                  type: string
++                                type: array
++                              maxPods:
++                                description: MaxPods defines the maximum number of
++                                  pods that can run on a node.
++                                type: integer
++                            type: object
++                        type: object
+                       bottlerocketAdmin:
+                         description: BottlerocketAdmin holds the image source for
+                           admin container This is only for bottlerocket
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index e435df3e1..1302cc4e1 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -1467,6 +1467,34 @@ spec:
+                                   value, and may reject unrecognized values. More
+                                   info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                                 type: string
++                              bottlerocket:
++                                description: Bottlerocket holds configuration for
++                                  certain bottlerocket settings. This is only for
++                                  bottlerocket.
++                                properties:
++                                  kubernetes:
++                                    description: Kubernetes holds the kubernetes settings
++                                      for bottlerocket nodes.
++                                    properties:
++                                      allowedUnsafeSysctls:
++                                        description: AllowedUnsafeSysctls defines
++                                          the list of unsafe sysctls that can be set
++                                          on a node.
++                                        items:
++                                          type: string
++                                        type: array
++                                      clusterDNSIPs:
++                                        description: ClusterDNSIPs defines IP addresses
++                                          of the DNS servers.
++                                        items:
++                                          type: string
++                                        type: array
++                                      maxPods:
++                                        description: MaxPods defines the maximum number
++                                          of pods that can run on a node.
++                                        type: integer
++                                    type: object
++                                type: object
+                               bottlerocketAdmin:
+                                 description: BottlerocketAdmin holds the image source
+                                   for admin container This is only for bottlerocket
+@@ -2351,6 +2379,34 @@ spec:
+                                   value, and may reject unrecognized values. More
+                                   info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                                 type: string
++                              bottlerocket:
++                                description: Bottlerocket holds configuration for
++                                  certain bottlerocket settings. This is only for
++                                  bottlerocket.
++                                properties:
++                                  kubernetes:
++                                    description: Kubernetes holds the kubernetes settings
++                                      for bottlerocket nodes.
++                                    properties:
++                                      allowedUnsafeSysctls:
++                                        description: AllowedUnsafeSysctls defines
++                                          the list of unsafe sysctls that can be set
++                                          on a node.
++                                        items:
++                                          type: string
++                                        type: array
++                                      clusterDNSIPs:
++                                        description: ClusterDNSIPs defines IP addresses
++                                          of the DNS servers.
++                                        items:
++                                          type: string
++                                        type: array
++                                      maxPods:
++                                        description: MaxPods defines the maximum number
++                                          of pods that can run on a node.
++                                        type: integer
++                                    type: object
++                                type: object
+                               bottlerocketAdmin:
+                                 description: BottlerocketAdmin holds the image source
+                                   for admin container This is only for bottlerocket
+-- 
+2.34.1
+

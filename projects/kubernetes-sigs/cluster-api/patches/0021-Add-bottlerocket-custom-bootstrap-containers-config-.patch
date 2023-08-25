@@ -1,0 +1,953 @@
+From fe0dd6e5530b8701117aceecc66567f2504c7a0d Mon Sep 17 00:00:00 2001
+From: Jiayi Wang <jiayiwang7@yahoo.com>
+Date: Mon, 21 Nov 2022 17:31:22 -0500
+Subject: [PATCH 21/37] Add bottlerocket custom bootstrap containers config
+ option
+
+---
+ .../api/v1alpha4/zz_generated.conversion.go   |  10 +-
+ .../kubeadm/api/v1beta1/kubeadm_types.go      |  36 ++++++-
+ .../api/v1beta1/zz_generated.deepcopy.go      |  26 +++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  84 +++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  94 ++++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        |  24 +++++
+ .../internal/bottlerocket/bootstrap_test.go   |  99 +++++++++++++++++
+ .../internal/bottlerocket/bottlerocket.go     |  27 +++--
+ .../controllers/kubeadmconfig_controller.go   |  27 ++---
+ .../zz_generated.conversion.go                |   2 +
+ .../zz_generated.conversion.go                |   2 +
+ .../zz_generated.conversion.go                |   2 +
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  92 ++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 100 ++++++++++++++++++
+ 14 files changed, 598 insertions(+), 27 deletions(-)
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+
+diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
+index fcea82a30..de8032f59 100644
+--- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
+@@ -420,13 +420,13 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddConversionFunc((*v1beta1.File)(nil), (*File)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta1_File_To_v1alpha4_File(a.(*v1beta1.File), b.(*File), scope)
++	if err := s.AddConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
++	if err := s.AddConversionFunc((*v1beta1.File)(nil), (*File)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_File_To_v1alpha4_File(a.(*v1beta1.File), b.(*File), scope)
+ 	}); err != nil {
+ 		return err
+ 	}
+@@ -728,6 +728,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+ 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+ 	out.ClusterName = in.ClusterName
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+@@ -1133,6 +1134,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+ 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+index 44ffa00f3..48e5f4b8e 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+@@ -175,6 +175,11 @@ type ClusterConfiguration struct {
+ 	// that we will deploy as host containers in the CPIs
+ 	// +optional
+ 	BottlerocketHostContainers []BottlerocketHostContainer `json:"bottlerocketCustomHostContainers,omitempty"`
++
++	// BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++	// This is only for bottlerocket.
++	// +optional
++	BottlerocketCustomBootstrapContainers []BottlerocketBootstrapContainer `json:"bottlerocketCustomBootstrapContainers,omitempty"`
+ }
+ 
+ // Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
+@@ -261,7 +266,7 @@ type ImageMeta struct {
+ 	// +optional
+ 	ImageTag string `json:"imageTag,omitempty"`
+ 
+-	//TODO: evaluate if we need also a ImageName based on user feedbacks
++	// TODO: evaluate if we need also a ImageName based on user feedbacks
+ }
+ 
+ // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+@@ -424,7 +429,6 @@ type BootstrapToken struct {
+ 
+ // Etcd contains elements describing Etcd configuration.
+ type Etcd struct {
+-
+ 	// Local provides configuration knobs for configuring the local etcd instance
+ 	// Local and External are mutually exclusive
+ 	// +optional
+@@ -547,6 +551,11 @@ type JoinConfiguration struct {
+ 	// that we will deploy as host containers in the CPIs
+ 	// +optional
+ 	BottlerocketCustomHostContainers []BottlerocketHostContainer `json:"bottlerocketCustomHostContainers,omitempty"`
++
++	// BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++	// This is only for bottlerocket.
++	// +optional
++	BottlerocketCustomBootstrapContainers []BottlerocketBootstrapContainer `json:"bottlerocketCustomBootstrapContainers,omitempty"`
+ }
+ 
+ // BottlerocketHostContainer describes a host image for Bottlerocket
+@@ -564,6 +573,29 @@ type BottlerocketHostContainer struct {
+ 	UserData string `json:"userData,omitempty"`
+ }
+ 
++// BottlerocketBootstrapContainer holds the bootstrap container setting for Bottlerocket
++type BottlerocketBootstrapContainer struct {
++	// Name is the bootstrap container name that will be given to the container in BR's `apiserver`.
++	Name string `json:"name"`
++
++	// ImageMeta is the actual image used for Bottlerocket bootstrap.
++	ImageMeta `json:",inline"`
++
++	// Essential decides whether or not the container should fail the boot process.
++	// Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++	// Default is false.
++	// +optional
++	Essential bool `json:"essential"`
++
++	// Mode represents the bootstrap container mode.
++	// +kubebuilder:validation:Enum=always;off;once
++	Mode string `json:"mode"`
++
++	// UserData is the base64-encoded userdata.
++	// +optional
++	UserData string `json:"userData,omitempty"`
++}
++
+ // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+ type JoinControlPlane struct {
+ 	// LocalAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
+diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
+index 1a6861a8f..f408188c5 100644
+--- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
+@@ -159,6 +159,22 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootstrapContainer) DeepCopyInto(out *BottlerocketBootstrapContainer) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootstrapContainer.
++func (in *BottlerocketBootstrapContainer) DeepCopy() *BottlerocketBootstrapContainer {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootstrapContainer)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
+ 	*out = *in
+@@ -218,6 +234,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 		*out = make([]BottlerocketHostContainer, len(*in))
+ 		copy(*out, *in)
+ 	}
++	if in.BottlerocketCustomBootstrapContainers != nil {
++		in, out := &in.BottlerocketCustomBootstrapContainers, &out.BottlerocketCustomBootstrapContainers
++		*out = make([]BottlerocketBootstrapContainer, len(*in))
++		copy(*out, *in)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterConfiguration.
+@@ -641,6 +662,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 		*out = make([]BottlerocketHostContainer, len(*in))
+ 		copy(*out, *in)
+ 	}
++	if in.BottlerocketCustomBootstrapContainers != nil {
++		in, out := &in.BottlerocketCustomBootstrapContainers, &out.BottlerocketCustomBootstrapContainers
++		*out = make([]BottlerocketBootstrapContainer, len(*in))
++		copy(*out, *in)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index 15536cd1d..44057be54 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -2397,6 +2397,48 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  bottlerocketCustomBootstrapContainers:
++                    description: BottlerocketCustomBootstrapContainers adds additional
++                      bootstrap containers for Bottlerocket. This is only for bottlerocket.
++                    items:
++                      description: BottlerocketBootstrapContainer holds the bootstrap
++                        container setting for Bottlerocket
++                      properties:
++                        essential:
++                          description: Essential decides whether or not the container
++                            should fail the boot process. Bootstrap containers configured
++                            with essential = true will stop the boot process if they
++                            exit code is a non-zero value. Default is false.
++                          type: boolean
++                        imageRepository:
++                          description: ImageRepository sets the container registry
++                            to pull images from. if not set, the ImageRepository defined
++                            in ClusterConfiguration will be used instead.
++                          type: string
++                        imageTag:
++                          description: ImageTag allows to specify a tag for the image.
++                            In case this value is set, kubeadm does not change automatically
++                            the version of the above components during upgrades.
++                          type: string
++                        mode:
++                          description: Mode represents the bootstrap container mode.
++                          enum:
++                          - always
++                          - "off"
++                          - once
++                          type: string
++                        name:
++                          description: Name is the bootstrap container name that will
++                            be given to the container in BR's `apiserver`.
++                          type: string
++                        userData:
++                          description: UserData is the base64-encoded userdata.
++                          type: string
++                      required:
++                      - mode
++                      - name
++                      type: object
++                    type: array
+                   bottlerocketCustomHostContainers:
+                     description: BottlerocketHostContainers contains the information
+                       of any additional images that we will deploy as host containers
+@@ -3132,6 +3174,48 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  bottlerocketCustomBootstrapContainers:
++                    description: BottlerocketCustomBootstrapContainers adds additional
++                      bootstrap containers for Bottlerocket. This is only for bottlerocket.
++                    items:
++                      description: BottlerocketBootstrapContainer holds the bootstrap
++                        container setting for Bottlerocket
++                      properties:
++                        essential:
++                          description: Essential decides whether or not the container
++                            should fail the boot process. Bootstrap containers configured
++                            with essential = true will stop the boot process if they
++                            exit code is a non-zero value. Default is false.
++                          type: boolean
++                        imageRepository:
++                          description: ImageRepository sets the container registry
++                            to pull images from. if not set, the ImageRepository defined
++                            in ClusterConfiguration will be used instead.
++                          type: string
++                        imageTag:
++                          description: ImageTag allows to specify a tag for the image.
++                            In case this value is set, kubeadm does not change automatically
++                            the version of the above components during upgrades.
++                          type: string
++                        mode:
++                          description: Mode represents the bootstrap container mode.
++                          enum:
++                          - always
++                          - "off"
++                          - once
++                          type: string
++                        name:
++                          description: Name is the bootstrap container name that will
++                            be given to the container in BR's `apiserver`.
++                          type: string
++                        userData:
++                          description: UserData is the base64-encoded userdata.
++                          type: string
++                      required:
++                      - mode
++                      - name
++                      type: object
++                    type: array
+                   bottlerocketCustomHostContainers:
+                     description: BottlerocketCustomHostContainers contains the information
+                       of any additional images that we will deploy as host containers
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 19b364d72..6279dedee 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -2430,6 +2430,53 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          bottlerocketCustomBootstrapContainers:
++                            description: BottlerocketCustomBootstrapContainers adds
++                              additional bootstrap containers for Bottlerocket. This
++                              is only for bottlerocket.
++                            items:
++                              description: BottlerocketBootstrapContainer holds the
++                                bootstrap container setting for Bottlerocket
++                              properties:
++                                essential:
++                                  description: Essential decides whether or not the
++                                    container should fail the boot process. Bootstrap
++                                    containers configured with essential = true will
++                                    stop the boot process if they exit code is a non-zero
++                                    value. Default is false.
++                                  type: boolean
++                                imageRepository:
++                                  description: ImageRepository sets the container
++                                    registry to pull images from. if not set, the
++                                    ImageRepository defined in ClusterConfiguration
++                                    will be used instead.
++                                  type: string
++                                imageTag:
++                                  description: ImageTag allows to specify a tag for
++                                    the image. In case this value is set, kubeadm
++                                    does not change automatically the version of the
++                                    above components during upgrades.
++                                  type: string
++                                mode:
++                                  description: Mode represents the bootstrap container
++                                    mode.
++                                  enum:
++                                  - always
++                                  - "off"
++                                  - once
++                                  type: string
++                                name:
++                                  description: Name is the bootstrap container name
++                                    that will be given to the container in BR's `apiserver`.
++                                  type: string
++                                userData:
++                                  description: UserData is the base64-encoded userdata.
++                                  type: string
++                              required:
++                              - mode
++                              - name
++                              type: object
++                            type: array
+                           bottlerocketCustomHostContainers:
+                             description: BottlerocketHostContainers contains the information
+                               of any additional images that we will deploy as host
+@@ -3215,6 +3262,53 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          bottlerocketCustomBootstrapContainers:
++                            description: BottlerocketCustomBootstrapContainers adds
++                              additional bootstrap containers for Bottlerocket. This
++                              is only for bottlerocket.
++                            items:
++                              description: BottlerocketBootstrapContainer holds the
++                                bootstrap container setting for Bottlerocket
++                              properties:
++                                essential:
++                                  description: Essential decides whether or not the
++                                    container should fail the boot process. Bootstrap
++                                    containers configured with essential = true will
++                                    stop the boot process if they exit code is a non-zero
++                                    value. Default is false.
++                                  type: boolean
++                                imageRepository:
++                                  description: ImageRepository sets the container
++                                    registry to pull images from. if not set, the
++                                    ImageRepository defined in ClusterConfiguration
++                                    will be used instead.
++                                  type: string
++                                imageTag:
++                                  description: ImageTag allows to specify a tag for
++                                    the image. In case this value is set, kubeadm
++                                    does not change automatically the version of the
++                                    above components during upgrades.
++                                  type: string
++                                mode:
++                                  description: Mode represents the bootstrap container
++                                    mode.
++                                  enum:
++                                  - always
++                                  - "off"
++                                  - once
++                                  type: string
++                                name:
++                                  description: Name is the bootstrap container name
++                                    that will be given to the container in BR's `apiserver`.
++                                  type: string
++                                userData:
++                                  description: UserData is the base64-encoded userdata.
++                                  type: string
++                              required:
++                              - mode
++                              - name
++                              type: object
++                            type: array
+                           bottlerocketCustomHostContainers:
+                             description: BottlerocketCustomHostContainers contains
+                               the information of any additional images that we will
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index bc5094eb1..fe280e091 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -34,6 +34,26 @@ user-data = "{{.UserData}}"
+ {{template "hostContainerSettings" $hContainer }}
+ {{- end -}}
+ {{- end -}}
++`
++
++	bootstrapContainerTemplate = `{{ define "bootstrapContainerSettings" -}}
++[settings.bootstrap-containers.{{.Name}}]
++essential = {{.Essential}}
++mode = "{{.Mode}}"
++{{- if (ne (imageUrl .ImageMeta) "")}}
++source = "{{imageUrl .ImageMeta}}"
++{{- end -}}
++{{- if (ne .UserData "")}}
++user-data = "{{.UserData}}"
++{{- end -}}
++{{- end -}}
++`
++
++	bootstrapContainerSliceTemplate = `{{ define "bootstrapContainerSlice" -}}
++{{- range $bContainer := .BootstrapContainers }}
++{{template "bootstrapContainerSettings" $bContainer }}
++{{- end -}}
++{{- end -}}
+ `
+ 
+ 	networkInitTemplate = `{{ define "networkInitSettings" -}}
+@@ -68,6 +88,10 @@ trusted=true
+ 
+ {{template "kubernetesInitSettings" .}}
+ 
++{{- if .BootstrapContainers}}
++{{template "bootstrapContainerSlice" .}}
++{{- end -}}
++
+ {{- if (ne .HTTPSProxyEndpoint "")}}
+ {{template "networkInitSettings" .}}
+ {{- end -}}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+new file mode 100644
+index 000000000..9065a7c58
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+@@ -0,0 +1,99 @@
++package bottlerocket
++
++import (
++	"testing"
++
++	. "github.com/onsi/gomega"
++
++	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
++)
++
++const userData = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++user-data = "B64USERDATA"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "REPO:TAG"
++user-data = "B64USERDATA"
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE"
++provider-id = "PROVIDERID"
++
++[settings.bootstrap-containers.BOOTSTRAP]
++essential = false
++mode = "MODE"
++user-data = "B64USERDATA"
++[settings.network]
++https-proxy = "PROXY"
++no-proxy = []
++[settings.container-registry.mirrors]
++"public.ecr.aws" = ["https://REGISTRYENDPOINT"]
++[settings.pki.registry-mirror-ca]
++data = "REGISTRYCA"
++trusted=true
++[settings.kubernetes.node-labels]
++KEY=VAR
++[settings.kubernetes.node-taints]
++KEY=VAR`
++
++func TestGenerateUserData(t *testing.T) {
++	g := NewWithT(t)
++
++	testcases := []struct {
++		name   string
++		input  *BottlerocketSettingsInput
++		output string
++	}{
++		{
++			name: "full settings",
++			input: &BottlerocketSettingsInput{
++				PauseContainerSource:   "PAUSE",
++				HTTPSProxyEndpoint:     "PROXY",
++				RegistryMirrorEndpoint: "REGISTRYENDPOINT",
++				RegistryMirrorCACert:   "REGISTRYCA",
++				NodeLabels:             "KEY=VAR",
++				Taints:                 "KEY=VAR",
++				ProviderId:             "PROVIDERID",
++				HostContainers: []bootstrapv1.BottlerocketHostContainer{
++					{
++						Name:         "admin",
++						Superpowered: true,
++						UserData:     "B64USERDATA",
++					},
++					{
++						Name:         "kubeadm-bootstrap",
++						Superpowered: true,
++						ImageMeta: bootstrapv1.ImageMeta{
++							ImageRepository: "REPO",
++							ImageTag:        "TAG",
++						},
++						UserData: "B64USERDATA",
++					},
++				},
++				BootstrapContainers: []bootstrapv1.BottlerocketBootstrapContainer{
++					{
++						Name:     "BOOTSTRAP",
++						Mode:     "MODE",
++						UserData: "B64USERDATA",
++					},
++				},
++			},
++			output: userData,
++		},
++	}
++	for _, testcase := range testcases {
++		t.Run(testcase.name, func(t *testing.T) {
++			b, err := generateNodeUserData("TestBottlerocketInit", bottlerocketNodeInitSettingsTemplate, testcase.input)
++			g.Expect(err).NotTo(HaveOccurred())
++			g.Expect(string(b)).To(Equal(testcase.output))
++		})
++	}
++}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 73d35963e..caea3a597 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -23,14 +23,15 @@ const (
+ )
+ 
+ type BottlerocketConfig struct {
+-	Pause                            bootstrapv1.Pause
+-	BottlerocketBootstrap            bootstrapv1.BottlerocketBootstrap
+-	BottlerocketControl              bootstrapv1.BottlerocketControl
+-	ProxyConfiguration               bootstrapv1.ProxyConfiguration
+-	RegistryMirrorConfiguration      bootstrapv1.RegistryMirrorConfiguration
+-	KubeletExtraArgs                 map[string]string
+-	Taints                           []corev1.Taint
+-	BottlerocketCustomHostContainers []bootstrapv1.BottlerocketHostContainer
++	Pause                                 bootstrapv1.Pause
++	BottlerocketBootstrap                 bootstrapv1.BottlerocketBootstrap
++	BottlerocketControl                   bootstrapv1.BottlerocketControl
++	ProxyConfiguration                    bootstrapv1.ProxyConfiguration
++	RegistryMirrorConfiguration           bootstrapv1.RegistryMirrorConfiguration
++	KubeletExtraArgs                      map[string]string
++	Taints                                []corev1.Taint
++	BottlerocketCustomHostContainers      []bootstrapv1.BottlerocketHostContainer
++	BottlerocketCustomBootstrapContainers []bootstrapv1.BottlerocketBootstrapContainer
+ }
+ 
+ type BottlerocketSettingsInput struct {
+@@ -43,6 +44,7 @@ type BottlerocketSettingsInput struct {
+ 	Taints                 string
+ 	ProviderId             string
+ 	HostContainers         []bootstrapv1.BottlerocketHostContainer
++	BootstrapContainers    []bootstrapv1.BottlerocketBootstrapContainer
+ }
+ 
+ type HostPath struct {
+@@ -103,6 +105,12 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ 	if _, err := tm.Parse(hostContainerSliceTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse hostContainerSettingsSlice %s template", kind)
+ 	}
++	if _, err := tm.Parse(bootstrapContainerTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse bootstrapContainerSettings %s template", kind)
++	}
++	if _, err := tm.Parse(bootstrapContainerSliceTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse bootstrapContainerSettingsSlice %s template", kind)
++	}
+ 	if _, err := tm.Parse(kubernetesInitTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse kubernetes %s template", kind)
+ 	}
+@@ -179,9 +187,10 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 		HTTPSProxyEndpoint:     config.ProxyConfiguration.HTTPSProxy,
+ 		RegistryMirrorEndpoint: config.RegistryMirrorConfiguration.Endpoint,
+ 		NodeLabels:             parseNodeLabels(config.KubeletExtraArgs["node-labels"]), // empty string if it does not exist
+-		Taints:                 parseTaints(config.Taints),                              //empty string if it does not exist
++		Taints:                 parseTaints(config.Taints),                              // empty string if it does not exist
+ 		ProviderId:             config.KubeletExtraArgs["provider-id"],
+ 		HostContainers:         hostContainers,
++		BootstrapContainers:    config.BottlerocketCustomBootstrapContainers,
+ 	}
+ 
+ 	if len(config.ProxyConfiguration.NoProxy) > 0 {
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index bc1ca64d9..85e198d39 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -465,10 +465,11 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		}
+ 
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+-			Pause:                            scope.Config.Spec.ClusterConfiguration.Pause,
+-			BottlerocketBootstrap:            scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:              scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
+-			BottlerocketCustomHostContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
++			Pause:                                 scope.Config.Spec.ClusterConfiguration.Pause,
++			BottlerocketBootstrap:                 scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
++			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
+ 		}
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
+@@ -668,10 +669,11 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		})
+ 	case bootstrapv1.Bottlerocket:
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+-			Pause:                            scope.Config.Spec.JoinConfiguration.Pause,
+-			BottlerocketBootstrap:            scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:              scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+-			BottlerocketCustomHostContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
++			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
++			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+@@ -795,10 +797,11 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		})
+ 	case bootstrapv1.Bottlerocket:
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+-			Pause:                            scope.Config.Spec.JoinConfiguration.Pause,
+-			BottlerocketBootstrap:            scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:              scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+-			BottlerocketCustomHostContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
++			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
++			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
+index 733b0a54a..fee4713a8 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
+@@ -562,6 +562,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfigur
+ 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+ 	out.ClusterName = in.ClusterName
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+@@ -859,6 +860,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
+ 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+index 6b4eac17b..2e3bc99ea 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+@@ -562,6 +562,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfigur
+ 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+ 	out.ClusterName = in.ClusterName
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+@@ -871,6 +872,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
+ 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index d290e4d94..1b2d94a1d 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -566,6 +566,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
+ 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+ 	out.ClusterName = in.ClusterName
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+@@ -863,6 +864,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+ 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
+ 	out.Patches = (*Patches)(unsafe.Pointer(in.Patches))
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
++	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 2f5b8f610..b6325ac35 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -2871,6 +2871,52 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      bottlerocketCustomBootstrapContainers:
++                        description: BottlerocketCustomBootstrapContainers adds additional
++                          bootstrap containers for Bottlerocket. This is only for
++                          bottlerocket.
++                        items:
++                          description: BottlerocketBootstrapContainer holds the bootstrap
++                            container setting for Bottlerocket
++                          properties:
++                            essential:
++                              description: Essential decides whether or not the container
++                                should fail the boot process. Bootstrap containers
++                                configured with essential = true will stop the boot
++                                process if they exit code is a non-zero value. Default
++                                is false.
++                              type: boolean
++                            imageRepository:
++                              description: ImageRepository sets the container registry
++                                to pull images from. if not set, the ImageRepository
++                                defined in ClusterConfiguration will be used instead.
++                              type: string
++                            imageTag:
++                              description: ImageTag allows to specify a tag for the
++                                image. In case this value is set, kubeadm does not
++                                change automatically the version of the above components
++                                during upgrades.
++                              type: string
++                            mode:
++                              description: Mode represents the bootstrap container
++                                mode.
++                              enum:
++                              - always
++                              - "off"
++                              - once
++                              type: string
++                            name:
++                              description: Name is the bootstrap container name that
++                                will be given to the container in BR's `apiserver`.
++                              type: string
++                            userData:
++                              description: UserData is the base64-encoded userdata.
++                              type: string
++                          required:
++                          - mode
++                          - name
++                          type: object
++                        type: array
+                       bottlerocketCustomHostContainers:
+                         description: BottlerocketHostContainers contains the information
+                           of any additional images that we will deploy as host containers
+@@ -3636,6 +3682,52 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      bottlerocketCustomBootstrapContainers:
++                        description: BottlerocketCustomBootstrapContainers adds additional
++                          bootstrap containers for Bottlerocket. This is only for
++                          bottlerocket.
++                        items:
++                          description: BottlerocketBootstrapContainer holds the bootstrap
++                            container setting for Bottlerocket
++                          properties:
++                            essential:
++                              description: Essential decides whether or not the container
++                                should fail the boot process. Bootstrap containers
++                                configured with essential = true will stop the boot
++                                process if they exit code is a non-zero value. Default
++                                is false.
++                              type: boolean
++                            imageRepository:
++                              description: ImageRepository sets the container registry
++                                to pull images from. if not set, the ImageRepository
++                                defined in ClusterConfiguration will be used instead.
++                              type: string
++                            imageTag:
++                              description: ImageTag allows to specify a tag for the
++                                image. In case this value is set, kubeadm does not
++                                change automatically the version of the above components
++                                during upgrades.
++                              type: string
++                            mode:
++                              description: Mode represents the bootstrap container
++                                mode.
++                              enum:
++                              - always
++                              - "off"
++                              - once
++                              type: string
++                            name:
++                              description: Name is the bootstrap container name that
++                                will be given to the container in BR's `apiserver`.
++                              type: string
++                            userData:
++                              description: UserData is the base64-encoded userdata.
++                              type: string
++                          required:
++                          - mode
++                          - name
++                          type: object
++                        type: array
+                       bottlerocketCustomHostContainers:
+                         description: BottlerocketCustomHostContainers contains the
+                           information of any additional images that we will deploy
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 1cf471a08..235ff121f 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -1502,6 +1502,56 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
+                                 type: object
++                              bottlerocketCustomBootstrapContainers:
++                                description: BottlerocketCustomBootstrapContainers
++                                  adds additional bootstrap containers for Bottlerocket.
++                                  This is only for bottlerocket.
++                                items:
++                                  description: BottlerocketBootstrapContainer holds
++                                    the bootstrap container setting for Bottlerocket
++                                  properties:
++                                    essential:
++                                      description: Essential decides whether or not
++                                        the container should fail the boot process.
++                                        Bootstrap containers configured with essential
++                                        = true will stop the boot process if they
++                                        exit code is a non-zero value. Default is
++                                        false.
++                                      type: boolean
++                                    imageRepository:
++                                      description: ImageRepository sets the container
++                                        registry to pull images from. if not set,
++                                        the ImageRepository defined in ClusterConfiguration
++                                        will be used instead.
++                                      type: string
++                                    imageTag:
++                                      description: ImageTag allows to specify a tag
++                                        for the image. In case this value is set,
++                                        kubeadm does not change automatically the
++                                        version of the above components during upgrades.
++                                      type: string
++                                    mode:
++                                      description: Mode represents the bootstrap container
++                                        mode.
++                                      enum:
++                                      - always
++                                      - "off"
++                                      - once
++                                      type: string
++                                    name:
++                                      description: Name is the bootstrap container
++                                        name that will be given to the container in
++                                        BR's `apiserver`.
++                                      type: string
++                                    userData:
++                                      description: UserData is the base64-encoded
++                                        userdata.
++                                      type: string
++                                  required:
++                                  - mode
++                                  - name
++                                  type: object
++                                type: array
+                               bottlerocketCustomHostContainers:
+                                 description: BottlerocketHostContainers contains the
+                                   information of any additional images that we will
+@@ -2319,6 +2369,56 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
+                                 type: object
++                              bottlerocketCustomBootstrapContainers:
++                                description: BottlerocketCustomBootstrapContainers
++                                  adds additional bootstrap containers for Bottlerocket.
++                                  This is only for bottlerocket.
++                                items:
++                                  description: BottlerocketBootstrapContainer holds
++                                    the bootstrap container setting for Bottlerocket
++                                  properties:
++                                    essential:
++                                      description: Essential decides whether or not
++                                        the container should fail the boot process.
++                                        Bootstrap containers configured with essential
++                                        = true will stop the boot process if they
++                                        exit code is a non-zero value. Default is
++                                        false.
++                                      type: boolean
++                                    imageRepository:
++                                      description: ImageRepository sets the container
++                                        registry to pull images from. if not set,
++                                        the ImageRepository defined in ClusterConfiguration
++                                        will be used instead.
++                                      type: string
++                                    imageTag:
++                                      description: ImageTag allows to specify a tag
++                                        for the image. In case this value is set,
++                                        kubeadm does not change automatically the
++                                        version of the above components during upgrades.
++                                      type: string
++                                    mode:
++                                      description: Mode represents the bootstrap container
++                                        mode.
++                                      enum:
++                                      - always
++                                      - "off"
++                                      - once
++                                      type: string
++                                    name:
++                                      description: Name is the bootstrap container
++                                        name that will be given to the container in
++                                        BR's `apiserver`.
++                                      type: string
++                                    userData:
++                                      description: UserData is the base64-encoded
++                                        userdata.
++                                      type: string
++                                  required:
++                                  - mode
++                                  - name
++                                  type: object
++                                type: array
+                               bottlerocketCustomHostContainers:
+                                 description: BottlerocketCustomHostContainers contains
+                                   the information of any additional images that we
+-- 
+2.34.1
+
