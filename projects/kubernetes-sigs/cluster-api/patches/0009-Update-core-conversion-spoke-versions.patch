@@ -1,0 +1,120 @@
+From 905414d5a9a353143be799c492502b284ec60d07 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Sun, 21 Nov 2021 01:16:11 -0800
+Subject: [PATCH 09/37] Update core conversion spoke versions
+
+---
+ api/v1alpha3/conversion.go              | 12 ++++++++++++
+ api/v1alpha3/zz_generated.conversion.go |  6 ++++++
+ api/v1alpha4/zz_generated.conversion.go |  6 ++++++
+ 3 files changed, 24 insertions(+)
+
+diff --git a/api/v1alpha3/conversion.go b/api/v1alpha3/conversion.go
+index 9352eb4de..39dfffb4e 100644
+--- a/api/v1alpha3/conversion.go
++++ b/api/v1alpha3/conversion.go
+@@ -39,6 +39,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
+ 		conditions.MarkTrue(dst, clusterv1.ControlPlaneInitializedCondition)
+ 	}
+ 
++	if src.Status.ManagedExternalEtcdInitialized {
++		conditions.MarkTrue(dst, clusterv1.ManagedExternalEtcdClusterInitializedCondition)
++	}
++
++	if src.Status.ManagedExternalEtcdReady {
++		conditions.MarkTrue(dst, clusterv1.ManagedExternalEtcdClusterReadyCondition)
++	}
++
+ 	// Manually restore data.
+ 	restored := &clusterv1.Cluster{}
+ 	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+@@ -49,6 +57,10 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
+ 		dst.Spec.Topology = restored.Spec.Topology
+ 	}
+ 
++	if restored.Spec.ManagedExternalEtcdRef != nil {
++		dst.Spec.ManagedExternalEtcdRef = restored.Spec.ManagedExternalEtcdRef
++	}
++
+ 	return nil
+ }
+ 
+diff --git a/api/v1alpha3/zz_generated.conversion.go b/api/v1alpha3/zz_generated.conversion.go
+index c7ea14ba3..30a689e8e 100644
+--- a/api/v1alpha3/zz_generated.conversion.go
++++ b/api/v1alpha3/zz_generated.conversion.go
+@@ -510,6 +510,7 @@ func autoConvert_v1alpha3_ClusterSpec_To_v1beta1_ClusterSpec(in *ClusterSpec, ou
+ 		return err
+ 	}
+ 	out.ControlPlaneRef = (*v1.ObjectReference)(unsafe.Pointer(in.ControlPlaneRef))
++	out.ManagedExternalEtcdRef = (*v1.ObjectReference)(unsafe.Pointer(in.ManagedExternalEtcdRef))
+ 	out.InfrastructureRef = (*v1.ObjectReference)(unsafe.Pointer(in.InfrastructureRef))
+ 	return nil
+ }
+@@ -526,6 +527,7 @@ func autoConvert_v1beta1_ClusterSpec_To_v1alpha3_ClusterSpec(in *v1beta1.Cluster
+ 		return err
+ 	}
+ 	out.ControlPlaneRef = (*v1.ObjectReference)(unsafe.Pointer(in.ControlPlaneRef))
++	out.ManagedExternalEtcdRef = (*v1.ObjectReference)(unsafe.Pointer(in.ManagedExternalEtcdRef))
+ 	out.InfrastructureRef = (*v1.ObjectReference)(unsafe.Pointer(in.InfrastructureRef))
+ 	// WARNING: in.Topology requires manual conversion: does not exist in peer-type
+ 	return nil
+@@ -541,6 +543,8 @@ func autoConvert_v1alpha3_ClusterStatus_To_v1beta1_ClusterStatus(in *ClusterStat
+ 	out.ControlPlaneReady = in.ControlPlaneReady
+ 	out.Conditions = *(*v1beta1.Conditions)(unsafe.Pointer(&in.Conditions))
+ 	out.ObservedGeneration = in.ObservedGeneration
++	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
++	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
+ 	return nil
+ }
+ 
+@@ -553,6 +557,8 @@ func autoConvert_v1beta1_ClusterStatus_To_v1alpha3_ClusterStatus(in *v1beta1.Clu
+ 	out.ControlPlaneReady = in.ControlPlaneReady
+ 	out.Conditions = *(*Conditions)(unsafe.Pointer(&in.Conditions))
+ 	out.ObservedGeneration = in.ObservedGeneration
++	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
++	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
+ 	return nil
+ }
+ 
+diff --git a/api/v1alpha4/zz_generated.conversion.go b/api/v1alpha4/zz_generated.conversion.go
+index 1f0c12a79..0abe06592 100644
+--- a/api/v1alpha4/zz_generated.conversion.go
++++ b/api/v1alpha4/zz_generated.conversion.go
+@@ -731,6 +731,7 @@ func autoConvert_v1alpha4_ClusterSpec_To_v1beta1_ClusterSpec(in *ClusterSpec, ou
+ 		return err
+ 	}
+ 	out.ControlPlaneRef = (*v1.ObjectReference)(unsafe.Pointer(in.ControlPlaneRef))
++	out.ManagedExternalEtcdRef = (*v1.ObjectReference)(unsafe.Pointer(in.ManagedExternalEtcdRef))
+ 	out.InfrastructureRef = (*v1.ObjectReference)(unsafe.Pointer(in.InfrastructureRef))
+ 	if in.Topology != nil {
+ 		in, out := &in.Topology, &out.Topology
+@@ -756,6 +757,7 @@ func autoConvert_v1beta1_ClusterSpec_To_v1alpha4_ClusterSpec(in *v1beta1.Cluster
+ 		return err
+ 	}
+ 	out.ControlPlaneRef = (*v1.ObjectReference)(unsafe.Pointer(in.ControlPlaneRef))
++	out.ManagedExternalEtcdRef = (*v1.ObjectReference)(unsafe.Pointer(in.ManagedExternalEtcdRef))
+ 	out.InfrastructureRef = (*v1.ObjectReference)(unsafe.Pointer(in.InfrastructureRef))
+ 	if in.Topology != nil {
+ 		in, out := &in.Topology, &out.Topology
+@@ -783,6 +785,8 @@ func autoConvert_v1alpha4_ClusterStatus_To_v1beta1_ClusterStatus(in *ClusterStat
+ 	out.ControlPlaneReady = in.ControlPlaneReady
+ 	out.Conditions = *(*v1beta1.Conditions)(unsafe.Pointer(&in.Conditions))
+ 	out.ObservedGeneration = in.ObservedGeneration
++	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
++	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
+ 	return nil
+ }
+ 
+@@ -800,6 +804,8 @@ func autoConvert_v1beta1_ClusterStatus_To_v1alpha4_ClusterStatus(in *v1beta1.Clu
+ 	out.ControlPlaneReady = in.ControlPlaneReady
+ 	out.Conditions = *(*Conditions)(unsafe.Pointer(&in.Conditions))
+ 	out.ObservedGeneration = in.ObservedGeneration
++	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
++	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
+ 	return nil
+ }
+ 
+-- 
+2.34.1
+
