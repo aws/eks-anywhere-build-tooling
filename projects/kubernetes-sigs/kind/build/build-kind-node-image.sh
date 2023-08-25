@@ -69,7 +69,7 @@ function build::kind::validate_versions(){
         echo "Did not find expected version of kubeadm: $eksd_tag"
         exit 1
     fi
-    if ! docker exec -i $container_id kubectl version --short --client=true | grep "$eksd_tag" > /dev/null 2>&1; then
+    if ! docker exec -i $container_id kubectl version -o json --client=true | jq -r ".clientVersion.gitVersion"  | grep "$eksd_tag" > /dev/null 2>&1; then
         echo "Did not find expected version of kubectl: $eksd_tag"
         exit 1
     fi
