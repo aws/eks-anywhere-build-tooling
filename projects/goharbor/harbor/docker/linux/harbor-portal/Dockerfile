@@ -12,6 +12,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends python-yaml \
     && npm install --unsafe-perm \ 
     && npm run generate-build-timestamp \
+    && npm --prefix /build_dir/app-swagger-ui install --unsafe-perm \
+    && npm --prefix /build_dir/app-swagger-ui run build \
     && node --max_old_space_size=2048 'node_modules/@angular/cli/bin/ng' build --configuration production \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger2.yaml > dist/swagger2.json \
@@ -22,7 +24,8 @@ RUN apt-get update \
     && ln -sf /dev/stdout /newroot/var/log/nginx/access.log \
     && ln -sf /dev/stderr /newroot/var/log/nginx/error.log \
     && mv /build_dir/package*.json /newroot/usr/share/nginx/ \
-    && mv /build_dir/dist/* /newroot/usr/share/nginx/html/ 
+    && mv /build_dir/dist/* /newroot/usr/share/nginx/html/ \
+    && mv /build_dir/app-swagger-ui/dist/* /newroot/usr/share/nginx/html/ 
 
 FROM $BASE_IMAGE
 
