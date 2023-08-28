@@ -1,0 +1,31 @@
+From 1f42fd3edda7bd83a1b1770e6038c7c6d6de6ece Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Mon, 28 Aug 2023 11:05:36 -0600
+Subject: [PATCH] Allow BOOTCONFIG_CONTENTS and CONTENTS to be checked:
+
+Without this a Bottlerocket action that only
+specifies BOOTCONFIG_CONTENTS will fail.
+
+Signed-off-by: Prow Bot <prow@amazonaws.com>
+---
+ actions/writefile/v1/main.go | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/actions/writefile/v1/main.go b/actions/writefile/v1/main.go
+index bf9f4ac..d5f923c 100644
+--- a/actions/writefile/v1/main.go
++++ b/actions/writefile/v1/main.go
+@@ -259,8 +259,8 @@ func main() {
+ 		}
+ 	}
+ 
+-	if contents == "" {
+-		log.Fatal("No content. Either the CONTENTS env var was not set or a data retrieval action failed.")
++	if contents == "" && bootconfig == "" {
++		log.Fatal("No content. Either the CONTENTS or BOOTCONFIG_CONTENTS env vars were not set or a data retrieval action failed.")
+ 	}
+ 
+ 	// If bootconfig is set, contents will be empty and will serve as output initrd file provided
+-- 
+2.41.0
+
