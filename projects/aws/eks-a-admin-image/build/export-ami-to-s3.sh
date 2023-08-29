@@ -17,6 +17,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+terminate_instance() {
+    aws ec2 terminate-instances --instance-ids $1
+}
+trap 'if [ -n "$INSTANCE_ID" ]; then terminate_instance $INSTANCE_ID; fi;' EXIT
 
 AMI_MANIFEST_OUTPUT="${1?Specify first argument - AMI manifest output file from packer}"
 IMAGE_FORMAT="${2?Specify second argument - Format for exported image \(vmdk\|raw\|vhd\)}"
@@ -74,3 +78,48 @@ do
   echo -n "$EXPORTED_IMAGE_SHA256  $(basename $dst)" > $(basename $dst).sha256
   aws s3 cp --no-progress --acl public-read $(basename $dst).sha256 $dst.sha256
 done
+
+echo "Launching EC2 instance from AMI $AMI_ID for Amazon Inspector scan"
+MAX_RETRIES=20
+for i in $(seq 1 $MAX_RETRIES); do
+    echo "Attempt $(($i)) of instance launch"
+
+    # Create a single EC2 instance with provided instance type and AMI
+    # Query the instance ID for use in future commands
+    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $SNOW_ADMIN_IMAGE_INSTANCE_TYPE  --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2" --associate-public-ip-address --iam-instance-profile Name=$SNOW_ADMIN_IMAGE_IAM_INSTANCE_PROFILE --query "Instances[0].InstanceId" --output text) && break
+
+    if [ "$i" = "$MAX_RETRIES" ]; then
+        echo "Failed to launch EC2 instance after $i retries"
+        exit 1
+    fi
+    sleep 30
+done
+
+# Wait in loop until instance is running
+aws ec2 wait instance-running --instance-ids $INSTANCE_ID && echo "EC2 instance $INSTANCE_ID is in Running state"
+
+# Amazon Inspector requires that the instance be managed by AWS Systems Manager, so we wait until
+# the condition is satisfied
+MAX_RETRIES=40
+for i in $(seq 1 $MAX_RETRIES); do
+  echo "Attempt $(($i)) of checking if instance is managed by AWS Systems Manager"
+  MANAGED_INSTANCES=($(aws ssm describe-instance-information --filters Key=ResourceType,Values=EC2Instance --query "InstanceInformationList[].InstanceId" --output text))
+  if [[ "${MANAGED_INSTANCES[@]}" =~ "$INSTANCE_ID" ]]; then
+    echo "EC2 instance $INSTANCE_ID successfully registered as a managed instance"
+    break
+  fi
+
+  if [ "$i" = "$MAX_RETRIES" ]; then
+    echo "EC2 instance $INSTANCE_ID failed to register as a managed instance"
+    exit 1
+  fi
+
+  sleep 15
+done
+
+# Generate the findings report for the EC2 instance using Amazon Inspector V2
+# and export it to an S3 bucket
+INSPECTOR_FINDINGS_REPORT_ID=$(aws inspector2 create-findings-report --filter-criteria '{"resourceId": [{"comparison": "EQUALS", "value": "'"$INSTANCE_ID"'"}], "findingStatus": [{"comparison": "EQUALS", "value": "ACTIVE"}]}' --report-format CSV --s3-destination '{"bucketName": "'"$SNOW_ADMIN_IMAGE_INSPECTOR_BUCKET"'", "kmsKeyArn": "'"$SNOW_ADMIN_IMAGE_INSPECTOR_KMS_KEY_ARN"'"}' --query "reportId" --output text) 
+
+# Make findings report public 
+aws s3api put-object-acl --bucket $SNOW_ADMIN_IMAGE_INSPECTOR_BUCKET --key $INSPECTOR_FINDINGS_REPORT_ID --acl public-read
