@@ -96,7 +96,7 @@ for i in $(seq 1 $MAX_RETRIES); do
 done
 
 # Wait in loop until instance is running
-aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+aws ec2 wait instance-running --instance-ids $INSTANCE_ID && echo "EC2 instance $INSTANCE_ID is in Running state"
 
 # Amazon Inspector requires that the instance be managed by AWS Systems Manager, so we wait until
 # the condition is satisfied
@@ -115,7 +115,7 @@ for i in $(seq 1 $MAX_RETRIES); do
   fi
 
   sleep 15
-fi
+done
 
 # Generate the findings report for the EC2 instance using Amazon Inspector V2
 # and export it to an S3 bucket
