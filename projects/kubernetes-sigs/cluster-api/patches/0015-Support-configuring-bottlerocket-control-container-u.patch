@@ -1,0 +1,1967 @@
+From 8b9f1762776a2f859dc981fbdfc6a19a6cc40e0e Mon Sep 17 00:00:00 2001
+From: Michael Chu <chumich@amazon.com>
+Date: Mon, 28 Feb 2022 09:51:25 -0800
+Subject: [PATCH 15/36] Support configuring bottlerocket control container uri
+
+Signed-off-by: Michael Chu <chumich@amazon.com>
+---
+ api/v1alpha4/zz_generated.deepcopy.go         |  5 +
+ api/v1beta1/zz_generated.deepcopy.go          |  5 +
+ .../kubeadm/api/v1alpha4/kubeadm_types.go     | 17 ++++
+ .../api/v1alpha4/zz_generated.conversion.go   | 46 +++++++++
+ .../api/v1alpha4/zz_generated.deepcopy.go     | 18 ++++
+ .../kubeadm/api/v1beta1/kubeadm_types.go      | 17 ++++
+ .../api/v1beta1/zz_generated.deepcopy.go      | 18 ++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 90 +++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 96 +++++++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        | 12 +++
+ .../internal/bottlerocket/bottlerocket.go     |  8 ++
+ .../controllers/kubeadmconfig_controller.go   |  2 +
+ .../kubeadm/types/upstreamv1beta1/types.go    | 17 ++++
+ .../zz_generated.conversion.go                | 46 +++++++++
+ .../upstreamv1beta1/zz_generated.deepcopy.go  | 18 ++++
+ .../kubeadm/types/upstreamv1beta2/types.go    | 17 ++++
+ .../zz_generated.conversion.go                | 46 +++++++++
+ .../upstreamv1beta2/zz_generated.deepcopy.go  | 93 ++++++++++++++++++
+ .../kubeadm/types/upstreamv1beta3/types.go    | 17 ++++
+ .../zz_generated.conversion.go                | 46 +++++++++
+ .../upstreamv1beta3/zz_generated.deepcopy.go  | 93 ++++++++++++++++++
+ bootstrap/kubeadm/types/utils_test.go         | 51 +++++++++-
+ cmd/clusterctl/client/cluster/mover_test.go   |  6 +-
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 96 +++++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 68 +++++++++++++
+ .../internal/workload_cluster_coredns_test.go |  5 +
+ .../internal/workload_cluster_etcd_test.go    | 10 ++
+ .../kubeadm/internal/workload_cluster_test.go | 25 +++++
+ 28 files changed, 982 insertions(+), 6 deletions(-)
+
+diff --git a/api/v1alpha4/zz_generated.deepcopy.go b/api/v1alpha4/zz_generated.deepcopy.go
+index 125f9356b..90d8a612b 100644
+--- a/api/v1alpha4/zz_generated.deepcopy.go
++++ b/api/v1alpha4/zz_generated.deepcopy.go
+@@ -248,6 +248,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+ 		*out = new(v1.ObjectReference)
+ 		**out = **in
+ 	}
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(v1.ObjectReference)
++		**out = **in
++	}
+ 	if in.InfrastructureRef != nil {
+ 		in, out := &in.InfrastructureRef, &out.InfrastructureRef
+ 		*out = new(v1.ObjectReference)
+diff --git a/api/v1beta1/zz_generated.deepcopy.go b/api/v1beta1/zz_generated.deepcopy.go
+index 49ee41659..5b1f28c0c 100644
+--- a/api/v1beta1/zz_generated.deepcopy.go
++++ b/api/v1beta1/zz_generated.deepcopy.go
+@@ -379,6 +379,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+ 		*out = new(v1.ObjectReference)
+ 		**out = **in
+ 	}
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(v1.ObjectReference)
++		**out = **in
++	}
+ 	if in.InfrastructureRef != nil {
+ 		in, out := &in.InfrastructureRef, &out.InfrastructureRef
+ 		*out = new(v1.ObjectReference)
+diff --git a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
+index 29df78f5c..9027f336f 100644
+--- a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
+@@ -71,6 +71,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -162,6 +167,13 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// BottlerocketControl holds the settings of control container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketControl struct {
++	// ImageMeta allows to customize the image used for the BottlerocketControl component
++	ImageMeta `json:",inline"`
++}
++
+ // ProxyConfiguration holds the settings for proxying bottlerocket services
+ type ProxyConfiguration struct {
+ 	// HTTPS proxy
+@@ -400,6 +412,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
+index 0e60d4e59..5c36c5ca4 100644
+--- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
+@@ -100,6 +100,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketControl)(nil), (*v1beta1.BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(a.(*BottlerocketControl), b.(*v1beta1.BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketControl)(nil), (*BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(a.(*v1beta1.BottlerocketControl), b.(*BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -605,6 +615,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in
+ 	return autoConvert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in, out, s)
+ }
+ 
++func autoConvert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
++	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl is an autogenerated conversion function.
++func Convert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
++	return autoConvert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(in *v1beta1.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_v1alpha4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(in *v1beta1.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(in, out, s)
++}
++
+ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
+ 	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
+ 		return err
+@@ -612,6 +646,9 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(i
+ 	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -657,6 +694,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -1045,6 +1085,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
+ 	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -1074,6 +1117,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
+index 334d940ca..c5999accd 100644
+--- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
+@@ -159,12 +159,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketControl.
++func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketControl)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+@@ -533,6 +550,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+index 9676d26a8..8c9dcac00 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+@@ -83,6 +83,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -181,6 +186,13 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// BottlerocketControl holds the settings of control container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketControl struct {
++	// ImageMeta allows to customize the image used for the BottlerocketControl component
++	ImageMeta `json:",inline"`
++}
++
+ // ProxyConfiguration holds the settings for proxying bottlerocket services
+ type ProxyConfiguration struct {
+ 	// HTTPS proxy
+@@ -477,6 +489,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
+index a77749836..921e6b0ea 100644
+--- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
+@@ -159,12 +159,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketControl.
++func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketControl)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+@@ -578,6 +595,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index 2b856fa95..c98744828 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -118,6 +118,21 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: BottlerocketControl holds the image source for control
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   certificatesDir:
+                     description: 'CertificatesDir specifies where to store or look
+                       for all required certificates. NB: if not provided, this will
+@@ -732,6 +747,21 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: BottlerocketControl holds the image source for control
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: 'CACertPath is the path to the SSL certificate authority
+                       used to secure comunications between node and control-plane.
+@@ -1224,6 +1254,21 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: BottlerocketControl holds the image source for control
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   certificatesDir:
+                     description: 'CertificatesDir specifies where to store or look
+                       for all required certificates. NB: if not provided, this will
+@@ -1832,6 +1877,21 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: BottlerocketControl holds the image source for control
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: 'CACertPath is the path to the SSL certificate authority
+                       used to secure comunications between node and control-plane.
+@@ -2322,6 +2382,21 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: BottlerocketControl holds the image source for control
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   certificatesDir:
+                     description: 'CertificatesDir specifies where to store or look
+                       for all required certificates. NB: if not provided, this will
+@@ -3000,6 +3075,21 @@ spec:
+                           the version of the above components during upgrades.
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: BottlerocketControl holds the image source for control
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: 'CACertPath is the path to the SSL certificate authority
+                       used to secure comunications between node and control-plane.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 72ba11e8e..1ffc551c9 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -127,6 +127,22 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: BottlerocketControl holds the image source
++                              for control container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           certificatesDir:
+                             description: 'CertificatesDir specifies where to store
+                               or look for all required certificates. NB: if not provided,
+@@ -779,6 +795,22 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: BottlerocketControl holds the image source
++                              for control container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: 'CACertPath is the path to the SSL certificate
+                               authority used to secure comunications between node
+@@ -1229,6 +1261,22 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: BottlerocketControl holds the image source
++                              for control container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           certificatesDir:
+                             description: 'CertificatesDir specifies where to store
+                               or look for all required certificates. NB: if not provided,
+@@ -1877,6 +1925,22 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: BottlerocketControl holds the image source
++                              for control container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: 'CACertPath is the path to the SSL certificate
+                               authority used to secure comunications between node
+@@ -2350,6 +2414,22 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: BottlerocketControl holds the image source
++                              for control container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           certificatesDir:
+                             description: 'CertificatesDir specifies where to store
+                               or look for all required certificates. NB: if not provided,
+@@ -3076,6 +3156,22 @@ spec:
+                                   components during upgrades.
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: BottlerocketControl holds the image source
++                              for control container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: 'CACertPath is the path to the SSL certificate
+                               authority used to secure comunications between node
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index dd769a78d..f8f1b97cb 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -53,6 +53,14 @@ trusted=true
+ [settings.kubernetes.node-taints]
+ {{.Taints}}
+ {{- end -}}
++`
++
++	controlContainerTemplate = `{{ define "controlContainerSettings" -}}
++[settings.host-containers.control]
++enabled = true
++superpowered = false
++source = "{{.ControlContainerSource}}"
++{{- end -}}
+ `
+ 
+ 	bottlerocketNodeInitSettingsTemplate = `{{template "bootstrapHostContainerSettings" .}}
+@@ -80,5 +88,9 @@ trusted=true
+ {{- if (ne .Taints "")}}
+ {{template "taintsTemplate" .}}
+ {{- end -}}
++
++{{- if (ne .ControlContainerSource "")}}
++{{template "controlContainerSettings" .}}
++{{- end -}}
+ `
+ )
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 36c3f67a7..e635308ea 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -25,6 +25,7 @@ const (
+ type BottlerocketConfig struct {
+ 	Pause                       bootstrapv1.Pause
+ 	BottlerocketBootstrap       bootstrapv1.BottlerocketBootstrap
++	BottlerocketControl         bootstrapv1.BottlerocketControl
+ 	ProxyConfiguration          bootstrapv1.ProxyConfiguration
+ 	RegistryMirrorConfiguration bootstrapv1.RegistryMirrorConfiguration
+ 	KubeletExtraArgs            map[string]string
+@@ -35,6 +36,7 @@ type BottlerocketSettingsInput struct {
+ 	BootstrapContainerUserData string
+ 	AdminContainerUserData     string
+ 	BootstrapContainerSource   string
++	ControlContainerSource     string
+ 	PauseContainerSource       string
+ 	HTTPSProxyEndpoint         string
+ 	NoProxyEndpoints           []string
+@@ -92,6 +94,9 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ 	if _, err := tm.Parse(adminContainerInitTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse adminContainer %s template", kind)
+ 	}
++	if _, err := tm.Parse(controlContainerTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse controlContainer %s template", kind)
++	}
+ 	if _, err := tm.Parse(kubernetesInitTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse kubernetes %s template", kind)
+ 	}
+@@ -147,6 +152,9 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 		NodeLabels:                 parseNodeLabels(config.KubeletExtraArgs["node-labels"]), // empty string if it does not exist
+ 		Taints:                     parseTaints(config.Taints), //empty string if it does not exist
+ 	}
++	if config.BottlerocketControl.ImageRepository != "" && config.BottlerocketControl.ImageTag != "" {
++		bottlerocketInput.ControlContainerSource = fmt.Sprintf("%s:%s", config.BottlerocketControl.ImageRepository, config.BottlerocketControl.ImageTag)
++	}
+ 	if len(config.ProxyConfiguration.NoProxy) > 0 {
+ 		for _, noProxy := range config.ProxyConfiguration.NoProxy {
+ 			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 2fc27bacb..cd327e38b 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -464,6 +464,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+ 			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
+ 			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
+ 		}
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
+@@ -665,6 +666,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+ 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+ 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/types.go b/bootstrap/kubeadm/types/upstreamv1beta1/types.go
+index 408678fe6..cf8d70b03 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/types.go
+@@ -65,6 +65,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -160,6 +165,13 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// BottlerocketControl holds the settings of control container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketControl struct {
++	// ImageMeta allows to customize the image used for the BottlerocketControl component
++	ImageMeta `json:",inline"`
++}
++
+ // ProxyConfiguration holds the settings for proxying bottlerocket services
+ type ProxyConfiguration struct {
+ 	// HTTPS proxy
+@@ -389,6 +401,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
+index c893bd235..700d980fe 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.conversion.go
+@@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketControl)(nil), (*v1beta1.BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta1_BottlerocketControl_To_v1beta1_BottlerocketControl(a.(*BottlerocketControl), b.(*v1beta1.BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketControl)(nil), (*BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketControl_To_upstreamv1beta1_BottlerocketControl(a.(*v1beta1.BottlerocketControl), b.(*BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -443,6 +453,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootst
+ 	return autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootstrap(in, out, s)
+ }
+ 
++func autoConvert_upstreamv1beta1_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta1_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_upstreamv1beta1_BottlerocketControl_To_v1beta1_BottlerocketControl is an autogenerated conversion function.
++func Convert_upstreamv1beta1_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta1_BottlerocketControl_To_v1beta1_BottlerocketControl(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketControl_To_upstreamv1beta1_BottlerocketControl(in *v1beta1.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_upstreamv1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketControl_To_upstreamv1beta1_BottlerocketControl is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketControl_To_upstreamv1beta1_BottlerocketControl(in *v1beta1.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketControl_To_upstreamv1beta1_BottlerocketControl(in, out, s)
++}
++
+ func autoConvert_upstreamv1beta1_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
+ 	if err := Convert_upstreamv1beta1_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
+ 		return err
+@@ -450,6 +484,9 @@ func autoConvert_upstreamv1beta1_ClusterConfiguration_To_v1beta1_ClusterConfigur
+ 	if err := Convert_upstreamv1beta1_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_upstreamv1beta1_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta1_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -491,6 +528,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta1_ClusterConfigur
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -771,6 +811,9 @@ func autoConvert_upstreamv1beta1_JoinConfiguration_To_v1beta1_JoinConfiguration(
+ 	if err := Convert_upstreamv1beta1_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_upstreamv1beta1_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta1_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -800,6 +843,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta1_JoinConfiguration(
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
+index 71e769f0f..b910e24ee 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
+@@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketControl.
++func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketControl)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+@@ -432,6 +449,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/types.go b/bootstrap/kubeadm/types/upstreamv1beta2/types.go
+index ff9a01d04..b45040a22 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/types.go
+@@ -74,6 +74,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -172,6 +177,13 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// BottlerocketControl holds the settings of control container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketControl struct {
++	// ImageMeta allows to customize the image used for the BottlerocketControl component
++	ImageMeta `json:",inline"`
++}
++
+ // ProxyConfiguration holds the settings for proxying bottlerocket services
+ type ProxyConfiguration struct {
+ 	// HTTPS proxy
+@@ -411,6 +423,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+index ae1158152..a0d3f763c 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+@@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketControl)(nil), (*v1beta1.BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(a.(*BottlerocketControl), b.(*v1beta1.BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketControl)(nil), (*BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(a.(*v1beta1.BottlerocketControl), b.(*BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -443,6 +453,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootst
+ 	return autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(in, out, s)
+ }
+ 
++func autoConvert_upstreamv1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta2_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_upstreamv1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl is an autogenerated conversion function.
++func Convert_upstreamv1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(in *v1beta1.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_upstreamv1beta2_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(in *v1beta1.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(in, out, s)
++}
++
+ func autoConvert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
+ 	if err := Convert_upstreamv1beta2_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
+ 		return err
+@@ -450,6 +484,9 @@ func autoConvert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfigur
+ 	if err := Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_upstreamv1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -491,6 +528,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfigur
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -767,6 +807,9 @@ func autoConvert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(
+ 	if err := Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_upstreamv1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -804,6 +847,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
+index 52218880c..a83cdeb61 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
+@@ -142,10 +142,47 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootstrap.
++func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootstrap)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketControl.
++func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketControl)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -410,6 +447,11 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -534,3 +576,54 @@ func (in *NodeRegistrationOptions) DeepCopy() *NodeRegistrationOptions {
+ 	in.DeepCopyInto(out)
+ 	return out
+ }
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *Pause) DeepCopyInto(out *Pause) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Pause.
++func (in *Pause) DeepCopy() *Pause {
++	if in == nil {
++		return nil
++	}
++	out := new(Pause)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *ProxyConfiguration) DeepCopyInto(out *ProxyConfiguration) {
++	*out = *in
++	if in.NoProxy != nil {
++		in, out := &in.NoProxy, &out.NoProxy
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ProxyConfiguration.
++func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(ProxyConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+index 42bda5ca0..ea1301706 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+@@ -83,6 +83,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -169,6 +174,13 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// BottlerocketControl holds the settings of control container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketControl struct {
++	// ImageMeta allows to customize the image used for the BottlerocketControl component
++	ImageMeta `json:",inline"`
++}
++
+ // ProxyConfiguration holds the settings for proxying bottlerocket services
+ type ProxyConfiguration struct {
+ 	// HTTPS proxy
+@@ -397,6 +409,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketControl holds the image source for control container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index 9b0c13356..197c2ef74 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -98,6 +98,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketControl)(nil), (*v1beta1.BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_BottlerocketControl_To_v1beta1_BottlerocketControl(a.(*BottlerocketControl), b.(*v1beta1.BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketControl)(nil), (*BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(a.(*v1beta1.BottlerocketControl), b.(*BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -443,6 +453,30 @@ func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootst
+ 	return autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(in, out, s)
+ }
+ 
++func autoConvert_upstreamv1beta3_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta3_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_upstreamv1beta3_BottlerocketControl_To_v1beta1_BottlerocketControl is an autogenerated conversion function.
++func Convert_upstreamv1beta3_BottlerocketControl_To_v1beta1_BottlerocketControl(in *BottlerocketControl, out *v1beta1.BottlerocketControl, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta3_BottlerocketControl_To_v1beta1_BottlerocketControl(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(in *v1beta1.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_upstreamv1beta3_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(in *v1beta1.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(in, out, s)
++}
++
+ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
+ 	if err := Convert_upstreamv1beta3_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
+ 		return err
+@@ -450,6 +484,9 @@ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfigur
+ 	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_upstreamv1beta3_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -495,6 +532,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -762,6 +802,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
+ 	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_upstreamv1beta3_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -796,6 +839,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
+index 07902b44e..dd8200e36 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
+@@ -142,10 +142,47 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootstrap.
++func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootstrap)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketControl.
++func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketControl)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -389,6 +426,11 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -538,3 +580,54 @@ func (in *Patches) DeepCopy() *Patches {
+ 	in.DeepCopyInto(out)
+ 	return out
+ }
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *Pause) DeepCopyInto(out *Pause) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Pause.
++func (in *Pause) DeepCopy() *Pause {
++	if in == nil {
++		return nil
++	}
++	out := new(Pause)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *ProxyConfiguration) DeepCopyInto(out *ProxyConfiguration) {
++	*out = *in
++	if in.NoProxy != nil {
++		in, out := &in.NoProxy, &out.NoProxy
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ProxyConfiguration.
++func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(ProxyConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
+diff --git a/bootstrap/kubeadm/types/utils_test.go b/bootstrap/kubeadm/types/utils_test.go
+index 5153d834a..dfbbc0839 100644
+--- a/bootstrap/kubeadm/types/utils_test.go
++++ b/bootstrap/kubeadm/types/utils_test.go
+@@ -163,11 +163,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+ 			},
+ 			want: "apiServer: {}\n" +
+ 				"apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
++				"bottlerocketBootstrap: {}\n" +
++				"bottlerocketControl: {}\n" +
+ 				"controllerManager: {}\n" +
+ 				"dns: {}\n" +
+ 				"etcd: {}\n" +
+ 				"kind: ClusterConfiguration\n" +
+ 				"networking: {}\n" +
++				"pause: {}\n" +
++				"proxy: {}\n" +
++				"registryMirror: {}\n" +
+ 				"scheduler: {}\n",
+ 			wantErr: false,
+ 		},
+@@ -179,11 +184,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+ 			},
+ 			want: "apiServer: {}\n" +
+ 				"apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
++				"bottlerocketBootstrap: {}\n" +
++				"bottlerocketControl: {}\n" +
+ 				"controllerManager: {}\n" +
+ 				"dns: {}\n" +
+ 				"etcd: {}\n" +
+ 				"kind: ClusterConfiguration\n" +
+ 				"networking: {}\n" +
++				"pause: {}\n" +
++				"proxy: {}\n" +
++				"registryMirror: {}\n" +
+ 				"scheduler: {}\n",
+ 			wantErr: false,
+ 		},
+@@ -195,11 +205,16 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
+ 			},
+ 			want: "apiServer: {}\n" +
+ 				"apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
++				"bottlerocketBootstrap: {}\n" +
++				"bottlerocketControl: {}\n" +
+ 				"controllerManager: {}\n" +
+ 				"dns: {}\n" +
+ 				"etcd: {}\n" +
+ 				"kind: ClusterConfiguration\n" +
+ 				"networking: {}\n" +
++				"pause: {}\n" +
++				"proxy: {}\n" +
++				"registryMirror: {}\n" +
+ 				"scheduler: {}\n",
+ 			wantErr: false,
+ 		},
+@@ -372,9 +387,14 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+ 				version: semver.MustParse("1.14.9"),
+ 			},
+ 			want: "apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
++				"bottlerocketBootstrap: {}\n" +
++				"bottlerocketControl: {}\n" +
+ 				"discovery: {}\n" +
+ 				"kind: JoinConfiguration\n" +
+-				"nodeRegistration: {}\n",
++				"nodeRegistration: {}\n" +
++				"pause: {}\n" +
++				"proxy: {}\n" +
++				"registryMirror: {}\n",
+ 			wantErr: false,
+ 		},
+ 		{
+@@ -388,11 +408,16 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+ 				version: semver.MustParse("1.15.0"),
+ 			},
+ 			want: "apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
++				"bottlerocketBootstrap: {}\n" +
++				"bottlerocketControl: {}\n" +
+ 				"discovery: {}\n" +
+ 				"kind: JoinConfiguration\n" +
+ 				"nodeRegistration:\n" +
+ 				"  ignorePreflightErrors:\n" +
+-				"  - some-preflight-check\n",
++				"  - some-preflight-check\n" +
++				"pause: {}\n" +
++				"proxy: {}\n" +
++				"registryMirror: {}\n",
+ 			wantErr: false,
+ 		},
+ 		{
+@@ -406,12 +431,17 @@ func TestMarshalJoinConfigurationForVersion(t *testing.T) {
+ 				version: semver.MustParse("1.22.0"),
+ 			},
+ 			want: "apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
++				"bottlerocketBootstrap: {}\n" +
++				"bottlerocketControl: {}\n" +
+ 				"discovery: {}\n" +
+ 				"kind: JoinConfiguration\n" +
+ 				"nodeRegistration:\n" +
+ 				"  ignorePreflightErrors:\n" +
+ 				"  - some-preflight-check\n" +
+-				"  taints: null\n",
++				"  taints: null\n" +
++				"pause: {}\n" +
++				"proxy: {}\n" +
++				"registryMirror: {}\n",
+ 			wantErr: false,
+ 		},
+ 	}
+@@ -445,11 +475,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+ 			args: args{
+ 				yaml: "apiServer: {}\n" +
+ 					"apiVersion: kubeadm.k8s.io/v1beta1\n" + "" +
++					"bottlerocketBootstrap: {}\n" +
++					"bottlerocketControl: {}\n" +
+ 					"controllerManager: {}\n" +
+ 					"dns: {}\n" +
+ 					"etcd: {}\n" +
+ 					"kind: ClusterConfiguration\n" +
+ 					"networking: {}\n" +
++					"pause: {}\n" +
++					"proxy: {}\n" +
++					"registryMirror: {}\n" +
+ 					"scheduler: {}\n",
+ 			},
+ 			want:    &bootstrapv1.ClusterConfiguration{},
+@@ -460,11 +495,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+ 			args: args{
+ 				yaml: "apiServer: {}\n" +
+ 					"apiVersion: kubeadm.k8s.io/v1beta2\n" + "" +
++					"bottlerocketBootstrap: {}\n" +
++					"bottlerocketControl: {}\n" +
+ 					"controllerManager: {}\n" +
+ 					"dns: {}\n" +
+ 					"etcd: {}\n" +
+ 					"kind: ClusterConfiguration\n" +
+ 					"networking: {}\n" +
++					"pause: {}\n" +
++					"proxy: {}\n" +
++					"registryMirror: {}\n" +
+ 					"scheduler: {}\n",
+ 			},
+ 			want:    &bootstrapv1.ClusterConfiguration{},
+@@ -475,11 +515,16 @@ func TestUnmarshalClusterConfiguration(t *testing.T) {
+ 			args: args{
+ 				yaml: "apiServer: {}\n" +
+ 					"apiVersion: kubeadm.k8s.io/v1beta3\n" + "" +
++					"bottlerocketBootstrap: {}\n" +
++					"bottlerocketControl: {}\n" +
+ 					"controllerManager: {}\n" +
+ 					"dns: {}\n" +
+ 					"etcd: {}\n" +
+ 					"kind: ClusterConfiguration\n" +
+ 					"networking: {}\n" +
++					"pause: {}\n" +
++					"proxy: {}\n" +
++					"registryMirror: {}\n" +
+ 					"scheduler: {}\n",
+ 			},
+ 			want:    &bootstrapv1.ClusterConfiguration{},
+diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
+index 56b10250d..c5281a30a 100644
+--- a/cmd/clusterctl/client/cluster/mover_test.go
++++ b/cmd/clusterctl/client/cluster/mover_test.go
+@@ -614,7 +614,7 @@ var backupRestoreTests = []struct {
+ 			objs: test.NewFakeCluster("ns1", "foo").Objs(),
+ 		},
+ 		files: map[string]string{
+-			"Cluster_ns1_foo.yaml":                      `{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","metadata":{"creationTimestamp":null,"name":"foo","namespace":"ns1","resourceVersion":"999","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"},"spec":{"controlPlaneEndpoint":{"host":"","port":0},"infrastructureRef":{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","name":"foo","namespace":"ns1"}},"status":{"controlPlaneReady":false,"infrastructureReady":false}}` + "\n",
++			"Cluster_ns1_foo.yaml":                      `{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","metadata":{"creationTimestamp":null,"name":"foo","namespace":"ns1","resourceVersion":"999","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"},"spec":{"controlPlaneEndpoint":{"host":"","port":0},"infrastructureRef":{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","name":"foo","namespace":"ns1"}},"status":{"controlPlaneReady":false,"infrastructureReady":false,"managedExternalEtcdInitialized":false,"managedExternalEtcdReady":false}}` + "\n",
+ 			"Secret_ns1_foo-kubeconfig.yaml":            `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"foo-kubeconfig","namespace":"ns1","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"foo","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"}],"resourceVersion":"999","uid":"/v1, Kind=Secret, ns1/foo-kubeconfig"}}` + "\n",
+ 			"Secret_ns1_foo-ca.yaml":                    `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"foo-ca","namespace":"ns1","resourceVersion":"999","uid":"/v1, Kind=Secret, ns1/foo-ca"}}` + "\n",
+ 			"GenericInfrastructureCluster_ns1_foo.yaml": `{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","metadata":{"creationTimestamp":null,"labels":{"cluster.x-k8s.io/cluster-name":"foo"},"name":"foo","namespace":"ns1","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"foo","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"}],"resourceVersion":"999","uid":"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns1/foo"}}` + "\n",
+@@ -632,11 +632,11 @@ var backupRestoreTests = []struct {
+ 			}(),
+ 		},
+ 		files: map[string]string{
+-			"Cluster_ns1_foo.yaml":                      `{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","metadata":{"creationTimestamp":null,"name":"foo","namespace":"ns1","resourceVersion":"999","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"},"spec":{"controlPlaneEndpoint":{"host":"","port":0},"infrastructureRef":{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","name":"foo","namespace":"ns1"}},"status":{"controlPlaneReady":false,"infrastructureReady":false}}` + "\n",
++			"Cluster_ns1_foo.yaml":                      `{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","metadata":{"creationTimestamp":null,"name":"foo","namespace":"ns1","resourceVersion":"999","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"},"spec":{"controlPlaneEndpoint":{"host":"","port":0},"infrastructureRef":{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","name":"foo","namespace":"ns1"}},"status":{"controlPlaneReady":false,"infrastructureReady":false,"managedExternalEtcdInitialized":false,"managedExternalEtcdReady":false}}` + "\n",
+ 			"Secret_ns1_foo-kubeconfig.yaml":            `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"foo-kubeconfig","namespace":"ns1","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"foo","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"}],"resourceVersion":"999","uid":"/v1, Kind=Secret, ns1/foo-kubeconfig"}}` + "\n",
+ 			"Secret_ns1_foo-ca.yaml":                    `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"foo-ca","namespace":"ns1","resourceVersion":"999","uid":"/v1, Kind=Secret, ns1/foo-ca"}}` + "\n",
+ 			"GenericInfrastructureCluster_ns1_foo.yaml": `{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","metadata":{"creationTimestamp":null,"labels":{"cluster.x-k8s.io/cluster-name":"foo"},"name":"foo","namespace":"ns1","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"foo","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/foo"}],"resourceVersion":"999","uid":"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns1/foo"}}` + "\n",
+-			"Cluster_ns2_bar.yaml":                      `{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","metadata":{"creationTimestamp":null,"name":"bar","namespace":"ns2","resourceVersion":"999","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"},"spec":{"controlPlaneEndpoint":{"host":"","port":0},"infrastructureRef":{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","name":"bar","namespace":"ns2"}},"status":{"controlPlaneReady":false,"infrastructureReady":false}}` + "\n",
++			"Cluster_ns2_bar.yaml":                      `{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","metadata":{"creationTimestamp":null,"name":"bar","namespace":"ns2","resourceVersion":"999","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"},"spec":{"controlPlaneEndpoint":{"host":"","port":0},"infrastructureRef":{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","name":"bar","namespace":"ns2"}},"status":{"controlPlaneReady":false,"infrastructureReady":false,"managedExternalEtcdInitialized":false,"managedExternalEtcdReady":false}}` + "\n",
+ 			"Secret_ns2_bar-kubeconfig.yaml":            `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"bar-kubeconfig","namespace":"ns2","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"bar","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"}],"resourceVersion":"999","uid":"/v1, Kind=Secret, ns2/bar-kubeconfig"}}` + "\n",
+ 			"Secret_ns2_bar-ca.yaml":                    `{"apiVersion":"v1","kind":"Secret","metadata":{"creationTimestamp":null,"name":"bar-ca","namespace":"ns2","resourceVersion":"999","uid":"/v1, Kind=Secret, ns2/bar-ca"}}` + "\n",
+ 			"GenericInfrastructureCluster_ns2_bar.yaml": `{"apiVersion":"infrastructure.cluster.x-k8s.io/v1beta1","kind":"GenericInfrastructureCluster","metadata":{"creationTimestamp":null,"labels":{"cluster.x-k8s.io/cluster-name":"bar"},"name":"bar","namespace":"ns2","ownerReferences":[{"apiVersion":"cluster.x-k8s.io/v1beta1","kind":"Cluster","name":"bar","uid":"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/bar"}],"resourceVersion":"999","uid":"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns2/bar"}}` + "\n",
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index f00836a83..2fc03f208 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -194,6 +194,22 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: BottlerocketControl holds the image source for
++                          control container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       certificatesDir:
+                         description: 'CertificatesDir specifies where to store or
+                           look for all required certificates. NB: if not provided,
+@@ -831,6 +847,22 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: BottlerocketControl holds the image source for
++                          control container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: 'CACertPath is the path to the SSL certificate
+                           authority used to secure comunications between node and
+@@ -1453,6 +1485,22 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: BottlerocketControl holds the image source for
++                          control container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       certificatesDir:
+                         description: 'CertificatesDir specifies where to store or
+                           look for all required certificates. NB: if not provided,
+@@ -2085,6 +2133,22 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: BottlerocketControl holds the image source for
++                          control container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: 'CACertPath is the path to the SSL certificate
+                           authority used to secure comunications between node and
+@@ -2791,6 +2855,22 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: BottlerocketControl holds the image source for
++                          control container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       certificatesDir:
+                         description: 'CertificatesDir specifies where to store or
+                           look for all required certificates. NB: if not provided,
+@@ -3497,6 +3577,22 @@ spec:
+                               upgrades.
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: BottlerocketControl holds the image source for
++                          control container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: 'CACertPath is the path to the SSL certificate
+                           authority used to secure comunications between node and
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index c96b0409c..e11d335ee 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -143,6 +143,23 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: BottlerocketControl holds the image source
++                                  for control container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               certificatesDir:
+                                 description: 'CertificatesDir specifies where to store
+                                   or look for all required certificates. NB: if not
+@@ -818,6 +835,23 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: BottlerocketControl holds the image source
++                                  for control container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               caCertPath:
+                                 description: 'CACertPath is the path to the SSL certificate
+                                   authority used to secure comunications between node
+@@ -1451,6 +1485,23 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: BottlerocketControl holds the image source
++                                  for control container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               certificatesDir:
+                                 description: 'CertificatesDir specifies where to store
+                                   or look for all required certificates. NB: if not
+@@ -2206,6 +2257,23 @@ spec:
+                                       the above components during upgrades.
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: BottlerocketControl holds the image source
++                                  for control container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               caCertPath:
+                                 description: 'CACertPath is the path to the SSL certificate
+                                   authority used to secure comunications between node
+diff --git a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
+index bac6124e7..79fa6843c 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
++++ b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
+@@ -1422,6 +1422,8 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+ 			wantClusterConfiguration: yaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
++				bottlerocketBootstrap: {}
++				bottlerocketControl: {}
+ 				controllerManager: {}
+ 				dns:
+ 				  imageRepository: example.com/k8s
+@@ -1429,6 +1431,9 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+ 				etcd: {}
+ 				kind: ClusterConfiguration
+ 				networking: {}
++				pause: {}
++				proxy: {}
++				registryMirror: {}
+ 				scheduler: {}
+ 				`),
+ 		},
+diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
+index 9972cd283..966c503ca 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
++++ b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
+@@ -58,6 +58,8 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
+ 			wantClusterConfiguration: yaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
++				bottlerocketBootstrap: {}
++				bottlerocketControl: {}
+ 				controllerManager: {}
+ 				dns: {}
+ 				etcd:
+@@ -66,6 +68,9 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
+ 				    imageTag: v1.6.0
+ 				kind: ClusterConfiguration
+ 				networking: {}
++				pause: {}
++				proxy: {}
++				registryMirror: {}
+ 				scheduler: {}
+ 				`),
+ 		},
+@@ -139,6 +144,8 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
+ 			wantClusterConfiguration: yaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
++				bottlerocketBootstrap: {}
++				bottlerocketControl: {}
+ 				controllerManager: {}
+ 				dns: {}
+ 				etcd:
+@@ -147,6 +154,9 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
+ 				      foo: bar
+ 				kind: ClusterConfiguration
+ 				networking: {}
++				pause: {}
++				proxy: {}
++				registryMirror: {}
+ 				scheduler: {}
+ 				`),
+ 		},
+diff --git a/controlplane/kubeadm/internal/workload_cluster_test.go b/controlplane/kubeadm/internal/workload_cluster_test.go
+index 63bbea586..0fede6ce6 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_test.go
++++ b/controlplane/kubeadm/internal/workload_cluster_test.go
+@@ -625,12 +625,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 					clusterConfigurationKey: yaml.Raw(`
+ 						apiServer: {}
+ 						apiVersion: kubeadm.k8s.io/v1beta2
++						bottlerocketBootstrap: {}
++						bottlerocketControl: {}
+ 						controllerManager: {}
+ 						dns: {}
+ 						etcd: {}
+ 						kind: ClusterConfiguration
+ 						kubernetesVersion: v1.17.2
+ 						networking: {}
++						pause: {}
++						proxy: {}
++						registryMirror: {}
+ 						scheduler: {}
+ 						`),
+ 				},
+@@ -664,12 +669,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 					clusterConfigurationKey: yaml.Raw(`
+ 						apiServer: {}
+ 						apiVersion: kubeadm.k8s.io/v1beta2
++						bottlerocketBootstrap: {}
++						bottlerocketControl: {}
+ 						controllerManager: {}
+ 						dns: {}
+ 						etcd: {}
+ 						kind: ClusterConfiguration
+ 						kubernetesVersion: v1.17.2
+ 						networking: {}
++						pause: {}
++						proxy: {}
++						registryMirror: {}
+ 						scheduler: {}
+ 						`),
+ 				},
+@@ -1029,11 +1039,16 @@ func TestUpdateApiServerInKubeadmConfigMap(t *testing.T) {
+ 				    mountPath: /foo/bar
+ 				    name: mount2
+ 				apiVersion: kubeadm.k8s.io/v1beta2
++				bottlerocketBootstrap: {}
++				bottlerocketControl: {}
+ 				controllerManager: {}
+ 				dns: {}
+ 				etcd: {}
+ 				kind: ClusterConfiguration
+ 				networking: {}
++				pause: {}
++				proxy: {}
++				registryMirror: {}
+ 				scheduler: {}
+ 				`),
+ 		},
+@@ -1098,6 +1113,8 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+ 			wantClusterConfiguration: yaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
++				bottlerocketBootstrap: {}
++				bottlerocketControl: {}
+ 				controllerManager:
+ 				  extraArgs:
+ 				    bar: baz
+@@ -1110,6 +1127,9 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+ 				etcd: {}
+ 				kind: ClusterConfiguration
+ 				networking: {}
++				pause: {}
++				proxy: {}
++				registryMirror: {}
+ 				scheduler: {}
+ 				`),
+ 		},
+@@ -1174,11 +1194,16 @@ func TestUpdateSchedulerInKubeadmConfigMap(t *testing.T) {
+ 			wantClusterConfiguration: yaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
++				bottlerocketBootstrap: {}
++				bottlerocketControl: {}
+ 				controllerManager: {}
+ 				dns: {}
+ 				etcd: {}
+ 				kind: ClusterConfiguration
+ 				networking: {}
++				pause: {}
++				proxy: {}
++				registryMirror: {}
+ 				scheduler:
+ 				  extraArgs:
+ 				    bar: baz
+-- 
+2.34.1
+
