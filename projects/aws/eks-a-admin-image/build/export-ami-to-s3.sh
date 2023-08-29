@@ -104,7 +104,7 @@ MAX_RETRIES=40
 for i in $(seq 1 $MAX_RETRIES); do
   echo "Attempt $(($i)) of checking if instance is managed by AWS Systems Manager"
   MANAGED_INSTANCES=($(aws ssm describe-instance-information --filters Key=ResourceType,Values=EC2Instance --query "InstanceInformationList[].InstanceId" --output text))
-  if [[ "${MANAGED_INSTANCES[@]}" =~ "INSTANCE_ID" ]]; then
+  if [[ "${MANAGED_INSTANCES[@]}" =~ "$INSTANCE_ID" ]]; then
     echo "EC2 instance $INSTANCE_ID successfully registered as a managed instance"
     break
   fi
