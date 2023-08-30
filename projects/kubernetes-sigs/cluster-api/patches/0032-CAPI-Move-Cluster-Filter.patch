@@ -1,0 +1,470 @@
+From f5db792f5f1c8e9d9d7a7d63bcb5b336f06aab24 Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Tue, 16 May 2023 11:03:09 -0500
+Subject: [PATCH 32/36] CAPI Move Cluster Filter
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+---
+ cmd/clusterctl/client/cluster/mover.go        |  32 +++--
+ cmd/clusterctl/client/cluster/mover_test.go   |  16 +--
+ cmd/clusterctl/client/cluster/objectgraph.go  |  40 +++++-
+ .../client/cluster/objectgraph_test.go        | 130 +++++++++++++++++-
+ cmd/clusterctl/client/move.go                 |  10 +-
+ cmd/clusterctl/cmd/move.go                    |   4 +
+ 6 files changed, 207 insertions(+), 25 deletions(-)
+
+diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
+index c65e8691a..d16ebfeaf 100644
+--- a/cmd/clusterctl/client/cluster/mover.go
++++ b/cmd/clusterctl/client/cluster/mover.go
+@@ -44,13 +44,16 @@ import (
+ // ObjectMover defines methods for moving Cluster API objects to another management cluster.
+ type ObjectMover interface {
+ 	// Move moves all the Cluster API objects existing in a namespace (or from all the namespaces if empty) to a target management cluster.
+-	Move(namespace string, toCluster Client, dryRun bool) error
++	// If `clusterName` is specified (not empty string), only objects belonging to the cluster will be moved.
++	Move(namespace string, toCluster Client, clusterName string, dryRun bool) error
+ 
+ 	// ToDirectory writes all the Cluster API objects existing in a namespace (or from all the namespaces if empty) to a target directory.
+-	ToDirectory(namespace string, directory string) error
++	// If `clusterName` is specified (not empty string), only objects belonging to the cluster will be moved.
++	ToDirectory(namespace string, directory, clusterName string) error
+ 
+ 	// FromDirectory reads all the Cluster API objects existing in a configured directory to a target management cluster.
+-	FromDirectory(toCluster Client, directory string) error
++	// If `clusterName` is specified (not empty string), only objects belonging to the cluster will be moved.
++	FromDirectory(toCluster Client, directory, clusterName string) error
+ }
+ 
+ // objectMover implements the ObjectMover interface.
+@@ -63,7 +66,7 @@ type objectMover struct {
+ // ensure objectMover implements the ObjectMover interface.
+ var _ ObjectMover = &objectMover{}
+ 
+-func (o *objectMover) Move(namespace string, toCluster Client, dryRun bool) error {
++func (o *objectMover) Move(namespace string, toCluster Client, clusterName string, dryRun bool) error {
+ 	log := logf.Log
+ 	log.Info("Performing move...")
+ 	o.dryRun = dryRun
+@@ -80,7 +83,7 @@ func (o *objectMover) Move(namespace string, toCluster Client, dryRun bool) erro
+ 		}
+ 	}
+ 
+-	objectGraph, err := o.getObjectGraph(namespace)
++	objectGraph, err := o.getObjectGraph(namespace, clusterName)
+ 	if err != nil {
+ 		return errors.Wrap(err, "failed to get object graph")
+ 	}
+@@ -94,11 +97,11 @@ func (o *objectMover) Move(namespace string, toCluster Client, dryRun bool) erro
+ 	return o.move(objectGraph, proxy)
+ }
+ 
+-func (o *objectMover) ToDirectory(namespace string, directory string) error {
++func (o *objectMover) ToDirectory(namespace, directory, clusterName string) error {
+ 	log := logf.Log
+ 	log.Info("Moving to directory...")
+ 
+-	objectGraph, err := o.getObjectGraph(namespace)
++	objectGraph, err := o.getObjectGraph(namespace, clusterName)
+ 	if err != nil {
+ 		return errors.Wrap(err, "failed to get object graph")
+ 	}
+@@ -106,7 +109,7 @@ func (o *objectMover) ToDirectory(namespace string, directory string) error {
+ 	return o.toDirectory(objectGraph, directory)
+ }
+ 
+-func (o *objectMover) FromDirectory(toCluster Client, directory string) error {
++func (o *objectMover) FromDirectory(toCluster Client, directory, clusterName string) error {
+ 	log := logf.Log
+ 	log.Info("Moving from directory...")
+ 
+@@ -140,6 +143,14 @@ func (o *objectMover) FromDirectory(toCluster Client, directory string) error {
+ 	// Check whether nodes are not included in GVK considered for fromDirectory.
+ 	objectGraph.checkVirtualNode()
+ 
++	// Filter and remove nodes in the graph that do not belong to cluster
++	if clusterName != "" {
++		err = objectGraph.filterCluster(clusterName)
++		if err != nil {
++			return errors.Wrap(err, "failed to filter for cluster")
++		}
++	}
++
+ 	// Restore the objects to the target cluster.
+ 	proxy := toCluster.Proxy()
+ 
+@@ -177,7 +188,7 @@ func (o *objectMover) filesToObjs(dir string) ([]unstructured.Unstructured, erro
+ 	return objs, nil
+ }
+ 
+-func (o *objectMover) getObjectGraph(namespace string) (*objectGraph, error) {
++func (o *objectMover) getObjectGraph(namespace, clusterName string) (*objectGraph, error) {
+ 	objectGraph := newObjectGraph(o.fromProxy, o.fromProviderInventory)
+ 
+ 	// Gets all the types defined by the CRDs installed by clusterctl plus the ConfigMap/Secret core types.
+@@ -189,7 +200,8 @@ func (o *objectMover) getObjectGraph(namespace string) (*objectGraph, error) {
+ 	// Discovery the object graph for the selected types:
+ 	// - Nodes are defined the Kubernetes objects (Clusters, Machines etc.) identified during the discovery process.
+ 	// - Edges are derived by the OwnerReferences between nodes.
+-	if err := objectGraph.Discovery(namespace); err != nil {
++	// - Filters and remove nodes that do not belong to provided cluster name
++	if err := objectGraph.Discovery(namespace, clusterName); err != nil {
+ 		return nil, errors.Wrap(err, "failed to discover the object graph")
+ 	}
+ 
+diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
+index c5281a30a..c6ef110b7 100644
+--- a/cmd/clusterctl/client/cluster/mover_test.go
++++ b/cmd/clusterctl/client/cluster/mover_test.go
+@@ -658,7 +658,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
+ 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+ 
+ 			// trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery("")).To(Succeed())
++			g.Expect(graph.Discovery("", "")).To(Succeed())
+ 
+ 			// Run backupTargetObject on nodes in graph
+ 			mover := objectMover{
+@@ -747,7 +747,7 @@ func Test_objectMover_restoreTargetObject(t *testing.T) {
+ 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+ 
+ 			// trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery("")).To(Succeed())
++			g.Expect(graph.Discovery("", "")).To(Succeed())
+ 
+ 			// gets a fakeProxy to an empty cluster with all the required CRDs
+ 			toProxy := getFakeProxyWithCRDs()
+@@ -853,7 +853,7 @@ func Test_objectMover_toDirectory(t *testing.T) {
+ 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+ 
+ 			// trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery("")).To(Succeed())
++			g.Expect(graph.Discovery("", "")).To(Succeed())
+ 
+ 			// Run toDirectory
+ 			mover := objectMover{
+@@ -1070,7 +1070,7 @@ func Test_getMoveSequence(t *testing.T) {
+ 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+ 
+ 			// trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery("")).To(Succeed())
++			g.Expect(graph.Discovery("", "")).To(Succeed())
+ 
+ 			moveSequence := getMoveSequence(graph)
+ 			g.Expect(moveSequence.groups).To(HaveLen(len(tt.wantMoveGroups)))
+@@ -1101,7 +1101,7 @@ func Test_objectMover_move_dryRun(t *testing.T) {
+ 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+ 
+ 			// trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery("")).To(Succeed())
++			g.Expect(graph.Discovery("", "")).To(Succeed())
+ 
+ 			// gets a fakeProxy to an empty cluster with all the required CRDs
+ 			toProxy := getFakeProxyWithCRDs()
+@@ -1174,7 +1174,7 @@ func Test_objectMover_move(t *testing.T) {
+ 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+ 
+ 			// trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery("")).To(Succeed())
++			g.Expect(graph.Discovery("", "")).To(Succeed())
+ 
+ 			// gets a fakeProxy to an empty cluster with all the required CRDs
+ 			toProxy := getFakeProxyWithCRDs()
+@@ -1445,7 +1445,7 @@ func Test_objectMover_checkProvisioningCompleted(t *testing.T) {
+ 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+ 
+ 			// trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery("")).To(Succeed())
++			g.Expect(graph.Discovery("", "")).To(Succeed())
+ 
+ 			o := &objectMover{
+ 				fromProxy: graph.proxy,
+@@ -1685,7 +1685,7 @@ func Test_objectMoverService_ensureNamespaces(t *testing.T) {
+ 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+ 
+ 			// Trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery("")).To(Succeed())
++			g.Expect(graph.Discovery("", "")).To(Succeed())
+ 
+ 			mover := objectMover{
+ 				fromProxy: graph.proxy,
+diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
+index b0934b45c..a14de3ac6 100644
+--- a/cmd/clusterctl/client/cluster/objectgraph.go
++++ b/cmd/clusterctl/client/cluster/objectgraph.go
+@@ -410,8 +410,8 @@ func getCRDList(proxy Proxy, crdList *apiextensionsv1.CustomResourceDefinitionLi
+ }
+ 
+ // Discovery reads all the Kubernetes objects existing in a namespace (or in all namespaces if empty) for the types received in input, and then adds
+-// everything to the objects graph.
+-func (o *objectGraph) Discovery(namespace string) error {
++// everything to the objects graph. Filters for objects only belonging to specific cluster if provided.
++func (o *objectGraph) Discovery(namespace, clusterName string) error {
+ 	log := logf.Log
+ 	log.Info("Discovering Cluster API objects")
+ 
+@@ -473,6 +473,42 @@ func (o *objectGraph) Discovery(namespace string) error {
+ 	// Completes the graph by setting for each node the list of tenants the node belongs to.
+ 	o.setTenants()
+ 
++	// Filter and remove nodes in the graph that do not belong to cluster
++	if clusterName != "" {
++		return o.filterCluster(clusterName)
++	}
++
++	return nil
++}
++
++// filterCluster removes all objects but provided cluster and its dependents and soft-dependents
++func (o *objectGraph) filterCluster(clusterName string) error {
++	for _, object := range o.getNodes() {
++
++		hasFilterCluster := false
++		var clusterTenants []string
++		for tenant, _ := range object.tenant {
++			if tenant.identity.GroupVersionKind().GroupKind() == clusterv1.GroupVersion.WithKind("Cluster").GroupKind() {
++				clusterTenants = append(clusterTenants, tenant.identity.Name)
++				if tenant.identity.Name == clusterName {
++					hasFilterCluster = true
++				}
++			}
++		}
++
++		// Return error only when node has more than 1 cluster tenant and one of those cluster tenant is the clusterName
++		// being filtered for. This is to prevent moving an object that more than one cluster is dependent on.
++		if hasFilterCluster && len(clusterTenants) > 1 {
++			return fmt.Errorf("resource %s is a dependent of clusters %s. Only one cluster dependent allowed",
++				object.identity.Name, strings.Join(clusterTenants, ","))
++		}
++
++		if !hasFilterCluster {
++			if _, ok := o.uidToNode[object.identity.UID]; ok {
++				delete(o.uidToNode, object.identity.UID)
++			}
++		}
++	}
+ 	return nil
+ }
+ 
+diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
+index dcd856f48..46572d62f 100644
+--- a/cmd/clusterctl/client/cluster/objectgraph_test.go
++++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
+@@ -1720,7 +1720,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
+ 			g.Expect(err).NotTo(HaveOccurred())
+ 
+ 			// finally test discovery
+-			err = graph.Discovery("")
++			err = graph.Discovery("", "")
+ 			if tt.wantErr {
+ 				g.Expect(err).To(HaveOccurred())
+ 				return
+@@ -1876,7 +1876,133 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+ 			g.Expect(err).NotTo(HaveOccurred())
+ 
+ 			// finally test discovery
+-			err = graph.Discovery(tt.args.namespace)
++			err = graph.Discovery(tt.args.namespace, "")
++			if tt.wantErr {
++				g.Expect(err).To(HaveOccurred())
++				return
++			}
++
++			g.Expect(err).NotTo(HaveOccurred())
++			assertGraph(t, graph, tt.want)
++		})
++	}
++}
++
++func TestObjectGraph_DiscoveryByCluster(t *testing.T) {
++	type args struct {
++		cluster string
++		objs    []client.Object
++	}
++	var tests = []struct {
++		name    string
++		args    args
++		want    wantGraph
++		wantErr bool
++	}{
++		{
++			name: "two clusters, read both",
++			args: args{
++				cluster: "", // read all the namespaces
++				objs: func() []client.Object {
++					objs := []client.Object{}
++					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
++					objs = append(objs, test.NewFakeCluster("ns2", "cluster2").Objs()...)
++					return objs
++				}(),
++			},
++			want: wantGraph{
++				nodes: map[string]wantGraphItem{
++					"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1": {
++						forceMove:          true,
++						forceMoveHierarchy: true,
++					},
++					"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns1/cluster1": {
++						owners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1",
++						},
++					},
++					"/v1, Kind=Secret, ns1/cluster1-ca": {
++						softOwners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1", // NB. this secret is not linked to the cluster through owner ref
++						},
++					},
++					"/v1, Kind=Secret, ns1/cluster1-kubeconfig": {
++						owners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1",
++						},
++					},
++					"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/cluster2": {
++						forceMove:          true,
++						forceMoveHierarchy: true,
++					},
++					"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns2/cluster2": {
++						owners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/cluster2",
++						},
++					},
++					"/v1, Kind=Secret, ns2/cluster2-ca": {
++						softOwners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/cluster2", // NB. this secret is not linked to the cluster through owner ref
++						},
++					},
++					"/v1, Kind=Secret, ns2/cluster2-kubeconfig": {
++						owners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns2/cluster2",
++						},
++					},
++				},
++			},
++		},
++		{
++			name: "two clusters, read only 1",
++			args: args{
++				cluster: "cluster1", // read only from ns1
++				objs: func() []client.Object {
++					objs := []client.Object{}
++					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
++					objs = append(objs, test.NewFakeCluster("ns1", "cluster2").Objs()...)
++					return objs
++				}(),
++			},
++			want: wantGraph{
++				nodes: map[string]wantGraphItem{
++					"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1": {
++						forceMove:          true,
++						forceMoveHierarchy: true,
++					},
++					"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureCluster, ns1/cluster1": {
++						owners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1",
++						},
++					},
++					"/v1, Kind=Secret, ns1/cluster1-ca": {
++						softOwners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1", // NB. this secret is not linked to the cluster through owner ref
++						},
++					},
++					"/v1, Kind=Secret, ns1/cluster1-kubeconfig": {
++						owners: []string{
++							"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1",
++						},
++					},
++				},
++			},
++		},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			g := NewWithT(t)
++
++			// Create an objectGraph bound to a source cluster with all the CRDs for the types involved in the test.
++			graph := getObjectGraphWithObjs(tt.args.objs)
++
++			// Get all the types to be considered for discovery
++			err := getFakeDiscoveryTypes(graph)
++			g.Expect(err).NotTo(HaveOccurred())
++
++			// finally test discovery
++			err = graph.Discovery("", tt.args.cluster)
+ 			if tt.wantErr {
+ 				g.Expect(err).To(HaveOccurred())
+ 				return
+diff --git a/cmd/clusterctl/client/move.go b/cmd/clusterctl/client/move.go
+index 32d90c65a..500f1e19b 100644
+--- a/cmd/clusterctl/client/move.go
++++ b/cmd/clusterctl/client/move.go
+@@ -38,6 +38,10 @@ type MoveOptions struct {
+ 	// namespace will be used.
+ 	Namespace string
+ 
++	// ClusterName defines the name of the workload cluster and its dependent objects to be moved. If unspecified,
++	// all the clusters will be moved.
++	ClusterName string
++
+ 	// FromDirectory apply configuration from directory.
+ 	FromDirectory string
+ 
+@@ -94,7 +98,7 @@ func (c *clusterctlClient) move(options MoveOptions) error {
+ 		}
+ 	}
+ 
+-	return fromCluster.ObjectMover().Move(options.Namespace, toCluster, options.DryRun)
++	return fromCluster.ObjectMover().Move(options.Namespace, toCluster, options.ClusterName, options.DryRun)
+ }
+ 
+ func (c *clusterctlClient) fromDirectory(options MoveOptions) error {
+@@ -107,7 +111,7 @@ func (c *clusterctlClient) fromDirectory(options MoveOptions) error {
+ 		return err
+ 	}
+ 
+-	return toCluster.ObjectMover().FromDirectory(toCluster, options.FromDirectory)
++	return toCluster.ObjectMover().FromDirectory(toCluster, options.FromDirectory, options.ClusterName)
+ }
+ 
+ func (c *clusterctlClient) toDirectory(options MoveOptions) error {
+@@ -129,7 +133,7 @@ func (c *clusterctlClient) toDirectory(options MoveOptions) error {
+ 		return err
+ 	}
+ 
+-	return fromCluster.ObjectMover().ToDirectory(options.Namespace, options.ToDirectory)
++	return fromCluster.ObjectMover().ToDirectory(options.Namespace, options.ToDirectory, options.ClusterName)
+ }
+ 
+ func (c *clusterctlClient) getClusterClient(kubeconfig Kubeconfig) (cluster.Client, error) {
+diff --git a/cmd/clusterctl/cmd/move.go b/cmd/clusterctl/cmd/move.go
+index c75557e0a..04b1ef8fe 100644
+--- a/cmd/clusterctl/cmd/move.go
++++ b/cmd/clusterctl/cmd/move.go
+@@ -29,6 +29,7 @@ type moveOptions struct {
+ 	toKubeconfig          string
+ 	toKubeconfigContext   string
+ 	namespace             string
++	filterCluster         string
+ 	fromDirectory         string
+ 	toDirectory           string
+ 	dryRun                bool
+@@ -78,6 +79,8 @@ func init() {
+ 		"Write Cluster API objects and all dependencies from a management cluster to directory.")
+ 	moveCmd.Flags().StringVar(&mo.fromDirectory, "from-directory", "",
+ 		"Read Cluster API objects and all dependencies from a directory into a management cluster.")
++	moveCmd.Flags().StringVar(&mo.filterCluster, "filter-cluster", "",
++		"Name of the cluster to be moved. All the dependent objects will also be moved. If empty, all clusters will be moved")
+ 
+ 	moveCmd.MarkFlagsMutuallyExclusive("to-directory", "to-kubeconfig")
+ 	moveCmd.MarkFlagsMutuallyExclusive("from-directory", "to-directory")
+@@ -105,6 +108,7 @@ func runMove() error {
+ 		FromDirectory:  mo.fromDirectory,
+ 		ToDirectory:    mo.toDirectory,
+ 		Namespace:      mo.namespace,
++		ClusterName:    mo.filterCluster,
+ 		DryRun:         mo.dryRun,
+ 	})
+ }
+-- 
+2.34.1
+

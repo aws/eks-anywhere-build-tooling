@@ -1,0 +1,1850 @@
+From 6d2dbd024cec295812d19a491ed18bb54c3e3134 Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Fri, 11 Jun 2021 10:43:09 -0700
+Subject: [PATCH 01/36] Adding capi support for Bottlerocket
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+
+Templating bottlerocket init data formats
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+
+Generating proper vip destnation path for bottlerocket among other cluster config patches
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+
+Fix kube-vip config patching by creating new Files array
+
+Adding pause and bottlerocket bootstrap Cluster configuration to kubeadm v1beta1 api
+
+Add bottlerocket API changes to v1beta1 types
+
+Set bottlerocket bootstrap container and pause container source in user data
+
+Add proxy config fields to v1beta1 api
+
+Support proxy configuration for bottlerocket
+
+Add network settings only when there is a proxy defined
+
+Remove userdata logging for bottlerocket
+---
+ api/v1alpha3/zz_generated.deepcopy.go         |   5 +
+ .../api/v1alpha3/kubeadmconfig_types.go       |   5 +-
+ .../kubeadm/api/v1beta1/kubeadm_types.go      |  53 +++++
+ .../api/v1beta1/kubeadmconfig_types.go        |   5 +-
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 174 ++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 186 ++++++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        |  45 +++++
+ .../internal/bottlerocket/bottlerocket.go     | 179 +++++++++++++++++
+ .../bottlerocket/controlplane_init.go         |  49 +++++
+ .../bottlerocket/controlplane_join.go         |  30 +++
+ .../kubeadm/internal/bottlerocket/files.go    |  18 ++
+ .../kubeadm/internal/bottlerocket/node.go     |  32 +++
+ .../kubeadm/internal/bottlerocket/users.go    |  12 ++
+ .../kubeadm/internal/bottlerocket/utils.go    |  18 ++
+ .../kubeadm/internal/cloudinit/cloudinit.go   |   2 +-
+ .../controllers/kubeadmconfig_controller.go   |  73 +++++++
+ .../kubeadm/types/upstreamv1beta1/types.go    |  55 +++++-
+ .../upstreamv1beta1/zz_generated.deepcopy.go  |  58 ++++++
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 186 ++++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  99 ++++++++++
+ go.mod                                        |   2 +-
+ 21 files changed, 1281 insertions(+), 5 deletions(-)
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/files.go
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/node.go
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/users.go
+ create mode 100644 bootstrap/kubeadm/internal/bottlerocket/utils.go
+
+diff --git a/api/v1alpha3/zz_generated.deepcopy.go b/api/v1alpha3/zz_generated.deepcopy.go
+index e1f023426..1c95079f7 100644
+--- a/api/v1alpha3/zz_generated.deepcopy.go
++++ b/api/v1alpha3/zz_generated.deepcopy.go
+@@ -177,6 +177,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+ 		*out = new(v1.ObjectReference)
+ 		**out = **in
+ 	}
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(v1.ObjectReference)
++		**out = **in
++	}
+ 	if in.InfrastructureRef != nil {
+ 		in, out := &in.InfrastructureRef, &out.InfrastructureRef
+ 		*out = new(v1.ObjectReference)
+diff --git a/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
+index 843ca08ed..6daf0dd64 100644
+--- a/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
++++ b/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
+@@ -24,12 +24,15 @@ import (
+ )
+ 
+ // Format specifies the output format of the bootstrap data
+-// +kubebuilder:validation:Enum=cloud-config
++// +kubebuilder:validation:Enum=cloud-config;bottlerocket
+ type Format string
+ 
+ const (
+ 	// CloudConfig make the bootstrap data to be of cloud-config format.
+ 	CloudConfig Format = "cloud-config"
++
++	// Bottlerocket make the bootstrap data to be of bottlerocket format.
++	Bottlerocket Format = "bottlerocket"
+ )
+ 
+ // KubeadmConfigSpec defines the desired state of KubeadmConfig.
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+index 653b4da55..11aa737a7 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+@@ -73,6 +73,21 @@ type InitConfiguration struct {
+ type ClusterConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
+ 	// Etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -147,6 +162,29 @@ type ClusterConfiguration struct {
+ 	ClusterName string `json:"clusterName,omitempty"`
+ }
+ 
++// Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
++// This setting is ONLY for bottlerocket nodes, as this needs to be set pre-boot time along with user-data
++type Pause struct {
++	// ImageMeta allows to customize the image used for the Pause component
++	ImageMeta `json:",inline"`
++}
++
++// BottlerocketBootstrap holds the settings of kubeadm bootstrap container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketBootstrap struct {
++	// ImageMeta allows to customize the image used for the BottlerocketBootstrap component
++	ImageMeta `json:",inline"`
++}
++
++// ProxyConfiguration holds the settings for proxying bottlerocket services
++type ProxyConfiguration struct {
++	// HTTPS proxy
++	HTTPSProxy string `json:"httpsProxy,omitempty"`
++
++	// No proxy, list of ips that should not use proxy
++	NoProxy []string `json:"noProxy,omitempty"`
++}
++
+ // ControlPlaneComponent holds settings common to control plane component of the cluster.
+ type ControlPlaneComponent struct {
+ 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+@@ -415,6 +453,21 @@ type ExternalEtcd struct {
+ type JoinConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
+ 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
+index fc6ebee0d..079b96fe7 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
+@@ -23,7 +23,7 @@ import (
+ )
+ 
+ // Format specifies the output format of the bootstrap data
+-// +kubebuilder:validation:Enum=cloud-config;ignition
++// +kubebuilder:validation:Enum=cloud-config;ignition;bottlerocket
+ type Format string
+ 
+ const (
+@@ -32,6 +32,9 @@ const (
+ 
+ 	// Ignition make the bootstrap data to be of Ignition format.
+ 	Ignition Format = "ignition"
++
++	// Bottlerocket make the bootstrap data to be of bottlerocket format.
++	Bottlerocket Format = "bottlerocket"
+ )
+ 
+ // KubeadmConfigSpec defines the desired state of KubeadmConfig.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index d4b6ce502..c9a3c1cea 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -103,6 +103,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketBootstrap:
++                    description: BottlerocketBootstrap holds the image source for
++                      kubeadm bootstrap container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   certificatesDir:
+                     description: 'CertificatesDir specifies where to store or look
+                       for all required certificates. NB: if not provided, this will
+@@ -306,6 +321,34 @@ spec:
+                           if that's unset.
+                         type: string
+                     type: object
++                  pause:
++                    description: Pause holds the image source for pause container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
++                  proxy:
++                    description: Proxy holds the https and no proxy information This
++                      is only for bottlerocket
++                    properties:
++                      httpsProxy:
++                        description: HTTPS proxy
++                        type: string
++                      noProxy:
++                        description: No proxy, list of ips that should not use proxy
++                        items:
++                          type: string
++                        type: array
++                    type: object
+                   scheduler:
+                     description: Scheduler contains extra settings for the scheduler
+                       control plane component
+@@ -495,6 +538,7 @@ spec:
+                 description: Format specifies the output format of the bootstrap data
+                 enum:
+                 - cloud-config
++                - bottlerocket
+                 type: string
+               initConfiguration:
+                 description: InitConfiguration along with ClusterConfiguration are
+@@ -661,6 +705,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketBootstrap:
++                    description: BottlerocketBootstrap holds the image source for
++                      kubeadm bootstrap container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: 'CACertPath is the path to the SSL certificate authority
+                       used to secure comunications between node and control-plane.
+@@ -831,6 +890,34 @@ spec:
+                           type: object
+                         type: array
+                     type: object
++                  pause:
++                    description: Pause holds the image source for pause container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
++                  proxy:
++                    description: Proxy holds the https and no proxy information This
++                      is only for bottlerocket
++                    properties:
++                      httpsProxy:
++                        description: HTTPS proxy
++                        type: string
++                      noProxy:
++                        description: No proxy, list of ips that should not use proxy
++                        items:
++                          type: string
++                        type: array
++                    type: object
+                 type: object
+               mounts:
+                 description: Mounts specifies a list of mount points to be setup.
+@@ -2086,6 +2173,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketBootstrap:
++                    description: BottlerocketBootstrap holds the image source for
++                      kubeadm bootstrap container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   certificatesDir:
+                     description: 'CertificatesDir specifies where to store or look
+                       for all required certificates. NB: if not provided, this will
+@@ -2292,6 +2394,34 @@ spec:
+                           if that's unset.
+                         type: string
+                     type: object
++                  pause:
++                    description: Pause holds the image source for pause container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
++                  proxy:
++                    description: Proxy holds the https and no proxy information This
++                      is only for bottlerocket
++                    properties:
++                      httpsProxy:
++                        description: HTTPS proxy
++                        type: string
++                      noProxy:
++                        description: No proxy, list of ips that should not use proxy
++                        items:
++                          type: string
++                        type: array
++                    type: object
+                   scheduler:
+                     description: Scheduler contains extra settings for the scheduler
+                       control plane component
+@@ -2481,6 +2611,7 @@ spec:
+                 enum:
+                 - cloud-config
+                 - ignition
++                - bottlerocket
+                 type: string
+               ignition:
+                 description: Ignition contains Ignition specific configuration.
+@@ -2708,6 +2839,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketBootstrap:
++                    description: BottlerocketBootstrap holds the image source for
++                      kubeadm bootstrap container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: 'CACertPath is the path to the SSL certificate authority
+                       used to secure comunications between node and control-plane.
+@@ -2911,6 +3057,34 @@ spec:
+                           content inline or by referencing a secret.
+                         type: string
+                     type: object
++                  pause:
++                    description: Pause holds the image source for pause container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
++                  proxy:
++                    description: Proxy holds the https and no proxy information This
++                      is only for bottlerocket
++                    properties:
++                      httpsProxy:
++                        description: HTTPS proxy
++                        type: string
++                      noProxy:
++                        description: No proxy, list of ips that should not use proxy
++                        items:
++                          type: string
++                        type: array
++                    type: object
+                   skipPhases:
+                     description: SkipPhases is a list of phases to skip during command
+                       execution. The list of phases can be obtained with the "kubeadm
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 2899e336a..348bc8362 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -111,6 +111,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketBootstrap:
++                            description: BottlerocketBootstrap holds the image source
++                              for kubeadm bootstrap container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           certificatesDir:
+                             description: 'CertificatesDir specifies where to store
+                               or look for all required certificates. NB: if not provided,
+@@ -327,6 +343,36 @@ spec:
+                                   or to "10.96.0.0/12" if that's unset.
+                                 type: string
+                             type: object
++                          pause:
++                            description: Pause holds the image source for pause container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
++                          proxy:
++                            description: Proxy holds the https and no proxy information
++                              This is only for bottlerocket
++                            properties:
++                              httpsProxy:
++                                description: HTTPS proxy
++                                type: string
++                              noProxy:
++                                description: No proxy, list of ips that should not
++                                  use proxy
++                                items:
++                                  type: string
++                                type: array
++                            type: object
+                           scheduler:
+                             description: Scheduler contains extra settings for the
+                               scheduler control plane component
+@@ -527,6 +573,7 @@ spec:
+                           data
+                         enum:
+                         - cloud-config
++                        - bottlerocket
+                         type: string
+                       initConfiguration:
+                         description: InitConfiguration along with ClusterConfiguration
+@@ -703,6 +750,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketBootstrap:
++                            description: BottlerocketBootstrap holds the image source
++                              for kubeadm bootstrap container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: 'CACertPath is the path to the SSL certificate
+                               authority used to secure comunications between node
+@@ -884,6 +947,36 @@ spec:
+                                   type: object
+                                 type: array
+                             type: object
++                          pause:
++                            description: Pause holds the image source for pause container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
++                          proxy:
++                            description: Proxy holds the https and no proxy information
++                              This is only for bottlerocket
++                            properties:
++                              httpsProxy:
++                                description: HTTPS proxy
++                                type: string
++                              noProxy:
++                                description: No proxy, list of ips that should not
++                                  use proxy
++                                items:
++                                  type: string
++                                type: array
++                            type: object
+                         type: object
+                       mounts:
+                         description: Mounts specifies a list of mount points to be
+@@ -2097,6 +2190,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketBootstrap:
++                            description: BottlerocketBootstrap holds the image source
++                              for kubeadm bootstrap container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           certificatesDir:
+                             description: 'CertificatesDir specifies where to store
+                               or look for all required certificates. NB: if not provided,
+@@ -2318,6 +2427,36 @@ spec:
+                                   or to "10.96.0.0/12" if that's unset.
+                                 type: string
+                             type: object
++                          pause:
++                            description: Pause holds the image source for pause container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
++                          proxy:
++                            description: Proxy holds the https and no proxy information
++                              This is only for bottlerocket
++                            properties:
++                              httpsProxy:
++                                description: HTTPS proxy
++                                type: string
++                              noProxy:
++                                description: No proxy, list of ips that should not
++                                  use proxy
++                                items:
++                                  type: string
++                                type: array
++                            type: object
+                           scheduler:
+                             description: Scheduler contains extra settings for the
+                               scheduler control plane component
+@@ -2518,6 +2657,7 @@ spec:
+                         enum:
+                         - cloud-config
+                         - ignition
++                        - bottlerocket
+                         type: string
+                       ignition:
+                         description: Ignition contains Ignition specific configuration.
+@@ -2763,6 +2903,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketBootstrap:
++                            description: BottlerocketBootstrap holds the image source
++                              for kubeadm bootstrap container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: 'CACertPath is the path to the SSL certificate
+                               authority used to secure comunications between node
+@@ -2982,6 +3138,36 @@ spec:
+                                   content inline or by referencing a secret.
+                                 type: string
+                             type: object
++                          pause:
++                            description: Pause holds the image source for pause container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
++                          proxy:
++                            description: Proxy holds the https and no proxy information
++                              This is only for bottlerocket
++                            properties:
++                              httpsProxy:
++                                description: HTTPS proxy
++                                type: string
++                              noProxy:
++                                description: No proxy, list of ips that should not
++                                  use proxy
++                                items:
++                                  type: string
++                                type: array
++                            type: object
+                           skipPhases:
+                             description: SkipPhases is a list of phases to skip during
+                               command execution. The list of phases can be obtained
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+new file mode 100644
+index 000000000..e4be8d945
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -0,0 +1,45 @@
++// This file defines the core bootstrap templates required
++// to bootstrap Bottlerocket
++package bottlerocket
++
++const (
++	adminContainerInitTemplate = `{{ define "adminContainerInitSettings" -}}
++[settings.host-containers.admin]
++enabled = true
++user-data = "{{.AdminContainerUserData}}"
++{{- end -}}
++`
++	kubernetesInitTemplate = `{{ define "kubernetesInitSettings" -}}
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "{{.PauseContainerSource}}"
++{{- end -}}
++`
++	bootstrapHostContainerTemplate = `{{define "bootstrapHostContainerSettings" -}}
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "{{.BootstrapContainerSource}}"
++user-data = "{{.BootstrapContainerUserData}}"
++{{- end -}}
++`
++	networkInitTemplate = `{{ define "networkInitSettings" -}}
++[settings.network]
++https-proxy = "{{.HTTPSProxyEndpoint}}"
++no-proxy = "{{.NoProxyEndpoints}}"
++{{- end -}}
++`
++	bottlerocketNodeInitSettingsTemplate = `{{template "bootstrapHostContainerSettings" .}}
++
++{{template "adminContainerInitSettings" .}}
++
++{{template "kubernetesInitSettings" .}}
++
++{{- if (ne .HTTPSProxyEndpoint "")}}
++{{template "networkInitSettings" .}}
++{{- end -}}
++`
++)
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+new file mode 100644
+index 000000000..d35016276
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -0,0 +1,179 @@
++package bottlerocket
++
++import (
++	"bytes"
++	"encoding/base64"
++	"fmt"
++	"strings"
++	"text/template"
++
++	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
++
++	"github.com/pkg/errors"
++	yaml "gopkg.in/yaml.v2"
++)
++
++const (
++	standardJoinCommand = "kubeadm join --config /tmp/kubeadm-join-config.yaml %s"
++	cloudConfigHeader   = `## template: jinja
++#cloud-config
++`
++)
++
++type BottlerocketConfig struct {
++	Pause                 bootstrapv1.Pause
++	BottlerocketBootstrap bootstrapv1.BottlerocketBootstrap
++	ProxyConfiguration    bootstrapv1.ProxyConfiguration
++}
++
++type BottlerocketSettingsInput struct {
++	BootstrapContainerUserData string
++	AdminContainerUserData     string
++	BootstrapContainerSource   string
++	PauseContainerSource       string
++	HTTPSProxyEndpoint         string
++	NoProxyEndpoints           []string
++}
++
++type HostPath struct {
++	Path string
++	Type string
++}
++
++func generateBootstrapContainerUserData(kind string, tpl string, data interface{}) ([]byte, error) {
++	tm := template.New(kind).Funcs(defaultTemplateFuncMap)
++	if _, err := tm.Parse(filesTemplate); err != nil {
++		return nil, errors.Wrap(err, "failed to parse files template")
++	}
++
++	t, err := tm.Parse(tpl)
++	if err != nil {
++		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
++	}
++
++	var out bytes.Buffer
++	if err := t.Execute(&out, data); err != nil {
++		return nil, errors.Wrapf(err, "failed to generate %s template", kind)
++	}
++
++	return out.Bytes(), nil
++}
++
++func generateAdminContainerUserData(kind string, tpl string, data interface{}) ([]byte, error) {
++	tm := template.New(kind)
++	if _, err := tm.Parse(usersTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse users - %s template", kind)
++	}
++	t, err := tm.Parse(tpl)
++	if err != nil {
++		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
++	}
++	var out bytes.Buffer
++	if err := t.Execute(&out, data); err != nil {
++		return nil, errors.Wrapf(err, "failed to generate %s template", kind)
++	}
++	return out.Bytes(), nil
++}
++
++func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, error) {
++	tm := template.New(kind)
++	if _, err := tm.Parse(bootstrapHostContainerTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse hostContainer %s template", kind)
++	}
++	if _, err := tm.Parse(adminContainerInitTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse adminContainer %s template", kind)
++	}
++	if _, err := tm.Parse(kubernetesInitTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse kubernetes %s template", kind)
++	}
++	if _, err := tm.Parse(networkInitTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse networks %s template", kind)
++	}
++
++	t, err := tm.Parse(tpl)
++	if err != nil {
++		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
++	}
++
++	var out bytes.Buffer
++	if err := t.Execute(&out, data); err != nil {
++		return nil, errors.Wrapf(err, "failed to generate %s template", kind)
++	}
++	return out.Bytes(), nil
++}
++
++// getBottlerocketNodeUserData returns the userdata for the host bottlerocket in toml format
++func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []bootstrapv1.User, config *BottlerocketConfig) ([]byte, error) {
++	// base64 encode the bootstrapContainer's user data
++	b64BootstrapContainerUserData := base64.StdEncoding.EncodeToString(bootstrapContainerUserData)
++
++	// Parse out all the ssh authorized keys
++	sshAuthorizedKeys := getAllAuthorizedKeys(users)
++
++	// generate the userdata for the admin container
++	adminContainerUserData, err := generateAdminContainerUserData("InitAdminContainer", usersTemplate, sshAuthorizedKeys)
++	if err != nil {
++		return nil, err
++	}
++	b64AdminContainerUserData := base64.StdEncoding.EncodeToString(adminContainerUserData)
++
++	bottlerocketInput := &BottlerocketSettingsInput{
++		BootstrapContainerUserData: b64BootstrapContainerUserData,
++		AdminContainerUserData:     b64AdminContainerUserData,
++		BootstrapContainerSource:   fmt.Sprintf("%s:%s", config.BottlerocketBootstrap.ImageRepository, config.BottlerocketBootstrap.ImageTag),
++		PauseContainerSource:       fmt.Sprintf("%s:%s", config.Pause.ImageRepository, config.Pause.ImageTag),
++		HTTPSProxyEndpoint:         config.ProxyConfiguration.HTTPSProxy,
++		NoProxyEndpoints:           config.ProxyConfiguration.NoProxy,
++	}
++
++	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
++	if err != nil {
++		return nil, err
++	}
++	return bottlerocketNodeUserData, nil
++}
++
++// Parses through all the users and return list of all user's authorized ssh keys
++func getAllAuthorizedKeys(users []bootstrapv1.User) string {
++	var sshAuthorizedKeys []string
++	for _, user := range users {
++		if len(user.SSHAuthorizedKeys) != 0 {
++			for _, key := range user.SSHAuthorizedKeys {
++				quotedKey := "\"" + key + "\""
++				sshAuthorizedKeys = append(sshAuthorizedKeys, quotedKey)
++			}
++		}
++	}
++	return strings.Join(sshAuthorizedKeys, ",")
++}
++
++func patchKubeVipFile(writeFiles []bootstrapv1.File) ([]bootstrapv1.File, error) {
++	var patchedFiles []bootstrapv1.File
++	for _, file := range writeFiles {
++		if file.Path == "/etc/kubernetes/manifests/kube-vip.yaml" {
++			// unmarshal the yaml file from contents
++			var yamlData map[string]interface{}
++			err := yaml.Unmarshal([]byte(file.Content), &yamlData)
++			if err != nil {
++				return nil, errors.Wrap(err, "Error unmarshalling yaml content from kube-vip")
++			}
++
++			// Patch the spec.Volume mount path
++			spec := yamlData["spec"].(map[interface{}]interface{})
++			volumes := spec["volumes"].([]interface{})
++			currentVol := volumes[0].(map[interface{}]interface{})
++			hostPath := currentVol["hostPath"].(map[interface{}]interface{})
++			hostPath["type"] = "File"
++			hostPath["path"] = "/var/lib/kubeadm/admin.conf"
++
++			// Marshall back into yaml and override
++			patchedYaml, err := yaml.Marshal(&yamlData)
++			if err != nil {
++				return nil, errors.Wrap(err, "Error marshalling patched kube-vip yaml")
++			}
++			file.Content = string(patchedYaml)
++		}
++		patchedFiles = append(patchedFiles, file)
++	}
++	return patchedFiles, nil
++}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+new file mode 100644
+index 000000000..edf555b8c
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+@@ -0,0 +1,49 @@
++// TODO: make bottlerocket(init) more agnostic. In addition to other changes to make things
++// less hacky, also move calling cloudinit from controller and passing it to
++// bottlerocket bootstrap, to all control to bottlerocket bootstrap itself.
++// That way, bottlerocket bootstrap will call cloudinit to generate that userdata
++// which is much more cleaner.
++package bottlerocket
++
++import (
++	"fmt"
++
++	"github.com/pkg/errors"
++	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
++)
++
++const (
++	controlPlaneBootstrapContainerTemplate = `{{.Header}}
++{{template "files" .WriteFiles}}
++-   path: /tmp/kubeadm.yaml
++    owner: root:root
++    permissions: '0640'
++    content: |
++      ---
++{{.ClusterConfiguration | Indent 6}}
++      ---
++{{.InitConfiguration | Indent 6}}
++runcmd: "ControlPlaneInit"
++`
++)
++
++// NewInitControlPlane will take the cloudinit's controlplane input as an argument
++// and generate the bottlerocket toml formatted userdata for the host node, which
++// has the settings for bootstrap container which has its own embedded base64 encoded userdata.
++func NewInitControlPlane(input *cloudinit.ControlPlaneInput, config *BottlerocketConfig) ([]byte, error) {
++	input.Header = cloudConfigHeader
++	input.WriteFiles = input.Certificates.AsFiles()
++	input.WriteFiles = append(input.WriteFiles, input.AdditionalFiles...)
++
++	var err error
++	input.WriteFiles, err = patchKubeVipFile(input.WriteFiles)
++	if err != nil {
++		return nil, errors.Wrap(err, "Failed to patch kube-vip manifest file")
++	}
++	bootstrapContainerUserData, err := generateBootstrapContainerUserData("InitBootstrapContainer", controlPlaneBootstrapContainerTemplate, input)
++	if err != nil {
++		return nil, err
++	}
++
++	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users, config)
++}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
+new file mode 100644
+index 000000000..b93e1164b
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
+@@ -0,0 +1,30 @@
++package bottlerocket
++
++import (
++	"github.com/pkg/errors"
++	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
++)
++
++const (
++	controlPlaneJoinBottlerocketInit = `{{template "files" .WriteFiles}}
++-   path: /tmp/kubeadm-join-config.yaml
++    owner: root:root
++    permissions: '0640'
++    content: |
++{{.JoinConfiguration | Indent 6}}
++runcmd: "ControlPlaneJoin"
++`
++)
++
++// NewJoinControlPlane returns the user data string to be used on a new control plane instance.
++func NewJoinControlPlane(input *cloudinit.ControlPlaneJoinInput, config *BottlerocketConfig) ([]byte, error) {
++	input.WriteFiles = input.Certificates.AsFiles()
++	input.ControlPlane = true
++	input.WriteFiles = append(input.WriteFiles, input.AdditionalFiles...)
++	bootstrapContainerUserData, err := generateBootstrapContainerUserData("JoinControlplane", controlPlaneJoinBottlerocketInit, input)
++	if err != nil {
++		return nil, errors.Wrapf(err, "failed to generate user data for machine joining control plane")
++	}
++
++	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users, config)
++}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/files.go b/bootstrap/kubeadm/internal/bottlerocket/files.go
+new file mode 100644
+index 000000000..9be431ba8
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/files.go
+@@ -0,0 +1,18 @@
++package bottlerocket
++
++const (
++	filesTemplate = `{{ define "files" -}}
++write_files:{{ range . }}
++-   path: {{.Path}}
++    {{ if ne .Owner "" -}}
++    owner: {{.Owner}}
++    {{ end -}}
++    {{ if ne .Permissions "" -}}
++    permissions: '{{.Permissions}}'
++    {{ end -}}
++    content: |
++{{.Content | Indent 6}}
++{{- end -}}
++{{- end -}}
++`
++)
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/node.go b/bootstrap/kubeadm/internal/bottlerocket/node.go
+new file mode 100644
+index 000000000..df52e59d5
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/node.go
+@@ -0,0 +1,32 @@
++package bottlerocket
++
++import (
++	"fmt"
++
++	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
++)
++
++const (
++	nodeBottleRocketInit = `{{template "files" .WriteFiles}}
++-   path: /tmp/kubeadm-join-config.yaml
++    owner: root:root
++    permissions: '0640'
++    content: |
++      ---
++{{.JoinConfiguration | Indent 6}}
++runcmd: "WorkerJoin"
++`
++)
++
++// NewNode creates a toml formatted userdata including bootstrap host container settings that has
++// a base64 encoded user data for the bootstrap container
++func NewNode(input *cloudinit.NodeInput, config *BottlerocketConfig) ([]byte, error) {
++	input.KubeadmCommand = fmt.Sprintf(standardJoinCommand, input.KubeadmVerbosity)
++	input.WriteFiles = append(input.WriteFiles, input.AdditionalFiles...)
++	bootstrapContainerUserData, err := generateBootstrapContainerUserData("Node", nodeBottleRocketInit, input)
++	if err != nil {
++		return nil, err
++	}
++
++	return getBottlerocketNodeUserData(bootstrapContainerUserData, input.Users, config)
++}
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/users.go b/bootstrap/kubeadm/internal/bottlerocket/users.go
+new file mode 100644
+index 000000000..e5eedcb9f
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/users.go
+@@ -0,0 +1,12 @@
++package bottlerocket
++
++const (
++	usersTemplate = `{{- if . }}
++{
++	"ssh": {
++		"authorized-keys": [{{.}}]
++	}
++}
++{{- end -}}
++`
++)
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/utils.go b/bootstrap/kubeadm/internal/bottlerocket/utils.go
+new file mode 100644
+index 000000000..9118e28c4
+--- /dev/null
++++ b/bootstrap/kubeadm/internal/bottlerocket/utils.go
+@@ -0,0 +1,18 @@
++package bottlerocket
++
++import (
++	"strings"
++	"text/template"
++)
++
++var (
++	defaultTemplateFuncMap = template.FuncMap{
++		"Indent": templateYAMLIndent,
++	}
++)
++
++func templateYAMLIndent(i int, input string) string {
++	split := strings.Split(input, "\n")
++	ident := "\n" + strings.Repeat(" ", i)
++	return strings.Repeat(" ", i) + strings.Join(split, ident)
++}
+diff --git a/bootstrap/kubeadm/internal/cloudinit/cloudinit.go b/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
+index c2f158f7c..aaf8c5dc0 100644
+--- a/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
++++ b/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
+@@ -59,8 +59,8 @@ type BaseUserData struct {
+ }
+ 
+ func (input *BaseUserData) prepare() error {
+-	input.Header = cloudConfigHeader
+ 	input.WriteFiles = append(input.WriteFiles, input.AdditionalFiles...)
++	input.Header = cloudConfigHeader
+ 	input.KubeadmCommand = fmt.Sprintf(standardJoinCommand, input.KubeadmVerbosity)
+ 	if input.UseExperimentalRetry {
+ 		input.KubeadmCommand = retriableJoinScriptName
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 04f93612e..ab0dd4391 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -42,6 +42,7 @@ import (
+ 
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
++	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/bottlerocket"
+ 	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
+ 	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/ignition"
+ 	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/locking"
+@@ -429,6 +430,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 	// injects into config.ClusterConfiguration values from top level object
+ 	r.reconcileTopLevelObjectSettings(ctx, scope.Cluster, machine, scope.Config)
+ 
++	// Add extra config to cluster config for bottlerocket
++	// Extract bottlerocket config from kubeadm
++	var bottlerocketConfig *bottlerocket.BottlerocketConfig
++	if scope.Config.Spec.Format == bootstrapv1.Bottlerocket {
++		// Add certificates dir
++		if scope.Config.Spec.ClusterConfiguration.CertificatesDir == "" {
++			scope.Config.Spec.ClusterConfiguration.CertificatesDir = "/var/lib/kubeadm/pki"
++		}
++
++		// Add controllerManager extra volumes
++		scope.Config.Spec.ClusterConfiguration.ControllerManager.ExtraVolumes = []bootstrapv1.HostPathMount{
++			{
++				Name:      "kubeconfig",
++				HostPath:  "/var/lib/kubeadm/controller-manager.conf",
++				MountPath: "/etc/kubernetes/controller-manager.conf",
++				ReadOnly:  true,
++				PathType:  "File",
++			},
++		}
++
++		// Add scheduler extraVol
++		scope.Config.Spec.ClusterConfiguration.Scheduler.ExtraVolumes = []bootstrapv1.HostPathMount{
++			{
++				Name:      "kubeconfig",
++				HostPath:  "/var/lib/kubeadm/scheduler.conf",
++				MountPath: "/etc/kubernetes/scheduler.conf",
++				ReadOnly:  true,
++				PathType:  "File",
++			},
++		}
++
++		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
++			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
++			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++		}
++		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
++			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
++		}
++	}
++
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
+ 	if err != nil {
+ 		scope.Error(err, "Failed to marshal cluster configuration")
+@@ -498,6 +539,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 			ControlPlaneInput: controlPlaneInput,
+ 			Ignition:          scope.Config.Spec.Ignition,
+ 		})
++	case bootstrapv1.Bottlerocket:
++		bootstrapInitData, err = bottlerocket.NewInitControlPlane(controlPlaneInput, bottlerocketConfig)
++		if err != nil {
++			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
++			return ctrl.Result{}, err
++		}
+ 	default:
+ 		bootstrapInitData, err = cloudinit.NewInitControlPlane(controlPlaneInput)
+ 	}
+@@ -605,6 +652,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 			NodeInput: nodeInput,
+ 			Ignition:  scope.Config.Spec.Ignition,
+ 		})
++	case bootstrapv1.Bottlerocket:
++		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
++			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++		}
++		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
++			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
++		}
++		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
++		if err != nil {
++			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
++			return ctrl.Result{}, err
++		}
+ 	default:
+ 		bootstrapJoinData, err = cloudinit.NewNode(nodeInput)
+ 	}
+@@ -708,6 +768,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 			ControlPlaneJoinInput: controlPlaneJoinInput,
+ 			Ignition:              scope.Config.Spec.Ignition,
+ 		})
++	case bootstrapv1.Bottlerocket:
++		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
++			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++		}
++		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
++			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
++		}
++		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
++		if err != nil {
++			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
++			return ctrl.Result{}, err
++		}
+ 	default:
+ 		bootstrapJoinData, err = cloudinit.NewJoinControlPlane(controlPlaneJoinInput)
+ 	}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/types.go b/bootstrap/kubeadm/types/upstreamv1beta1/types.go
+index 3f90b4611..45bfe7dcd 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/types.go
+@@ -55,6 +55,21 @@ type InitConfiguration struct {
+ type ClusterConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
+ 	// Etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -126,7 +141,30 @@ type ClusterConfiguration struct {
+ 	ClusterName string `json:"clusterName,omitempty"`
+ }
+ 
+-// ControlPlaneComponent holds settings common to control plane component of the cluster.
++// Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
++// This setting is ONLY for bottlerocket nodes, as this needs to be set pre-boot time along with user-data
++type Pause struct {
++	// ImageMeta allows to customize the image used for the Pause component
++	ImageMeta `json:",inline"`
++}
++
++// BottlerocketBootstrap holds the settings of kubeadm bootstrap container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketBootstrap struct {
++	// ImageMeta allows to customize the image used for the BottlerocketBootstrap component
++	ImageMeta `json:",inline"`
++}
++
++// ProxyConfiguration holds the settings for proxying bottlerocket services
++type ProxyConfiguration struct {
++	// HTTPS proxy
++	HTTPSProxy string `json:"httpsProxy,omitempty"`
++
++	// No proxy, list of ips that should not use proxy
++	NoProxy []string `json:"noProxy,omitempty"`
++}
++
++// ControlPlaneComponent holds settings common to control plane component of the cluster
+ type ControlPlaneComponent struct {
+ 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+ 	// TODO: This is temporary and ideally we would like to switch all components to
+@@ -327,6 +365,21 @@ type ExternalEtcd struct {
+ type JoinConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
+ 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
+index 2eebc2402..e924a4a4b 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
+@@ -142,10 +142,29 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootstrap.
++func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootstrap)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -410,6 +429,9 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -529,3 +551,39 @@ func (in *NodeRegistrationOptions) DeepCopy() *NodeRegistrationOptions {
+ 	in.DeepCopyInto(out)
+ 	return out
+ }
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *Pause) DeepCopyInto(out *Pause) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Pause.
++func (in *Pause) DeepCopy() *Pause {
++	if in == nil {
++		return nil
++	}
++	out := new(Pause)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *ProxyConfiguration) DeepCopyInto(out *ProxyConfiguration) {
++	*out = *in
++	if in.NoProxy != nil {
++		in, out := &in.NoProxy, &out.NoProxy
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ProxyConfiguration.
++func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(ProxyConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 94952c5cd..f7418dfa5 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -178,6 +178,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketBootstrap:
++                        description: BottlerocketBootstrap holds the image source
++                          for kubeadm bootstrap container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       certificatesDir:
+                         description: 'CertificatesDir specifies where to store or
+                           look for all required certificates. NB: if not provided,
+@@ -387,6 +403,36 @@ spec:
+                               "10.96.0.0/12" if that's unset.
+                             type: string
+                         type: object
++                      pause:
++                        description: Pause holds the image source for pause container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
++                      proxy:
++                        description: Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
+                       scheduler:
+                         description: Scheduler contains extra settings for the scheduler
+                           control plane component
+@@ -583,6 +629,7 @@ spec:
+                       data
+                     enum:
+                     - cloud-config
++                    - bottlerocket
+                     type: string
+                   initConfiguration:
+                     description: InitConfiguration along with ClusterConfiguration
+@@ -755,6 +802,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketBootstrap:
++                        description: BottlerocketBootstrap holds the image source
++                          for kubeadm bootstrap container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: 'CACertPath is the path to the SSL certificate
+                           authority used to secure comunications between node and
+@@ -931,6 +994,36 @@ spec:
+                               type: object
+                             type: array
+                         type: object
++                      pause:
++                        description: Pause holds the image source for pause container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
++                      proxy:
++                        description: Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
+                     type: object
+                   mounts:
+                     description: Mounts specifies a list of mount points to be setup.
+@@ -2538,6 +2631,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketBootstrap:
++                        description: BottlerocketBootstrap holds the image source
++                          for kubeadm bootstrap container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       certificatesDir:
+                         description: 'CertificatesDir specifies where to store or
+                           look for all required certificates. NB: if not provided,
+@@ -2751,6 +2860,36 @@ spec:
+                               "10.96.0.0/12" if that's unset.
+                             type: string
+                         type: object
++                      pause:
++                        description: Pause holds the image source for pause container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
++                      proxy:
++                        description: Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
+                       scheduler:
+                         description: Scheduler contains extra settings for the scheduler
+                           control plane component
+@@ -2947,6 +3086,7 @@ spec:
+                     enum:
+                     - cloud-config
+                     - ignition
++                    - bottlerocket
+                     type: string
+                   ignition:
+                     description: Ignition contains Ignition specific configuration.
+@@ -3184,6 +3324,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketBootstrap:
++                        description: BottlerocketBootstrap holds the image source
++                          for kubeadm bootstrap container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: 'CACertPath is the path to the SSL certificate
+                           authority used to secure comunications between node and
+@@ -3397,6 +3553,36 @@ spec:
+                               or by referencing a secret.
+                             type: string
+                         type: object
++                      pause:
++                        description: Pause holds the image source for pause container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
++                      proxy:
++                        description: Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
+                       skipPhases:
+                         description: SkipPhases is a list of phases to skip during
+                           command execution. The list of phases can be obtained with
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 4e182d911..5a1623e9f 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -1309,6 +1309,24 @@ spec:
+                                   value, and may reject unrecognized values. More
+                                   info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                                 type: string
++                              bottlerocketBootstrap:
++                                description: BottlerocketBootstrap holds the image
++                                  source for kubeadm bootstrap container This is only
++                                  for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               certificatesDir:
+                                 description: 'CertificatesDir specifies where to store
+                                   or look for all required certificates. NB: if not
+@@ -1538,6 +1556,37 @@ spec:
+                                       or to "10.96.0.0/12" if that's unset.
+                                     type: string
+                                 type: object
++                              pause:
++                                description: Pause holds the image source for pause
++                                  container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
++                              proxy:
++                                description: Proxy holds the https and no proxy information
++                                  This is only for bottlerocket
++                                properties:
++                                  httpsProxy:
++                                    description: HTTPS proxy
++                                    type: string
++                                  noProxy:
++                                    description: No proxy, list of ips that should
++                                      not use proxy
++                                    items:
++                                      type: string
++                                    type: array
++                                type: object
+                               scheduler:
+                                 description: Scheduler contains extra settings for
+                                   the scheduler control plane component
+@@ -1745,6 +1794,7 @@ spec:
+                             enum:
+                             - cloud-config
+                             - ignition
++                            - bottlerocket
+                             type: string
+                           ignition:
+                             description: Ignition contains Ignition specific configuration.
+@@ -2001,6 +2051,24 @@ spec:
+                                   value, and may reject unrecognized values. More
+                                   info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                                 type: string
++                              bottlerocketBootstrap:
++                                description: BottlerocketBootstrap holds the image
++                                  source for kubeadm bootstrap container This is only
++                                  for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               caCertPath:
+                                 description: 'CACertPath is the path to the SSL certificate
+                                   authority used to secure comunications between node
+@@ -2230,6 +2298,37 @@ spec:
+                                       by referencing a secret.
+                                     type: string
+                                 type: object
++                              pause:
++                                description: Pause holds the image source for pause
++                                  container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
++                              proxy:
++                                description: Proxy holds the https and no proxy information
++                                  This is only for bottlerocket
++                                properties:
++                                  httpsProxy:
++                                    description: HTTPS proxy
++                                    type: string
++                                  noProxy:
++                                    description: No proxy, list of ips that should
++                                      not use proxy
++                                    items:
++                                      type: string
++                                    type: array
++                                type: object
+                               skipPhases:
+                                 description: SkipPhases is a list of phases to skip
+                                   during command execution. The list of phases can
+diff --git a/go.mod b/go.mod
+index d8509544b..8117ae43e 100644
+--- a/go.mod
++++ b/go.mod
+@@ -32,6 +32,7 @@ require (
+ 	golang.org/x/net v0.13.0 // indirect
+ 	golang.org/x/oauth2 v0.6.0
+ 	google.golang.org/grpc v1.55.0
++	gopkg.in/yaml.v2 v2.4.0
+ 	k8s.io/api v0.26.1
+ 	k8s.io/apiextensions-apiserver v0.26.1
+ 	k8s.io/apimachinery v0.26.1
+@@ -133,7 +134,6 @@ require (
+ 	google.golang.org/protobuf v1.30.0 // indirect
+ 	gopkg.in/inf.v0 v0.9.1 // indirect
+ 	gopkg.in/ini.v1 v1.67.0 // indirect
+-	gopkg.in/yaml.v2 v2.4.0 // indirect
+ 	gopkg.in/yaml.v3 v3.0.1 // indirect
+ 	k8s.io/cli-runtime v0.25.0 // indirect
+ 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
+-- 
+2.34.1
+
