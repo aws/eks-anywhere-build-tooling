@@ -1,4 +1,4 @@
-From c8011909f0200ac5683f235f790f68f7874045e1 Mon Sep 17 00:00:00 2001
+From 2242003870df9e80b7b5d44a839424db5d4be9f4 Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Tue, 31 Aug 2021 15:56:28 +0000
 Subject: [PATCH 05/36] Make pause and bottlerocket bootstrap images updatable
@@ -11,19 +11,19 @@ cr: https://code.amazon.com/reviews/CR-56335855
  2 files changed, 41 insertions(+)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index f07738674..263bda967 100644
+index 633a1f7d1..639501310 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-@@ -139,6 +139,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+@@ -140,6 +140,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) (admission.War
  	// For example, {"spec", "*"} will allow any path under "spec" to change.
  	allowedPaths := [][]string{
  		{"metadata", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
+ 		{spec, kubeadmConfigSpec, "useExperimentalRetryJoin"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs"},
-@@ -161,6 +163,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+@@ -163,6 +165,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) (admission.War
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, patches, directory},
  		{spec, kubeadmConfigSpec, joinConfiguration, skipPhases},
@@ -33,10 +33,10 @@ index f07738674..263bda967 100644
  		{spec, kubeadmConfigSpec, postKubeadmCommands},
  		{spec, kubeadmConfigSpec, files},
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-index 6ae774051..86c02c2e5 100644
+index b5d678d89..38946192d 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-@@ -647,6 +647,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -649,6 +649,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  		Directory: "/tmp/patches",
  	}
  
@@ -55,9 +55,9 @@ index 6ae774051..86c02c2e5 100644
  	updateInitConfigurationSkipPhases := before.DeepCopy()
  	updateInitConfigurationSkipPhases.Spec.KubeadmConfigSpec.InitConfiguration.SkipPhases = []string{"addon/kube-proxy"}
  
-@@ -1014,6 +1026,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
- 			before:                before,
- 			kcp:                   switchFromCloudInitToIgnition,
+@@ -1027,6 +1039,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before:    beforeUseExperimentalRetryJoin,
+ 			kcp:       updateUseExperimentalRetryJoin,
  		},
 +		{
 +			name:      "should allow changes to cluster configuration pause image",
@@ -86,7 +86,7 @@ index 6ae774051..86c02c2e5 100644
  	}
  
  	for _, tt := range tests {
-@@ -1192,6 +1228,7 @@ func TestValidateVersion(t *testing.T) {
+@@ -1206,6 +1242,7 @@ func TestValidateVersion(t *testing.T) {
  		})
  	}
  }
@@ -95,5 +95,5 @@ index 6ae774051..86c02c2e5 100644
  	before := &KubeadmControlPlane{
  		ObjectMeta: metav1.ObjectMeta{
 -- 
-2.39.2
+2.37.3
 

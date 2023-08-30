@@ -1,4 +1,4 @@
-From 29d2da31077e2ace33144a2f7416801768b1c2ee Mon Sep 17 00:00:00 2001
+From b17cf0615ab4523c5aff2c9549b223cc6d4ac80c Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
 Subject: [PATCH 03/36] Unstacked etcd and controlplane upgrade
@@ -63,10 +63,10 @@ index 58ef4a74e..1c7d411bd 100644
  
  // MachineAddressType describes a valid MachineAddress type.
 diff --git a/api/v1beta1/common_types.go b/api/v1beta1/common_types.go
-index 947ce108c..a557464fc 100644
+index 6edc7e5be..cccc154b6 100644
 --- a/api/v1beta1/common_types.go
 +++ b/api/v1beta1/common_types.go
-@@ -142,6 +142,9 @@ const (
+@@ -154,6 +154,9 @@ const (
  	// will receive the resulting object.
  	TopologyDryRunAnnotation = "topology.cluster.x-k8s.io/dry-run"
  
@@ -152,10 +152,10 @@ index e9870d34c..adc1b2a0a 100644
  
  const (
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index 098de41e6..8bc588429 100644
+index 14409355c..6c9540a3f 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
-@@ -196,12 +196,35 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -197,12 +197,35 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  		sort.Strings(currentEtcdEndpoints)
  		currentKCPEndpoints := kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints
  		if !reflect.DeepEqual(currentEtcdEndpoints, currentKCPEndpoints) {
@@ -190,8 +190,8 @@ index 098de41e6..8bc588429 100644
 +		}
  	}
  
- 	// Add finalizer first if not exist to avoid the race condition between init and delete
-@@ -424,6 +447,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, cluster *
+ 	// Add finalizer first if not set to avoid the race condition between init and delete.
+@@ -449,6 +472,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
  		// NOTE: we are checking the condition already exists in order to avoid to set this condition at the first
  		// reconciliation/before a rolling upgrade actually starts.
  		if conditions.Has(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition) {
@@ -199,9 +199,9 @@ index 098de41e6..8bc588429 100644
 +				/* Once KCP upgrade has completed, the controller will annotate the external etcd object to indicate that the older KCP machines
 +				are no longer part of the cluster, and so any older out-of-date etcd members and machines can be deleted
 +				*/
-+				if cluster.Spec.ManagedExternalEtcdRef != nil {
-+					etcdRef := cluster.Spec.ManagedExternalEtcdRef
-+					externalEtcd, err := external.Get(ctx, r.Client, etcdRef, cluster.Namespace)
++				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef != nil {
++					etcdRef := controlPlane.Cluster.Spec.ManagedExternalEtcdRef
++					externalEtcd, err := external.Get(ctx, r.Client, etcdRef, controlPlane.Cluster.Namespace)
 +					if err != nil {
 +						return ctrl.Result{}, err
 +					}
@@ -218,21 +218,21 @@ index 098de41e6..8bc588429 100644
  		}
  	}
 diff --git a/controlplane/kubeadm/internal/controllers/upgrade.go b/controlplane/kubeadm/internal/controllers/upgrade.go
-index a3c0a6f8e..cde7f6ba0 100644
+index b1528283d..200a27174 100644
 --- a/controlplane/kubeadm/internal/controllers/upgrade.go
 +++ b/controlplane/kubeadm/internal/controllers/upgrade.go
-@@ -102,6 +102,12 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
+@@ -99,6 +99,12 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
  		}
  	}
  
-+	if kcp.Spec.KubeadmConfigSpec.ClusterConfiguration != nil && kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External != nil {
-+		if err := workloadCluster.UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints, parsedVersion); err != nil {
++	if controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration != nil && controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External != nil {
++		if err := workloadCluster.UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx, controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints, parsedVersion); err != nil {
 +			return ctrl.Result{}, errors.Wrap(err, "failed to update the external etcd endpoints in the kubeadm config map")
 +		}
 +	}
 +
- 	if kcp.Spec.KubeadmConfigSpec.ClusterConfiguration != nil {
- 		if err := workloadCluster.UpdateAPIServerInKubeadmConfigMap(ctx, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer, parsedVersion); err != nil {
+ 	if controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration != nil {
+ 		if err := workloadCluster.UpdateAPIServerInKubeadmConfigMap(ctx, controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer, parsedVersion); err != nil {
  			return ctrl.Result{}, errors.Wrap(err, "failed to update api server in the kubeadm config map")
 diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
 index 4112106f5..329ae81b1 100644
@@ -274,7 +274,7 @@ index 3b3662a29..6c814656e 100644
  // Removing the last remaining member of the cluster is not supported.
  func (w *Workload) RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error {
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 9572a8ebd..7f2a32379 100644
+index 590967dd6..2ad53385e 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -355,10 +355,12 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv
@@ -295,5 +295,5 @@ index 9572a8ebd..7f2a32379 100644
  	}
  
 -- 
-2.39.2
+2.37.3
 

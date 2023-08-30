@@ -1,4 +1,4 @@
-From 26064de942ed31af6fec2c932b364eb870aaa7e7 Mon Sep 17 00:00:00 2001
+From 9a98a15553e15399bbcbe0e754d7ce28b6d56d7d Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Fri, 11 Jun 2021 10:43:09 -0700
 Subject: [PATCH 01/36] Adding capi support for Bottlerocket
@@ -77,7 +77,7 @@ index e1f023426..1c95079f7 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
-index 843ca08ed..6daf0dd64 100644
+index ffca6a5a5..f0577f74e 100644
 --- a/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
 +++ b/bootstrap/kubeadm/api/v1alpha3/kubeadmconfig_types.go
 @@ -24,12 +24,15 @@ import (
@@ -199,7 +199,7 @@ index fc6ebee0d..079b96fe7 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index d4b6ce502..c9a3c1cea 100644
+index a24d72abc..c95422c6b 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -103,6 +103,21 @@ spec:
@@ -447,7 +447,7 @@ index d4b6ce502..c9a3c1cea 100644
                      description: SkipPhases is a list of phases to skip during command
                        execution. The list of phases can be obtained with the "kubeadm
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 2899e336a..348bc8362 100644
+index e8b897862..983e3788a 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -111,6 +111,22 @@ spec:
@@ -1152,10 +1152,10 @@ index c2f158f7c..aaf8c5dc0 100644
  	if input.UseExperimentalRetry {
  		input.KubeadmCommand = retriableJoinScriptName
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 4376845b1..2ac572c92 100644
+index 53eb5c4c8..9dc3d19c1 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -42,6 +42,7 @@ import (
+@@ -41,6 +41,7 @@ import (
  
  	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
  	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
@@ -1163,7 +1163,7 @@ index 4376845b1..2ac572c92 100644
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/ignition"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/locking"
-@@ -432,6 +433,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -439,6 +440,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  	// injects into config.ClusterConfiguration values from top level object
  	r.reconcileTopLevelObjectSettings(ctx, scope.Cluster, machine, scope.Config)
  
@@ -1210,7 +1210,7 @@ index 4376845b1..2ac572c92 100644
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
  	if err != nil {
  		scope.Error(err, "Failed to marshal cluster configuration")
-@@ -501,6 +542,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -510,6 +551,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  			ControlPlaneInput: controlPlaneInput,
  			Ignition:          scope.Config.Spec.Ignition,
  		})
@@ -1223,7 +1223,7 @@ index 4376845b1..2ac572c92 100644
  	default:
  		bootstrapInitData, err = cloudinit.NewInitControlPlane(controlPlaneInput)
  	}
-@@ -608,6 +655,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -618,6 +665,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  			NodeInput: nodeInput,
  			Ignition:  scope.Config.Spec.Ignition,
  		})
@@ -1243,7 +1243,7 @@ index 4376845b1..2ac572c92 100644
  	default:
  		bootstrapJoinData, err = cloudinit.NewNode(nodeInput)
  	}
-@@ -711,6 +771,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -722,6 +782,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  			ControlPlaneJoinInput: controlPlaneJoinInput,
  			Ignition:              scope.Config.Spec.Ignition,
  		})
@@ -1428,7 +1428,7 @@ index 2eebc2402..e924a4a4b 100644
 +	return out
 +}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 94952c5cd..f7418dfa5 100644
+index f9ac22eb3..5b20fb215 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -178,6 +178,22 @@ spec:
@@ -1688,7 +1688,7 @@ index 94952c5cd..f7418dfa5 100644
                          description: SkipPhases is a list of phases to skip during
                            command execution. The list of phases can be obtained with
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 4e182d911..5a1623e9f 100644
+index 1a6d560e9..68484236f 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -1309,6 +1309,24 @@ spec:
@@ -1826,25 +1826,25 @@ index 4e182d911..5a1623e9f 100644
                                  description: SkipPhases is a list of phases to skip
                                    during command execution. The list of phases can
 diff --git a/go.mod b/go.mod
-index 7fce6267e..20883a1cd 100644
+index 347b9c697..4c653ad98 100644
 --- a/go.mod
 +++ b/go.mod
-@@ -32,6 +32,7 @@ require (
- 	golang.org/x/net v0.8.0 // indirect
- 	golang.org/x/oauth2 v0.6.0
+@@ -33,6 +33,7 @@ require (
+ 	golang.org/x/net v0.13.0 // indirect
+ 	golang.org/x/oauth2 v0.10.0
  	google.golang.org/grpc v1.55.0
 +	gopkg.in/yaml.v2 v2.4.0
- 	k8s.io/api v0.26.1
- 	k8s.io/apiextensions-apiserver v0.26.1
- 	k8s.io/apimachinery v0.26.1
+ 	k8s.io/api v0.27.2
+ 	k8s.io/apiextensions-apiserver v0.27.2
+ 	k8s.io/apimachinery v0.27.2
 @@ -133,7 +134,6 @@ require (
- 	google.golang.org/protobuf v1.30.0 // indirect
+ 	google.golang.org/protobuf v1.31.0 // indirect
  	gopkg.in/inf.v0 v0.9.1 // indirect
  	gopkg.in/ini.v1 v1.67.0 // indirect
 -	gopkg.in/yaml.v2 v2.4.0 // indirect
  	gopkg.in/yaml.v3 v3.0.1 // indirect
- 	k8s.io/cli-runtime v0.25.0 // indirect
- 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
+ 	k8s.io/cli-runtime v0.27.2 // indirect
+ 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f
 -- 
-2.39.2
+2.37.3
 
