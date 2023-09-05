@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	eksaVersion string
+	eksaVersion         string
 	eksaReleaseManifest string
-	codebuild   = os.Getenv(codebuildCIEnvVar)
+	codebuild           = os.Getenv(codebuildCIEnvVar)
 )
 
 func (b *BuildOptions) BuildImage() {
@@ -29,7 +29,7 @@ func (b *BuildOptions) BuildImage() {
 		// Clean up build tooling repo in cwd
 		cleanup(buildToolingRepoPath)
 	}
-	
+
 	gitCommitFromBundle, detectedEksaVersion, err := b.getGitCommitFromBundle()
 	if err != nil {
 		log.Fatalf("Error getting git commit from bundle: %v", err)
@@ -62,7 +62,7 @@ func (b *BuildOptions) BuildImage() {
 	var outputArtifactPath string
 	var outputImageGlob []string
 	commandEnvVars := []string{
-		fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel), 
+		fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel),
 		fmt.Sprintf("%s=%s", eksAReleaseVersionEnvVar, detectedEksaVersion),
 		fmt.Sprintf("%s=%s", eksAReleaseManifestURLEnvVar, getEksAReleasesManifestURL()),
 	}
@@ -111,6 +111,13 @@ func (b *BuildOptions) BuildImage() {
 		commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerAdditionalFilesConfigFileEnvVar, additionalFilesConfigFile))
 	}
 	if b.Hypervisor == VSphere {
+		// Set proxy on RHSM if available
+		if b.Os == RedHat && b.VsphereConfig.HttpProxy != "" {
+			if err := setRhsmProxy(&b.VsphereConfig.ProxyConfig, &b.VsphereConfig.RhsmConfig); err != nil {
+				log.Fatalf("Error parsing proxy host and port for RHSM: %v", err)
+			}
+		}
+
 		// Read and set the vsphere connection data
 		vsphereConfigData, err := json.Marshal(b.VsphereConfig)
 		if err != nil {
@@ -134,6 +141,8 @@ func (b *BuildOptions) BuildImage() {
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.VsphereConfig.RhelUsername),
 				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.VsphereConfig.RhelPassword),
+				fmt.Sprintf("%s=%s", rhsmActivationKeyEnvVar, b.VsphereConfig.ActivationKey),
+				fmt.Sprintf("%s=%s", rhsmOrgIDEnvVar, b.VsphereConfig.OrgId),
 			)
 		}
 
@@ -151,6 +160,13 @@ func (b *BuildOptions) BuildImage() {
 
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == Baremetal {
+		// Set proxy on RHSM if available
+		if b.Os == RedHat && b.BaremetalConfig.HttpProxy != "" {
+			if err := setRhsmProxy(&b.BaremetalConfig.ProxyConfig, &b.BaremetalConfig.RhsmConfig); err != nil {
+				log.Fatalf("Error parsing proxy host and port for RHSM: %v", err)
+			}
+		}
+
 		baremetalConfigFile := filepath.Join(imageBuilderProjectPath, packerBaremetalConfigFile)
 		if b.BaremetalConfig != nil {
 			baremetalConfigData, err := json.Marshal(b.BaremetalConfig)
@@ -172,6 +188,8 @@ func (b *BuildOptions) BuildImage() {
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.BaremetalConfig.RhelUsername),
 				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.BaremetalConfig.RhelPassword),
+				fmt.Sprintf("%s=%s", rhsmActivationKeyEnvVar, b.BaremetalConfig.ActivationKey),
+				fmt.Sprintf("%s=%s", rhsmOrgIDEnvVar, b.BaremetalConfig.OrgId),
 			)
 		}
 		if b.BaremetalConfig != nil {
@@ -214,6 +232,13 @@ func (b *BuildOptions) BuildImage() {
 
 		log.Printf("Image Build Successful\n Please find the image uploaded under Nutanix Image Service with name %s\n", b.NutanixConfig.ImageName)
 	} else if b.Hypervisor == CloudStack {
+		// Set proxy on RHSM if available
+		if b.Os == RedHat && b.CloudstackConfig.HttpProxy != "" {
+			if err := setRhsmProxy(&b.CloudstackConfig.ProxyConfig, &b.CloudstackConfig.RhsmConfig); err != nil {
+				log.Fatalf("Error parsing proxy host and port for RHSM: %v", err)
+			}
+		}
+
 		// Create config file
 		cloudstackConfigFile := filepath.Join(imageBuilderProjectPath, packerCloudStackConfigFile)
 
@@ -239,6 +264,8 @@ func (b *BuildOptions) BuildImage() {
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.CloudstackConfig.RhelUsername),
 				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.CloudstackConfig.RhelPassword),
+				fmt.Sprintf("%s=%s", rhsmActivationKeyEnvVar, b.CloudstackConfig.ActivationKey),
+				fmt.Sprintf("%s=%s", rhsmOrgIDEnvVar, b.CloudstackConfig.OrgId),
 			)
 		}
 		if b.CloudstackConfig != nil {
@@ -296,6 +323,6 @@ func (b *BuildOptions) BuildImage() {
 	}
 
 	cleanup(buildToolingRepoPath)
-	
+
 	log.Print("Build Successful. Output artifacts located at current working directory\n")
 }

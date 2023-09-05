@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -212,20 +214,48 @@ func getEksAReleasesManifestURL() string {
 		if eksaReleaseManifest != "" {
 			return eksaReleaseManifest
 		}
-		
+
 		return prodEksaReleaseManifestURL
 	}
-		
+
 	// using a dev release, allow branch_name env var to
 	// override manifest url
 	branchName, ok := os.LookupEnv(branchNameEnvVar)
 	if !ok {
 		branchName = mainBranch
-	}		
+	}
 
 	if branchName != mainBranch {
-		return fmt.Sprintf(devBranchEksaReleaseManifestURL, branchName)		
-	} 
-	
-	return devEksaReleaseManifestURL	
+		return fmt.Sprintf(devBranchEksaReleaseManifestURL, branchName)
+	}
+
+	return devEksaReleaseManifestURL
+}
+
+// setRhsmProxy takes the proxy config, parses it and sets the appropriate config on rhsm config
+func setRhsmProxy(proxy *ProxyConfig, rhsm *RhsmConfig) error {
+	if proxy.HttpProxy != "" {
+		host, port, err := parseUrl(proxy.HttpProxy)
+		if err != nil {
+			return err
+		}
+		rhsm.ProxyHostname = host
+		rhsm.ProxyPort = port
+	}
+
+	return nil
+}
+
+// parseUrl takes a http endpoint and returns hostname, ports and error
+func parseUrl(endpoint string) (string, string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", "", err
+	}
+
+	host, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return "", "", err
+	}
+	return host, port, nil
 }

@@ -147,7 +147,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				return err
 			}
 			if bo.Os == builder.RedHat {
-				if err = validateRedhat(bo.VsphereConfig.RhelUsername, bo.VsphereConfig.RhelPassword, bo.VsphereConfig.IsoUrl); err != nil {
+				if err = validateRedhat(&bo.VsphereConfig.RhelConfig, bo.VsphereConfig.IsoUrl); err != nil {
 					return err
 				}
 			}
@@ -156,12 +156,15 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 					return err
 				}
 			}
+			if err = validateRHSM(bo.Os, &bo.VsphereConfig.RhsmConfig); err != nil {
+				return err
+			}
 		case builder.Baremetal:
 			if err = json.Unmarshal(config, &bo.BaremetalConfig); err != nil {
 				return err
 			}
 			if bo.Os == builder.RedHat {
-				if err = validateRedhat(bo.BaremetalConfig.RhelUsername, bo.BaremetalConfig.RhelPassword, bo.BaremetalConfig.IsoUrl); err != nil {
+				if err = validateRedhat(&bo.BaremetalConfig.RhelConfig, bo.BaremetalConfig.IsoUrl); err != nil {
 					return err
 				}
 			}
@@ -169,6 +172,9 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				if err = validateCustomIso(bo.BaremetalConfig.IsoChecksum, bo.BaremetalConfig.IsoChecksumType); err != nil {
 					return err
 				}
+			}
+			if err = validateRHSM(bo.Os, &bo.BaremetalConfig.RhsmConfig); err != nil {
+				return err
 			}
 		case builder.Nutanix:
 			if err = json.Unmarshal(config, &bo.NutanixConfig); err != nil {
@@ -184,7 +190,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				return err
 			}
 			if bo.Os == builder.RedHat {
-				if err = validateRedhat(bo.CloudstackConfig.RhelUsername, bo.CloudstackConfig.RhelPassword, bo.CloudstackConfig.IsoUrl); err != nil {
+				if err = validateRedhat(&bo.CloudstackConfig.RhelConfig, bo.CloudstackConfig.IsoUrl); err != nil {
 					return err
 				}
 			}
@@ -192,6 +198,9 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				if err = validateCustomIso(bo.CloudstackConfig.IsoChecksum, bo.CloudstackConfig.IsoChecksumType); err != nil {
 					return err
 				}
+			}
+			if err = validateRHSM(bo.Os, &bo.CloudstackConfig.RhsmConfig); err != nil {
+				return err
 			}
 		case builder.AMI:
 			// Default configuration for AMI builds
@@ -260,9 +269,28 @@ func validateOSHypervisorCombinations(os, hypervisor string) error {
 	return nil
 }
 
-func validateRedhat(rhelUsername, rhelPassword, isoUrl string) error {
-	if rhelUsername == "" || rhelPassword == "" {
-		return fmt.Errorf("\"rhel_username\" and \"rhel_password\" are required fields in config when os is redhat")
+func validateRHSM(os string, rhsmConfig *builder.RhsmConfig) error {
+	if rhsmConfig.ServerHostname != "" {
+		if os != builder.RedHat {
+			return fmt.Errorf("RedHat Subscription Manager Config (RHSM) cannot be provided when OS is not RedHat")
+		}
+
+		if rhsmConfig.ServerReleaseVersion == "" {
+			return fmt.Errorf("RHSM version required when satelite server hostname is set for RHSM")
+		}
+
+		if rhsmConfig.ActivationKey == "" || rhsmConfig.OrgId == "" {
+			return fmt.Errorf("Activation key and Org ID are required to use RHSM with satellite")
+		}
+	}
+	return nil
+}
+
+func validateRedhat(rhelConfig *builder.RhelConfig, isoUrl string) error {
+	if rhelConfig.ServerHostname == "" {
+		if rhelConfig.RhelUsername == "" || rhelConfig.RhelPassword == "" {
+			return fmt.Errorf("\"rhel_username\" and \"rhel_password\" are required fields in config when os is redhat")
+		}
 	}
 	if isoUrl == "" {
 		return fmt.Errorf("\"iso_url\" is a required field in config when os is redhat")

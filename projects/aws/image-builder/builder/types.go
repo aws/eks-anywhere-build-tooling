@@ -69,6 +69,7 @@ type VsphereConfig struct {
 	AdditionalFiles    []File `json:"files"`
 	IsoConfig
 	RhelConfig
+	ProxyConfig
 	ExtraPackagesConfig
 }
 
@@ -76,6 +77,7 @@ type BaremetalConfig struct {
 	AdditionalFiles []File `json:"files"`
 	IsoConfig
 	RhelConfig
+	ProxyConfig
 	ExtraPackagesConfig
 }
 
@@ -83,6 +85,7 @@ type CloudstackConfig struct {
 	AnsibleUserVars string `json:"ansible_user_vars"`
 	IsoConfig
 	RhelConfig
+	ProxyConfig
 	ExtraPackagesConfig
 }
 
@@ -95,6 +98,8 @@ type IsoConfig struct {
 type RhelConfig struct {
 	RhelUsername string `json:"rhel_username"`
 	RhelPassword string `json:"rhel_password"`
+
+	RhsmConfig
 }
 
 type NutanixConfig struct {
@@ -107,6 +112,7 @@ type NutanixConfig struct {
 	NutanixUserName   string `json:"nutanix_username"`
 	NutanixPassword   string `json:"nutanix_password"`
 	NutanixSubnetName string `json:"nutanix_subnet_name"`
+	ProxyConfig
 	ExtraPackagesConfig
 }
 
@@ -122,6 +128,7 @@ type AMIConfig struct {
 	VolumeSize          string `json:"volume_size"`
 	VolumeType          string `json:"volume_type"`
 
+	ProxyConfig
 	ExtraPackagesConfig
 }
 
@@ -129,4 +136,21 @@ type ExtraPackagesConfig struct {
 	ExtraDebs  string `json:"extra_debs,omitempty"`
 	ExtraRepos string `json:"extra_repos,omitempty"`
 	ExtraRpms  string `json:"extra_rpms,omitempty"`
+}
+
+type ProxyConfig struct {
+	HttpProxy  string `json:"http_proxy,omitempty"`
+	HttpsProxy string `json:"https_proxy,omitempty"`
+
+	// This can be set to a comma-delimited list of domains that should be excluded from proxying
+	NoProxy string `json:"no_proxy,omitempty"`
+}
+
+type RhsmConfig struct {
+	ProxyHostname        string `json:"rhsm_server_proxy_hostname,omitempty"`
+	ProxyPort            string `json:"rhsm_server_proxy_port,omitempty"`
+	ServerHostname       string `json:"rhsm_server_hostname,omitempty"`
+	ServerReleaseVersion string `json:"rhsm_server_release_version,omitempty"`
+	ActivationKey        string `json:"rhsm_activation_key,omitempty"`
+	OrgId                string `json:"rhsm_org_id,omitempty"`
 }
