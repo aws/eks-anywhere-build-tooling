@@ -23,9 +23,12 @@ ARTIFACTS_PATH="$3"
 TAG="$4"
 IMAGE_REPO="$5"
 IMAGE_TAG="$6"
+GOLANG_VERSION="$6"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
+
+build::common::use_go_version ${GOLANG_VERSION}
 
 cd $REPO
 
