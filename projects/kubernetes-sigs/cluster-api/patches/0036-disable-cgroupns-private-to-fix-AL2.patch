@@ -1,4 +1,4 @@
-From be2cbf0bc0f887c9c230d061be380c349fc06261 Mon Sep 17 00:00:00 2001
+From 9cc0f2b3429cfe29f4dd1fbc30f6ec12a9f691d3 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Sat, 19 Aug 2023 09:35:39 -0500
 Subject: [PATCH 36/36] disable cgroupns=private to fix AL2
@@ -8,10 +8,10 @@ Subject: [PATCH 36/36] disable cgroupns=private to fix AL2
  1 file changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/test/infrastructure/container/docker.go b/test/infrastructure/container/docker.go
-index 8030a4f26..dba7945b7 100644
+index f2de71416..e06e2f3fb 100644
 --- a/test/infrastructure/container/docker.go
 +++ b/test/infrastructure/container/docker.go
-@@ -40,7 +40,6 @@ import (
+@@ -41,7 +41,6 @@ import (
  	"k8s.io/utils/pointer"
  
  	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -19,7 +19,7 @@ index 8030a4f26..dba7945b7 100644
  )
  
  const (
-@@ -405,9 +404,11 @@ func (d *dockerRuntime) RunContainer(ctx context.Context, runConfig *RunContaine
+@@ -411,9 +410,11 @@ func (d *dockerRuntime) RunContainer(ctx context.Context, runConfig *RunContaine
  	networkConfig := network.NetworkingConfig{}
  
  	// NOTE: starting from Kind 0.20 kind requires CgroupnsMode to be set to private.
@@ -32,8 +32,8 @@ index 8030a4f26..dba7945b7 100644
 +	// 	hostConfig.CgroupnsMode = "private"
 +	// }
  
- 	if runConfig.IPFamily == clusterv1.IPv6IPFamily {
+ 	if runConfig.IPFamily == clusterv1.IPv6IPFamily || runConfig.IPFamily == clusterv1.DualStackIPFamily {
  		hostConfig.Sysctls = map[string]string{
 -- 
-2.34.1
+2.42.0
 

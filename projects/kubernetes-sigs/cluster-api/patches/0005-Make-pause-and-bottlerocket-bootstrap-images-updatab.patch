@@ -1,4 +1,4 @@
-From afb41ed7f1590eeb3726614e31ddecc25acf97e3 Mon Sep 17 00:00:00 2001
+From 42fab735e575e90e5cfe7964225c7152370bafde Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Tue, 31 Aug 2021 15:56:28 +0000
 Subject: [PATCH 05/36] Make pause and bottlerocket bootstrap images updatable
@@ -11,10 +11,10 @@ cr: https://code.amazon.com/reviews/CR-56335855
  2 files changed, 41 insertions(+)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index 88293c005..15b2301e3 100644
+index 633a1f7d1..3d2e056ea 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-@@ -140,6 +140,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+@@ -141,6 +141,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) (admission.War
  	allowedPaths := [][]string{
  		{"metadata", "*"},
  		{spec, kubeadmConfigSpec, "useExperimentalRetryJoin"},
@@ -23,7 +23,7 @@ index 88293c005..15b2301e3 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs"},
-@@ -162,6 +164,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+@@ -163,6 +165,8 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) (admission.War
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, patches, directory},
  		{spec, kubeadmConfigSpec, joinConfiguration, skipPhases},
@@ -33,10 +33,10 @@ index 88293c005..15b2301e3 100644
  		{spec, kubeadmConfigSpec, postKubeadmCommands},
  		{spec, kubeadmConfigSpec, files},
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-index a1d85d452..3eaa8e8f0 100644
+index b5d678d89..38946192d 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook_test.go
-@@ -647,6 +647,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -649,6 +649,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  		Directory: "/tmp/patches",
  	}
  
@@ -55,7 +55,7 @@ index a1d85d452..3eaa8e8f0 100644
  	updateInitConfigurationSkipPhases := before.DeepCopy()
  	updateInitConfigurationSkipPhases.Spec.KubeadmConfigSpec.InitConfiguration.SkipPhases = []string{"addon/kube-proxy"}
  
-@@ -1025,6 +1037,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1027,6 +1039,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    beforeUseExperimentalRetryJoin,
  			kcp:       updateUseExperimentalRetryJoin,
  		},
@@ -86,7 +86,7 @@ index a1d85d452..3eaa8e8f0 100644
  	}
  
  	for _, tt := range tests {
-@@ -1203,6 +1239,7 @@ func TestValidateVersion(t *testing.T) {
+@@ -1206,6 +1242,7 @@ func TestValidateVersion(t *testing.T) {
  		})
  	}
  }
@@ -95,5 +95,5 @@ index a1d85d452..3eaa8e8f0 100644
  	before := &KubeadmControlPlane{
  		ObjectMeta: metav1.ObjectMeta{
 -- 
-2.34.1
+2.42.0
 
