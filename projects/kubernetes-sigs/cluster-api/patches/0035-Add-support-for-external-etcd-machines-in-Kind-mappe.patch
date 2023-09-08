@@ -1,16 +1,30 @@
-From 7e4d97db5b757fc3ed5bc447ece4e0010e0ddc8b Mon Sep 17 00:00:00 2001
+From 63e2c2082b3fe6940de33ed610f248b602813e00 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 16 Aug 2023 19:58:01 -0700
 Subject: [PATCH 35/36] Add support for external etcd machines in Kind mapper
 
 ---
+ .../client/cluster/objectgraph_test.go        |  2 +-
  .../docker/exp/internal/docker/nodepool.go    |  4 +-
  .../controllers/dockermachine_controller.go   | 13 ++--
  .../docker/internal/docker/machine.go         | 69 +++++++++++++------
- 3 files changed, 54 insertions(+), 32 deletions(-)
+ 4 files changed, 55 insertions(+), 33 deletions(-)
 
+diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
+index ffd6439e8..739e163b4 100644
+--- a/cmd/clusterctl/client/cluster/objectgraph_test.go
++++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
+@@ -1942,7 +1942,7 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+ 		{
+ 			name: "two clusters with external force object, read only 1 cluster & both external objects",
+ 			args: args{
+-				cluster: "cluster1", // read only from ns1
++				namespace: "ns1", // read only from ns1
+ 				objs: func() []client.Object {
+ 					objs := []client.Object{}
+ 					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
 diff --git a/test/infrastructure/docker/exp/internal/docker/nodepool.go b/test/infrastructure/docker/exp/internal/docker/nodepool.go
-index 1a46d283a..9e1705cac 100644
+index 08683dea8..b8cb3cb1d 100644
 --- a/test/infrastructure/docker/exp/internal/docker/nodepool.go
 +++ b/test/infrastructure/docker/exp/internal/docker/nodepool.go
 @@ -219,7 +219,7 @@ func (np *NodePool) addMachine(ctx context.Context) error {
@@ -32,10 +46,10 @@ index 1a46d283a..9e1705cac 100644
  			}
  			// Check for bootstrap success
 diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-index decaafda4..00cbe0d39 100644
+index 5905e95f2..2350ffb13 100644
 --- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 +++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-@@ -252,7 +252,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -255,7 +255,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
  	if !externalMachine.Exists() {
  		// NOTE: FailureDomains don't mean much in CAPD since it's all local, but we are setting a label on
  		// each container, so we can check placement.
@@ -44,7 +58,7 @@ index decaafda4..00cbe0d39 100644
  			return ctrl.Result{}, errors.Wrap(err, "failed to create worker DockerMachine")
  		}
  	}
-@@ -332,7 +332,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -335,7 +335,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
  			}()
  
  			// Run the bootstrap script. Simulates cloud-init/Ignition.
@@ -53,7 +67,7 @@ index decaafda4..00cbe0d39 100644
  				conditions.MarkFalse(dockerMachine, infrav1.BootstrapExecSucceededCondition, infrav1.BootstrapFailedReason, clusterv1.ConditionSeverityWarning, "Repeating bootstrap")
  				return ctrl.Result{}, errors.Wrap(err, "failed to exec DockerMachine bootstrap")
  			}
-@@ -361,12 +361,12 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -364,12 +364,12 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
  	// Machine will never get a node ref as ProviderID is required to set the node ref, so we would get a deadlock.
  	if cluster.Spec.ControlPlaneRef != nil &&
  		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) &&
@@ -68,8 +82,8 @@ index decaafda4..00cbe0d39 100644
  		// Usually a cloud provider will do this, but there is no docker-cloud provider.
  		// Requeue if there is an error, as this is likely momentary load balancer
  		// state changes during control plane provisioning.
-@@ -534,8 +534,3 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
- 	}
+@@ -539,8 +539,3 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
+ 
  	return nil
  }
 -
@@ -78,18 +92,18 @@ index decaafda4..00cbe0d39 100644
 -	return ok
 -}
 diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
-index 12bda2cb2..d36e122ca 100644
+index c65c9a882..f37071c2d 100644
 --- a/test/infrastructure/docker/internal/docker/machine.go
 +++ b/test/infrastructure/docker/internal/docker/machine.go
-@@ -47,6 +47,7 @@ import (
+@@ -48,6 +48,7 @@ import (
  	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/provisioning/ignition"
  	"sigs.k8s.io/cluster-api/test/infrastructure/kind"
  	"sigs.k8s.io/cluster-api/util/patch"
 +	versionutil "sigs.k8s.io/cluster-api/util/version"
  )
  
- type nodeCreator interface {
-@@ -192,23 +193,35 @@ func (m *Machine) ContainerImage() string {
+ var (
+@@ -201,23 +202,35 @@ func (m *Machine) ContainerImage() string {
  }
  
  // Create creates a docker container hosting a Kubernetes node.
@@ -136,7 +150,7 @@ index 12bda2cb2..d36e122ca 100644
  		}
  
  		kindMapping := kind.GetMapping(semVer, image)
-@@ -320,23 +333,37 @@ func (m *Machine) PreloadLoadImages(ctx context.Context, images []string) error
+@@ -329,23 +342,37 @@ func (m *Machine) PreloadLoadImages(ctx context.Context, images []string) error
  }
  
  // ExecBootstrap runs bootstrap on a node, this is generally `kubeadm <init|join>`.
@@ -185,5 +199,5 @@ index 12bda2cb2..d36e122ca 100644
  
  	kindMapping := kind.GetMapping(semVer, image)
 -- 
-2.34.1
+2.42.0
 
