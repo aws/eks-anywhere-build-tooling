@@ -44,7 +44,7 @@ cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
 
 .PHONY: create-manifests
 create-manifests: tarballs
-	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
+	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
 
 $(FIX_LICENSES_GO_JSON_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The ajeddeloh/go-json dependency github repo does not have a license, however it redirects to coreos/go-json repo
