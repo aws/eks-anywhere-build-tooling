@@ -1,4 +1,4 @@
-From ee81b4261cbd94b7b21521de59180e169c7a94c8 Mon Sep 17 00:00:00 2001
+From ac1fb06eef70de7624e30cf195b01ac77542a66a Mon Sep 17 00:00:00 2001
 From: Abhinav <abhinavmpandey08@gmail.com>
 Date: Wed, 1 Feb 2023 16:34:23 -0800
 Subject: [PATCH 25/36] Add support for configuring NTP servers on bottlerocket
@@ -9,8 +9,8 @@ Signed-off-by: Abhinav <abhinavmpandey08@gmail.com>
  .../internal/bottlerocket/bootstrap.go        | 10 ++++++++++
  .../internal/bottlerocket/bootstrap_test.go   | 19 ++++++++++++++++++-
  .../internal/bottlerocket/bottlerocket.go     | 15 ++++++++++++---
- .../controllers/kubeadmconfig_controller.go   |  9 +++++++++
- 4 files changed, 49 insertions(+), 4 deletions(-)
+ .../controllers/kubeadmconfig_controller.go   | 10 +++++++++-
+ 4 files changed, 49 insertions(+), 5 deletions(-)
 
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index 58f38ca34..cd70d69a8 100644
@@ -138,10 +138,10 @@ index c37713406..05e441723 100644
  	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
  	if err != nil {
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index e0373ead5..b4474d27f 100644
+index f4d14d0e7..427dbab92 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -503,6 +503,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -493,6 +493,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		if len(scope.Config.Spec.InitConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = scope.Config.Spec.InitConfiguration.NodeRegistration.Taints
  		}
@@ -151,7 +151,7 @@ index e0373ead5..b4474d27f 100644
  
  	}
  
-@@ -719,6 +722,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -706,6 +709,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		if len(scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
  		}
@@ -161,7 +161,7 @@ index e0373ead5..b4474d27f 100644
  		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -856,6 +862,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -842,6 +848,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		if len(scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
  		}
@@ -171,6 +171,14 @@ index e0373ead5..b4474d27f 100644
  		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
+@@ -962,7 +971,6 @@ func (r *KubeadmConfigReconciler) resolveRegistryCredentials(ctx context.Context
+ 	return username, password, nil
+ }
+ 
+-
+ // ClusterToKubeadmConfigs is a handler.ToRequestsFunc to be used to enqueue
+ // requests for reconciliation of KubeadmConfigs.
+ func (r *KubeadmConfigReconciler) ClusterToKubeadmConfigs(o client.Object) []ctrl.Request {
 -- 
-2.42.0
+2.34.1
 
