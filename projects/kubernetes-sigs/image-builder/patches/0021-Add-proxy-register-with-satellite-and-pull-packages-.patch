@@ -1,0 +1,107 @@
+From 91143f2373965792a7ae883d6ee49ae8508892c0 Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Fri, 11 Aug 2023 11:59:20 -0500
+Subject: [PATCH] Add proxy, register with satellite, and pull packages from
+ satellite support to redhat subscription manager
+
+When pulling from satellite the os version must be set using `rhsm_server_release_version`
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+---
+ .../capi/ansible/roles/setup/tasks/redhat.yml | 68 +++++++++++++++++++
+ images/capi/packer/config/ansible-args.json   |  2 +-
+ 2 files changed, 69 insertions(+), 1 deletion(-)
+
+diff --git a/images/capi/ansible/roles/setup/tasks/redhat.yml b/images/capi/ansible/roles/setup/tasks/redhat.yml
+index 0961f37d4..345aeaa33 100644
+--- a/images/capi/ansible/roles/setup/tasks/redhat.yml
++++ b/images/capi/ansible/roles/setup/tasks/redhat.yml
+@@ -22,6 +22,74 @@
+     - ansible_distribution == "RedHat"
+     - lookup('env', 'RHSM_USER') | length > 0
+     - lookup('env', 'RHSM_PASS') | length > 0
++    - rhsm_server_hostname == ""
++    - rhsm_server_proxy_hostname == ""
++
++- name: RHEL subscription with proxy
++  redhat_subscription:
++    state: present
++    username: "{{ lookup('env', 'RHSM_USER') }}"
++    password: "{{ lookup('env', 'RHSM_PASS') }}"
++    auto_attach: true
++    server_proxy_hostname: "{{ rhsm_server_proxy_hostname | default(omit) }}"
++    server_proxy_port: "{{ rhsm_server_proxy_port | default(omit) }}"
++  when:
++    - ansible_distribution == "RedHat"
++    - lookup('env', 'RHSM_USER') | length > 0
++    - lookup('env', 'RHSM_PASS') | length > 0
++    - rhsm_server_hostname == ""
++    - rhsm_server_proxy_hostname != ""
++
++- name: Download Katello CA Consumer RPM from Satellite Server
++  get_url:
++    url: "http://{{ rhsm_server_hostname }}/pub/katello-ca-consumer-latest.noarch.rpm"
++    dest: /tmp/katello.rpm
++    mode: 0755
++    owner: root
++    group: root
++  when:
++    - ansible_distribution == "RedHat"
++    - rhsm_server_hostname != ""
++
++- name: Install Katello CA Consumer RPM from Satellite Server
++  yum:
++    name: /tmp/katello.rpm
++    state: present
++    disable_gpg_check: true
++    lock_timeout: 60
++  when:
++    - ansible_distribution == "RedHat"
++    - rhsm_server_hostname != ""
++
++- name: RHEL subscription with satellite using activation key
++  redhat_subscription:
++    state: present
++    activationkey: "{{ lookup('env', 'RHSM_ACTIVATION_KEY') }}"
++    org_id: "{{ lookup('env', 'RHSM_ORG_ID') }}"
++    server_hostname: "{{ rhsm_server_hostname | default(omit) }}"
++    release: "{{ rhsm_server_release_version }}"
++  when:
++    - ansible_distribution == "RedHat"
++    - lookup('env', 'RHSM_ACTIVATION_KEY') | length > 0
++    - lookup('env', 'RHSM_ORG_ID') | length > 0
++    - rhsm_server_hostname != ""
++    - rhsm_server_proxy_hostname == ""
++
++- name: RHEL subscription with satellite and proxy
++  redhat_subscription:
++    state: present
++    activationkey: "{{ lookup('env', 'RHSM_ACTIVATION_KEY') }}"
++    org_id: "{{ lookup('env', 'RHSM_ORG_ID') }}"
++    server_hostname: "{{ rhsm_server_hostname | default(omit) }}"
++    server_proxy_hostname: "{{ rhsm_server_proxy_hostname | default(omit) }}"
++    server_proxy_port: "{{ rhsm_server_proxy_port | default(omit) }}"
++    release: "{{ rhsm_server_release_version }}"
++  when:
++    - ansible_distribution == "RedHat"
++    - lookup('env', 'RHSM_ACTIVATION_KEY') | length > 0
++    - lookup('env', 'RHSM_ORG_ID') | length > 0
++    - rhsm_server_hostname != ""
++    - rhsm_server_proxy_hostname != ""
+ 
+ - name: import epel gpg key
+   rpm_key:
+diff --git a/images/capi/packer/config/ansible-args.json b/images/capi/packer/config/ansible-args.json
+index 62990ab41..d8139e3d7 100644
+--- a/images/capi/packer/config/ansible-args.json
++++ b/images/capi/packer/config/ansible-args.json
+@@ -1,5 +1,5 @@
+ {
+   "ansible_common_ssh_args": "-o IdentitiesOnly=yes -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa",
+-  "ansible_common_vars": "containerd_url={{user `containerd_url`}} containerd_sha256={{user `containerd_sha256`}} pause_image={{user `pause_image`}} containerd_additional_settings={{user `containerd_additional_settings`}} containerd_cri_socket={{user `containerd_cri_socket`}} containerd_version={{user `containerd_version`}} containerd_wasm_shims_url={{user `containerd_wasm_shims_url`}} containerd_wasm_shims_version={{user `containerd_wasm_shims_version`}} containerd_wasm_shims_sha256={{user `containerd_wasm_shims_sha256`}} containerd_wasm_shims_runtimes=\"{{user `containerd_wasm_shims_runtimes`}}\" crictl_url={{user `crictl_url`}} crictl_sha256={{user `crictl_sha256`}} crictl_source_type={{user `crictl_source_type`}} custom_role_names=\"{{user `custom_role_names`}}\" firstboot_custom_roles_pre=\"{{user `firstboot_custom_roles_pre`}}\" firstboot_custom_roles_post=\"{{user `firstboot_custom_roles_post`}}\" node_custom_roles_pre=\"{{user `node_custom_roles_pre`}}\" node_custom_roles_post=\"{{user `node_custom_roles_post`}}\" disable_public_repos={{user `disable_public_repos`}} extra_debs=\"{{user `extra_debs`}}\" extra_repos=\"{{user `extra_repos`}}\" extra_rpms=\"{{user `extra_rpms`}}\" http_proxy={{user `http_proxy`}} https_proxy={{user `https_proxy`}} kubeadm_template={{user `kubeadm_template`}} kubernetes_cni_http_source={{user `kubernetes_cni_http_source`}} kubernetes_cni_http_checksum={{user `kubernetes_cni_http_checksum`}} kubernetes_http_source={{user `kubernetes_http_source`}} kubernetes_container_registry={{user `kubernetes_container_registry`}} kubernetes_rpm_repo={{user `kubernetes_rpm_repo`}} kubernetes_rpm_gpg_key={{user `kubernetes_rpm_gpg_key`}} kubernetes_rpm_gpg_check={{user `kubernetes_rpm_gpg_check`}} kubernetes_deb_repo={{user `kubernetes_deb_repo`}} kubernetes_deb_gpg_key={{user `kubernetes_deb_gpg_key`}} kubernetes_cni_deb_version={{user `kubernetes_cni_deb_version`}} kubernetes_cni_rpm_version={{user `kubernetes_cni_rpm_version`}} kubernetes_cni_semver={{user `kubernetes_cni_semver`}} kubernetes_cni_source_type={{user `kubernetes_cni_source_type`}} kubernetes_semver={{user `kubernetes_semver`}} kubernetes_source_type={{user `kubernetes_source_type`}} kubernetes_load_additional_imgs={{user `kubernetes_load_additional_imgs`}} kubernetes_deb_version={{user `kubernetes_deb_version`}} kubernetes_rpm_version={{user `kubernetes_rpm_version`}} no_proxy={{user `no_proxy`}} pip_conf_file={{user `pip_conf_file`}} python_path={{user `python_path`}} redhat_epel_rpm={{user `redhat_epel_rpm`}} epel_rpm_gpg_key={{user `epel_rpm_gpg_key`}} reenable_public_repos={{user `reenable_public_repos`}} remove_extra_repos={{user `remove_extra_repos`}} systemd_prefix={{user `systemd_prefix`}} sysusr_prefix={{user `sysusr_prefix`}} sysusrlocal_prefix={{user `sysusrlocal_prefix`}} load_additional_components={{ user `load_additional_components`}} additional_registry_images={{ user `additional_registry_images`}} additional_registry_images_list={{ user `additional_registry_images_list`}} additional_url_images={{ user `additional_url_images`}} additional_url_images_list={{ user `additional_url_images_list`}} additional_executables={{ user `additional_executables`}} additional_executables_list={{ user `additional_executables_list`}} additional_executables_destination_path={{ user `additional_executables_destination_path`}} additional_s3={{ user `additional_s3`}} build_target={{ user `build_target`}} amazon_ssm_agent_rpm={{ user `amazon_ssm_agent_rpm` }} etcd_http_source={{user `etcd_http_source`}} etcd_version={{user `etcd_version`}} etcdadm_http_source={{user `etcdadm_http_source`}} etcd_sha256={{user `etcd_sha256`}} etcdadm_version={{user `etcdadm_version`}}",
++  "ansible_common_vars": "containerd_url={{user `containerd_url`}} containerd_sha256={{user `containerd_sha256`}} pause_image={{user `pause_image`}} containerd_additional_settings={{user `containerd_additional_settings`}} containerd_cri_socket={{user `containerd_cri_socket`}} containerd_version={{user `containerd_version`}} containerd_wasm_shims_url={{user `containerd_wasm_shims_url`}} containerd_wasm_shims_version={{user `containerd_wasm_shims_version`}} containerd_wasm_shims_sha256={{user `containerd_wasm_shims_sha256`}} containerd_wasm_shims_runtimes=\"{{user `containerd_wasm_shims_runtimes`}}\" crictl_url={{user `crictl_url`}} crictl_sha256={{user `crictl_sha256`}} crictl_source_type={{user `crictl_source_type`}} custom_role_names=\"{{user `custom_role_names`}}\" firstboot_custom_roles_pre=\"{{user `firstboot_custom_roles_pre`}}\" firstboot_custom_roles_post=\"{{user `firstboot_custom_roles_post`}}\" node_custom_roles_pre=\"{{user `node_custom_roles_pre`}}\" node_custom_roles_post=\"{{user `node_custom_roles_post`}}\" disable_public_repos={{user `disable_public_repos`}} extra_debs=\"{{user `extra_debs`}}\" extra_repos=\"{{user `extra_repos`}}\" extra_rpms=\"{{user `extra_rpms`}}\" http_proxy={{user `http_proxy`}} https_proxy={{user `https_proxy`}} kubeadm_template={{user `kubeadm_template`}} kubernetes_cni_http_source={{user `kubernetes_cni_http_source`}} kubernetes_cni_http_checksum={{user `kubernetes_cni_http_checksum`}} kubernetes_http_source={{user `kubernetes_http_source`}} kubernetes_container_registry={{user `kubernetes_container_registry`}} kubernetes_rpm_repo={{user `kubernetes_rpm_repo`}} kubernetes_rpm_gpg_key={{user `kubernetes_rpm_gpg_key`}} kubernetes_rpm_gpg_check={{user `kubernetes_rpm_gpg_check`}} kubernetes_deb_repo={{user `kubernetes_deb_repo`}} kubernetes_deb_gpg_key={{user `kubernetes_deb_gpg_key`}} kubernetes_cni_deb_version={{user `kubernetes_cni_deb_version`}} kubernetes_cni_rpm_version={{user `kubernetes_cni_rpm_version`}} kubernetes_cni_semver={{user `kubernetes_cni_semver`}} kubernetes_cni_source_type={{user `kubernetes_cni_source_type`}} kubernetes_semver={{user `kubernetes_semver`}} kubernetes_source_type={{user `kubernetes_source_type`}} kubernetes_load_additional_imgs={{user `kubernetes_load_additional_imgs`}} kubernetes_deb_version={{user `kubernetes_deb_version`}} kubernetes_rpm_version={{user `kubernetes_rpm_version`}} no_proxy={{user `no_proxy`}} pip_conf_file={{user `pip_conf_file`}} python_path={{user `python_path`}} redhat_epel_rpm={{user `redhat_epel_rpm`}} epel_rpm_gpg_key={{user `epel_rpm_gpg_key`}} reenable_public_repos={{user `reenable_public_repos`}} remove_extra_repos={{user `remove_extra_repos`}} systemd_prefix={{user `systemd_prefix`}} sysusr_prefix={{user `sysusr_prefix`}} sysusrlocal_prefix={{user `sysusrlocal_prefix`}} load_additional_components={{ user `load_additional_components`}} additional_registry_images={{ user `additional_registry_images`}} additional_registry_images_list={{ user `additional_registry_images_list`}} additional_url_images={{ user `additional_url_images`}} additional_url_images_list={{ user `additional_url_images_list`}} additional_executables={{ user `additional_executables`}} additional_executables_list={{ user `additional_executables_list`}} additional_executables_destination_path={{ user `additional_executables_destination_path`}} additional_s3={{ user `additional_s3`}} build_target={{ user `build_target`}} amazon_ssm_agent_rpm={{ user `amazon_ssm_agent_rpm` }} etcd_http_source={{user `etcd_http_source`}} etcd_version={{user `etcd_version`}} etcdadm_http_source={{user `etcdadm_http_source`}} etcd_sha256={{user `etcd_sha256`}} etcdadm_version={{user `etcdadm_version`}} rhsm_server_hostname={{ user `rhsm_server_hostname` }} rhsm_server_release_version={{ user `rhsm_server_release_version` }} rhsm_server_proxy_hostname={{ user `rhsm_server_proxy_hostname` }} rhsm_server_proxy_port={{ user `rhsm_server_proxy_port` }}" ,
+   "ansible_scp_extra_args": "{{env `ANSIBLE_SCP_EXTRA_ARGS`}}"
+ }
+-- 
+2.39.2 (Apple Git-143)
+
