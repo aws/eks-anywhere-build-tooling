@@ -35,3 +35,35 @@ EKS-A CLI project uses these images as the node image when constructing workload
 1. Compare the old tag to the new, looking specifically for Makefile changes. If any of the make targets used in projects/kubernetes-sigs/image-builder/Makefile to call upstream make changed, make those appropriate changes.
 1. Update the version at the top of this Readme.
 1. Monitor node image builds and e2e tests as updates to this project can potentially break cluster create and update process.
+
+### RedHat Satellite Support
+
+When building a RedHat image, image-builder supports registering the build vm against a RedHat Satellite and pulling packages from the satellite.
+In order to use RedHat Satellite in the build process follow the steps below
+
+#### Prerequisites
+1. Ensure the host running image-builder has bi-directional network connectivity with the RedHat Satellite
+2. Image builder flow only support RedHat Satellite version >= 6.8
+3. Add RedHat Repositories for the latest RedHat 8.x version and sync them
+   1. Base Os Rpms 
+   2. BaseOS - Extended Update Support RPMs
+   3. AppStream - Extended Update Support RPMs
+4. Create an activation key and ensure library environment is enabled
+
+#### Steps
+1. Export the activation key and org name as environment variable
+```
+export RHSM_ACTIVATION_KEY="image-builder-key"
+export RHSM_ORG_ID="AWS EKS-A"
+```
+2. Create an extra vars json file that includes the Satellite server hostname and full version to be set on subscription manager (required to use Satellite).
+```
+{
+    "rhsm_server_hostname": "redhat-sat.com"
+    "rhsm_server_release_version": "8.8
+}
+```
+3. Run image-builder with the above json as PACKER_EXTRA_VARS
+```
+PACKER_EXTRA_VARS=satellite.json make rhel-8-raw
+```
