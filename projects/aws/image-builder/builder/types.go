@@ -71,6 +71,7 @@ type VsphereConfig struct {
 	RhelConfig
 	ProxyConfig
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type BaremetalConfig struct {
@@ -79,6 +80,7 @@ type BaremetalConfig struct {
 	RhelConfig
 	ProxyConfig
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type CloudstackConfig struct {
@@ -87,6 +89,7 @@ type CloudstackConfig struct {
 	RhelConfig
 	ProxyConfig
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type IsoConfig struct {
@@ -114,6 +117,7 @@ type NutanixConfig struct {
 	NutanixSubnetName string `json:"nutanix_subnet_name"`
 	ProxyConfig
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type AMIConfig struct {
@@ -130,6 +134,7 @@ type AMIConfig struct {
 
 	ProxyConfig
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type ExtraPackagesConfig struct {
@@ -153,4 +158,13 @@ type RhsmConfig struct {
 	ServerReleaseVersion string `json:"rhsm_server_release_version,omitempty"`
 	ActivationKey        string `json:"rhsm_activation_key,omitempty"`
 	OrgId                string `json:"rhsm_org_id,omitempty"`
+}
+
+type ExtraOverridesConfig struct {
+	FirstbootCustomRolesPre  string `json:"firstboot_custom_roles_pre,omitempty"`
+	FirstbootCustomRolesPost string `json:"firstboot_custom_roles_post,omitempty"`
+	NodeCustomRolesPre       string `json:"node_custom_roles_pre,omitempty"`
+	NodeCustomRolesPost      string `json:"node_custom_roles_post,omitempty"`
+	DisablePublicRepos       string `json:"disable_public_repos,omitempty"`
+	ReenablePublicRepos      string `json:"reenable_public_repos,omitempty"`
 }
