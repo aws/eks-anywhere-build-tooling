@@ -70,6 +70,7 @@ type VsphereConfig struct {
 	IsoConfig
 	RhelConfig
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type BaremetalConfig struct {
@@ -77,6 +78,7 @@ type BaremetalConfig struct {
 	IsoConfig
 	RhelConfig
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type CloudstackConfig struct {
@@ -84,6 +86,7 @@ type CloudstackConfig struct {
 	IsoConfig
 	RhelConfig
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type IsoConfig struct {
@@ -108,6 +111,7 @@ type NutanixConfig struct {
 	NutanixPassword   string `json:"nutanix_password"`
 	NutanixSubnetName string `json:"nutanix_subnet_name"`
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type AMIConfig struct {
@@ -123,10 +127,20 @@ type AMIConfig struct {
 	VolumeType          string `json:"volume_type"`
 
 	ExtraPackagesConfig
+	ExtraOverridesConfig
 }
 
 type ExtraPackagesConfig struct {
 	ExtraDebs  string `json:"extra_debs,omitempty"`
 	ExtraRepos string `json:"extra_repos,omitempty"`
 	ExtraRpms  string `json:"extra_rpms,omitempty"`
+}
+
+type ExtraOverridesConfig struct {
+	FirstbootCustomRolesPre  string `json:"firstboot_custom_roles_pre,omitempty"`
+	FirstbootCustomRolesPost string `json:"firstboot_custom_roles_post,omitempty"`
+	NodeCustomRolesPre       string `json:"node_custom_roles_pre,omitempty"`
+	NodeCustomRolesPost      string `json:"node_custom_roles_post,omitempty"`
+	DisablePublicRepos       string `json:"disable_public_repos,omitempty"`
+	ReenablePublicRepos      string `json:"reenable_public_repos,omitempty"`
 }
