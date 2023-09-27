@@ -72,13 +72,25 @@ if [[ -n "$PLATFORM" ]]; then
 	MAKE_VARS=" BINARY_PLATFORMS=$PLATFORM"
 fi
 
+DOCKER_USER_FLAG=""
+NETRC_DIR="/root"
+if [ "$(uname -s)" = "Linux" ] && [ -n "${USER:-}" ]; then
+	# on a linux host, the uid needs to match the host user otherwise
+	# all the downloaded go modules will be owned by root in the host
+	USER_ID=$(id -u ${USER})
+	USER_GROUP_ID=$(id -g ${USER})
+	DOCKER_USER_FLAG="-u $USER_ID:$USER_GROUP_ID"
+	NETRC_DIR="/home/matchinguser"
+fi
+
+
 if [[ "$SKIP_RUN" == "false" ]]; then
 	build::docker::retry_pull $IMAGE
 
 	NETRC=""
 	if [ -f $HOME/.netrc ]; then
 		DOCKER_RUN_NETRC="${DOCKER_RUN_NETRC:-$HOME/.netrc}"
-		NETRC="--mount type=bind,source=$DOCKER_RUN_NETRC,target=/root/.netrc"
+		NETRC="--mount type=bind,source=$DOCKER_RUN_NETRC,target=$NETRC_DIR/.netrc"
 	else
 		DOCKER_RUN_NETRC=""
 	fi
@@ -91,9 +103,16 @@ if [[ "$SKIP_RUN" == "false" ]]; then
 		-e GOPROXY=${GOPROXY:-} -e GOMODCACHE=/mod-cache -e DOCKER_RUN_BASE_DIRECTORY=$DOCKER_RUN_BASE_DIRECTORY -e DOCKER_RUN_GO_MOD_CACHE=$DOCKER_RUN_GO_MOD_CACHE -e DOCKER_RUN_NETRC=$DOCKER_RUN_NETRC \
 		--entrypoint sleep $IMAGE infinity)
 
-	docker exec -it $CONTAINER_ID git config --global --add safe.directory /eks-anywhere-build-tooling
+	if [ -n "$DOCKER_USER_FLAG" ]; then
+		docker exec -it $CONTAINER_ID groupadd -g 100 users
+		docker exec -it $CONTAINER_ID groupadd --gid "$USER_GROUP_ID" matchinguser
+		docker exec -it $CONTAINER_ID useradd  --no-create-home --uid "$USER_ID" --gid "$USER_GROUP_ID" matchinguser
+		docker exec -it $CONTAINER_ID mkdir -p /home/matchinguser
+		docker exec -it $CONTAINER_ID chown -R matchinguser:matchinguser /home/matchinguser
+	fi
 fi
 
 
-build::common::echo_and_run docker exec -e RELEASE_BRANCH=$RELEASE_BRANCH -it $CONTAINER_ID \
+build::common::echo_and_run docker exec -e RELEASE_BRANCH=$RELEASE_BRANCH $DOCKER_USER_FLAG \
+	-it $CONTAINER_ID \
 	make $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT $MAKE_VARS
