@@ -23,7 +23,7 @@ s3-artifacts: create-manifests
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_VM_OPERATOR_TARGET)
 
 .PHONY: create-manifests
-create-manifests: tarballs
+create-manifests: tarballs ensure-yq
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
 
 $(FIX_LICENSES_VM_OPERATOR_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
