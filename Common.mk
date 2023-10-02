@@ -302,7 +302,7 @@ ADD_TRAILING_CHAR=$(if $(1),$(1)$(2),)
 # check if pass variable has length of 1
 IS_ONE_WORD=$(if $(filter 1,$(words $(1))),true,false)
 
-SED_CMD=$(shell if [ "$$(uname -s)" = "Darwin" ] && command -v gsed &> /dev/null; then echo gsed; else echo sed; fi)
+SED_CMD=$(shell source $(BUILD_LIB)/common.sh && build::common::gnu_variant_on_mac sed)
 
 ####################################################
 
@@ -842,7 +842,8 @@ release: $(RELEASE_TARGETS)
 # Iterate over release branch versions, avoiding branches explicitly marked as skipped
 .PHONY: %/release-branches/all
 %/release-branches/all:
-	@for version in $(SUPPORTED_K8S_VERSIONS) ; do \
+	@set -e; \
+	for version in $(SUPPORTED_K8S_VERSIONS) ; do \
 	    if ! [[ "$(SKIPPED_K8S_VERSIONS)" =~ $$version  ]]; then \
 			$(MAKE) $* $(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),clean-output,) RELEASE_BRANCH=$$version; \
 		fi \

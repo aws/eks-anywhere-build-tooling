@@ -41,10 +41,10 @@ FOOTER="########### END GENERATED ###########################"
 MAKEFILE=$PROJECT_ROOT/Makefile
 HELPFILE=$PROJECT_ROOT/Help.mk
 
-SED=sed
-if [ "$(uname -s)" = "Darwin" ]; then
-    SED=gsed
-fi
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
+
+SED=$(build::common::gnu_variant_on_mac sed)
 
 $SED -i "/$HEADER/,/$FOOTER/d" $MAKEFILE
 # remove trailing newlines

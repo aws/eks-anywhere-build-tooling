@@ -37,10 +37,7 @@ if [ -n "$IMAGE_FORMAT" ]; then
   fi
 fi
 
-REALPATH=realpath
-if which grealpath &>/dev/null; then
-    REALPATH=grealpath
-fi
+REALPATH=$(build::common::gnu_variant_on_mac realpath)
 
 ACTUAL_FILES=$(mktemp)
 find "$ARTIFACTS_FOLDER" \

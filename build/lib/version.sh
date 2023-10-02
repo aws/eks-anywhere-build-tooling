@@ -14,6 +14,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
+
 version::get_version_vars() {
     local -r repo=$1
     GIT_RELEASE_TAG=$(git -C $repo describe --match 'v[0-9]*.[0-9]*.[0-9]**' --abbrev=0 --tags)
@@ -58,12 +61,7 @@ version::ldflags() {
             "-X '${package_prefix}.${key}=${val}'"
         )
     }
-    DATE=date
-    if which gdate &>/dev/null; then
-        DATE=gdate
-    elif which gnudate &>/dev/null; then
-        DATE=gnudate
-    fi
+    DATE=$(build::common::gnu_variant_on_mac date)
     
     # buildDate is not actual buildDate to avoid it breaking reproducible checksums
     # instead it is the date of the last commit, either the upstream TAG commit or the latest patch applied

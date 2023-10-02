@@ -18,10 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SED=sed
-if [ "$(uname -s)" = "Darwin" ]; then
-    SED=gsed
-fi
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
+
+SED=$(build::common::gnu_variant_on_mac sed)
 
 HELM_DESTINATION_REPOSITORY="${1?First argument is helm destination repository}"
 OUTPUT_DIR="${2?Second arguement is output directory}"

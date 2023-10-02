@@ -17,19 +17,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
+
 ASSET_ROOT="$1"
 
-FIND=find
-if which gfind &>/dev/null; then
-    FIND=gfind
-elif which gnudate &>/dev/null; then
-    FIND=gnufind
-fi
+FIND=$(build::common::gnu_variant_on_mac find)
 
-REALPATH=realpath
-if which grealpath &>/dev/null; then
-    REALPATH=grealpath
-fi
+REALPATH=$(build::common::gnu_variant_on_mac realpath)
 
 SHA256SUM=$(dirname ${ASSET_ROOT})/SHA256SUM
 SHA512SUM=$(dirname ${ASSET_ROOT})/SHA512SUM

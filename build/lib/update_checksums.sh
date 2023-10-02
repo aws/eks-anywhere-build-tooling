@@ -17,10 +17,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
+
 MAKE_ROOT="$1"
 PROJECT_ROOT="$2"
 OUTPUT_BIN_DIR="$3"
 
+REALPATH=$(build::common::gnu_variant_on_mac realpath)
 
 if [ ! -d ${OUTPUT_BIN_DIR} ] ;  then
     echo "${OUTPUT_BIN_DIR} not present! Run 'make binaries'"
@@ -31,7 +35,7 @@ CHECKSUMS_FILE=$PROJECT_ROOT/CHECKSUMS
 
 rm -f $CHECKSUMS_FILE
 for file in $(find ${OUTPUT_BIN_DIR} -type f | sort); do
-    filepath=$(realpath --relative-base=$MAKE_ROOT $file)
+    filepath=$($REALPATH --relative-base=$MAKE_ROOT $file)
     sha256sum $filepath >> $CHECKSUMS_FILE
 done
 

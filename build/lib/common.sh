@@ -20,6 +20,31 @@ if [ -n "${OUTPUT_DEBUG_LOG:-}" ]; then
     set -x
 fi
 
+function build::common::gnu_variant_on_mac() {
+  local -r cmd="$1"
+
+  if [ "$(uname -s)" = "Linux" ]; then
+    echo "$cmd"
+    return
+  fi
+
+  local final="$cmd"
+  if command -v "g$final" &> /dev/null; then
+    final="g$final"
+  fi
+
+  if [[ "$final" = "$cmd" ]] && command -v "gnu$final" &> /dev/null; then
+    final="gnu$final"
+  fi
+
+  if [[ "$final" = "$cmd" ]]; then
+    >&2 echo " !!! Building on Mac OS X and GNU '$cmd' not found. Using the builtin version"
+    >&2 echo "     *may* work, but in general you should either build on a Linux host or"
+    >&2 echo "     install the gnu version via brew, usually 'brew install gnu-$cmd'"    
+  fi
+
+  echo "$final"
+}
 
 function build::common::ensure_tar() {
   if [[ -n "${TAR:-}" ]]; then
@@ -27,12 +52,7 @@ function build::common::ensure_tar() {
   fi
 
   # Find gnu tar if it is available, bomb out if not.
-  TAR=tar
-  if which gtar &>/dev/null; then
-      TAR=gtar
-  elif which gnutar &>/dev/null; then
-      TAR=gnutar
-  fi
+  TAR=$(build::common::gnu_variant_on_mac tar)
   if ! "${TAR}" --version | grep -q GNU; then
     echo "  !!! Cannot find GNU tar. Build on Linux or install GNU tar"
     echo "      on Mac OS X (brew install gnu-tar)."
@@ -129,7 +149,7 @@ function build::gather_licenses() {
   # data about each dependency to generate the amazon approved attribution.txt files
   # go-deps is needed for module versions
   # go-licenses are all the dependencies found from the module(s) that were passed in via patterns
-  build::common::echo_and_run go list -deps=true -json ./... | jq -s ''  > "${outputdir}/attribution/go-deps.json"
+  build::common::echo_and_run go list -deps=true -json ./... | jq -s '.'  > "${outputdir}/attribution/go-deps.json"
 
   # go-licenses can be a bit noisy with its output and lot of it can be confusing 
   # the following messages are safe to ignore since we do not need the license url for our process
@@ -418,12 +438,13 @@ function build::common::copy_if_source_destination_different() {
   local source=$1
   local destination=$2
 
-  source_inode=$(stat -c %i $source)
+  STAT=$(build::common::gnu_variant_on_mac stat)
+  source_inode=$($STAT -c %i $source)
   destination_inode=""
   if [ -d $destination ] && [ -e $destination/$(basename $source) ]; then
-    destination_inode=$(stat -c %i $destination/$(basename $source))
+    destination_inode=$($STAT -c %i $destination/$(basename $source))
   elif [ -f $destination ] && [ -e $destination ]; then
-    destination_inode=$(stat -c %i $destination)
+    destination_inode=$($STAT -c %i $destination)
   fi
 
   if [ -n "$destination_inode" ] && [ "$source_inode" = "$destination_inode" ]; then
