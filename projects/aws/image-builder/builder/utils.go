@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"archive/tar"
 	"fmt"
 	"io"
 	"log"
@@ -16,6 +17,46 @@ import (
 	releasev1 "github.com/aws/eks-anywhere/release/api/v1alpha1"
 	"sigs.k8s.io/yaml"
 )
+
+type EksDReleases struct {
+	Releases []EksDRelease `yaml:"releases"`
+}
+
+type EksDRelease struct {
+	Branch      string `yaml:"branch"`
+	Number      string `yaml:"number"`
+	KubeVersion string `yaml:"kubeVersion"`
+}
+
+func prepBuildToolingRepo(buildToolingRepoPath, eksAReleaseVersion string, force bool) (string, error) {
+	// Clone build tooling repo
+	if force {
+		// Clean up build tooling repo in cwd
+		cleanup(buildToolingRepoPath)
+	}
+
+	gitCommitFromBundle, detectedEksaVersion, err := getGitCommitFromBundle(eksAReleaseVersion)
+	if err != nil {
+		return "", fmt.Errorf("Error getting git commit from bundle: %v", err)
+	}
+	if codebuild != "true" {
+		err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
+		if err != nil {
+			return "", fmt.Errorf("Error cloning build tooling repo: %v", err)
+		}
+		log.Println("Cloned eks-anywhere-build-tooling repo")
+
+		err = checkoutRepo(buildToolingRepoPath, gitCommitFromBundle)
+		if err != nil {
+			return "", fmt.Errorf("Error checking out build tooling repo at commit %s: %v", gitCommitFromBundle, err)
+		}
+		log.Printf("Checked out eks-anywhere-build-tooling repo at commit %s\n", gitCommitFromBundle)
+	} else {
+		buildToolingRepoPath = os.Getenv(codebuildSourceDirectoryEnvVar)
+		log.Println("Using repo checked out from code commit")
+	}
+	return detectedEksaVersion, nil
+}
 
 func cloneRepo(cloneUrl, destination string) error {
 	log.Println("Cloning eks-anywhere-build-tooling...")
@@ -76,6 +117,48 @@ func GetSupportedReleaseBranches() []string {
 	return supportReleaseBranches
 }
 
+func getEksDReleaseBranchesWithNumber() (map[string]string, error) {
+	buildToolingPath, err := getRepoRoot()
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
+	eksDReleaseBranchesFile := filepath.Join(buildToolingPath, "EKSD_LATEST_RELEASES")
+	eksDReleaseBranchesFileData, err := os.ReadFile(eksDReleaseBranchesFile)
+
+	eksDReleaseBranchesWithNumber := make(map[string]string)
+	var eksDReleaseBranchesDataWithNumber EksDReleases
+	err = yaml.Unmarshal(eksDReleaseBranchesFileData, &eksDReleaseBranchesDataWithNumber)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling EKSD_LATEST_RELEASES file: %v", err)
+	}
+
+	for _, eksdRelease := range eksDReleaseBranchesDataWithNumber.Releases {
+		eksDReleaseBranchesWithNumber[eksdRelease.Branch] = eksdRelease.Number
+	}
+
+	return eksDReleaseBranchesWithNumber, nil
+}
+
+func downloadFile(filepath string, url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
 func getBuildToolingPath(cwd string) string {
 	buildToolingRepoPath := filepath.Join(cwd, "eks-anywhere-build-tooling")
 	if codebuild == "true" {
@@ -118,7 +201,7 @@ func execCommand(cmd *exec.Cmd) (string, error) {
 	return commandOutputStr, nil
 }
 
-func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
+func getGitCommitFromBundle(eksaReleaseVersion string) (string, string, error) {
 	eksAReleasesManifestURL := getEksAReleasesManifestURL()
 	releasesManifestContents, err := readFileFromURL(eksAReleasesManifestURL)
 	if err != nil {
@@ -135,8 +218,8 @@ func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
 	if os.Getenv(eksaUseDevReleaseEnvVar) == "true" {
 		eksAReleaseVersion = devEksaReleaseVersion
 		log.Printf("EKSA_USE_DEV_RELEASE set to true, using EKS-A dev release version: %s", eksAReleaseVersion)
-	} else if bo.EKSAReleaseVersion != "" {
-		eksAReleaseVersion = bo.EKSAReleaseVersion
+	} else if eksaReleaseVersion != "" {
+		eksAReleaseVersion = eksaReleaseVersion
 		log.Printf("EKS-A release version provided: %s", eksAReleaseVersion)
 	} else if eksaVersion != "" {
 		eksAReleaseVersion = eksaVersion
@@ -258,4 +341,56 @@ func parseUrl(endpoint string) (string, string, error) {
 		return "", "", err
 	}
 	return host, port, nil
+}
+
+// createTarball takes in a filename and creates a tarball of the contents in the provided path
+func createTarball(fileName, path string) error {
+	// Create a new tarball.
+	tarball, err := os.Create(fileName)
+	if err != nil {
+		panic(err)
+	}
+	defer tarball.Close()
+
+	// Create a tar writer.
+	tw := tar.NewWriter(tarball)
+	filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		// Create a new tar header.
+		header, err := tar.FileInfoHeader(info, path)
+		if err != nil {
+			return err
+		}
+
+		// Write the header to the tar writer.
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// Copy the file contents to the tar writer.
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		_, err = io.Copy(tw, file)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	// Close the tar writer.
+	err = tw.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	return nil
 }

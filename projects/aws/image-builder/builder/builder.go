@@ -18,37 +18,14 @@ var (
 )
 
 func (b *BuildOptions) BuildImage() {
-	// Clone build tooling repo
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("Error retrieving current working directory: %v", err)
 	}
 	buildToolingRepoPath := getBuildToolingPath(cwd)
-
-	if b.Force {
-		// Clean up build tooling repo in cwd
-		cleanup(buildToolingRepoPath)
-	}
-
-	gitCommitFromBundle, detectedEksaVersion, err := b.getGitCommitFromBundle()
+	detectedEksaVersion, err := prepBuildToolingRepo(buildToolingRepoPath, b.EKSAReleaseVersion, b.Force)
 	if err != nil {
-		log.Fatalf("Error getting git commit from bundle: %v", err)
-	}
-	if codebuild != "true" {
-		err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
-		if err != nil {
-			log.Fatalf("Error cloning build tooling repo: %v", err)
-		}
-		log.Println("Cloned eks-anywhere-build-tooling repo")
-
-		err = checkoutRepo(buildToolingRepoPath, gitCommitFromBundle)
-		if err != nil {
-			log.Fatalf("Error checking out build tooling repo at commit %s: %v", gitCommitFromBundle, err)
-		}
-		log.Printf("Checked out eks-anywhere-build-tooling repo at commit %s\n", gitCommitFromBundle)
-	} else {
-		buildToolingRepoPath = os.Getenv(codebuildSourceDirectoryEnvVar)
-		log.Println("Using repo checked out from code commit")
+		log.Fatal(err.Error())
 	}
 
 	supportedReleaseBranches := GetSupportedReleaseBranches()
@@ -196,7 +173,7 @@ func (b *BuildOptions) BuildImage() {
 			commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerTypeVarFilesEnvVar, baremetalConfigFile))
 		}
 
-		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
+		err := executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
 		}
@@ -210,7 +187,7 @@ func (b *BuildOptions) BuildImage() {
 	} else if b.Hypervisor == Nutanix {
 		// Patch firmware config for tool
 		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
-		if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
+		if err := executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
 			log.Fatalf("Error executing upstream patch command: %v", err)
 		}
 
