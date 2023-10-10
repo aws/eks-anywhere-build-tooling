@@ -47,6 +47,8 @@ type BuildOptions struct {
 	FilesConfig        *AdditionalFilesConfig
 	ReleaseChannel     string
 	Force              bool
+	AirGapped          bool
+	ManifestTarball    string
 	Firmware           string
 	EKSAReleaseVersion string
 }
@@ -73,6 +75,7 @@ type VsphereConfig struct {
 	ProxyConfig
 	ExtraPackagesConfig
 	ExtraOverridesConfig
+	AirGappedConfig
 }
 
 type BaremetalConfig struct {
@@ -82,6 +85,7 @@ type BaremetalConfig struct {
 	ProxyConfig
 	ExtraPackagesConfig
 	ExtraOverridesConfig
+	AirGappedConfig
 }
 
 type CloudstackConfig struct {
@@ -91,6 +95,7 @@ type CloudstackConfig struct {
 	ProxyConfig
 	ExtraPackagesConfig
 	ExtraOverridesConfig
+	AirGappedConfig
 }
 
 type IsoConfig struct {
@@ -121,6 +126,7 @@ type NutanixConfig struct {
 	ProxyConfig
 	ExtraPackagesConfig
 	ExtraOverridesConfig
+	AirGappedConfig
 }
 
 type AMIConfig struct {
@@ -170,4 +176,11 @@ type ExtraOverridesConfig struct {
 	NodeCustomRolesPost      string `json:"node_custom_roles_post,omitempty"`
 	DisablePublicRepos       string `json:"disable_public_repos,omitempty"`
 	ReenablePublicRepos      string `json:"reenable_public_repos,omitempty"`
+}
+
+type AirGappedConfig struct {
+	EksABuildToolingRepoUrl    string `json:"eksa_build_tooling_repo_url,omitempty"`
+	ImageBuilderRepoUrl        string `json:"image_builder_repo_url,omitempty"`
+	PrivateServerEksDDomainUrl string `json:"private_artifacts_eksd_fqdn,omitempty"`
+	PrivateServerEksADomainUrl string `json:"private_artifacts_eksa_fqdn,omitempty"`
 }

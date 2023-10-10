@@ -53,6 +53,8 @@ func init() {
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA and Raw builds.")
 	buildCmd.Flags().StringVar(&bo.EKSAReleaseVersion, "eksa-release", "", "The EKS-A CLI version to build images for")
+	buildCmd.Flags().StringVar(&bo.ManifestTarball, "manifest-tarball", "", "Path to Image Builder built EKS-D/A manifest tarball")
+	buildCmd.Flags().BoolVar(&bo.AirGapped, "air-gapped", false, "Flag to instruct image builder to run in air-gapped mode. Requires --manifest-tarball to be set")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
 		log.Fatalf("Error marking flag as required: %v", err)
 	}
@@ -105,6 +107,20 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			bo.Firmware = builder.EFI
 		} else {
 			bo.Firmware = builder.BIOS
+		}
+	}
+
+	// Airgapped
+	if bo.AirGapped {
+		if bo.ManifestTarball == "" {
+			log.Fatalf("Please provide --manifest-tarball when running air-gapped builds")
+		}
+
+		if bo.Os != builder.Ubuntu {
+			log.Fatalf("Only Ubuntu os is supported for air-gapped builds")
+		}
+		if bo.Hypervisor == builder.AMI {
+			log.Fatalf("AMI hypervisor not supported for air-gapped builds")
 		}
 	}
 
@@ -163,6 +179,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = validateRHSM(bo.Os, &bo.VsphereConfig.RhsmConfig); err != nil {
 				return err
 			}
+			if err = validateAirGapped(&bo.VsphereConfig.AirGappedConfig,
+				bo.VsphereConfig.ExtraRepos, bo.VsphereConfig.IsoUrl); err != nil {
+				return err
+			}
 		case builder.Baremetal:
 			if err = json.Unmarshal(config, &bo.BaremetalConfig); err != nil {
 				return err
@@ -180,6 +200,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = validateRHSM(bo.Os, &bo.BaremetalConfig.RhsmConfig); err != nil {
 				return err
 			}
+			if err = validateAirGapped(&bo.BaremetalConfig.AirGappedConfig,
+				bo.BaremetalConfig.ExtraRepos, bo.BaremetalConfig.IsoUrl); err != nil {
+				return err
+			}
 		case builder.Nutanix:
 			if err = json.Unmarshal(config, &bo.NutanixConfig); err != nil {
 				return err
@@ -193,6 +217,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 
 			if bo.NutanixConfig.NutanixUserName == "" || bo.NutanixConfig.NutanixPassword == "" {
 				log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
+			}
+			if err = validateAirGapped(&bo.NutanixConfig.AirGappedConfig,
+				bo.NutanixConfig.ExtraRepos, bo.NutanixConfig.ImageName); err != nil {
+				return err
 			}
 			// TODO Validate other fields as well
 		case builder.CloudStack:
@@ -210,6 +238,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				}
 			}
 			if err = validateRHSM(bo.Os, &bo.CloudstackConfig.RhsmConfig); err != nil {
+				return err
+			}
+			if err = validateAirGapped(&bo.CloudstackConfig.AirGappedConfig,
+				bo.CloudstackConfig.ExtraRepos, bo.CloudstackConfig.IsoUrl); err != nil {
 				return err
 			}
 		case builder.AMI:
@@ -354,5 +386,27 @@ func validateFirmware(firmware, os, hypervisor string) error {
 		return fmt.Errorf("Ubuntu Raw builds only support EFI firmware.")
 	}
 
+	return nil
+}
+
+func validateAirGapped(airgappedConfig *builder.AirGappedConfig, extraRepos, isoUrl string) error {
+	if airgappedConfig.EksABuildToolingRepoUrl == "" {
+		return fmt.Errorf("eksa_build_tooling_repo_url must be set when using air-gapped mode")
+	}
+	if airgappedConfig.ImageBuilderRepoUrl == "" {
+		return fmt.Errorf("image_builder_repo_url must be set when using air-gapped mode")
+	}
+	if extraRepos == "" {
+		return fmt.Errorf("Please set extra_repos to internal os package repo when using air-gapped mode")
+	}
+	if airgappedConfig.PrivateServerEksDDomainUrl == "" {
+		return fmt.Errorf("Please set private_artifacts_eksd_fqdn to internal artifacts server's eks-d endpoint")
+	}
+	if airgappedConfig.PrivateServerEksADomainUrl == "" {
+		return fmt.Errorf("Please set private_artifacts_eksa_fqdn to internal artifacts server's eks-a endpoint")
+	}
+	if isoUrl == "" {
+		return fmt.Errorf("Please provide iso_url when building in air-gapped mode")
+	}
 	return nil
 }

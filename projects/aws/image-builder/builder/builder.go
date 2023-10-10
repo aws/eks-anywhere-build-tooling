@@ -22,8 +22,28 @@ func (b *BuildOptions) BuildImage() {
 	if err != nil {
 		log.Fatalf("Error retrieving current working directory: %v", err)
 	}
+	if b.AirGapped {
+		var eksDArtifactsDomain, eksAArtifactsDomain string
+		switch b.Hypervisor {
+		case VSphere:
+			eksDArtifactsDomain = b.VsphereConfig.PrivateServerEksDDomainUrl
+			eksAArtifactsDomain = b.VsphereConfig.PrivateServerEksADomainUrl
+		case Baremetal:
+			eksDArtifactsDomain = b.BaremetalConfig.PrivateServerEksDDomainUrl
+			eksAArtifactsDomain = b.BaremetalConfig.PrivateServerEksADomainUrl
+		case CloudStack:
+			eksDArtifactsDomain = b.CloudstackConfig.PrivateServerEksDDomainUrl
+			eksAArtifactsDomain = b.CloudstackConfig.PrivateServerEksADomainUrl
+		case Nutanix:
+			eksDArtifactsDomain = b.NutanixConfig.PrivateServerEksDDomainUrl
+			eksAArtifactsDomain = b.NutanixConfig.PrivateServerEksADomainUrl
+		}
+		if err = extractAndPrepManifestTarball(b.ManifestTarball, eksDArtifactsDomain, eksAArtifactsDomain); err != nil {
+			log.Fatalf(err.Error())
+		}
+	}
 	buildToolingRepoPath := getBuildToolingPath(cwd)
-	detectedEksaVersion, err := prepBuildToolingRepo(buildToolingRepoPath, b.EKSAReleaseVersion, b.Force)
+	detectedEksaVersion, err := b.prepBuildToolingRepo(buildToolingRepoPath)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -38,10 +58,14 @@ func (b *BuildOptions) BuildImage() {
 	upstreamImageBuilderProjectPath := filepath.Join(imageBuilderProjectPath, imageBuilderCAPIDirectory)
 	var outputArtifactPath string
 	var outputImageGlob []string
+	eksAReleaseManifestUrl, err := getEksAReleasesManifestURL(b.AirGapped)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 	commandEnvVars := []string{
 		fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel),
 		fmt.Sprintf("%s=%s", eksAReleaseVersionEnvVar, detectedEksaVersion),
-		fmt.Sprintf("%s=%s", eksAReleaseManifestURLEnvVar, getEksAReleasesManifestURL()),
+		fmt.Sprintf("%s=%s", eksAReleaseManifestURLEnvVar, eksAReleaseManifestUrl),
 	}
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n Firmware: %s\n", b.Os, b.OsVersion, b.Hypervisor, b.Firmware)
@@ -89,6 +113,14 @@ func (b *BuildOptions) BuildImage() {
 	}
 	var outputImageGlobPattern string
 	if b.Hypervisor == VSphere {
+		if b.AirGapped {
+			airGapEnvVars, err := getAirGapCmdEnvVars(b.VsphereConfig.ImageBuilderRepoUrl, detectedEksaVersion, b.ReleaseChannel)
+			if err != nil {
+				log.Fatalf("Error getting air gapped env variables: %v", err)
+			}
+			commandEnvVars = append(commandEnvVars, airGapEnvVars...)
+		}
+
 		// Set proxy on RHSM if available
 		if b.Os == RedHat && b.VsphereConfig.HttpProxy != "" {
 			if err := setRhsmProxy(&b.VsphereConfig.ProxyConfig, &b.VsphereConfig.RhsmConfig); err != nil {
@@ -134,6 +166,14 @@ func (b *BuildOptions) BuildImage() {
 
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == Baremetal {
+		if b.AirGapped {
+			airGapEnvVars, err := getAirGapCmdEnvVars(b.BaremetalConfig.ImageBuilderRepoUrl, detectedEksaVersion, b.ReleaseChannel)
+			if err != nil {
+				log.Fatalf("Error getting air gapped env variables: %v", err)
+			}
+			commandEnvVars = append(commandEnvVars, airGapEnvVars...)
+		}
+
 		// Set proxy on RHSM if available
 		if b.Os == RedHat && b.BaremetalConfig.HttpProxy != "" {
 			if err := setRhsmProxy(&b.BaremetalConfig.ProxyConfig, &b.BaremetalConfig.RhsmConfig); err != nil {
@@ -187,10 +227,12 @@ func (b *BuildOptions) BuildImage() {
 			}
 		}
 
-		// Patch firmware config for tool
-		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
-		if err := executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
-			log.Fatalf("Error executing upstream patch command: %v", err)
+		if b.AirGapped {
+			airGapEnvVars, err := getAirGapCmdEnvVars(b.NutanixConfig.ImageBuilderRepoUrl, detectedEksaVersion, b.ReleaseChannel)
+			if err != nil {
+				log.Fatalf("Error getting air gapped env variables: %v", err)
+			}
+			commandEnvVars = append(commandEnvVars, airGapEnvVars...)
 		}
 
 		// Read and set the nutanix connection data
@@ -227,6 +269,13 @@ func (b *BuildOptions) BuildImage() {
 
 		log.Printf("Image Build Successful\n Please find the image uploaded under Nutanix Image Service with name %s\n", b.NutanixConfig.ImageName)
 	} else if b.Hypervisor == CloudStack {
+		if b.AirGapped {
+			airGapEnvVars, err := getAirGapCmdEnvVars(b.CloudstackConfig.ImageBuilderRepoUrl, detectedEksaVersion, b.ReleaseChannel)
+			if err != nil {
+				log.Fatalf("Error getting air gapped env variables: %v", err)
+			}
+			commandEnvVars = append(commandEnvVars, airGapEnvVars...)
+		}
 		// Set proxy on RHSM if available
 		if b.Os == RedHat && b.CloudstackConfig.HttpProxy != "" {
 			if err := setRhsmProxy(&b.CloudstackConfig.ProxyConfig, &b.CloudstackConfig.RhsmConfig); err != nil {
