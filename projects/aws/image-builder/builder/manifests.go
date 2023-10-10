@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	releasev1 "github.com/aws/eks-anywhere/release/api/v1alpha1"
-	"sigs.k8s.io/yaml"
+	k8syaml "sigs.k8s.io/yaml"
 )
 
 // DownloadManifests connects to the internet, clones a fresh copy of eks-a-build-tooling repo
@@ -87,7 +87,7 @@ func downloadEKSAManifests(outputPath string) error {
 	}
 
 	releases := &releasev1.Release{}
-	if err = yaml.Unmarshal(releaseManifestData, releases); err != nil {
+	if err = k8syaml.Unmarshal(releaseManifestData, releases); err != nil {
 		return err
 	}
 	for _, r := range releases.Spec.Releases {

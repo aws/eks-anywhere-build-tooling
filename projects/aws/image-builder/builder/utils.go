@@ -15,7 +15,8 @@ import (
 	"time"
 
 	releasev1 "github.com/aws/eks-anywhere/release/api/v1alpha1"
-	"sigs.k8s.io/yaml"
+	"github.com/ghodss/yaml"
+	k8syaml "sigs.k8s.io/yaml"
 )
 
 type EksDReleases struct {
@@ -209,7 +210,7 @@ func getGitCommitFromBundle(eksaReleaseVersion string) (string, string, error) {
 	}
 
 	releases := &releasev1.Release{}
-	if err = yaml.Unmarshal(releasesManifestContents, releases); err != nil {
+	if err = k8syaml.Unmarshal(releasesManifestContents, releases); err != nil {
 		return "", "", fmt.Errorf("failed to unmarshal release manifest from [%s]: %v", eksAReleasesManifestURL, err)
 	}
 
@@ -260,7 +261,7 @@ func getGitCommitFromBundle(eksaReleaseVersion string) (string, string, error) {
 	}
 
 	bundles := &releasev1.Bundles{}
-	if err = yaml.Unmarshal(bundleManifestContents, bundles); err != nil {
+	if err = k8syaml.Unmarshal(bundleManifestContents, bundles); err != nil {
 		return "", "", fmt.Errorf("failed to unmarshal bundles manifest from [%s]: %v", bundleManifestUrl, err)
 	}
 
