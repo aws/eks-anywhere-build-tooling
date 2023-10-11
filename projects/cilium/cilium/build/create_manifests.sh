@@ -40,7 +40,11 @@ function build::cilium::manifests(){
     --set operator.image.tag=$TAG --set image.tag=$TAG --set image.repository="$REGISTRY/cilium" --set operator.image.repository="$REGISTRY/operator" > _output/manifests/cilium/${TAG}/cilium.yaml
 }
 
-build::install::helm
+# Temp: workaround issue in helm latest which breaks pulling from public ecr
+if ! command -v helm &> /dev/null; then
+  build::install::helm
+fi
+
 build::cilium::manifests
 
 cp -rf _output/manifests $ARTIFACTS_PATH
