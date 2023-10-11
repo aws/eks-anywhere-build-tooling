@@ -485,7 +485,7 @@ endif
 
 #### Source repo + binary Targets
 ifneq ($(REPO_NO_CLONE),true)
-$(REPO):
+$(REPO): | ensure-bash-version
 	@echo -e $(call TARGET_START_LOG)
 ifneq ($(REPO_SPARSE_CHECKOUT),)
 	source $(BUILD_LIB)/common.sh && retry git clone --depth 1 --filter=blob:none --sparse -b $(GIT_TAG) $(CLONE_URL) $(REPO)
@@ -1022,6 +1022,17 @@ ensure-buildkitd-host:
 		echo "make run-buildkit-and-registry"; \
 		exit 1; \
 	fi
+
+.PHONY: ensure-bash-version
+ensure-bash-version:
+	@if (($${BASH_VERSINFO[0]}<4)) || ( (($${BASH_VERSINFO[0]}==4)) && (($${BASH_VERSINFO[1]}<2)) ); then \
+    	echo "Bash version 4.2 or newer is required."; \
+		if [ "$$(uname)" = 'Darwin' ]; then \
+			echo "Install with 'brew install bash' on Mac OS X."; \
+		fi; \
+    	exit 1; \
+  	fi
+
 ## --------------------------------------
 ## Docker Helpers
 ## --------------------------------------
