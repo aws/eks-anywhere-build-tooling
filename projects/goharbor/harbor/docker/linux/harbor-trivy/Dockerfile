@@ -1,12 +1,11 @@
 ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-base
 FROM $BASE_IMAGE
 
-ARG RELEASE_BRANCH
 ARG TARGETARCH
 ARG TARGETOS
 ARG TRIVY_VERSION
 
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/harbor-scanner-trivy/scanner-trivy _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/trivy/trivy _output/harbor-trivy _output/LICENSES ATTRIBUTION.txt /
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/harbor-scanner-trivy/scanner-trivy _output/dependencies/$TARGETOS-$TARGETARCH/eksa/aquasecurity/trivy/trivy _output/harbor-trivy _output/LICENSES ATTRIBUTION.txt /
 
 RUN yum install -y shadow-utils tar gzip >> /dev/null \
     && yum clean all \
