@@ -423,6 +423,7 @@ SKIP_CHECKSUM_VALIDATION?=false
 IN_DOCKER_TARGETS=all-attributions all-attributions-checksums all-checksums attribution attribution-checksums binaries checksums clean clean-go-cache
 PRUNE_BUILDCTL?=false
 GITHUB_TOKEN?=
+DEPENDENCY_TOOLS=buildctl helm jq skopeo tuftool yq
 ####################################################
 
 #################### LOGGING #######################
@@ -557,7 +558,7 @@ $(OUTPUT_BIN_DIR)/%: BINARY_TARGET=$(@F:%.exe=%)
 $(OUTPUT_BIN_DIR)/%: SOURCE_PATTERN=$(if $(filter $(BINARY_TARGET),$(BINARY_TARGET_FILES_BUILD_TOGETHER)),$(SOURCE_PATTERNS_BUILD_TOGETHER),$(word $(call pos,$(BINARY_TARGET),$(BINARY_TARGET_FILES)),$(SOURCE_PATTERNS)))
 $(OUTPUT_BIN_DIR)/%: OUTPUT_PATH=$(if $(and $(if $(filter false,$(call IS_ONE_WORD,$(BINARY_TARGET_FILES_BUILD_TOGETHER))),$(filter $(BINARY_TARGET),$(BINARY_TARGET_FILES_BUILD_TOGETHER)))),$(@D)/,$@)
 $(OUTPUT_BIN_DIR)/%: GO_MOD_PATH=$($(call GO_MOD_TARGET_FOR_BINARY_VAR_NAME,$(BINARY_TARGET)))
-$(OUTPUT_BIN_DIR)/%: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH))
+$(OUTPUT_BIN_DIR)/%: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH)) 
 	@echo -e $(call TARGET_START_LOG)
 	$(if $(filter true,$(call needs-cgo-builder,$(PLATFORM))),$(call CGO_CREATE_BINARIES_SHELL,$@,$(*D)),$(call SIMPLE_CREATE_BINARIES_SHELL))
 	@echo -e $(call TARGET_END_LOG)
@@ -604,7 +605,7 @@ $(OUTPUT_DIR)/%TTRIBUTION.txt:
 $(OUTPUT_DIR)/%ttribution/go-license.csv: BINARY_TARGET=$(if $(filter .,$(*D)),,$(*D))
 $(OUTPUT_DIR)/%ttribution/go-license.csv: GO_MOD_PATH=$(if $(BINARY_TARGET),$(GO_MOD_TARGET_FOR_BINARY_$(call TO_UPPER,$(BINARY_TARGET))),$(word 1,$(UNIQ_GO_MOD_PATHS)))
 $(OUTPUT_DIR)/%ttribution/go-license.csv: LICENSE_PACKAGE_FILTER=$(GO_MOD_$(subst /,_,$(GO_MOD_PATH))_LICENSE_PACKAGE_FILTER)
-$(OUTPUT_DIR)/%ttribution/go-license.csv: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH))
+$(OUTPUT_DIR)/%ttribution/go-license.csv: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH)) | ensure-jq
 	@echo -e $(call TARGET_START_LOG)
 	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/$(BINARY_TARGET) "$(LICENSE_PACKAGE_FILTER)" $(GO_MOD_PATH) $(GOLANG_VERSION) $(LICENSE_THRESHOLD)
 	@echo -e $(call TARGET_END_LOG)
@@ -616,7 +617,7 @@ gather-licenses: $(GATHER_LICENSES_TARGETS)
 # if there is only one go mod path so only one attribution is created, the file will be named ATTRIBUTION.txt and licenses will be stored in _output, `%` will equal `A`
 # if multiple attributions are being generated, the file will be <binary>_ATTRIBUTION.txt and licenses will be stored in _output/<binary>, `%` will equal `<BINARY>_A`
 %TTRIBUTION.txt: LICENSE_OUTPUT_PATH=$(OUTPUT_DIR)$(if $(filter A,$(*F)),,/$(call TO_LOWER,$(*F:%_A=%)))
-%TTRIBUTION.txt: $$(LICENSE_OUTPUT_PATH)/attribution/go-license.csv
+%TTRIBUTION.txt: $$(LICENSE_OUTPUT_PATH)/attribution/go-license.csv 
 	@echo -e $(call TARGET_START_LOG)
 	@rm -f $(@F)
 	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSE_OUTPUT_PATH) $(@F) $(RELEASE_BRANCH)
@@ -727,19 +728,19 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE?=oci
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).tar
 
-%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
+%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host
 	@echo -e $(call TARGET_START_LOG)
 	$(BUILDCTL)
 	@echo -e $(call TARGET_END_LOG)
 
-%/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
+%/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host
 	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
 	@echo -e $(call TARGET_END_LOG)
 
-%/images/arm64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET)
+%/images/arm64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host
 	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
@@ -759,10 +760,10 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 %/cgo/amd64: IMAGE_PLATFORMS=linux/amd64
 %/cgo/arm64: IMAGE_PLATFORMS=linux/arm64
 
-%/cgo/amd64:
+%/cgo/amd64: | ensure-jq
 	$(if $(filter true, $(USE_DOCKER_FOR_CGO_BUILD)),$(CGO_DOCKER),$(BUILDCTL))
 
-%/cgo/arm64:
+%/cgo/arm64: | ensure-jq
 	$(if $(filter true, $(USE_DOCKER_FOR_CGO_BUILD)),$(CGO_DOCKER),$(BUILDCTL))
 
 # As an attempt to see if using docker is more stable for cgo builds in Codebuild
@@ -775,7 +776,7 @@ binary-builder/cgo/%: USE_DOCKER_FOR_CGO_BUILD=$(shell command -v docker &> /dev
 %-useradd/images/export: IMAGE_BUILD_ARGS=IMAGE_USERADD_USER_ID IMAGE_USERADD_USER_NAME
 %-useradd/images/export: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/useradd
 %-useradd/images/export: IMAGE_PLATFORMS=linux/amd64
-%-useradd/images/export:
+%-useradd/images/export: | ensure-buildctl ensure-buildkitd-host
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 
@@ -790,7 +791,7 @@ helm/pull:
 .PHONY: helm/build
 helm/build: $(LICENSES_TARGETS_FOR_PREREQ)
 helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
-helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),) | ensure-helm ensure-skopeo
 	@echo -e $(call TARGET_START_LOG)
 	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
@@ -800,7 +801,7 @@ helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGE
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
-helm/push: helm/build
+helm/push: helm/build | ensure-helm
 	@echo -e $(call TARGET_START_LOG)
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 	@echo -e $(call TARGET_END_LOG)
@@ -888,7 +889,7 @@ add-generated-help-block:
 #@ Update Helpers
 
 .PHONY: run-target-in-docker
-run-target-in-docker: # Run `MAKE_TARGET` using builder base docker container
+run-target-in-docker: | ensure-docker # Run `MAKE_TARGET` using builder base docker container
 	$(BUILD_LIB)/run_target_docker.sh $(COMPONENT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" "$(ARTIFACTS_BUCKET)" "$(BASE_DIRECTORY)" "$(GO_MOD_CACHE)"
 
 .PHONY: stop-docker-builder
@@ -989,6 +990,38 @@ ensure-locale:
 		fi; \
 	fi
 
+.PHONY: ensure-/
+ensure/%: CMD=$*
+ensure/%:
+	@if ! command -v "$(CMD)" &> /dev/null; then \
+		echo "'$(CMD)' is required for this target, please install."; \
+		exit 1; \
+	fi
+
+# needs to be defined explictly to avoid messing up usage as prereqs for targets with their own %/stems
+.PHONY: $(foreach tool,$(DEPENDENCY_TOOLS), ensure-$(tool))
+$(foreach tool,$(DEPENDENCY_TOOLS),$(eval ensure-$(tool): ensure/$(tool)))
+
+.PHONY: ensure-docker
+ensure-docker: ensure/docker
+	@if ! docker info > /dev/null 2>&1 ; then \
+		echo "Please ensure docker is running to make this target"; \
+		exit 1; \
+	fi
+
+.PHONY: ensure-buildkitd-host
+ensure-buildkitd-host:
+	@if [ -z "$${BUILDKIT_HOST:-}" ] && [ ! -S /run/buildkit/buildkitd.sock ]; then \
+		echo "Please set the 'BUILDKIT_HOST' environment variable."; \
+		echo "If you want to run buildkitd via a docker container use"; \
+		echo "export BUILDKIT_HOST=docker-container://buildkitd && make run-buildkit-and-registry"; \
+		exit 1; \
+	elif ! buildctl debug workers > /dev/null 2>&1; then \
+		echo "buildkit does not appear to be running."; \
+		echo "If you want to run buildkitd via a docker container use"; \
+		echo "make run-buildkit-and-registry"; \
+		exit 1; \
+	fi
 ## --------------------------------------
 ## Docker Helpers
 ## --------------------------------------

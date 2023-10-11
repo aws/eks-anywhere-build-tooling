@@ -31,7 +31,7 @@ create-manifests:
 	build/create_manifests.sh $(GIT_TAG) $(ARTIFACTS_PATH) $(REGISTRY)
 
 .PHONY: update-digests
-update-digests:
+update-digests: | ensure-skopeo
 	build/update_digest.sh $(REGISTRY) $(CILIUM_IMAGE) $(GIT_TAG) images/cilium/IMAGE_DIGEST
 	build/update_digest.sh $(REGISTRY) $(OPERATOR_IMAGE) $(GIT_TAG) images/operator-generic/IMAGE_DIGEST
 	build/update_digest.sh $(REGISTRY) $(CILIUM_CHART) $(CHART_TAG) images/cilium-chart/IMAGE_DIGEST
