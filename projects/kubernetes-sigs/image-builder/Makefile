@@ -206,6 +206,10 @@ SKIP_ON_RELEASE_BRANCH=$(if $(filter bottlerocket,$(IMAGE_OS)),false,true)
 
 include $(BASE_DIRECTORY)/Common.mk
 
+# TEMP: work around for using older ansible verison in builder-base
+ifeq ($(IS_ON_BUILDER_BASE),true)
+export ANSIBLE_CONFIG=$(MAKE_ROOT)/ansible.cfg
+endif
 
 export PATH:=$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
 export GOVC_INSECURE?=true
