@@ -18,11 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
+
 RETURN=0
-SED=sed
-if [ "$(uname -s)" = "Darwin" ]; then
-    SED=gsed
-fi
+SED=$(build::find::gnu_variant_on_mac sed)
 
 for GIT_TAG_FILE in projects/*/*/GIT_TAG
 do
