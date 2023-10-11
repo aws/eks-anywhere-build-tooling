@@ -1,11 +1,10 @@
 ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-base
 FROM $BASE_IMAGE
 
-ARG RELEASE_BRANCH
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry _output/harbor-registry/ _output/LICENSES ATTRIBUTION.txt /
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry _output/harbor-registry/ _output/LICENSES ATTRIBUTION.txt /
 
 RUN yum install -y shadow-utils >> /dev/null \
     && yum clean all \
