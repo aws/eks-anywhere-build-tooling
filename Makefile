@@ -1,5 +1,12 @@
+MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
+.SUFFIXES:
+
 BASE_DIRECTORY:=$(abspath .)
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
+SHELL_TRACE?=false
+SHELL:=$(if $(filter true,$(SHELL_TRACE)),$(BUILD_LIB)/make_shell_trace.sh,bash)
+.SHELLFLAGS:=$(if $(filter true,$(SHELL_TRACE)),-c,-eu -o pipefail -c)
+
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2
 IMAGE_REPO?=$(if $(AWS_ACCOUNT_ID),$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com,localhost:5000)
