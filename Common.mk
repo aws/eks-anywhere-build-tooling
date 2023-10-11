@@ -302,8 +302,7 @@ ADD_TRAILING_CHAR=$(if $(1),$(1)$(2),)
 # check if pass variable has length of 1
 IS_ONE_WORD=$(if $(filter 1,$(words $(1))),true,false)
 
-SED_CMD=$(shell if [ "$$(uname -s)" = "Darwin" ] && command -v gsed &> /dev/null; then echo gsed; else echo sed; fi)
-
+SED_CMD=$(shell source $(BUILD_LIB)/common.sh && build::find::gnu_variant_on_mac sed)
 ####################################################
 
 #################### BINARIES ######################
@@ -426,7 +425,7 @@ GITHUB_TOKEN?=
 ####################################################
 
 #################### LOGGING #######################
-DATE_CMD=TZ=utc $(shell if [ "$$(uname -s)" = "Darwin" ] && command -v gdate &> /dev/null; then echo gdate; else echo date; fi)
+DATE_CMD=TZ=utc $(shell source $(BUILD_LIB)/common.sh && build::find::gnu_variant_on_mac date)
 DATE_NANO=$(shell if [ "$$(uname -s)" = "Linux" ] || command -v gdate &> /dev/null; then echo %3N; fi)
 TARGET_START_LOG?=$(eval _START_TIME:=$(shell $(DATE_CMD) +%s.$(DATE_NANO)))\\n------------------- $(shell $(DATE_CMD) +"%Y-%m-%dT%H:%M:%S.$(DATE_NANO)%z") Starting target=$@ -------------------
 TARGET_END_LOG?="------------------- `$(DATE_CMD) +'%Y-%m-%dT%H:%M:%S.$(DATE_NANO)%z'` Finished target=$@ duration=`echo $$($(DATE_CMD) +%s.$(DATE_NANO)) - $(_START_TIME) | bc` seconds -------------------\\n"
