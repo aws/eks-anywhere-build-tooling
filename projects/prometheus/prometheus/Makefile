@@ -12,7 +12,7 @@ SOURCE_PATTERNS=./cmd/prometheus ./cmd/promtool
 EXTRA_GOBUILD_FLAGS=-tags netgo,builtinassets
 GIT_COMMIT=$(shell git -C $(REPO) rev-parse --short HEAD)
 GIT_BRANCH=$(shell git -C $(REPO) rev-parse --abbrev-ref HEAD)
-BUILD_USER=$(shell id -u -n)
+BUILD_USER=ec2-user
 BUILD_DATE=$(shell git -C $(REPO) show -s --format=format:%cd --date=format:'%Y-%m-%dT%H:%M:%SZ' HEAD)
 EXTRA_GO_LDFLAGS=-X github.com/prometheus/common/version.Version=$(GIT_TAG)	\
 	-X github.com/prometheus/common/version.Revision=$(GIT_COMMIT)	\
