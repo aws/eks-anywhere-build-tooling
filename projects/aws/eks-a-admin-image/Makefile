@@ -1,6 +1,6 @@
 -include .env
 
-BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG=0.0.0-dev # This value does not matter but needs to be set
 
 SIMPLE_CREATE_BINARIES=false

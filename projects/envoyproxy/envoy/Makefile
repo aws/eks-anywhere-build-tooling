@@ -1,4 +1,4 @@
-BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG:=$(shell cat GIT_TAG)
 
 ENVOY_IMAGE=public.ecr.aws/appmesh/aws-appmesh-envoy:$(GIT_TAG)

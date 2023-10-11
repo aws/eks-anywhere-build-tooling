@@ -1,4 +1,4 @@
-BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG:=$(shell cat GIT_TAG)
 HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
  # Upstream images are used directly without re-building and re-tagging in build
