@@ -1,7 +1,7 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG:=$(shell cat GIT_TAG)
-HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
-GOLANG_VERSION:=$(shell cat GOLANG_VERSION)
+GIT_TAG=$(shell cat GIT_TAG)
+HELM_GIT_TAG=$(shell cat HELM_GIT_TAG)
+GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 REPO=prometheus
 REPO_OWNER=prometheus
 

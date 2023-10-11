@@ -1,6 +1,6 @@
-BASE_DIRECTORY=$(shell git rev-parse --show-toplevel)
+BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 GIT_TAG?=$(shell cat GIT_TAG)
-GOLANG_VERSION:=$(shell cat GOLANG_VERSION)
+GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 REPO=cert-manager
 REPO_OWNER=cert-manager
 

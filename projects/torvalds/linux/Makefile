@@ -1,5 +1,5 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG:=$(shell cat GIT_TAG)
+GIT_TAG=$(shell cat GIT_TAG)
 
 REPO=linux
 REPO_OWNER=torvalds

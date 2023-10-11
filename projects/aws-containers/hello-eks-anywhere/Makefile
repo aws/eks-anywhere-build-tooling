@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION:=$(shell cat GOLANG_VERSION)
+GIT_TAG=$(shell cat GIT_TAG)
+GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 REPO=hello-eks-anywhere
 REPO_OWNER=aws-containers
 IMAGE_COMPONENT=$(REPO)

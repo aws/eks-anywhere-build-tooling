@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(abspath ../../../)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/kubernetes-sigs/image-builder
-GIT_TAG:=$(shell cat GIT_TAG)
+GIT_TAG=$(shell cat GIT_TAG)
 
 REPO=image-builder
 REPO_OWNER=kubernetes-sigs

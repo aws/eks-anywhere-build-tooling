@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG=$(shell cat ./$(RELEASE_BRANCH)/GIT_TAG)
-GOLANG_VERSION:=$(shell cat ./$(RELEASE_BRANCH)/GOLANG_VERSION)
+GOLANG_VERSION=$(shell cat ./$(RELEASE_BRANCH)/GOLANG_VERSION)
 
 REPO=cloud-provider-vsphere
 REPO_OWNER=kubernetes

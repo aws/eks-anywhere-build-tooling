@@ -1,5 +1,5 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG:=$(shell cat GIT_TAG)
+GIT_TAG=$(shell cat GIT_TAG)
 CHART_TAG:=$(shell echo $(GIT_TAG) | sed 's/^v//')
 
 REGISTRY=public.ecr.aws/isovalent

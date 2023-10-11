@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG:=$(shell cat GIT_TAG)
-HELM_GIT_TAG:=$(shell cat HELM_GIT_TAG)
+GIT_TAG=$(shell cat GIT_TAG)
+HELM_GIT_TAG=$(shell cat HELM_GIT_TAG)
  # Upstream images are used directly without re-building and re-tagging in build
  # tooling, so the IMAGE_TAG needs to be overwritten to match upstream ECR tags.
 IMAGE_TAG=$(GIT_TAG)
