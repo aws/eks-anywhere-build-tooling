@@ -1,0 +1,66 @@
+From e5dc1e79cb84409b894c468a15e9c48d98ca5791 Mon Sep 17 00:00:00 2001
+From: Mihaela Balutoiu <mbalutoiu@cloudbasesolutions.com>
+Date: Mon, 19 Jun 2023 13:46:21 +0000
+Subject: [PATCH] Flatcar: ARM64: fix make deps
+
+Fixed the make dependencies to ensure compatibility with both architectures.
+
+Signed-off-by: Mihaela Balutoiu <mbalutoiu@cloudbasesolutions.com>
+---
+ images/capi/hack/ensure-goss.sh | 16 ++++++++++++++--
+ images/capi/hack/utils.sh       |  5 ++++-
+ 2 files changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/images/capi/hack/ensure-goss.sh b/images/capi/hack/ensure-goss.sh
+index 40a301f73..182ade732 100755
+--- a/images/capi/hack/ensure-goss.sh
++++ b/images/capi/hack/ensure-goss.sh
+@@ -25,7 +25,8 @@ source hack/utils.sh
+ # SHA are for amd64 arch.
+ _version="3.1.4"
+ darwin_sha256="ddb663a3e4208639d90b89ebdb69dc240ec16d6b01877ccbf968f76a58a89f99"
+-linux_sha256="9084877c2eea7e41fae60aaa6cdf7a7dde4e5de5e3d1f693ec8e812419ac54e9"
++linux_amd64_sha256="9084877c2eea7e41fae60aaa6cdf7a7dde4e5de5e3d1f693ec8e812419ac54e9"
++linux_arm64_sha256="5c3f43800b22cc9a1084f3f700243ea1a2392e12c0ae55987bec91d07b5547ed"
+ _bin_url="https://github.com/YaleUniversity/packer-provisioner-goss/releases/download/v${_version}/packer-provisioner-goss-v${_version}-${HOSTOS}-${HOSTARCH}.tar.gz"
+ _tarfile="${HOME}/.packer.d/plugins/packer-provisioner-goss.tar.gz"
+ _binfile="${HOME}/.packer.d/plugins/packer-provisioner-goss"
+@@ -33,7 +34,18 @@ _binfile="${HOME}/.packer.d/plugins/packer-provisioner-goss"
+ # Get a shasum for right OS's binary
+ case "${HOSTOS}" in
+ linux)
+-  _sha256="${linux_sha256}"
++  case "${HOSTARCH}" in
++    amd64)
++      _sha256="${linux_amd64_sha256}"
++      ;;
++    arm64)
++      _sha256="${linux_arm64_sha256}"
++      ;;
++    *)
++      echo "unsupported HOSTARCH=${HOSTARCH}" 1>&2
++      return 1
++      ;;
++  esac
+   ;;
+ darwin)
+   _sha256="${darwin_sha256}"
+diff --git a/images/capi/hack/utils.sh b/images/capi/hack/utils.sh
+index cfea5db00..6a9a7d8e8 100755
+--- a/images/capi/hack/utils.sh
++++ b/images/capi/hack/utils.sh
+@@ -29,7 +29,10 @@ esac
+ 
+ _hostarch=$(uname -m)
+ case "${_hostarch}" in
+-*64*)
++*aarch64*)
++  HOSTARCH=arm64
++  ;;
++*x86_64*)
+   HOSTARCH=amd64
+   ;;
+ *386*)
+-- 
+2.40.1
+
