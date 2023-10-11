@@ -16,7 +16,7 @@ s3-artifacts: create-manifests
 
 .PHONY: create-manifests
 create-manifests: export PATH:=$(MAKE_ROOT)/$(OUTPUT_DIR):$(PATH)
-create-manifests: $(KUSTOMIZE_TARGET) tarballs
+create-manifests: $(KUSTOMIZE_TARGET) tarballs | ensure-yq
 	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
 
 
