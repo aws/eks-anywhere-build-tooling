@@ -1,4 +1,4 @@
-BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG:=$(shell cat GIT_TAG)
 LINUX_KERNEL_VERSION:=$(shell cat LINUX_KERNEL_VERSION)
 GOLANG_VERSION:=$(shell cat GOLANG_VERSION)

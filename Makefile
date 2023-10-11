@@ -1,4 +1,4 @@
-BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+BASE_DIRECTORY:=$(abspath .)
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION?=us-west-2

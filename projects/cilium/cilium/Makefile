@@ -1,4 +1,4 @@
-BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG:=$(shell cat GIT_TAG)
 CHART_TAG:=$(shell echo $(GIT_TAG) | sed 's/^v//')
 
