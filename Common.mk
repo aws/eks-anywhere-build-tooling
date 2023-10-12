@@ -1008,9 +1008,13 @@ ensure-docker: ensure/docker
 		exit 1; \
 	fi
 
+# in code build we use the /buildkit.sh to launch buildkitd when we need it
+# in that case skip this check
 .PHONY: ensure-buildkitd-host
 ensure-buildkitd-host:
-	@if [ -z "$${BUILDKIT_HOST:-}" ] && [ ! -S /run/buildkit/buildkitd.sock ]; then \
+	@if [ "true" = "$(CODEBUILD_CI)" ] && [ "true" = "$(IS_ON_BUILDER_BASE)" ]; then \
+		exit 0; \
+	elif [ -z "$${BUILDKIT_HOST:-}" ] && [ ! -S /run/buildkit/buildkitd.sock ]; then \
 		echo "Please set the 'BUILDKIT_HOST' environment variable."; \
 		echo "If you want to run buildkitd via a docker container use"; \
 		echo "export BUILDKIT_HOST=docker-container://buildkitd && make run-buildkit-and-registry"; \
