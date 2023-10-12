@@ -1,7 +1,5 @@
 # Disable built-in rules and variables
 MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables
-SHELL=bash
-.SHELLFLAGS:=-eu -o pipefail -c
 .SUFFIXES:
 .SECONDEXPANSION:
 
@@ -14,6 +12,9 @@ PROJECT_PATH?=$(subst $(BASE_DIRECTORY)/,,$(MAKE_ROOT))
 BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 
+SHELL_TRACE?=false
+SHELL:=$(if $(filter true,$(SHELL_TRACE)),$(BUILD_LIB)/make_shell_trace.sh,bash)
+.SHELLFLAGS:=$(if $(filter true,$(SHELL_TRACE)),-c,-eu -o pipefail -c)
 #################### AWS ###########################
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
