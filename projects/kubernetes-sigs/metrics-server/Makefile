@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG=$(shell source $(BUILD_LIB)/common.sh && build::eksd_releases::get_eksd_component_asset_image_tag metrics-server metrics-server-image $(RELEASE_BRANCH))
-HELM_GIT_TAG:=$(shell cat $(RELEASE_BRANCH)/HELM_GIT_TAG)
+HELM_GIT_TAG=$(shell cat $(RELEASE_BRANCH)/HELM_GIT_TAG)
  # Upstream images are used directly without re-building and re-tagging in build
  # tooling, so the IMAGE_TAG needs to be overwritten to match upstream ECR tags.
 IMAGE_TAG=$(GIT_TAG)

@@ -1,5 +1,5 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG:=$(shell cat GIT_TAG)
+GIT_TAG=$(shell cat GIT_TAG)
 
 ENVOY_IMAGE=public.ecr.aws/appmesh/aws-appmesh-envoy:$(GIT_TAG)
 IMAGE_BUILD_ARGS=ENVOY_IMAGE

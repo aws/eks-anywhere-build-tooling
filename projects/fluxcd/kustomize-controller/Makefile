@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG:=$(shell cat GIT_TAG)
-GOLANG_VERSION:=$(shell cat GOLANG_VERSION)
+GIT_TAG=$(shell cat GIT_TAG)
+GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 REPO=kustomize-controller
 REPO_OWNER=fluxcd
 

@@ -7,12 +7,20 @@ ECR_PUBLIC_URI?=$(shell aws ecr-public describe-registries --region us-east-1 --
 JOB_TYPE?=
 
 RELEASE_BRANCH?=
-GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
+GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 ALL_PROJECTS=$(shell $(BUILD_LIB)/all_projects.sh $(BASE_DIRECTORY))
 
 # $1 - project name using _ as separator, ex: rancher_local-path-provisoner
 PROJECT_PATH_MAP=projects/$(patsubst $(firstword $(subst _, ,$(1)))_%,$(firstword $(subst _, ,$(1)))/%,$(1))
 
+# $1 - variable name to resolve and cache
+CACHE_RESULT = $(if $(filter undefined,$(origin _cached-$1)),$(eval _cached-$1 := 1)$(eval _cache-$1 := $($1)),)$(_cache-$1)
+
+# $1 - variable name
+CACHE_VARIABLE=$(eval _old-$(1)=$(value $(1)))$(eval $(1)=$$(call CACHE_RESULT,_old-$(1)))
+
+CACHE_VARS=ALL_PROJECTS AWS_ACCOUNT_ID GIT_HASH
+$(foreach v,$(CACHE_VARS),$(call CACHE_VARIABLE,$(v)))
 
 .PHONY: clean-project-%
 clean-project-%:

@@ -7,12 +7,11 @@ SHELL=bash
 
 RELEASE_ENVIRONMENT?=development
 
-GIT_HASH:=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
-
+GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 COMPONENT?=$(REPO_OWNER)/$(REPO)
 MAKE_ROOT=$(BASE_DIRECTORY)/projects/$(COMPONENT)
 PROJECT_PATH?=$(subst $(BASE_DIRECTORY)/,,$(MAKE_ROOT))
-BUILD_LIB=${BASE_DIRECTORY}/build/lib
+BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 
 #################### AWS ###########################
@@ -65,7 +64,7 @@ else
 	ifeq ($(CI),true)
 		BUILD_IDENTIFIER=$(PROW_JOB_ID)
 	else
-		BUILD_IDENTIFIER:=$(shell date "+%F-%s")
+		BUILD_IDENTIFIER=$(shell date "+%F-%s")
 	endif
 endif
 EXCLUDE_FROM_STAGING_BUILDSPEC?=false
@@ -89,7 +88,7 @@ REPO_SPARSE_CHECKOUT?=
 #################### RELEASE BRANCHES ##############
 HAS_RELEASE_BRANCHES?=false
 RELEASE_BRANCH?=
-SUPPORTED_K8S_VERSIONS:=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_BRANCHES)
+SUPPORTED_K8S_VERSIONS=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_BRANCHES)
 # Comma-separated list of Kubernetes versions to skip building artifacts for
 SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
@@ -228,6 +227,12 @@ TO_LOWER = $(subst A,a,$(subst B,b,$(subst C,c,$(subst D,d,$(subst E,e,$(subst \
 	M,m,$(subst N,n,$(subst O,o,$(subst P,p,$(subst Q,q,$(subst R,r,$(subst S,s,$(subst \
 	T,t,$(subst U,u,$(subst V,v,$(subst W,w,$(subst X,x,$(subst Y,y,$(subst Z,z,$(subst _,-,$(1))))))))))))))))))))))))))))
 
+# $1 - variable name to resolve and cache
+CACHE_RESULT=$(if $(filter undefined,$(origin _cached-$1)),$(eval _cached-$1:=1)$(eval _cache-$1:=$($1)),)$(_cache-$1)
+
+# $1 - variable name
+CACHE_VARIABLE=$(eval _old-$(1)=$(value $(1)))$(eval $(1)=$$(call CACHE_RESULT,_old-$(1)))
+
 # $1 - potential override variable name
 # $2 - value if variable not set
 # returns value of override var if one is set, otherwise returns $(2)
@@ -239,16 +244,6 @@ IMAGE_TARGETS_FOR_NAME=$(addsuffix /images/push, $(1)) $(addsuffix /images/amd64
 
 # $1 - binary file name
 FULL_FETCH_BINARIES_TARGETS=$(foreach platform,$(BINARY_PLATFORMS),$(addprefix $(BINARY_DEPS_DIR)/$(subst /,-,$(platform))/, $(1)))
-
-# Based on PROJECT_DEPENDENCIES, generate fetch binaries targets, only projects with s3 artifacts will be fetched
-PROJECT_DEPENDENCIES_TARGETS=$(foreach dep,$(PROJECT_DEPENDENCIES), \
-	$(eval project_path_parts:=$(subst /, ,$(dep))) \
-	$(eval project_path:=$(BASE_DIRECTORY)/projects/$(word 2,$(project_path_parts))/$(word 3,$(project_path_parts))) \
-	$(if $(or $(findstring eksd,$(dep)), \
-		$(and \
-			$(if $(wildcard $(project_path)),true,$(error Non-existent dependency: $(dep))), \
-			$(filter true,$(shell $(MAKE) -C $(project_path) var-value-HAS_S3_ARTIFACTS)) \
-		)),$(call FULL_FETCH_BINARIES_TARGETS,$(dep)),))
 
 # $1 - targets
 # $2 - platforms
@@ -356,12 +351,14 @@ GO_MOD_DOWNLOAD_TARGETS?=$(foreach path, $(UNIQ_GO_MOD_PATHS), $(call GO_MOD_DOW
 VENDOR_UPDATE_SCRIPT?=
 #### CGO ############
 CGO_CREATE_BINARIES?=false
-IS_ON_BUILDER_BASE?=$(shell if [ -f /buildkit.sh ]; then echo true; fi;)
-BUILDER_PLATFORM?=$(shell echo $$(go env GOHOSTOS)/$$(go env GOHOSTARCH))
-needs-cgo-builder=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter-out $(1),$(BUILDER_PLATFORM)),true,))
+IS_ON_BUILDER_BASE=$(if $(wildcard /buildkit.sh),true,false)
+BUILDER_PLATFORM_OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
+BUILDER_PLATFORM_ARCH=$(if $(filter x86_64,$(shell uname -m)),amd64,arm64)
+BUILDER_PLATFORM=$(BUILDER_PLATFORM_OS)/$(BUILDER_PLATFORM_ARCH)
+NEEDS_CGO_BUILDER=$(and $(if $(filter true,$(CGO_CREATE_BINARIES)),true,),$(if $(filter true,$(IS_ON_BUILDER_BASE)),,true))
 USE_DOCKER_FOR_CGO_BUILD?=false
-GO_MOD_CACHE=$(shell source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) > /dev/null 2>&1 && go env GOMODCACHE)
-GO_BUILD_CACHE=$(shell source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) > /dev/null 2>&1 && go env GOCACHE)
+GO_MOD_CACHE=$(shell if source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) > /dev/null 2>&1 && command -v go &> /dev/null; then go env GOMODCACHE; else echo $${HOME}/.cache/go/pkg/mod; fi)
+GO_BUILD_CACHE=$(shell if source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) > /dev/null 2>&1 && command -v go &> /dev/null; then go env GOCACHE; else echo $${HOME}/.cache/go-build; fi)
 CGO_TARGET?=
 GO_MODS_VENDORED?=false
 ######################
@@ -386,6 +383,17 @@ GOBUILD_COMMAND?=build
 BINARY_DEPS_DIR?=$(OUTPUT_DIR)/dependencies
 PROJECT_DEPENDENCIES?=
 HANDLE_DEPENDENCIES_TARGET?=handle-dependencies
+
+# Based on PROJECT_DEPENDENCIES, generate fetch binaries targets, only projects with s3 artifacts will be fetched
+PROJECT_DEPENDENCIES_TARGETS=$(foreach dep,$(PROJECT_DEPENDENCIES), \
+	$(eval project_path_parts:=$(subst /, ,$(dep))) \
+	$(eval project_path:=$(BASE_DIRECTORY)/projects/$(word 2,$(project_path_parts))/$(word 3,$(project_path_parts))) \
+	$(eval release_branch:=$(or $(word 4,$(project_path_parts)),$(RELEASE_BRANCH))) \
+	$(if $(or $(findstring eksd,$(dep)), \
+		$(and \
+			$(if $(wildcard $(project_path)),true,$(error Non-existent dependency: $(dep))), \
+			$(filter true,$(shell $(MAKE) -C $(project_path) var-value-HAS_S3_ARTIFACTS RELEASE_BRANCH=$(release_branch))) \
+		)),$(call FULL_FETCH_BINARIES_TARGETS,$(dep)),))
 ####################################################
 
 #################### LICENSES ######################
@@ -436,6 +444,12 @@ TARGET_END_LOG?="------------------- `$(DATE_CMD) +'%Y-%m-%dT%H:%M:%S.$(DATE_NAN
 BUILD_TARGETS?=github-rate-limit-pre validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr github-rate-limit-post
 RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
 ####################################################
+
+# convert commonly used, usually shell call, variables to lazily resolved cached variables
+CACHE_VARS=AWS_ACCOUNT_ID BUILD_IDENTIFIER BUILDER_PLATFORM_ARCH BUILDER_PLATFORM_OS DATE_CMD DATE_NANO \
+	GIT_HASH GIT_TAG GO_BUILD_CACHE GO_MOD_CACHE GOLANG_VERSION HELM_GIT_TAG IS_ON_BUILDER_BASE \
+	PROJECT_DEPENDENCIES_TARGETS SUPPORTED_K8S_VERSIONS
+$(foreach v,$(strip $(CACHE_VARS)),$(call CACHE_VARIABLE,$(v)))
 
 define BUILDCTL
 	$(BUILD_LIB)/buildkit.sh \
@@ -559,7 +573,7 @@ $(OUTPUT_BIN_DIR)/%: OUTPUT_PATH=$(if $(and $(if $(filter false,$(call IS_ONE_WO
 $(OUTPUT_BIN_DIR)/%: GO_MOD_PATH=$($(call GO_MOD_TARGET_FOR_BINARY_VAR_NAME,$(BINARY_TARGET)))
 $(OUTPUT_BIN_DIR)/%: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH)) 
 	@echo -e $(call TARGET_START_LOG)
-	$(if $(filter true,$(call needs-cgo-builder,$(PLATFORM))),$(call CGO_CREATE_BINARIES_SHELL,$@,$(*D)),$(call SIMPLE_CREATE_BINARIES_SHELL))
+	$(if $(NEEDS_CGO_BUILDER),$(call CGO_CREATE_BINARIES_SHELL,$@,$(*D)),$(call SIMPLE_CREATE_BINARIES_SHELL))
 	@echo -e $(call TARGET_END_LOG)
 endif
 
