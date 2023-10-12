@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Short-circuit if script has already been sourced
+[[ $(type -t build::common::loaded) == function ]] && return 0
+
 BUILD_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
 source "${BUILD_ROOT}/eksd_releases.sh"
 
@@ -149,7 +152,7 @@ function build::gather_licenses() {
   # data about each dependency to generate the amazon approved attribution.txt files
   # go-deps is needed for module versions
   # go-licenses are all the dependencies found from the module(s) that were passed in via patterns
-  build::common::echo_and_run go list -deps=true -json ./... | jq -s ''  > "${outputdir}/attribution/go-deps.json"
+  build::common::echo_and_run go list -deps=true -json ./... | jq -s '.'  > "${outputdir}/attribution/go-deps.json"
 
   # go-licenses can be a bit noisy with its output and lot of it can be confusing 
   # the following messages are safe to ignore since we do not need the license url for our process
@@ -453,4 +456,9 @@ function build::common::copy_if_source_destination_different() {
   fi
 
   cp -rf $source $destination
+}
+
+# Marker function to indicate script has been fully sourced
+function build::common::loaded() {
+  return 0
 }

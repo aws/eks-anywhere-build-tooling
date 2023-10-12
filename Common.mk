@@ -13,8 +13,9 @@ BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 
 SHELL_TRACE?=false
-SHELL:=$(if $(filter true,$(SHELL_TRACE)),$(BUILD_LIB)/make_shell_trace.sh,bash)
-.SHELLFLAGS:=$(if $(filter true,$(SHELL_TRACE)),-c,-eu -o pipefail -c)
+DEFAULT_SHELL:=$(if $(filter true,$(SHELL_TRACE)),$(BUILD_LIB)/make_shell.sh trace,bash)
+SHELL:=$(DEFAULT_SHELL)
+.SHELLFLAGS:=-eu -o pipefail -c
 #################### AWS ###########################
 AWS_REGION?=us-west-2
 AWS_ACCOUNT_ID?=$(shell aws sts get-caller-identity --query Account --output text)
@@ -439,6 +440,17 @@ DATE_CMD=TZ=utc $(shell source $(BUILD_LIB)/common.sh && build::find::gnu_varian
 DATE_NANO=$(shell if [ "$$(uname -s)" = "Linux" ] || command -v gdate &> /dev/null; then echo %3N; fi)
 TARGET_START_LOG?=$(eval _START_TIME:=$(shell $(DATE_CMD) +%s.$(DATE_NANO)))\\n------------------- $(shell $(DATE_CMD) +"%Y-%m-%dT%H:%M:%S.$(DATE_NANO)%z") Starting target=$@ -------------------
 TARGET_END_LOG?="------------------- `$(DATE_CMD) +'%Y-%m-%dT%H:%M:%S.$(DATE_NANO)%z'` Finished target=$@ duration=`echo $$($(DATE_CMD) +%s.$(DATE_NANO)) - $(_START_TIME) | bc` seconds -------------------\\n"
+
+ENABLE_LOGGING=$(eval $(call ENABLE_LOGGING_BODY,$@))
+# $1 - target name
+# target is exported so that the script can tell the difference between
+# a recipe and a $(shell) call, which we do not want to log around
+# this style of enable logging only works for single line recipes
+define ENABLE_LOGGING_BODY
+$(eval _TARGET:=$1)
+$(_TARGET): export LOGGING_TARGET=$(_TARGET)
+$(_TARGET): SHELL=$(BUILD_LIB)/make_shell.sh log
+endef
 ####################################################
 
 #################### TARGETS FOR OVERRIDING ########
@@ -477,14 +489,14 @@ define CGO_DOCKER
 endef
 
 define SIMPLE_CREATE_BINARIES_SHELL
-	$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_PATH) $(REPO) $(GOLANG_VERSION) $(PLATFORM) "$(SOURCE_PATTERN)" \
+	@$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_PATH) $(REPO) $(GOLANG_VERSION) $(PLATFORM) "$(SOURCE_PATTERN)" \
 		"$(GOBUILD_COMMAND)" "$(EXTRA_GOBUILD_FLAGS)" "$(GO_LDFLAGS)" $(CGO_ENABLED) "$(CGO_LDFLAGS)" "$(GO_MOD_PATH)" "$(BINARY_TARGET_FILES_BUILD_TOGETHER)"
 endef
 
 # $1 - make target
 # $2 - target directory
 define CGO_CREATE_BINARIES_SHELL
-	$(MAKE) binary-builder/cgo/$(PLATFORM:linux/%=%) IMAGE_OUTPUT=dest=$(OUTPUT_BIN_DIR)/$(2) CGO_TARGET=$(1) IMAGE_BUILD_ARGS="GOPROXY COMPONENT CGO_TARGET"
+	@$(MAKE) binary-builder/cgo/$(PLATFORM:linux/%=%) IMAGE_OUTPUT=dest=$(OUTPUT_BIN_DIR)/$(2) CGO_TARGET=$(1) IMAGE_BUILD_ARGS="GOPROXY COMPONENT CGO_TARGET"
 endef
 
 define WRITE_LOCAL_IMAGE_TAG
@@ -572,10 +584,8 @@ $(OUTPUT_BIN_DIR)/%: BINARY_TARGET=$(@F:%.exe=%)
 $(OUTPUT_BIN_DIR)/%: SOURCE_PATTERN=$(if $(filter $(BINARY_TARGET),$(BINARY_TARGET_FILES_BUILD_TOGETHER)),$(SOURCE_PATTERNS_BUILD_TOGETHER),$(word $(call pos,$(BINARY_TARGET),$(BINARY_TARGET_FILES)),$(SOURCE_PATTERNS)))
 $(OUTPUT_BIN_DIR)/%: OUTPUT_PATH=$(if $(and $(if $(filter false,$(call IS_ONE_WORD,$(BINARY_TARGET_FILES_BUILD_TOGETHER))),$(filter $(BINARY_TARGET),$(BINARY_TARGET_FILES_BUILD_TOGETHER)))),$(@D)/,$@)
 $(OUTPUT_BIN_DIR)/%: GO_MOD_PATH=$($(call GO_MOD_TARGET_FOR_BINARY_VAR_NAME,$(BINARY_TARGET)))
-$(OUTPUT_BIN_DIR)/%: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH)) 
-	@echo -e $(call TARGET_START_LOG)
+$(OUTPUT_BIN_DIR)/%: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH)) | $$(ENABLE_LOGGING)
 	$(if $(NEEDS_CGO_BUILDER),$(call CGO_CREATE_BINARIES_SHELL,$@,$(*D)),$(call SIMPLE_CREATE_BINARIES_SHELL))
-	@echo -e $(call TARGET_END_LOG)
 endif
 
 .PHONY: binaries
@@ -619,10 +629,8 @@ $(OUTPUT_DIR)/%TTRIBUTION.txt:
 $(OUTPUT_DIR)/%ttribution/go-license.csv: BINARY_TARGET=$(if $(filter .,$(*D)),,$(*D))
 $(OUTPUT_DIR)/%ttribution/go-license.csv: GO_MOD_PATH=$(if $(BINARY_TARGET),$(GO_MOD_TARGET_FOR_BINARY_$(call TO_UPPER,$(BINARY_TARGET))),$(word 1,$(UNIQ_GO_MOD_PATHS)))
 $(OUTPUT_DIR)/%ttribution/go-license.csv: LICENSE_PACKAGE_FILTER=$(GO_MOD_$(subst /,_,$(GO_MOD_PATH))_LICENSE_PACKAGE_FILTER)
-$(OUTPUT_DIR)/%ttribution/go-license.csv: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH)) | ensure-jq
-	@echo -e $(call TARGET_START_LOG)
-	$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/$(BINARY_TARGET) "$(LICENSE_PACKAGE_FILTER)" $(GO_MOD_PATH) $(GOLANG_VERSION) $(LICENSE_THRESHOLD)
-	@echo -e $(call TARGET_END_LOG)
+$(OUTPUT_DIR)/%ttribution/go-license.csv: $$(call GO_MOD_DOWNLOAD_TARGET_FROM_GO_MOD_PATH,$$(GO_MOD_PATH)) | ensure-jq $$(ENABLE_LOGGING)
+	@$(BASE_DIRECTORY)/build/lib/gather_licenses.sh $(REPO) $(MAKE_ROOT)/$(OUTPUT_DIR)/$(BINARY_TARGET) "$(LICENSE_PACKAGE_FILTER)" $(GO_MOD_PATH) $(GOLANG_VERSION) $(LICENSE_THRESHOLD)
 
 .PHONY: gather-licenses
 gather-licenses: $(GATHER_LICENSES_TARGETS)
@@ -631,20 +639,15 @@ gather-licenses: $(GATHER_LICENSES_TARGETS)
 # if there is only one go mod path so only one attribution is created, the file will be named ATTRIBUTION.txt and licenses will be stored in _output, `%` will equal `A`
 # if multiple attributions are being generated, the file will be <binary>_ATTRIBUTION.txt and licenses will be stored in _output/<binary>, `%` will equal `<BINARY>_A`
 %TTRIBUTION.txt: LICENSE_OUTPUT_PATH=$(OUTPUT_DIR)$(if $(filter A,$(*F)),,/$(call TO_LOWER,$(*F:%_A=%)))
-%TTRIBUTION.txt: $$(LICENSE_OUTPUT_PATH)/attribution/go-license.csv 
-	@echo -e $(call TARGET_START_LOG)
-	@rm -f $(@F)
-	$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSE_OUTPUT_PATH) $(@F) $(RELEASE_BRANCH)
-	@echo -e $(call TARGET_END_LOG)
+%TTRIBUTION.txt: $$(LICENSE_OUTPUT_PATH)/attribution/go-license.csv | $$(ENABLE_LOGGING)
+	@$(BASE_DIRECTORY)/build/lib/create_attribution.sh $(MAKE_ROOT) $(GOLANG_VERSION) $(MAKE_ROOT)/$(LICENSE_OUTPUT_PATH) $(@F) $(RELEASE_BRANCH)
 
 .PHONY: attribution
 attribution: $(and $(filter true,$(HAS_LICENSES)),$(ATTRIBUTION_TARGETS))
 
 .PHONY: attribution-pr
-attribution-pr: attribution
-	@echo -e $(call TARGET_START_LOG)
-	$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
-	@echo -e $(call TARGET_END_LOG)
+attribution-pr: attribution | $$(ENABLE_LOGGING)
+	@$(BASE_DIRECTORY)/build/update-attribution-files/create_pr.sh
 
 .PHONY: all-attributions
 all-attributions:
@@ -653,18 +656,14 @@ all-attributions:
 #### Tarball Targets
 
 .PHONY: tarballs
-tarballs: $(LICENSES_TARGETS_FOR_PREREQ)
+tarballs: $(LICENSES_TARGETS_FOR_PREREQ) | $$(ENABLE_LOGGING)
 ifeq ($(SIMPLE_CREATE_TARBALLS),true)
-	@echo -e $(call TARGET_START_LOG)
-	$(BASE_DIRECTORY)/build/lib/simple_create_tarballs.sh $(TAR_FILE_PREFIX) $(MAKE_ROOT)/$(OUTPUT_DIR) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(ARTIFACTS_PATH) $(GIT_HASH)
-	@echo -e $(call TARGET_END_LOG)
+	@$(BUILD_LIB)/simple_create_tarballs.sh $(TAR_FILE_PREFIX) $(MAKE_ROOT)/$(OUTPUT_DIR) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(GIT_TAG) "$(BINARY_PLATFORMS)" $(ARTIFACTS_PATH) $(GIT_HASH)
 endif
 
 .PHONY: upload-artifacts
-upload-artifacts: s3-artifacts upload-output-to-prow-artifacts-s3-artifacts
-	@echo -e $(call TARGET_START_LOG)
-	$(BASE_DIRECTORY)/build/lib/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN) $(UPLOAD_DO_NOT_DELETE)
-	@echo -e $(call TARGET_END_LOG)
+upload-artifacts: s3-artifacts upload-output-to-prow-artifacts-s3-artifacts | $$(ENABLE_LOGGING)
+	@$(BUILD_LIB)/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN) $(UPLOAD_DO_NOT_DELETE)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
@@ -682,19 +681,15 @@ upload-output-to-prow-artifacts-%:
 ### Checksum Targets
 
 .PHONY: checksums
-checksums: $(BINARY_TARGETS)
+checksums: $(BINARY_TARGETS) | $$(ENABLE_LOGGING)
 ifneq ($(strip $(BINARY_TARGETS)),)
-	@echo -e $(call TARGET_START_LOG)
-	$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
-	@echo -e $(call TARGET_END_LOG)
+	@$(BASE_DIRECTORY)/build/lib/update_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR)
 endif
 
 .PHONY: validate-checksums
-validate-checksums: $(BINARY_TARGETS) upload-output-to-prow-artifacts-validate-checksums
+validate-checksums: $(BINARY_TARGETS) upload-output-to-prow-artifacts-validate-checksums | $$(ENABLE_LOGGING)
 ifneq ($(and $(strip $(BINARY_TARGETS)), $(filter false, $(SKIP_CHECKSUM_VALIDATION))),)
-	@echo -e $(call TARGET_START_LOG)
-	$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION)
-	@echo -e $(call TARGET_END_LOG)
+	@$(BASE_DIRECTORY)/build/lib/validate_checksums.sh $(MAKE_ROOT) $(PROJECT_ROOT) $(MAKE_ROOT)/$(OUTPUT_BIN_DIR) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION)
 endif
 
 .PHONY: attribution-checksums
@@ -742,10 +737,8 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE?=oci
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).tar
 
-%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host
-	@echo -e $(call TARGET_START_LOG)
-	$(BUILDCTL)
-	@echo -e $(call TARGET_END_LOG)
+%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host $$(ENABLE_LOGGING)
+	@$(BUILDCTL)
 
 %/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host
 	@echo -e $(call TARGET_START_LOG)
@@ -796,10 +789,8 @@ binary-builder/cgo/%: USE_DOCKER_FOR_CGO_BUILD=$(shell command -v docker &> /dev
 
 ## Helm Targets
 .PHONY: helm/pull 
-helm/pull: 
-	@echo -e $(call TARGET_START_LOG)
-	$(BUILD_LIB)/helm_pull.sh $(HELM_PULL_LOCATION) $(HELM_REPO_URL) $(HELM_PULL_NAME) $(REPO) $(HELM_DIRECTORY) $(CHART_VERSION) $(COPY_CRDS)
-	@echo -e $(call TARGET_END_LOG)
+helm/pull: | $$(ENABLE_LOGGING)
+	@$(BUILD_LIB)/helm_pull.sh $(HELM_PULL_LOCATION) $(HELM_REPO_URL) $(HELM_PULL_NAME) $(REPO) $(HELM_DIRECTORY) $(CHART_VERSION) $(COPY_CRDS)
 
 # Build helm chart
 .PHONY: helm/build
@@ -815,19 +806,15 @@ helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGE
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
-helm/push: helm/build | ensure-helm
-	@echo -e $(call TARGET_START_LOG)
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
-	@echo -e $(call TARGET_END_LOG)
+helm/push: helm/build | ensure-helm $$(ENABLE_LOGGING)
+	@$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
 ## Fetch Binary Targets
 .PHONY: handle-dependencies 
 handle-dependencies: $(call PROJECT_DEPENDENCIES_TARGETS)
 
-$(BINARY_DEPS_DIR)/linux-%:
-	@echo -e $(call TARGET_START_LOG)
+$(BINARY_DEPS_DIR)/linux-%: | $$(ENABLE_LOGGING)
 	$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(LATEST) $(RELEASE_BRANCH)
-	@echo -e $(call TARGET_END_LOG)
 
 ## Build Targets
 .PHONY: build
@@ -840,7 +827,8 @@ release: $(RELEASE_TARGETS)
 # Iterate over release branch versions, avoiding branches explicitly marked as skipped
 .PHONY: %/release-branches/all
 %/release-branches/all:
-	@for version in $(SUPPORTED_K8S_VERSIONS) ; do \
+	@set -e; \
+	for version in $(SUPPORTED_K8S_VERSIONS) ; do \
 	    if ! [[ "$(SKIPPED_K8S_VERSIONS)" =~ $$version  ]]; then \
 			$(MAKE) $* $(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),clean-output,) RELEASE_BRANCH=$$version; \
 		fi \
@@ -1062,3 +1050,8 @@ run-$(1)-in-docker: run-target-in-docker
 endef
 
 $(foreach target,$(IN_DOCKER_TARGETS),$(eval $(call RUN_IN_DOCKER_TARGET,$(target))))
+
+# make sure by default all targets use the 
+# if we do not have this as a catch all target then the first target
+# which sets it to 0 will affect all the prereq targets for that target
+%: SHELL=$(DEFAULT_SHELL)
