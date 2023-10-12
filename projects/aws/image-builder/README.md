@@ -17,11 +17,11 @@ Supported OSes
 * Red Hat Enterprise Linux
 
 Supported Release Channels
+* 1-28
 * 1-27
 * 1-26
 * 1-25
 * 1-24
-* 1-23
 
 Supported Firmwares
 * bios

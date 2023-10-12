@@ -54,9 +54,6 @@ PACKER_VAR_FILES=$(FULL_OUTPUT_DIR)/config/kubernetes.json $(FULL_OUTPUT_DIR)/co
 # Kubernetes pause tag in v1.22.4: https://github.com/kubernetes/kubernetes/blob/v1.22.4/build/pause/Makefile#L20
 # Kubernetes pause tag in v1.21.5: https://github.com/kubernetes/kubernetes/blob/v1.21.5/build/pause/Makefile#L20
 # Kubeadm constants: https://github.com/kubernetes/kubernetes/blob/v1.22.4/cmd/kubeadm/app/constants/constants.go#L397
-ADDITIONAL_PAUSE_1-21_FROM=1-20
-ADDITIONAL_PAUSE_1-22_FROM=1-21
-ADDITIONAL_PAUSE_1-23_FROM=1-22
 ADDITIONAL_PAUSE_1-24_FROM=1-23
 ADDITIONAL_PAUSE_1-25_FROM=1-24
 ADDITIONAL_PAUSE_1-26_FROM=1-26
