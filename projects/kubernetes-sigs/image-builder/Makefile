@@ -67,6 +67,9 @@ HAS_RELEASE_BRANCHES=true
 HAS_LICENSES=false
 SIMPLE_CREATE_TARBALLS=false
 
+# if running locally and do not want to try and create ec2 instance
+SKIP_METAL_INSTANCE_TEST?=false
+
 # to support a no op attribution target
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution
 
@@ -131,7 +134,7 @@ BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload
 
 # only running release-raw-ubuntu-2004 on presubmit here since we are just validating the instance creation and do not need to run for every OS
 # tinkerbell/bare metal node images
-BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) release-raw-ubuntu-2004
+BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) $(if $(filter true,$(SKIP_METAL_INSTANCE_TEST)),,release-raw-ubuntu-2004)
 
 # cloud stack node images
 BUILD_CLOUDSTACK_TARGETS=build-cloudstack-redhat-8 $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,cloudstack,redhat-8) upload-artifacts-cloudstack-redhat-8
@@ -216,16 +219,12 @@ export GOVC_INSECURE?=true
 
 ######################## DEPS #################################
 .PHONY: setup-ami-share
-setup-ami-share:
-	@echo -e $(call TARGET_START_LOG)
-	jq -n '{"ami_users": "$(DEV_ACCOUNTS)", "ami_groups": "", "snapshot_users": "$(DEV_ACCOUNTS)", "snapshot_groups": ""}' > $(PACKER_AMI_SHARE_FILE)
-	@echo -e $(call TARGET_END_LOG)
+setup-ami-share: | $$(ENABLE_LOGGING)
+	@jq -n '{"ami_users": "$(DEV_ACCOUNTS)", "ami_groups": "", "snapshot_users": "$(DEV_ACCOUNTS)", "snapshot_groups": ""}' > $(PACKER_AMI_SHARE_FILE)
 
 .PHONY: setup-packer-configs-%
-setup-packer-configs-%: $(GIT_PATCH_TARGET) | ensure-jq ensure-yq
-	@echo -e $(call TARGET_START_LOG)
-	build/setup_packer_configs.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(FINAL_IMAGE_DIR) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR) $(IMAGE_OS_DIR) $(IMAGE_OS_VERSION)
-	@echo -e $(call TARGET_END_LOG)
+setup-packer-configs-%: $(GIT_PATCH_TARGET) | ensure-jq ensure-yq $$(ENABLE_LOGGING)
+	@build/setup_packer_configs.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(FINAL_IMAGE_DIR) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR) $(IMAGE_OS_DIR) $(IMAGE_OS_VERSION)
 
 ##############################################################
 
@@ -233,11 +232,8 @@ setup-packer-configs-%: $(GIT_PATCH_TARGET) | ensure-jq ensure-yq
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
 # ex: fake-ubuntu-2004-raw.gz,fake-ubuntu-2004-ova-efi.ova
 fake-%: PACKER_LOG_PATH=$(ARTIFACTS_PATH)/$(subst -,/,$(basename $(*F)))/packer.log
-fake-%:
-	@echo -e $(call TARGET_START_LOG)
-	touch $(@)
-	touch $(PACKER_LOG_PATH)
-	@echo -e $(call TARGET_END_LOG)
+fake-%: | $$(ENABLE_LOGGING)
+	@touch $(@) $(PACKER_LOG_PATH)
 
 packer/ova/vsphere.json:
 	echo "{}" > $@
@@ -268,10 +264,8 @@ $(ARTIFACTS_PATH)/bottlerocket/%: | ensure-yq ensure-tuftool
 # ex: upload-bottlerocket-1-ova, upload-bottlerocket-1-raw
 upload-bottlerocket-%: IMAGE_OS_VERSION=$(word 1,$(subst -, ,$*))
 upload-bottlerocket-%: IMAGE_FORMAT=$(word 2,$(subst -, ,$*))
-upload-bottlerocket-%: $$(FINAL_IMAGE_PATH)
-	@echo -e $(call TARGET_START_LOG)
-	build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) $(IMAGE_OS_VERSION)
-	@echo -e $(call TARGET_END_LOG)
+upload-bottlerocket-%: $$(FINAL_IMAGE_PATH) | $$(ENABLE_LOGGING)
+	@build/upload_bottlerocket_artifacts.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_PATH_IMAGE_FORMAT) $(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) $(IMAGE_OS_VERSION)
 ###############################################################
 
 ########################### FINAL TARGETS ##############################
@@ -292,10 +286,8 @@ build-%: IMAGE_FORMAT=$(word 1,$(subst -, ,$*))
 build-%: IMAGE_OS=$(word 2,$(subst -, ,$*))
 build-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
 build-%: IMAGE_OS_FIRMWARE=$(word 4,$(subst -, ,$*))
-build-%: validate-supported-image-% setup-packer-configs-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,)
-	@echo -e $(call TARGET_START_LOG)	
-	PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,validate-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
-	@echo -e $(call TARGET_END_LOG)
+build-%: validate-supported-image-% setup-packer-configs-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,) | $$(ENABLE_LOGGING)
+	@PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,validate-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
 #########################################################
 
 ######################## IMAGE BUILDER TARGETS #######################
@@ -322,10 +314,8 @@ release-ami-%: validate-supported-image-% setup-ami-share | ensure-jq
 	@echo -e $(call TARGET_END_LOG)
 
 release-ova-%: IMAGE_FORMAT=ova
-release-ova-%: validate-supported-image-% | ensure-jq
-	@echo -e $(call TARGET_START_LOG)
-	build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST) $(IMAGE_OS_FIRMWARE)
-	@echo -e $(call TARGET_END_LOG)
+release-ova-%: validate-supported-image-% | ensure-jq $$(ENABLE_LOGGING)
+	@build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST) $(IMAGE_OS_FIRMWARE)
 
 release-raw-%: IMAGE_FORMAT=raw
 release-raw-%: release-image-build-on-metal-%
@@ -338,10 +328,8 @@ release-cloudstack-%: release-image-build-on-metal-%
 # used for cloudstack and raw
 # clone the repo first since its scp'd to the temporary instance which runs kvm
 release-image-build-on-metal-%: IMAGE_FORMAT?=raw
-release-image-build-on-metal-%: validate-supported-image-% $(GIT_PATCH_TARGET) | ensure-jq
-	@echo -e $(call TARGET_START_LOG)
-	build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $(IMAGE_OS) $(IMAGE_OS_VERSION) $(IMAGE_FORMAT) $(LATEST) $(FINAL_IMAGE_DIR) $(BRANCH_NAME)
-	@echo -e $(call TARGET_END_LOG)
+release-image-build-on-metal-%: validate-supported-image-% $(GIT_PATCH_TARGET) | ensure-jq $$(ENABLE_LOGGING)
+	@build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $(IMAGE_OS) $(IMAGE_OS_VERSION) $(IMAGE_FORMAT) $(LATEST) $(FINAL_IMAGE_DIR) $(BRANCH_NAME)
 
 #######################################################################
 
@@ -369,15 +357,11 @@ local-build-%: validate-supported-image-% setup-packer-configs-%
 #######################################################################
 
 ######################## ARTIFACT TARGETS #############################
-s3-artifacts-%: $$(FINAL_IMAGE_PATH)
-	@echo -e $(call TARGET_START_LOG)
-	$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
-	@echo -e $(call TARGET_END_LOG)
+s3-artifacts-%: $$(FINAL_IMAGE_PATH) | $$(ENABLE_LOGGING)
+	@$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
 
-upload-artifacts-%: s3-artifacts-%
-	@echo -e $(call TARGET_START_LOG)
-	$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
-	@echo -e $(call TARGET_END_LOG)
+upload-artifacts-%: s3-artifacts-% | $$(ENABLE_LOGGING)
+	@$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
 
 #######################################################################
 
