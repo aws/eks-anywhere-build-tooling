@@ -39,14 +39,20 @@ function build::eksd_releases::load_release_yaml() {
 
 function build::eksd_releases::get_release_yaml_url() {
     local -r release_branch=$1
-    local -r release_number=$(yq e ".releases[] | select(.branch==\"${release_branch}\").number" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
-    local -r dev=$(yq e ".releases[] | select(.branch==\"${release_branch}\").dev" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
-    local -r yaml_path="kubernetes-${release_branch}/kubernetes-${release_branch}-eks-${release_number}.yaml"
-    local yaml_url="https://$PROD_DOMAIN/$yaml_path"
-    if [[ $dev == "true" ]]; then
-      yaml_url="https://$DEV_DOMAIN/$yaml_path"
+    # EKSD_MANIFEST_URL is set only when image-builder CLI is running in airgapped mode.
+    # This will be set to a filepath that has the downloaded or pre-baked eks-d manifest file
+    if [ -n "$EKSD_MANIFEST_URL" ]; then
+        echo "${EKSD_MANIFEST_URL}"
+    else
+        local -r release_number=$(yq e ".releases[] | select(.branch==\"${release_branch}\").number" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
+        local -r dev=$(yq e ".releases[] | select(.branch==\"${release_branch}\").dev" ${REPO_ROOT}/EKSD_LATEST_RELEASES)
+        local -r yaml_path="kubernetes-${release_branch}/kubernetes-${release_branch}-eks-${release_number}.yaml"
+        local yaml_url="https://$PROD_DOMAIN/$yaml_path"
+        if [[ $dev == "true" ]]; then
+          yaml_url="https://$DEV_DOMAIN/$yaml_path"
+        fi
+        echo "$yaml_url"
     fi
-    echo "$yaml_url"
 }
 
 function build::eksd_releases::get_release_branch() {
