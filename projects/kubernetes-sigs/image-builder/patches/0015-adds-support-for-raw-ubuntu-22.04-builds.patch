@@ -1,7 +1,7 @@
-From 2787a5bd657cb37f2fb1d9be90b1ce34238526ce Mon Sep 17 00:00:00 2001
+From 4bde5df4762a2afb6c74f7df3c7b05489e65b995 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Fri, 16 Jun 2023 15:27:15 -0500
-Subject: [PATCH 16/19] adds support for raw ubuntu 22.04 builds
+Subject: [PATCH 15/22] adds support for raw ubuntu 22.04 builds
 
 ---
  images/capi/Makefile                          |   6 +-
@@ -20,20 +20,20 @@ Subject: [PATCH 16/19] adds support for raw ubuntu 22.04 builds
  create mode 100644 images/capi/packer/raw/raw-ubuntu-2204.json
 
 diff --git a/images/capi/Makefile b/images/capi/Makefile
-index 0226a7e53..4f90365aa 100644
+index 2b190b755..f841eac48 100644
 --- a/images/capi/Makefile
 +++ b/images/capi/Makefile
-@@ -353,7 +353,7 @@ OSC_BUILD_NAMES 			?=	osc-ubuntu-2004
- QEMU_BUILD_NAMES			?=	qemu-ubuntu-1804 qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-centos-7 qemu-ubuntu-2004-efi qemu-rhel-8 qemu-rockylinux-8 qemu-flatcar
+@@ -359,7 +359,7 @@ QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2204-efi qem
+ 
  QEMU_KUBEVIRT_BUILD_NAMES	:= $(addprefix kubevirt-,$(QEMU_BUILD_NAMES))
  
--RAW_BUILD_NAMES                        ?=      raw-ubuntu-1804 raw-ubuntu-2004 raw-ubuntu-2004-efi raw-flatcar raw-rhel-8
-+RAW_BUILD_NAMES                        ?=      raw-ubuntu-1804 raw-ubuntu-2004 raw-ubuntu-2004-efi raw-ubuntu-2204 raw-ubuntu-2204-efi raw-flatcar raw-rhel-8
+-RAW_BUILD_NAMES				?=      raw-ubuntu-2004 raw-ubuntu-2004-efi raw-flatcar raw-rhel-8
++RAW_BUILD_NAMES				?=      raw-ubuntu-2004 raw-ubuntu-2004-efi raw-ubuntu-2204 raw-ubuntu-2204-efi raw-flatcar raw-rhel-8
  VBOX_BUILD_NAMES			?=      vbox-windows-2019
  
  POWERVS_BUILD_NAMES         ?= powervs-centos-8
-@@ -743,6 +743,8 @@ build-raw-flatcar: ## Builds Flatcar RAW image
- build-raw-ubuntu-1804: ## Builds Ubuntu 18.04 RAW image
+@@ -746,6 +746,8 @@ build-qemu-all: $(QEMU_BUILD_TARGETS) ## Builds all Qemu images
+ build-raw-flatcar: ## Builds Flatcar RAW image
  build-raw-ubuntu-2004: ## Builds Ubuntu 20.04 RAW image
  build-raw-ubuntu-2004-efi: ## Builds Ubuntu 20.04 RAW image that EFI boots
 +build-raw-ubuntu-2204: ## Builds Ubuntu 22.04 RAW image
@@ -41,8 +41,8 @@ index 0226a7e53..4f90365aa 100644
  build-raw-rhel-8: ## Builds RHEL 8 RAW image
  build-raw-all: $(RAW_BUILD_TARGETS) ## Builds all RAW images
  
-@@ -876,6 +878,8 @@ validate-raw-flatcar: ## Validates Flatcar RAW image packer config
- validate-raw-ubuntu-1804: ## Validates Ubuntu 18.04 RAW image packer config
+@@ -880,6 +882,8 @@ validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
+ validate-raw-flatcar: ## Validates Flatcar RAW image packer config
  validate-raw-ubuntu-2004: ## Validates Ubuntu 20.04 RAW image packer config
  validate-raw-ubuntu-2004-efi: ## Validates Ubuntu 20.04 RAW EFI image packer config
 +validate-raw-ubuntu-2204: ## Validates Ubuntu 22.04 RAW image packer config
@@ -275,7 +275,7 @@ index 000000000..e2838e3c4
 +    - curtin in-target --target=/target -- rm -rf /var/lib/apt/lists/*
 diff --git a/images/capi/packer/raw/raw-ubuntu-2204-efi.json b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
 new file mode 100644
-index 000000000..7d2f921c5
+index 000000000..3de116312
 --- /dev/null
 +++ b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
 @@ -0,0 +1,13 @@
@@ -294,7 +294,7 @@ index 000000000..7d2f921c5
 +  }
 diff --git a/images/capi/packer/raw/raw-ubuntu-2204.json b/images/capi/packer/raw/raw-ubuntu-2204.json
 new file mode 100644
-index 000000000..38e827ef1
+index 000000000..e03f336cd
 --- /dev/null
 +++ b/images/capi/packer/raw/raw-ubuntu-2204.json
 @@ -0,0 +1,12 @@
@@ -302,7 +302,7 @@ index 000000000..38e827ef1
 +  "boot_command_prefix": "c<wait>linux /casper/vmlinuz --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/22.04/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
 +  "build_name": "ubuntu-2204",
 +  "build_target": "raw",
-+  "distro_name": "ubuntu",  
++  "distro_name": "ubuntu",
 +  "guest_os_type": "ubuntu-64",
 +  "iso_checksum": "5e38b55d57d94ff029719342357325ed3bda38fa80054f9330dc789cd2d43931",
 +  "iso_checksum_type": "sha256",
@@ -311,5 +311,5 @@ index 000000000..38e827ef1
 +  "shutdown_command": "shutdown -P now"
 +  }
 -- 
-2.39.2
+2.40.1
 

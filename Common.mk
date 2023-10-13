@@ -986,7 +986,7 @@ ensure-locale:
 	@if [ "Linux" = "$$(uname -s)" ]; then \
 		LOCALE=$$(locale | grep LANG | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]'); \
 		if [[ "c.utf-8 posix" != *"$${LOCALE:-posix}"* ]]; then \
-			echo WARNING: Environment locale set to $(LANG). On Linux systems this may create \
+			echo WARNING: Environment locale set to $$LOCALE. On Linux systems this may create \
 				non-deterministic behavior when running generation recipes. If the CI fails validation try \
 				exporting LANG=C.UTF-8 to generate files instead.; \
 		fi; \
