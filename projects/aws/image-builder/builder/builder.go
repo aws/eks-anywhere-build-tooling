@@ -236,7 +236,7 @@ func (b *BuildOptions) BuildImage() {
 		var outputImageGlobPattern string
 		switch b.Os {
 		case RedHat:
-			outputImageGlobPattern = "output/rhel-*/rhel-*"
+			outputImageGlobPattern = "output/rhel-*"
 			buildCommand = fmt.Sprintf("make -C %s local-build-cloudstack-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.CloudstackConfig.RhelUsername),
@@ -260,6 +260,8 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.qcow2", b.Os))
+
+		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == AMI {
 		amiConfigFile := filepath.Join(imageBuilderProjectPath, packerAMIConfigFile)
 
