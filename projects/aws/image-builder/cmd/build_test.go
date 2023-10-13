@@ -77,7 +77,7 @@ func TestValidateOSHypervisorCombinations(t *testing.T) {
 				Hypervisor: "nutanix",
 				Os:         "redhat",
 			},
-			wantErr: "Invalid OS type. Only ubuntu OS is supported for Nutanix",
+			wantErr: "",
 		},
 	}
 
@@ -138,7 +138,7 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 				Os:        "redhat",
 				OsVersion: "9",
 			},
-			wantErr: "9 is not a supported version of Redhat. Please select one of 8",
+			wantErr: "",
 		},
 		{
 			testName: "Rockylinux 1",

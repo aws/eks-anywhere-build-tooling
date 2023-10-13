@@ -39,9 +39,7 @@ PACKER_OVA_VAR_FILES+=$(PACKER_OVA_CONF_FILE)
 
 PACKER_RAW_VAR_FILES?=
 PACKER_CLOUDSTACK_VAR_FILES?=
-
-PACKER_NUTANIX_CONF_FILES=$(MAKE_ROOT)/packer/nutanix/nutanix.json
-PACKER_NUTANIX_VAR_FILES+=$(PACKER_NUTANIX_CONF_FILES)
+PACKER_NUTANIX_VAR_FILES?=
 
 PACKER_TYPE_VAR_FILES?=$(PACKER_$(call TO_UPPER,$(IMAGE_FORMAT))_VAR_FILES)
 PACKER_ADDITIONAL_FILES_VAR_FILES?=
@@ -166,12 +164,12 @@ ALLOWED_OVA_OS=ubuntu bottlerocket redhat
 ALLOWED_RAW_OS=ubuntu bottlerocket redhat
 ALLOWED_CLOUDSTACK_OS=redhat
 ALLOWED_AMI_OS=ubuntu bottlerocket
-ALLOWED_NUTANIX_OS=ubuntu
+ALLOWED_NUTANIX_OS=ubuntu redhat
 
 ALLOWED_UBUNTU_VERSIONS=2004 2204
 DEFAULT_UBUNTU_VERSION=2004
 
-ALLOWED_REDHAT_VERSIONS=8
+ALLOWED_REDHAT_VERSIONS=8 9
 DEFAULT_REDHAT_VERSION=8
 
 ALLOWED_BOTTLEROCKET_VERSIONS=1
@@ -433,8 +431,12 @@ release-ami-ubuntu-2204:
 
 build-nutanix-ubuntu-2004:
 build-nutanix-ubuntu-2204:
+build-nutanix-redhat-8:
+build-nutanix-redhat-9:
 release-nutanix-ubuntu-2004:
 release-nutanix-ubuntu-2204:
+release-nutanix-redhat-8:
+release-nutanix-redhat-9:
 
 build-ova-ubuntu-2004:
 build-ova-ubuntu-2204:

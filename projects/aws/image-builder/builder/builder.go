@@ -185,6 +185,13 @@ func (b *BuildOptions) BuildImage() {
 
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
 	} else if b.Hypervisor == Nutanix {
+		// Set proxy on RHSM if available
+		if b.Os == RedHat && b.NutanixConfig.HttpProxy != "" {
+			if err := setRhsmProxy(&b.NutanixConfig.ProxyConfig, &b.NutanixConfig.RhsmConfig); err != nil {
+				log.Fatalf("Error parsing proxy host and port for RHSM: %v", err)
+			}
+		}
+
 		// Patch firmware config for tool
 		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
 		if err := executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
@@ -201,7 +208,19 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error writing nutanix config file to packer: %v", err)
 		}
 
-		buildCommand := fmt.Sprintf("make -C %s local-build-nutanix-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
+		var buildCommand string
+		switch b.Os {
+		case Ubuntu:
+			buildCommand = fmt.Sprintf("make -C %s local-build-nutanix-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
+		case RedHat:
+			buildCommand = fmt.Sprintf("make -C %s local-build-nutanix-redhat-%s", imageBuilderProjectPath, b.OsVersion)
+			commandEnvVars = append(commandEnvVars,
+				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.NutanixConfig.RhelUsername),
+				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.NutanixConfig.RhelPassword),
+				fmt.Sprintf("%s=%s", rhelImageUrlNutanixEnvVar, b.NutanixConfig.ImageUrl),
+			)
+		}
+
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for nutanix hypervisor: %v", err)

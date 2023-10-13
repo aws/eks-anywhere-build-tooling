@@ -87,6 +87,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		bo.OsVersion = "8"
 	}
 
+	if bo.Hypervisor != builder.Nutanix && bo.Os == builder.RedHat && bo.OsVersion != "8" {
+		log.Fatalf("Invalid OS version for RedHat. Please choose 8")
+	}
+
 	if err = validateOSVersion(bo.Os, bo.OsVersion); err != nil {
 		log.Fatal(err.Error())
 	}
@@ -181,6 +185,12 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				return err
 			}
 
+			if bo.Os == builder.RedHat {
+				if err = validateRedhat(&bo.NutanixConfig.RhelConfig, "Don't check IsoUrl Param"); err != nil {
+					return err
+				}
+			}
+
 			if bo.NutanixConfig.NutanixUserName == "" || bo.NutanixConfig.NutanixPassword == "" {
 				log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
 			}
@@ -256,10 +266,6 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 func validateOSHypervisorCombinations(os, hypervisor string) error {
 	if hypervisor == builder.CloudStack && os != builder.RedHat {
 		return fmt.Errorf("Invalid OS type. Only redhat OS is supported for CloudStack")
-	}
-
-	if hypervisor == builder.Nutanix && os != builder.Ubuntu {
-		return fmt.Errorf("Invalid OS type. Only ubuntu OS is supported for Nutanix")
 	}
 
 	if hypervisor == builder.AMI && os != builder.Ubuntu {
