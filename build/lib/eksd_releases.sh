@@ -41,6 +41,7 @@ function build::eksd_releases::get_release_yaml_url() {
     local -r release_branch=$1
     # EKSD_MANIFEST_URL is set only when image-builder CLI is running in airgapped mode.
     # This will be set to a filepath that has the downloaded or pre-baked eks-d manifest file
+    EKSD_MANIFEST_URL="${EKSD_MANIFEST_URL:-}"
     if [ -n "$EKSD_MANIFEST_URL" ]; then
         echo "${EKSD_MANIFEST_URL}"
     else
