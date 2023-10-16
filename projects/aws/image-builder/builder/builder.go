@@ -218,6 +218,7 @@ func (b *BuildOptions) BuildImage() {
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.NutanixConfig.RhelUsername),
 				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.NutanixConfig.RhelPassword),
 				fmt.Sprintf("%s=%s", rhelImageUrlNutanixEnvVar, b.NutanixConfig.ImageUrl),
+				fmt.Sprintf("%s=%s", "PACKER_NUTANIX_TEST_CONF_FILES", " "),
 			)
 		}
 
