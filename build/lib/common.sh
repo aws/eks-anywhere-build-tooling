@@ -129,7 +129,8 @@ function build::gather_licenses() {
   local -r patterns=$2
   local -r golang_version=$3
   local -r threshold=$4
-  
+  local -r cgo_enabled=$5
+
   # Force deps to only be pulled form vendor directories
   # this is important in a couple cases where license files
   # have to be manually created
@@ -137,6 +138,7 @@ function build::gather_licenses() {
   # force platform to be linux to ensure all deps are picked up
   export GOOS=linux 
   export GOARCH=amd64 
+  export CGO_ENABLED=$cgo_enabled
 
   build::common::use_go_version "$golang_version"
 
@@ -156,7 +158,7 @@ function build::gather_licenses() {
 
   # go-licenses can be a bit noisy with its output and lot of it can be confusing 
   # the following messages are safe to ignore since we do not need the license url for our process
-  NOISY_MESSAGES="cannot determine URL for|Error discovering license URL|unsupported package host|contains non-Go code|has empty version|vendor.*\.(h|s)$"
+  NOISY_MESSAGES="cannot determine URL for|Error discovering license URL|unsupported package host|contains non-Go code|has empty version|\.(h|s|c)$"
  
   build::common::echo_and_run go-licenses save --confidence_threshold $threshold --force $patterns --save_path "${outputdir}/LICENSES" 2> >(grep -vE "$NOISY_MESSAGES")
   
