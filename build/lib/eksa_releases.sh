@@ -41,7 +41,7 @@ function build::eksa_releases::load_bundle_manifest() {
     if [ $dev_release = true ] && [ -n "$EKSA_RELEASE_VERSION" ]; then
       eksa_release_version="$eksa_release_version+build.*"
     fi
-    local -r bundle_manifest_url=$(echo "$release_manifest" | yq e ".spec.releases[] | select(.version == \"$eksa_release_version\") .bundleManifestUrl" -)
+    local bundle_manifest_url=$(echo "$release_manifest" | yq e ".spec.releases[] | select(.version == \"$eksa_release_version\") .bundleManifestUrl" -)
     # EKSA_BUNDLE_MANIFEST_URL is set only when image-builder CLI is running in airgapped mode.
     # This will be set to a filepath that has the downloaded or pre-baked bundles file
     EKSA_BUNDLE_MANIFEST_URL="${EKSA_BUNDLE_MANIFEST_URL:-}"
