@@ -1,4 +1,6 @@
 ## **Emissary-ingress**
+![Version](https://img.shields.io/badge/version-v3.6.0-blue)
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoid2Vla0ZUclhyN0dNN1ZLRnRoV3dBV241UDVVUUNmYUFyWVdDUWg3SUdqcThyblJvZ245cHN0cjFhUGNETDZhUkkySUNDZC9kdVFhemlpUjZGclRibUdnPSIsIml2UGFyYW1ldGVyU3BlYyI6IjRsempqaUZTNlB6TjF0bVQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 Official website: https://www.getambassador.io/docs/
 Upstream repository: https://github.com/emissary-ingress/emissary
