@@ -87,6 +87,7 @@ func (b *BuildOptions) BuildImage() {
 
 		commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerAdditionalFilesConfigFileEnvVar, additionalFilesConfigFile))
 	}
+	var outputImageGlobPattern string
 	if b.Hypervisor == VSphere {
 		// Set proxy on RHSM if available
 		if b.Os == RedHat && b.VsphereConfig.HttpProxy != "" {
@@ -128,11 +129,7 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error executing image-builder for vsphere hypervisor: %v", err)
 		}
 
-		// Move the output ova to cwd
-		outputImageGlob, err = filepath.Glob(filepath.Join(upstreamImageBuilderProjectPath, "output/*.ova"))
-		if err != nil {
-			log.Fatalf("Error getting glob for output files: %v", err)
-		}
+		outputImageGlobPattern = "output/*.ova"
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.ova", b.Os))
 
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
@@ -178,12 +175,10 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
 		}
 
-		outputImageGlob, err = filepath.Glob(filepath.Join(upstreamImageBuilderProjectPath, "output/*.gz"))
-		if err != nil {
-			log.Fatalf("Error getting glob for output files: %v", err)
-		}
-
+		outputImageGlobPattern = "output/*.gz"
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
+
+		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == Nutanix {
 		// Patch firmware config for tool
 		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
@@ -233,10 +228,9 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		var buildCommand string
-		var outputImageGlobPattern string
 		switch b.Os {
 		case RedHat:
-			outputImageGlobPattern = "output/rhel-*"
+			outputImageGlobPattern = "output/rhel-*/rhel-*"
 			buildCommand = fmt.Sprintf("make -C %s local-build-cloudstack-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.CloudstackConfig.RhelUsername),
@@ -252,11 +246,6 @@ func (b *BuildOptions) BuildImage() {
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
-		}
-
-		outputImageGlob, err = filepath.Glob(filepath.Join(upstreamImageBuilderProjectPath, outputImageGlobPattern))
-		if err != nil {
-			log.Fatalf("Error getting glob for output files: %v", err)
 		}
 
 		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.qcow2", b.Os))
@@ -293,6 +282,11 @@ func (b *BuildOptions) BuildImage() {
 	}
 
 	if outputArtifactPath != "" {
+		outputImageGlob, err = filepath.Glob(filepath.Join(upstreamImageBuilderProjectPath, outputImageGlobPattern))
+		if err != nil {
+			log.Fatalf("Error getting glob for output files: %v", err)
+		}
+
 		// Moving artifacts from upstream directory to cwd
 		log.Println("Moving artifacts from build directory to current working directory")
 		err = os.Rename(outputImageGlob[0], outputArtifactPath)
