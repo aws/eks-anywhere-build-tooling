@@ -48,6 +48,7 @@ const (
 	rhsmActivationKeyEnvVar               string = "RHSM_ACTIVATION_KEY"
 	rhsmOrgIDEnvVar                       string = "RHSM_ORG_ID"
 	packerTypeVarFilesEnvVar              string = "PACKER_TYPE_VAR_FILES"
+	packerNutanixVarFilesEnvVar           string = "PACKER_NUTANIX_VAR_FILES"
 	eksaUseDevReleaseEnvVar               string = "EKSA_USE_DEV_RELEASE"
 
 	// Miscellaneous
