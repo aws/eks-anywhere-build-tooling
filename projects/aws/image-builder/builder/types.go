@@ -27,6 +27,7 @@ var SupportedUbuntuVersions = []string{
 
 var SupportedRedHatVersions = []string{
 	"8",
+	"9",
 }
 
 var SupportedFirmwares = []string{
@@ -108,13 +109,15 @@ type RhelConfig struct {
 type NutanixConfig struct {
 	ClusterName       string `json:"nutanix_cluster_name"`
 	ImageName         string `json:"image_name"`
-	SourceImageName   string `json:"source_image_name"`
+	ImageUrl          string `json:"image_url,omitempty"`
+	SourceImageName   string `json:"source_image_name,omitempty"`
 	NutanixEndpoint   string `json:"nutanix_endpoint"`
 	NutanixInsecure   string `json:"nutanix_insecure"`
 	NutanixPort       string `json:"nutanix_port"`
 	NutanixUserName   string `json:"nutanix_username"`
 	NutanixPassword   string `json:"nutanix_password"`
 	NutanixSubnetName string `json:"nutanix_subnet_name"`
+	RhelConfig
 	ProxyConfig
 	ExtraPackagesConfig
 	ExtraOverridesConfig

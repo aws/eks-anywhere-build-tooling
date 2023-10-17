@@ -1,0 +1,42 @@
+From ac7f6a843dc531ee813346ff66aa9b53164e3cb0 Mon Sep 17 00:00:00 2001
+From: Ilya Alekseyev <ilya.alekseyev@nutanix.com>
+Date: Thu, 12 Oct 2023 09:12:01 -0400
+Subject: [PATCH 24/25] Fix redhat 9 cloud-init feature flags bug
+
+---
+ images/capi/ansible/roles/providers/tasks/main.yml | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/images/capi/ansible/roles/providers/tasks/main.yml b/images/capi/ansible/roles/providers/tasks/main.yml
+index fd93ef4b2..ea0150391 100644
+--- a/images/capi/ansible/roles/providers/tasks/main.yml
++++ b/images/capi/ansible/roles/providers/tasks/main.yml
+@@ -132,14 +132,23 @@
+     mode: 0644
+   when: ansible_os_family == "Debian"
+ 
+-- name: set cloudinit feature flags for redhat
++- name: set cloudinit feature flags for redhat 8
+   copy:
+     src: usr/lib/python3/site-packages/cloudinit/feature_overrides.py
+     dest: /usr/lib/python3.6/site-packages/cloudinit/feature_overrides.py
+     owner: root
+     group: root
+     mode: 0644
+-  when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat"
++  when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat" and ansible_distribution_major_version == "8"
++
++- name: set cloudinit feature flags for redhat 9
++  copy:
++    src: usr/lib/python3/site-packages/cloudinit/feature_overrides.py
++    dest: /usr/lib/python3.9/site-packages/cloudinit/feature_overrides.py
++    owner: root
++    group: root
++    mode: 0644
++  when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat" and ansible_distribution_major_version == "9"
+ 
+ - name: Ensure chrony is running
+   systemd:
+-- 
+2.39.2
+
