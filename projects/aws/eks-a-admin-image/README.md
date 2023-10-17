@@ -1,7 +1,7 @@
 # EKS-A Admin image
-This project builds EKS-A Admin VM image's containing all necessary artifacts to manage EKS-A clusters.
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiSGtiejcreFBSRjBuVzV1cTlIb1BTa09KaGt2Z3lOZ1JLblBLQ0hwU1phQ0JyUjRKcmZ5SlB6UThXZDJhZ3JhZ3U1cFVlZ1BDNFJvS1FwcjlUMUtWRXh3PSIsIml2UGFyYW1ldGVyU3BlYyI6InBBTFpDN2xRRGNyMFZIRXIiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
-All images are built using packer.
+This project uses Packer to build EKS-A Admin VM images containing all necessary artifacts to create and manage EKS-A clusters.
 
 ## Add more components
 1. Add a bash script that installs your component under `providers`

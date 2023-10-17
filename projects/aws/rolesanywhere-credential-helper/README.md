@@ -1,5 +1,6 @@
 ## **rolesanywhere-credential-helper**
 ![Version](https://img.shields.io/badge/version-v1.0.4-blue)
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiSlViVU00Vk4wbmtjdmtXTnVURVB6MUcwRktoKzduS0haUUpEeER4R3hKYkUwbUxNNldGS3F3cytyYXJmMllRQUI5b2dWQTJlanhBL1RhMERwS1lSNi9ZPSIsIml2UGFyYW1ldGVyU3BlYyI6IkdhZXIzVXk1b3JLdTFMRTAiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The Rolesanywhere credential binary implements the [signing process](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-sign-process.html) for IAM Roles Anywhere's [CreateSession API](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-create-session.html) to get temporary credentials compatible with the `credential_process` feature available across the language SDKs.
 

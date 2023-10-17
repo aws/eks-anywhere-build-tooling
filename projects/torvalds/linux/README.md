@@ -1,5 +1,6 @@
 ## **Linux Boot Config**
 ![Version](https://img.shields.io/badge/version-v5.17-blue)
+![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiQzVkSWVDSHVIYkNHSWdxMTVwMkI3RnFXVEMyeWdJbWplOUdUbFcxbkpEd3Zld05LaDhUYlRIK09xaFhTQ3doMVM2U3doWkpkOCt4NmVpYi85VzV1SnNNPSIsIml2UGFyYW1ldGVyU3BlYyI6Ik9ySnBzTE9LMnRwRWNhekgiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [Linux Boot Config](https://github.com/torvalds/linux/tree/master/tools/bootconfig) project is a tool on the linux repository that helps expand 
 the kernel command line to support additional key-value data when booting the kernel in an efficient way. This allows administrators to pass a structured key config file
