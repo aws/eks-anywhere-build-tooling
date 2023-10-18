@@ -432,7 +432,7 @@ SKIP_CHECKSUM_VALIDATION?=false
 IN_DOCKER_TARGETS=all-attributions all-attributions-checksums all-checksums attribution attribution-checksums binaries checksums clean clean-go-cache
 PRUNE_BUILDCTL?=false
 GITHUB_TOKEN?=
-DEPENDENCY_TOOLS=buildctl helm jq skopeo tuftool yq
+DEPENDENCY_TOOLS=buildctl helm jq lz4 skopeo tuftool yq
 ####################################################
 
 #################### LOGGING #######################

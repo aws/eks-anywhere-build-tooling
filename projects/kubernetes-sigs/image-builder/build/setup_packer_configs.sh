@@ -160,16 +160,20 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
         if [ -z $PACKER_ACTIVE_INTERFACE ]; then
             echo "Finding interface for Packer temporary HTTP server"
             if [ "$(uname -s)" = "Linux" ]; then
-                INTERFACES=($(ls /sys/class/net))
-                for interface in "${INTERFACES[@]}"; do
-                    if [ "$interface" = "eth0" ] || [ "$interface" = "en0" ] || [ "$interface" = "eno1" ]; then
-                        PACKER_ACTIVE_INTERFACE=$interface
-                        echo "Found interface: $interface"
-                        break
-                    fi
-                done
+                if command -v route &> /dev/null; then
+                    PACKER_ACTIVE_INTERFACE=$(route |awk '/^default/{print $NF}')
+                else
+                    INTERFACES=($(ls /sys/class/net))
+                    for interface in "${INTERFACES[@]}"; do
+                        if [ "$interface" = "eth0" ] || [ "$interface" = "en0" ] || [ "$interface" = "eno1" ]; then
+                            PACKER_ACTIVE_INTERFACE=$interface
+                            echo "Found interface: $interface"
+                            break
+                        fi
+                    done
+                fi
             elif [ "$(uname -s)" = "Darwin" ]; then
-                PACKER_ACTIVE_INTERFACE="en0"
+                PACKER_ACTIVE_INTERFACE=$(route -n get default | grep 'interface:' | grep -o '[^ ]*$')
             fi
         fi
 
