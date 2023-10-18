@@ -20,11 +20,12 @@ set -o pipefail
 BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
 ALL_PROJECTS="${2?Specify second argument - All projects in repo}"
 STAGING_BUILDSPEC_FILE="${3}"
-SKIP_DEPEND_ON="${4:-false}"
-EXCLUDE_VAR="${5:-EXCLUDE_FROM_STAGING_BUILDSPEC}"
-BUILDSPECS_VAR="${6:-BUILDSPECS}"
-FAST_FAIL="${7:-true}"
-ADD_FINAL_STAGE="${8:-}"
+DEFAULT_BUILDSPEC_FILE="${4}"
+SKIP_DEPEND_ON="${5:-false}"
+EXCLUDE_VAR="${6:-EXCLUDE_FROM_STAGING_BUILDSPEC}"
+BUILDSPECS_VAR="${7:-BUILDSPECS}"
+FAST_FAIL="${8:-true}"
+ADD_FINAL_STAGE="${9:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
@@ -45,7 +46,7 @@ MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 cd $MAKE_ROOT
 
 mkdir -p $(dirname $STAGING_BUILDSPEC_FILE)
-yq eval --null-input ".batch={\"fast-fail\":$FAST_FAIL,\"build-graph\":[]}" > $STAGING_BUILDSPEC_FILE # Creates an empty YAML array
+yq eval --null-input ".batch={\"fast-fail\":$FAST_FAIL,\"build-graph\":[]} | . *= load(\"$DEFAULT_BUILDSPEC_FILE\")" > $STAGING_BUILDSPEC_FILE # Creates an empty YAML array
 
 # TODO: refactor use of release_branch to get git_tag and golang_version in makefile, we should be able to push this to common.mk and avoid needing to pass it here
 RELEASE_BRANCH=$(build::eksd_releases::get_release_branch)
@@ -78,7 +79,11 @@ for project in "${PROJECTS[@]}"; do
         IDENTIFIER="${org//-/_}_${repo//-/_}"
 
         buildspec=${SPECS[$i]}
-
+        buildspec_field="\"buildspec\":\"$buildspec\","
+        if [[ $(realpath $buildspec) == $(realpath $DEFAULT_BUILDSPEC_FILE) ]]; then
+            buildspec_field=""
+        fi
+        
         DEPEND_ON=""
         # something other than empty string since some overrides are empty strings
         PROJECT_DEPENDENCIES="false"
@@ -189,7 +194,7 @@ for project in "${PROJECTS[@]}"; do
 
                     ALL_PROJECT_IDS+="\"$IDENTIFIER\","
                     yq eval -i -P \
-                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"}}}]" \
+                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"}}}]" \
                         $STAGING_BUILDSPEC_FILE
                 done
             else
@@ -204,7 +209,7 @@ for project in "${PROJECTS[@]}"; do
                         IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}_${val2//-/_}_${BUILDSPEC_NAME//-/_}
                         ALL_PROJECT_IDS+="\"$IDENTIFIER\","
                         yq eval -i -P \
-                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"}}}]" \
+                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"}}}]" \
                             $STAGING_BUILDSPEC_FILE 
                     done
                 done
@@ -212,7 +217,7 @@ for project in "${PROJECTS[@]}"; do
         else
             ALL_PROJECT_IDS+="\"$IDENTIFIER\","
             yq eval -i -P \
-                ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"$buildspec\",$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL}}}]" \
+                ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL}}}]" \
                 $STAGING_BUILDSPEC_FILE 
         fi
         

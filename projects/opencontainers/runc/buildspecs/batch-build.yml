@@ -18,16 +18,22 @@ batch:
   fast-fail: true
   build-graph:
     - identifier: opencontainers_runc_linux_amd64
-      buildspec: buildspec.yml
       env:
         type: LINUX_CONTAINER
         compute-type: BUILD_GENERAL1_SMALL
         variables:
           BINARY_PLATFORMS: linux/amd64
     - identifier: opencontainers_runc_linux_arm64
-      buildspec: buildspec.yml
       env:
         type: ARM_CONTAINER
         compute-type: BUILD_GENERAL1_SMALL
         variables:
           BINARY_PLATFORMS: linux/arm64
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - ./build/lib/setup.sh
+  build:
+    commands:
+      - if $(make check-project-path-exists) && make check-for-release-branch-skip -C $PROJECT_PATH; then make release -C $PROJECT_PATH; fi

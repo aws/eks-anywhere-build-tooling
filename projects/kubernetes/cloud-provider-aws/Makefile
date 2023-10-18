@@ -2,9 +2,6 @@ BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG=$(shell cat ./$(RELEASE_BRANCH)/GIT_TAG)
 GOLANG_VERSION=$(shell cat ./$(RELEASE_BRANCH)/GOLANG_VERSION)
 
-EXCLUDE_FROM_STAGING_BUILDSPEC=true
-SKIP_ON_RELEASE_BRANCH=true
-
 REPO=cloud-provider-aws
 REPO_OWNER=kubernetes
 
