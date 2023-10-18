@@ -114,12 +114,12 @@ function build::common::upload_artifacts() {
     # Upload artifacts to s3 
     # 1. To proper path on s3 with buildId-githash
     # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
-    build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read
+    build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read --no-progress
 
     if [ "$do_not_delete" = "true" ]; then
-      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --acl public-read
+      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --acl public-read --no-progress
     else
-      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read
+      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read --no-progress
     fi
   fi
 }
@@ -278,7 +278,7 @@ function build::common::use_go_version() {
   # Adding to the beginning of PATH to allow for builds on specific version if it exists
   export PATH=${gobinarypath}:$PATH
   export GOCACHE=$(go env GOCACHE)/$version
-}
+  }
 
 # Use a seperate build cache for each project/version to ensure there are no
 # shared bits which can mess up the final checksum calculation

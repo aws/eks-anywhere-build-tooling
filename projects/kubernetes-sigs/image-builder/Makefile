@@ -80,6 +80,10 @@ RAW_FORMAT_EXT=gz
 AMI_FORMAT_EXT=gz
 CLOUDSTACK_FORMAT_EXT=qcow2
 
+# there is no file produced during nutanix builds, defining to avoid
+# missing variable warning
+NUTANIX_FORMAT_EXT=
+
 # $1- image_format
 # $2 - image_os
 EXT_FROM_FORMAT=$(if $(and $(filter bottlerocket,$2),$(filter-out ova,$1)),img.,)$($(call TO_UPPER,$1)_FORMAT_EXT)
@@ -206,6 +210,22 @@ DEBUG?=0
 
 SKIP_ON_RELEASE_BRANCH=$(if $(filter bottlerocket,$(IMAGE_OS)),false,true)
 
+# our file builds/downloads are technically intermediate targets which would get deleted when
+# make finishes, this avoids that
+ALL_FINAL_FILE_PATHS=\
+	$(foreach format,$(IMAGE_FORMATS_AVAIL),\
+		$(foreach os,$(ALLOWED_$(call TO_UPPER,$(format))_OS),\
+			$(foreach ver,$(ALLOWED_$(call TO_UPPER,$(os))_VERSIONS),\
+				$(foreach firmware,$(if $(filter $(os)-$(format),$(ALLOWED_EFI_OS_FORMATS)),/ /efi/,/),\
+					$(ARTIFACTS_PATH)/$(os)/$(ver)/$(format)$(firmware)$(os).$(call EXT_FROM_FORMAT,$(format),$(os))\
+				)\
+			)\
+		)\
+	)
+
+SPECIAL_TARGET_SECONDARY=$(strip $(ALL_FINAL_FILE_PATHS))
+
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
@@ -242,7 +262,7 @@ $(ARTIFACTS_PATH)/bottlerocket/% upload-bottlerocket-%: IMAGE_OS=bottlerocket
 $(ARTIFACTS_PATH)/bottlerocket/%: IMAGE_OS_VERSION=$(word 1,$(subst /, ,$(*D)))
 $(ARTIFACTS_PATH)/bottlerocket/%: IMAGE_FORMAT=$(word 2,$(subst /, ,$(*D)))
 $(ARTIFACTS_PATH)/bottlerocket/%: export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
-$(ARTIFACTS_PATH)/bottlerocket/%: | ensure-yq ensure-tuftool
+$(ARTIFACTS_PATH)/bottlerocket/%: | ensure-yq ensure-tuftool ensure-lz4
 	@echo -e $(call TARGET_START_LOG)
 	mkdir -p $(@D) $(BOTTLEROCKET_DOWNLOAD_PATH)
 	# This configuration supports local installations and checksum validations of root.json file
