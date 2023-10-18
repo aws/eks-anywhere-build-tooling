@@ -5,8 +5,6 @@ REPO=hub
 REPO_OWNER=tinkerbell
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
-BINARY_PLATFORMS=linux/amd64
-IMAGE_PLATFORMS=linux/amd64
 
 CEXEC_IMAGE_COMPONENT=tinkerbell/hub/cexec
 KEXEC_IMAGE_COMPONENT=tinkerbell/hub/kexec
