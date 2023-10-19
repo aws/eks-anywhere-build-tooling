@@ -130,7 +130,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		outputImageGlobPattern = "output/*.ova"
-		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.ova", b.Os))
+		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s-%s-kube-%s.ova", b.Os, b.OsVersion, b.ReleaseChannel))
 
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == Baremetal {
@@ -176,7 +176,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		outputImageGlobPattern = "output/*.gz"
-		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.gz", b.Os))
+		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s-%s-kube-%s.gz", b.Os, b.OsVersion, b.ReleaseChannel))
 
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == Nutanix {
@@ -271,7 +271,7 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
 		}
 
-		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s.qcow2", b.Os))
+		outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s-%s-kube-%s.qcow2", b.Os, b.OsVersion, b.ReleaseChannel))
 
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == AMI {
