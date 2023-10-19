@@ -180,6 +180,10 @@ IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS
 CURRENT_BUILDER_BASE_TAG=$(or $(and $(wildcard /config/BUILDER_BASE_TAG_FILE),$(shell cat /config/BUILDER_BASE_TAG_FILE)),latest)
 CURRENT_BUILDER_BASE_IMAGE=$(if $(CODEBUILD_BUILD_IMAGE),$(CODEBUILD_BUILD_IMAGE),$(BASE_IMAGE_REPO)/builder-base:$(CURRENT_BUILDER_BASE_TAG))
 GOLANG_GCC_BUILDER_IMAGE=$(BASE_IMAGE_REPO)/golang:$(shell cat $(BASE_DIRECTORY)/EKS_DISTRO_MINIMAL_BASE_GOLANG_COMPILER_$(GOLANG_VERSION)_GCC_TAG_FILE)
+
+# in CODEBUILD always use buildctl
+BUILDCTL_AVAILABLE=$(or $(filter true,$(CODEBUILD_CI)),$(shell command -v buildctl &> /dev/null && buildctl debug workers &> /dev/null && echo "true" || echo "false"))
+BUILDX_AVAILABLE=$(shell docker buildx inspect &> /dev/null && echo "true" || echo "false")
 ####################################################
 
 #################### HELM ##########################
@@ -461,7 +465,7 @@ RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter t
 # convert commonly used, usually shell call, variables to lazily resolved cached variables
 CACHE_VARS=AWS_ACCOUNT_ID BUILD_IDENTIFIER BUILDER_PLATFORM_ARCH BUILDER_PLATFORM_OS DATE_CMD DATE_NANO \
 	GIT_HASH GIT_TAG GO_BUILD_CACHE GO_MOD_CACHE GOLANG_VERSION HELM_GIT_TAG IS_ON_BUILDER_BASE \
-	PROJECT_DEPENDENCIES_TARGETS SUPPORTED_K8S_VERSIONS
+	PROJECT_DEPENDENCIES_TARGETS SUPPORTED_K8S_VERSIONS BUILDCTL_AVAILABLE BUILDX_AVAILABLE
 $(foreach v,$(strip $(CACHE_VARS)),$(call CACHE_VARIABLE,$(v)))
 
 define BUILDCTL
@@ -722,6 +726,9 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 %/images/push %/images/amd64 %/images/arm64: DOCKERFILE_FOLDER?=./docker/linux
 %/images/push %/images/amd64 %/images/arm64: IMAGE_CONTEXT_DIR?=.
 %/images/push %/images/amd64 %/images/arm64: IMAGE_BUILD_ARGS?=
+# if there is neither buildctl or buildx, use ensure-buildctl to show the user that error
+%/images/push %/images/amd64 %/images/arm64 %/cgo/amd64 %/cgo/arm64 %-useradd/images/export: ENSURE_PREREQ=$(if $(or $(filter true,$(BUILDCTL_AVAILABLE)),$(filter false,$(BUILDX_AVAILABLE))),ensure-buildkitd-host,)
+%/images/push %/images/amd64 %/images/arm64 %/cgo/amd64 %/cgo/arm64 %-useradd/images/export: export USE_BUILDX=$(if $(filter ensure-buildkitd-host,$(ENSURE_PREREQ)),false,true)
 
 # Build image using buildkit for all platforms, by default pushes to registry defined in IMAGE_REPO.
 %/images/push: IMAGE_PLATFORMS?=linux/amd64,linux/arm64
@@ -737,17 +744,17 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE?=oci
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT?=dest=$(IMAGE_OUTPUT_DIR)/$(IMAGE_OUTPUT_NAME).tar
 
-%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host $$(ENABLE_LOGGING)
+%/images/push: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | $$(ENSURE_PREREQ) $$(ENABLE_LOGGING)
 	@$(BUILDCTL)
 
-%/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host
+%/images/amd64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | $$(ENSURE_PREREQ)
 	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 	$(WRITE_LOCAL_IMAGE_TAG)
 	@echo -e $(call TARGET_END_LOG)
 
-%/images/arm64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | ensure-buildctl ensure-buildkitd-host
+%/images/arm64: $(BINARY_TARGETS) $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | $$(ENSURE_PREREQ)
 	@echo -e $(call TARGET_START_LOG)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
@@ -783,7 +790,7 @@ binary-builder/cgo/%: USE_DOCKER_FOR_CGO_BUILD=$(shell command -v docker &> /dev
 %-useradd/images/export: IMAGE_BUILD_ARGS=IMAGE_USERADD_USER_ID IMAGE_USERADD_USER_NAME
 %-useradd/images/export: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/useradd
 %-useradd/images/export: IMAGE_PLATFORMS=linux/amd64
-%-useradd/images/export: | ensure-buildctl ensure-buildkitd-host
+%-useradd/images/export: | $$(ENSURE_PREREQ)
 	@mkdir -p $(IMAGE_OUTPUT_DIR)
 	$(BUILDCTL)
 
@@ -1014,7 +1021,7 @@ ensure-docker: ensure/docker
 # in code build we use the /buildkit.sh to launch buildkitd when we need it
 # in that case skip this check
 .PHONY: ensure-buildkitd-host
-ensure-buildkitd-host:
+ensure-buildkitd-host: | ensure-buildctl
 	@if [ "true" = "$(CODEBUILD_CI)" ] && [ "true" = "$(IS_ON_BUILDER_BASE)" ]; then \
 		exit 0; \
 	elif [ -z "$${BUILDKIT_HOST:-}" ] && [ ! -S /run/buildkit/buildkitd.sock ]; then \
