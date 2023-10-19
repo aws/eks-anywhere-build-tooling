@@ -1,5 +1,5 @@
 ## **Image Builder Tool**
-![Version](https://img.shields.io/badge/version-v0.2.1-blue)
+![Version](https://img.shields.io/badge/version-v0.3.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiRHQ0UnNzTElaQyt5eDI5OG9XYUhYQW85WXE5RzI3Sjd5YWFwK2d2aHBVb2R4dS8xek5aeUcrVHJFN05JR2JnbWx2aGRURlAxdDZrNFQwMFRaMzY4MWU0PSIsIml2UGFyYW1ldGVyU3BlYyI6InIxUHNId1RQcCs3SzlFWWQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 Image Builder Tool is a cli that builds EKS-A compatible Kubernetes node images. The tool is based on upstream
@@ -234,8 +234,8 @@ Image builder only supports building Ubuntu in an airgapped mode for now.
     }
    ```
 2. Install pre-requisites required for image builder in the environment or admin machine.
-   1. Packer version 1.8.7 
-   2. Ansible version 2.11.5
+   1. Packer version 1.9.4
+   2. Ansible version 2.15.3
    3. Packer provisioner goss version 3.1.4
    4. jq
    5. yq
