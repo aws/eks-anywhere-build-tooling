@@ -31,16 +31,17 @@ BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
 BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
+REMOVE_CLOUD_PROVIDERS_TARGET=$(REPO)/cluster-autoscaler/cloudprovider/eks-anywhere-cloud-providers-removed-$(GIT_TAG)
 
 include $(BASE_DIRECTORY)/Common.mk
 
 
-$(GO_MOD_DOWNLOAD_TARGETS): remove-cloud-providers
-attributions: remove-cloud-providers
+$(GO_MOD_DOWNLOAD_TARGETS): $(REMOVE_CLOUD_PROVIDERS_TARGET)
+attributions: $(REMOVE_CLOUD_PROVIDERS_TARGET)
 
-.PHONY: remove-cloud-providers
-remove-cloud-providers: $(GIT_PATCH_TARGET)
+$(REMOVE_CLOUD_PROVIDERS_TARGET): $(GIT_PATCH_TARGET)
 	cd ./autoscaler/cluster-autoscaler/cloudprovider && ls . | grep -v -e builder -e clusterapi -e mocks -e test -e .go | xargs rm -rf
+	touch $@
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
 

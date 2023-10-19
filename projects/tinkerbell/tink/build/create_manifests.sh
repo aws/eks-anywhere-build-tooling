@@ -33,9 +33,9 @@ build::common::use_go_version ${GOLANG_VERSION}
 
 cd $REPO
 
-npm install prettier --global
+npm install prettier
 
-make release-manifests \
+PATH=$(pwd)/node_modules/.bin/:$PATH make release-manifests \
   TINK_SERVER_IMAGE=${IMAGE_REPO}/${TINK_SERVER_IMAGE_COMPONENT} \
   TINK_CONTROLLER_IMAGE=${IMAGE_REPO}/${TINK_CONTROLLER_IMAGE_COMPONENT} \
   TINK_SERVER_TAG=${IMAGE_TAG} \

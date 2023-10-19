@@ -58,10 +58,9 @@ build-%: KUBECTL_URL?=$(shell ./build/get_kubectl_url.sh)
 build-%: export PKR_VAR_kubectl-url=$(KUBECTL_URL)
 build-%: export PKR_VAR_yq-url=$(YQ_URL)
 
-$(PACKER): OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
 $(PACKER):
 	mkdir -p $(@D)
-	curl --silent -L https://releases.hashicorp.com/packer/$(PACKER_VERSION)/packer_$(PACKER_VERSION)_$(OS)_amd64.zip > packer.zip
+	curl --silent -L https://releases.hashicorp.com/packer/$(PACKER_VERSION)/packer_$(PACKER_VERSION)_$(BUILDER_PLATFORM_OS)_$(BUILDER_PLATFORM_ARCH).zip > packer.zip
 	unzip packer.zip -d $(@D)
 	rm packer.zip
 

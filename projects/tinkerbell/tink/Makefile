@@ -28,8 +28,8 @@ include $(BASE_DIRECTORY)/Common.mk
 s3-artifacts: create-manifests
 
 .PHONY: create-manifests
-create-manifests: tarballs
-	build/create_manifests.sh $(REPO) $(ARTIFACTS_PATH) $(IMAGE_REPO) $(TINK_SERVER_IMAGE_COMPONENT) ${TINK_CONTROLLER_IMAGE_COMPONENT} $(IMAGE_TAG) $(GOLANG_VERSION)
+create-manifests: tarballs | $$(ENABLE_DOCKER)
+	@build/create_manifests.sh $(REPO) $(ARTIFACTS_PATH) $(IMAGE_REPO) $(TINK_SERVER_IMAGE_COMPONENT) ${TINK_CONTROLLER_IMAGE_COMPONENT} $(IMAGE_TAG) $(GOLANG_VERSION)
 
 
 ########### DO NOT EDIT #############################

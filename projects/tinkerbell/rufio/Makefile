@@ -16,8 +16,8 @@ include $(BASE_DIRECTORY)/Common.mk
 s3-artifacts: create-manifests
 
 .PHONY: create-manifests
-create-manifests: tarballs | ensure-yq
-	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(GOLANG_VERSION)
+create-manifests: tarballs | ensure-yq $$(ENABLE_DOCKER)
+	@build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(GOLANG_VERSION)
 
 FIX_LICENSE_TARGET=$(REPO)/vendor/github.com/bmc-toolbox/common/LICENSE
 

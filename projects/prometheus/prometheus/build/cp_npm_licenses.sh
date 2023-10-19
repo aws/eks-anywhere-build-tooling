@@ -17,10 +17,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-TAR=tar
-if [ "$(uname -s)" = "Darwin" ]; then
-    TAR=gtar
-fi
+MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "${MAKE_ROOT}/../../../build/lib/common.sh"
+
+TAR=$(build::find::gnu_variant_on_mac tar)
 
 rm -f "prometheus/npm_licenses.tar.bz2"
 find prometheus/web/ui/node_modules -iname "license*" | $TAR cfj "prometheus/npm_licenses.tar.bz2" --transform 's/^/npm_licenses\//' --files-from=-

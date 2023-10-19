@@ -35,8 +35,8 @@ include $(BASE_DIRECTORY)/Common.mk
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_HOOK_BOOTKIT_TARGET) $(FIX_LICENSES_HOOK_DOCKER_TARGET)
 
 # For local image builds we override to push to local registry.
-%/images/amd64: IMAGE_OUTPUT=push=true
-%/images/amd64: IMAGE_OUTPUT_TYPE=image
+%/images/amd64 %/images/arm64: IMAGE_OUTPUT=push=true
+%/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE=image
 
 # hook-docker image required docker runtime.
 # We are using eks-distro-minimal-base-glibc as the base and builder to install docker.
@@ -48,14 +48,15 @@ kernel/images/%: BASE_IMAGE=quay.io/tinkerbell/hook-kernel:$(LINUX_KERNEL_VERSIO
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
-$(CREATE_HOOK_FILES): tarballs
+$(CREATE_HOOK_FILES): MAKEFLAGS=
+$(CREATE_HOOK_FILES): tarballs | $$(ENABLE_DOCKER)
 # Modify the linuxkit config file hook/hook.yaml to point to IMAGE_REPO.
 # Upstream make target `dist` is triggered to perform linuxkit build and generate OSIE files ().
-	source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.19" && make dist IMAGE_REPO=$(IMAGE_REPO) LATEST_TAG=$(LATEST_TAG) -C $(REPO)
-	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG)
-	cp $(REPO)/out/sha-*/rel/vmlinuz-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
-	cp $(REPO)/out/sha-*/rel/initramfs-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/
-	mkdir -p $(ARTIFACTS_PATH)
+	@source $(BUILD_LIB)/common.sh && build::common::use_go_version "1.19" && make dist IMAGE_REPO=$(IMAGE_REPO) LATEST_TAG=$(LATEST_TAG) -C $(REPO); \
+	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG); \
+	cp $(REPO)/out/sha-*/rel/vmlinuz-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
+	cp $(REPO)/out/sha-*/rel/initramfs-* $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
+	mkdir -p $(ARTIFACTS_PATH); \
 	cp -rf $(OUTPUT_DIR)/hook/* $(ARTIFACTS_PATH)
 
 $(REPO)/%/LICENSE: | $(GO_MOD_DOWNLOAD_TARGETS)

@@ -23,8 +23,8 @@ s3-artifacts: create-manifests
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_VM_OPERATOR_TARGET)
 
 .PHONY: create-manifests
-create-manifests: tarballs | ensure-yq
-	build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
+create-manifests: tarballs | ensure-yq $$(ENABLE_DOCKER)
+	@build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
 
 $(FIX_LICENSES_VM_OPERATOR_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The vmware-tanzu/vm-operator dependency github repo has a license however tanzu-topology and ncp are subfolders

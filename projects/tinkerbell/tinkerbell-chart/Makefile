@@ -4,6 +4,7 @@ GIT_TAG=$(shell cat GIT_TAG)
 REPO_OWNER=tinkerbell
 REPO=tinkerbell-chart
 
+IMAGE_NAMES=
 REPO_NO_CLONE=true
 BUILD_TARGETS=helm/build
 RELEASE_TARGETS=helm/push
