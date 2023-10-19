@@ -12,12 +12,17 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `cexec kexec image2disk oci2disk writefile` for `linux/amd64`
+binaries: ## Build all binaries: `cexec kexec image2disk oci2disk writefile` for `linux/amd64 linux/arm64`
 _output/bin/hub/linux-amd64/cexec: ## Build `_output/bin/hub/linux-amd64/cexec`
 _output/bin/hub/linux-amd64/kexec: ## Build `_output/bin/hub/linux-amd64/kexec`
 _output/bin/hub/linux-amd64/image2disk: ## Build `_output/bin/hub/linux-amd64/image2disk`
 _output/bin/hub/linux-amd64/oci2disk: ## Build `_output/bin/hub/linux-amd64/oci2disk`
 _output/bin/hub/linux-amd64/writefile: ## Build `_output/bin/hub/linux-amd64/writefile`
+_output/bin/hub/linux-arm64/cexec: ## Build `_output/bin/hub/linux-arm64/cexec`
+_output/bin/hub/linux-arm64/kexec: ## Build `_output/bin/hub/linux-arm64/kexec`
+_output/bin/hub/linux-arm64/image2disk: ## Build `_output/bin/hub/linux-arm64/image2disk`
+_output/bin/hub/linux-arm64/oci2disk: ## Build `_output/bin/hub/linux-arm64/oci2disk`
+_output/bin/hub/linux-arm64/writefile: ## Build `_output/bin/hub/linux-arm64/writefile`
 
 ##@ Image Targets
 local-images: ## Builds `cexec/images/amd64 kexec/images/amd64 image2disk/images/amd64 oci2disk/images/amd64 writefile/images/amd64 reboot/images/amd64` as oci tars for presumbit validation
@@ -37,6 +42,7 @@ reboot/images/push: ## Builds/pushes `reboot/images/push`
 
 ##@ Fetch Binary Targets
 _output/dependencies/linux-amd64/eksa/torvalds/linux: ## Fetch `_output/dependencies/linux-amd64/eksa/torvalds/linux`
+_output/dependencies/linux-arm64/eksa/torvalds/linux: ## Fetch `_output/dependencies/linux-arm64/eksa/torvalds/linux`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
