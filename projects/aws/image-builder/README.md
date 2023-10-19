@@ -214,3 +214,64 @@ sudo snap install yq
 ```
 image-builder build --os ubuntu --hypervisor nutanix --nutanix-config <path to above json file> --release-channel <release channel, ex 1-23>
 ```
+
+### Air Gapped Image Building
+Image builder only supports building Ubuntu in an airgapped mode for now.
+
+1. Create the config json file for respective provider and make sure to include the fields required for airgapped building.
+   An example of baremetal config json for ubuntu airgapped builds are below
+   ```
+   {
+      "eksa_build_tooling_repo_url": "https://internal-repos/eks-anywhere-build-tooling.git",
+      "image_builder_repo_url": "https://internal-repos/image-builder.git",
+      "private_artifacts_eksd_fqdn": "http://artifactory:8081/artifactory",
+      "private_artifacts_eksa_fqdn": "http://artifactory:8081/artifactory/EKS-A",
+      "extra_repos": "/home/airgapped/sources.list",
+      "disable_public_repos": "true",
+      "iso_url": "http://artifactory:8081/artifactory/EKS-A/ISO/ubuntu-20.04.1-legacy-server-amd64.iso",
+      "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
+      "iso_checksum_type": "sha256"
+    }
+   ```
+2. Install pre-requisites required for image builder in the environment or admin machine.
+   1. Packer version 1.8.7 
+   2. Ansible version 2.11.5
+   3. Packer provisioner goss version 3.1.4
+   4. jq
+   5. yq
+   6. unzip 
+   7. make 
+   8. python3-pip
+3. From an environment with internet access run the following command to generate the manifest tarball
+    ```
+   image-builder download manifests
+    ```
+   This will download a eks-a-manifests.tar in the current working directory. This tarball is required for airgapped building.
+4. Replicate all the required EKS-D and EKS-A artifacts to the internal artifacts server like artifactory.
+   Required artifacts are as follows
+   EKS-D amd64 artifacts for specific release branch
+   1. kube-apiserver.tar
+   2. kube-scheduler.tar
+   3. kube-proxy.tar
+   4. kube-controller-manager.tar
+   5. etcd.tar
+   6. coredns.tar
+   7. pause.tar
+   8. kubectl
+   9. kubeadm
+   10. kubelet
+   11. etcd-linux-amd64-v<version>.tar.gz
+   12. cni-plugins-linux-amd64-v<version>.tar.gz
+   
+   
+   EKS-A amd64 artifacts for specific release bundle version
+   1. containerd-linux-amd64.tar.gz
+   2. etcdadm-linux-amd64.tar.gz
+   3. cri-tools-amd64.tar.gz
+
+   In addition to these EKS-D and EKS-A artifacts please ensure the base ubuntu iso is also hosted internally.
+   
+5. Run image builder in airgapped mode
+   ```
+   image-builder build --os ubuntu --hypervisor baremetal --release-channel 1-27 --air-gapped --baremetal-config baremetal.json --manifest-tarball eks-a-manifests.tar
+   ```

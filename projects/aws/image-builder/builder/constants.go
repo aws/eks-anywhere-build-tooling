@@ -29,10 +29,12 @@ const (
 	devEksaReleaseManifestURL        string = "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/eks-a-release.yaml"
 	devBranchEksaReleaseManifestURL  string = "https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/%s/eks-a-release.yaml"
 	eksDistroProdDomain              string = "distro.eks.amazonaws.com"
+	eksAnywhereAssetsProdDomain      string = "anywhere-assets.eks.amazonaws.com"
 	eksDistroManifestFileNameFormat  string = "eks-d-%s.yaml"
 	eksAnywhereManifestFileName      string = "eks-a-manifest.yaml"
 	eksAnywhereBundlesFileNameFormat string = "eks-a-bundles-%s.yaml"
 	manifestsTarballName             string = "eks-a-manifests.tar"
+	manifestsDirName                 string = "eks-a-d-manifests"
 
 	// Environment variables
 	branchNameEnvVar                      string = "BRANCH_NAME"
@@ -41,6 +43,8 @@ const (
 	releaseBranchEnvVar                   string = "RELEASE_BRANCH"
 	eksAReleaseVersionEnvVar              string = "EKSA_RELEASE_VERSION"
 	eksAReleaseManifestURLEnvVar          string = "EKSA_RELEASE_MANIFEST_URL"
+	eksABundlesURLEnvVar                  string = "EKSA_BUNDLE_MANIFEST_URL"
+	eksDManifestURLEnvVar                 string = "EKSD_MANIFEST_URL"
 	packerAdditionalFilesConfigFileEnvVar string = "PACKER_ADDITIONAL_FILES_VAR_FILES"
 	rhelUsernameEnvVar                    string = "RHSM_USERNAME"
 	rhelPasswordEnvVar                    string = "RHSM_PASSWORD"
@@ -50,6 +54,7 @@ const (
 	packerTypeVarFilesEnvVar              string = "PACKER_TYPE_VAR_FILES"
 	packerNutanixVarFilesEnvVar           string = "PACKER_NUTANIX_VAR_FILES"
 	eksaUseDevReleaseEnvVar               string = "EKSA_USE_DEV_RELEASE"
+	cloneUrlEnvVar                        string = "CLONE_URL"
 
 	// Miscellaneous
 	mainBranch            string = "main"

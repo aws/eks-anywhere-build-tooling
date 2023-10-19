@@ -29,19 +29,19 @@ type EksDRelease struct {
 	KubeVersion string `yaml:"kubeVersion"`
 }
 
-func prepBuildToolingRepo(buildToolingRepoPath, eksAReleaseVersion string, force bool) (string, error) {
+func (bo *BuildOptions) prepBuildToolingRepo(buildToolingRepoPath string) (string, error) {
 	// Clone build tooling repo
-	if force {
+	if bo.Force {
 		// Clean up build tooling repo in cwd
 		cleanup(buildToolingRepoPath)
 	}
 
-	gitCommitFromBundle, detectedEksaVersion, err := getGitCommitFromBundle(eksAReleaseVersion)
+	gitCommitFromBundle, detectedEksaVersion, err := bo.getGitCommitFromBundle()
 	if err != nil {
 		return "", fmt.Errorf("Error getting git commit from bundle: %v", err)
 	}
 	if codebuild != "true" {
-		err = cloneRepo(buildToolingRepoUrl, buildToolingRepoPath)
+		err = cloneRepo(bo.getBuildToolingRepoUrl(), buildToolingRepoPath)
 		if err != nil {
 			return "", fmt.Errorf("Error cloning build tooling repo: %v", err)
 		}
@@ -59,8 +59,24 @@ func prepBuildToolingRepo(buildToolingRepoPath, eksAReleaseVersion string, force
 	return detectedEksaVersion, nil
 }
 
+func (bo *BuildOptions) getBuildToolingRepoUrl() string {
+	if bo.AirGapped {
+		switch bo.Hypervisor {
+		case VSphere:
+			return bo.VsphereConfig.EksABuildToolingRepoUrl
+		case Baremetal:
+			return bo.BaremetalConfig.EksABuildToolingRepoUrl
+		case Nutanix:
+			return bo.NutanixConfig.EksABuildToolingRepoUrl
+		case CloudStack:
+			return bo.CloudstackConfig.EksABuildToolingRepoUrl
+		}
+	}
+	return buildToolingRepoUrl
+}
+
 func cloneRepo(cloneUrl, destination string) error {
-	log.Println("Cloning eks-anywhere-build-tooling...")
+	log.Printf("Cloning eks-anywhere-build-tooling from %s...", cloneUrl)
 	cloneRepoCommandSequence := fmt.Sprintf("git clone %s %s", cloneUrl, destination)
 	cmd := exec.Command("bash", "-c", cloneRepoCommandSequence)
 	return execCommandWithStreamOutput(cmd)
@@ -182,6 +198,33 @@ func getRepoRoot() (string, error) {
 	return commandOut, nil
 }
 
+func getManifestRoot() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("error retrieving current working directory: %v", err)
+	}
+	return filepath.Join(cwd, manifestsDirName), nil
+}
+
+func getAirGapCmdEnvVars(cloneUrl, eksAVersion, eksDReleaseBranch string) ([]string, error) {
+	manifestRoot, err := getManifestRoot()
+	if err != nil {
+		return nil, err
+	}
+	manifestRoot = fmt.Sprintf("file://%s", manifestRoot)
+	// EKS-A Manifest file path
+	eksABundlesFilePath := filepath.Join(manifestRoot, fmt.Sprintf(eksAnywhereBundlesFileNameFormat, eksAVersion))
+	cmdEnvVars := []string{fmt.Sprintf("%s=%s", eksABundlesURLEnvVar, eksABundlesFilePath)}
+
+	// EKS-D Manifest file path
+	eksDManifestFilePath := filepath.Join(manifestRoot, fmt.Sprintf(eksDistroManifestFileNameFormat, eksDReleaseBranch))
+	cmdEnvVars = append(cmdEnvVars, fmt.Sprintf("%s=%s", eksDManifestURLEnvVar, eksDManifestFilePath))
+
+	// Upstream clone url
+	cmdEnvVars = append(cmdEnvVars, fmt.Sprintf("%s=%s", cloneUrlEnvVar, cloneUrl))
+	return cmdEnvVars, nil
+}
+
 func SliceContains(s []string, str string) bool {
 	for _, elem := range s {
 		if elem == str {
@@ -202,11 +245,30 @@ func execCommand(cmd *exec.Cmd) (string, error) {
 	return commandOutputStr, nil
 }
 
-func getGitCommitFromBundle(eksaReleaseVersion string) (string, string, error) {
-	eksAReleasesManifestURL := getEksAReleasesManifestURL()
-	releasesManifestContents, err := readFileFromURL(eksAReleasesManifestURL)
+func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
+	manifestDirPath, err := getManifestRoot()
 	if err != nil {
 		return "", "", err
+	}
+
+	eksAReleasesManifestURL, err := getEksAReleasesManifestURL(bo.AirGapped)
+	if err != nil {
+		return "", "", err
+	}
+	var releasesManifestContents []byte
+	if bo.ManifestTarball != "" {
+		eksAManifestFile := filepath.Join(manifestDirPath, eksAnywhereManifestFileName)
+		log.Printf("Reading EKS-A Manifest file: %s", eksAManifestFile)
+		releasesManifestContents, err = os.ReadFile(eksAManifestFile)
+		if err != nil {
+			return "", "", err
+		}
+	} else {
+		log.Printf("Reading EKS-A Manifest file: %s", eksAReleasesManifestURL)
+		releasesManifestContents, err = readFileFromURL(eksAReleasesManifestURL)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
 	releases := &releasev1.Release{}
@@ -219,8 +281,8 @@ func getGitCommitFromBundle(eksaReleaseVersion string) (string, string, error) {
 	if os.Getenv(eksaUseDevReleaseEnvVar) == "true" {
 		eksAReleaseVersion = devEksaReleaseVersion
 		log.Printf("EKSA_USE_DEV_RELEASE set to true, using EKS-A dev release version: %s", eksAReleaseVersion)
-	} else if eksaReleaseVersion != "" {
-		eksAReleaseVersion = eksaReleaseVersion
+	} else if bo.EKSAReleaseVersion != "" {
+		eksAReleaseVersion = bo.EKSAReleaseVersion
 		log.Printf("EKS-A release version provided: %s", eksAReleaseVersion)
 	} else if eksaVersion != "" {
 		eksAReleaseVersion = eksaVersion
@@ -253,11 +315,20 @@ func getGitCommitFromBundle(eksaReleaseVersion string) (string, string, error) {
 	if !foundRelease {
 		return "", "", fmt.Errorf("version %s is not a valid EKS-A release", eksAReleaseVersion)
 	}
-	log.Printf("Fetching git commit from bundle manifest: %s", bundleManifestUrl)
-
-	bundleManifestContents, err := readFileFromURL(bundleManifestUrl)
-	if err != nil {
-		return "", "", err
+	var bundleManifestContents []byte
+	if bo.ManifestTarball == "" {
+		log.Printf("Fetching git commit from bundle manifest: %s", bundleManifestUrl)
+		bundleManifestContents, err = readFileFromURL(bundleManifestUrl)
+		if err != nil {
+			return "", "", err
+		}
+	} else {
+		bundleManifestFile := filepath.Join(manifestDirPath, fmt.Sprintf(eksAnywhereBundlesFileNameFormat, eksAReleaseVersion))
+		log.Printf("Fetching git commit from bundle manifest: %s", bundleManifestFile)
+		bundleManifestContents, err = os.ReadFile(bundleManifestFile)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
 	bundles := &releasev1.Bundles{}
@@ -293,13 +364,19 @@ func readFileFromURL(url string) ([]byte, error) {
 	return data, nil
 }
 
-func getEksAReleasesManifestURL() string {
+func getEksAReleasesManifestURL(airgapped bool) (string, error) {
 	if os.Getenv(eksaUseDevReleaseEnvVar) != "true" {
 		if eksaReleaseManifest != "" {
-			return eksaReleaseManifest
+			return eksaReleaseManifest, nil
 		}
-
-		return prodEksaReleaseManifestURL
+		if airgapped {
+			manifestRoot, err := getManifestRoot()
+			if err != nil {
+				return "", nil
+			}
+			return fmt.Sprintf("file://%s/%s", manifestRoot, eksAnywhereManifestFileName), nil
+		}
+		return prodEksaReleaseManifestURL, nil
 	}
 
 	// using a dev release, allow branch_name env var to
@@ -310,10 +387,10 @@ func getEksAReleasesManifestURL() string {
 	}
 
 	if branchName != mainBranch {
-		return fmt.Sprintf(devBranchEksaReleaseManifestURL, branchName)
+		return fmt.Sprintf(devBranchEksaReleaseManifestURL, branchName), nil
 	}
 
-	return devEksaReleaseManifestURL
+	return devEksaReleaseManifestURL, nil
 }
 
 // setRhsmProxy takes the proxy config, parses it and sets the appropriate config on rhsm config
@@ -393,5 +470,21 @@ func createTarball(fileName, path string) error {
 		panic(err)
 	}
 
+	return nil
+}
+
+func replaceStringInFile(filePath, oldString, newString string) error {
+	fileContents, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+	replacedString := strings.ReplaceAll(string(fileContents), oldString, newString)
+	if err = os.Remove(filePath); err != nil {
+		return err
+	}
+	err = os.WriteFile(filePath, []byte(replacedString), 0755)
+	if err != nil {
+		return err
+	}
 	return nil
 }
