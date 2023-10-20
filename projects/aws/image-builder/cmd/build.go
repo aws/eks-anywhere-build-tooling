@@ -179,9 +179,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = validateRHSM(bo.Os, &bo.VsphereConfig.RhsmConfig); err != nil {
 				return err
 			}
-			if err = validateAirGapped(&bo.VsphereConfig.AirGappedConfig,
-				bo.VsphereConfig.ExtraRepos, bo.VsphereConfig.IsoUrl); err != nil {
-				return err
+			if bo.AirGapped {
+				if err = validateAirGapped(&bo.VsphereConfig.AirGappedConfig,
+					bo.VsphereConfig.ExtraRepos, bo.VsphereConfig.IsoUrl); err != nil {
+					return err
+				}
 			}
 		case builder.Baremetal:
 			if err = json.Unmarshal(config, &bo.BaremetalConfig); err != nil {
@@ -200,9 +202,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = validateRHSM(bo.Os, &bo.BaremetalConfig.RhsmConfig); err != nil {
 				return err
 			}
-			if err = validateAirGapped(&bo.BaremetalConfig.AirGappedConfig,
-				bo.BaremetalConfig.ExtraRepos, bo.BaremetalConfig.IsoUrl); err != nil {
-				return err
+			if bo.AirGapped {
+				if err = validateAirGapped(&bo.BaremetalConfig.AirGappedConfig,
+					bo.BaremetalConfig.ExtraRepos, bo.BaremetalConfig.IsoUrl); err != nil {
+					return err
+				}
 			}
 		case builder.Nutanix:
 			if err = json.Unmarshal(config, &bo.NutanixConfig); err != nil {
@@ -218,9 +222,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if bo.NutanixConfig.NutanixUserName == "" || bo.NutanixConfig.NutanixPassword == "" {
 				log.Fatalf("\"nutanix_username\" and \"nutanix_password\" are required fields in nutanix-config")
 			}
-			if err = validateAirGapped(&bo.NutanixConfig.AirGappedConfig,
-				bo.NutanixConfig.ExtraRepos, bo.NutanixConfig.ImageName); err != nil {
-				return err
+			if bo.AirGapped {
+				if err = validateAirGapped(&bo.NutanixConfig.AirGappedConfig,
+					bo.NutanixConfig.ExtraRepos, bo.NutanixConfig.ImageName); err != nil {
+					return err
+				}
 			}
 			// TODO Validate other fields as well
 		case builder.CloudStack:
@@ -240,9 +246,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = validateRHSM(bo.Os, &bo.CloudstackConfig.RhsmConfig); err != nil {
 				return err
 			}
-			if err = validateAirGapped(&bo.CloudstackConfig.AirGappedConfig,
-				bo.CloudstackConfig.ExtraRepos, bo.CloudstackConfig.IsoUrl); err != nil {
-				return err
+			if bo.AirGapped {
+				if err = validateAirGapped(&bo.CloudstackConfig.AirGappedConfig,
+					bo.CloudstackConfig.ExtraRepos, bo.CloudstackConfig.IsoUrl); err != nil {
+					return err
+				}
 			}
 		case builder.AMI:
 			// Default configuration for AMI builds
