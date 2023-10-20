@@ -19,7 +19,60 @@ set -o pipefail
 
 BUILD_LIB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
 
-CMD="buildctl"
+if [ "${USE_BUILDX:-}" == "true" ]; then
+    printf "\nBuilding with docker buildx\n" >&2
+
+    CMD="docker buildx"
+    ARGS=""
+    while test $# -gt 0; do
+        case "$1" in
+            --frontend)
+                shift
+                shift
+                ;;
+            --opt)
+                shift
+                if [[ $1 = filename* ]]; then
+                    ARGS+="--${1/filename/file} "
+                elif [[ $1 = "no-cache"* ]]; then
+                    ARGS+="--${1/no-cache/no-cache-filter} "
+                else
+                    ARGS+="--${1/:/ } "
+                fi
+                shift
+                ;;
+            --local)
+                shift
+                if [[ $1 = context* ]]; then
+                    ARGS+="${1/context=/} "
+                elif [[ $1 = dockerfile* ]]; then
+                    ARGS+="${1/dockerfile=/-f }/Dockerfile "
+                fi
+                shift
+                ;;
+            --export-cache)
+                shift
+                ARGS+="--cache-to $1 "
+                shift
+                ;;
+            --import-cache)
+                shift
+                ARGS+="--cache-from $1 "
+                shift
+                ;;
+            *)
+                ARGS+="$1 "
+                shift
+                ;;
+        esac
+    done
+else
+    printf "\nBuilding with buildctl\n" >&2
+
+    CMD="buildctl"
+    ARGS="$@"
+fi
+
 if [ -f "/buildkit.sh" ] && ! buildctl debug workers >/dev/null 2>&1; then
     # on the builder base this helper file exists to run buildkitd
     # in prow buildkitd is run as a seperate container so it will be running already
@@ -34,12 +87,12 @@ fi
 if [ -f "/buildkit.sh" ]; then
     for i in $(seq 1 5); do
         [ $i -gt 1 ] && sleep 15
-        $CMD "$@" && s=0 && break || s=$?
+        $CMD $ARGS && s=0 && break || s=$?
     done
 
     # space is limited on presubmit nodes, after each image build clear the build cache
     if [ "${JOB_TYPE:-}" == "presubmit" ] && [ "${PRUNE_BUILDCTL:-false}" == "true" ]; then
-        $CMD prune --all
+        buildctl prune --all
     fi
 
     (exit $s)
@@ -47,11 +100,18 @@ else
     # skip retry when running locally
     log_file=$(mktemp)
     trap "rm -f $log_file" EXIT
-    if ! $CMD "$@" 2>&1 | tee $log_file; then        
+    if ! $CMD $ARGS 2>&1 | tee $log_file; then      
         if grep -q "blobs/uploads/\": EOF" $log_file ; then
             echo "******************************************************"
             echo "Ensure container registry and repository exists!!"
             echo "Try running make create-ecr-repos to create ecr repositories in your aws account."
+            echo "******************************************************"
+        elif [ "$CMD" = "docker buildx" ] && grep -i -q "\(multiple platforms\|OCI exporter\) feature is currently not supported" $log_file; then
+            echo "******************************************************"
+            echo "When using docker buildx with multiple platforms you can not use the default builder."
+            echo "You need to create another builder using the docker-container or remote driver."
+            echo "For example to use the docker-container driver run the following:"
+            echo "docker buildx create --name multiarch --driver docker-container --use"
             echo "******************************************************"
         fi
         exit 1
