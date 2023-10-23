@@ -268,6 +268,11 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		log.Printf("Image Build Successful\n Please find the image uploaded under Nutanix Image Service with name %s\n", b.NutanixConfig.ImageName)
+		if b.NutanixConfig.ImageExport == "true" {
+			outputImageGlobPattern = "*.img"
+			outputArtifactPath = filepath.Join(cwd, fmt.Sprintf("%s-%s-kube-%s.img", b.Os, b.OsVersion, b.ReleaseChannel))
+			log.Printf("Also please find the exported image at %s\n", outputArtifactPath)
+		}
 	} else if b.Hypervisor == CloudStack {
 		if b.AirGapped {
 			airGapEnvVars, err := getAirGapCmdEnvVars(b.CloudstackConfig.ImageBuilderRepoUrl, detectedEksaVersion, b.ReleaseChannel)
