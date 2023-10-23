@@ -27,6 +27,7 @@ IMAGE_BUILD_ARGS=ATTRIBUTION_FILE
 ATTRIBUTION_FILE=$(call TO_UPPER,$(IMAGE_NAME))_ATTRIBUTION.txt
 
 PROJECT_DEPENDENCIES=eksa/torvalds/linux
+BUILDSPEC_DEPENDS_ON_OVERRIDE=torvalds_linux_linux_amd64 torvalds_linux_linux_arm64
 
 FIX_LICENSES=$(foreach path,$(GO_MOD_PATHS),$(REPO)/$(path)/LICENSE)
 
