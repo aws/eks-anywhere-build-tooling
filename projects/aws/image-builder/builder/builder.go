@@ -235,12 +235,15 @@ func (b *BuildOptions) BuildImage() {
 			commandEnvVars = append(commandEnvVars, airGapEnvVars...)
 		}
 
+		// Create config file
+		nutanixConfigFile := filepath.Join(imageBuilderProjectPath, packerNutanixConfigFile)
+
 		// Read and set the nutanix connection data
 		nutanixConfigData, err := json.Marshal(b.NutanixConfig)
 		if err != nil {
 			log.Fatalf("Error marshalling nutanix config data: %v", err)
 		}
-		err = ioutil.WriteFile(filepath.Join(upstreamImageBuilderProjectPath, packerNutanixConfigFile), nutanixConfigData, 0o644)
+		err = ioutil.WriteFile(nutanixConfigFile, nutanixConfigData, 0o644)
 		if err != nil {
 			log.Fatalf("Error writing nutanix config file to packer: %v", err)
 		}
@@ -259,7 +262,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		if b.NutanixConfig != nil {
-			commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerNutanixVarFilesEnvVar, packerNutanixConfigFile))
+			commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerTypeVarFilesEnvVar, nutanixConfigFile))
 		}
 
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
