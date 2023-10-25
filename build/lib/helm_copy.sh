@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -33,6 +33,6 @@ source "${SCRIPT_ROOT}/common.sh"
 #
 # Copy
 #
-mkdir -p ${DEST_DIR}
-rsync -a --exclude .git "${SOURCE_DIR}" "${DEST_DIR}"
-build::non-golang::copy_licenses ${HELM_SOURCE_REPOSITORY} $DEST_DIR/LICENSES/github.com/${HELM_SOURCE_REPOSITORY}
+build::common::echo_and_run mkdir -p ${DEST_DIR}
+build::common::echo_and_run rsync -a --exclude .git "${SOURCE_DIR}" "${DEST_DIR}"
+build::common::echo_and_run build::non-golang::copy_licenses ${HELM_SOURCE_REPOSITORY} $DEST_DIR/LICENSES/github.com/${HELM_SOURCE_REPOSITORY}

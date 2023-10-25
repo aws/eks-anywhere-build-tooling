@@ -210,6 +210,7 @@ HELM_IMAGE_LIST?=
 HELM_GIT_CHECKOUT_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
 HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
 PACKAGE_DEPENDENCIES?=
+FORCE_JSON_SCHEMA_FILE?=
 ####################################################
 
 #### HELPERS ########
@@ -822,17 +823,25 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 helm/pull: | $$(ENABLE_LOGGING)
 	@$(BUILD_LIB)/helm_pull.sh $(HELM_PULL_LOCATION) $(HELM_REPO_URL) $(HELM_PULL_NAME) $(REPO) $(HELM_DIRECTORY) $(CHART_VERSION) $(COPY_CRDS)
 
-# Build helm chart
-.PHONY: helm/build
-helm/build: $(LICENSES_TARGETS_FOR_PREREQ)
-helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
-helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),) | ensure-helm ensure-skopeo
-	@echo -e $(call TARGET_START_LOG)
-	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
-	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
-	@echo -e $(call TARGET_END_LOG)
+
+.PHONY: helm/copy helm/require helm/replace helm/build helm/push
+
+helm/copy: $(LICENSES_TARGETS_FOR_PREREQ)
+helm/copy: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
+helm/copy: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),) | ensure-helm ensure-skopeo $$(ENABLE_LOGGING)
+	@$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
+
+helm/require: helm/copy | $$(ENABLE_LOGGING)
+	@$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) "$(PACKAGE_DEPENDENCIES)" "$(FORCE_JSON_SCHEMA_FILE)" $(HELM_IMAGE_LIST)
+
+helm/replace: helm/require | $$(ENABLE_LOGGING)
+	@$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
+
+helm/build: helm/replace | $$(ENABLE_LOGGING)
+	@$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
+
+helm/push: helm/build | $$(ENABLE_LOGGING)
+	@$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
