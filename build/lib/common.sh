@@ -106,6 +106,12 @@ function build::common::upload_artifacts() {
   local -r latesttag=$6
   local -r dry_run=$7
   local -r do_not_delete=$8
+  local -r create_public_acl=$9
+
+  local public_acl=""
+  if [ "$create_public_acl" = "true" ]; then
+    public_acl="--acl public-read"
+  fi
   
   if [ "$dry_run" = "true" ]; then
     build::common::echo_and_run aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
@@ -114,12 +120,12 @@ function build::common::upload_artifacts() {
     # Upload artifacts to s3 
     # 1. To proper path on s3 with buildId-githash
     # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
-    build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --acl public-read --no-progress
+    build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts $public_acl --no-progress
 
     if [ "$do_not_delete" = "true" ]; then
-      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --acl public-read --no-progress
+      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" $public_acl --no-progress
     else
-      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --acl public-read --no-progress
+      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete $public_acl --no-progress
     fi
   fi
 }
@@ -296,11 +302,12 @@ function build::common::re_quote() {
 }
 
 function build::common::get_latest_eksa_asset_url() {
-  local -r artifact_bucket=$1
+  local -r artifact_bucket="${1%/}" # remove trailing slash if it exists
   local -r project=$2
   local -r arch=${3-amd64}
   local -r s3downloadpath=${4-latest}
   local -r releasebranch=${5-}
+  local -r sha=${6-false}
 
   s3artifactfolder=$s3downloadpath
 
@@ -314,14 +321,31 @@ function build::common::get_latest_eksa_asset_url() {
 
   local -r tar_file_prefix=$(MAKEFLAGS= make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
  
-  local -r url="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$projectwithreleasebranch/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
+  local specific_uri="projects/$projectwithreleasebranch/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
+  local fallback_latest_uri="projects/$projectwithreleasebranch/latest/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
 
-  local -r http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $url)
-  if [[ "$http_code" == "200" ]]; then 
-    echo "$url"
-  else
-    echo "https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com/projects/$projectwithreleasebranch/latest/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
+  if [ "$sha" = "true" ]; then
+    specific_uri+=".sha256"
+    fallback_latest_uri+=".sha256"
   fi
+  local -r s3_url_prefix="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com"
+
+  if [[ "$(build::common::echo_and_run curl -I -L -s -o /dev/null -w "%{http_code}" $s3_url_prefix/$specific_uri)" == "200" ]]; then 
+    echo "$s3_url_prefix/$specific_uri"
+  elif [[ "$(build::common::echo_and_run curl -I -L -s -o /dev/null -w "%{http_code}" $s3_url_prefix/$fallback_latest_uri)" == "200" ]]; then 
+    echo "$s3_url_prefix/$fallback_latest_uri"
+  elif build::common::echo_and_run aws s3api head-object --bucket $(basename $artifact_bucket) --key $specific_uri &> /dev/null; then
+    aws s3 presign $artifact_bucket/$specific_uri
+  elif build::common::echo_and_run aws s3api head-object --bucket $(basename $artifact_bucket) --key $fallback_latest_uri &> /dev/null; then
+    aws s3 presign $artifact_bucket/$fallback_latest_uri
+  else
+    echo "No artifact availabe!"
+    exit 1
+  fi
+}
+
+function build::common::get_latest_eksa_asset_url_sha256() {
+  build::common::get_latest_eksa_asset_url $@ true
 }
 
 function build::common::wait_for_tag() {

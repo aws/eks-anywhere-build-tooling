@@ -425,6 +425,7 @@ FAKE_ARM_IMAGES_FOR_VALIDATION?=false
 IMAGE_FORMAT?=
 IMAGE_OS?=
 UPLOAD_DO_NOT_DELETE?=false
+UPLOAD_CREATE_PUBLIC_ACL?=true
 ####################################################
 
 #################### OTHER #########################
@@ -667,7 +668,7 @@ endif
 
 .PHONY: upload-artifacts
 upload-artifacts: s3-artifacts upload-output-to-prow-artifacts-s3-artifacts | $$(ENABLE_LOGGING)
-	@$(BUILD_LIB)/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN) $(UPLOAD_DO_NOT_DELETE)
+	@$(BUILD_LIB)/upload_artifacts.sh $(ARTIFACTS_PATH) $(ARTIFACTS_BUCKET) $(ARTIFACTS_UPLOAD_PATH) $(BUILD_IDENTIFIER) $(GIT_HASH) $(LATEST) $(UPLOAD_DRY_RUN) $(UPLOAD_DO_NOT_DELETE) $(UPLOAD_CREATE_PUBLIC_ACL)
 
 .PHONY: s3-artifacts
 s3-artifacts: tarballs
