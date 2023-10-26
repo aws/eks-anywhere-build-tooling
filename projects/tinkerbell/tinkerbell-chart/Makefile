@@ -12,12 +12,13 @@ RELEASE_TARGETS=helm/push
 HAS_HELM_CHART=true
 HELM_DIRECTORY=chart
 HELM_SOURCE_REPOSITORY=.
-HELM_DESTINATION_REPOSITORY=$(REPO_OWNER)/$(REPO)
+HELM_IMAGE_LIST=
+HELM_CHART_NAMES=$(REPO_OWNER)/$(REPO)
 
 include $(BASE_DIRECTORY)/Common.mk
 
 verify:
-	scripts/verify.sh $(BASE_DIRECTORY)/projects/$(HELM_DESTINATION_REPOSITORY)/chart $(GIT_TAG)
+	scripts/verify.sh $(BASE_DIRECTORY)/projects/$(HELM_CHART_NAMES)/chart $(GIT_TAG)
 
 
 ########### DO NOT EDIT #############################

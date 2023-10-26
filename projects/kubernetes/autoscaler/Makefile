@@ -24,8 +24,9 @@ HELM_TAG=$(subst cluster-autoscaler-chart-,,$(HELM_GIT_TAG))-$(subst -,.,$(RELEA
 HELM_SOURCE_OWNER=kubernetes
 HELM_SOURCE_REPOSITORY=autoscaler
 HELM_DIRECTORY=charts/cluster-autoscaler
-HELM_DESTINATION_REPOSITORY=cluster-autoscaler/charts/cluster-autoscaler
 HELM_IMAGE_LIST=kubernetes/autoscaler
+
+HELM_CHART_NAMES=cluster-autoscaler/charts/cluster-autoscaler
 
 BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS

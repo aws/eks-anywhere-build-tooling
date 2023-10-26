@@ -33,8 +33,9 @@ HAS_HELM_CHART=true
 HELM_SOURCE_OWNER=prometheus-community
 HELM_SOURCE_REPOSITORY=helm-charts
 HELM_DIRECTORY=charts/prometheus
-HELM_DESTINATION_REPOSITORY=prometheus/charts/prometheus
 HELM_IMAGE_LIST=prometheus/prometheus prometheus/node-exporter
+
+HELM_CHART_NAMES=prometheus/charts/prometheus
 
 include $(BASE_DIRECTORY)/Common.mk
 

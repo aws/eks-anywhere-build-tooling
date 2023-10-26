@@ -32,13 +32,24 @@ FIX_LICENSES_ECRTOKENREFRESHER_TARGET=$(REPO)/ecrtokenrefresher/LICENSE
 FIX_LICENSES_CREDENTIALPROVIDERPACKAGE_TARGET=$(REPO)/credentialproviderpackage/LICENSE
 
 HAS_HELM_CHART=true
-HELM_DIRECTORY=charts/eks-anywhere-packages
+HELM_DIRECTORY?=charts/$(HELM_CHART_NAME)
 HELM_IMAGE_LIST=eks-anywhere-packages ecr-token-refresher
 CRED_HELM_IMAGE_LIST=credential-provider-package
+
+HELM_CHART_NAMES=eks-anywhere-packages-migrations eks-anywhere-packages-crds eks-anywhere-packages credential-provider-package
 
 BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
 include $(BASE_DIRECTORY)/Common.mk
+
+# building multiple helm charts requires overrides
+eks-anywhere-packages-crds/helm/%: PACKAGE_DEPENDENCIES=eks-anywhere-packages-migrations
+
+eks-anywhere-packages/helm/%: PACKAGE_DEPENDENCIES=eks-anywhere-packages-crds
+
+credential-provider-package/helm/%: HELM_IMAGE_LIST=$(CRED_HELM_IMAGE_LIST)
+credential-provider-package/helm/%: HELM_DIRECTORY=credentialproviderpackage/charts/credential-provider-package
+credential-provider-package/helm/%: FORCE_JSON_SCHEMA_FILE=$(PROJECT_ROOT)/helm/credential-provider-package.schema.json
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_ECRTOKENREFRESHER_TARGET) $(FIX_LICENSES_CREDENTIALPROVIDERPACKAGE_TARGET)
 
@@ -51,40 +62,6 @@ $(FIX_LICENSES_ECRTOKENREFRESHER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 $(FIX_LICENSES_CREDENTIALPROVIDERPACKAGE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 	cp $(REPO)/LICENSE $(REPO)/credentialproviderpackage/LICENSE
 
-# Build helm chart
-.PHONY: helm/build
-helm/build: $(LICENSES_TARGETS_FOR_PREREQ)
-helm/build: $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET))
-helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
-	# Pkg controller requires multiple charts. Consider this a temporary work-around (turned too permanent).
-	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) eks-anywhere-packages-migrations charts/eks-anywhere-packages-migrations $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) eks-anywhere-packages-migrations $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) "$(PACKAGE_DEPENDENCIES)" "$(FORCE_JSON_SCHEMA_FILE)" $(HELM_IMAGE_LIST)
-	$(BUILD_LIB)/helm_replace.sh eks-anywhere-packages-migrations $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) eks-anywhere-packages-migrations
-
-	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) eks-anywhere-packages-crds charts/eks-anywhere-packages-crds $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) eks-anywhere-packages-crds $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) eks-anywhere-packages-migrations "$(FORCE_JSON_SCHEMA_FILE)" $(HELM_IMAGE_LIST)
-	$(BUILD_LIB)/helm_replace.sh eks-anywhere-packages-crds $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) eks-anywhere-packages-crds
-
-	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) "eks-anywhere-packages-crds" "$(FORCE_JSON_SCHEMA_FILE)" $(HELM_IMAGE_LIST)
-	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
-	
-	# Credential Provider Package lives in pkg controller repo. Workaround for its sepearate chart
-	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) credential-provider-package credentialproviderpackage/charts/credential-provider-package $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) credential-provider-package $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) "$(PACKAGE_DEPENDENCIES)" "$(PROJECT_ROOT)/helm/credential-provider-package.schema.json" $(CRED_HELM_IMAGE_LIST)
-	$(BUILD_LIB)/helm_replace.sh credential-provider-package $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) credential-provider-package
-
-# Build helm chart and push to registry defined in IMAGE_REPO.
-.PHONY: helm/push
-helm/push: helm/build
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) eks-anywhere-packages-crds $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) eks-anywhere-packages-migrations $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) credential-provider-package $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
 
 ########### DO NOT EDIT #############################

@@ -27,9 +27,10 @@ HELM_SOURCE_IMAGE_REPO=public.ecr.aws
 HELM_SOURCE_OWNER=kubernetes-sigs
 HELM_SOURCE_REPOSITORY=metrics-server
 HELM_DIRECTORY=charts/metrics-server
-HELM_DESTINATION_REPOSITORY=metrics-server/charts/metrics-server
 HELM_IMAGE_LIST=eks-distro/kubernetes-sigs/metrics-server
 HELM_USE_UPSTREAM_IMAGE=true
+
+HELM_CHART_NAMES=metrics-server/charts/metrics-server
 
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 
