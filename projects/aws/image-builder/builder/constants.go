@@ -35,6 +35,8 @@ const (
 	eksAnywhereBundlesFileNameFormat string = "eks-a-bundles-%s.yaml"
 	manifestsTarballName             string = "eks-a-manifests.tar"
 	manifestsDirName                 string = "eks-a-d-manifests"
+	supportedReleaseBranchesFileName string = "release/SUPPORTED_RELEASE_BRANCHES"
+	eksDLatestReleasesFileName       string = "EKSD_LATEST_RELEASES"
 
 	// Environment variables
 	branchNameEnvVar                      string = "BRANCH_NAME"
@@ -54,6 +56,7 @@ const (
 	packerTypeVarFilesEnvVar              string = "PACKER_TYPE_VAR_FILES"
 	eksaUseDevReleaseEnvVar               string = "EKSA_USE_DEV_RELEASE"
 	cloneUrlEnvVar                        string = "CLONE_URL"
+	ansibleVerbosityEnvVar                string = "ANSIBLE_VERBOSITY"
 
 	// Miscellaneous
 	mainBranch            string = "main"
