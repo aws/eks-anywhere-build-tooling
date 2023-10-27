@@ -50,6 +50,7 @@ type BuildOptions struct {
 	AirGapped          bool
 	ManifestTarball    string
 	Firmware           string
+	AnsibleVerbosity   int
 	EKSAReleaseVersion string
 }
 

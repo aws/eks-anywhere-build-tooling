@@ -127,7 +127,7 @@ func GetSupportedReleaseBranches() []string {
 		log.Fatalf(err.Error())
 	}
 
-	supportedBranchesFile := filepath.Join(buildToolingPath, "release/SUPPORTED_RELEASE_BRANCHES")
+	supportedBranchesFile := filepath.Join(buildToolingPath, supportedReleaseBranchesFileName)
 	supportedBranchesFileData, err := os.ReadFile(supportedBranchesFile)
 	supportReleaseBranches := strings.Split(string(supportedBranchesFileData), "\n")
 
@@ -140,7 +140,7 @@ func getEksDReleaseBranchesWithNumber() (map[string]string, error) {
 		log.Fatalf(err.Error())
 	}
 
-	eksDReleaseBranchesFile := filepath.Join(buildToolingPath, "EKSD_LATEST_RELEASES")
+	eksDReleaseBranchesFile := filepath.Join(buildToolingPath, eksDLatestReleasesFileName)
 	eksDReleaseBranchesFileData, err := os.ReadFile(eksDReleaseBranchesFile)
 
 	eksDReleaseBranchesWithNumber := make(map[string]string)
@@ -157,7 +157,7 @@ func getEksDReleaseBranchesWithNumber() (map[string]string, error) {
 	return eksDReleaseBranchesWithNumber, nil
 }
 
-func downloadFile(filepath string, url string) error {
+func downloadFile(filepath, url string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -495,7 +495,7 @@ func replaceStringInFile(filePath, oldString, newString string) error {
 	if err = os.Remove(filePath); err != nil {
 		return err
 	}
-	err = os.WriteFile(filePath, []byte(replacedString), 0755)
+	err = os.WriteFile(filePath, []byte(replacedString), 0o755)
 	if err != nil {
 		return err
 	}
