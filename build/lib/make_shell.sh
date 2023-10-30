@@ -48,7 +48,7 @@ DATE_NANO=$(if [ "$(uname -s)" = "Linux" ] || [ "$DATE" = "gdate" ]; then echo %
 
 START_TIME=$($DATE +%s.$DATE_NANO)
 
-echo -e "\n------------------- $($DATE +"%Y-%m-%dT%H:%M:%S.$DATE_NANO%z") Starting target=$TARGET -------------------"
+echo -e "\n------------------- $($DATE +"%Y-%m-%dT%H:%M:%S.$DATE_NANO%z") $([ -n "${DOCKER_RUN_BASE_DIRECTORY:-}" ] && echo "(In Docker) ")Starting target=$TARGET -------------------"
 echo "($(pwd)) \$ $@"
 eval "$@"
-echo -e "------------------- $($DATE +"%Y-%m-%dT%H:%M:%S.$DATE_NANO%z") Finished target=$TARGET duration=$(echo $($DATE +%s.$DATE_NANO) - $START_TIME | bc) seconds -------------------\n"
+echo -e "------------------- $($DATE +"%Y-%m-%dT%H:%M:%S.$DATE_NANO%z") $([ -n "${DOCKER_RUN_BASE_DIRECTORY:-}" ] && echo "(In Docker) ")Finished target=$TARGET duration=$(echo $($DATE +%s.$DATE_NANO) - $START_TIME | bc) seconds -------------------\n"

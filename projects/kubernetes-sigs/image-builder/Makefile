@@ -5,6 +5,9 @@ GIT_TAG=$(shell cat GIT_TAG)
 REPO=image-builder
 REPO_OWNER=kubernetes-sigs
 
+# no container images for this project
+IMAGE_NAMES=
+
 IMAGE_BUILDER_DIR=$(REPO)/images/capi
 RAW_IMAGE_BUILD_AMI?=ami-095413544ce52437d
 RAW_IMAGE_BUILD_INSTANCE_TYPE?=t2.micro
@@ -436,6 +439,11 @@ local-build-qemu-rhel-8: local-build-cloudstack-redhat-8
 local-build-raw-ubuntu-2004-efi: local-build-raw-ubuntu-2004
 	@echo Done building $@
 
+.PHONY: clean-extra
+clean-extra:
+	@rm -rf fake-*
+
+clean: clean-extra
 ############################################################################
 ## --------------------------------------
 ## Document dynamic targets

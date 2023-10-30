@@ -153,7 +153,7 @@ fi
 TARGETS=(${IN_DOCKER_TARGETS// / })
 DOCKER_TARGETS="${NL}${NL}##@ Run in Docker Targets"
 for target in "${TARGETS[@]}"; do
-    DOCKER_TARGETS+="${NL}run-${target}-in-docker: ## Run \`${target}\` in docker builder container"
+    DOCKER_TARGETS+="${NL}run-in-docker/${target}: ## Run \`${target}\` in docker builder container"
 done
 
 cat >> $HELPFILE << EOF

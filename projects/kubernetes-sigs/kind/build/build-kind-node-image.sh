@@ -19,6 +19,7 @@ set -o pipefail
 EKSD_RELEASE_BRANCH="${1?Specify first argument - release branch}"
 INTERMEDIATE_BASE_IMAGE="${2?Specify second argument - kind base tag}"
 ARCH="${3?Specify third argument - Targetarch}"
+BUILDER_PLATFORM_ARCH="${4?Specify fourth argument - Hostarch}"
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "${MAKE_ROOT}/../../../build/lib/common.sh"
@@ -39,7 +40,7 @@ function build::kind::build_node_image(){
     export EKSD_ASSET_URL=$EKSD_ASSET_URL
     export KUBE_ARCH=$ARCH
 
-    KIND_PATH="$MAKE_ROOT/_output/bin/kind/$(uname | tr '[:upper:]' '[:lower:]')-$(go env GOHOSTARCH)/kind"
+    KIND_PATH="$MAKE_ROOT/_output/bin/kind/$(uname | tr '[:upper:]' '[:lower:]')-$BUILDER_PLATFORM_ARCH/kind"
     $KIND_PATH build node-image $MAKE_ROOT/images/k8s.io/kubernetes \
         --base-image $INTERMEDIATE_BASE_IMAGE --image $INTERMEDIATE_NODE_IMAGE --arch $ARCH      
 }

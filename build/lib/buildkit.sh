@@ -23,7 +23,11 @@ if [ "${USE_BUILDX:-}" == "true" ]; then
     printf "\nBuilding with docker buildx\n" >&2
 
     CMD="docker buildx"
-    ARGS=""
+    # for the hook build pushing the provenance manifest borks linuxkit
+    # this is not pushed by buildctl which is what we use in prod
+    ARGS="build --provenance=false "
+    # shift build off the args list
+    shift
     while test $# -gt 0; do
         case "$1" in
             --frontend)

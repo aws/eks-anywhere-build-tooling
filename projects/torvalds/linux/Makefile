@@ -11,8 +11,8 @@ SIMPLE_CREATE_BINARIES=false
 # ensure we are building to a directory based on the current
 # host platform to avoid ever creating a different arch'd
 # binary in the wrong folder
-BINARY_PLATFORMS?=$(BUILDER_PLATFORM)
-BINARY_TARGETS=$(OUTPUT_BIN_DIR)/$(subst /,-,$(BINARY_PLATFORMS))/tools/bootconfig
+BINARY_PLATFORMS?=linux/$(BUILDER_PLATFORM_ARCH)
+BINARY_TARGETS=$(foreach platform,$(BINARY_PLATFORMS),$(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/tools/bootconfig)
 
 HAS_LICENSES=false
 
@@ -39,9 +39,10 @@ include $(BASE_DIRECTORY)/Common.mk
 
 tarballs: gather-non-golang-licenses $(OUTPUT_DIR)/ATTRIBUTION.txt
 
-$(BINARY_TARGETS): MAKEFLAGS=
-$(BINARY_TARGETS): $(GIT_CHECKOUT_TARGET)	
-	mkdir -p $(MAKE_ROOT)/$(@D)
+$(OUTPUT_BIN_DIR)/%: MAKEFLAGS=
+$(OUTPUT_BIN_DIR)/%: PLATFORM=$(subst -,/,$(*D:/tools=))
+$(OUTPUT_BIN_DIR)/%: $(GIT_CHECKOUT_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
+	@mkdir -p $(MAKE_ROOT)/$(@D); \
 	$(MAKE) -C $(REPO)/tools/bootconfig OUTPUT=$(MAKE_ROOT)/$(@D)/
 
 .PHONY: gather-non-golang-licenses

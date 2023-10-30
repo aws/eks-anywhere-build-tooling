@@ -26,6 +26,7 @@ HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/emissary-ingress
 HELM_DESTINATION_REPOSITORY=emissary-ingress/emissary
 HELM_IMAGE_LIST=emissary-ingress/emissary
+CHART_VERSION?=
 
 AMBASSADOR_VERSION_TARGET=$(REPO)/python/ambassador.version
 
@@ -35,8 +36,11 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(AMBASSADOR_VERSION_TARGET)
 
 # do not pass our makeflags down to emissary make since there will be unncessary warnings
 $(AMBASSADOR_VERSION_TARGET): MAKEFLAGS=
-$(AMBASSADOR_VERSION_TARGET):
-	@export VERSION="v3.6.0" && export CHART_VERSION=$(CHART_VERSION) && cd emissary && GOPATH=/var && make python/ambassador.version
+$(AMBASSADOR_VERSION_TARGET): export VERSION=v3.6.0
+$(AMBASSADOR_VERSION_TARGET): export CHART_VERSION:=$(CHART_VERSION)
+$(AMBASSADOR_VERSION_TARGET): export GOPATH=/var
+$(AMBASSADOR_VERSION_TARGET): | $$(ENABLE_DOCKER)
+	@$(MAKE) -C $(REPO) python/ambassador.version
 
 # Build helm chart
 .PHONY: helm/build

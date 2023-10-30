@@ -89,8 +89,8 @@ clean-extra:
 
 clean: clean-extra
 
-unit-test:
-	go test ./...
+unit-test: | $$(ENABLE_DOCKER)
+	@go test ./...
 
 .PHONY: mocks
 mocks: $(MOCKGEN)
