@@ -11,6 +11,6 @@
 1. Verify the golang version has not changed. Currently the version 1.15 mentioned in the [Dockerfile](https://github.com/tinkerbell/hub/blob/main/actions/cexec/v1/Dockerfile) of each action.
 1. Verify no changes have been made to the Dockerfile for each action under under [actions](https://github.com/tinkerbell/hub/blob/main/actions) looking specifically for added dependencies or build 
 process changes.
-1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
+1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

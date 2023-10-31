@@ -10,7 +10,7 @@
 1. Update the `GIT_TAG` file to have the new desired release tag.
 1. Verify the golang version has not changed. Currently the version mentioned in the [go.mod](https://github.com/tinkerbell/boots/blob/94e4b4899b383e28b6002750b14e254cfbbdd81f/go.mod#L3) is being used to build.
 1. Verify no changes have been made to the [dockerfile](https://github.com/tinkerbell/boots/blob/94e4b4899b383e28b6002750b14e254cfbbdd81f/Dockerfile) looking specifically for added runtime deps.
-1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
+1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
 

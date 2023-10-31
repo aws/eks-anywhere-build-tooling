@@ -18,6 +18,6 @@ ex: [0.24.0 compared to 0.27.4](https://github.com/vmware/govmomi/compare/v0.24.
 for LDFLAGS changes, these should match what is in their Makefile and the EKS-A Makefile.
 1. Verify the golang version has not changed. Use the github release [action](https://github.com/vmware/govmomi/blob/master/.github/workflows/govmomi-release.yaml) as the source
 of truth for the golang version upstream builds with.
-1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
+1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

@@ -10,6 +10,6 @@
 1. Update the `GIT_TAG` file to have the new desired tag based on upstream.
 1. Verify the golang version has not changed. Currently the version mentioned in a [dockerfile](https://github.com/tinkerbell/hegel/blob/main/cmd/hegel/Dockerfile#L1) is being used to build.
 1. Verify no changes have been made to the [dockerfile](https://github.com/tinkerbell/hegel/blob/main/cmd/hegel/Dockerfile) looking specifically for added runtime deps.
-1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
+1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
