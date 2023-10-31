@@ -13,6 +13,6 @@ The [Cluster API Provider for Nutanix (CAPX)](https://github.com/nutanix-cloud-n
 2. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 3. Check the go.mod file to see if the golang version has changed when updating a version. Update the `GOLANG_VERSION` in `Makefile` to match the version upstream.
 4. Compare the old tag to the new, looking specifically for Makefile changes. If `release-manifests` target has changed in the Makefile, make the required changes in `create_manifests.sh`
-5. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
+5. Update checksums and attribution using `make attribution checksums`.
 6. Update the version at the top of this Readme.
 7. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

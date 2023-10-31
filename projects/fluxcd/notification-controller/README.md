@@ -21,6 +21,6 @@ any build flag changes, tag changes, dependencies, etc.
 a [dockerfile](https://github.com/fluxcd/notification-controller/blob/main/Dockerfile#L5) they use for building which has it defined.
 1. Verify no changes have been made to the [dockerfile](https://github.com/fluxcd/notification-controller/blob/main/Dockerfile) looking specifically for
 added runtime deps.
-1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
+1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

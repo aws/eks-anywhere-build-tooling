@@ -14,6 +14,6 @@
    target has changed in the Makefile, and make the required changes in create_manifests.sh
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
-1. Update checksums and attribution using `make run-attribution-checksums-in-docker`.
+1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.

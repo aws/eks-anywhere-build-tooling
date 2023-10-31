@@ -16,7 +16,7 @@ You can find the latest version of this image [on ECR Public Gallery](https://ga
 2. Update GIT_TAG file based on the upstream release tags.
 3. Update GOLANG_VERSION in Makefile consistent with upstream release's [go version](https://github.com/kubernetes/autoscaler/blob/master/builder/Dockerfile#L15). (specified as source of truth [here](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#what-go-version-should-be-used-to-compile-ca))
 4. If adding a new version, rip out cloud providers other than clusterapi. See below for details.
-5. Run `make run-attribution-checksums-in-docker` for each release version in this folder.
+5. Run `make attribution checksums` for each release version in this folder.
 6. Update CHECKSUMS as necessary (updated by default).
 7. Update the versions at the top of this README.
 8. Update the hardcoded appVersion values in sedfile.template

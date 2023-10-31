@@ -9,6 +9,6 @@
 2. Update GIT_TAG file based on the upstream release tags.
 3. Update GOLANG_VERSION in Makefile consistent with upstream release's [go version](https://github.com/helm/helm/blob/main/.github/workflows/build-pr.yml#L15).
 4. Ensure correct patch has been used. The base patch to be used can be found [here](https://github.com/helm/helm/pull/10408). 
-5. Run `make run-attribution-checksums-in-docker` in this folder.
+5. Run `make attribution checksums` in this folder.
 6. Update CHECKSUMS as necessary (updated by default).
 7. Update the version at the top of this Readme.
