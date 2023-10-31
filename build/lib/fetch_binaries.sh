@@ -53,14 +53,16 @@ fi
 if [[ $PRODUCT = 'eksd' ]]; then
     if [[ $REPO_OWNER = 'kubernetes' ]]; then
         TARBALL="kubernetes-$REPO-linux-$ARCH.tar.gz"
-        URL=$(build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL $RELEASE_BRANCH $ARCH)
+        URL=$(build::common::echo_and_run build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL $RELEASE_BRANCH $ARCH)
         # these tarballs will extra with the kubernetes/{client,server} folders
         OUTPUT_DIR_FILE=$BINARY_DEPS_DIR/linux-$ARCH/$PRODUCT
     else
-        URL=$(build::eksd_releases::get_eksd_component_url $REPO_OWNER $RELEASE_BRANCH $ARCH)
+        URL=$(build::common::echo_and_run build::eksd_releases::get_eksd_component_url $REPO_OWNER $RELEASE_BRANCH $ARCH)
     fi
+    SHA_URL="$URL.sha256"
 else
-    URL=$(build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $LATEST_TAG $RELEASE_BRANCH)
+    URL="$(build::common::echo_and_run build::common::get_latest_eksa_asset_url $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $LATEST_TAG $RELEASE_BRANCH)"
+    SHA_URL="$(build::common::echo_and_run build::common::get_latest_eksa_asset_url_sha256 $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $LATEST_TAG $RELEASE_BRANCH)"
 fi
 
 if [ "$CODEBUILD_CI" = "true" ]; then
@@ -70,8 +72,11 @@ fi
 DOWNLOAD_DIR=$(mktemp -d)
 trap "rm -rf $DOWNLOAD_DIR" EXIT
 
-build::common::echo_and_run wget -q --retry-connrefused $URL $URL.sha256 -P $DOWNLOAD_DIR
-(cd $DOWNLOAD_DIR && sha256sum -c *.sha256)
+FILENAME_AND_POSSIBLE_QUERY=${URL##*/}
+
+build::common::echo_and_run wget -q --retry-connrefused "$URL" -O $DOWNLOAD_DIR/${FILENAME_AND_POSSIBLE_QUERY%%[?#]*}
+build::common::echo_and_run wget -q --retry-connrefused "$SHA_URL" -O $DOWNLOAD_DIR/${FILENAME_AND_POSSIBLE_QUERY%%[?#]*}.sha256
+ (cd $DOWNLOAD_DIR && sha256sum -c *.sha256)
 
 if [[ $REPO == *.tar.gz ]]; then
     build::common::echo_and_run mv $DOWNLOAD_DIR/*.tar.gz $OUTPUT_DIR_FILE
