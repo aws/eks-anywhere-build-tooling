@@ -13,12 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# args: <trace|log> <-c|-eu -o pipefail -c>
+# args: <trace|log|docker> <-c|-eu -o pipefail -c>
 
 ACTION="$1"
 if [ "$ACTION" = "trace" ]; then
     >&2 echo "Shell trace: $@"
 fi
+
+shift
 
 # remove action and shellflags up to the -c
 for var; do
@@ -47,8 +49,16 @@ DATE=$(build::find::gnu_variant_on_mac date)
 DATE_NANO=$(if [ "$(uname -s)" = "Linux" ] || [ "$DATE" = "gdate" ]; then echo %3N; fi)
 
 START_TIME=$($DATE +%s.$DATE_NANO)
+if [ "$ACTION" = "docker" ]; then
+    TARGET="run-in-docker/$TARGET"
+fi
 
 echo -e "\n------------------- $($DATE +"%Y-%m-%dT%H:%M:%S.$DATE_NANO%z") $([ -n "${DOCKER_RUN_BASE_DIRECTORY:-}" ] && echo "(In Docker) ")Starting target=$TARGET -------------------"
-echo "($(pwd)) \$ $@"
-eval "$@"
+if [ "$ACTION" = "docker" ]; then
+    echo "($(pwd)) \$ $RUN_IN_DOCKER_ARGS"
+    eval $SCRIPT_ROOT/run_target_docker.sh $RUN_IN_DOCKER_ARGS
+else
+    echo "($(pwd)) \$ $@"
+    eval "$@"
+fi
 echo -e "------------------- $($DATE +"%Y-%m-%dT%H:%M:%S.$DATE_NANO%z") $([ -n "${DOCKER_RUN_BASE_DIRECTORY:-}" ] && echo "(In Docker) ")Finished target=$TARGET duration=$(echo $($DATE +%s.$DATE_NANO) - $START_TIME | bc) seconds -------------------\n"

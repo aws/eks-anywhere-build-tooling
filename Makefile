@@ -18,6 +18,7 @@ RELEASE_BRANCH?=$(LATEST_EKSD_RELEASE)
 GIT_HASH=$(shell git -C $(BASE_DIRECTORY) rev-parse HEAD)
 ALL_PROJECTS=$(shell $(BUILD_LIB)/all_projects.sh $(BASE_DIRECTORY))
 
+UPLOAD_ARTIFACTS_TO_S3?=false
 LATEST_EKSD_RELEASE=$(shell source $(BUILD_LIB)/common.sh && build::eksd_releases::get_release_branch)
 
 # $1 - project name using _ as separator, ex: rancher_local-path-provisoner
@@ -48,7 +49,6 @@ clean: $(addprefix clean-project-, $(ALL_PROJECTS))
 ############################## BUILD ALL ###################################
 
 .PHONY: build-all
-build-all: UPLOAD_ARTIFACTS_TO_S3?=false
 build-all: build-all-warning
 # Build projects with dependecies first to try and validate if there are any missing
 	@set -eu -o pipefail; \

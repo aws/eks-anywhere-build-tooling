@@ -15,6 +15,7 @@ OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 SHELL_TRACE?=false
 TRACE_SHELL=$(BUILD_LIB)/make_shell.sh trace
 LOGGING_SHELL=$(BUILD_LIB)/make_shell.sh log
+DOCKER_SHELL=$(BUILD_LIB)/make_shell.sh docker
 NOOP_SHELL=true
 DEFAULT_SHELL=$(if $(filter true,$(SHELL_TRACE)),$(TRACE_SHELL),bash)
 SHELL=$(DEFAULT_SHELL)
@@ -181,9 +182,7 @@ IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS
 
 # intentionally not setting a default verison, we do not want projects depending on a default
 GOLANG_VERSION?=
-# If running in the builder base on prow or codebuild, grab the current tag to be used when building with cgo
-BUILDER_BASE_TAG=${BUILDER_BASE_TAG:-$(curl -s https://raw.githubusercontent.com/aws/eks-anywhere-prow-jobs/main/BUILDER_BASE_TAG_FILE)}
-
+# If running in the builder base on prow or codebuild, grab the current tag to be used when building with cgo or docker
 CURRENT_BUILDER_BASE_TAG=$(or \
 	$(and $(wildcard /config/BUILDER_BASE_TAG_FILE),$(shell cat /config/BUILDER_BASE_TAG_FILE))\
 	,$(shell curl -s https://raw.githubusercontent.com/aws/eks-anywhere-prow-jobs/main/BUILDER_BASE_TAG_FILE))
@@ -191,8 +190,8 @@ CURRENT_BUILDER_BASE_IMAGE=$(if $(CODEBUILD_BUILD_IMAGE),$(CODEBUILD_BUILD_IMAGE
 GOLANG_GCC_BUILDER_IMAGE=$(BASE_IMAGE_REPO)/golang:$(shell cat $(BASE_DIRECTORY)/EKS_DISTRO_MINIMAL_BASE_GOLANG_COMPILER_$(GOLANG_VERSION)_GCC_TAG_FILE)
 
 # in CODEBUILD always use buildctl
-BUILDCTL_AVAILABLE=$(or $(filter true,$(CODEBUILD_CI)),$(shell command -v buildctl &> /dev/null && buildctl debug workers &> /dev/null && echo "true" || echo "false"))
-BUILDX_AVAILABLE=$(shell docker buildx inspect &> /dev/null && echo "true" || echo "false")
+BUILDCTL_AVAILABLE=$(or $(filter true,$(IS_ON_BUILDER_BASE)),$(shell command -v buildctl &> /dev/null && buildctl debug workers &> /dev/null && echo "true" || echo "false"))
+BUILDX_AVAILABLE=$(shell command -v docker &> /dev/null && docker info &> /dev/null && docker buildx inspect &> /dev/null && echo "true" || echo "false")
 DOCKER_AVAILABLE=$(shell command -v docker &> /dev/null && docker info &> /dev/null && echo "true" || echo "false")
 ####################################################
 
@@ -457,36 +456,44 @@ DEPENDENCY_TOOLS=buildctl helm jq lz4 skopeo tuftool yq
 # around checksum mismatch
 FORCE_BUILD_ON_HOST?=false
 
-# $1 - target(s)
-# $2 - should run on host
+# $1 - should run on host
 MAYBE_RUN_IN_DOCKER?=$(if \
 	$(or \
 		$(filter true,$(IS_ON_BUILDER_BASE)), \
 		$(filter true,$(FORCE_BUILD_ON_HOST)), \
 		$(filter true,$2), \
-		$(filter false,$(EVAL_DOCKER_AVAILABLE)) \
-	),,$(foreach target,$1,run-in-docker/$(target)))
+		$(filter false,$(DOCKER_AVAILABLE)) \
+	),,true)
 
 # this can be used as a normal macro, $(ENABLE_DOCKER), or as a func with 1 param, $(call ENABLE_DOCKER)
 # $1 - should run on host (optional)
-ENABLE_DOCKER=$(ENABLE_LOGGING)$(eval $(call ENABLE_DOCKER_BODY,$@,$(if $(filter undefined,$(origin 1)),false,$(value 1)),))$(DOCKER_TARGET)
+ENABLE_DOCKER=$(eval $(call ENABLE_DOCKER_BODY,$@,$(if $(filter undefined,$(origin 1)),false,$(value 1)),))$(if $(USE_DOCKER),ensure-docker,)
 # $1 - container platform to use
-ENABLE_DOCKER_PLATFORM=$(ENABLE_LOGGING)$(eval $(call ENABLE_DOCKER_BODY,$@,false,$(if $(filter undefined,$(origin 1)),,$(value 1))))$(DOCKER_TARGET)
+ENABLE_DOCKER_PLATFORM=$(eval $(call ENABLE_DOCKER_BODY,$@,false,$(if $(filter undefined,$(origin 1)),,$(value 1))))$(if $(USE_DOCKER),ensure-docker,)
 
 # $1 - target name
 # $2 - should run on host
-# SHELL is overriden to the cli `true` so that when the actual target ends up running on the host it is an noop
+# $3 - container platform to use (for cgo)
+# SHELL is overriden with the run_in_docker.sh $(RUN_IN_DOCKER_BODY) args passed at the beginning
+# in the make_shell.sh, if the action is docker, then it will wait until its the actual target
+# signified by LOGGING_TARGET being set and then run that script instead of the actual target script
 # since we are manipulating the SHELL here we have to make sure any variables which are going to be used in the
-# context of MAYBE_RUN_IN_DOCKER cannot themselves call out to a shell, we force eval to avoid
+# context of MAYBE_RUN_IN_DOCKER cannot themselves call out to a shell, we can force eval to avoid
 define ENABLE_DOCKER_BODY
 $(eval _TARGET:=$1)
 $(eval _RUN_ON_HOST:=$2)
 $(eval _DOCKER_PLATFORM:=$3)
-$(_TARGET): EVAL_DOCKER_AVAILABLE:=$$(DOCKER_AVAILABLE)
-$(_TARGET): EVAL_RUN_ON_HOST:=$(_RUN_ON_HOST)
-$(_TARGET): DOCKER_PLATFORM:=$(_DOCKER_PLATFORM)
-$(_TARGET): DOCKER_TARGET=$$(call MAYBE_RUN_IN_DOCKER,$$@,$$(EVAL_RUN_ON_HOST))
-$(_TARGET): SHELL=$$(if $$(DOCKER_TARGET),$$(NOOP_SHELL),$$(LOGGING_SHELL))
+$(eval _USE_DOCKER:=$(call MAYBE_RUN_IN_DOCKER,$(_RUN_ON_HOST)))
+$(_TARGET): export LOGGING_TARGET=$(_TARGET)
+$(_TARGET): export RUN_IN_DOCKER_ARGS=$$(RUN_IN_DOCKER_ARGS_BODY)
+$(_TARGET): MAKE_TARGET=$(_TARGET)
+$(_TARGET): DOCKER_PLATFORM=$(_DOCKER_PLATFORM)
+$(_TARGET): USE_DOCKER=$(_USE_DOCKER)
+$(_TARGET): SHELL=$(if $(_USE_DOCKER),$(DOCKER_SHELL),$(LOGGING_SHELL))
+endef
+
+define RUN_IN_DOCKER_ARGS_BODY
+$(COMPONENT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" "$(ARTIFACTS_BUCKET)" "$(BASE_DIRECTORY)" "$(GO_MOD_CACHE)" "$(BUILDER_PLATFORM_ARCH)" true "$(CURRENT_BUILDER_BASE_TAG)" "$(DOCKER_PLATFORM)"
 endef
 
 ####################################################
@@ -1050,7 +1057,7 @@ ensure-docker: ensure/docker
 # in that case skip this check
 .PHONY: ensure-buildkitd-host
 ensure-buildkitd-host: | ensure-buildctl
-	@if [ "true" = "$(CODEBUILD_CI)" ] && [ "true" = "$(IS_ON_BUILDER_BASE)" ]; then \
+	@if [ "true" = "$(IS_ON_BUILDER_BASE)" ]; then \
 		exit 0; \
 	elif [ -z "$${BUILDKIT_HOST:-}" ] && [ ! -S /run/buildkit/buildkitd.sock ]; then \
 		echo "Please set the 'BUILDKIT_HOST' environment variable."; \
@@ -1086,7 +1093,7 @@ run-in-docker/%: MAKE_TARGET=$*
 run-in-docker/%: export LOGGING_TARGET=$@
 run-in-docker/%: SHELL=$(LOGGING_SHELL)
 run-in-docker/%: | ensure-docker $$(ENABLE_LOGGING)
-	@$(BUILD_LIB)/run_target_docker.sh $(COMPONENT) $(MAKE_TARGET) $(IMAGE_REPO) "$(RELEASE_BRANCH)" "$(ARTIFACTS_BUCKET)" "$(BASE_DIRECTORY)" "$(GO_MOD_CACHE)" "$(BUILDER_PLATFORM_ARCH)" true "$(CURRENT_BUILDER_BASE_TAG)" "$(DOCKER_PLATFORM)"
+	@$(BUILD_LIB)/run_target_docker.sh $(RUN_IN_DOCKER_ARGS_BODY)
 
 # backcompat old style run-<>-in-docker style targets which work for anything that does not have a / in the target
 .PHONY: run-%-in-docker
@@ -1097,3 +1104,6 @@ run-%-in-docker: run-in-docker/%
 # if we do not have this as a catch all target then the first target
 # which sets it to 0 will affect all the prereq targets for that target
 %: SHELL=$(DEFAULT_SHELL)
+# reset to default in case we are running a submake or some other target which has set it
+%: export LOGGING_TARGET=
+%: export RUN_IN_DOCKER_ARGS=

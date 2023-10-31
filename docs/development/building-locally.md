@@ -32,7 +32,6 @@ To force running targets on the host: `export FORCE_GO_BUILD_ON_HOST=true`.
 	* https://github.com/containers/skopeo - There is no binary release of skopeo for linux see [installing](https://github.com/containers/skopeo/blob/main/install.md) or
 		copy from builder-base image to host: `CONTAINER_ID=$(docker run -d -i public.ecr.aws/eks-distro-build-tooling/builder-base:standard-latest.al2 bash) && sudo docker cp $CONTAINER_ID:/usr/bin/skopeo /usr/local/bin && docker rm -vf $CONTAINER_ID`
 * Building container images for different architectures will require `qemu`
-	* `curl -Ls https://github.com/tonistiigi/binfmt/releases/download/deploy%2Fv6.2.0-26/qemu_v6.2.0_linux-amd64.tar.gz | sudo tar xzvf - -C /usr/bin`
 	* `docker run --privileged --rm public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v6.1.0 --install aarch64,amd64`
 * To ensure string sorting matches our build pipelines - `export LANG=C.UTF-8`
 * To make pushing to ECR easier: `sudo yum install amazon-ecr-credential-helper -y`
