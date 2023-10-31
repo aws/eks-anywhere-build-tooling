@@ -11,12 +11,6 @@ clone-repo:  ## Clone upstream `image-builder`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
-##@ Image Targets
-local-images: ## Builds `image-builder/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `image-builder/images/push` to IMAGE_REPO
-image-builder/images/amd64: ## Builds/pushes `image-builder/images/amd64`
-image-builder/images/push: ## Builds/pushes `image-builder/images/push`
-
 ##@ Fetch Binary Targets
 _output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
 _output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
@@ -24,15 +18,16 @@ _output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `
 _output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
 
 ##@ Run in Docker Targets
-run-all-attributions-in-docker: ## Run `all-attributions` in docker builder container
-run-all-attributions-checksums-in-docker: ## Run `all-attributions-checksums` in docker builder container
-run-all-checksums-in-docker: ## Run `all-checksums` in docker builder container
-run-attribution-in-docker: ## Run `attribution` in docker builder container
-run-attribution-checksums-in-docker: ## Run `attribution-checksums` in docker builder container
-run-binaries-in-docker: ## Run `binaries` in docker builder container
-run-checksums-in-docker: ## Run `checksums` in docker builder container
-run-clean-in-docker: ## Run `clean` in docker builder container
-run-clean-go-cache-in-docker: ## Run `clean-go-cache` in docker builder container
+run-in-docker/all-attributions: ## Run `all-attributions` in docker builder container
+run-in-docker/all-attributions-checksums: ## Run `all-attributions-checksums` in docker builder container
+run-in-docker/all-checksums: ## Run `all-checksums` in docker builder container
+run-in-docker/attribution: ## Run `attribution` in docker builder container
+run-in-docker/attribution-checksums: ## Run `attribution-checksums` in docker builder container
+run-in-docker/binaries: ## Run `binaries` in docker builder container
+run-in-docker/checksums: ## Run `checksums` in docker builder container
+run-in-docker/clean: ## Run `clean` in docker builder container
+run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
+run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
@@ -43,8 +38,10 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@Update Helpers
-run-target-in-docker: ## Run `MAKE_TARGET` using builder base docker container
+start-docker-builder: ## Start long lived builder base docker container
 stop-docker-builder: ## Clean up builder base docker container
+run-buildkit-and-registry: ## Run buildkitd and a local docker registry as containers
+stop-buildkit-and-registry: ## Stop the buildkitd and a local docker registry containers
 generate: ## Update UPSTREAM_PROJECTS.yaml
 update-go-mods: ## Update locally checked-in go sum to assist in vuln scanning
 update-vendor-for-dep-patch: ## After bumping dep in go.mod file, uses generic vendor update script or one provided from upstream project

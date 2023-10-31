@@ -50,15 +50,36 @@ validate-checksums: # Validate checksums of currently built binaries against che
 all-checksums: ## Update checksums files for all RELEASE_BRANCHes.
 
 ##@ Run in Docker Targets
-run-all-attributions-in-docker: ## Run `all-attributions` in docker builder container
-run-all-attributions-checksums-in-docker: ## Run `all-attributions-checksums` in docker builder container
-run-all-checksums-in-docker: ## Run `all-checksums` in docker builder container
-run-attribution-in-docker: ## Run `attribution` in docker builder container
-run-attribution-checksums-in-docker: ## Run `attribution-checksums` in docker builder container
-run-binaries-in-docker: ## Run `binaries` in docker builder container
-run-checksums-in-docker: ## Run `checksums` in docker builder container
-run-clean-in-docker: ## Run `clean` in docker builder container
-run-clean-go-cache-in-docker: ## Run `clean-go-cache` in docker builder container
+run-in-docker/all-attributions: ## Run `all-attributions` in docker builder container
+run-in-docker/all-attributions-checksums: ## Run `all-attributions-checksums` in docker builder container
+run-in-docker/all-checksums: ## Run `all-checksums` in docker builder container
+run-in-docker/attribution: ## Run `attribution` in docker builder container
+run-in-docker/attribution-checksums: ## Run `attribution-checksums` in docker builder container
+run-in-docker/binaries: ## Run `binaries` in docker builder container
+run-in-docker/checksums: ## Run `checksums` in docker builder container
+run-in-docker/clean: ## Run `clean` in docker builder container
+run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
+run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
+run-in-docker/hub/actions/cexec/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/cexec/v1/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/hub/actions/kexec/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/kexec/v1/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/hub/actions/image2disk/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/image2disk/v1/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/hub/actions/oci2disk/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/oci2disk/v1/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/hub/actions/writefile/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/writefile/v1/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/_output/bin/hub/linux-amd64/cexec: ## Run `_output/bin/hub/linux-amd64/cexec` in docker builder container
+run-in-docker/_output/bin/hub/linux-amd64/kexec: ## Run `_output/bin/hub/linux-amd64/kexec` in docker builder container
+run-in-docker/_output/bin/hub/linux-amd64/image2disk: ## Run `_output/bin/hub/linux-amd64/image2disk` in docker builder container
+run-in-docker/_output/bin/hub/linux-amd64/oci2disk: ## Run `_output/bin/hub/linux-amd64/oci2disk` in docker builder container
+run-in-docker/_output/bin/hub/linux-amd64/writefile: ## Run `_output/bin/hub/linux-amd64/writefile` in docker builder container
+run-in-docker/_output/bin/hub/linux-arm64/cexec: ## Run `_output/bin/hub/linux-arm64/cexec` in docker builder container
+run-in-docker/_output/bin/hub/linux-arm64/kexec: ## Run `_output/bin/hub/linux-arm64/kexec` in docker builder container
+run-in-docker/_output/bin/hub/linux-arm64/image2disk: ## Run `_output/bin/hub/linux-arm64/image2disk` in docker builder container
+run-in-docker/_output/bin/hub/linux-arm64/oci2disk: ## Run `_output/bin/hub/linux-arm64/oci2disk` in docker builder container
+run-in-docker/_output/bin/hub/linux-arm64/writefile: ## Run `_output/bin/hub/linux-arm64/writefile` in docker builder container
+run-in-docker/_output/cexec/attribution/go-license.csv: ## Run `_output/cexec/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/kexec/attribution/go-license.csv: ## Run `_output/kexec/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/image2disk/attribution/go-license.csv: ## Run `_output/image2disk/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/oci2disk/attribution/go-license.csv: ## Run `_output/oci2disk/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/writefile/attribution/go-license.csv: ## Run `_output/writefile/attribution/go-license.csv` in docker builder container
 
 ##@ License Targets
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
@@ -77,8 +98,10 @@ help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
 
 ##@Update Helpers
-run-target-in-docker: ## Run `MAKE_TARGET` using builder base docker container
+start-docker-builder: ## Start long lived builder base docker container
 stop-docker-builder: ## Clean up builder base docker container
+run-buildkit-and-registry: ## Run buildkitd and a local docker registry as containers
+stop-buildkit-and-registry: ## Stop the buildkitd and a local docker registry containers
 generate: ## Update UPSTREAM_PROJECTS.yaml
 update-go-mods: ## Update locally checked-in go sum to assist in vuln scanning
 update-vendor-for-dep-patch: ## After bumping dep in go.mod file, uses generic vendor update script or one provided from upstream project
