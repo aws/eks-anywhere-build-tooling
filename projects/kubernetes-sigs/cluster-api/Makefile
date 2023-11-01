@@ -69,6 +69,7 @@ $(FIX_LICENSES_TEST_KIND_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # We use capi license instead
 	cp $(REPO)/LICENSE $@
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
