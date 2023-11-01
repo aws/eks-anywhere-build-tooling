@@ -81,6 +81,9 @@ all-attributions-checksums: ## Update attribution and checksums files for all RE
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-repo: ## Removes source directory
+
+------------------- 2023-11-01T08:01:17.199+0000 Starting target=_output/1-26/kind-base-image-build-args -------------------
+(/home/prow/go/src/github.com/aws/eks-anywhere-build-tooling/projects/kubernetes-sigs/kind) $ build/base-image-build-args.sh 1-26 s3://my-s3-bucket _output/1-26/kind-base-image-build-args latest
 create-kind-cluster-amd64: ## Create local kind cluster using built amd64 image
 create-kind-cluster-arm64: ## Create local kind cluster using built arm64 image
 
