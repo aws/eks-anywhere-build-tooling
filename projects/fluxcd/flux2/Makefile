@@ -35,6 +35,7 @@ $(FIX_LICENSES_SHA1CD): | $(GO_MOD_DOWNLOAD_TARGETS)
 # Copying in manually for now until the dep is updated upstream
 	wget -q --retry-connrefused -O $@ https://raw.githubusercontent.com/pjbgf/sha1cd/main/LICENSE
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion

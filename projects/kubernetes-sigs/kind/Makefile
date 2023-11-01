@@ -65,7 +65,7 @@ BUILDSPEC_2_VARS_VALUES=SUPPORTED_K8S_VERSIONS
 include $(BASE_DIRECTORY)/Common.mk
 
 # Do not need to import if running clean or any var-value-% targets
-ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean,$(MAKECMDGOALS_WITHOUT_VAR_VALUE))),)
+ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean help-list add-generated-help-block,$(MAKECMDGOALS_WITHOUT_VAR_VALUE))),)
 -include $(KIND_BASE_IMAGE_BUILD_ARGS)
 -include $(KIND_NODE_IMAGE_BUILD_ARGS)
 endif
