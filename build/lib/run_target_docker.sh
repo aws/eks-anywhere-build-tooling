@@ -53,14 +53,14 @@ else
 	trap "remove_container" EXIT
 fi
 
-IMAGE="public.ecr.aws/eks-distro-build-tooling/builder-base:$BUILDER_BASE_TAG"
+IMAGE="736510011942.dkr.ecr.us-west-2.amazonaws.com/builder-base:latest.2"
 # since if building cgo we will specifically set the arch to something other than the host
 # ensure we always explictly ask for the host platform, unless override for cgo
 PLATFORM_ARG="--platform linux/$BUILDER_PLATFORM_ARCH"
 
 if [[ -n "$PLATFORM" ]]; then
-	DIGEST=$(docker buildx imagetools inspect --raw public.ecr.aws/eks-distro-build-tooling/builder-base:$BUILDER_BASE_TAG | jq -r ".manifests[] | select(.platform.architecture == \"${PLATFORM#linux/}\") | .digest")
-	IMAGE="public.ecr.aws/eks-distro-build-tooling/builder-base@$DIGEST"
+	DIGEST=$(docker buildx imagetools inspect --raw $IMAGE | jq -r ".manifests[] | select(.platform.architecture == \"${PLATFORM#linux/}\") | .digest")
+	IMAGE="$IMAGE@$DIGEST"
 	PLATFORM_ARG="--platform $PLATFORM"
 	MAKE_VARS+=" BINARY_PLATFORMS=$PLATFORM"
 fi
@@ -79,9 +79,9 @@ fi
 
 if [[ "$SKIP_RUN" == "false" ]]; then
 	echo "Pulling $IMAGE...."
-	if ! build::docker::retry_pull $IMAGE > /dev/null 2>&1; then
-		# try one more time to show the error to the user
-		docker pull $IMAGE
+	if ! docker pull $IMAGE > /dev/null 2>&1; then
+		# try more times to show the error to the user
+		build::docker::retry_pull $IMAGE
 	fi
 
 	NETRC=""
@@ -92,11 +92,16 @@ if [[ "$SKIP_RUN" == "false" ]]; then
 		DOCKER_RUN_NETRC=""
 	fi
 
+	PRIVILEGED=""
+	if [[ "$REMOVE" == "false" ]]; then
+		PRIVILEGED="--privileged --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock"
+	fi
+
 	mkdir -p $GO_MOD_CACHE
-	CONTAINER_ID=$(build::common::echo_and_run docker run -d $NAME --privileged $NETRC $PLATFORM_ARG \
+	CONTAINER_ID=$(build::common::echo_and_run docker run -d $NAME $PRIVILEGED $NETRC $PLATFORM_ARG \
 		--mount type=bind,source=$BASE_DIRECTORY,target=/eks-anywhere-build-tooling \
 		--mount type=bind,source=$GO_MOD_CACHE,target=/mod-cache \
-		-e GOPROXY=${GOPROXY:-} -e GOMODCACHE=/mod-cache -e DOCKER_RUN_BASE_DIRECTORY=$BASE_DIRECTORY \
+		-e GOPROXY=${GOPROXY:-} -e GOMODCACHE=/mod-cache \
 		--entrypoint sleep $IMAGE infinity)
 
 	if [ -n "$DOCKER_USER_FLAG" ]; then
@@ -113,6 +118,6 @@ if [[ "$SKIP_RUN" == "false" ]]; then
 fi
 
 
-build::common::echo_and_run docker exec -e RELEASE_BRANCH=$RELEASE_BRANCH $DOCKER_USER_FLAG \
+build::common::echo_and_run docker exec -e RELEASE_BRANCH=$RELEASE_BRANCH -e DOCKER_RUN_BASE_DIRECTORY=$BASE_DIRECTORY $DOCKER_USER_FLAG \
 	-t $CONTAINER_ID \
 	make --no-print-directory $TARGET -C /eks-anywhere-build-tooling/projects/$PROJECT $MAKE_VARS
