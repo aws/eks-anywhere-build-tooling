@@ -59,10 +59,6 @@ else
     SHA_URL="$(build::common::echo_and_run build::common::get_latest_eksa_asset_url_sha256 $ARTIFACTS_BUCKET $REPO_OWNER/$REPO $ARCH $LATEST_TAG $RELEASE_BRANCH)"
 fi
 
-if [ "$CODEBUILD_CI" = "true" ]; then
-    build::common::echo_and_run build::common::wait_for_tarball $URL
-fi
-
 DOWNLOAD_DIR=$(mktemp -d)
 trap "rm -rf $DOWNLOAD_DIR" EXIT
 
