@@ -58,6 +58,7 @@ all-attributions-checksums: ## Update attribution and checksums files for all RE
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
+clean-go-cache: ## Removes the GOMODCACHE AND GOCACHE folders
 clean-repo: ## Removes source directory
 
 ##@ Helpers

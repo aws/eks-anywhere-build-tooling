@@ -29,6 +29,7 @@ upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
+clean-go-cache: ## Removes the GOMODCACHE AND GOCACHE folders
 clean-repo: ## Removes source directory
 
 ##@ Helpers
