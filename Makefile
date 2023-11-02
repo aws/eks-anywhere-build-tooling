@@ -4,7 +4,7 @@ MAKEFLAGS+=--no-builtin-rules --warn-undefined-variables --no-print-directory
 BASE_DIRECTORY:=$(abspath .)
 BUILD_LIB=${BASE_DIRECTORY}/build/lib
 SHELL_TRACE?=false
-DEFAULT_SHELL:=$(if $(filter true,$(SHELL_TRACE)),$(BUILD_LIB)/make_shell.sh trace,bash)
+DEFAULT_SHELL:=$(if $(filter true,$(SHELL_TRACE)),$(BUILD_LIB)/make_shell.sh trace true,bash)
 SHELL:=$(DEFAULT_SHELL)
 .SHELLFLAGS:=-eu -o pipefail -c
 

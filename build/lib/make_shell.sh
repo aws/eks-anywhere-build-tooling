@@ -13,13 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# args: <trace|log|docker> <-c|-eu -o pipefail -c>
+# args: <trace|log|docker> <true|false> <-c|-eu -o pipefail -c>
 
 ACTION="$1"
-if [ "$ACTION" = "trace" ]; then
+TRACE="$2"
+if [ "$TRACE" = "true" ]; then
     >&2 echo "Shell trace: $@"
+
+    if [ -n "${LOGGING_TARGET:-}" ]; then
+        >&2 echo "LOGGING_TARGET set to: ${LOGGING_TARGET}"
+    fi
+    
+    if [ -n "${RUN_IN_DOCKER_ARGS:-}" ]; then
+        >&2 echo "RUN_IN_DOCKER_ARGS set to: ${RUN_IN_DOCKER_ARGS}"
+    fi
 fi
 
+shift
 shift
 
 # remove action and shellflags up to the -c

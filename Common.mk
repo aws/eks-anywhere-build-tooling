@@ -13,9 +13,9 @@ BUILD_LIB=$(BASE_DIRECTORY)/build/lib
 OUTPUT_BIN_DIR?=$(OUTPUT_DIR)/bin/$(REPO)
 
 SHELL_TRACE?=false
-TRACE_SHELL=$(BUILD_LIB)/make_shell.sh trace
-LOGGING_SHELL=$(BUILD_LIB)/make_shell.sh log
-DOCKER_SHELL=$(BUILD_LIB)/make_shell.sh docker
+TRACE_SHELL=$(BUILD_LIB)/make_shell.sh trace true
+LOGGING_SHELL=$(BUILD_LIB)/make_shell.sh log $(SHELL_TRACE)
+DOCKER_SHELL=$(BUILD_LIB)/make_shell.sh docker $(SHELL_TRACE)
 NOOP_SHELL=true
 DEFAULT_SHELL=$(if $(filter true,$(SHELL_TRACE)),$(TRACE_SHELL),bash)
 SHELL=$(DEFAULT_SHELL)
@@ -467,9 +467,9 @@ MAYBE_RUN_IN_DOCKER?=$(if \
 
 # this can be used as a normal macro, $(ENABLE_DOCKER), or as a func with 1 param, $(call ENABLE_DOCKER)
 # $1 - should run on host (optional)
-ENABLE_DOCKER=$(eval $(call ENABLE_DOCKER_BODY,$@,$(if $(filter undefined,$(origin 1)),false,$(value 1)),))$(if $(USE_DOCKER),ensure-docker,)
+ENABLE_DOCKER=$(eval $(call ENABLE_DOCKER_BODY,$@,$(if $(filter undefined,$(origin 1)),false,$(value 1)),))
 # $1 - container platform to use
-ENABLE_DOCKER_PLATFORM=$(eval $(call ENABLE_DOCKER_BODY,$@,false,$(if $(filter undefined,$(origin 1)),,$(value 1))))$(if $(USE_DOCKER),ensure-docker,)
+ENABLE_DOCKER_PLATFORM=$(eval $(call ENABLE_DOCKER_BODY,$@,false,$(if $(filter undefined,$(origin 1)),,$(value 1))))
 
 # $1 - target name
 # $2 - should run on host
@@ -524,7 +524,7 @@ RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter t
 # convert commonly used, usually shell call, variables to lazily resolved cached variables
 CACHE_VARS=AWS_ACCOUNT_ID BUILD_IDENTIFIER BUILDER_PLATFORM_ARCH BUILDER_PLATFORM_OS DATE_CMD DATE_NANO \
 	GIT_HASH GIT_TAG GO_BUILD_CACHE GO_MOD_CACHE GOLANG_VERSION HELM_GIT_TAG IS_ON_BUILDER_BASE \
-	PROJECT_DEPENDENCIES_TARGETS SUPPORTED_K8S_VERSIONS BUILDCTL_AVAILABLE BUILDX_AVAILABLE DOCKER_AVAILABLE
+	PROJECT_DEPENDENCIES_TARGETS SUPPORTED_K8S_VERSIONS BUILDCTL_AVAILABLE BUILDX_AVAILABLE DOCKER_AVAILABLE CURRENT_BUILDER_BASE_TAG
 $(foreach v,$(strip $(CACHE_VARS)),$(call CACHE_VARIABLE,$(v)))
 
 define BUILDCTL
@@ -865,14 +865,9 @@ release: $(RELEASE_TARGETS)
 
 ###  Clean Targets
 
-.PHONY: clean-go-cache
-clean-go-cache:
-	@echo -e $(call TARGET_START_LOG)
 # When go downloads pkg to the module cache, GOPATH/pkg/mod, it removes the write permissions
 # prevent accident modifications since files/checksums are tightly controlled
 # adding the perms necessary to perform the delete
-	@chmod -fR 777 $(GO_MOD_CACHE) &> /dev/null || :
-	$(foreach folder,$(GO_MOD_CACHE) $(GO_BUILD_CACHE),$(if $(wildcard $(folder)),du -hs $(folder) && rm -rf $(folder);,))
 # When building go bins using mods which have been downloaded by go mod download/vendor which will exist in the go_mod_cache
 # there is additional checksum (?) information that is not preserved in the vendor directory within the project folder
 # This additional information gets written out into the resulting binary. If we did not run go mod vendor, which we do 
@@ -880,8 +875,13 @@ clean-go-cache:
 # downloaded in the go_mod_cahe.  Running go mod vendor always ensures that the go mod has always been downloaded
 # to the go_mod_cache directory. If we clear the go_mod_cache we need to delete the go_mod_download sentinel file
 # so the next time we run build go mods will be redownloaded
-	$(foreach file,$(GO_MOD_DOWNLOAD_TARGETS),$(if $(wildcard $(file)),rm -f $(file);,))
-	@echo -e $(call TARGET_END_LOG)
+.PHONY: clean-go-cache
+clean-go-cache: | $$(ENABLE_LOGGING)
+	@if [ -n "$(GOLANG_VERSION)" ]; then \
+		chmod -fR 777 $(GO_MOD_CACHE) &> /dev/null || :; \
+		$(foreach folder,$(GO_MOD_CACHE) $(GO_BUILD_CACHE),$(if $(wildcard $(folder)),du -hs $(folder) && rm -rf $(folder);,)) \
+		$(foreach file,$(GO_MOD_DOWNLOAD_TARGETS),$(if $(wildcard $(file)),rm -f $(file);,)) \
+	fi
 
 .PHONY: clean-repo
 clean-repo:
