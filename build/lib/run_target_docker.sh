@@ -53,7 +53,7 @@ else
 	trap "remove_container" EXIT
 fi
 
-IMAGE="736510011942.dkr.ecr.us-west-2.amazonaws.com/builder-base:latest.2"
+IMAGE="public.ecr.aws/eks-distro-build-tooling/builder-base:$BUILDER_BASE_TAG"
 # since if building cgo we will specifically set the arch to something other than the host
 # ensure we always explictly ask for the host platform, unless override for cgo
 PLATFORM_ARG="--platform linux/$BUILDER_PLATFORM_ARCH"
