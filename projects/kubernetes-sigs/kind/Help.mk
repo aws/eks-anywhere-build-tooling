@@ -80,6 +80,7 @@ all-attributions-checksums: ## Update attribution and checksums files for all RE
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
+clean-go-cache: ## Removes the GOMODCACHE AND GOCACHE folders
 clean-repo: ## Removes source directory
 create-kind-cluster-amd64: ## Create local kind cluster using built amd64 image
 create-kind-cluster-arm64: ## Create local kind cluster using built arm64 image

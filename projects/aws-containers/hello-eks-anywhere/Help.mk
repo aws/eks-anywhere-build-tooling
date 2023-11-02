@@ -34,6 +34,7 @@ run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder 
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
+clean-go-cache: ## Removes the GOMODCACHE AND GOCACHE folders
 clean-repo: ## Removes source directory
 
 ##@ Helpers

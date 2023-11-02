@@ -130,6 +130,7 @@ fi
 
 CLEAN_TARGETS="${NL}${NL}##@ Clean Targets"
 CLEAN_TARGETS+="${NL}clean: ## Removes source and _output directory"
+CLEAN_TARGETS+="${NL}clean-go-cache: ## Removes the GOMODCACHE AND GOCACHE folders"
 if [[ "$REPO_NO_CLONE" != "true" ]]; then
     CLEAN_TARGETS+="${NL}clean-repo: ## Removes source directory"
 fi
