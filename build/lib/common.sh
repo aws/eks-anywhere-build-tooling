@@ -344,7 +344,11 @@ function build::common::get_latest_eksa_asset_url() {
   elif build::common::echo_and_run aws s3api head-object --bucket $(basename $artifact_bucket) --key $fallback_latest_uri &> /dev/null; then
     aws s3 presign $artifact_bucket/$fallback_latest_uri
   else
-    echo "No artifact availabe!"
+    >&2 echo "******* No artifact availabe! *******"
+    >&2 echo "${s3_url_prefix}/${fallback_latest_uri} does not exists!"
+    >&2 echo "Please double check the value of \$ARTIFACTS_BUCKET."
+    >&2 echo "${git_tag} of ${project} may not be the current latest version, verify you have the latest code from main to be sure."
+    >&2 echo "*************************************"
     exit 1
   fi
 }

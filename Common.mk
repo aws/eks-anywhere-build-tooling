@@ -839,9 +839,10 @@ helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGE
 helm/push: helm/build | ensure-helm $$(ENABLE_LOGGING)
 	@$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 
-## Fetch Binary Targets
+#@ Fetch Binary Targets
 .PHONY: handle-dependencies 
-handle-dependencies: $(call PROJECT_DEPENDENCIES_TARGETS)
+handle-dependencies: # Download and extract TARs for each dependency listed in PROJECT_DEPENDENCIES
+handle-dependencies: $(PROJECT_DEPENDENCIES_TARGETS)
 
 $(BINARY_DEPS_DIR)/linux-%: | $$(ENABLE_LOGGING)
 	@$(BUILD_LIB)/fetch_binaries.sh $(BINARY_DEPS_DIR) $* $(ARTIFACTS_BUCKET) $(LATEST) $(RELEASE_BRANCH)
