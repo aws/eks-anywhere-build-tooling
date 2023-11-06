@@ -44,12 +44,6 @@ if [[ -n "$RELEASE_BRANCH_OVERRIDE" ]]; then
     OUTPUT_DIR_FILE+=/$RELEASE_BRANCH_OVERRIDE
 fi
 
-if [[ $REPO == *.tar.gz ]]; then
-    mkdir -p $(dirname $OUTPUT_DIR_FILE)
-else
-    mkdir -p $OUTPUT_DIR_FILE
-fi
-
 if [[ $PRODUCT = 'eksd' ]]; then
     if [[ $REPO_OWNER = 'kubernetes' ]]; then
         TARBALL="kubernetes-$REPO-linux-$ARCH.tar.gz"
@@ -76,7 +70,13 @@ FILENAME_AND_POSSIBLE_QUERY=${URL##*/}
 
 build::common::echo_and_run wget -q --retry-connrefused "$URL" -O $DOWNLOAD_DIR/${FILENAME_AND_POSSIBLE_QUERY%%[?#]*}
 build::common::echo_and_run wget -q --retry-connrefused "$SHA_URL" -O $DOWNLOAD_DIR/${FILENAME_AND_POSSIBLE_QUERY%%[?#]*}.sha256
- (cd $DOWNLOAD_DIR && sha256sum -c *.sha256)
+(cd $DOWNLOAD_DIR && sha256sum -c *.sha256)
+
+if [[ $REPO == *.tar.gz ]]; then
+    mkdir -p $(dirname $OUTPUT_DIR_FILE)
+else
+    mkdir -p $OUTPUT_DIR_FILE
+fi
 
 if [[ $REPO == *.tar.gz ]]; then
     build::common::echo_and_run mv $DOWNLOAD_DIR/*.tar.gz $OUTPUT_DIR_FILE
