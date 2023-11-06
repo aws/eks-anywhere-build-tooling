@@ -28,6 +28,9 @@ run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder 
 clean: ## Removes source and _output directory
 clean-go-cache: ## Removes the GOMODCACHE AND GOCACHE folders
 
+##@Fetch Binary Targets
+handle-dependencies: ## Download and extract TARs for each dependency listed in PROJECT_DEPENDENCIES
+
 ##@ Helpers
 help: ## Display this help
 add-generated-help-block: ## Add or update generated help block to document project make file and support shell auto completion
