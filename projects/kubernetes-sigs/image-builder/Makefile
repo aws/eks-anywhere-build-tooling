@@ -28,6 +28,9 @@ export BUILDER_ROOT=$(MAKE_ROOT)
 export RHSM_USER=$(RHSM_USERNAME)
 export RHSM_PASS=$(RHSM_PASSWORD)
 
+REDHAT_CONFIG_TARGET=redhat-config.json
+IF_REDHAT_CONFIG_TARGET=$(if $(filter redhat,$(IMAGE_OS)),$(REDHAT_CONFIG_TARGET),)
+
 VSPHERE_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
 DEV_ACCOUNTS?=
@@ -244,6 +247,15 @@ setup-ami-share: | $$(ENABLE_LOGGING)
 setup-packer-configs-%: $(GIT_PATCH_TARGET) | ensure-jq ensure-yq $$(ENABLE_LOGGING)
 	@build/setup_packer_configs.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(FINAL_IMAGE_DIR) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR) $(IMAGE_OS_DIR) $(IMAGE_OS_VERSION)
 
+$(REDHAT_CONFIG_TARGET):
+	jq --null-input \
+		--arg rhel_username "$(RHSM_USERNAME)" \
+		--arg rhel_password "$(RHSM_PASSWORD)" \
+		--arg iso_url "$$(aws s3 presign redhat-iso-pdx/8.4/rhel-8.4-x86_64-dvd.iso)" \
+		--arg extra_rpms "$(if $(filter raw,$(IMAGE_FORMAT)),$$(aws s3 presign redhat-iso-pdx/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm),)" \
+		--arg iso_checksum_type "sha256" \
+		--arg iso_checksum "ea5f349d492fed819e5086d351de47261c470fc794f7124805d176d69ddf1fcd" \
+		'{"rhel_username": $$rhel_username, "rhel_password": $$rhel_password, "iso_url": $$iso_url, "iso_checksum_type": $$iso_checksum_type, "iso_checksum": $$iso_checksum, "extra_rpms": $$extra_rpms}' > $@
 ##############################################################
 
 ########################### FAKE TARGETS ###############################
@@ -332,7 +344,7 @@ release-ami-%: validate-supported-image-% setup-ami-share | ensure-jq
 	@echo -e $(call TARGET_END_LOG)
 
 release-ova-%: IMAGE_FORMAT=ova
-release-ova-%: validate-supported-image-% | ensure-jq $$(ENABLE_LOGGING)
+release-ova-%: validate-supported-image-% $(IF_REDHAT_CONFIG_TARGET) | ensure-jq $$(ENABLE_LOGGING)
 	@build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST) $(IMAGE_OS_FIRMWARE)
 
 release-raw-%: IMAGE_FORMAT=raw
@@ -346,7 +358,7 @@ release-cloudstack-%: release-image-build-on-metal-%
 # used for cloudstack and raw
 # clone the repo first since its scp'd to the temporary instance which runs kvm
 release-image-build-on-metal-%: IMAGE_FORMAT?=raw
-release-image-build-on-metal-%: validate-supported-image-% $(GIT_PATCH_TARGET) | ensure-jq $$(ENABLE_LOGGING)
+release-image-build-on-metal-%: validate-supported-image-% $(GIT_PATCH_TARGET) $(IF_REDHAT_CONFIG_TARGET) | ensure-jq $$(ENABLE_LOGGING)
 	@build/build_image_on_metal.sh $(BASE_DIRECTORY) $(PROJECT_PATH) $(RELEASE_BRANCH) $(RAW_IMAGE_BUILD_AMI) $(RAW_IMAGE_BUILD_INSTANCE_TYPE) $(RAW_IMAGE_BUILD_KEY_NAME) $(IMAGE_OS) $(IMAGE_OS_VERSION) $(IMAGE_FORMAT) $(LATEST) $(FINAL_IMAGE_DIR) $(BRANCH_NAME)
 
 #######################################################################

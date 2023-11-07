@@ -44,16 +44,34 @@ if [ ! -f "${HOME}/image-builder" ]; then
 fi
 
 image_builder_config_file="${HOME}/image_builder_config_file"
-redhat_config_file="${HOME}/redhat_config_file"
-if [[ $image_os == "redhat" ]]; then
-  jq --null-input \
-    --arg rhel_username $RHSM_USERNAME \
-    --arg rhel_password $RHSM_PASSWORD \
-    --arg iso_url "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rhel-8.4-x86_64-dvd.iso" \
-    --arg iso_checksum_type "sha256" \
-    --arg iso_checksum "ea5f349d492fed819e5086d351de47261c470fc794f7124805d176d69ddf1fcd" \
-    '{"rhel_username": $rhel_username, "rhel_password": $rhel_password, "iso_url": $iso_url, "iso_checksum_type": $iso_checksum_type, "iso_checksum": $iso_checksum}' > $redhat_config_file
-fi
+redhat_config_file="${MAKE_ROOT}/redhat-config.json"
+
+function retry_image_builder() {
+  local n=1
+  local max=3
+  local delay=30
+  local failed="false"
+  while true; do
+    "${HOME}"/image-builder "$@" && break || {
+      local retry="false"
+      if [[ $n -lt $max ]]; then
+        ((n++))
+        local log_file=$(find $MAKE_ROOT -name "packer.log" -type f)
+        [ ! -f "$log_file" ] && break
+        if grep -q "Timeout waiting for IP." "$log_file"; then
+          >&2 echo "Failed waiting for IP. This is likely transisent, retrying. Attempt $n/$max:"
+          retry="true"          
+        fi
+      fi
+      [ "${retry}" = "true" ] && sleep $delay || failed="true" && break
+    }
+  done
+
+  if [ "${failed}" = "true" ]; then
+    >&2 echo "The command has failed after $n attempts."
+    exit 1;
+  fi
+}
 
 if [[ $image_format == "ova" ]]; then
   # Setup vsphere config
@@ -72,18 +90,15 @@ if [[ $image_format == "ova" ]]; then
     firmware_arg="--firmware $firmware"
   fi
 
-  "${HOME}"/image-builder build --hypervisor vsphere --os $image_os $image_os_version_arg --vsphere-config $image_builder_config_file --release-channel $release_channel $firmware_arg
+  retry_image_builder build --hypervisor vsphere --os $image_os $image_os_version_arg --vsphere-config $image_builder_config_file --release-channel $release_channel $firmware_arg
 elif [[ $image_format == "raw" ]]; then
   # Run image-builder cli
   if [[ $image_os == "ubuntu" ]]; then
-    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel
+    retry_image_builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel
     echo "done with image builder"
   elif [[ $image_os == "redhat" ]]; then
-    echo "Creating baremetal config"
-    echo "$(jq --arg extra_rpms "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm" \
-      '. += {"extra_rpms": $extra_rpms}' $redhat_config_file)" > $image_builder_config_file
-
-    "${HOME}"/image-builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel --baremetal-config $image_builder_config_file
+    image_builder_config_file=$redhat_config_file
+    retry_image_builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel --baremetal-config $image_builder_config_file
   fi
 elif [[ $image_format == "cloudstack" ]]; then
   if [[ $image_os != "redhat" ]]; then
@@ -93,7 +108,7 @@ elif [[ $image_format == "cloudstack" ]]; then
 
   echo "Creating cloudstack config"
   image_builder_config_file=$redhat_config_file
-  "${HOME}"/image-builder build --hypervisor cloudstack --os $image_os $image_os_version_arg --release-channel $release_channel --cloudstack-config $image_builder_config_file
+  retry_image_builder build --hypervisor cloudstack --os $image_os $image_os_version_arg --release-channel $release_channel --cloudstack-config $image_builder_config_file
 elif [[ $image_format == "ami" ]]; then
   if [[ $image_os != "ubuntu" ]]; then
     echo "AMI builds do not support any non-ubuntu os"
@@ -105,5 +120,5 @@ elif [[ $image_format == "ami" ]]; then
     --arg ami_filter_owners "099720109477" \
     --arg manifest_output "$MANIFEST_OUTPUT" \
     '{"ami_filter_owners": $ami_filter_owners, "manifest_output": $manifest_output}' > $image_builder_config_file
-  "${HOME}"/image-builder build --hypervisor ami --os $image_os $image_os_version_arg --release-channel $release_channel --ami-config $image_builder_config_file
+  retry_image_builder build --hypervisor ami --os $image_os $image_os_version_arg --release-channel $release_channel --ami-config $image_builder_config_file
 fi
