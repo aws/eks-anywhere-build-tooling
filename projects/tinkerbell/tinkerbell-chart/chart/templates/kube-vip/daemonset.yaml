@@ -14,6 +14,8 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ .Values.kubevip.name }}
+      annotations:
+        prometheus.io/port: "{{ .Values.kubevip.prometheus.port }}"
     spec:
       containers:
       - args:
@@ -27,6 +29,8 @@ spec:
           value: "true"
         - name: svc_election
           value: "true"
+        - name: prometheus_server
+          value: {{ .Values.kubevip.prometheus.addr }}:{{ .Values.kubevip.prometheus.port }}
         image: {{ .Values.kubevip.image }}
         imagePullPolicy: {{ .Values.kubevip.imagePullPolicy }}
         name: {{ .Values.kubevip.name }}
@@ -37,4 +41,6 @@ spec:
             - NET_RAW
       hostNetwork: true
       serviceAccountName: {{ .Values.kubevip.name }}
+      tolerations:
+      {{- include "controlPlaneTolerations" . | indent 6 }}
 {{- end }}
