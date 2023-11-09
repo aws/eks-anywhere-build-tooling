@@ -40,19 +40,6 @@ function remove_container()
 	docker rm -vf $CONTAINER_ID > /dev/null 2>&1
 }
 
-SKIP_RUN="false"
-NAME=""
-if [[ "$REMOVE" == "false" ]]; then
-	NAME="--name eks-a-builder"
-
-	if docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
-		SKIP_RUN="true"
-		CONTAINER_ID="eks-a-builder"
-	fi
-else
-	trap "remove_container" EXIT
-fi
-
 IMAGE="public.ecr.aws/eks-distro-build-tooling/builder-base:$BUILDER_BASE_TAG"
 # since if building cgo we will specifically set the arch to something other than the host
 # ensure we always explictly ask for the host platform, unless override for cgo
@@ -63,6 +50,8 @@ if [[ -n "$PLATFORM" ]]; then
 	IMAGE="$IMAGE@$DIGEST"
 	PLATFORM_ARG="--platform $PLATFORM"
 	MAKE_VARS+=" BINARY_PLATFORMS=$PLATFORM"
+	
+	build::common::check_for_qemu $PLATFORM
 fi
 
 DOCKER_USER_FLAG=""
@@ -76,6 +65,16 @@ if [ "$(uname -s)" = "Linux" ] && [ -n "${USER:-}" ]; then
 	NETRC_DIR="/home/matchinguser"
 fi
 
+SKIP_RUN="false"
+NAME=""
+if [[ "$REMOVE" == "false" ]]; then
+	NAME="--name eks-a-builder"
+
+	if docker ps -f name=eks-a-builder | grep -w eks-a-builder; then
+		SKIP_RUN="true"
+		CONTAINER_ID="eks-a-builder"
+	fi
+fi
 
 if [[ "$SKIP_RUN" == "false" ]]; then
 	echo "Pulling $IMAGE...."
@@ -95,6 +94,8 @@ if [[ "$SKIP_RUN" == "false" ]]; then
 	PRIVILEGED=""
 	if [[ "$REMOVE" == "false" ]]; then
 		PRIVILEGED="--privileged --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock"
+	else
+		trap "remove_container" EXIT
 	fi
 
 	mkdir -p $GO_MOD_CACHE
