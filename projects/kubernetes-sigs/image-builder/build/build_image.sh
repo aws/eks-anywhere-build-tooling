@@ -60,10 +60,18 @@ function retry_image_builder() {
         [ ! -f "$log_file" ] && break
         if grep -q "Timeout waiting for IP." "$log_file"; then
           >&2 echo "Failed waiting for IP. This is likely transisent, retrying. Attempt $n/$max:"
-          retry="true"          
+          retry="true"
+        elif grep -q "Cancelling provisioner after a timeout" "$log_file"; then
+          >&2 echo "Provisioner timed out, this could be transisent, retrying. Attempt $n/$max:"
+          retry="true"    
         fi
       fi
-      [ "${retry}" = "true" ] && sleep $delay || failed="true" && break
+      if [ "${retry}" = "true" ]; then
+        sleep $delay
+      else
+        failed="true" 
+        break
+      fi
     }
   done
 
