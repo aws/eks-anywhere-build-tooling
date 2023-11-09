@@ -35,6 +35,9 @@ BRANCH_NAME="${12?Specify the twelveth argument - Branch Name}"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 CI="${CI:-false}"
 
+BUILD_ACCOUNT_ID="857151390494"
+KVM_AMI_NAME_PREFIX="kvm-Ubuntu-builder-*"
+
 if [ "$CODEBUILD_CI" = "true" ]; then
     KEY_NAME="$KEY_NAME-$CODEBUILD_BUILD_ID"
     CREATOR=$CODEBUILD_BUILD_ID
@@ -91,6 +94,8 @@ if [ "$CODEBUILD_CI" = "true" ]; then
     RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --placement AvailabilityZone=$SUBNET_AZ --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address --iam-instance-profile Name=eksa-imagebuilder-instance-profile"
 fi
 
+AMI_ID=$(aws ec2 describe-images --owners $BUILD_ACCOUNT_ID --filters "Name=name,Values=$KVM_AMI_NAME_PREFIX" --query 'sort_by(Images, &CreationDate)[-1].[ImageId]' --output text)
+
 MAX_RETRIES=20
 for i in $(seq 1 $MAX_RETRIES); do
     echo "Attempt $(($i)) of instance launch"
@@ -112,6 +117,21 @@ aws ec2 wait instance-running --instance-ids $INSTANCE_ID
 PUBLIC_DNS_NAME=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[].Instances[].PublicDnsName" --output text)
 REMOTE_HOST=ubuntu@$PUBLIC_DNS_NAME
 
+# modify the config file to point to the local iso file before rsync-ing
+ISO_CONFIG_FILE=""
+if [[ "$IMAGE_OS" == "redhat" ]]; then
+    ISO_CONFIG_FILE=$REPO_ROOT/$PROJECT_PATH/redhat-config.json
+elif [[ "$IMAGE_OS" == "ubuntu" ]]; then
+    FORMAT="$(echo "${IMAGE_FORMAT}" | sed 's/cloudstack/qemu/g')"
+    ISO_CONFIG_FILE=$REPO_ROOT/$PROJECT_PATH/image-builder/images/capi/packer/$FORMAT/$FORMAT-ubuntu-$IMAGE_OS_VERSION-efi.json
+fi
+
+ISO_URL=$(jq -r '.iso_url' $ISO_CONFIG_FILE)
+ISO_FILENAME_AND_POSSIBLE_QUERY=${ISO_URL##*/}
+ISO_FILENAME=${ISO_FILENAME_AND_POSSIBLE_QUERY%%[?#]*}
+CONFIG_CONTENTS="$(jq ".iso_url = \"/tmp/$ISO_FILENAME\"" $ISO_CONFIG_FILE)"
+echo -E "${CONFIG_CONTENTS}" > $ISO_CONFIG_FILE
+
 # rsync might sometimes fail with flaky connection issues, so
 # implementing retry logic will make it more robust to flakes
 for i in $(seq 1 $MAX_RETRIES); do
@@ -126,12 +146,15 @@ for i in $(seq 1 $MAX_RETRIES); do
     sleep 10
 done
 
+# Ensure python/packer/ansible are setup on the ami
+ssh $SSH_OPTS $REMOTE_HOST "make -C $REMOTE_PROJECT_PATH/image-builder/images/capi deps-raw"
+
 # If not running on Codebuild, exit gracefully
 if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; export IMAGE_OS=$IMAGE_OS IMAGE_OS_VERSION=$IMAGE_OS_VERSION IMAGE_FORMAT=$IMAGE_FORMAT; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=$REMOTE_ARTIFACTS_PATH $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $IMAGE_OS_VERSION $RELEASE_BRANCH $IMAGE_FORMAT $ARTIFACTS_BUCKET $LATEST"
+SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; curl -sSL --retry 5 \"$ISO_URL\" -o /tmp/$ISO_FILENAME; export IMAGE_OS=$IMAGE_OS IMAGE_OS_VERSION=$IMAGE_OS_VERSION IMAGE_FORMAT=$IMAGE_FORMAT; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=$REMOTE_ARTIFACTS_PATH $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $IMAGE_OS_VERSION $RELEASE_BRANCH $IMAGE_FORMAT $ARTIFACTS_BUCKET $LATEST"
 if [[ "$IMAGE_OS" == "redhat" ]]; then
   SSH_COMMANDS="export RHSM_USERNAME='$RHSM_USERNAME' RHSM_PASSWORD='$RHSM_PASSWORD'; $SSH_COMMANDS"
 fi
