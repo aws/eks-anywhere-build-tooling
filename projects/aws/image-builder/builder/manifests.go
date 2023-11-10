@@ -23,7 +23,7 @@ func (b *BuildOptions) DownloadManifests() error {
 	}
 
 	buildToolingRepoPath := getBuildToolingPath(cwd)
-	_, err = b.prepBuildToolingRepo(buildToolingRepoPath)
+	_, _, err = b.prepBuildToolingRepo(buildToolingRepoPath)
 	if err != nil {
 		return err
 	}

@@ -35,6 +35,9 @@ const (
 	eksAnywhereBundlesFileNameFormat string = "eks-a-bundles-%s.yaml"
 	manifestsTarballName             string = "eks-a-manifests.tar"
 	manifestsDirName                 string = "eks-a-d-manifests"
+	artifactsDirName                 string = "eks-a-d-artifacts"
+	eksAnywhereArtifactsDirName      string = "eks-a-artifacts"
+	eksDistroArtifactsDirName        string = "eks-d-artifacts"
 
 	// Environment variables
 	branchNameEnvVar                      string = "BRANCH_NAME"
