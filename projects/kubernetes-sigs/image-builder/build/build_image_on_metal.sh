@@ -91,7 +91,7 @@ if [ "$CODEBUILD_CI" = "true" ]; then
 
     # Define extra args to run the instance in the same subnet and use
     # the same security group as Codebuild
-    RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --placement AvailabilityZone=$SUBNET_AZ --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address --iam-instance-profile Name=eksa-imagebuilder-instance-profile"
+    RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --placement AvailabilityZone=$SUBNET_AZ --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address"
 fi
 
 AMI_ID=$(aws ec2 describe-images --owners $BUILD_ACCOUNT_ID --filters "Name=name,Values=$KVM_AMI_NAME_PREFIX" --query 'sort_by(Images, &CreationDate)[-1].[ImageId]' --output text)
@@ -102,7 +102,7 @@ for i in $(seq 1 $MAX_RETRIES); do
 
     # Create a single EC2 instance with provided instance type and AMI
     # Query the instance ID for use in future commands
-    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --tag-specifications "ResourceType=instance,Tags=[{Key=Creator,Value=$CREATOR}]" --query "Instances[0].InstanceId" --output text --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2") && break
+    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --tag-specifications "ResourceType=instance,Tags=[{Key=Creator,Value=$CREATOR}]" --query "Instances[0].InstanceId" --iam-instance-profile Name=eksa-imagebuilder-instance-profile --output text --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2") && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
@@ -114,8 +114,12 @@ done
 aws ec2 wait instance-running --instance-ids $INSTANCE_ID
 
 # Get the public DNS of the instance to use as SSH hostname
-PUBLIC_DNS_NAME=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[].Instances[].PublicDnsName" --output text)
-REMOTE_HOST=ubuntu@$PUBLIC_DNS_NAME
+DNS_KEY="PublicDnsName"
+if [ "${JOB_TYPE:-}" = "presubmit" ]; then
+    DNS_KEY="PrivateDnsName"
+fi
+DNS_NAME=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[].Instances[].$DNS_KEY" --output text)
+REMOTE_HOST=ubuntu@$DNS_NAME
 
 # modify the config file to point to the local iso file before rsync-ing
 ISO_CONFIG_FILE=""

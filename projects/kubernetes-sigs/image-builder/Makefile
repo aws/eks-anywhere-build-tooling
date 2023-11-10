@@ -143,7 +143,7 @@ BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload
 
 # only running release-raw-ubuntu-2004 on presubmit here since we are just validating the instance creation and do not need to run for every OS
 # tinkerbell/bare metal node images
-BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) $(if $(filter true,$(SKIP_METAL_INSTANCE_TEST)),,release-raw-ubuntu-2004)
+BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) $(if $(filter true,$(SKIP_METAL_INSTANCE_TEST)),,metal-instance-test)
 
 # cloud stack node images
 BUILD_CLOUDSTACK_TARGETS=build-cloudstack-redhat-8 $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,cloudstack,redhat-8) upload-artifacts-cloudstack-redhat-8
@@ -450,13 +450,25 @@ local-build-qemu-rhel-8: local-build-cloudstack-redhat-8
 .PHONY: local-build-raw-ubuntu-2004-efi
 local-build-raw-ubuntu-2004-efi: local-build-raw-ubuntu-2004
 	@echo Done building $@
+############################################################################
 
 .PHONY: clean-extra
 clean-extra:
 	@rm -rf fake-*
 
 clean: clean-extra
-############################################################################
+
+
+.PHONY: metal-instance-test
+metal-instance-test:
+	@if [ "$(JOB_TYPE)" = "presubmit" ]; then \
+		build/prow_build.sh release-raw-ubuntu-2004; \
+	else \
+		$(MAKE) release-raw-ubuntu-2004; \
+	fi
+
+	
+
 ## --------------------------------------
 ## Document dynamic targets
 ## --------------------------------------
