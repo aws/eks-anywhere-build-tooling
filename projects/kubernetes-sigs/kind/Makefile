@@ -99,7 +99,7 @@ kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/image
 kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
 kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_OS_VERSION=$(MINIMAL_BASE_KIND_IMAGE_NAME_OS_VERSION)
 kind-base/images/% kind-base-versioned/images/%: IMAGE_BUILD_ARGS=CNI_PLUGINS_AMD64_URL CNI_PLUGINS_ARM64_URL CNI_PLUGINS_AMD64_SHA256SUM \
-	CNI_PLUGINS_ARM64_SHA256SUM CRICTL_AMD64_SHA256SUM_URL CRICTL_ARM64_SHA256SUM_URL CRICTL_AMD64_URL CRICTL_ARM64_URL
+	CNI_PLUGINS_ARM64_SHA256SUM
 
 kind-base/images/%: IMAGE_TARGET=base
 kind-base/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/base

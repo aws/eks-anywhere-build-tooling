@@ -69,7 +69,7 @@ helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} 2>&1 |
 DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 
 # Adds a 2nd tag to the helm chart for the bundle-release jobs.
-if [[ "${IMAGE_REGISTRY}" != *"public.ecr.aws"* ]]; then
+if [[ "${IMAGE_REGISTRY}" != *"public.ecr.aws"* ]] && [[ "${IMAGE_REGISTRY}" == *"ecr"* ]]; then
   MANIFEST=$(build::common::echo_and_run aws ecr batch-get-image --repository-name "$HELM_DESTINATION_REPOSITORY" --image-ids imageDigest=${DIGEST} --query "images[].imageManifest" --output text)
   export AWS_PAGER=""
   build::common::echo_and_run aws ecr put-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-tag ${SEMVER_GIT_TAG}-${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"

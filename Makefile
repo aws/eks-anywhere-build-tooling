@@ -32,7 +32,7 @@ CACHE_RESULT = $(if $(filter undefined,$(origin _cached-$1)),$(eval _cached-$1 :
 # $1 - variable name
 CACHE_VARIABLE=$(eval _old-$(1)=$(value $(1)))$(eval $(1)=$$(call CACHE_RESULT,_old-$(1)))
 
-CACHE_VARS=ALL_PROJECTS AWS_ACCOUNT_ID BUILDER_PLATFORM_ARCH GIT_HASH LATEST_EKSD_RELEASE
+CACHE_VARS=ALL_PROJECTS AWS_ACCOUNT_ID BUILDER_PLATFORM_ARCH GIT_HASH LATEST_EKSD_RELEASE ECR_PUBLIC_URI
 $(foreach v,$(CACHE_VARS),$(call CACHE_VARIABLE,$(v)))
 
 .PHONY: clean-project-%
@@ -70,7 +70,7 @@ build-all: build-all-warning
 projects/kubernetes-sigs/kind/eks-anywhere-full-build-complete: override IMAGE_PLATFORMS=linux/amd64,linux/arm64
 
 # tinkerbell/hook needs to be built with a public ecr repo so docker container can pull
-projects/tinkerbell/hook/eks-anywhere-full-build-complete: IMAGE_REPO=$(ECR_PUBLIC_URI)
+projects/tinkerbell/hook/eks-anywhere-full-build-complete: override IMAGE_REPO_OVERRIDE=$(or $(ECR_PUBLIC_URI),$(IMAGE_REPO))
 projects/tinkerbell/hook/eks-anywhere-full-build-complete: override IMAGE_PLATFORMS=linux/amd64,linux/arm64
 
 projects/kubernetes-sigs/image-builder/eks-anywhere-full-build-complete: MAIN_TARGET=build
@@ -91,6 +91,7 @@ projects/goharbor/harbor/eks-anywhere-full-build-complete:
 
 # Actual target
 %/eks-anywhere-full-build-complete: IMAGE_PLATFORMS=linux/$(BUILDER_PLATFORM_ARCH)
+%/eks-anywhere-full-build-complete: IMAGE_REPO_OVERRIDE=$(IMAGE_REPO)
 # override this on the command line to true if you want to push to your own s3 bucket
 %/eks-anywhere-full-build-complete: MAIN_TARGET=release
 %/eks-anywhere-full-build-complete:
@@ -101,28 +102,31 @@ projects/goharbor/harbor/eks-anywhere-full-build-complete:
 		DEPS=($${PROJECT_DEPS// / }); \
   		for dep in "$${DEPS[@]}"; do \
 			if [[ "$${dep}" = *"eksa"* ]]; then \
-				OVERRIDES="IMAGE_REPO=$(IMAGE_REPO) IMAGE_PLATFORMS=$(IMAGE_PLATFORMS)"; \
+				OVERRIDES="IMAGE_REPO=$(IMAGE_REPO_OVERRIDE) IMAGE_PLATFORMS=$(IMAGE_PLATFORMS)"; \
 				DEP_RELEASE_BRANCH="$$(cut -d/ -f4 <<< $$dep)"; \
 				if [ -n "$${DEP_RELEASE_BRANCH}" ]; then \
 					dep="$$(dirname $$dep)"; \
 					OVERRIDES+=" RELEASE_BRANCH=$$DEP_RELEASE_BRANCH"; \
 				fi; \
+				if [ -f projects/$${dep#"eksa/"}/eks-anywhere-full-build-complete-$$DEP_RELEASE_BRANCH ]; then \
+					continue; \
+				fi; \
 				echo "Running make $${dep#eksa/} as dependency for $(@D)"; \
 				$(MAKE) projects/$${dep#"eksa/"}/eks-anywhere-full-build-complete $$OVERRIDES; \
 				if [ -n "$${DEP_RELEASE_BRANCH}" ]; then \
-					rm projects/$${dep#"eksa/"}/eks-anywhere-full-build-complete; \
+					mv projects/$${dep#"eksa/"}/eks-anywhere-full-build-complete projects/$${dep#"eksa/"}/eks-anywhere-full-build-complete-$$DEP_RELEASE_BRANCH; \
 				fi; \
 			fi; \
 		done; \
 	fi; \
 	TARGETS="attribution $(MAIN_TARGET)"; \
-	if  [ -n "$$($(MAKE) -C $(@D) var-value-IMAGE_NAMES)" ] || [ "$$($(MAKE) -C $(@D) var-value-HAS_HELM_CHART)" = "true" ]; then \
+	if [[ $(IMAGE_REPO_OVERRIDE) == *"ecr"* ]] && [[ -n "$$($(MAKE) -C $(@D) var-value-IMAGE_NAMES)"  ||  "$$($(MAKE) -C $(@D) var-value-HAS_HELM_CHART)" = "true" ]]; then \
 		TARGETS="create-ecr-repos $${TARGETS}"; \
 	fi; \
 	if [ "$(UPLOAD_ARTIFACTS_TO_S3)" = "true" ]; then \
 		TARGETS+=" UPLOAD_DRY_RUN=false UPLOAD_CREATE_PUBLIC_ACL=false"; \
 	fi; \
-	TARGETS+=" IMAGE_REPO=$(IMAGE_REPO) IMAGE_PLATFORMS=$(IMAGE_PLATFORMS) RELEASE_BRANCH=$(RELEASE_BRANCH)"; \
+	TARGETS+=" IMAGE_REPO=$(IMAGE_REPO_OVERRIDE) IMAGE_PLATFORMS=$(IMAGE_PLATFORMS) RELEASE_BRANCH=$(RELEASE_BRANCH)"; \
 	echo "Running 'make -C $(@D) $${TARGETS}'"; \
 	make -C $(@D) $${TARGETS}; \
 	touch $@

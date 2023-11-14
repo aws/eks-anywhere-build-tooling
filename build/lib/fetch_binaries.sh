@@ -64,8 +64,8 @@ trap "rm -rf $DOWNLOAD_DIR" EXIT
 
 FILENAME_AND_POSSIBLE_QUERY=${URL##*/}
 
-build::common::echo_and_run wget -q --retry-connrefused "$URL" -O $DOWNLOAD_DIR/${FILENAME_AND_POSSIBLE_QUERY%%[?#]*}
-build::common::echo_and_run wget -q --retry-connrefused "$SHA_URL" -O $DOWNLOAD_DIR/${FILENAME_AND_POSSIBLE_QUERY%%[?#]*}.sha256
+build::common::echo_and_run curl -q --retry-connrefused --output-dir $DOWNLOAD_DIR -o ${FILENAME_AND_POSSIBLE_QUERY%%[?#]*} "$URL"
+build::common::echo_and_run curl -q --retry-connrefused --output-dir $DOWNLOAD_DIR -o ${FILENAME_AND_POSSIBLE_QUERY%%[?#]*}.sha256 "$SHA_URL"
 (cd $DOWNLOAD_DIR && sha256sum -c *.sha256)
 
 if [[ $REPO == *.tar.gz ]]; then
