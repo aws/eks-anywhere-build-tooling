@@ -79,12 +79,14 @@ fi
 chmod 600 $KEY_LOCATION
 
 RUN_INSTANCE_EXTRA_ARGS=""
+INSTANCE_PROFILE_ROLE="eksa-imagebuilder-presubmit-instance-profile"
 if [ "$CODEBUILD_CI" = "true" ]; then
     # Select a random subnet from Codebuild project's private subnet list
     SUBNET_ID_LIST=$RAW_IMAGE_BUILD_SUBNET_ID
     SUBNET_COUNT=$(echo $SUBNET_ID_LIST | awk -F\, '{print NF}')
     INDEX=$((($RANDOM % $SUBNET_COUNT) + 1))
     SUBNET_ID=$(cut -d',' -f${INDEX} <<< $SUBNET_ID_LIST)
+    INSTANCE_PROFILE_ROLE="eksa-imagebuilder-instance-profile"
 
     # Query the availability zone that this subnet exists in
     SUBNET_AZ=$(aws ec2 describe-subnets --subnet-ids $SUBNET_ID --query "Subnets[].AvailabilityZone" --output text)
@@ -102,7 +104,7 @@ for i in $(seq 1 $MAX_RETRIES); do
 
     # Create a single EC2 instance with provided instance type and AMI
     # Query the instance ID for use in future commands
-    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --tag-specifications "ResourceType=instance,Tags=[{Key=Creator,Value=$CREATOR}]" --query "Instances[0].InstanceId" --iam-instance-profile Name=eksa-imagebuilder-instance-profile --output text --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2") && break
+    INSTANCE_ID=$(aws ec2 run-instances --count 1 --image-id=$AMI_ID --instance-type $INSTANCE_TYPE --key-name $KEY_NAME $RUN_INSTANCE_EXTRA_ARGS --tag-specifications "ResourceType=instance,Tags=[{Key=Creator,Value=$CREATOR}]" --query "Instances[0].InstanceId" --iam-instance-profile Name=$INSTANCE_PROFILE_ROLE --output text --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2") && break
 
     if [ "$i" = "$MAX_RETRIES" ]; then
         exit 1
