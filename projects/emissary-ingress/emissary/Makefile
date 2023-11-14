@@ -9,20 +9,21 @@ REPO_OWNER=emissary-ingress
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
 SKIP_ON_RELEASE_BRANCH=true
+
 BINARY_TARGET_FILES=busyambassador capabilities_wrapper example-envoy-metrics-sink k8sregistryctl kat-client kat-server
 SOURCE_PATTERNS=./cmd/busyambassador ./cmd/capabilities_wrapper ./cmd/example-envoy-metrics-sink ./cmd/k8sregistryctl ./cmd/kat-client ./cmd/kat-server
 
 EMISSARY_IMAGE_COMPONENT=emissary-ingress/emissary
 
-IMAGE_NAMES=emissary
-DOCKERFILE_FOLDER=./docker/linux/emissary-image
+IMAGE_NAMES?=emissary
+DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-python
 BASE_IMAGE_OS_VERSION=al2023
 
 COMPILER_IMAGE_VERSION=3.9
 
-HAS_HELM_CHART=true
+HAS_HELM_CHART?=true
 HELM_DIRECTORY=charts/emissary-ingress
 HELM_DESTINATION_REPOSITORY=emissary-ingress/emissary
 HELM_IMAGE_LIST=emissary-ingress/emissary
@@ -31,6 +32,9 @@ CHART_VERSION?=
 AMBASSADOR_VERSION_TARGET=$(REPO)/python/ambassador.version
 
 include $(BASE_DIRECTORY)/Common.mk
+
+
+combine/images/push: IMAGE_BUILD_ARGS=IMAGE
 
 $(GO_MOD_DOWNLOAD_TARGETS): $(AMBASSADOR_VERSION_TARGET)
 
@@ -59,6 +63,11 @@ helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGE
 helm/push: helm/build
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
 	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) emissary-ingress/crds $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
+
+PHONY: combine-images
+combine-images: IMAGE_BUILD_ARGS=IMAGE
+combine-images: DOCKERFILE_FOLDER=./docker/linux/combine
+combine-images: images
 
 
 ########### DO NOT EDIT #############################
