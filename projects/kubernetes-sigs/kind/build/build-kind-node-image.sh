@@ -40,6 +40,8 @@ function build::kind::build_node_image(){
     export EKSD_ASSET_URL=$EKSD_ASSET_URL
     export KUBE_ARCH=$ARCH
 
+    build::common::check_for_qemu linux/$ARCH
+
     KIND_PATH="$MAKE_ROOT/_output/bin/kind/$(uname | tr '[:upper:]' '[:lower:]')-$BUILDER_PLATFORM_ARCH/kind"
     $KIND_PATH build node-image $MAKE_ROOT/images/k8s.io/kubernetes \
         --base-image $INTERMEDIATE_BASE_IMAGE --image $INTERMEDIATE_NODE_IMAGE --arch $ARCH      
