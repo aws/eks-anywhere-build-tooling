@@ -48,7 +48,7 @@ $(AMBASSADOR_VERSION_TARGET): | $$(ENABLE_DOCKER)
 
 # Build helm chart
 .PHONY: helm/build
-helm/build: $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),)
+helm/build: $(GIT_PATCH_TARGET)
 	# Emissary requires 2 charts. Consider this a temporary work-around.
 	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) emissary/crds charts/crds $(OUTPUT_DIR)
 	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) emissary/crds  $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
