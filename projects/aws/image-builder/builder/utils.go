@@ -395,6 +395,19 @@ func getEksAReleasesManifestURL(airgapped bool) (string, error) {
 
 // setRhsmProxy takes the proxy config, parses it and sets the appropriate config on rhsm config
 func setRhsmProxy(proxy *ProxyConfig, rhsm *RhsmConfig) error {
+	// Redhat Subscription Ansible module does not take in a no_proxy input.
+	// If user does not want the subscription module to use proxy to reach the RedHat Satellite,
+	// the ServerHostname on RhsmConfig will also be set on the list of hostnames/urls to exclude on the no_proxy list
+	// If detected, skip setting proxy variables on the Redhat subscription module.
+	if proxy.NoProxy != "" {
+		noProxy := strings.Split(proxy.NoProxy, ",")
+		for _, endpoint := range noProxy {
+			if rhsm.ServerHostname == endpoint {
+				// skip setting proxy for subscription module
+				return nil
+			}
+		}
+	}
 	if proxy.HttpProxy != "" {
 		host, port, err := parseUrl(proxy.HttpProxy)
 		if err != nil {
