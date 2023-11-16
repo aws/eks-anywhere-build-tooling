@@ -199,6 +199,7 @@ generate-staging-buildspec: | ensure-locale
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "containerd_containerd" "$(BASE_DIRECTORY)/projects/containerd/containerd/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "opencontainers_runc" "$(BASE_DIRECTORY)/projects/opencontainers/runc/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "torvalds_linux" "$(BASE_DIRECTORY)/projects/torvalds/linux/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_upgrader" "$(BASE_DIRECTORY)/projects/aws/upgrader/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 
 .PHONY: generate
 generate: generate-project-list generate-staging-buildspec

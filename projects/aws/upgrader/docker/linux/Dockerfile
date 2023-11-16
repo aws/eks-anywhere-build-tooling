@@ -1,0 +1,35 @@
+ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-glibc
+ARG BUILDER_IMAGE
+FROM $BUILDER_IMAGE as builder
+
+RUN set -x && \
+    install_binary /usr/bin/nsenter \
+    /usr/bin/cp && \
+    cleanup "deps"
+
+FROM $BASE_IMAGE
+
+ARG RELEASE_BRANCH
+ARG TARGETARCH
+ARG TARGETOS
+
+COPY --from=builder /newroot /
+
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd /eksa-upgrades/binaries/containerd
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/cri-tools /eksa-upgrades/binaries/containerd/usr/local/bin
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/cni-plugins /eksa-upgrades/binaries/cni-plugins/opt/cni/bin
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/client/bin /eksa-upgrades/binaries/kubernetes/usr/bin
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/server/bin/kubelet \
+    _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/server/bin/kubeadm \
+    /eksa-upgrades/binaries/kubernetes/usr/bin/
+COPY ../../upgrade.sh /eksa-upgrades/scripts/
+
+# TODO: ATTR/Licenses
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/ATTRIBUTION.txt /CONTAINERD_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/LICENSES /CONTAINERD_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/cri-tools/ATTRIBUTION.txt /CRI-TOOLS_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/cri-tools/LICENSES /CRI-TOOLS_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/cni-plugins/ATTRIBUTION.txt /CNI-PLUGINS_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/cni-plugins/LICENSES /CNI-PLUGINS_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/LICENSES /KUBERNETES_LICENSES
