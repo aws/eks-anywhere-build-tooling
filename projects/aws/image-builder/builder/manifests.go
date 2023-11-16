@@ -211,7 +211,7 @@ func extractAndPrepManifestTarball(tarballFile, privateEksDServerDomain, private
 				return err
 			}
 
-			fmt.Printf("File: %s, Match: %s, Pattern: %s\n", file.Name(), eksAMatch, eksABundlesManifestFilePattern)
+			fmt.Printf("File: %s, Match: %t, Pattern: %s\n", file.Name(), eksAMatch, eksABundlesManifestFilePattern)
 			if eksAMatch {
 				log.Printf("Replacing EKS-A domain name in file: %s\n", file.Name())
 				if err = replaceStringInFile(absFilePath, fmt.Sprintf("https://%s", eksAnywhereAssetsProdDomain), privateEksAServerDomain); err != nil {
