@@ -1,6 +1,8 @@
 package builder
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -104,4 +106,41 @@ func TestSetRhsmProxy(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDownloadFile(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Error getting current working dir: %v", err)
+	}
+	testDir := filepath.Join(cwd, "testdata")
+	os.MkdirAll(testDir, 0755)
+	testcases := []struct {
+		name    string
+		path    string
+		url     string
+		wantErr bool
+	}{
+		{
+			name:    "Download file to local dir",
+			path:    filepath.Join(testDir, "test-A"),
+			url:     "https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml",
+			wantErr: false,
+		},
+		{
+			name:    "Fail download with bad url",
+			path:    filepath.Join(testDir, "test-B"),
+			url:     "https:////anywhere-assets.eks.amazonaws.com/releases/eks-a/bad-manifest.yaml",
+			wantErr: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := downloadFile(tc.path, tc.url)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Unexpected error status. Got error: %v, Expected error: %t", err, tc.wantErr)
+			}
+		})
+	}
+	os.RemoveAll(testDir)
 }

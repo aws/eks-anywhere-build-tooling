@@ -14,6 +14,10 @@ import (
 )
 
 func (b *BuildOptions) DownloadArtifacts() error {
+	// Default arch if not set
+	if b.Arch == "" {
+		b.Arch = amd64
+	}
 	// Clone build tooling from the latest release branch
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -98,7 +102,7 @@ func (b *BuildOptions) downloadEKSDArtifacts(outputPath, manifestUrl string) err
 			log.Printf("Full Kube Version: %s\n", fullKubeVersion)
 
 			for _, asset := range component.Assets {
-				if asset.Name == "bin/linux/amd64/kube-apiserver.tar" {
+				if asset.Name == fmt.Sprintf("bin/linux/%s/kube-apiserver.tar", b.Arch) {
 					apiServerUrl := asset.Archive.URI
 					eksDBaseUrl = strings.ReplaceAll(apiServerUrl, "/kube-apiserver.tar", "")
 				}
@@ -107,7 +111,7 @@ func (b *BuildOptions) downloadEKSDArtifacts(outputPath, manifestUrl string) err
 
 		if component.Name == "etcd" || component.Name == "cni-plugins" {
 			for _, asset := range component.Assets {
-				if asset.Name == fmt.Sprintf("%s-linux-amd64-%s.tar.gz", component.Name, component.GitTag) {
+				if asset.Name == fmt.Sprintf("%s-linux-%s-%s.tar.gz", component.Name, b.Arch, component.GitTag) {
 					log.Printf("Downloading EKS-D Artifact: %s", component.Name)
 					if err = downloadArtifact(outputPath, asset.Archive.URI); err != nil {
 						return err

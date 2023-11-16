@@ -38,6 +38,7 @@ var SupportedFirmwares = []string{
 type BuildOptions struct {
 	Os                 string
 	OsVersion          string
+	Arch               string
 	Hypervisor         string
 	VsphereConfig      *VsphereConfig
 	BaremetalConfig    *BaremetalConfig
