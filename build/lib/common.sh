@@ -404,6 +404,12 @@ function build::common::get_clone_url() {
   fi
 }
 
+
+function fail() {
+  echo $1 >&2
+  exit 1
+}
+
 function retry() {
   local n=1
   local max=120
