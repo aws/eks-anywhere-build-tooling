@@ -4,7 +4,7 @@ FROM $BUILDER_IMAGE as builder
 
 RUN set -x && \
     install_binary /usr/bin/nsenter \
-    /usr/bin/cp && \
+        /usr/bin/cp && \
     cleanup "deps"
 
 FROM $BASE_IMAGE
@@ -24,12 +24,11 @@ COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/
     /eksa-upgrades/binaries/kubernetes/usr/bin/
 COPY ../../upgrade.sh /eksa-upgrades/scripts/
 
-# TODO: ATTR/Licenses
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/ATTRIBUTION.txt /CONTAINERD_ATTRIBUTION.txt
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/LICENSES /CONTAINERD_LICENSES
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/cri-tools/ATTRIBUTION.txt /CRI-TOOLS_ATTRIBUTION.txt
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/cri-tools/LICENSES /CRI-TOOLS_LICENSES
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/cni-plugins/ATTRIBUTION.txt /CNI-PLUGINS_ATTRIBUTION.txt
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/cni-plugins/LICENSES /CNI-PLUGINS_LICENSES
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/ATTRIBUTION.txt /KUBERNETES_ATTRIBUTION.txt
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/LICENSES /KUBERNETES_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/usr/local/bin/CONTAINERD_ATTRIBUTION.txt /THIRD_PARTY_LICENSES/CONTAINERD_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/usr/local/sbin/RUNC_ATTRIBUTION.txt /THIRD_PARTY_LICENSES/RUNC_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/cri-tools/ATTRIBUTION.txt /THIRD_PARTY_LICENSES/CRI-TOOLS_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/kubernetes-sigs/cri-tools/LICENSES /THIRD_PARTY_LICENSES/CRI-TOOLS_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/cni-plugins/ATTRIBUTION.txt /THIRD_PARTY_LICENSES/CNI-PLUGINS_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/cni-plugins/LICENSES /THIRD_PARTY_LICENSES/CNI-PLUGINS_LICENSES
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/ATTRIBUTION.txt /THIRD_PARTY_LICENSES/KUBERNETES_ATTRIBUTION.txt
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/LICENSES /THIRD_PARTY_LICENSES/KUBERNETES_LICENSES
