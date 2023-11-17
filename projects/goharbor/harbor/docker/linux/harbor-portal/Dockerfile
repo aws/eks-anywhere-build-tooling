@@ -1,6 +1,6 @@
 ARG BASE_IMAGE # https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-nginx
 
-FROM node:16.10.0 as nodeportal
+FROM public.ecr.aws/docker/library/node:16.18.0 as nodeportal
 
 WORKDIR /build_dir
 
@@ -16,8 +16,6 @@ RUN apt-get update \
     && npm --prefix /build_dir/app-swagger-ui run build \
     && node --max_old_space_size=2048 'node_modules/@angular/cli/bin/ng' build --configuration production \
     && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json \
-    && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger2.yaml > dist/swagger2.json \
-    && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger3.yaml > dist/swagger3.json \
     && cp swagger.yaml dist \
     && mkdir -p /newroot/var/log/nginx /newroot/usr/share/nginx/html \
     && chmod 755 /newroot/var/log/nginx \
