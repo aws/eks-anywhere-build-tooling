@@ -9,6 +9,7 @@ HAS_RELEASE_BRANCHES=true
 
 BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
+BUILDSPEC_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 kubernetes_sigs_cri_tools
 
 REPO_NO_CLONE=true
 
