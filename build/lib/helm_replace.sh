@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -36,12 +35,12 @@ TEMPLATE_DIR=helm/templates
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 for file in Chart.yaml values.yaml
 do
-  $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
+  build::common::echo_and_run $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
 done
 
 if [ -d ${OUTPUT_DIR}/helm/${CHART_NAME}/crds ]; then
   for file in crds/*.yaml 
   do
-    $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
+    build::common::echo_and_run $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
   done
 fi

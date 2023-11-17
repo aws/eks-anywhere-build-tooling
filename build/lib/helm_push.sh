@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -47,26 +46,35 @@ export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
 export HELM_EXPERIMENTAL_OCI=1
 TMPFILE=$(mktemp /tmp/helm-output.XXXXXX)
 function cleanup() {
-  if [[ "${IMAGE_REGISTRY}" == *"public.ecr.aws"* ]]; then
-    echo "If authentication failed: aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws"
+  if grep -q "blobs/uploads/\": EOF" $TMPFILE ; then
+    echo "******************************************************"
+    echo "Ensure container registry and repository exists!!"
+    echo "Try running make create-ecr-repos to create ecr repositories in your aws account."
+    echo "******************************************************"
   else
-    echo "If authentication failed: aws ecr get-login-password --region \${AWS_REGION} | docker login --username AWS --password-stdin ${IMAGE_REGISTRY}"
+    cat $TMPFILE
+    if [[ "${IMAGE_REGISTRY}" == *"public.ecr.aws"* ]]; then
+      echo "If authentication failed: aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws"
+    else
+      echo "If authentication failed: aws ecr get-login-password --region \${AWS_REGION} | docker login --username AWS --password-stdin ${IMAGE_REGISTRY}"
+    fi
   fi
   rm -f "${TMPFILE}"
 }
 
 trap cleanup err
 trap "rm -f $TMPFILE" exit
-helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} | tee ${TMPFILE}
+echo "($(pwd)) \$ helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER}"
+helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER}  2> ${TMPFILE}
+DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 
 # Adds a 2nd tag to the helm chart for the bundle-release jobs.
 if [[ "${IMAGE_REGISTRY}" != *"public.ecr.aws"* ]]; then
-  MANIFEST=$(aws ecr batch-get-image --repository-name "$HELM_DESTINATION_REPOSITORY" --image-ids imageTag=${SEMVER} --query "images[].imageManifest" --output text)
+  MANIFEST=$(aws ecr batch-get-image --repository-name "$HELM_DESTINATION_REPOSITORY" --image-ids imageDigest=${DIGEST} --query "images[].imageManifest" --output text)
   export AWS_PAGER=""
-  aws ecr put-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-tag ${SEMVER_GIT_TAG}-${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
+  build::common::echo_and_run aws ecr put-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-tag ${SEMVER_GIT_TAG}-${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
 fi
 
-DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 {
     set +x
     echo

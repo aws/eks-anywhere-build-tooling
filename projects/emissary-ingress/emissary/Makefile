@@ -25,8 +25,7 @@ COMPILER_IMAGE_VERSION=3.9
 
 HAS_HELM_CHART?=true
 HELM_DIRECTORY=charts/emissary-ingress
-HELM_DESTINATION_REPOSITORY=emissary-ingress/emissary
-HELM_IMAGE_LIST=emissary-ingress/emissary
+HELM_CHART_NAMES=emissary/crds emissary-ingress/emissary
 CHART_VERSION?=
 
 AMBASSADOR_VERSION_TARGET=$(REPO)/python/ambassador.version
@@ -35,6 +34,17 @@ include $(BASE_DIRECTORY)/Common.mk
 
 
 combine/images/push: IMAGE_BUILD_ARGS=IMAGE
+emissary-ingress/emissary/helm/%: PACKAGE_DEPENDENCIES=emissary-crds
+
+emissary/crds/helm/%: HELM_DIRECTORY=charts/crds
+# Originially emissary was created with `emissary/crds` as the HELM_DESTINATION_REPOSITORY for everything but the push
+# which is `emissary-ingress/crds`
+# this really only made a differnece in the helm_require.sh script which uses this value in the EksaPackageRequires file
+# otherwise it was always `basename`, which was the same either way
+# overriding for push to keep it consistent
+emissary/crds/helm/build: HELM_DESTINATION_REPOSITORY=emissary/crds
+emissary/crds/helm/push: HELM_DESTINATION_REPOSITORY=emissary-ingress/crds
+emissary/crds/__helm__/create-ecr-repo: IMAGE_NAME=emissary-ingress/crds/__helm__
 
 $(GO_MOD_DOWNLOAD_TARGETS): $(AMBASSADOR_VERSION_TARGET)
 
@@ -46,29 +56,10 @@ $(AMBASSADOR_VERSION_TARGET): export GOPATH=/var
 $(AMBASSADOR_VERSION_TARGET): | $$(ENABLE_DOCKER)
 	@$(MAKE) -C $(REPO) python/ambassador.version
 
-# Build helm chart
-.PHONY: helm/build
-helm/build: $(GIT_PATCH_TARGET)
-	# Emissary requires 2 charts. Consider this a temporary work-around.
-	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) emissary/crds charts/crds $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) emissary/crds  $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
-	$(BUILD_LIB)/helm_replace.sh emissary/crds $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) emissary/crds
-	$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
-	PACKAGE_DEPENDENCIES=emissary-crds $(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) $(HELM_IMAGE_LIST)
-	$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)
-	$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY)
-
-.PHONY: helm/push
-helm/push: helm/build
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
-	$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) emissary-ingress/crds $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
-
 PHONY: combine-images
 combine-images: IMAGE_BUILD_ARGS=IMAGE
 combine-images: DOCKERFILE_FOLDER=./docker/linux/combine
 combine-images: images
-
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

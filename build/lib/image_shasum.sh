@@ -13,22 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
 
 REGISTRY="${1?First argument is registry}"
 REPOSITORY="${2?Second argument is repository}"
 IMAGE_TAG="${3?Third argument is image tag}"
 
-if [ "${JOB_TYPE:-}" == "presubmit" ]
-then
-  echo latest
-  exit 0
-fi
 TMPFILE=$(mktemp)
 trap "rm -f $TMPFILE" exit
 TARGET=${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}
-skopeo inspect -n --raw docker://${TARGET} >${TMPFILE}
-skopeo manifest-digest ${TMPFILE}
+
+>&2 echo -n "Checking for the existence of ${TARGET}..."
+if skopeo inspect -n --raw docker://${TARGET} >${TMPFILE} 2>/dev/null; then
+  >&2 echo "Found!"
+  skopeo manifest-digest ${TMPFILE}
+else
+  >&2 echo "Not Found!"
+fi
+

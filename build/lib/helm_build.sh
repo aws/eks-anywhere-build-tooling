@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
 set -o errexit
 set -o nounset
 set -o pipefail
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_ROOT}/common.sh"
 
 OUTPUT_DIR="${1?First arguement is output directory}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
@@ -26,4 +28,4 @@ CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 # Build
 #
 cd ${OUTPUT_DIR}/helm
-helm package "${CHART_NAME}"
+build::common::echo_and_run helm package "${CHART_NAME}"
