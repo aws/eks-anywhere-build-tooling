@@ -1,4 +1,4 @@
-From 973bdb11665402451e8109b66aacbc4efbff1237 Mon Sep 17 00:00:00 2001
+From 0f29c7c981ccf4bcd29d641e7cdd1492e0da0bc9 Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Thu, 2 Mar 2023 10:18:07 -0800
 Subject: [PATCH 27/36] Add bottlerocket k8s settings support
@@ -13,7 +13,7 @@ Signed-off-by: Abhinav Pandey <abhinavmpandey08@gmail.com>
  ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  54 ++
  .../internal/bottlerocket/bootstrap.go        |  21 +-
  .../internal/bottlerocket/bootstrap_test.go   | 534 ++++++++++++------
- .../internal/bottlerocket/bottlerocket.go     |  36 +-
+ .../internal/bottlerocket/bottlerocket.go     |  31 +-
  .../controllers/kubeadmconfig_controller.go   |   4 +-
  .../zz_generated.conversion.go                |   2 +
  .../zz_generated.conversion.go                |   2 +
@@ -23,13 +23,13 @@ Signed-off-by: Abhinav Pandey <abhinavmpandey08@gmail.com>
  .../v1beta1/kubeadm_control_plane_webhook.go  |   2 +
  ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  52 ++
  ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  56 ++
- 18 files changed, 741 insertions(+), 189 deletions(-)
+ 18 files changed, 739 insertions(+), 186 deletions(-)
 
 diff --git a/api/v1beta1/zz_generated.openapi.go b/api/v1beta1/zz_generated.openapi.go
-index 71ea0311f..53ab5f4e1 100644
+index a54ed0937..31f4aa009 100644
 --- a/api/v1beta1/zz_generated.openapi.go
 +++ b/api/v1beta1/zz_generated.openapi.go
-@@ -716,6 +716,12 @@ func schema_sigsk8sio_cluster_api_api_v1beta1_ClusterSpec(ref common.ReferenceCa
+@@ -718,6 +718,12 @@ func schema_sigsk8sio_cluster_api_api_v1beta1_ClusterSpec(ref common.ReferenceCa
  							Ref:         ref("k8s.io/api/core/v1.ObjectReference"),
  						},
  					},
@@ -42,7 +42,7 @@ index 71ea0311f..53ab5f4e1 100644
  					"infrastructureRef": {
  						SchemaProps: spec.SchemaProps{
  							Description: "InfrastructureRef is a reference to a provider-specific resource that holds the details for provisioning infrastructure for a cluster in said provider.",
-@@ -816,6 +822,22 @@ func schema_sigsk8sio_cluster_api_api_v1beta1_ClusterStatus(ref common.Reference
+@@ -818,6 +824,22 @@ func schema_sigsk8sio_cluster_api_api_v1beta1_ClusterStatus(ref common.Reference
  							Format:      "int64",
  						},
  					},
@@ -1046,24 +1046,10 @@ index dd0422007..3463a2769 100644
  			g.Expect(string(b)).To(Equal(testcase.output))
  		})
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index e2611c1ca..f21247061 100644
+index 943a3ed81..7a9e08eec 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-@@ -8,11 +8,10 @@ import (
- 	"strings"
- 	"text/template"
- 
--	corev1 "k8s.io/api/core/v1"
--	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
--
- 	"github.com/pkg/errors"
- 	"gopkg.in/yaml.v2"
-+	corev1 "k8s.io/api/core/v1"
-+	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
- )
- 
- const (
-@@ -22,11 +21,13 @@ const (
+@@ -22,11 +22,13 @@ const (
  `
  )
  
@@ -1077,7 +1063,7 @@ index e2611c1ca..f21247061 100644
  	ProxyConfiguration                    bootstrapv1.ProxyConfiguration
  	RegistryMirrorConfiguration           bootstrapv1.RegistryMirrorConfiguration
  	KubeletExtraArgs                      map[string]string
-@@ -38,6 +39,7 @@ type BottlerocketConfig struct {
+@@ -38,6 +40,7 @@ type BottlerocketConfig struct {
  	RegistryMirrorCredentials
  }
  
@@ -1085,7 +1071,7 @@ index e2611c1ca..f21247061 100644
  type BottlerocketSettingsInput struct {
  	PauseContainerSource   string
  	HTTPSProxyEndpoint     string
-@@ -49,17 +51,22 @@ type BottlerocketSettingsInput struct {
+@@ -49,17 +52,22 @@ type BottlerocketSettingsInput struct {
  	NodeLabels             string
  	NTPServers             []string
  	Taints                 string
@@ -1109,7 +1095,7 @@ index e2611c1ca..f21247061 100644
  type RegistryMirrorCredentials struct {
  	Username string
  	Password string
-@@ -100,7 +107,7 @@ func generateAdminContainerUserData(kind string, tpl string, data interface{}) (
+@@ -100,7 +108,7 @@ func generateAdminContainerUserData(kind string, tpl string, data interface{}) (
  	return out.Bytes(), nil
  }
  
@@ -1118,7 +1104,7 @@ index e2611c1ca..f21247061 100644
  	if containerLocation.ImageRepository != "" && containerLocation.ImageTag != "" {
  		return fmt.Sprintf("%s:%s", containerLocation.ImageRepository, containerLocation.ImageTag)
  	}
-@@ -110,7 +117,7 @@ func imageUrl(containerLocation bootstrapv1.ImageMeta) string {
+@@ -110,7 +118,7 @@ func imageUrl(containerLocation bootstrapv1.ImageMeta) string {
  func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, error) {
  	tm := template.New(kind).Funcs(template.FuncMap{
  		"stringsJoin": strings.Join,
@@ -1127,7 +1113,7 @@ index e2611c1ca..f21247061 100644
  	})
  	if _, err := tm.Parse(hostContainerTemplate); err != nil {
  		return nil, errors.Wrapf(err, "failed to parse hostContainerSettings %s template", kind)
-@@ -208,7 +215,7 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+@@ -208,7 +216,7 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
  		RegistryMirrorEndpoint: config.RegistryMirrorConfiguration.Endpoint,
  		NodeLabels:             parseNodeLabels(config.KubeletExtraArgs["node-labels"]), // empty string if it does not exist
  		Taints:                 parseTaints(config.Taints),                              // empty string if it does not exist
@@ -1136,7 +1122,7 @@ index e2611c1ca..f21247061 100644
  		Hostname:               config.Hostname,
  		HostContainers:         hostContainers,
  		BootstrapContainers:    config.BottlerocketCustomBootstrapContainers,
-@@ -231,12 +238,17 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+@@ -231,12 +239,17 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
  			bottlerocketInput.NTPServers = append(bottlerocketInput.NTPServers, strconv.Quote(ntp))
  		}
  	}
@@ -1446,5 +1432,5 @@ index 0091bd97a..1f25a4320 100644
                                  description: BottlerocketAdmin holds the image source
                                    for admin container This is only for bottlerocket
 -- 
-2.42.0
+2.34.1
 
