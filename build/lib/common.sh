@@ -99,7 +99,7 @@ function build::common::generate_shasum() {
 
 function build::common::upload_artifacts() {
   local -r artifactspath=$1
-  local -r artifactsbucket=$2
+  local -r artifactsbucket="${2%/}" # remove trailing slash if it exists
   local -r projectpath=$3
   local -r buildidentifier=$4
   local -r githash=$5
@@ -305,6 +305,22 @@ function build::common::re_quote() {
     local -r to_escape=$1
     sed 's/[][()\.^$\/?*+]/\\&/g' <<< "$to_escape"
 }
+function build::common::check_eksa_asset_url() {
+  local -r s3_url_prefix="$1"
+  local -r specific_uri="$2"
+  local -r fallback_latest_uri="$3"
+  local -r bucket_name="$4"
+
+  if [[ "$(build::common::echo_and_run curl -I -L -s -o /dev/null -w "%{http_code}" $s3_url_prefix/$specific_uri)" == "200" ]]; then 
+    echo "$s3_url_prefix/$specific_uri"
+  elif [[ "$(build::common::echo_and_run curl -I -L -s -o /dev/null -w "%{http_code}" $s3_url_prefix/$fallback_latest_uri)" == "200" ]]; then 
+    echo "$s3_url_prefix/$fallback_latest_uri"
+  elif build::common::echo_and_run aws s3api head-object --bucket $bucket_name --key $specific_uri &> /dev/null; then
+    build::common::echo_and_run aws s3 presign $bucket_name/$specific_uri
+  elif build::common::echo_and_run aws s3api head-object --bucket $bucket_name --key $fallback_latest_uri &> /dev/null; then
+    build::common::echo_and_run aws s3 presign $bucket_name/$fallback_latest_uri
+  fi
+}
 
 function build::common::get_latest_eksa_asset_url() {
   local -r artifact_bucket="${1%/}" # remove trailing slash if it exists
@@ -333,24 +349,35 @@ function build::common::get_latest_eksa_asset_url() {
     specific_uri+=".sha256"
     fallback_latest_uri+=".sha256"
   fi
-  local -r s3_url_prefix="https://$(basename $artifact_bucket).s3-us-west-2.amazonaws.com"
 
-  if [[ "$(build::common::echo_and_run curl -I -L -s -o /dev/null -w "%{http_code}" $s3_url_prefix/$specific_uri)" == "200" ]]; then 
-    echo "$s3_url_prefix/$specific_uri"
-  elif [[ "$(build::common::echo_and_run curl -I -L -s -o /dev/null -w "%{http_code}" $s3_url_prefix/$fallback_latest_uri)" == "200" ]]; then 
-    echo "$s3_url_prefix/$fallback_latest_uri"
-  elif build::common::echo_and_run aws s3api head-object --bucket $(basename $artifact_bucket) --key $specific_uri &> /dev/null; then
-    aws s3 presign $artifact_bucket/$specific_uri
-  elif build::common::echo_and_run aws s3api head-object --bucket $(basename $artifact_bucket) --key $fallback_latest_uri &> /dev/null; then
-    aws s3 presign $artifact_bucket/$fallback_latest_uri
-  else
-    >&2 echo "******* No artifact availabe! *******"
-    >&2 echo "${s3_url_prefix}/${fallback_latest_uri} does not exists!"
-    >&2 echo "Please double check the value of \$ARTIFACTS_BUCKET."
-    >&2 echo "${git_tag} of ${project} may not be the current latest version, verify you have the latest code from main to be sure."
-    >&2 echo "*************************************"
-    exit 1
+  local -r bucket_name_without_prefix=${artifact_bucket#s3://} 
+  local -r bucket_name=${bucket_name_without_prefix%%/*}
+  local -r url_path=${bucket_name_without_prefix#*/}
+  if [ "${url_path}" != "${bucket_name}" ]; then 
+    specific_uri="${url_path%/}/${specific_uri}"
+    fallback_latest_uri="${url_path%/}/${fallback_latest_uri}"
   fi
+
+  local -r s3_url_prefix="https://$bucket_name.s3-us-west-2.amazonaws.com"
+  
+  local -r sleep_interval=20
+  for i in {1..60}; do
+    local final_url=$(build::common::check_eksa_asset_url "$s3_url_prefix" "$specific_uri" "$fallback_latest_uri" "$bucket_name")
+    if [ -n "$final_url" ]; then
+      echo "$final_url"
+      break
+    elif [ "${CODEBUILD_CI:-false}" = "false" ] || [ "$i" = "60" ]; then
+      >&2 echo "******* No artifact availabe! *******"
+      >&2 echo "${s3_url_prefix}/${fallback_latest_uri} does not exists!"
+      >&2 echo "Please double check the value of \$ARTIFACTS_BUCKET."
+      >&2 echo "${git_tag} of ${project} may not be the current latest version, verify you have the latest code from main to be sure."
+      >&2 echo "*************************************"
+      exit 1
+    fi
+    >&2 echo "Tarball does not exist!"
+    >&2 echo "Waiting for tarball to be uploaded to ${specific_uri}"
+    sleep $sleep_interval
+  done
 }
 
 function build::common::get_latest_eksa_asset_url_sha256() {
@@ -366,24 +393,6 @@ function build::common::wait_for_tag() {
     git fetch --tags > /dev/null 2>&1
     echo "Tag ${tag} does not exist!"
     echo "Waiting for tag ${tag}..."
-    sleep $sleep_interval
-    if [ "$i" = "60" ]; then
-      exit 1
-    fi
-  done
-}
-
-function build::common::wait_for_tarball() {
-  local -r tarball_url=$1
-  sleep_interval=20
-  for i in {1..60}; do
-    echo "Checking for URL ${tarball_url}..."
-    local http_code=$(curl -I -L -s -o /dev/null -w "%{http_code}" $tarball_url)
-    if [[ "$http_code" == "200" ]]; then 
-      echo "Tarball exists!" && break
-    fi
-    echo "Tarball does not exist!"
-    echo "Waiting for tarball to be uploaded to ${tarball_url}"
     sleep $sleep_interval
     if [ "$i" = "60" ]; then
       exit 1
