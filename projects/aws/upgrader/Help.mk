@@ -7,22 +7,22 @@
 
 
 ##@ Image Targets
-local-images: ## Builds `upgrader/images/arm64` as oci tars for presumbit validation
+local-images: ## Builds `upgrader/images/amd64` as oci tars for presumbit validation
 images: ## Pushes `upgrader/images/push` to IMAGE_REPO
-upgrader/images/arm64: ## Builds/pushes `upgrader/images/arm64`
+upgrader/images/amd64: ## Builds/pushes `upgrader/images/amd64`
 upgrader/images/push: ## Builds/pushes `upgrader/images/push`
 
 ##@ Fetch Binary Targets
-_output/1-28/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-28/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/1-28/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-28/dependencies/linux-arm64/eksd/kubernetes/client`
-_output/1-28/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-28/dependencies/linux-amd64/eksd/kubernetes/server`
-_output/1-28/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-28/dependencies/linux-arm64/eksd/kubernetes/server`
-_output/1-28/dependencies/linux-amd64/eksd/cni-plugins: ## Fetch `_output/1-28/dependencies/linux-amd64/eksd/cni-plugins`
-_output/1-28/dependencies/linux-arm64/eksd/cni-plugins: ## Fetch `_output/1-28/dependencies/linux-arm64/eksd/cni-plugins`
-_output/1-28/dependencies/linux-amd64/eksa/containerd/containerd: ## Fetch `_output/1-28/dependencies/linux-amd64/eksa/containerd/containerd`
-_output/1-28/dependencies/linux-arm64/eksa/containerd/containerd: ## Fetch `_output/1-28/dependencies/linux-arm64/eksa/containerd/containerd`
-_output/1-28/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-28/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
-_output/1-28/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-28/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
+_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client`
+_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/1-26/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/server`
+_output/1-26/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/server`
+_output/1-26/dependencies/linux-amd64/eksd/cni-plugins: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/cni-plugins`
+_output/1-26/dependencies/linux-arm64/eksd/cni-plugins: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/cni-plugins`
+_output/1-26/dependencies/linux-amd64/eksa/containerd/containerd: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/containerd/containerd`
+_output/1-26/dependencies/linux-arm64/eksa/containerd/containerd: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/containerd/containerd`
+_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
+_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
 
 ##@ Run in Docker Targets
 run-in-docker/all-attributions: ## Run `all-attributions` in docker builder container
