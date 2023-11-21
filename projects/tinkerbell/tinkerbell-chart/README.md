@@ -1,5 +1,5 @@
 # **Tinkerbell Stack Helm Chart**
-![Version](https://img.shields.io/badge/version-0.2.3-blue)
+![Version](https://img.shields.io/badge/version-0.2.4-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoic0w3TWw2ZDdFblpMMDZtamh2S3RiNmVwbTdRaDVlbmgxWGZkVi9WdGZjMDgvL2J2a1ZGSXJoMVV2dWJlNWZpbjV5Z3k4THRjZ0VyWUlBM0RLTUNWaE4wPSIsIml2UGFyYW1ldGVyU3BlYyI6IllIWGJ1SDFRZm1HM0dnK1giLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 ## Updating
