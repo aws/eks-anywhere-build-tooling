@@ -92,7 +92,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d
 	@cp harbor/make/photon/db/docker-entrypoint.sh harbor/make/photon/db/initdb.sh harbor/make/photon/db/upgrade.sh harbor/make/photon/db/docker-healthcheck.sh $(OUTPUT_DIR)/harbor-db/
-	@cp harbor/make/photon/db/initial-notaryserver.sql harbor/make/photon/db/initial-notarysigner.sql harbor/make/photon/db/initial-registry.sql $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d/
+	@cp harbor/make/photon/db/initial-registry.sql $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d/
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-exporter/harbor
 	@cp harbor/make/photon/exporter/entrypoint.sh harbor/make/photon/common/install_cert.sh $(OUTPUT_DIR)/harbor-exporter/harbor/
@@ -110,9 +110,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-portal/build_dir/dist
 	@cp -r harbor/src/portal/* $(OUTPUT_DIR)/harbor-portal/build_dir/
-	@cp harbor/api/v2.0/legacy_swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger.yaml
-	@cp harbor/api/v2.0/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger2.yaml
-	@cp harbor/api/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger3.yaml
+	@cp harbor/api/v2.0/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger.yaml
 	@cp harbor/LICENSE $(OUTPUT_DIR)/harbor-portal/build_dir/dist/LICENSE
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-redis/etc
