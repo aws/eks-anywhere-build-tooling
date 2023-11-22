@@ -18,14 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
+PROJECT=${2:-}
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
 RETURN=0
 SED=$(build::find::gnu_variant_on_mac sed)
-PROJECT=${1:-}
 
-SUPPORTED_RELEASE_BRANCHES=($(cat $SCRIPT_ROOT/../../release/SUPPORTED_RELEASE_BRANCHES))
+SUPPORTED_RELEASE_BRANCHES=($(cat $BASE_DIRECTORY/release/SUPPORTED_RELEASE_BRANCHES))
 LATEST_RELEASE_BRANCH=${SUPPORTED_RELEASE_BRANCHES[-1]}
 
 function check_and_update_readme() {
@@ -69,9 +70,9 @@ function check_and_update_readme() {
     $SED -i -e "s/$ACTUAL_VERSION/$VERSION/" $README
 }
 
-PROJECTS="projects/*/*"
+PROJECTS="$BASE_DIRECTORY/projects/*/*"
 if [ -n "$PROJECT" ]; then
-    PROJECTS=projects/$PROJECT
+    PROJECTS=$BASE_DIRECTORY/projects/$PROJECT
 fi
 
 for PROJECT in $PROJECTS
