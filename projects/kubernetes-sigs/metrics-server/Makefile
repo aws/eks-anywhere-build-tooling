@@ -1,9 +1,10 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG=$(shell source $(BUILD_LIB)/common.sh && build::eksd_releases::get_eksd_component_asset_image_tag metrics-server metrics-server-image $(RELEASE_BRANCH))
+EKS_D_TAG=$(shell source $(BUILD_LIB)/common.sh && build::eksd_releases::get_eksd_component_asset_image_tag metrics-server metrics-server-image $(RELEASE_BRANCH))
+GIT_TAG=$(EKS_D_TAG)
 HELM_GIT_TAG=$(shell cat $(RELEASE_BRANCH)/HELM_GIT_TAG)
  # Upstream images are used directly without re-building and re-tagging in build
  # tooling, so the IMAGE_TAG needs to be overwritten to match upstream ECR tags.
-IMAGE_TAG=$(GIT_TAG)
+IMAGE_TAG=$(EKS_D_TAG)
 
 HAS_RELEASE_BRANCHES=true
 SKIPPED_K8S_VERSIONS=1-20
@@ -36,6 +37,9 @@ EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+# To avoid issues cloning/checking out the repo, git_tag is set to
+# a valid branch/tag
+$(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_D_TAG)))
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

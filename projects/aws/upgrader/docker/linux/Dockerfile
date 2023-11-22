@@ -3,8 +3,7 @@ ARG BUILDER_IMAGE
 FROM $BUILDER_IMAGE as builder
 
 RUN set -x && \
-    install_binary /usr/bin/nsenter \
-        /usr/bin/cp && \
+    install_binary /usr/bin/cp && \
     cleanup "deps"
 
 FROM $BASE_IMAGE
