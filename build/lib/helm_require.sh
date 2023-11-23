@@ -35,7 +35,7 @@ DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
-if ! aws sts get-caller-identity &> /dev/null; then
+if [ "${HELM_USE_UPSTREAM_IMAGE}" != true ] && [[ "${IMAGE_REGISTRY}" == *"ecr"* ]] && ! aws sts get-caller-identity &> /dev/null; then
   echo "The AWS cli is used to find the ECR registries and repos for the current AWS account please login!"
   exit 1;
 fi
@@ -55,9 +55,14 @@ spec:
 !
 JSON_SCHEMA_FILE=$PROJECT_ROOT/helm/schema.json
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
+
+export HELM_REGISTRY="$IMAGE_REGISTRY"
+if [ "${HELM_USE_UPSTREAM_IMAGE}" != true ] && [[ "${IMAGE_REGISTRY}" == *"ecr"* ]]; then
+  export HELM_REGISTRY=$(aws ecr-public describe-registries --region us-east-1 --output text --query 'registries[*].registryUri' 2> /dev/null)
+fi
+
 export IMAGE_TAG
 export HELM_TAG
-export HELM_REGISTRY=$(aws ecr-public describe-registries --region us-east-1  --output text --query 'registries[*].registryUri' 2> /dev/null)
 envsubst <$PROJECT_ROOT/helm/sedfile.template >${SEDFILE}
 # Semver requires that our version begin with a digit, so strip the v.
 echo "s,version: v,version: ,g" >>${SEDFILE}
@@ -69,8 +74,8 @@ function get_image_shasum() {
 
   local image_shasum=
   if [ "${HELM_USE_UPSTREAM_IMAGE}" = true ]; then
-    image_shasum=$(${SCRIPT_ROOT}/image_shasum.sh ${IMAGE_REGISTRY} ${image} ${tag})
-  elif [ "${JOB_TYPE:-}" = "presubmit" ]; then
+    image_shasum=$(build::common::echo_and_run ${SCRIPT_ROOT}/image_shasum.sh ${IMAGE_REGISTRY} ${image} ${tag})
+  elif [ "${JOB_TYPE:-}" = "presubmit" ] || [[ "${IMAGE_REGISTRY}" != *"ecr"* ]]; then
     image_shasum=${LATEST}
   fi
 
@@ -96,7 +101,7 @@ function get_image_tag_not_latest() {
     local -r tag=$2
 
     local use_tag=
-    if [ "${JOB_TYPE:-}" = "presubmit" ]; then
+    if [ "${JOB_TYPE:-}" = "presubmit" ] ||  [[ "${IMAGE_REGISTRY}" != *"ecr"* ]]; then
       use_tag=${tag}      
     fi
 
