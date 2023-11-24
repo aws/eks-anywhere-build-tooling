@@ -194,6 +194,7 @@ generate-project-list: | ensure-locale
 
 .PHONY: generate-staging-buildspec
 generate-staging-buildspec: export BINARY_PLATFORMS=linux/amd64 linux/arm64
+generate-staging-buildspec: export IMAGE_PLATFORMS=linux/amd64 linux/arm64
 generate-staging-buildspec: | ensure-locale
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/release/staging-build.yml" "$(BASE_DIRECTORY)/buildspec.yml"
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/release/checksums-build.yml" "$(BASE_DIRECTORY)/buildspecs/checksums-buildspec.yml" true EXCLUDE_FROM_CHECKSUMS_BUILDSPEC CHECKSUMS_BUILDSPECS false buildspecs/checksums-pr-buildspec.yml
@@ -203,7 +204,9 @@ generate-staging-buildspec: | ensure-locale
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "containerd_containerd" "$(BASE_DIRECTORY)/projects/containerd/containerd/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "opencontainers_runc" "$(BASE_DIRECTORY)/projects/opencontainers/runc/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "torvalds_linux" "$(BASE_DIRECTORY)/projects/torvalds/linux/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
-	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_upgrader" "$(BASE_DIRECTORY)/projects/aws/upgrader/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "emissary-ingress_emissary" "$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "goharbor_harbor" "$(BASE_DIRECTORY)/projects/goharbor/harbor/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_upgrader" "$(BASE_DIRECTORY)/projects/aws/upgrader/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
 
 .PHONY: generate
 generate: generate-project-list generate-staging-buildspec

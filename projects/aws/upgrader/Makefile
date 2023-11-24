@@ -7,16 +7,26 @@ GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".releases[] | select(.branch==\"${RELEA
 
 HAS_RELEASE_BRANCHES=true
 
-BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
-BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
-BUILDSPEC_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 kubernetes_sigs_cri_tools
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+# for the staging buildspec generation
+BUILDSPEC_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 kubernetes_sigs_cri_tools
+
+BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
+BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
+BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
+BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
+BUILDSPEC_2_DEPENDS_ON_OVERRIDE=aws_upgrader_linux_amd64 aws_upgrader_linux_arm64
 
 REPO_NO_CLONE=true
 HAS_LICENSES=false
 
-BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
+BASE_IMAGE_NAME=eks-distro-minimal-base-nsenter
 IMAGE_NAMES=upgrader
+# its not clear why, but if we do not set this here, even though this is the default
+# when we try and override it in the combine-images target the override will not take
+DOCKERFILE_FOLDER=./docker/linux
+IMAGE_BUILD_ARGS=
 
 PROJECT_DEPENDENCIES=eksd/kubernetes/client eksd/kubernetes/server eksd/cni-plugins eksa/containerd/containerd eksa/kubernetes-sigs/cri-tools
 
