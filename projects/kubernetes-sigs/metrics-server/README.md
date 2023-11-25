@@ -12,5 +12,5 @@ AWS Distro for ([Metrics Server](https://github.com/kubernetes-sigs/metrics-serv
 Review [helm chart releases](https://github.com/kubernetes-sigs/metrics-server/releases) periodically to identify new releases and decide on an update plan and an update schedule.
 
 ### Updating
-0. Latest images are automatically pulled in from EKS-D. GIT_TAG is generated dynamically.
+0. Latest images are automatically pulled in from EKS-D. GIT_TAG is generated dynamically. See EKS D releases in [ECR Gallery](https://gallery.ecr.aws/eks-distro/kubernetes-sigs/metrics-server)
 1. For updating HELM_GIT_TAG, monitor [upstream releases](https://github.com/kubernetes-sigs/metrics-server/releases) and changelogs and when to bump the tag. Reach out to @jonathanmeier5 if you have any questions.
