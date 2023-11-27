@@ -50,26 +50,37 @@ function retry_image_builder() {
   local n=1
   local max=3
   local delay=30
-  local failed="false"
-  while true; do
-    "${HOME}"/image-builder "$@" && break || {
-      local retry="false"
-      if [[ $n -lt $max ]]; then
-        ((n++))
-        local log_file=$(find $MAKE_ROOT -name "packer.log" -type f)
-        [ ! -f "$log_file" ] && break
-        if grep -q "Timeout waiting for IP." "$log_file"; then
-          >&2 echo "Failed waiting for IP. This is likely transisent, retrying. Attempt $n/$max:"
-          retry="true"
-        elif grep -q "Cancelling provisioner after a timeout" "$log_file"; then
-          >&2 echo "Provisioner timed out, this could be transisent, retrying. Attempt $n/$max:"
-          retry="true"    
-        fi
+  local failed=""
+  declare -A retryable_messages=(
+    ["Timeout waiting for IP."]="Failed waiting for IP" 
+    ["Cancelling provisioner after a timeout"]="Provisioner timed out")
+
+  until [ $n -eq $max ]; do
+    failed="false"
+    timeout "1h" "${HOME}"/image-builder $@" && break || {
+      failed="true"
+
+      local log_file=$(find $MAKE_ROOT -name "packer.log" -type f)
+      if [ ! -f "$log_file" ]; then
+        >&2 echo "packer.log not found in ${MAKE_ROOT}!"
+        break
       fi
+
+      local retry="false"
+      local message=""
+      for key in "${!retryable_messages[@]}"; do 
+        if grep -q "$key" "$log_file"; then
+          message="${retryable_messages[$key]}"
+          retry="true"
+          break
+        fi
+      done
+
       if [ "${retry}" = "true" ]; then
+        ((n++))
+        >&2 echo "$message. This is likely transisent, retrying. Attempt $n/$max:"
         sleep $delay
       else
-        failed="true" 
         break
       fi
     }
