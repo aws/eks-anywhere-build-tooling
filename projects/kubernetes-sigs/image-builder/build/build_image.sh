@@ -57,7 +57,7 @@ function retry_image_builder() {
 
   until [ $n -eq $max ]; do
     failed="false"
-    timeout "1h" "${HOME}/image-builder $@" && break || {
+    timeout "1h" ${HOME}/image-builder "$@" && break || {
       failed="true"
 
       local log_file=$(find $MAKE_ROOT -name "packer.log" -type f)
