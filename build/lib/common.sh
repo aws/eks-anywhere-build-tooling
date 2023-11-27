@@ -554,3 +554,4 @@ function build::common::check_for_qemu() {
 function build::common::loaded() {
   return 0
 }
+
