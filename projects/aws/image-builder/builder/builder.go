@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ghodss/yaml"
 )
@@ -66,6 +67,10 @@ func (b *BuildOptions) BuildImage() {
 		fmt.Sprintf("%s=%s", releaseBranchEnvVar, b.ReleaseChannel),
 		fmt.Sprintf("%s=%s", eksAReleaseVersionEnvVar, detectedEksaVersion),
 		fmt.Sprintf("%s=%s", eksAReleaseManifestURLEnvVar, eksAReleaseManifestUrl),
+	}
+	if b.AnsibleVerbosity != 0 {
+		ansibleVerbosityArg := fmt.Sprintf("-%s", strings.Repeat("v", b.AnsibleVerbosity))
+		commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", eksaAnsibleVerbosityEnvVar, ansibleVerbosityArg))
 	}
 
 	log.Printf("Initiating Image Build\n Image OS: %s\n Image OS Version: %s\n Hypervisor: %s\n Firmware: %s\n", b.Os, b.OsVersion, b.Hypervisor, b.Firmware)
@@ -333,11 +338,6 @@ func (b *BuildOptions) BuildImage() {
 		log.Printf("Image Build Successful\n Please find the output artifact at %s\n", outputArtifactPath)
 	} else if b.Hypervisor == AMI {
 		amiConfigFile := filepath.Join(imageBuilderProjectPath, packerAMIConfigFile)
-
-		upstreamPatchCommand := fmt.Sprintf("make -C %s patch-repo", imageBuilderProjectPath)
-		if err = executeMakeBuildCommand(upstreamPatchCommand, commandEnvVars...); err != nil {
-			log.Fatalf("Error executing upstream patch command")
-		}
 
 		if b.AMIConfig != nil {
 			if b.AMIConfig.ManifestOutput == DefaultAMIManifestOutput {

@@ -214,3 +214,17 @@ if [ "$IMAGE_FORMAT" = "ami" ]; then
     fi
 fi
 
+EKSA_ANSIBLE_VERBOSITY="${EKSA_ANSIBLE_VERBOSITY:-}"
+if [ -n "$EKSA_ANSIBLE_VERBOSITY" ]; then
+    PACKER_FILE_NAME="packer.json"
+    if [ "$IMAGE_FORMAT" = "ova" ]; then
+        PACKER_FILE_NAME="packer-node.json"
+    fi
+
+    HYPERVISOR_DIRNAME=$IMAGE_FORMAT
+    if [ "$IMAGE_FORMAT" = "cloudstack" ]; then
+        HYPERVISOR_DIRNAME="qemu"
+    fi
+
+    build::jq::update_in_place ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/$HYPERVISOR_DIRNAME/$PACKER_FILE_NAME "(.provisioners[] | select(.type == \"ansible\").extra_arguments) += [\"$EKSA_ANSIBLE_VERBOSITY\"]"
+fi
