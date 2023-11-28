@@ -75,6 +75,7 @@ else
 endif
 EXCLUDE_FROM_STAGING_BUILDSPEC?=false
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC?=false
+DO_NOT_EXCLUDE_FROM_BUILDSPEC=false
 BUILDSPECS?=buildspec.yml
 CHECKSUMS_BUILDSPECS?=buildspecs/checksums-buildspec.yml
 BUILDSPEC_VARS_KEYS?=
@@ -88,6 +89,7 @@ GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
 GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
 REPO_NO_CLONE?=false
 PATCHES_DIR=$(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches))
+HELM_PATCHES_DIR=$(or $(wildcard $(PROJECT_ROOT)/helm/patches),$(wildcard $(MAKE_ROOT)/helm/patches))
 REPO_SPARSE_CHECKOUT?=
 ####################################################
 
@@ -102,7 +104,7 @@ IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
 UNRELEASE_BRANCH_BINARY_TARGETS=binaries attribution checksums
 IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter $(UNRELEASE_BRANCH_BINARY_TARGETS) $(foreach target,$(UNRELEASE_BRANCH_BINARY_TARGETS),run-$(target)-in-docker run-in-docker/$(target)),$(MAKECMDGOALS)))
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help start-docker-builder stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums update-patch-numbers check-for-release-branch-skip run-buildkit-and-registry
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help start-docker-builder stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums update-patch-numbers check-for-release-branch-skip run-buildkit-and-registry $(if $(filter false, $(HAS_LICENSES)),attribution,) $(if $(filter true, $(HAS_HELM_CHART)),,helm/push)
 MAKECMDGOALS_WITHOUT_VAR_VALUE=$(foreach t,$(MAKECMDGOALS),$(if $(findstring var-value-,$(t)),,$(t)))
 ifneq ($(and $(IS_RELEASE_BRANCH_BUILD),$(or $(RELEASE_BRANCH),$(IS_UNRELEASE_BRANCH_TARGET))),)
 	RELEASE_BRANCH_SUFFIX=$(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),/$(RELEASE_BRANCH),)
@@ -122,8 +124,10 @@ else ifneq ($(and $(IS_RELEASE_BRANCH_BUILD), $(filter-out $(TARGETS_ALLOWED_WIT
 $(error When running targets for this project other than `$(TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH)` a `RELEASE_BRANCH` is required)
 else ifneq ($(IS_RELEASE_BRANCH_BUILD),)
 	# project has release branches and one was not specified, trigger target for all
-	BUILD_TARGETS=build/release-branches/all
-	RELEASE_TARGETS=release/release-branches/all
+	# if BUILD_TARGETS or RELEASE_TARGETS are set via an env and we change them here
+	# it will change the env var for the sub shell/make calls which is not what we want
+	BUILD_TARGETS_OVERRIDE=build/release-branches/all
+	RELEASE_TARGETS_OVERRIDE=release/release-branches/all
 
 	# avoid warnings when trying to read GIT_TAG file which wont exist when no release_branch is given
 	GIT_TAG=non-existent
@@ -530,6 +534,8 @@ endef
 #################### TARGETS FOR OVERRIDING ########
 BUILD_TARGETS?=github-rate-limit-pre validate-checksums attribution $(if $(IMAGE_NAMES),local-images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/build,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,) attribution-pr github-rate-limit-post
 RELEASE_TARGETS?=validate-checksums $(if $(IMAGE_NAMES),images,) $(if $(filter true,$(HAS_HELM_CHART)),helm/push,) $(if $(filter true,$(HAS_S3_ARTIFACTS)),upload-artifacts,)
+BUILD_TARGETS_OVERRIDE?=
+RELEASE_TARGETS_OVERRIDE?=
 ####################################################
 
 # convert commonly used, usually shell call, variables to lazily resolved cached variables
@@ -627,7 +633,7 @@ $(HELM_GIT_PATCH_TARGET): $(HELM_GIT_CHECKOUT_TARGET)
 	@echo -e $(call TARGET_START_LOG)
 	git -C $(HELM_SOURCE_REPOSITORY) config user.email prow@amazonaws.com
 	git -C $(HELM_SOURCE_REPOSITORY) config user.name "Prow Bot"
-	git -C $(HELM_SOURCE_REPOSITORY) am --committer-date-is-author-date $(wildcard $(PROJECT_ROOT)/helm/patches)/*
+	if [ -n "$(HELM_PATCHES_DIR)" ]; then git -C $(HELM_SOURCE_REPOSITORY) am --committer-date-is-author-date $(HELM_PATCHES_DIR)/*; fi
 	@touch $@
 	@echo -e $(call TARGET_END_LOG)
 
@@ -664,7 +670,10 @@ endif
 clone-repo: $(REPO)
 
 .PHONY: checkout-repo
-checkout-repo: $(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET))
+checkout-repo: $(if $(filter true,$(REPO_NO_CLONE)),,$(if $(PATCHES_DIR),$(GIT_PATCH_TARGET),$(GIT_CHECKOUT_TARGET)))
+
+.PHONY: checkout-helm-repo
+checkout-helm-repo: $(if $(filter true,$(REPO_NO_CLONE)),,$(if $(HELM_PATCHES_DIR),$(HELM_GIT_PATCH_TARGET),$(HELM_GIT_CHECKOUT_TARGET)))
 
 .PHONY: patch-repo
 patch-repo: checkout-repo
@@ -828,6 +837,11 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 %-useradd/images/export: | $$(ENSURE_PREREQ) $$(ENABLE_LOGGING)
 	@mkdir -p $(IMAGE_OUTPUT_DIR) && $(BUILDCTL)
 
+PHONY: combine-images
+combine-images: IMAGE_BUILD_ARGS=IMAGE
+combine-images: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/combine
+combine-images: images
+
 ## Helm Targets
 .PHONY: helm/pull 
 helm/pull: | $$(ENABLE_LOGGING)
@@ -836,7 +850,7 @@ helm/pull: | $$(ENABLE_LOGGING)
 .PHONY: %/helm/copy %/helm/require %/helm/replace %/helm/build %/helm/push
 %/helm/copy %/helm/require %/helm/replace %/helm/build %/helm/push: HELM_CHART_NAME=$*
 
-$(call FULL_CHART_TARGETS,copy) : %/helm/copy: $(LICENSES_TARGETS_FOR_PREREQ) $(if $(filter true,$(REPO_NO_CLONE)),,$(HELM_GIT_CHECKOUT_TARGET)) $(if $(wildcard $(PROJECT_ROOT)/helm/patches),$(HELM_GIT_PATCH_TARGET),) | ensure-helm ensure-skopeo $$(ENABLE_LOGGING)
+$(call FULL_CHART_TARGETS,copy) : %/helm/copy: checkout-repo checkout-helm-repo $(LICENSES_TARGETS_FOR_PREREQ) | ensure-helm ensure-skopeo $$(ENABLE_LOGGING)
 	@$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 
 $(call FULL_CHART_TARGETS,require) : %/helm/require: %/helm/copy | $$(ENABLE_LOGGING)
@@ -857,7 +871,7 @@ helm/build: $(foreach chart,$(HELM_CHART_NAMES),$(chart)/helm/build)
 
 # Build helm chart and push to registry defined in IMAGE_REPO.
 .PHONY: helm/push
-helm/push: $(foreach chart,$(HELM_CHART_NAMES),$(chart)/helm/push)
+helm/push: $(if $(filter true,$(HAS_HELM_CHART)),$(foreach chart,$(HELM_CHART_NAMES),$(chart)/helm/push),)
 
 #@ Fetch Binary Targets
 .PHONY: handle-dependencies 
@@ -869,10 +883,10 @@ $(BINARY_DEPS_DIR)/linux-%: | $$(ENABLE_LOGGING)
 
 ## Build Targets
 .PHONY: build
-build: $(BUILD_TARGETS)
+build: $(or $(BUILD_TARGETS_OVERRIDE),$(BUILD_TARGETS))
 
 .PHONY: release
-release: $(RELEASE_TARGETS)
+release: $(or $(RELEASE_TARGETS_OVERRIDE),$(RELEASE_TARGETS))
 
 # Iterate over release branch versions, avoiding branches explicitly marked as skipped
 .PHONY: %/release-branches/all

@@ -31,8 +31,9 @@ for FOLDER in eksd/kubernetes eksa/kubernetes-sigs/etcdadm eksd/cni-plugins eksa
     cp $DEP_FOLDER/$FOLDER/ATTRIBUTION.txt "$OUTPUT_FOLDER/LICENSES/$(echo $(basename $FOLDER) | tr a-z A-Z  | tr -d '-'  )_ATTRIBUTION.txt"
 done
 
-mkdir -p $OUTPUT_FOLDER/usr/bin/
+mkdir -p $OUTPUT_FOLDER/usr/bin/ $OUTPUT_FOLDER/usr/local/bin/
 cp $DEP_FOLDER/eksa/kubernetes-sigs/etcdadm/etcdadm $OUTPUT_FOLDER/usr/bin/
+cp $DEP_FOLDER/eksa/kubernetes-sigs/cri-tools/{crictl,critest} $OUTPUT_FOLDER/usr/local/bin/
 
 # Place etcd tarball etcdadm cache directory to avoid downloading at runtime   
 ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_RELEASE_BRANCH $ARCH)

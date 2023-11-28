@@ -29,6 +29,9 @@ source "${MAKE_ROOT}/_output/$EKSD_RELEASE_BRANCH/kind-node-image-build-args"
 
 INTERMEDIATE_NODE_IMAGE="kind/build/node-image:$KUBE_VERSION-$EKSD_RELEASE_BRANCH"
 
+FILES_DIR=$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH/files
+ROOT_FS=$FILES_DIR/rootfs
+
 # Uses kind cli to build node-image, usually the fake kubernetes src
 # to download the eks-d release artifacts instead of building from src
 # ouput image: $INTERMEDIATE_NODE_IMAGE
@@ -92,6 +95,7 @@ function build::kind::load_images(){
 
     build::kind::validate_versions $CONTAINER_ID
 
+    docker cp $ROOT_FS/usr/local/bin/crictl $CONTAINER_ID:/usr/local/bin
     docker exec --privileged -i $CONTAINER_ID bash -c "nohup containerd > /dev/null 2>&1 & sleep 5"
     docker exec --privileged -i $CONTAINER_ID crictl images
 
@@ -173,8 +177,6 @@ function build::kind::load_images(){
     docker kill $CONTAINER_ID
 
     # Copy files created by the node build process and ctr import out to be used in next build
-    FILES_DIR=$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH/files
-    ROOT_FS=$FILES_DIR/rootfs
     mkdir -p $ROOT_FS/var/lib/containerd $ROOT_FS/etc/containerd
     docker cp $CONTAINER_ID:/etc/containerd/config.toml $ROOT_FS/etc/containerd
     docker cp $CONTAINER_ID:/kind $ROOT_FS

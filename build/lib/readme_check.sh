@@ -13,38 +13,79 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#set -x
+# set -x
 set -o errexit
 set -o nounset
 set -o pipefail
 
+BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
+PROJECT=${2:-}
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
 RETURN=0
 SED=$(build::find::gnu_variant_on_mac sed)
 
-for GIT_TAG_FILE in projects/*/*/GIT_TAG
-do
-    VERSION="$(cat $GIT_TAG_FILE | $SED "s,-,--,g")"
-    README="$(dirname $GIT_TAG_FILE)/README.md"
+SUPPORTED_RELEASE_BRANCHES=($(cat $BASE_DIRECTORY/release/SUPPORTED_RELEASE_BRANCHES))
+LATEST_RELEASE_BRANCH=${SUPPORTED_RELEASE_BRANCHES[-1]}
+
+function check_and_update_readme() {
+    local -r git_tag_file=$1
+    local -r project_path=$2
+    local -r release_branched=$3
+
+    if [ ! -f $git_tag_file ]; then
+        return
+    fi
+    VERSION="$(cat $git_tag_file | $SED "s,-,--,g")"
+    README="$project_path/README.md"
     if [ ! -f $README ]
     then
         echo "Missing file $README"
         continue
     fi
+
     EXPECTED_VERSION="img.shields.io/badge/version-$VERSION"
+    if [ "$release_branched" = "true" ]; then
+        RELEASE_BRANCH=$(basename $(dirname $git_tag_file) | $SED "s,-,--,g")
+        EXPECTED_VERSION=img.shields.io/badge/$RELEASE_BRANCH%20version-$VERSION
+    fi
     if grep -l "$EXPECTED_VERSION" ${README} >/dev/null
     then
-        continue
+        echo "Actual version in README matches expected version"
+        return
     fi
-    if ! grep "img.shields.io/badge/version" ${README} >/dev/null
+    VERSION_SEARCH_PATTERN="img.shields.io/badge/version"
+    if [ "$release_branched" = "true" ]; then
+        VERSION_SEARCH_PATTERN=img.shields.io/badge/$RELEASE_BRANCH%20version
+    fi
+    if ! grep $VERSION_SEARCH_PATTERN ${README} >/dev/null
     then
-        echo "Did not find version $README"
-        continue
+        echo "Did not find version  in $README"
+        return
     fi
-    RETURN=-1
-    ACTUAL_VERSION=$(grep "img.shields.io/badge/version" ${README} | $SED -e 's,.*img.shields.io/badge/version-,,' -e 's/-blue).*$//')
-    echo "Version mismatch $README expected $VERSION actual $ACTUAL_VERSION"
+
+    ACTUAL_VERSION=$(grep $VERSION_SEARCH_PATTERN ${README} | $SED -e "s,.*$VERSION_SEARCH_PATTERN-,," -e 's/-blue).*$//')
+    echo "Version mismatch in $README - expected $VERSION, actual $ACTUAL_VERSION"
     $SED -i -e "s/$ACTUAL_VERSION/$VERSION/" $README
+}
+
+PROJECTS="$BASE_DIRECTORY/projects/*/*"
+if [ -n "$PROJECT" ]; then
+    PROJECTS=$BASE_DIRECTORY/projects/$PROJECT
+fi
+
+for PROJECT in $PROJECTS
+do
+    RELEASE_BRANCHED=false
+    if [ -f "$PROJECT/GIT_TAG" ] & [ -f "$PROJECT/$LATEST_RELEASE_BRANCH/GIT_TAG" ]; then
+        RELEASE_BRANCHED=true
+    fi
+    if [ "$RELEASE_BRANCHED" = "true" ]; then
+        for branch in ${SUPPORTED_RELEASE_BRANCHES[@]}; do
+            check_and_update_readme $PROJECT/$branch/GIT_TAG $PROJECT true
+        done
+    else
+        check_and_update_readme "$PROJECT/GIT_TAG" $PROJECT false
+    fi
 done

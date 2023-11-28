@@ -8,6 +8,14 @@ REPO=emissary
 REPO_OWNER=emissary-ingress
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
+
+BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
+BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
+BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
+BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
+BUILDSPEC_2_DEPENDS_ON_OVERRIDE=emissary_ingress_emissary_linux_amd64 emissary_ingress_emissary_linux_arm64
+
 SKIP_ON_RELEASE_BRANCH=true
 
 BINARY_TARGET_FILES=busyambassador capabilities_wrapper example-envoy-metrics-sink k8sregistryctl kat-client kat-server
@@ -33,7 +41,6 @@ AMBASSADOR_VERSION_TARGET=$(REPO)/python/ambassador.version
 include $(BASE_DIRECTORY)/Common.mk
 
 
-combine/images/push: IMAGE_BUILD_ARGS=IMAGE
 emissary-ingress/emissary/helm/%: PACKAGE_DEPENDENCIES=emissary-crds
 
 emissary/crds/helm/%: HELM_DIRECTORY=charts/crds
@@ -56,10 +63,6 @@ $(AMBASSADOR_VERSION_TARGET): export GOPATH=/var
 $(AMBASSADOR_VERSION_TARGET): | $$(ENABLE_DOCKER)
 	@$(MAKE) -C $(REPO) python/ambassador.version
 
-PHONY: combine-images
-combine-images: IMAGE_BUILD_ARGS=IMAGE
-combine-images: DOCKERFILE_FOLDER=./docker/linux/combine
-combine-images: images
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

@@ -11,8 +11,8 @@ To force running targets on the host: `export FORCE_GO_BUILD_ON_HOST=true`.
 * Docker
 	* `sudo yum install -y docker && sudo usermod -a -G docker ec2-user && id ec2-user && newgrp docker`
 	* `sudo systemctl enable docker.service && sudo systemctl start docker.service`
-* Common utils required 
-	* `sudo yum -y install bc jq git-core make lz4`
+* Common utils required git
+	* `sudo yum -y install bc jq git-core make lz4 rsync`
 * `yq` is required by a number of targets
 	* `sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$([ "x86_64" = "$(uname -m)" ] && echo amd64 || echo arm64) && sudo chmod +x /usr/local/bin/yq`
 * Building helm charts requires `helm` and `skopeo`

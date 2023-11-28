@@ -98,7 +98,7 @@ function build::common::generate_shasum() {
 }
 
 function build::common::upload_artifacts() {
-  local -r artifactspath=$1
+  local -r artifactspath="${1%/}" # remove trailing slash if it exists
   local -r artifactsbucket="${2%/}" # remove trailing slash if it exists
   local -r projectpath=$3
   local -r buildidentifier=$4
@@ -108,24 +108,39 @@ function build::common::upload_artifacts() {
   local -r do_not_delete=$8
   local -r create_public_acl=$9
 
-  local public_acl=""
-  if [ "$create_public_acl" = "true" ]; then
-    public_acl="--acl public-read"
-  fi
-  
-  if [ "$dry_run" = "true" ]; then
-    build::common::echo_and_run aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
-    build::common::echo_and_run aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --recursive --dryrun
-  else
-    # Upload artifacts to s3 
-    # 1. To proper path on s3 with buildId-githash
-    # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
-    build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts $public_acl --no-progress
-
-    if [ "$do_not_delete" = "true" ]; then
-      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" $public_acl --no-progress
+  if [[ $artifactsbucket = /* ]]; then
+    if [ "$dry_run" = "true" ]; then
+      build::common::echo_and_run rsync -i "$artifactspath/" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dry-run
+      build::common::echo_and_run rsync -i "$artifactspath/" "$artifactsbucket"/"$projectpath"/"$latesttag" --recursive --dry-run
     else
-      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete $public_acl --no-progress
+      build::common::echo_and_run rsync -i --mkpath "$artifactspath/" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive 
+
+      if [ "$do_not_delete" = "true" ]; then
+        build::common::echo_and_run rsync -i --mkpath "$artifactspath/" "$artifactsbucket"/"$projectpath"/"$latesttag" --recursive 
+      else
+        build::common::echo_and_run rsync -i --mkpath "$artifactspath/" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete --recursive 
+      fi
+    fi
+  else
+    local public_acl=""
+    if [ "$create_public_acl" = "true" ]; then
+      public_acl="--acl public-read"
+    fi
+    
+    if [ "$dry_run" = "true" ]; then
+      build::common::echo_and_run aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts --recursive --dryrun
+      build::common::echo_and_run aws s3 cp "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --recursive --dryrun
+    else
+      # Upload artifacts to s3 
+      # 1. To proper path on s3 with buildId-githash
+      # 2. Latest path to indicate the latest build, with --delete option to delete stale files in the dest path
+      build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$buildidentifier"-"$githash"/artifacts $public_acl --no-progress
+
+      if [ "$do_not_delete" = "true" ]; then
+        build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" $public_acl --no-progress
+      else
+        build::common::echo_and_run aws s3 sync "$artifactspath" "$artifactsbucket"/"$projectpath"/"$latesttag" --delete $public_acl --no-progress
+      fi
     fi
   fi
 }
@@ -340,7 +355,7 @@ function build::common::get_latest_eksa_asset_url() {
     git_tag=$(cat $BUILD_ROOT/../../projects/${projectwithreleasebranch}/GIT_TAG)
   fi  
 
-  local -r tar_file_prefix=$(MAKEFLAGS= make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
+  local -r tar_file_prefix=$(MAKEOVERRIDES= MAKEFLAGS= make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
  
   local specific_uri="projects/$projectwithreleasebranch/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
   local fallback_latest_uri="projects/$projectwithreleasebranch/latest/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
@@ -348,6 +363,15 @@ function build::common::get_latest_eksa_asset_url() {
   if [ "$sha" = "true" ]; then
     specific_uri+=".sha256"
     fallback_latest_uri+=".sha256"
+  fi
+
+  if [[ $artifact_bucket = /* ]]; then
+    if [ -f $artifact_bucket/$specific_uri ]; then
+      echo "file://$artifact_bucket/$specific_uri"
+    elif [ -f $artifact_bucket/$fallback_latest_uri ]; then
+      echo "file://$artifact_bucket/$fallback_latest_uri"
+    fi
+    return
   fi
 
   local -r bucket_name_without_prefix=${artifact_bucket#s3://} 

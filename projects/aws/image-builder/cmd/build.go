@@ -41,7 +41,7 @@ var buildCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().StringVar(&bo.Os, "os", "", "Operating system to use for EKS-A node image")
-	buildCmd.Flags().StringVar(&bo.OsVersion, "os-version", "", "Operating system version to use for EKS-A node image. Can be 20.04 or 22.04 for Ubuntu or 8 for Redhat. ")
+	buildCmd.Flags().StringVar(&bo.OsVersion, "os-version", "", "Operating system version to use for EKS-A node image. Can be 20.04 or 22.04 for Ubuntu or 8 for Redhat.")
 	buildCmd.Flags().StringVar(&bo.Hypervisor, "hypervisor", "", "Target hypervisor for EKS-A node image")
 	buildCmd.Flags().StringVar(&baremetalConfigFile, "baremetal-config", "", "Path to Baremetal Config file")
 	buildCmd.Flags().StringVar(&vSphereConfigFile, "vsphere-config", "", "Path to vSphere Config file")
@@ -49,11 +49,12 @@ func init() {
 	buildCmd.Flags().StringVar(&cloudstackConfigFile, "cloudstack-config", "", "Path to CloudStack Config file")
 	buildCmd.Flags().StringVar(&amiConfigFile, "ami-config", "", "Path to AMI Config file")
 	buildCmd.Flags().StringVar(&additionalFilesConfigFile, "files-config", "", "Path to Config file specifying additional files to be copied into EKS-A node image")
-	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-27", "EKS-D Release channel for node image. Can be 1-23, 1-24, 1-25, 1-26 or 1-27")
+	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-27", "EKS-D Release channel for node image. Can be 1-24, 1-25, 1-26, 1-27 or 1-28")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA and Raw builds.")
 	buildCmd.Flags().StringVar(&bo.EKSAReleaseVersion, "eksa-release", "", "The EKS-A CLI version to build images for")
 	buildCmd.Flags().StringVar(&bo.ManifestTarball, "manifest-tarball", "", "Path to Image Builder built EKS-D/A manifest tarball")
+	buildCmd.Flags().IntVar(&bo.AnsibleVerbosity, "ansible-verbosity", 0, "Verbosity level for the Ansible tasks run during image building, should be in the range 0-6")
 	buildCmd.Flags().BoolVar(&bo.AirGapped, "air-gapped", false, "Flag to instruct image builder to run in air-gapped mode. Requires --manifest-tarball to be set")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
 		log.Fatalf("Error marking flag as required: %v", err)
@@ -77,6 +78,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 
 	if err = validateOSHypervisorCombinations(bo.Os, bo.Hypervisor); err != nil {
 		log.Fatal(err.Error())
+	}
+
+	if bo.AnsibleVerbosity < 0 || bo.AnsibleVerbosity > 6 {
+		log.Fatalf("Invalid Ansible verbosity level. Please provide a value in the range 0 to 6")
 	}
 
 	if bo.Os == builder.Ubuntu && bo.OsVersion == "" {

@@ -65,7 +65,12 @@ HELM_IMAGE_LIST=harbor/harbor-core harbor/harbor-db harbor/harbor-log harbor/har
 HELM_CHART_NAMES=harbor/$(HELM_SOURCE_REPOSITORY)
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
-BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
+BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
+BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
+BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
+BUILDSPEC_2_DEPENDS_ON_OVERRIDE=goharbor_harbor_linux_amd64 goharbor_harbor_linux_arm64
 
 SKIP_ON_RELEASE_BRANCH=true
 
@@ -75,7 +80,6 @@ include $(BASE_DIRECTORY)/Common.mk
 harbor-nginx/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx
 harbor-portal/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-nginx
 harbor-redis/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
-combine/images/push: IMAGE_BUILD_ARGS=IMAGE
 
 $(GO_MOD_DOWNLOAD_TARGETS): $(OUTPUT_DIR)/$(REPO)
 
@@ -92,7 +96,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d
 	@cp harbor/make/photon/db/docker-entrypoint.sh harbor/make/photon/db/initdb.sh harbor/make/photon/db/upgrade.sh harbor/make/photon/db/docker-healthcheck.sh $(OUTPUT_DIR)/harbor-db/
-	@cp harbor/make/photon/db/initial-notaryserver.sql harbor/make/photon/db/initial-notarysigner.sql harbor/make/photon/db/initial-registry.sql $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d/
+	@cp harbor/make/photon/db/initial-registry.sql $(OUTPUT_DIR)/harbor-db/docker-entrypoint-initdb.d/
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-exporter/harbor
 	@cp harbor/make/photon/exporter/entrypoint.sh harbor/make/photon/common/install_cert.sh $(OUTPUT_DIR)/harbor-exporter/harbor/
@@ -110,9 +114,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-portal/build_dir/dist
 	@cp -r harbor/src/portal/* $(OUTPUT_DIR)/harbor-portal/build_dir/
-	@cp harbor/api/v2.0/legacy_swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger.yaml
-	@cp harbor/api/v2.0/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger2.yaml
-	@cp harbor/api/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger3.yaml
+	@cp harbor/api/v2.0/swagger.yaml $(OUTPUT_DIR)/harbor-portal/build_dir/swagger.yaml
 	@cp harbor/LICENSE $(OUTPUT_DIR)/harbor-portal/build_dir/dist/LICENSE
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-redis/etc
@@ -148,12 +150,6 @@ $(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 		wget --retry-connrefused -q https://raw.githubusercontent.com/xeipuuv/$$package/master/LICENSE-APACHE-2.0.txt -O \
 			$$dest; \
 	done;
-
-PHONY: combine-images
-combine-images: IMAGE_BUILD_ARGS=IMAGE
-combine-images: DOCKERFILE_FOLDER=./docker/linux/combine
-combine-images: images
-
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block

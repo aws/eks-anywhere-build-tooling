@@ -111,7 +111,7 @@ for project in "${PROJECTS[@]}"; do
             PROJECT_DEPENDENCIES=$(make_var $PROJECT_PATH PROJECT_DEPENDENCIES)
         fi
 
-        if [ -n "$PROJECT_DEPENDENCIES" ] && [ "$SKIP_DEPEND_ON" != "true" ]; then
+        if [ -n "$PROJECT_DEPENDENCIES" ] && [[ "${buildspec}" = "buildspecs/combine-images.yml" || "$SKIP_DEPEND_ON" != "true" ]]; then
             DEPS=(${PROJECT_DEPENDENCIES// / })
             for dep in "${DEPS[@]}"; do
                 if [ "$HARDCODED_DEP" = "true" ]; then
@@ -160,7 +160,7 @@ for project in "${PROJECTS[@]}"; do
 
         ARCH_TYPE="\"type\":\"$BUILDSPEC_PLATFORM\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
     
-        if [[ "$BUILDSPECS_VAR" == "CHECKSUMS_BUILDSPECS" ]] && [[ "$BUILDSPEC_VARS_KEYS" == "RELEASE_BRANCH" ]] && [[ "false" == "$(make_var $PROJECT_PATH BINARIES_ARE_RELEASE_BRANCHED)" ]]; then
+        if [[ "$BUILDSPECS_VAR" == "CHECKSUMS_BUILDSPECS" ]] && [[ "${BUILDSPEC_VARS_KEYS}" = "IMAGE_PLATFORMS" || ("$BUILDSPEC_VARS_KEYS" == "RELEASE_BRANCH" && "false" == "$(make_var $PROJECT_PATH BINARIES_ARE_RELEASE_BRANCHED)") ]]; then
             BUILDSPEC_VARS_KEYS=""
         fi
 
@@ -184,18 +184,28 @@ for project in "${PROJECTS[@]}"; do
                     
                     # If building on one binary platform assume we want to run on a specific arch instance
                     ARCH_TYPE="\"type\":\"$BUILDSPEC_PLATFORM\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
-                    if [ "${KEYS[0]}" = "BINARY_PLATFORMS" ]; then
+                    if [ "${KEYS[0]}" = "BINARY_PLATFORMS" ] || [ "${KEYS[0]}" = "IMAGE_PLATFORMS" ]; then
                         if [ "${val1}" = "linux/amd64" ]; then
-                            ARCH_TYPE="\"type\":\"LINUX_CONTAINER\",\"compute-type\":\"BUILD_GENERAL1_SMALL\","
+                            ARCH_TYPE="\"type\":\"LINUX_CONTAINER\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
                         else
-                            ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"BUILD_GENERAL1_SMALL\","
+                            ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
+                        fi
+                    fi
+
+                    EXTRA_VARS=""    
+                    if [ "${KEYS[0]}" = "IMAGE_PLATFORMS" ]; then
+                        EXTRA_VARS+=",\"BINARY_PLATFORMS\":\"${val1}\",\"IMAGE_TAG_SUFFIX\":\"-${val1#linux/}\""
+                        HAS_HELM_CHART=$(make_var $PROJECT_PATH HAS_HELM_CHART)
+                        if [ "${HAS_HELM_CHART}" = "true" ]; then
+                            EXTRA_VARS+=",\"HAS_HELM_CHART\":\"false\""
                         fi
                     fi
 
                     ALL_PROJECT_IDS+="\"$IDENTIFIER\","
                     yq eval -i -P \
-                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"}}}]" \
+                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"$EXTRA_VARS}}}]" \
                         $STAGING_BUILDSPEC_FILE
+
                 done
             else
                 VALUES_1=$(make_var $PROJECT_PATH ${VARS[0]})

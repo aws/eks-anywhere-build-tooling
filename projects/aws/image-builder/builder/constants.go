@@ -38,6 +38,8 @@ const (
 	artifactsDirName                 string = "eks-a-d-artifacts"
 	eksAnywhereArtifactsDirName      string = "eks-a-artifacts"
 	eksDistroArtifactsDirName        string = "eks-d-artifacts"
+	supportedReleaseBranchesFileName string = "release/SUPPORTED_RELEASE_BRANCHES"
+	eksDLatestReleasesFileName       string = "EKSD_LATEST_RELEASES"
 
 	// Environment variables
 	branchNameEnvVar                      string = "BRANCH_NAME"
@@ -57,6 +59,7 @@ const (
 	packerTypeVarFilesEnvVar              string = "PACKER_TYPE_VAR_FILES"
 	eksaUseDevReleaseEnvVar               string = "EKSA_USE_DEV_RELEASE"
 	cloneUrlEnvVar                        string = "CLONE_URL"
+	eksaAnsibleVerbosityEnvVar            string = "EKSA_ANSIBLE_VERBOSITY"
 
 	// Miscellaneous
 	mainBranch            string = "main"

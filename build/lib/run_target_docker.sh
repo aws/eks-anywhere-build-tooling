@@ -55,14 +55,14 @@ if [[ -n "$PLATFORM" ]]; then
 fi
 
 DOCKER_USER_FLAG=""
-NETRC_DIR="/root"
+CONTAINER_USER_HOME_DIR="/root"
 if [ "$(uname -s)" = "Linux" ] && [ -n "${USER:-}" ]; then
 	# on a linux host, the uid needs to match the host user otherwise
 	# all the downloaded go modules will be owned by root in the host
 	USER_ID=$(id -u ${USER})
 	USER_GROUP_ID=$(id -g ${USER})
 	DOCKER_USER_FLAG="-u $USER_ID:$USER_GROUP_ID"
-	NETRC_DIR="/home/matchinguser"
+	CONTAINER_USER_HOME_DIR="/home/matchinguser"
 fi
 
 SKIP_RUN="false"
@@ -86,7 +86,7 @@ if [[ "$SKIP_RUN" == "false" ]]; then
 	NETRC=""
 	if [ -f $HOME/.netrc ]; then
 		DOCKER_RUN_NETRC="${DOCKER_RUN_NETRC:-$HOME/.netrc}"
-		NETRC="--mount type=bind,source=$DOCKER_RUN_NETRC,target=$NETRC_DIR/.netrc"
+		NETRC="--mount type=bind,source=$DOCKER_RUN_NETRC,target=$CONTAINER_USER_HOME_DIR/.netrc"
 	else
 		DOCKER_RUN_NETRC=""
 	fi
@@ -98,10 +98,13 @@ if [[ "$SKIP_RUN" == "false" ]]; then
 		trap "remove_container" EXIT
 	fi
 
-	mkdir -p $GO_MOD_CACHE
+	GENERATE_ATTRIBUTION_CACHE="$HOME/.generate-attribution" 
+
+	mkdir -p $GO_MOD_CACHE $GENERATE_ATTRIBUTION_CACHE
 	CONTAINER_ID=$(build::common::echo_and_run docker run -d $NAME $PRIVILEGED $NETRC $PLATFORM_ARG \
 		--mount type=bind,source=$BASE_DIRECTORY,target=/eks-anywhere-build-tooling \
 		--mount type=bind,source=$GO_MOD_CACHE,target=/mod-cache \
+		--mount type=bind,source=$GENERATE_ATTRIBUTION_CACHE,target=$CONTAINER_USER_HOME_DIR/.generate-attribution \
 		-e GOPROXY=${GOPROXY:-} -e GOMODCACHE=/mod-cache \
 		--entrypoint sleep $IMAGE infinity)
 

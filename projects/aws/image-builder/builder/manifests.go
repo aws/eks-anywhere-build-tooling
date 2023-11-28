@@ -62,7 +62,7 @@ func downloadEKSDManifests(outputPath string) error {
 	}
 
 	// Create output directory path
-	if err = os.MkdirAll(outputPath, 0755); err != nil {
+	if err = os.MkdirAll(outputPath, 0o755); err != nil {
 		return err
 	}
 
@@ -87,7 +87,7 @@ func downloadEKSAManifests(outputPath string) error {
 	}
 
 	// Create output directory path
-	if err = os.MkdirAll(outputPath, 0755); err != nil {
+	if err = os.MkdirAll(outputPath, 0o755); err != nil {
 		return err
 	}
 
@@ -131,7 +131,7 @@ func extractTarball(tarball, path string) error {
 		return err
 	}
 
-	err = os.MkdirAll(path, 0755)
+	err = os.MkdirAll(path, 0o755)
 	if err != nil {
 		return err
 	}
