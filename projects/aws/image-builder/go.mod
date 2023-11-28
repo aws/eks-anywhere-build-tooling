@@ -1,9 +1,10 @@
 module github.com/aws/eks-anywhere-build-tooling/image-builder
 
-go 1.18
+go 1.21
 
 require (
 	github.com/aws/eks-anywhere/release v0.0.0-20231012171053-04fe8327676e
+	github.com/aws/eks-distro-build-tooling/release v0.0.0-20211103003257-a7e2379eae5e
 	github.com/ghodss/yaml v1.0.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.17.0

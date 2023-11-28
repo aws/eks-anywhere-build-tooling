@@ -29,34 +29,35 @@ type EksDRelease struct {
 	KubeVersion string `yaml:"kubeVersion"`
 }
 
-func (bo *BuildOptions) prepBuildToolingRepo(buildToolingRepoPath string) (string, error) {
+func (bo *BuildOptions) prepBuildToolingRepo(buildToolingRepoPath string) (*releasev1.Bundles, string, error) {
 	// Clone build tooling repo
 	if bo.Force {
 		// Clean up build tooling repo in cwd
 		cleanup(buildToolingRepoPath)
 	}
 
-	gitCommitFromBundle, detectedEksaVersion, err := bo.getGitCommitFromBundle()
+	bundles, detectedEksaVersion, err := bo.getBundle()
 	if err != nil {
-		return "", fmt.Errorf("Error getting git commit from bundle: %v", err)
+		return nil, "", fmt.Errorf("Error getting git commit from bundle: %v", err)
 	}
+	gitCommitFromBundle := bundles.Spec.VersionsBundles[0].EksD.GitCommit
 	if codebuild != "true" {
 		err = cloneRepo(bo.getBuildToolingRepoUrl(), buildToolingRepoPath)
 		if err != nil {
-			return "", fmt.Errorf("Error cloning build tooling repo: %v", err)
+			return nil, "", fmt.Errorf("Error cloning build tooling repo: %v", err)
 		}
 		log.Println("Cloned eks-anywhere-build-tooling repo")
 
 		err = checkoutRepo(buildToolingRepoPath, gitCommitFromBundle)
 		if err != nil {
-			return "", fmt.Errorf("Error checking out build tooling repo at commit %s: %v", gitCommitFromBundle, err)
+			return nil, "", fmt.Errorf("Error checking out build tooling repo at commit %s: %v", gitCommitFromBundle, err)
 		}
 		log.Printf("Checked out eks-anywhere-build-tooling repo at commit %s\n", gitCommitFromBundle)
 	} else {
 		buildToolingRepoPath = os.Getenv(codebuildSourceDirectoryEnvVar)
 		log.Println("Using repo checked out from code commit")
 	}
-	return detectedEksaVersion, nil
+	return bundles, detectedEksaVersion, nil
 }
 
 func (bo *BuildOptions) getBuildToolingRepoUrl() string {
@@ -157,15 +158,21 @@ func getEksDReleaseBranchesWithNumber() (map[string]string, error) {
 	return eksDReleaseBranchesWithNumber, nil
 }
 
-func downloadFile(filepath, url string) error {
+func downloadFile(path, url string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
+	// Create the leading directories if it doesnt exists
+	dirs := filepath.Dir(path)
+	if _, err := os.Stat(dirs); os.IsNotExist(err) {
+		os.MkdirAll(dirs, 0755)
+	}
+
 	// Create the file
-	out, err := os.Create(filepath)
+	out, err := os.Create(path)
 	if err != nil {
 		return err
 	}
@@ -245,15 +252,15 @@ func execCommand(cmd *exec.Cmd) (string, error) {
 	return commandOutputStr, nil
 }
 
-func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
+func (bo *BuildOptions) getBundle() (*releasev1.Bundles, string, error) {
 	manifestDirPath, err := getManifestRoot()
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 
 	eksAReleasesManifestURL, err := getEksAReleasesManifestURL(bo.AirGapped)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 	var releasesManifestContents []byte
 	if bo.ManifestTarball != "" {
@@ -261,19 +268,19 @@ func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
 		log.Printf("Reading EKS-A Manifest file: %s", eksAManifestFile)
 		releasesManifestContents, err = os.ReadFile(eksAManifestFile)
 		if err != nil {
-			return "", "", err
+			return nil, "", err
 		}
 	} else {
 		log.Printf("Reading EKS-A Manifest file: %s", eksAReleasesManifestURL)
 		releasesManifestContents, err = readFileFromURL(eksAReleasesManifestURL)
 		if err != nil {
-			return "", "", err
+			return nil, "", err
 		}
 	}
 
 	releases := &releasev1.Release{}
 	if err = k8syaml.Unmarshal(releasesManifestContents, releases); err != nil {
-		return "", "", fmt.Errorf("failed to unmarshal release manifest from [%s]: %v", eksAReleasesManifestURL, err)
+		return nil, "", fmt.Errorf("failed to unmarshal release manifest from [%s]: %v", eksAReleasesManifestURL, err)
 	}
 
 	var eksAReleaseVersion, bundleManifestUrl string
@@ -313,27 +320,36 @@ func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
 		}
 	}
 	if !foundRelease {
-		return "", "", fmt.Errorf("version %s is not a valid EKS-A release", eksAReleaseVersion)
+		return nil, "", fmt.Errorf("version %s is not a valid EKS-A release", eksAReleaseVersion)
 	}
 	var bundleManifestContents []byte
 	if bo.ManifestTarball == "" {
 		log.Printf("Fetching git commit from bundle manifest: %s", bundleManifestUrl)
 		bundleManifestContents, err = readFileFromURL(bundleManifestUrl)
 		if err != nil {
-			return "", "", err
+			return nil, "", err
 		}
 	} else {
 		bundleManifestFile := filepath.Join(manifestDirPath, fmt.Sprintf(eksAnywhereBundlesFileNameFormat, eksAReleaseVersion))
 		log.Printf("Fetching git commit from bundle manifest: %s", bundleManifestFile)
 		bundleManifestContents, err = os.ReadFile(bundleManifestFile)
 		if err != nil {
-			return "", "", err
+			return nil, "", err
 		}
 	}
 
 	bundles := &releasev1.Bundles{}
 	if err = k8syaml.Unmarshal(bundleManifestContents, bundles); err != nil {
-		return "", "", fmt.Errorf("failed to unmarshal bundles manifest from [%s]: %v", bundleManifestUrl, err)
+		return nil, "", fmt.Errorf("failed to unmarshal bundles manifest from [%s]: %v", bundleManifestUrl, err)
+	}
+
+	return bundles, eksAReleaseVersion, nil
+}
+
+func (bo *BuildOptions) getGitCommitFromBundle() (string, string, error) {
+	bundles, eksAReleaseVersion, err := bo.getBundle()
+	if err != nil {
+		return "", "", err
 	}
 
 	return bundles.Spec.VersionsBundles[0].EksD.GitCommit, eksAReleaseVersion, nil

@@ -44,7 +44,7 @@ func (b *BuildOptions) BuildImage() {
 		}
 	}
 	buildToolingRepoPath := getBuildToolingPath(cwd)
-	detectedEksaVersion, err := b.prepBuildToolingRepo(buildToolingRepoPath)
+	_, detectedEksaVersion, err := b.prepBuildToolingRepo(buildToolingRepoPath)
 	if err != nil {
 		log.Fatal(err.Error())
 	}

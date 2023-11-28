@@ -35,6 +35,9 @@ const (
 	eksAnywhereBundlesFileNameFormat string = "eks-a-bundles-%s.yaml"
 	manifestsTarballName             string = "eks-a-manifests.tar"
 	manifestsDirName                 string = "eks-a-d-manifests"
+	artifactsDirName                 string = "eks-a-d-artifacts"
+	eksAnywhereArtifactsDirName      string = "eks-a-artifacts"
+	eksDistroArtifactsDirName        string = "eks-d-artifacts"
 	supportedReleaseBranchesFileName string = "release/SUPPORTED_RELEASE_BRANCHES"
 	eksDLatestReleasesFileName       string = "EKSD_LATEST_RELEASES"
 
@@ -61,6 +64,8 @@ const (
 	// Miscellaneous
 	mainBranch            string = "main"
 	devEksaReleaseVersion string = "v0.0.0-dev"
+	amd64                 string = "amd64"
+	arm64                 string = "arm64"
 )
 
 var DefaultAMIAdditionalFiles = []File{
