@@ -35,10 +35,14 @@ cd $REPO
 
 yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" config/manager/manager.yaml
 
-make manifests STAGE="release" \
-  MANIFEST_DIR="out" \
-  PULL_POLICY="IfNotPresent" \
-  IMAGE="${IMAGE_REPO}/kubernetes-sigs/cluster-api-provider-vsphere/release/manager:$IMAGE_TAG"
+make manifest-modification STAGE="release" \
+  REGISTRY="${IMAGE_REPO}" \
+  IMAGE_NAME="kubernetes-sigs/cluster-api-provider-vsphere/release/manager" \
+  RELEASE_TAG="${IMAGE_TAG}" \
+  PULL_POLICY="IfNotPresent"
+
+make release-manifests STAGE="release" \
+  MANIFEST_DIR="out"
 
 mkdir -p $OUTPUT_DIR/manifests/infrastructure-vsphere/$TAG
 cp out/cluster-template.yaml "$OUTPUT_DIR/manifests/infrastructure-vsphere/$TAG"
