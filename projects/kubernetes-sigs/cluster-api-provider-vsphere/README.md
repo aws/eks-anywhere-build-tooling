@@ -1,5 +1,5 @@
 ## **Cluster API Provider for vSphere**
-![Version](https://img.shields.io/badge/version-v1.7.0-blue)
+![Version](https://img.shields.io/badge/version-v1.7.4-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiYm85WnJ4aDc2ZXhhVUxOWHJuUFJwN3FlQmE2L1Q4b2ZzNG91OVpjNVNGM1ZvbVBEUUM2bkdER3N5eVNrWTBKS2VSSW9Oa051aFVWS1dzVVlTOHBBZ0NRPSIsIml2UGFyYW1ldGVyU3BlYyI6IlEwOWNtd0llNXdjUGRvQWkiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [Cluster API Provider for vSphere (CAPV)](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere) is a a concrete implementation of Cluster API for vSphere, which paves the way for true vSphere hybrid deployments of Kubernetes. CAPV is designed to allow customers to use their existing vSphere infrastructure, including vCenter credentials, VMs, templates, etc. for bootstrapping and creating workload clusters.
@@ -22,13 +22,18 @@ You can find the latest version of this image [on ECR Public Gallery](https://ga
 1. Follow these steps for changes to the patches/ folder:
    1. Fork and clone CAPV repo, and checkout the desired tag. For instance if in step 1 we decided to upgrade to v1.6.1 CAPV version, do `git checkout v1.6.1`
    on your fork.
-   1. Review the patches under patches/ folder in this repo. Apply the required patches to your fork. Remove any patches that are either
-   merged upstream or no longer needed. Please reach out to @jaxesn, @vignesh-goutham or @g-gaston for any questions regarding which patches to keep.
+   1. Review the patches under patches/ folder in this repo. Apply the required patches to your fork. 
+      1. Run `git am *.patch`
+      1. For patches that need some manual changes, you will see a similar error: `Patch failed at *`
+      1. For that patch, run `git apply --reject --whitespace=fix *.patch`. This will apply hunks of the patch that do apply correctly, leaving
+      the failing parts in a new file ending in `.rej`. This file shows what changes weren't applied and you need to manually apply.
+      1. Once the changes are done, delete the `.rej` file and run `git add .` and `git am --continue`
+   1. Remove any patches that are either merged upstream or no longer needed. Please reach out to @jaxesn, @vignesh-goutham or @g-gaston for any questions regarding which patches to keep.
    1. Run `git format-patch <commit>`, where `<commit>` is the last upstream commit on that tag. Move the generated patches under the patches/ folder in this repo.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
-   ex: [1.6.1 compared to 1.3.1](https://github.com/kubernetes-sigs/provider-vsphere/compare/v1.3.1...v1.6.1). Check if the [manifests](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/blob/v1.6.1/Makefile#L359)
-   target has changed in the Makefile, and make the required changes in create_manifests.sh
+   ex: [1.7.0 compared to 1.7.4](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/compare/v1.7.0...v1.7.4). Check if the [manifest-modification](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/blob/27368586949f746c6830a47dc2439cd5ebe57dd2/Makefile#L568) or [release-manifests](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/blob/27368586949f746c6830a47dc2439cd5ebe57dd2/Makefile#L577C9-L577C26)
+   targets have changed in the Makefile, and make the required changes in create_manifests.sh
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
 1. Update checksums and attribution using `make attribution checksums`.
