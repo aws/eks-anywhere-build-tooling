@@ -154,14 +154,14 @@ for i in $(seq 1 $MAX_RETRIES); do
 done
 
 # Ensure python/packer/ansible are setup on the ami
-ssh $SSH_OPTS $REMOTE_HOST "make -C $REMOTE_PROJECT_PATH/image-builder/images/capi deps-raw"
+ssh $SSH_OPTS $REMOTE_HOST "source ~/.bash_profile; make -C $REMOTE_PROJECT_PATH/image-builder/images/capi deps-raw"
 
 # If not running on Codebuild, exit gracefully
 if [ "$CODEBUILD_CI" = "false" ]; then
     exit 0
 fi
 
-SSH_COMMANDS="sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/download_iso.sh $ISO_FILENAME $ISO_CHECKSUM \"$ISO_URL\"; export IMAGE_OS=$IMAGE_OS IMAGE_OS_VERSION=$IMAGE_OS_VERSION IMAGE_FORMAT=$IMAGE_FORMAT; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=$REMOTE_ARTIFACTS_PATH $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $IMAGE_OS_VERSION $RELEASE_BRANCH $IMAGE_FORMAT $ARTIFACTS_BUCKET $LATEST"
+SSH_COMMANDS="source ~/.bash_profile; sudo usermod -a -G kvm ubuntu; sudo chmod 666 /dev/kvm; sudo chown root:kvm /dev/kvm; $REMOTE_PROJECT_PATH/build/download_iso.sh $ISO_FILENAME $ISO_CHECKSUM \"$ISO_URL\"; export IMAGE_OS=$IMAGE_OS IMAGE_OS_VERSION=$IMAGE_OS_VERSION IMAGE_FORMAT=$IMAGE_FORMAT; CODEBUILD_CI=true CODEBUILD_SRC_DIR=/home/ubuntu/$REPO_NAME BRANCH_NAME=$BRANCH_NAME ARTIFACTS_PATH=$REMOTE_ARTIFACTS_PATH $REMOTE_PROJECT_PATH/build/build_image.sh $IMAGE_OS $IMAGE_OS_VERSION $RELEASE_BRANCH $IMAGE_FORMAT $ARTIFACTS_BUCKET $LATEST"
 if [[ "$IMAGE_OS" == "redhat" ]]; then
   SSH_COMMANDS="export RHSM_USERNAME='$RHSM_USERNAME' RHSM_PASSWORD='$RHSM_PASSWORD'; $SSH_COMMANDS"
 fi
