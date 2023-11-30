@@ -7,7 +7,6 @@ HELM_GIT_TAG=$(shell cat $(RELEASE_BRANCH)/HELM_GIT_TAG)
 IMAGE_TAG=$(EKS_D_TAG)
 
 HAS_RELEASE_BRANCHES=true
-SKIPPED_K8S_VERSIONS=1-20
 
 REPO_OWNER=kubernetes-sigs
 REPO=metrics-server
@@ -28,7 +27,7 @@ HELM_SOURCE_IMAGE_REPO=public.ecr.aws
 HELM_SOURCE_OWNER=kubernetes-sigs
 HELM_SOURCE_REPOSITORY=metrics-server
 HELM_DIRECTORY=charts/metrics-server
-HELM_IMAGE_LIST=eks-distro/kubernetes-sigs/metrics-server
+HELM_IMAGE_LIST=$(if $(filter true,$(shell yq e ".releases[] | select(.branch==\"${RELEASE_BRANCH}\").dev" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)),h1r8a7l5,eks-distro)/kubernetes-sigs/metrics-server
 HELM_USE_UPSTREAM_IMAGE=true
 
 HELM_CHART_NAMES=metrics-server/charts/metrics-server
