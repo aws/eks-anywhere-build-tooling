@@ -153,8 +153,8 @@ for i in $(seq 1 $MAX_RETRIES); do
     sleep 10
 done
 
-# Ensure python/packer/ansible are setup on the ami
-ssh $SSH_OPTS $REMOTE_HOST "packer --version; make -C $REMOTE_PROJECT_PATH/image-builder/images/capi deps-raw"
+# Ensure python/packer/ansible are setup on the ami and they match what we expect based on the versions yaml
+ssh $SSH_OPTS $REMOTE_HOST "packer --version; make -C $REMOTE_PROJECT_PATH validate-dependency-versions-$IMAGE_FORMAT"
 
 # If not running on Codebuild, exit gracefully
 if [ "$CODEBUILD_CI" = "false" ]; then

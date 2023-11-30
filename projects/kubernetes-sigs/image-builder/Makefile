@@ -77,7 +77,7 @@ SIMPLE_CREATE_TARBALLS=false
 SKIP_METAL_INSTANCE_TEST?=false
 
 # to support a no op attribution target
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution update-dependency-versions validate-dependency-versions-raw
 
 IMAGE_OS_DIR=$(IMAGE_OS)/$(IMAGE_OS_VERSION)
 IMAGE_OS_WITH_VER=$(IMAGE_OS)-$(IMAGE_OS_VERSION)
@@ -162,7 +162,7 @@ ifneq ($(BOTTLEROCKET_OVA_RELEASE_VERSION),null)
 	BUILD_OVA_TARGETS+=upload-bottlerocket-1-ova
 endif
 
-BUILD_TARGETS=$(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS) $(BUILD_CLOUDSTACK_TARGETS) $(BUILD_NUTANIX_TARGETS)
+BUILD_TARGETS=$(if $(filter presubmit,$(JOB_TYPE)),update-dependency-versions,) $(BUILD_RAW_TARGETS) $(BUILD_AMI_TARGETS) $(BUILD_OVA_TARGETS) $(BUILD_CLOUDSTACK_TARGETS) $(BUILD_NUTANIX_TARGETS)
 #####################################################################
 
 ###################### RELEASE TARGETS ##############################
@@ -374,7 +374,7 @@ local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS_FIRMWARE=$(word 4,$(su
 ######################## IMAGE BUILDER CLI TARGETS #######################
 # OVF_CUSTOM_PROPERTIES is only for ova, but should be ok to passed since its ignored by other builds
 local-build-%: MAKEFLAGS=
-local-build-%: validate-supported-image-% setup-packer-configs-%
+local-build-%: validate-supported-image-% validate-dependency-versions-$$(IMAGE_FORMAT) setup-packer-configs-%
 	@echo -e $(call TARGET_START_LOG)
 	if [[ "$(DEBUG)" == "1" ]]; then \
 		touch $(FINAL_IMAGE_DIR)/packer.log; \
@@ -384,6 +384,11 @@ local-build-%: validate-supported-image-% setup-packer-configs-%
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,build-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
 	@echo -e $(call TARGET_END_LOG)
+
+validate-dependency-versions-%: IMAGE_FORMAT=$*
+validate-dependency-versions-%:
+	@$(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,deps-$(IMAGE_FORMAT))
+	@build/validate_required_deps.sh $(IMAGE_FORMAT)
 
 #######################################################################
 
@@ -420,6 +425,16 @@ validate-supported-image-%:
 		echo "EFI is only supported for Ubuntu OVAs"; \
 		exit 1; \
 	fi
+
+.PHONY: update-dependency-versions
+update-dependency-versions: $(GIT_PATCH_TARGET) | $$(ENABLE_LOGGING)
+	build/update_required_deps.sh; \
+	if [ "$$(git status --porcelain -- REQUIRED_DEPENDENCY_VERSIONS.yaml | wc -l)" -gt 0 ]; then \
+		echo "Error: Generated files, REQUIRED_DEPENDENCY_VERSIONS.yaml, do not match expected. Please run make update-dependency-versions to update"; \
+		git diff -- REQUIRED_DEPENDENCY_VERSIONS.yaml; \
+		exit 1; \
+	fi
+
 
 ######################## LOCAL HELPERS ####################################
 
