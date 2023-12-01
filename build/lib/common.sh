@@ -535,6 +535,12 @@ function build::common::copy_if_source_destination_different() {
 function build::common::check_for_qemu() {
   local -r platform="$1"
 
+  if [ "${CODEBUILD_CI:-false}" = "true" ]; then
+    # code build is running in a container so we cant rely on checking for the proc file
+    # since it would be on the host directly
+    return
+  fi
+
   local -r normalized_platform="$(echo "${platform}" | sed 's/linux\/arm64/aarch64/g;s/linux\/amd64/x86_64/g')"
 
   if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" != "$normalized_platform" ]; then
