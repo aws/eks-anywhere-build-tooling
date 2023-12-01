@@ -71,19 +71,13 @@ kubeadm_in_first_cp(){
   # Ideally we will instruct kubeadm to just skip coredns upgrade during this phase, but
   # it doesn't seem like there is an option.
   # TODO: consider using --skip-phases to skip addons/coredns once the feature flag is supported in kubeadm upgrade command
-  coredns_backup="${components_dir}/coredns.yaml"
-  coredns=$(kubectl get cm -n kube-system coredns -oyaml --kubeconfig /etc/kubernetes/admin.conf --ignore-not-found=true)
-  if [ -n "$coredns" ]; then
-    echo "$coredns" >"$coredns_backup"
-  fi
-  kubectl delete cm -n kube-system coredns --kubeconfig /etc/kubernetes/admin.conf --ignore-not-found=true
+  backup_and_delete_coredns_config "$components_dir"
 
   kubeadm version
   kubeadm upgrade plan --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --config "$new_kubeadm_config"
   kubeadm upgrade apply "$kube_version" --config "$new_kubeadm_config" --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --allow-experimental-upgrades --yes
 
-  # Restore coredns config backup
-  kubectl create -f "$coredns_backup" --kubeconfig /etc/kubernetes/admin.conf
+  restore_coredns_config "$components_dir"
 }
 
 kubeadm_in_rest_cp(){
@@ -91,8 +85,44 @@ kubeadm_in_rest_cp(){
 
   backup_and_replace /usr/bin/kubeadm "$components_dir" "$components_dir/kubeadm"
 
+  # Backup and delete coredns configmap. If the CM doesn't exist, kubeadm will skip its upgrade.
+  # This is desirable for 2 reaons:
+  # - CAPI already takes care of coredns upgrades
+  # - kubeadm will fail when verifying the current version of coredns bc the image tag created by
+  #   eks-s is not recognised by the migration verification logic https://github.com/coredns/corefile-migration/blob/master/migration/versions.go
+  # Ideally we will instruct kubeadm to just skip coredns upgrade during this phase, but
+  # it doesn't seem like there is an option.
+  # TODO: consider using --skip-phases to skip addons/coredns once the feature flag is supported in kubeadm upgrade command
+  backup_and_delete_coredns_config "$components_dir"
+
   kubeadm version
   kubeadm upgrade node --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration
+  restore_coredns_config "$components_dir"
+}
+
+backup_and_delete_coredns_config(){
+  components_dir=$1
+  # Backup and delete coredns configmap. If the CM doesn't exist, kubeadm will skip its upgrade.
+  # This is desirable for 2 reaons:
+  # - CAPI already takes care of coredns upgrades
+  # - kubeadm will fail when verifying the current version of coredns bc the image tag created by
+  #   eks-s is not recognised by the migration verification logic https://github.com/coredns/corefile-migration/blob/master/migration/versions.go
+  # Ideally we will instruct kubeadm to just skip coredns upgrade during this phase, but
+  # it doesn't seem like there is an option.
+  # TODO: consider using --skip-phases to skip addons/coredns once the feature flag is supported in kubeadm upgrade command
+  coredns_backup="${components_dir}/coredns.yaml"
+  coredns=$(kubectl get cm -n kube-system coredns -oyaml --kubeconfig /etc/kubernetes/admin.conf --ignore-not-found=true)
+  if [ -n "$coredns" ]; then
+    echo "$coredns" >"$coredns_backup"
+  fi
+  kubectl delete cm -n kube-system coredns --kubeconfig /etc/kubernetes/admin.conf --ignore-not-found=true
+}
+
+restore_coredns_config(){
+  components_dir=$1
+  coredns_backup="${components_dir}/coredns.yaml"
+  # Restore coredns config from backup
+  kubectl create -f "$coredns_backup" --kubeconfig /etc/kubernetes/admin.conf
 }
 
 kubeadm_in_worker() {
