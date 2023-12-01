@@ -105,7 +105,7 @@ else
     log_file=$(mktemp)
     trap "rm -f $log_file" EXIT
     if ! $CMD $ARGS 2>&1 | tee $log_file; then      
-        if grep -q "blobs/uploads/\": EOF" $log_file ; then
+        if grep -q "blobs/uploads/\": EOF" $log_file || grep -q "blobs/uploads.*404 Not Found" $log_file; then
             echo "******************************************************"
             echo "Ensure container registry and repository exists!!"
             echo "Try running make create-ecr-repos to create ecr repositories in your aws account."

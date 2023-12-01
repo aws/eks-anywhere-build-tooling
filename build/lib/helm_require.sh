@@ -35,11 +35,6 @@ DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
-if [ "${HELM_USE_UPSTREAM_IMAGE}" != true ] && [[ "${IMAGE_REGISTRY}" == *"ecr"* ]] && ! aws sts get-caller-identity &> /dev/null; then
-  echo "The AWS cli is used to find the ECR registries and repos for the current AWS account please login!"
-  exit 1;
-fi
-
 #
 # Image tags
 #
@@ -56,11 +51,6 @@ spec:
 JSON_SCHEMA_FILE=$PROJECT_ROOT/helm/schema.json
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
 
-export HELM_REGISTRY="$IMAGE_REGISTRY"
-if [ "${HELM_USE_UPSTREAM_IMAGE}" != true ] && [[ "${IMAGE_REGISTRY}" == *"ecr"* ]]; then
-  export HELM_REGISTRY=$(aws ecr-public describe-registries --region us-east-1 --output text --query 'registries[*].registryUri' 2> /dev/null)
-fi
-
 export IMAGE_TAG
 export HELM_TAG
 envsubst <$PROJECT_ROOT/helm/sedfile.template >${SEDFILE}
@@ -73,70 +63,66 @@ function get_image_shasum() {
   local -r tag=$2
 
   local image_shasum=
-  if [ "${HELM_USE_UPSTREAM_IMAGE}" = true ]; then
-    image_shasum=$(build::common::echo_and_run ${SCRIPT_ROOT}/image_shasum.sh ${IMAGE_REGISTRY} ${image} ${tag})
-  elif [ "${JOB_TYPE:-}" = "presubmit" ] || [[ "${IMAGE_REGISTRY}" != *"ecr"* ]]; then
-    image_shasum=${LATEST}
+  if [ "${JOB_TYPE:-}" = "presubmit" ]; then
+    echo ${LATEST}
+  elif [[ -z ${image_shasum} ]]; then
+    build::common::echo_and_run ${SCRIPT_ROOT}/image_shasum.sh ${IMAGE_REGISTRY} ${image} ${tag}
   fi
-
-  if [[ -z ${image_shasum} ]] && aws --region us-east-1 ecr-public describe-repositories --repository-names ${image} &> /dev/null; then
-    image_shasum=$(build::common::echo_and_run ${SCRIPT_ROOT}/image_shasum.sh ${HELM_REGISTRY} ${image} ${tag})
-  fi
-
-  if [[ -z ${image_shasum} ]] && aws ecr describe-repositories --repository-names ${image} &> /dev/null; then
-    image_shasum=$(build::common::echo_and_run ${SCRIPT_ROOT}/image_shasum.sh ${IMAGE_REGISTRY} ${image} ${tag})    
-  fi
-
-  if [[ -n ${image_shasum} ]]; then
-    echo ${image_shasum}
-  else
-    echo "${image} does not exist in ECR Public or Private"
-    exit 1
-  fi  
 }
 
   # query ecr for the image by latest tag and find the first non-latest tag the image is also tagged with
 function get_image_tag_not_latest() {
     local -r image=$1
-    local -r tag=$2
+    local -r shasum=$2
 
-    local use_tag=
+    # to find another tag associated with this image we have to use the aws cli
+    # the following only works for ecr repos
     if [ "${JOB_TYPE:-}" = "presubmit" ] ||  [[ "${IMAGE_REGISTRY}" != *"ecr"* ]]; then
-      use_tag=${tag}      
-    fi
-
-    if [[ -z ${use_tag} ]] && aws --region us-east-1 ecr-public describe-repositories --repository-names ${image} &> /dev/null; then
-      use_tag=$(build::common::echo_and_run aws --region us-east-1 ecr-public describe-images --repository-name ${image} --image-ids imageTag=${tag} --query 'imageDetails[0].imageTags' --output yaml 2> /dev/null | grep -v ${tag} | head -1| sed -e 's/- //')
-    fi
-    
-    if [[ -z ${use_tag} ]] && aws ecr describe-repositories --repository-names ${image} &> /dev/null; then
-      use_tag=$(build::common::echo_and_run  aws ecr describe-images --repository-name ${image} --image-id imageTag=${tag} --query 'imageDetails[0].imageTags' --output yaml 2> /dev/null | grep -v ${tag} | head -1| sed -e 's/- //')
-    fi
-
-    if [[ -n ${use_tag} ]]; then
-      echo ${use_tag}
+      echo ${tag}      
     else
-      echo "${image}@${tag} does not exist in ECR Public or Private"
-      exit 1
-    fi  
+      if ! aws sts get-caller-identity &> /dev/null; then
+        echo "The AWS cli is used to find the ECR registries and repos for the current AWS account please login!"
+        exit 1;
+      fi
+
+      local service="ecr"
+      if [[ "${IMAGE_REGISTRY}" = *"public.ecr"* ]]; then
+        service="--region us-east-1 ecr-public"      
+      fi
+      build::common::echo_and_run aws ${service} describe-images --repository-name ${image} --image-id imageDigest=${shasum} --query 'imageDetails[0].imageTags' --output yaml | grep -v ${LATEST} | head -1| sed -e 's/- //'      
+    fi
 }
 
 for IMAGE in ${HELM_IMAGE_LIST:-}; do
-  # if its the image(s) built from this project, use the image_tag
-  # otherwise its an image from a different project so use latest to trigger finding the latest image
-  if [ "${IMAGE}" = "${HELM_DESTINATION_REPOSITORY}" ] || [ "${IMAGE_TAG}" != "${HELM_TAG}" ]; then
-    TAG="${IMAGE_TAG}"
-  else
-    TAG="${LATEST}"
+  # the image_list will include images built by the current project and potentially images built from
+  # other projects, ex: prometheus chart includes the node_exporter which is built seperately
+  # since each project is built independently and is tagged with the current HEAD commit hash
+  # images built via this current build may not be tagged exactly the same as images from other builds
+  # this code will first try to pull the image by the IMAGE_TAG and if that is not available
+  # it will fallback to the LATEST tag which follows the same pattern we use for artifacts on s3
+  # in the event that the LATEST tag is used, the ecr api will be used to get a different tag, which
+  # should be the tag in the format <version>-<commit-hash>, this tag will be used in the requires.yaml 
+  IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${IMAGE_TAG})
+
+  if [[ -z ${IMAGE_SHASUM} ]]; then
+    IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${LATEST})
   fi
-  
-  IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${TAG})
+
+  if [[ -z ${IMAGE_SHASUM} ]]; then
+    echo "Neither ${IMAGE}@${IMAGE_TAG} nor ${IMAGE}@${LATEST} exists!"
+    exit 1
+  fi 
 
   echo "s,{{${IMAGE}}},${IMAGE_SHASUM},g" >>${SEDFILE}
-  if [ "${TAG}" = "${LATEST}" ];  then
-    USE_TAG=$(get_image_tag_not_latest ${IMAGE} ${LATEST})
+  if [ "${IMAGE_TAG}" = "${LATEST}" ]; then
+    # if finding an image from another project using the `latest` tag, find the image and a different tag associated with that image
+    USE_TAG=$(get_image_tag_not_latest ${IMAGE} ${IMAGE_SHASUM})
+    if [[ -z ${USE_TAG} ]]; then
+      echo "non-${LATEST} tag does not exist for ${IMAGE}@${IMAGE_SHASUM}!"
+      exit 1
+    fi 
   else
-    USE_TAG=$TAG
+    USE_TAG=$IMAGE_TAG
   fi
   
   # If HELM_USE_UPSTREAM_IMAGE is true, we are using images from upstream.

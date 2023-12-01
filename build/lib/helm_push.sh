@@ -46,7 +46,7 @@ export HELM_REGISTRY_CONFIG="${DOCKER_CONFIG}/config.json"
 export HELM_EXPERIMENTAL_OCI=1
 TMPFILE=$(mktemp /tmp/helm-output.XXXXXX)
 function cleanup() {
-  if grep -q "blobs/uploads/\": EOF" $TMPFILE ; then
+  if grep -q "blobs/uploads/\": EOF" $TMPFILE || grep -q "blobs/uploads.*404 Not Found" $TMPFILE; then
     echo "******************************************************"
     echo "Ensure container registry and repository exists!!"
     echo "Try running make create-ecr-repos to create ecr repositories in your aws account."
@@ -69,11 +69,7 @@ helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} 2>&1 |
 DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 
 # Adds a 2nd tag to the helm chart for the bundle-release jobs.
-if [[ "${IMAGE_REGISTRY}" != *"public.ecr.aws"* ]] && [[ "${IMAGE_REGISTRY}" == *"ecr"* ]]; then
-  MANIFEST=$(build::common::echo_and_run aws ecr batch-get-image --repository-name "$HELM_DESTINATION_REPOSITORY" --image-ids imageDigest=${DIGEST} --query "images[].imageManifest" --output text)
-  export AWS_PAGER=""
-  build::common::echo_and_run aws ecr put-image --repository-name ${HELM_DESTINATION_REPOSITORY} --image-tag ${SEMVER_GIT_TAG}-${LATEST_TAG}-helm --image-manifest "$MANIFEST" --image-manifest-media-type "application/vnd.oci.image.manifest.v1+json"
-fi
+build::common::echo_and_run skopeo copy docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}@${DIGEST} docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}:${SEMVER_GIT_TAG}-${LATEST_TAG}-helm
 
 {
     set +x
