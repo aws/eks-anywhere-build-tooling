@@ -96,7 +96,7 @@ if [ "$CODEBUILD_CI" = "true" ]; then
     RUN_INSTANCE_EXTRA_ARGS="--subnet-id $SUBNET_ID --placement AvailabilityZone=$SUBNET_AZ --security-group-ids $RAW_IMAGE_BUILD_SECURITY_GROUP --associate-public-ip-address"
 fi
 
-AMI_ID="ami-08cb54181472d8110"
+AMI_ID=$(aws ec2 describe-images --owners $BUILD_ACCOUNT_ID --filters "Name=name,Values=$KVM_AMI_NAME_PREFIX" --query 'sort_by(Images, &CreationDate)[-1].[ImageId]' --output text)
 
 MAX_RETRIES=20
 for i in $(seq 1 $MAX_RETRIES); do
@@ -154,7 +154,7 @@ for i in $(seq 1 $MAX_RETRIES); do
 done
 
 # Ensure python/packer/ansible are setup on the ami
-ssh $SSH_OPTS $REMOTE_HOST "make -C $REMOTE_PROJECT_PATH/image-builder/images/capi deps-raw"
+ssh $SSH_OPTS $REMOTE_HOST "packer --version; make -C $REMOTE_PROJECT_PATH/image-builder/images/capi deps-raw"
 
 # If not running on Codebuild, exit gracefully
 if [ "$CODEBUILD_CI" = "false" ]; then
