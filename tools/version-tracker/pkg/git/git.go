@@ -9,6 +9,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
@@ -54,6 +55,7 @@ func CloneRepo(cloneURL, destination, headRepoOwner string) (*git.Repository, st
 			}
 		}
 	}
+
 	return repo, repoHeadCommitHash, nil
 }
 
@@ -101,7 +103,22 @@ func Add(worktree *git.Worktree, paths []string) error {
 // Commit creates a new commit with the given commit message.
 func Commit(worktree *git.Worktree, commitMessage string) error {
 	logger.V(6).Info("Committing file(s) in the index")
-	_, err := worktree.Commit(commitMessage, &git.CommitOptions{})
+	var commitAuthorName, commitAuthorEmail string
+	commitAuthorName, ok := os.LookupEnv(constants.CommitAuthorNameEnvvar)
+	if !ok {
+		commitAuthorName = constants.DefaultCommitAuthorName
+	}
+
+	commitAuthorEmail, ok = os.LookupEnv(constants.CommitAuthorEmailEnvvar)
+	if !ok {
+		commitAuthorEmail = constants.DefaultCommitAuthorEmail
+	}
+	_, err := worktree.Commit(commitMessage, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  commitAuthorName,
+			Email: commitAuthorEmail,
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("committing file(s) in the index: %v", err)
 	}
