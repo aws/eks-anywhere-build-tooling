@@ -11,6 +11,7 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base-glibc
 
 REPO_NO_CLONE=true
 SIMPLE_CREATE_BINARIES=false
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 

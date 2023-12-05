@@ -22,6 +22,7 @@ VERSION?=$(shell git -C $(REPO) rev-parse --short HEAD)
 EXTRA_GO_LDFLAGS=-X main.version=$(VERSION)
 
 HAS_S3_ARTIFACTS=true
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 

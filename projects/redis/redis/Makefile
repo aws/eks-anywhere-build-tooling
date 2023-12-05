@@ -14,6 +14,8 @@ REPO_NO_CLONE=true
 BUILD_TARGETS=local-images
 RELEASE_TARGETS=images
 
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 

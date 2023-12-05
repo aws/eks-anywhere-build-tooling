@@ -31,6 +31,8 @@ BUILDSPEC_DEPENDS_ON_OVERRIDE=torvalds_linux_linux_amd64 torvalds_linux_linux_ar
 
 FIX_LICENSES=$(foreach path,$(GO_MOD_PATHS),$(REPO)/$(path)/LICENSE)
 
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 

@@ -21,6 +21,7 @@ HAS_RELEASE_BRANCHES=true
 
 BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 # Go 1.18 and newer automatically embeds vcs information if the go module being built
 # belongs (upwards) to a git repo. In this case, that repo is the buildtooling repo, 
