@@ -1,18 +1,18 @@
-From da76ee3c8122e13cfddc1714f7d55b03d44a2ff3 Mon Sep 17 00:00:00 2001
+From 82906b15ac5c0b9b3c30df8591bbdf396db499c9 Mon Sep 17 00:00:00 2001
 From: Vivek Koppuru <koppv@amazon.com>
 Date: Wed, 12 Jan 2022 19:04:15 -0800
 Subject: [PATCH 11/36] Add status.version to list of fields to ignore for
  update
 
 ---
- .../kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go        | 2 ++
+ controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-index 3d2e056ea..bd79f2322 100644
---- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-+++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_webhook.go
-@@ -112,6 +112,7 @@ func (in *KubeadmControlPlane) ValidateCreate() (admission.Warnings, error) {
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+index 12b0389de..f5252b3a0 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+@@ -132,6 +132,7 @@ func (webhook *KubeadmControlPlane) ValidateCreate(_ context.Context, obj runtim
  
  const (
  	spec                 = "spec"
@@ -20,14 +20,14 @@ index 3d2e056ea..bd79f2322 100644
  	kubeadmConfigSpec    = "kubeadmConfigSpec"
  	clusterConfiguration = "clusterConfiguration"
  	initConfiguration    = "initConfiguration"
-@@ -197,6 +198,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) (admission.War
+@@ -219,6 +220,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, "rolloutBefore", "*"},
  		{spec, "rolloutStrategy"},
  		{spec, "rolloutStrategy", "*"},
 +		{status, "version"},
  	}
  
- 	allErrs := validateKubeadmControlPlaneSpec(in.Spec, in.Namespace, field.NewPath("spec"))
+ 	oldK, ok := oldObj.(*controlplanev1.KubeadmControlPlane)
 -- 
 2.34.1
 

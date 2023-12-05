@@ -1,20 +1,20 @@
-From 4e8c7c900424e1744a6b0a7d9acc9077a10f4f26 Mon Sep 17 00:00:00 2001
+From 7c854c32b070690761243b6e1bc3e18b422791b4 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 16 Aug 2023 19:58:01 -0700
 Subject: [PATCH 35/36] Add support for external etcd machines in Kind mapper
 
 ---
  .../client/cluster/objectgraph_test.go        |  2 +-
- .../docker/exp/internal/docker/nodepool.go    |  4 +-
+ .../dockermachinepool_controller_phases.go    |  2 +-
  .../controllers/dockermachine_controller.go   | 13 ++--
  .../docker/internal/docker/machine.go         | 69 +++++++++++++------
- 4 files changed, 55 insertions(+), 33 deletions(-)
+ 4 files changed, 54 insertions(+), 32 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index ffd6439e8..739e163b4 100644
+index 2b92ba3bc..48b617339 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
-@@ -1942,7 +1942,7 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+@@ -1934,7 +1934,7 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
  		{
  			name: "two clusters with external force object, read only 1 cluster & both external objects",
  			args: args{
@@ -23,33 +23,24 @@ index ffd6439e8..739e163b4 100644
  				objs: func() []client.Object {
  					objs := []client.Object{}
  					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
-diff --git a/test/infrastructure/docker/exp/internal/docker/nodepool.go b/test/infrastructure/docker/exp/internal/docker/nodepool.go
-index 08683dea8..b8cb3cb1d 100644
---- a/test/infrastructure/docker/exp/internal/docker/nodepool.go
-+++ b/test/infrastructure/docker/exp/internal/docker/nodepool.go
-@@ -219,7 +219,7 @@ func (np *NodePool) addMachine(ctx context.Context) error {
- 		}
+diff --git a/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go b/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
+index 1a7201c53..caf71e708 100644
+--- a/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
++++ b/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
+@@ -98,7 +98,7 @@ func createDockerContainer(ctx context.Context, name string, cluster *clusterv1.
  	}
  
--	if err := externalMachine.Create(ctx, np.dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, np.machinePool.Spec.Template.Spec.Version, labels, np.dockerMachinePool.Spec.Template.ExtraMounts); err != nil {
-+	if err := externalMachine.Create(ctx, np.dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, np.machinePool.Spec.Template.Spec.Version, labels, np.dockerMachinePool.Spec.Template.ExtraMounts, false); err != nil {
- 		return errors.Wrapf(err, "failed to create docker machine with instance name %s", instanceName)
+ 	log.Info("Creating container for machinePool", "name", name, "machinePool", machinePool.Name)
+-	if err := externalMachine.Create(ctx, dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, machinePool.Spec.Template.Spec.Version, labels, dockerMachinePool.Spec.Template.ExtraMounts); err != nil {
++	if err := externalMachine.Create(ctx, dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, machinePool.Spec.Template.Spec.Version, labels, dockerMachinePool.Spec.Template.ExtraMounts, false); err != nil {
+ 		return errors.Wrapf(err, "failed to create docker machine with name %s", name)
  	}
  	return nil
-@@ -301,7 +301,7 @@ func (np *NodePool) reconcileMachine(ctx context.Context, machine *docker.Machin
- 			}
- 
- 			// Run the bootstrap script. Simulates cloud-init/Ignition.
--			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, np.machinePool.Spec.Template.Spec.Version, np.dockerMachinePool.Spec.Template.CustomImage); err != nil {
-+			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, np.machinePool.Spec.Template.Spec.Version, np.dockerMachinePool.Spec.Template.CustomImage, false); err != nil {
- 				return ctrl.Result{}, errors.Wrapf(err, "failed to exec DockerMachinePool instance bootstrap for instance named %s", machine.Name())
- 			}
- 			// Check for bootstrap success
 diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-index 5905e95f2..2350ffb13 100644
+index 30128dcc4..21fa98f41 100644
 --- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 +++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-@@ -255,7 +255,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -294,7 +294,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
  	if !externalMachine.Exists() {
  		// NOTE: FailureDomains don't mean much in CAPD since it's all local, but we are setting a label on
  		// each container, so we can check placement.
@@ -58,16 +49,16 @@ index 5905e95f2..2350ffb13 100644
  			return ctrl.Result{}, errors.Wrap(err, "failed to create worker DockerMachine")
  		}
  	}
-@@ -335,7 +335,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -379,7 +379,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
  			}()
  
  			// Run the bootstrap script. Simulates cloud-init/Ignition.
--			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, machine.Spec.Version, dockerMachine.Spec.CustomImage); err != nil {
-+			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, machine.Spec.Version, dockerMachine.Spec.CustomImage, util.IsEtcdMachine(machine)); err != nil {
+-			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, version, dockerMachine.Spec.CustomImage); err != nil {
++			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, version, dockerMachine.Spec.CustomImage, util.IsEtcdMachine(machine)); err != nil {
  				conditions.MarkFalse(dockerMachine, infrav1.BootstrapExecSucceededCondition, infrav1.BootstrapFailedReason, clusterv1.ConditionSeverityWarning, "Repeating bootstrap")
  				return ctrl.Result{}, errors.Wrap(err, "failed to exec DockerMachine bootstrap")
  			}
-@@ -364,12 +364,12 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -409,12 +409,12 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
  	// Machine will never get a node ref as ProviderID is required to set the node ref, so we would get a deadlock.
  	if cluster.Spec.ControlPlaneRef != nil &&
  		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) &&
@@ -82,7 +73,7 @@ index 5905e95f2..2350ffb13 100644
  		// Usually a cloud provider will do this, but there is no docker-cloud provider.
  		// Requeue if there is an error, as this is likely momentary load balancer
  		// state changes during control plane provisioning.
-@@ -539,8 +539,3 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
+@@ -603,8 +603,3 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
  
  	return nil
  }
@@ -92,7 +83,7 @@ index 5905e95f2..2350ffb13 100644
 -	return ok
 -}
 diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
-index c65c9a882..f37071c2d 100644
+index 96c9df5ed..3a5090e0b 100644
 --- a/test/infrastructure/docker/internal/docker/machine.go
 +++ b/test/infrastructure/docker/internal/docker/machine.go
 @@ -48,6 +48,7 @@ import (

@@ -1,85 +1,85 @@
-From 31930d7cca9a14b076945acd2e6d52adc05a04d6 Mon Sep 17 00:00:00 2001
+From 8cb231254fb850314fcde6323a5ca4106d7e84a5 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 16 May 2023 11:03:09 -0500
 Subject: [PATCH 32/36] CAPI Move Cluster Filter
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
- cmd/clusterctl/client/cluster/mover.go        |  32 +++--
- cmd/clusterctl/client/cluster/mover_test.go   |  18 +--
+ cmd/clusterctl/client/cluster/mover.go        |  31 ++--
+ cmd/clusterctl/client/cluster/mover_test.go   |  20 +--
  cmd/clusterctl/client/cluster/objectgraph.go  |  40 +++++-
- .../client/cluster/objectgraph_test.go        | 130 +++++++++++++++++-
+ .../client/cluster/objectgraph_test.go        | 134 +++++++++++++++++-
  cmd/clusterctl/client/move.go                 |  10 +-
- cmd/clusterctl/client/move_test.go            |   6 +-
+ cmd/clusterctl/client/move_test.go            |   8 +-
  cmd/clusterctl/cmd/move.go                    |   4 +
- 7 files changed, 211 insertions(+), 29 deletions(-)
+ 7 files changed, 214 insertions(+), 33 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index 3ea19a800..1904472ff 100644
+index 61270d3a7..ca2757e7f 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
-@@ -49,13 +49,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
+@@ -51,13 +51,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
  // ObjectMover defines methods for moving Cluster API objects to another management cluster.
  type ObjectMover interface {
  	// Move moves all the Cluster API objects existing in a namespace (or from all the namespaces if empty) to a target management cluster.
--	Move(namespace string, toCluster Client, dryRun bool, mutators ...ResourceMutatorFunc) error
+-	Move(ctx context.Context, namespace string, toCluster Client, dryRun bool, mutators ...ResourceMutatorFunc) error
 +	// If `clusterName` is specified (not empty string), only objects belonging to the cluster will be moved.
-+	Move(namespace string, toCluster Client, clusterName string, dryRun bool, mutators ...ResourceMutatorFunc) error
++	Move(ctx context.Context, namespace string, toCluster Client, clusterName string, dryRun bool, mutators ...ResourceMutatorFunc) error
  
  	// ToDirectory writes all the Cluster API objects existing in a namespace (or from all the namespaces if empty) to a target directory.
--	ToDirectory(namespace string, directory string) error
+-	ToDirectory(ctx context.Context, namespace string, directory string) error
 +	// If `clusterName` is specified (not empty string), only objects belonging to the cluster will be moved.
-+	ToDirectory(namespace string, directory string, clusterName string) error
++	ToDirectory(ctx context.Context, namespace string, directory, clusterName string) error
  
  	// FromDirectory reads all the Cluster API objects existing in a configured directory to a target management cluster.
--	FromDirectory(toCluster Client, directory string) error
+-	FromDirectory(ctx context.Context, toCluster Client, directory string) error
 +	// If `clusterName` is specified (not empty string), only objects belonging to the cluster will be moved.
-+	FromDirectory(toCluster Client, directory string, clusterName string) error
++	FromDirectory(ctx context.Context, toCluster Client, directory, clusterName string) error
  }
  
  // objectMover implements the ObjectMover interface.
-@@ -68,7 +71,7 @@ type objectMover struct {
+@@ -70,7 +73,7 @@ type objectMover struct {
  // ensure objectMover implements the ObjectMover interface.
  var _ ObjectMover = &objectMover{}
  
--func (o *objectMover) Move(namespace string, toCluster Client, dryRun bool, mutators ...ResourceMutatorFunc) error {
-+func (o *objectMover) Move(namespace string, toCluster Client, clusterName string, dryRun bool, mutators ...ResourceMutatorFunc) error {
+-func (o *objectMover) Move(ctx context.Context, namespace string, toCluster Client, dryRun bool, mutators ...ResourceMutatorFunc) error {
++func (o *objectMover) Move(ctx context.Context, namespace string, toCluster Client, clusterName string, dryRun bool, mutators ...ResourceMutatorFunc) error {
  	log := logf.Log
  	log.Info("Performing move...")
  	o.dryRun = dryRun
-@@ -85,7 +88,7 @@ func (o *objectMover) Move(namespace string, toCluster Client, dryRun bool, muta
+@@ -87,7 +90,7 @@ func (o *objectMover) Move(ctx context.Context, namespace string, toCluster Clie
  		}
  	}
  
--	objectGraph, err := o.getObjectGraph(namespace)
-+	objectGraph, err := o.getObjectGraph(namespace, clusterName)
+-	objectGraph, err := o.getObjectGraph(ctx, namespace)
++	objectGraph, err := o.getObjectGraph(ctx, namespace, clusterName)
  	if err != nil {
  		return errors.Wrap(err, "failed to get object graph")
  	}
-@@ -99,11 +102,11 @@ func (o *objectMover) Move(namespace string, toCluster Client, dryRun bool, muta
- 	return o.move(objectGraph, proxy, mutators...)
+@@ -101,11 +104,11 @@ func (o *objectMover) Move(ctx context.Context, namespace string, toCluster Clie
+ 	return o.move(ctx, objectGraph, proxy, mutators...)
  }
  
--func (o *objectMover) ToDirectory(namespace string, directory string) error {
-+func (o *objectMover) ToDirectory(namespace string, directory string, clusterName string) error {
+-func (o *objectMover) ToDirectory(ctx context.Context, namespace string, directory string) error {
++func (o *objectMover) ToDirectory(ctx context.Context, namespace string, directory, clusterName string) error {
  	log := logf.Log
  	log.Info("Moving to directory...")
  
--	objectGraph, err := o.getObjectGraph(namespace)
-+	objectGraph, err := o.getObjectGraph(namespace, clusterName)
+-	objectGraph, err := o.getObjectGraph(ctx, namespace)
++	objectGraph, err := o.getObjectGraph(ctx, namespace, clusterName)
  	if err != nil {
  		return errors.Wrap(err, "failed to get object graph")
  	}
-@@ -111,7 +114,7 @@ func (o *objectMover) ToDirectory(namespace string, directory string) error {
- 	return o.toDirectory(objectGraph, directory)
+@@ -113,7 +116,7 @@ func (o *objectMover) ToDirectory(ctx context.Context, namespace string, directo
+ 	return o.toDirectory(ctx, objectGraph, directory)
  }
  
--func (o *objectMover) FromDirectory(toCluster Client, directory string) error {
-+func (o *objectMover) FromDirectory(toCluster Client, directory, clusterName string) error {
+-func (o *objectMover) FromDirectory(ctx context.Context, toCluster Client, directory string) error {
++func (o *objectMover) FromDirectory(ctx context.Context, toCluster Client, directory, clusterName string) error {
  	log := logf.Log
  	log.Info("Moving from directory...")
  
-@@ -145,6 +148,14 @@ func (o *objectMover) FromDirectory(toCluster Client, directory string) error {
+@@ -147,6 +150,14 @@ func (o *objectMover) FromDirectory(ctx context.Context, toCluster Client, direc
  	// Check whether nodes are not included in GVK considered for fromDirectory.
  	objectGraph.checkVirtualNode()
  
@@ -94,126 +94,134 @@ index 3ea19a800..1904472ff 100644
  	// Restore the objects to the target cluster.
  	proxy := toCluster.Proxy()
  
-@@ -182,7 +193,7 @@ func (o *objectMover) filesToObjs(dir string) ([]unstructured.Unstructured, erro
+@@ -184,7 +195,7 @@ func (o *objectMover) filesToObjs(dir string) ([]unstructured.Unstructured, erro
  	return objs, nil
  }
  
--func (o *objectMover) getObjectGraph(namespace string) (*objectGraph, error) {
-+func (o *objectMover) getObjectGraph(namespace, clusterName string) (*objectGraph, error) {
+-func (o *objectMover) getObjectGraph(ctx context.Context, namespace string) (*objectGraph, error) {
++func (o *objectMover) getObjectGraph(ctx context.Context, namespace, clusterName string) (*objectGraph, error) {
  	objectGraph := newObjectGraph(o.fromProxy, o.fromProviderInventory)
  
  	// Gets all the types defined by the CRDs installed by clusterctl plus the ConfigMap/Secret core types.
-@@ -194,7 +205,8 @@ func (o *objectMover) getObjectGraph(namespace string) (*objectGraph, error) {
+@@ -196,7 +207,7 @@ func (o *objectMover) getObjectGraph(ctx context.Context, namespace string) (*ob
  	// Discovery the object graph for the selected types:
  	// - Nodes are defined the Kubernetes objects (Clusters, Machines etc.) identified during the discovery process.
  	// - Edges are derived by the OwnerReferences between nodes.
--	if err := objectGraph.Discovery(namespace); err != nil {
-+	// - Filters and remove nodes that do not belong to provided cluster name
-+	if err := objectGraph.Discovery(namespace, clusterName); err != nil {
+-	if err := objectGraph.Discovery(ctx, namespace); err != nil {
++	if err := objectGraph.Discovery(ctx, namespace, clusterName); err != nil {
  		return nil, errors.Wrap(err, "failed to discover the object graph")
  	}
  
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index ba3d2da0e..7d43c5e50 100644
+index dee567918..78776c5b4 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
-@@ -733,7 +733,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -738,7 +738,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			// Run backupTargetObject on nodes in graph
  			mover := objectMover{
-@@ -822,7 +822,7 @@ func Test_objectMover_restoreTargetObject(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -829,7 +829,7 @@ func Test_objectMover_restoreTargetObject(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			// gets a fakeProxy to an empty cluster with all the required CRDs
  			toProxy := getFakeProxyWithCRDs()
-@@ -928,7 +928,7 @@ func Test_objectMover_toDirectory(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -937,7 +937,7 @@ func Test_objectMover_toDirectory(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			// Run toDirectory
  			mover := objectMover{
-@@ -1145,7 +1145,7 @@ func Test_getMoveSequence(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -1158,7 +1158,7 @@ func Test_getMoveSequence(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			moveSequence := getMoveSequence(graph)
  			g.Expect(moveSequence.groups).To(HaveLen(len(tt.wantMoveGroups)))
-@@ -1176,7 +1176,7 @@ func Test_objectMover_move_dryRun(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -1191,7 +1191,7 @@ func Test_objectMover_move_dryRun(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			// gets a fakeProxy to an empty cluster with all the required CRDs
  			toProxy := getFakeProxyWithCRDs()
-@@ -1249,7 +1249,7 @@ func Test_objectMover_move(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -1266,7 +1266,7 @@ func Test_objectMover_move(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			// gets a fakeProxy to an empty cluster with all the required CRDs
  			toProxy := getFakeProxyWithCRDs()
-@@ -1358,7 +1358,7 @@ func Test_objectMover_move_with_Mutator(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -1378,7 +1378,7 @@ func Test_objectMover_move_with_Mutator(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			// gets a fakeProxy to an empty cluster with all the required CRDs
  			toProxy := getFakeProxyWithCRDs()
-@@ -1641,7 +1641,7 @@ func Test_objectMover_checkProvisioningCompleted(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -1663,7 +1663,7 @@ func Test_objectMover_checkProvisioningCompleted(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			o := &objectMover{
  				fromProxy: graph.proxy,
-@@ -1881,7 +1881,7 @@ func Test_objectMoverService_ensureNamespaces(t *testing.T) {
- 			g.Expect(getFakeDiscoveryTypes(graph)).To(Succeed())
+@@ -1909,7 +1909,7 @@ func Test_objectMoverService_ensureNamespaces(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// Trigger discovery the content of the source cluster
--			g.Expect(graph.Discovery("")).To(Succeed())
-+			g.Expect(graph.Discovery("", "")).To(Succeed())
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
  
  			mover := objectMover{
  				fromProxy: graph.proxy,
+@@ -2388,7 +2388,7 @@ func TestWaitReadyForMove(t *testing.T) {
+ 			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
+ 
+ 			// trigger discovery the content of the source cluster
+-			g.Expect(graph.Discovery(ctx, "")).To(Succeed())
++			g.Expect(graph.Discovery(ctx, "", "")).To(Succeed())
+ 
+ 			backoff := wait.Backoff{
+ 				Steps: 1,
 diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
-index b0934b45c..a14de3ac6 100644
+index 454ec27a8..42e1e2ef1 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph.go
-@@ -410,8 +410,8 @@ func getCRDList(proxy Proxy, crdList *apiextensionsv1.CustomResourceDefinitionLi
+@@ -417,8 +417,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
  }
  
  // Discovery reads all the Kubernetes objects existing in a namespace (or in all namespaces if empty) for the types received in input, and then adds
 -// everything to the objects graph.
--func (o *objectGraph) Discovery(namespace string) error {
+-func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
 +// everything to the objects graph. Filters for objects only belonging to specific cluster if provided.
-+func (o *objectGraph) Discovery(namespace, clusterName string) error {
++func (o *objectGraph) Discovery(ctx context.Context, namespace, clusterName string) error {
  	log := logf.Log
  	log.Info("Discovering Cluster API objects")
  
-@@ -473,6 +473,42 @@ func (o *objectGraph) Discovery(namespace string) error {
+@@ -480,6 +480,42 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
  	// Completes the graph by setting for each node the list of tenants the node belongs to.
  	o.setTenants()
  
@@ -257,30 +265,47 @@ index b0934b45c..a14de3ac6 100644
  }
  
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index df835eea4..04ef6721b 100644
+index 258acda9d..8586ef19c 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
-@@ -1797,7 +1797,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
+@@ -1043,7 +1043,6 @@ var objectGraphsTests = []struct {
+ 		},
+ 		want: wantGraph{
+ 			nodes: map[string]wantGraphItem{
+-
+ 				"infrastructure.cluster.x-k8s.io/v1beta1, Kind=GenericInfrastructureMachineTemplate, ns1/shared": {
+ 					owners: []string{
+ 						"cluster.x-k8s.io/v1beta1, Kind=Cluster, ns1/cluster1",
+@@ -1790,7 +1789,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
--			err = graph.Discovery("")
-+			err = graph.Discovery("", "")
+-			err = graph.Discovery(ctx, "")
++			err = graph.Discovery(ctx, "", "")
  			if tt.wantErr {
  				g.Expect(err).To(HaveOccurred())
  				return
-@@ -1953,7 +1953,133 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+@@ -1807,7 +1806,7 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+ 		namespace string
+ 		objs      []client.Object
+ 	}
+-	var tests = []struct {
++	tests := []struct {
+ 		name    string
+ 		args    args
+ 		want    wantGraph
+@@ -1948,7 +1947,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
--			err = graph.Discovery(tt.args.namespace)
-+			err = graph.Discovery(tt.args.namespace, "")
+-			err = graph.Discovery(ctx, tt.args.namespace)
++			err = graph.Discovery(ctx, tt.args.namespace, "")
 +			if tt.wantErr {
 +				g.Expect(err).To(HaveOccurred())
 +				return
 +			}
 +
-+			g.Expect(err).NotTo(HaveOccurred())
++			g.Expect(err).ToNot(HaveOccurred())
 +			assertGraph(t, graph, tt.want)
 +		})
 +	}
@@ -291,7 +316,7 @@ index df835eea4..04ef6721b 100644
 +		cluster string
 +		objs    []client.Object
 +	}
-+	var tests = []struct {
++	tests := []struct {
 +		name    string
 +		args    args
 +		want    wantGraph
@@ -391,24 +416,25 @@ index df835eea4..04ef6721b 100644
 +	for _, tt := range tests {
 +		t.Run(tt.name, func(t *testing.T) {
 +			g := NewWithT(t)
++			ctx := context.Background()
 +
 +			// Create an objectGraph bound to a source cluster with all the CRDs for the types involved in the test.
 +			graph := getObjectGraphWithObjs(tt.args.objs)
 +
 +			// Get all the types to be considered for discovery
-+			err := getFakeDiscoveryTypes(graph)
-+			g.Expect(err).NotTo(HaveOccurred())
++			err := graph.getDiscoveryTypes(ctx)
++			g.Expect(err).ToNot(HaveOccurred())
 +
 +			// finally test discovery
-+			err = graph.Discovery("", tt.args.cluster)
++			err = graph.Discovery(ctx, "", tt.args.cluster)
  			if tt.wantErr {
  				g.Expect(err).To(HaveOccurred())
  				return
 diff --git a/cmd/clusterctl/client/move.go b/cmd/clusterctl/client/move.go
-index 386171432..813a8b352 100644
+index 6d5299cc9..977f8b881 100644
 --- a/cmd/clusterctl/client/move.go
 +++ b/cmd/clusterctl/client/move.go
-@@ -38,6 +38,10 @@ type MoveOptions struct {
+@@ -39,6 +39,10 @@ type MoveOptions struct {
  	// namespace will be used.
  	Namespace string
  
@@ -419,65 +445,69 @@ index 386171432..813a8b352 100644
  	// ExperimentalResourceMutatorFn accepts any number of resource mutator functions that are applied on all resources being moved.
  	// This is an experimental feature and is exposed only from the library and not (yet) through the CLI.
  	ExperimentalResourceMutators []cluster.ResourceMutatorFunc
-@@ -98,7 +102,7 @@ func (c *clusterctlClient) move(options MoveOptions) error {
+@@ -99,7 +103,7 @@ func (c *clusterctlClient) move(ctx context.Context, options MoveOptions) error
  		}
  	}
  
--	return fromCluster.ObjectMover().Move(options.Namespace, toCluster, options.DryRun, options.ExperimentalResourceMutators...)
-+	return fromCluster.ObjectMover().Move(options.Namespace, toCluster, options.ClusterName, options.DryRun, options.ExperimentalResourceMutators...)
+-	return fromCluster.ObjectMover().Move(ctx, options.Namespace, toCluster, options.DryRun, options.ExperimentalResourceMutators...)
++	return fromCluster.ObjectMover().Move(ctx, options.Namespace, toCluster, options.ClusterName, options.DryRun, options.ExperimentalResourceMutators...)
  }
  
- func (c *clusterctlClient) fromDirectory(options MoveOptions) error {
-@@ -111,7 +115,7 @@ func (c *clusterctlClient) fromDirectory(options MoveOptions) error {
+ func (c *clusterctlClient) fromDirectory(ctx context.Context, options MoveOptions) error {
+@@ -112,7 +116,7 @@ func (c *clusterctlClient) fromDirectory(ctx context.Context, options MoveOption
  		return err
  	}
  
--	return toCluster.ObjectMover().FromDirectory(toCluster, options.FromDirectory)
-+	return toCluster.ObjectMover().FromDirectory(toCluster, options.FromDirectory, options.ClusterName)
+-	return toCluster.ObjectMover().FromDirectory(ctx, toCluster, options.FromDirectory)
++	return toCluster.ObjectMover().FromDirectory(ctx, toCluster, options.FromDirectory, options.ClusterName)
  }
  
- func (c *clusterctlClient) toDirectory(options MoveOptions) error {
-@@ -133,7 +137,7 @@ func (c *clusterctlClient) toDirectory(options MoveOptions) error {
+ func (c *clusterctlClient) toDirectory(ctx context.Context, options MoveOptions) error {
+@@ -134,7 +138,7 @@ func (c *clusterctlClient) toDirectory(ctx context.Context, options MoveOptions)
  		return err
  	}
  
--	return fromCluster.ObjectMover().ToDirectory(options.Namespace, options.ToDirectory)
-+	return fromCluster.ObjectMover().ToDirectory(options.Namespace, options.ToDirectory, options.ClusterName)
+-	return fromCluster.ObjectMover().ToDirectory(ctx, options.Namespace, options.ToDirectory)
++	return fromCluster.ObjectMover().ToDirectory(ctx, options.Namespace, options.ToDirectory, options.ClusterName)
  }
  
- func (c *clusterctlClient) getClusterClient(kubeconfig Kubeconfig) (cluster.Client, error) {
+ func (c *clusterctlClient) getClusterClient(ctx context.Context, kubeconfig Kubeconfig) (cluster.Client, error) {
 diff --git a/cmd/clusterctl/client/move_test.go b/cmd/clusterctl/client/move_test.go
-index 8bf911b45..c2d07f9b5 100644
+index 83ad30d67..f5c516859 100644
 --- a/cmd/clusterctl/client/move_test.go
 +++ b/cmd/clusterctl/client/move_test.go
-@@ -298,11 +298,11 @@ type fakeObjectMover struct {
+@@ -307,11 +307,11 @@ type fakeObjectMover struct {
  	fromDirectoryErr error
  }
  
--func (f *fakeObjectMover) Move(_ string, _ cluster.Client, _ bool, _ ...cluster.ResourceMutatorFunc) error {
-+func (f *fakeObjectMover) Move(_ string, _ cluster.Client, _ string, _ bool, _ ...cluster.ResourceMutatorFunc) error {
+-func (f *fakeObjectMover) Move(_ context.Context, _ string, _ cluster.Client, _ bool, _ ...cluster.ResourceMutatorFunc) error {
++func (f *fakeObjectMover) Move(_ context.Context, _ string, _ cluster.Client, _ string, _ bool, _ ...cluster.ResourceMutatorFunc) error {
  	return f.moveErr
  }
  
--func (f *fakeObjectMover) ToDirectory(_ string, _ string) error {
-+func (f *fakeObjectMover) ToDirectory(_ string, _ string, _ string) error {
+-func (f *fakeObjectMover) ToDirectory(_ context.Context, _ string, _ string) error {
++func (f *fakeObjectMover) ToDirectory(_ context.Context, _ string, _, _ string) error {
  	return f.toDirectoryErr
  }
  
-@@ -310,7 +310,7 @@ func (f *fakeObjectMover) Backup(_ string, _ string) error {
+@@ -319,10 +319,10 @@ func (f *fakeObjectMover) Backup(_ context.Context, _ string, _ string) error {
  	return f.toDirectoryErr
  }
  
--func (f *fakeObjectMover) FromDirectory(_ cluster.Client, _ string) error {
-+func (f *fakeObjectMover) FromDirectory(_ cluster.Client, _ string, _ string) error {
+-func (f *fakeObjectMover) FromDirectory(_ context.Context, _ cluster.Client, _ string) error {
++func (f *fakeObjectMover) FromDirectory(_ context.Context, _ cluster.Client, _, _ string) error {
  	return f.fromDirectoryErr
  }
  
+-func (f *fakeObjectMover) Restore(_ context.Context, _ cluster.Client, _ string) error {
++func (f *fakeObjectMover) Restore(_ context.Context, _ cluster.Client, _, _ string) error {
+ 	return f.fromDirectoryErr
+ }
 diff --git a/cmd/clusterctl/cmd/move.go b/cmd/clusterctl/cmd/move.go
-index c75557e0a..04b1ef8fe 100644
+index c8316b376..7ba98b264 100644
 --- a/cmd/clusterctl/cmd/move.go
 +++ b/cmd/clusterctl/cmd/move.go
-@@ -29,6 +29,7 @@ type moveOptions struct {
+@@ -31,6 +31,7 @@ type moveOptions struct {
  	toKubeconfig          string
  	toKubeconfigContext   string
  	namespace             string
@@ -485,7 +515,7 @@ index c75557e0a..04b1ef8fe 100644
  	fromDirectory         string
  	toDirectory           string
  	dryRun                bool
-@@ -78,6 +79,8 @@ func init() {
+@@ -80,6 +81,8 @@ func init() {
  		"Write Cluster API objects and all dependencies from a management cluster to directory.")
  	moveCmd.Flags().StringVar(&mo.fromDirectory, "from-directory", "",
  		"Read Cluster API objects and all dependencies from a directory into a management cluster.")
@@ -494,7 +524,7 @@ index c75557e0a..04b1ef8fe 100644
  
  	moveCmd.MarkFlagsMutuallyExclusive("to-directory", "to-kubeconfig")
  	moveCmd.MarkFlagsMutuallyExclusive("from-directory", "to-directory")
-@@ -105,6 +108,7 @@ func runMove() error {
+@@ -109,6 +112,7 @@ func runMove() error {
  		FromDirectory:  mo.fromDirectory,
  		ToDirectory:    mo.toDirectory,
  		Namespace:      mo.namespace,
