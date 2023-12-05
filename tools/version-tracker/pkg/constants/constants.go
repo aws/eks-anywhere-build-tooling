@@ -9,6 +9,10 @@ const (
 	BaseRepoOwnerEnvvar         = "BASE_REPO_OWNER"
 	HeadRepoOwnerEnvvar         = "HEAD_REPO_OWNER"
 	GitHubTokenEnvvar           = "GITHUB_TOKEN"
+	CommitAuthorNameEnvvar      = "COMMIT_AUTHOR_NAME"
+	CommitAuthorEmailEnvvar     = "COMMIT_AUTHOR_EMAIL"
+	DefaultCommitAuthorName     = "EKS Distro PR Bot"
+	DefaultCommitAuthorEmail    = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
 	BuildToolingRepoName        = "eks-anywhere-build-tooling"
 	BuildToolingRepoURL         = "https://github.com/aws/eks-anywhere-build-tooling"
 	ReadmeFile                  = "README.md"
@@ -49,6 +53,12 @@ var (
 			BinaryName: "cmctl",
 			Extract:    true,
 		},
+		"containerd/containerd": {
+			AssetName:                "containerd-%s-linux-amd64.tar.gz",
+			BinaryName:               "bin/containerd",
+			Extract:                  true,
+			TrimLeadingVersionPrefix: true,
+		},
 		"fluxcd/flux2": {
 			AssetName:                "flux_%s_linux_amd64.tar.gz",
 			BinaryName:               "flux",
@@ -74,6 +84,11 @@ var (
 		"kubernetes-sigs/kind": {
 			AssetName:  "kind-linux-amd64",
 			BinaryName: "kind-linux-amd64",
+			Extract:    false,
+		},
+		"opencontainers/runc": {
+			AssetName:  "runc.amd64",
+			BinaryName: "runc.amd64",
 			Extract:    false,
 		},
 		"rancher/local-path-provisioner": {
