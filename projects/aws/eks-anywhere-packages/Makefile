@@ -40,6 +40,8 @@ HELM_CHART_NAMES=eks-anywhere-packages-migrations eks-anywhere-packages-crds eks
 
 BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 # building multiple helm charts requires overrides

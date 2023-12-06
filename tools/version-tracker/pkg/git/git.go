@@ -143,6 +143,10 @@ func Push(repo *git.Repository, headRepoOwner, branch, githubToken string) error
 		Force:    true,
 	})
 	if err != nil {
+		if err == git.NoErrAlreadyUpToDate {
+			logger.V(6).Info(fmt.Sprintf("Destination branch [%s] on remote [%s] is already up-to-date", branch, headRepoOwner))
+			return nil
+		}
 		return fmt.Errorf("pushing changes to remote %s: %v", headRepoOwner, err)
 	}
 	return nil
