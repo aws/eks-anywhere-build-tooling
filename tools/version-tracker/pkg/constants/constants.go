@@ -30,12 +30,12 @@ const (
 	MainBranchName              = "main"
 	BaseRepoHeadRevision        = "refs/remotes/origin/main"
 	PullRequestBody             = `This PR bumps %[1]s/%[2]s to the latest Git revision, along with other updates such as Go version, checksums and attribution files.
-	
+
 [Compare changes](https://github.com/%[1]s/%[2]s/compare/%s...%s)
-	
+
+/hold
+
 By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
-	PullRequestHoldLabel           = "do-not-merge/hold"
-	PullRequestWorkInProgressLabel = "do-not-merge/work-in-progress"
 	PatchesCommentBody             = `# This pull request is incomplete!
 The project being upgraded in this pull request needs changes to patches that cannot be handled automatically. A developer will need to regenerate the patches locally and update the pull request. In addition to patches, the checksums and attribution file(s) corresponding to the project will need to be updated.`
 )

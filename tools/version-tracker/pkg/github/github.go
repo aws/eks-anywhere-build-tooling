@@ -285,11 +285,6 @@ func CreatePullRequest(client *github.Client, org, repo, baseRepoOwner, baseBran
 		return fmt.Errorf("creating pull request with updated versions from %s to %s: %v", headBranch, baseBranch, err)
 	}
 
-	_, _, err = client.Issues.AddLabelsToIssue(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, []string{constants.PullRequestHoldLabel, constants.PullRequestWorkInProgressLabel})
-	if err != nil {
-		return fmt.Errorf("adding do-not-merge labels to pull request [%s]: %v", *pullRequest.HTMLURL, err)
-	}
-
 	if projectHasPatches {
 		newComment := &github.IssueComment{
 			Body: github.String(constants.PatchesCommentBody),
