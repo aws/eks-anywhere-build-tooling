@@ -21,7 +21,6 @@ HELM_IMAGE_LIST=metallb/controller metallb/speaker
 HELM_CHART_NAMES=metallb/crds metallb/metallb
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
-EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 SKIP_ON_RELEASE_BRANCH=true
 
 include $(BASE_DIRECTORY)/Common.mk
