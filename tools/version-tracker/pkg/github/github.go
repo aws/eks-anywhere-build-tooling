@@ -179,20 +179,18 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 		var tarballName, tarballUrl string
 		projectReleaseAsset := constants.ProjectReleaseAssets[projectFullName]
 		searchAssetName := projectReleaseAsset.AssetName
+		assetVersionReplacement := latestRevision
+		if constants.ProjectReleaseAssets[projectFullName].TrimLeadingVersionPrefix {
+			assetVersionReplacement = latestRevision[1:]
+		}
 		if strings.Count(searchAssetName, "%s") > 0 {
-			if constants.ProjectReleaseAssets[projectFullName].TrimLeadingVersionPrefix {
-				latestRevision = latestRevision[1:]
-			}
-			searchAssetName = fmt.Sprintf(searchAssetName, latestRevision)
+			searchAssetName = fmt.Sprintf(searchAssetName, assetVersionReplacement)
 		}
 		if projectReleaseAsset.OverrideAssetURL != "" {
 			tarballName = searchAssetName
 			tarballUrl = projectReleaseAsset.OverrideAssetURL
 			if strings.Count(tarballUrl, "%s") > 0 {
-				if constants.ProjectReleaseAssets[projectFullName].TrimLeadingVersionPrefix {
-					latestRevision = latestRevision[1:]
-				}
-				tarballUrl = fmt.Sprintf(tarballUrl, latestRevision)
+				tarballUrl = fmt.Sprintf(tarballUrl, assetVersionReplacement)
 			}
 		} else {
 			for _, asset := range release.Assets {
@@ -228,7 +226,11 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 			}
 		}
 
-		binaryFilePath := filepath.Join(tarballDownloadPath, projectReleaseAsset.BinaryName)
+		binaryName := projectReleaseAsset.BinaryName
+		if strings.Count(binaryName, "%s") > 0 {
+			binaryName = fmt.Sprintf(binaryName, assetVersionReplacement)
+		}
+		binaryFilePath := filepath.Join(tarballDownloadPath, binaryName)
 		goVersion, err = version.GetGoVersion(binaryFilePath)
 		if err != nil {
 			return "", fmt.Errorf("getting Go version embedded in binary [%s]: %v", binaryFilePath, err)

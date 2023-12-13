@@ -8,7 +8,6 @@ REPO=emissary
 REPO_OWNER=emissary-ingress
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
-EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE

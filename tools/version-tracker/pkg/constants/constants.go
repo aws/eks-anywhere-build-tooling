@@ -34,9 +34,10 @@ const (
 [Compare changes](https://github.com/%[1]s/%[2]s/compare/%s...%s)
 
 /hold
+/area dependencies
 
 By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
-	PatchesCommentBody             = `# This pull request is incomplete!
+	PatchesCommentBody = `# This pull request is incomplete!
 The project being upgraded in this pull request needs changes to patches that cannot be handled automatically. A developer will need to regenerate the patches locally and update the pull request. In addition to patches, the checksums and attribution file(s) corresponding to the project will need to be updated.`
 )
 
@@ -48,6 +49,25 @@ var (
 			BinaryName: "cmk.linux.x86-64",
 			Extract:    false,
 		},
+		"aquasecurity/harbor-scanner-trivy": {
+			AssetName:                "harbor-scanner-trivy_%s_Linux_x86_64.tar.gz",
+			BinaryName:               "scanner-trivy",
+			Extract:                  true,
+			TrimLeadingVersionPrefix: true,
+		},
+		"aquasecurity/trivy": {
+			AssetName:                "trivy_%s_Linux-64bit.tar.gz",
+			BinaryName:               "trivy",
+			Extract:                  true,
+			TrimLeadingVersionPrefix: true,
+		},
+		"aws/rolesanywhere-credential-helper": {
+			OverrideAssetURL:         "https://rolesanywhere.amazonaws.com/releases/%s/X86_64/Linux/aws_signing_helper",
+			AssetName:                "aws_signing_helper",
+			BinaryName:               "aws_signing_helper",
+			Extract:                  false,
+			TrimLeadingVersionPrefix: true,
+		},
 		"cert-manager/cert-manager": {
 			AssetName:  "cmctl-linux-amd64.tar.gz",
 			BinaryName: "cmctl",
@@ -56,6 +76,12 @@ var (
 		"containerd/containerd": {
 			AssetName:                "containerd-%s-linux-amd64.tar.gz",
 			BinaryName:               "bin/containerd",
+			Extract:                  true,
+			TrimLeadingVersionPrefix: true,
+		},
+		"distribution/distribution": {
+			AssetName:                "registry_%s_linux_amd64.tar.gz",
+			BinaryName:               "registry",
 			Extract:                  true,
 			TrimLeadingVersionPrefix: true,
 		},
@@ -91,6 +117,18 @@ var (
 			BinaryName: "runc.amd64",
 			Extract:    false,
 		},
+		"prometheus/prometheus": {
+			AssetName:                "prometheus-%s.linux-amd64.tar.gz",
+			BinaryName:               "prometheus-%s.linux-amd64/prometheus",
+			Extract:                  true,
+			TrimLeadingVersionPrefix: true,
+		},
+		"prometheus/node_exporter": {
+			AssetName:                "node_exporter-%s.linux-amd64.tar.gz",
+			BinaryName:               "node_exporter-%s.linux-amd64/node_exporter",
+			Extract:                  true,
+			TrimLeadingVersionPrefix: true,
+		},
 		"rancher/local-path-provisioner": {
 			AssetName:  "local-path-provisioner-amd64",
 			BinaryName: "local-path-provisioner-amd64",
@@ -113,6 +151,14 @@ var (
 		"brancz/kube-rbac-proxy": {
 			SourceOfTruthFile:     ".github/workflows/build.yml",
 			GoVersionSearchString: `go-version: '(1\.\d\d)\.\d+'`,
+		},
+		"emissary-ingress/emissary": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"goharbor/harbor": {
+			SourceOfTruthFile:     "Makefile",
+			GoVersionSearchString: `GOBUILDIMAGE=golang:(1\.\d\d)`,
 		},
 		"fluxcd/helm-controller": {
 			SourceOfTruthFile:     "Dockerfile",
@@ -147,6 +193,10 @@ var (
 			GoVersionSearchString: `GO_IMAGE \?= golang:(1\.\d\d)`,
 		},
 		"nutanix-cloud-native/cluster-api-provider-nutanix": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"metallb/metallb": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},

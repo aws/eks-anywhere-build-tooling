@@ -3,7 +3,7 @@ module github.com/aws/eks-anywhere-build-tooling/tools/version-tracker
 go 1.20
 
 require (
-	github.com/aws/eks-anywhere v0.18.2
+	github.com/aws/eks-anywhere v0.18.3
 	github.com/go-git/go-git/v5 v5.8.1
 	github.com/go-logr/logr v1.2.4
 	github.com/go-logr/zapr v1.2.4

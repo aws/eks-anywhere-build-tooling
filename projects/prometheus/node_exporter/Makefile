@@ -13,7 +13,6 @@ NODE_EXPORTER_IMAGE_COMPONENT=prometheus/node-exporter
 FIX_LICENSES_DENNWC_TARGETS=$(REPO)/vendor/github.com/dennwc/btrfs/LICENSE $(REPO)/vendor/github.com/dennwc/ioctl/LICENSE
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
-EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 SKIP_ON_RELEASE_BRANCH=true
 
 include $(BASE_DIRECTORY)/Common.mk

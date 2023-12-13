@@ -16,7 +16,6 @@ EXTRA_GOBUILD_FLAGS=-tags include_oss,include_gcs
 
 HAS_S3_ARTIFACTS=true
 IMAGE_NAMES=
-EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 FIX_LICENSES_REDIS_TARGET=$(REPO)/vendor/github.com/garyburd/redigo/LICENSE.txt
 
