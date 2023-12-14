@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/aws/eks-anywhere/pkg/semver"
 	"github.com/google/go-github/v53/github"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
@@ -18,8 +19,8 @@ import (
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/version"
 )
 
-// GetReleasesForRepo retrieves the list of releases for the given GitHub repository.
-func GetReleasesForRepo(client *github.Client, org, repo string) ([]*github.RepositoryRelease, error) {
+// getReleasesForRepo retrieves the list of releases for the given GitHub repository.
+func getReleasesForRepo(client *github.Client, org, repo string) ([]*github.RepositoryRelease, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting releases for [%s/%s] repository\n", org, repo))
 	var allReleases []*github.RepositoryRelease
 	listReleasesOptions := &github.ListOptions{
@@ -45,8 +46,8 @@ func GetReleasesForRepo(client *github.Client, org, repo string) ([]*github.Repo
 	return allReleases, nil
 }
 
-// GetTagsForRepo retrieves the list of tags for the given GitHub repository.
-func GetTagsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryTag, error) {
+// getTagsForRepo retrieves the list of tags for the given GitHub repository.
+func getTagsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryTag, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting tags for [%s/%s] repository\n", org, repo))
 	var allTags []*github.RepositoryTag
 	listTagOptions := &github.ListOptions{
@@ -69,8 +70,8 @@ func GetTagsForRepo(client *github.Client, org, repo string) ([]*github.Reposito
 	return allTags, nil
 }
 
-// GetCommitsForRepo retrieves the list of commits for the given GitHub repository.
-func GetCommitsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryCommit, error) {
+// getCommitsForRepo retrieves the list of commits for the given GitHub repository.
+func getCommitsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryCommit, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting commits for [%s/%s] repository\n", org, repo))
 	var allCommits []*github.RepositoryCommit
 	listCommitOptions := &github.CommitsListOptions{
@@ -95,8 +96,8 @@ func GetCommitsForRepo(client *github.Client, org, repo string) ([]*github.Repos
 	return allCommits, nil
 }
 
-// GetCommitDateEpoch gets the Unix epoch time equivalent of a given Github commit's date.
-func GetCommitDateEpoch(client *github.Client, org, repo, commitSHA string) (int64, error) {
+// getCommitDateEpoch gets the Unix epoch time equivalent of a given Github commit's date.
+func getCommitDateEpoch(client *github.Client, org, repo, commitSHA string) (int64, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting date for commit %s in [%s/%s] repository\n", commitSHA, org, repo))
 
 	commit, _, err := client.Repositories.GetCommit(context.Background(), org, repo, commitSHA, nil)
@@ -108,51 +109,121 @@ func GetCommitDateEpoch(client *github.Client, org, repo, commitSHA string) (int
 }
 
 // GetLatestRevision returns the latest revision (GitHub release or tag) for a given GitHub repository.
-func GetLatestRevision(client *github.Client, org, repo string) (string, string, []*github.RepositoryTag, error) {
+func GetLatestRevision(client *github.Client, org, repo, currentRevision string) (string, bool, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository\n", org, repo))
 	var latestRevision string
-	allReleases, err := GetReleasesForRepo(client, org, repo)
+	needsUpgrade := false
+
+	// Get all GitHub releases for this project.
+	allReleases, err := getReleasesForRepo(client, org, repo)
 	if err != nil {
-		return "", "", nil, fmt.Errorf("getting all releases for [%s/%s] repository: %v", org, repo, err)
+		return "", false, fmt.Errorf("getting all releases for [%s/%s] repository: %v", org, repo, err)
 	}
 
-	allTags, err := GetTagsForRepo(client, org, repo)
+	// Get all GitHub tags for this project.
+	allTags, err := getTagsForRepo(client, org, repo)
 	if err != nil {
-		return "", "", nil, fmt.Errorf("getting all tags for [%s/%s] repository: %v", org, repo, err)
+		return "", false, fmt.Errorf("getting all tags for [%s/%s] repository: %v", org, repo, err)
 	}
+
+	// Get commit hash corresponding to current revision tag.
+	currentRevisionCommit := getCommitForTag(allTags, currentRevision)
+
+	// Get Unix timestamp for current revision's commit.
+	currentRevisionCommitEpoch, err := getCommitDateEpoch(client, org, repo, currentRevisionCommit)
+	if err != nil {
+		return "", false, fmt.Errorf("getting epoch time corresponding to current revision commit: %v", err)
+	}
+
+	// Get SemVer construct corresponding to the current revision tag.
+	currentRevisionSemver, err := semver.New(currentRevision)
+	if err != nil {
+		return "", false, fmt.Errorf("getting semver for current version: %v", err)
+	}
+
+	// If the project has GitHub releases, determine the latest from among them.
 	if len(allReleases) > 0 {
-		latestRevision = *allReleases[0].TagName
-	} else {
-		if len(allTags) > 0 {
-			latestRevision = *allTags[0].Name
-		} else {
-			allCommits, err := GetCommitsForRepo(client, org, repo)
+		for _, release := range allReleases {
+			latestRevision = *release.TagName
+
+			// Determine if upgrade is required based on current and latest revisions
+			upgradeRequired, shouldBreak, err := isUpgradeRequired(client, org, repo, latestRevision, currentRevisionCommitEpoch, currentRevisionSemver, allTags)
 			if err != nil {
-				return "", "", nil, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
+				return "", false, fmt.Errorf("determining if upgrade is required for project: %v", err)
+			}
+			if shouldBreak {
+				needsUpgrade = upgradeRequired
+				break
+			}
+		}
+	} else {
+		// If the project doesn't have GitHub releases but has tags on GitHub, determine the latest from among them.
+		if len(allTags) > 0 {
+			for _, tag := range allTags {
+				latestRevision = *tag.Name
+
+				// Determine if upgrade is required based on current and latest revisions
+				upgradeRequired, shouldBreak, err := isUpgradeRequired(client, org, repo, latestRevision, currentRevisionCommitEpoch, currentRevisionSemver, allTags)
+				if err != nil {
+					return "", false, fmt.Errorf("determining if upgrade is required for project: %v", err)
+				}
+				if shouldBreak {
+					needsUpgrade = upgradeRequired
+					break
+				}
+			}
+		} else {
+			// If the project has neither Github releases nor tags, pick the latest commit.
+			allCommits, err := getCommitsForRepo(client, org, repo)
+			if err != nil {
+				return "", false, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
 			}
 			latestRevision = *allCommits[0].SHA
+			needsUpgrade = true
 		}
 	}
 
-	var latestRevisionCommit string
-	commitHashMatch, err := regexp.MatchString("^[0-9a-f]{40}$", latestRevision)
-	if err != nil {
-		return "", "", nil, fmt.Errorf("checking if latest revision is a commit hash: %v", err)
-	}
-	if commitHashMatch {
-		latestRevisionCommit = latestRevision
-	} else {
-		latestRevisionCommit = GetCommitForTag(allTags, latestRevision)
-		if latestRevisionCommit == "" {
-			return "", "", nil, fmt.Errorf("empty commit hash for latest revision: %s", latestRevision)
-		}
-	}
-
-	return latestRevision, latestRevisionCommit, allTags, nil
+	return latestRevision, needsUpgrade, nil
 }
 
-// GetCommitForTag returns the commit hash corresponding to the given tag.
-func GetCommitForTag(allTags []*github.RepositoryTag, searchTag string) string {
+// isUpgradeRequired determines if the project requires an upgrade by comparing the current revision to the latest revision.
+func isUpgradeRequired(client *github.Client, org, repo, latestRevision string, currentRevisionCommitEpoch int64, currentRevisionSemver *semver.Version, allTags []*github.RepositoryTag) (bool, bool, error) {
+	needsUpgrade := false
+	shouldBreak := false
+
+	// Get commit hash corresponding to latest revision tag.
+	latestRevisionCommit := getCommitForTag(allTags, latestRevision)
+	if latestRevisionCommit == "" {
+		return false, false, fmt.Errorf("empty commit hash for latest revision: %s", latestRevision)
+	}
+
+	// Get Unix timestamp for latest revision's commit.
+	latestRevisionCommitEpoch, err := getCommitDateEpoch(client, org, repo, latestRevisionCommit)
+	if err != nil {
+		return false, false, fmt.Errorf("getting epoch time corresponding to latest revision commit: %v", err)
+	}
+
+	// Get SemVer construct corresponding to the latest revision tag.
+	latestRevisionSemver, err := semver.New(latestRevision)
+	if err != nil {
+		return false, false, fmt.Errorf("getting semver for latest version: %v", err)
+	}
+
+	// If the latest revision comes after the current revision both chronologically and semantically, then declare that
+	// an upgrade is required
+	if latestRevisionCommitEpoch > currentRevisionCommitEpoch && latestRevisionSemver.GreaterThan(currentRevisionSemver) {
+		needsUpgrade = true
+		shouldBreak = true
+	} else if latestRevisionSemver.Equal(currentRevisionSemver) {
+		needsUpgrade = false
+		shouldBreak = true
+	}
+
+	return needsUpgrade, shouldBreak, nil
+}
+
+// getCommitForTag returns the commit hash corresponding to the given tag.
+func getCommitForTag(allTags []*github.RepositoryTag, searchTag string) string {
 	for _, tag := range allTags {
 		if searchTag == *tag.Name {
 			return *tag.Commit.SHA

@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/eks-anywhere/pkg/semver"
 	gogithub "github.com/google/go-github/v53/github"
 	"gopkg.in/yaml.v3"
 
@@ -103,12 +102,6 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		return fmt.Errorf("release-branched projects not supported at this time")
 	}
 
-	// Get latest revision for the project from GitHub.
-	latestRevision, latestRevisionCommit, allTags, err := github.GetLatestRevision(client, projectOrg, projectRepo)
-	if err != nil {
-		return fmt.Errorf("getting latest revision from GitHub: %v", err)
-	}
-
 	currentVersion := targetRepo.Versions[0]
 	// Validate whether the project builds off a commit hash instead of a tag.
 	if currentVersion.Tag == "" {
@@ -116,33 +109,15 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 	}
 	currentRevision := currentVersion.Tag
 
-	// Get commit hash corresponding to current revision tag.
-	currentRevisionCommit := github.GetCommitForTag(allTags, currentRevision)
-
-	// Get Unix timestamp for current revision's commit
-	currentRevisionCommitEpoch, err := github.GetCommitDateEpoch(client, projectOrg, projectRepo, currentRevisionCommit)
+	// Get latest revision for the project from GitHub.
+	latestRevision, needsUpgrade, err := github.GetLatestRevision(client, projectOrg, projectRepo, currentRevision)
 	if err != nil {
-		return fmt.Errorf("getting epoch time corresponding to current revision commit: %v", err)
+		return fmt.Errorf("getting latest revision from GitHub: %v", err)
 	}
 
-	// Get Unix timestamp for latest revision's commit
-	latestRevisionCommitEpoch, err := github.GetCommitDateEpoch(client, projectOrg, projectRepo, latestRevisionCommit)
-	if err != nil {
-		return fmt.Errorf("getting epoch time corresponding to latest revision commit: %v", err)
-	}
-
-	currentRevisionSemver, err := semver.New(currentRevision)
-	if err != nil {
-		return fmt.Errorf("getting semver for current version: %v", err)
-	}
-
-	latestRevisionSemver, err := semver.New(latestRevision)
-	if err != nil {
-		return fmt.Errorf("getting semver for latest version: %v", err)
-	}
-
-	// Upgrade project if latest commit was made after current commit.
-	if latestRevisionCommitEpoch > currentRevisionCommitEpoch || latestRevisionSemver.GreaterThan(currentRevisionSemver) {
+	// Upgrade project if latest commit was made after current commit and the semver of the latest revision is
+	// greater than the semver of the current version.
+	if needsUpgrade {
 		logger.Info("Project is out of date.", "Current version", currentRevision, "Latest version", latestRevision)
 
 		var updatedFiles []string

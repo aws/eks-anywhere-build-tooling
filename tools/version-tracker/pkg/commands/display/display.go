@@ -77,7 +77,7 @@ func Run(displayOptions *types.DisplayOptions) error {
 			}
 
 			// Get latest revision for the project from GitHub.
-			latestRevision, _, _, err := github.GetLatestRevision(client, org, repoName)
+			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from GitHub: %v", err)
 			}
