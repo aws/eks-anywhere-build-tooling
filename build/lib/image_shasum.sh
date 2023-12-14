@@ -28,11 +28,8 @@ TMPFILE=$(mktemp)
 trap "rm -f $TMPFILE" exit
 TARGET=${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}
 
->&2 echo -n "Checking for the existence of ${TARGET}..."
-if skopeo inspect -n --raw docker://${TARGET} >${TMPFILE} 2>/dev/null; then
-  >&2 echo "Found!"
+if build::common::echo_and_run skopeo inspect -n --raw docker://${TARGET} >${TMPFILE}; then
+  >&2 echo "Found: $(skopeo manifest-digest ${TMPFILE})"
   skopeo manifest-digest ${TMPFILE}
-else
-  >&2 echo "Not Found!"
 fi
 
