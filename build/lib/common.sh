@@ -532,13 +532,13 @@ function build::common::copy_if_source_destination_different() {
   cp -rf $source $destination
 }
 
-function build::common::check_for_qemu() {
+function build::common::is_qemu_available() {
   local -r platform="$1"
 
   if [ "${CODEBUILD_CI:-false}" = "true" ]; then
     # code build is running in a container so we cant rely on checking for the proc file
     # since it would be on the host directly
-    return
+    return 0
   fi
 
   local -r normalized_platform="$(echo "${platform}" | sed 's/linux\/arm64/aarch64/g;s/linux\/amd64/x86_64/g')"
@@ -546,14 +546,26 @@ function build::common::check_for_qemu() {
   if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" != "$normalized_platform" ]; then
     local -r qemu_file="qemu-${normalized_platform}"
     if [ ! -f "/proc/sys/fs/binfmt_misc/$qemu_file" ] || ! grep -q "enabled" "/proc/sys/fs/binfmt_misc/$qemu_file"; then
-      echo "****************************************************************"
-      echo "You are trying to run, or build, a $platform based container which does not match your host architecture."
-      echo "Run the following to register qemu virtualization:"
-      echo "docker run --privileged --rm public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v6.1.0 --install aarch64,amd64"
-      echo "****************************************************************"
-      exit 1
+      return 1
     fi
   fi
+
+  return 0
+}
+
+function build::common::check_for_qemu() {
+  local -r platform="$1"
+  
+  if build::common::is_qemu_available "$platform"; then
+    return
+  fi
+
+  echo "****************************************************************"
+  echo "You are trying to run, or build, a $platform based container which does not match your host architecture."
+  echo "Run the following to register qemu virtualization:"
+  echo "docker run --privileged --rm public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v6.1.0 --install aarch64,amd64"
+  echo "****************************************************************"
+  exit 1
 }
 
 # Marker function to indicate script has been fully sourced
