@@ -19,6 +19,8 @@ set -o pipefail
 
 BUILD_LIB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd -P)"
 
+source "$BUILD_LIB_ROOT/common.sh"
+
 if [ "${USE_BUILDX:-}" == "true" ]; then
     printf "\nBuilding with docker buildx\n" >&2
 
@@ -40,6 +42,22 @@ if [ "${USE_BUILDX:-}" == "true" ]; then
                     ARGS+="--${1/filename/file} "
                 elif [[ $1 = "no-cache"* ]]; then
                     ARGS+="--${1/no-cache/no-cache-filter} "
+                elif [[ $1 = "platform"* ]]; then
+                    platforms="${1#platform=}"
+                    platforms=(${platforms//,/ })
+                    for platform in "${platforms[@]}"; do
+                        if build::common::is_qemu_available "$platform"; then
+                            continue
+                        fi
+
+                        >&2 echo -e "\n****************************************************************"
+                        >&2 echo "You are trying to build a $platform based container which does not match your host architecture."
+                        >&2 echo "You may run into issues due to docker/buildkit's builtin version of qemu."
+                        >&2 echo "If you have weird issues that seem to only affect one platform try running the following to register qemu virtualization manually:"
+                        >&2 echo "docker run --privileged --rm public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v6.1.0 --install aarch64,amd64"
+                        >&2 echo -e "****************************************************************\n"
+                    done
+                    ARGS+="--${1/:/ } "
                 else
                     ARGS+="--${1/:/ } "
                 fi
