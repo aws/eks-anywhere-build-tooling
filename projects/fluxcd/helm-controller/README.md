@@ -1,5 +1,5 @@
 ## **Helm Controller**
-![Version](https://img.shields.io/badge/version-v0.37.1-blue)
+![Version](https://img.shields.io/badge/version-v0.37.2-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiS045T05yUXhCRzNPeXZwczkwcjgrbm8wOWJmSXZ6dll3eHBlVTV3bERUSlhadlRyOGE1Q1AzeWpEQTlvN2RISG9MNnMrMGRmOG1FZ2N2d0Nxc0l0b2UwPSIsIml2UGFyYW1ldGVyU3BlYyI6IlpJMTJ1cUxhdzc4bWlqNFUiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [helm-controller](https://github.com/fluxcd/helm-controller) is a Kubernetes operator that allows users to declaratively manage Helm chart releases. The desired state of a Helm release is described through a Kubernetes Custom Resource named HelmRelease. Based on the creation, mutation or removal of a HelmRelease resource in the cluster, Helm actions are performed by the operator.
@@ -36,3 +36,4 @@ added runtime deps.
 1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
+1. When upgrading helm-controller to a new version, make sure to upgrade the fluxcd/flux2 project to a release that supports this version of helm-controller.

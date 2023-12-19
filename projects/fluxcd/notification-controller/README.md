@@ -15,7 +15,7 @@ about changes necessary to eks-anywhere to support the new version and/or automa
 eks-anywhere version reach out to @jiayiwang7 or @danbudris
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes. 
-ex: [v1.0.0 compared to v1.2.3](https://github.com/fluxcd/notification-controller/compare/v1.0.0...v1.2.0). Check the `manager` target for
+ex: [v1.2.2 compared to v1.2.3](https://github.com/fluxcd/notification-controller/compare/v1.2.2...v1.2.3). Check the `manager` target for
 any build flag changes, tag changes, dependencies, etc.
 1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.  There is also
 a [dockerfile](https://github.com/fluxcd/notification-controller/blob/main/Dockerfile#L5) they use for building which has it defined.
@@ -24,3 +24,4 @@ added runtime deps.
 1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
+1. When upgrading notification-controller to a new version, make sure to upgrade the fluxcd/flux2 project to a release that supports this version of notification-controller.
