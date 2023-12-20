@@ -5,8 +5,10 @@ REPO=rolesanywhere-credential-helper
 REPO_OWNER=aws
 
 BINARY_TARGET_FILES=aws_signing_helper
-SOURCE_PATTERNS=./cmd/aws_signing_helper
+SOURCE_PATTERNS=.
+EXTRA_GOBUILD_FLAGS=-buildmode=pie
 EXTRA_GO_LDFLAGS=-X k8s.io/component-base/version.gitVersion=$(GIT_TAG)
+CGO_CREATE_BINARIES=true
 
 HAS_S3_ARTIFACTS=true
 
