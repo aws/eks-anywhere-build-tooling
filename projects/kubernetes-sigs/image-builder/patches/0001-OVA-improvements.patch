@@ -1,16 +1,67 @@
-From c1cf6093ad760214200f68f5f826c7d1c8b4f73f Mon Sep 17 00:00:00 2001
+From 5d24708a478702444bebc8ce433ad6a0db368a80 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
-Date: Tue, 11 Jan 2022 21:00:12 -0800
-Subject: [PATCH 02/27] Output vsphere builds to content library instead of
- exports
+Date: Tue, 11 Jan 2022 21:05:13 -0800
+Subject: [PATCH 1/10] OVA improvements
+
+- Creat /etc/pki/tls/certs dir as part of image-builds
+- Tweak Product info in OVF
+- Output vsphere builds to content library instead of exports
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
- images/capi/packer/ova/packer-node.json | 36 ++++++++++++++++---------
- 1 file changed, 24 insertions(+), 12 deletions(-)
+ .../capi/ansible/roles/sysprep/tasks/main.yml |  9 +++++
+ images/capi/hack/ovf_template.xml             | 10 +----
+ images/capi/packer/ova/packer-node.json       | 37 +++++++++++++------
+ 3 files changed, 36 insertions(+), 20 deletions(-)
 
+diff --git a/images/capi/ansible/roles/sysprep/tasks/main.yml b/images/capi/ansible/roles/sysprep/tasks/main.yml
+index 975506921..0aab7f565 100644
+--- a/images/capi/ansible/roles/sysprep/tasks/main.yml
++++ b/images/capi/ansible/roles/sysprep/tasks/main.yml
+@@ -27,6 +27,15 @@
+ - import_tasks: photon.yml
+   when: ansible_os_family == "VMware Photon OS"
+ 
++- name: Get stats of the /etc/pki folder
++  ansible.builtin.stat:
++    path: /etc/pki
++  register: pki
++
++- name: Ensures /etc/pki/tls/certs dir exists
++  file: path=/etc/pki/tls/certs state=directory
++  when: pki.stat.isdir is defined and pki.stat.isdir
++
+ - name: Remove containerd http proxy conf file if needed
+   file:
+     path: /etc/systemd/system/containerd.service.d/http-proxy.conf
+diff --git a/images/capi/hack/ovf_template.xml b/images/capi/hack/ovf_template.xml
+index 316427ec3..ca23db5f9 100644
+--- a/images/capi/hack/ovf_template.xml
++++ b/images/capi/hack/ovf_template.xml
+@@ -147,19 +147,13 @@
+     <vmw:BootOrderSection vmw:instanceId="8" vmw:type="disk">
+       <Info>Virtual hardware device boot order</Info>
+     </vmw:BootOrderSection>
+-    <EulaSection>
+-      <Info>An end-user license agreement</Info>
+-      <License>
+-${EULA}
+-      </License>
+-    </EulaSection>
+     <ProductSection>
+       <Info>Information about the installed software</Info>
+       <Product>${PRODUCT}</Product>
+-      <Vendor>VMware Inc.</Vendor>
++      <Vendor>AWS</Vendor>
+       <Version>${TYPED_VERSION}</Version>
+       <FullVersion>${TYPED_VERSION}</FullVersion>
+-      <VendorUrl>https://vmware.com</VendorUrl>
++      <VendorUrl>https://aws.amazon.com/</VendorUrl>
+       <Category>Cluster API Provider (CAPI)</Category>
+       <Property ovf:userConfigurable="false" ovf:value="${BUILD_TIMESTAMP}" ovf:type="string" ovf:key="BUILD_TIMESTAMP"/>
+       <Property ovf:userConfigurable="false" ovf:value="${BUILD_DATE}" ovf:type="string" ovf:key="BUILD_DATE"/>
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 64eb272cb..dc308e490 100644
+index 64eb272cb..a0d2591ec 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
 @@ -184,6 +184,12 @@
@@ -77,18 +128,19 @@ index 64eb272cb..dc308e490 100644
      {
        "custom_data": {
          "build_date": "{{isotime}}",
-@@ -323,7 +332,9 @@
+@@ -323,7 +332,10 @@
        ],
        "inline": [
          "cd {{user `output_dir`}}",
 -        "../../hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ../../hack/ovf_eula.txt --ovf_template ../../hack/ovf_template.xml --vmdk_file {{user `build_version`}}-disk-0.vmdk"
-+        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}",
++        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}.ovf",
++        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-1.vmdk",
 +        "govc library.rm /{{user `vsphere_library_name`}}/{{user `build_version`}}",
 +        "../hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ../hack/ovf_eula.txt --ovf_template ../hack/ovf_template.xml --vmdk_file {{user `build_version`}}-1.vmdk"
        ],
        "name": "vsphere",
        "type": "shell-local"
-@@ -508,6 +519,7 @@
+@@ -508,6 +520,7 @@
      "resource_pool": "",
      "username": "",
      "vcenter_server": "",
@@ -98,5 +150,5 @@ index 64eb272cb..dc308e490 100644
    }
  }
 -- 
-2.39.2
+2.34.1
 

@@ -1,0 +1,322 @@
+From 9f2eebaa6a0bd12027f6f645c9b6643bfe0929a4 Mon Sep 17 00:00:00 2001
+From: Vignesh Goutham Ganesh <vgg@amazon.com>
+Date: Tue, 11 Jan 2022 18:36:56 -0800
+Subject: [PATCH 2/10] EKS-D support and changes
+
+- Add goss validations for EKS-D artifacts
+- Add etcdadm and etcd.tar.gz to image for unstacked etcd support
+- Additional EKS-A specific goss validations
+- Support crictl validation from input checksum
+- Add EKS-A specific inline Goss vars to all supported providers
+- Use tar.gz extension for CNI plugins tarball
+
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+---
+ .../roles/kubernetes/tasks/crictl-url.yml     | 15 +-------
+ .../ansible/roles/kubernetes/tasks/url.yml    | 37 ++++++++++++++++++-
+ images/capi/packer/ami/packer.json            |  7 +++-
+ images/capi/packer/config/ansible-args.json   |  2 +-
+ images/capi/packer/config/kubernetes.json     |  4 ++
+ images/capi/packer/goss/goss-command.yaml     | 20 +++++++++-
+ images/capi/packer/goss/goss-files.yaml       |  6 +++
+ images/capi/packer/goss/goss-vars.yaml        |  6 +++
+ images/capi/packer/nutanix/packer.json        |  7 +++-
+ images/capi/packer/ova/packer-node.json       |  7 +++-
+ images/capi/packer/qemu/packer.json           |  7 +++-
+ images/capi/packer/raw/packer.json            |  7 +++-
+ 12 files changed, 102 insertions(+), 23 deletions(-)
+
+diff --git a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
+index 9ae4f81b1..1ef16318a 100644
+--- a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
++++ b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
+@@ -12,23 +12,10 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ ---
+-- name: Download crictl checksum
+-  get_url:
+-    url: "{{ crictl_sha256 }}"
+-    dest: /tmp/crictl.tar.gz.sha256
+-    mode: 0600
+-
+-- name: Register checksum value for crictl
+-  slurp:
+-    src: /tmp/crictl.tar.gz.sha256
+-  register: csum
+-
+ - name: download crictl
+-  vars:
+-    sha256: "{{ csum['content'] | b64decode | trim }}"
+   get_url:
+     url: "{{ crictl_url }}"
+-    checksum: "sha256:{{ sha256 }}"
++    checksum: "sha256:{{ crictl_sha256 }}"
+     dest: /tmp/crictl.tar.gz
+     mode: 0600
+ 
+diff --git a/images/capi/ansible/roles/kubernetes/tasks/url.yml b/images/capi/ansible/roles/kubernetes/tasks/url.yml
+index 83de5a486..99bf2f843 100644
+--- a/images/capi/ansible/roles/kubernetes/tasks/url.yml
++++ b/images/capi/ansible/roles/kubernetes/tasks/url.yml
+@@ -12,6 +12,41 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ ---
++- name: Download etcdadm binary
++  get_url:
++    url: "{{ etcdadm_http_source }}"
++    dest: "/tmp/etcdadm.tar.gz"
++    mode: 0755
++    owner: root
++    group: root
++
++- name: Install etcdadm
++  unarchive:
++    remote_src: yes
++    dest: "{{ sysusr_prefix }}/bin"
++    src: /tmp/etcdadm.tar.gz
++
++- name: Remove etcdadm tarball
++  file:
++    state: absent
++    path: /tmp/etcdadm.tar.gz
++
++- name: Create etcdadm cache directory
++  file:
++    state: directory
++    path: /var/cache/etcdadm/etcd/{{ etcd_version }}/
++    mode: 0755
++    owner: root
++    group: root
++
++- name: Download etcd tarball
++  get_url:
++    url: "{{ etcd_http_source }}"
++    dest: "/var/cache/etcdadm/etcd/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-amd64.tar.gz"
++    mode: 0755
++    owner: root
++    group: root
++
+ - name: Create CNI directory
+   file:
+     state: directory
+@@ -22,7 +57,7 @@
+ 
+ - name: Download CNI tarball
+   get_url:
+-    url: "{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_goarch }}-{{ kubernetes_cni_semver }}.tgz"
++    url: "{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_goarch }}-{{ kubernetes_cni_semver }}.tar.gz"
+     checksum: "{{ kubernetes_cni_http_checksum }}"
+     dest: /tmp/cni.tar.gz
+     mode: 0755
+diff --git a/images/capi/packer/ami/packer.json b/images/capi/packer/ami/packer.json
+index 3117354cd..27a4ebfd6 100644
+--- a/images/capi/packer/ami/packer.json
++++ b/images/capi/packer/ami/packer.json
+@@ -133,7 +133,12 @@
+         "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
+         "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0 }}",
+         "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
+-        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}"
++        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}",
++        "etcdadm_version": "{{ user `etcdadm_version` }}",
++        "etcd_version": "{{ user `etcd_version` }}",
++        "etcd_sha256": "{{ user `etcd_sha256` }}",
++        "pause_image": "{{ user `pause_image` }}",
++        "kubernetes_cni_host_device_sha256": "{{ user `kubernetes_cni_host_device_sha256` }}"
+       },
+       "version": "{{user `goss_version`}}"
+     }
+diff --git a/images/capi/packer/config/ansible-args.json b/images/capi/packer/config/ansible-args.json
+index f28889c44..4176c8ff9 100644
+--- a/images/capi/packer/config/ansible-args.json
++++ b/images/capi/packer/config/ansible-args.json
+@@ -1,5 +1,5 @@
+ {
+   "ansible_common_ssh_args": "-o IdentitiesOnly=yes",
+-  "ansible_common_vars": "containerd_url={{user `containerd_url`}} containerd_sha256={{user `containerd_sha256`}} pause_image={{user `pause_image`}} containerd_additional_settings={{user `containerd_additional_settings`}} containerd_cri_socket={{user `containerd_cri_socket`}} containerd_version={{user `containerd_version`}} containerd_wasm_shims_url={{user `containerd_wasm_shims_url`}} containerd_wasm_shims_version={{user `containerd_wasm_shims_version`}} containerd_wasm_shims_sha256={{user `containerd_wasm_shims_sha256`}} containerd_wasm_shims_runtimes=\"{{user `containerd_wasm_shims_runtimes`}}\" crictl_url={{user `crictl_url`}} crictl_sha256={{user `crictl_sha256`}} crictl_source_type={{user `crictl_source_type`}} custom_role_names=\"{{user `custom_role_names`}}\" firstboot_custom_roles_pre=\"{{user `firstboot_custom_roles_pre`}}\" firstboot_custom_roles_post=\"{{user `firstboot_custom_roles_post`}}\" node_custom_roles_pre=\"{{user `node_custom_roles_pre`}}\" node_custom_roles_post=\"{{user `node_custom_roles_post`}}\" disable_public_repos={{user `disable_public_repos`}} extra_debs=\"{{user `extra_debs`}}\" extra_repos=\"{{user `extra_repos`}}\" extra_rpms=\"{{user `extra_rpms`}}\" http_proxy={{user `http_proxy`}} https_proxy={{user `https_proxy`}} kubeadm_template={{user `kubeadm_template`}} kubernetes_apiserver_port={{user `kubernetes_apiserver_port`}} kubernetes_cni_http_source={{user `kubernetes_cni_http_source`}} kubernetes_cni_http_checksum={{user `kubernetes_cni_http_checksum`}} kubernetes_goarch={{user `kubernetes_goarch`}} kubernetes_http_source={{user `kubernetes_http_source`}} kubernetes_container_registry={{user `kubernetes_container_registry`}} kubernetes_rpm_repo={{user `kubernetes_rpm_repo`}} kubernetes_rpm_gpg_key={{user `kubernetes_rpm_gpg_key`}} kubernetes_rpm_gpg_check={{user `kubernetes_rpm_gpg_check`}} kubernetes_deb_repo={{user `kubernetes_deb_repo`}} kubernetes_deb_gpg_key={{user `kubernetes_deb_gpg_key`}} kubernetes_cni_deb_version={{user `kubernetes_cni_deb_version`}} kubernetes_cni_rpm_version={{user `kubernetes_cni_rpm_version`}} kubernetes_cni_semver={{user `kubernetes_cni_semver`}} kubernetes_cni_source_type={{user `kubernetes_cni_source_type`}} kubernetes_semver={{user `kubernetes_semver`}} kubernetes_source_type={{user `kubernetes_source_type`}} kubernetes_load_additional_imgs={{user `kubernetes_load_additional_imgs`}} kubernetes_deb_version={{user `kubernetes_deb_version`}} kubernetes_rpm_version={{user `kubernetes_rpm_version`}} no_proxy={{user `no_proxy`}} pip_conf_file={{user `pip_conf_file`}} python_path={{user `python_path`}} redhat_epel_rpm={{user `redhat_epel_rpm`}} epel_rpm_gpg_key={{user `epel_rpm_gpg_key`}} reenable_public_repos={{user `reenable_public_repos`}} remove_extra_repos={{user `remove_extra_repos`}} systemd_prefix={{user `systemd_prefix`}} sysusr_prefix={{user `sysusr_prefix`}} sysusrlocal_prefix={{user `sysusrlocal_prefix`}} load_additional_components={{ user `load_additional_components`}} additional_registry_images={{ user `additional_registry_images`}} additional_registry_images_list={{ user `additional_registry_images_list`}} additional_url_images={{ user `additional_url_images`}} additional_url_images_list={{ user `additional_url_images_list`}} additional_executables={{ user `additional_executables`}} additional_executables_list={{ user `additional_executables_list`}} additional_executables_destination_path={{ user `additional_executables_destination_path`}} additional_s3={{ user `additional_s3`}} build_target={{ user `build_target`}} amazon_ssm_agent_rpm={{ user `amazon_ssm_agent_rpm` }} enable_containerd_audit={{ user `enable_containerd_audit` }}",
++  "ansible_common_vars": "containerd_url={{user `containerd_url`}} containerd_sha256={{user `containerd_sha256`}} pause_image={{user `pause_image`}} containerd_additional_settings={{user `containerd_additional_settings`}} containerd_cri_socket={{user `containerd_cri_socket`}} containerd_version={{user `containerd_version`}} containerd_wasm_shims_url={{user `containerd_wasm_shims_url`}} containerd_wasm_shims_version={{user `containerd_wasm_shims_version`}} containerd_wasm_shims_sha256={{user `containerd_wasm_shims_sha256`}} containerd_wasm_shims_runtimes=\"{{user `containerd_wasm_shims_runtimes`}}\" crictl_url={{user `crictl_url`}} crictl_sha256={{user `crictl_sha256`}} crictl_source_type={{user `crictl_source_type`}} custom_role_names=\"{{user `custom_role_names`}}\" firstboot_custom_roles_pre=\"{{user `firstboot_custom_roles_pre`}}\" firstboot_custom_roles_post=\"{{user `firstboot_custom_roles_post`}}\" node_custom_roles_pre=\"{{user `node_custom_roles_pre`}}\" node_custom_roles_post=\"{{user `node_custom_roles_post`}}\" disable_public_repos={{user `disable_public_repos`}} extra_debs=\"{{user `extra_debs`}}\" extra_repos=\"{{user `extra_repos`}}\" extra_rpms=\"{{user `extra_rpms`}}\" http_proxy={{user `http_proxy`}} https_proxy={{user `https_proxy`}} kubeadm_template={{user `kubeadm_template`}} kubernetes_apiserver_port={{user `kubernetes_apiserver_port`}} kubernetes_cni_http_source={{user `kubernetes_cni_http_source`}} kubernetes_cni_http_checksum={{user `kubernetes_cni_http_checksum`}} kubernetes_goarch={{user `kubernetes_goarch`}} kubernetes_http_source={{user `kubernetes_http_source`}} kubernetes_container_registry={{user `kubernetes_container_registry`}} kubernetes_rpm_repo={{user `kubernetes_rpm_repo`}} kubernetes_rpm_gpg_key={{user `kubernetes_rpm_gpg_key`}} kubernetes_rpm_gpg_check={{user `kubernetes_rpm_gpg_check`}} kubernetes_deb_repo={{user `kubernetes_deb_repo`}} kubernetes_deb_gpg_key={{user `kubernetes_deb_gpg_key`}} kubernetes_cni_deb_version={{user `kubernetes_cni_deb_version`}} kubernetes_cni_rpm_version={{user `kubernetes_cni_rpm_version`}} kubernetes_cni_semver={{user `kubernetes_cni_semver`}} kubernetes_cni_source_type={{user `kubernetes_cni_source_type`}} kubernetes_semver={{user `kubernetes_semver`}} kubernetes_source_type={{user `kubernetes_source_type`}} kubernetes_load_additional_imgs={{user `kubernetes_load_additional_imgs`}} kubernetes_deb_version={{user `kubernetes_deb_version`}} kubernetes_rpm_version={{user `kubernetes_rpm_version`}} no_proxy={{user `no_proxy`}} pip_conf_file={{user `pip_conf_file`}} python_path={{user `python_path`}} redhat_epel_rpm={{user `redhat_epel_rpm`}} epel_rpm_gpg_key={{user `epel_rpm_gpg_key`}} reenable_public_repos={{user `reenable_public_repos`}} remove_extra_repos={{user `remove_extra_repos`}} systemd_prefix={{user `systemd_prefix`}} sysusr_prefix={{user `sysusr_prefix`}} sysusrlocal_prefix={{user `sysusrlocal_prefix`}} load_additional_components={{ user `load_additional_components`}} additional_registry_images={{ user `additional_registry_images`}} additional_registry_images_list={{ user `additional_registry_images_list`}} additional_url_images={{ user `additional_url_images`}} additional_url_images_list={{ user `additional_url_images_list`}} additional_executables={{ user `additional_executables`}} additional_executables_list={{ user `additional_executables_list`}} additional_executables_destination_path={{ user `additional_executables_destination_path`}} additional_s3={{ user `additional_s3`}} build_target={{ user `build_target`}} amazon_ssm_agent_rpm={{ user `amazon_ssm_agent_rpm` }} enable_containerd_audit={{ user `enable_containerd_audit` }} etcd_http_source={{user `etcd_http_source`}} etcd_version={{user `etcd_version`}} etcdadm_http_source={{user `etcdadm_http_source`}} etcd_sha256={{user `etcd_sha256`}} etcdadm_version={{user `etcdadm_version`}}",
+   "ansible_scp_extra_args": "{{env `ANSIBLE_SCP_EXTRA_ARGS`}}"
+ }
+diff --git a/images/capi/packer/config/kubernetes.json b/images/capi/packer/config/kubernetes.json
+index 9cce0a96a..37fd9e4eb 100644
+--- a/images/capi/packer/config/kubernetes.json
++++ b/images/capi/packer/config/kubernetes.json
+@@ -4,6 +4,9 @@
+   "crictl_source_type": "pkg",
+   "crictl_url": "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{user `crictl_version`}}/crictl-v{{user `crictl_version`}}-linux-{{user `crictl_arch`}}.tar.gz",
+   "crictl_version": "1.26.0",
++  "etcd_http_source":"",
++  "etcd_version":"",
++  "etcdadm_http_source":"",
+   "kubeadm_template": "etc/kubeadm.yml",
+   "kubernetes_apiserver_port": "6443",
+   "kubernetes_container_registry": "registry.k8s.io",
+@@ -18,6 +21,7 @@
+   "kubernetes_rpm_repo": "https://pkgs.k8s.io/core:/stable:/{{ user `kubernetes_series` }}/rpm/",
+   "kubernetes_rpm_repo_arch": "x86_64",
+   "kubernetes_rpm_version": "1.26.7",
++  "kubernetes_full_version": "v1.26.7",
+   "kubernetes_semver": "v1.26.7",
+   "kubernetes_series": "v1.26",
+   "kubernetes_source_type": "pkg",
+diff --git a/images/capi/packer/goss/goss-command.yaml b/images/capi/packer/goss/goss-command.yaml
+index 0fec04c4e..2afdd2ff2 100644
+--- a/images/capi/packer/goss/goss-command.yaml
++++ b/images/capi/packer/goss/goss-command.yaml
+@@ -32,6 +32,11 @@ command:
+     stderr: [ ]
+     timeout: 0
+ {{end}}
++  cat /etc/containerd/config.toml | grep sandbox_image | tr -d '"' | awk -F ' = ' '{print $2}':
++    exit-status: 0
++    stderr: []
++    timeout: 0
++    stdout: [{{ .Vars.pause_image }}]
+ {{if eq .Vars.kubernetes_source_type "pkg"}}
+ {{if eq .Vars.kubernetes_cni_source_type "pkg"}}
+   crictl images | grep -v 'IMAGE ID' | awk -F'[ /]' '{print $2}' | sed 's/-{{ .Vars.arch }}//g' | sort:
+@@ -43,15 +48,21 @@ command:
+ {{end}}
+ {{if and (eq .Vars.kubernetes_source_type "http") (eq .Vars.kubernetes_cni_source_type "http") (not .Vars.kubernetes_load_additional_imgs)}}
+ # The second last pipe of awk is to take out arch from kube-apiserver-amd64 (i.e. amd64 or any other arch)
+-  crictl images | grep -v 'IMAGE ID' | awk -F'[ /]' '{print $2}' | sed 's/-{{ .Vars.arch }}//g' | sort:
++  crictl images | grep -v 'IMAGE ID' | awk -F'[ /]' '{print $4}' | sed 's/-{{ .Vars.arch }}//g' | sort:
+     exit-status: 0
+     stderr: []
+     timeout: 0
+     stdout: ["kube-apiserver", "kube-controller-manager", "kube-proxy", "kube-scheduler"]
++# Make sure at least one of the embedded images is tagged with eks-d tag
++  crictl images | grep -v 'IMAGE ID' | awk -F'[ ]+' '{print $2}':
++    exit-status: 0
++    stderr: []
++    timeout: 0
++    stdout: [{{ .Vars.kubernetes_version }}]
+ {{end}}
+ {{if and (eq .Vars.kubernetes_source_type "http") (eq .Vars.kubernetes_cni_source_type "http") (.Vars.kubernetes_load_additional_imgs)}}
+ # The second last pipe of awk is to take out arch from kube-apiserver-amd64 (i.e. amd64 or any other arch)
+-  crictl images | grep -v 'IMAGE ID' | awk -F'[ /]' '{print $2}' | sed 's/-{{ .Vars.arch }}//g' | sort:
++  crictl images | grep -v 'IMAGE ID' | awk -F'[ /]' '{print $4}' | sed 's/-{{ .Vars.arch }}//g' | sort:
+     exit-status: 0
+     stderr: []
+     timeout: 0
+@@ -88,6 +99,11 @@ command:
+     stderr: []
+     timeout: 0
+ {{end}}
++  etcdadm version --short:
++    exit-status: 0
++    stdout: [{{ .Vars.etcdadm_version }}]
++    stderr: []
++    timeout: 0
+ {{range $name, $vers := index .Vars .Vars.OS .Vars.PROVIDER "command"}}
+   {{ $name }}:
+   {{range $key, $val := $vers}}
+diff --git a/images/capi/packer/goss/goss-files.yaml b/images/capi/packer/goss/goss-files.yaml
+index 278f403fa..eb92570cc 100644
+--- a/images/capi/packer/goss/goss-files.yaml
++++ b/images/capi/packer/goss/goss-files.yaml
+@@ -1,4 +1,10 @@
+ file:
++  /var/cache/etcdadm/etcd/{{ .Vars.etcd_version }}/etcd-{{ .Vars.etcd_version }}-linux-amd64.tar.gz:
++    exists: true
++    sha256: {{ .Vars.etcd_sha256 }}
++  /opt/cni/bin/host-device:
++    exists: true
++    sha256: {{ .Vars.kubernetes_cni_host_device_sha256 }}
+ {{range $name, $vers := index .Vars .Vars.OS "common-files"}}
+   {{ $name }}:
+     exists: {{ $vers.exists }}
+diff --git a/images/capi/packer/goss/goss-vars.yaml b/images/capi/packer/goss/goss-vars.yaml
+index a7878bfa2..8dd593110 100644
+--- a/images/capi/packer/goss/goss-vars.yaml
++++ b/images/capi/packer/goss/goss-vars.yaml
+@@ -105,6 +105,12 @@ kubernetes_cni_rpm_version: ""
+ # When k8s and k8s cni source is http
+ kubernetes_load_additional_imgs: false
+ 
++etcd_version: ""
++etcdadm_version: ""
++etcd_sha256: ""
++kubernetes_cni_host_device_sha256: ""
++pause_image: ""
++
+ #windows variables
+ kubernetes_install_path: ""
+ windows_service_manager: ""
+diff --git a/images/capi/packer/nutanix/packer.json b/images/capi/packer/nutanix/packer.json
+index b27eb7d86..a4b752397 100644
+--- a/images/capi/packer/nutanix/packer.json
++++ b/images/capi/packer/nutanix/packer.json
+@@ -103,7 +103,12 @@
+         "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
+         "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0  }}",
+         "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
+-        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}"
++        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}",
++        "etcdadm_version": "{{ user `etcdadm_version` }}",
++        "etcd_version": "{{ user `etcd_version` }}",
++        "etcd_sha256": "{{ user `etcd_sha256` }}",
++        "pause_image": "{{ user `pause_image` }}",
++        "kubernetes_cni_host_device_sha256": "{{ user `kubernetes_cni_host_device_sha256` }}"
+       },
+       "version": "{{user `goss_version`}}"
+     }
+diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
+index a0d2591ec..4c0892fa6 100644
+--- a/images/capi/packer/ova/packer-node.json
++++ b/images/capi/packer/ova/packer-node.json
+@@ -462,7 +462,12 @@
+         "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
+         "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0  }}",
+         "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
+-        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}"
++        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}",
++        "etcdadm_version": "{{ user `etcdadm_version` }}",
++        "etcd_version": "{{ user `etcd_version` }}",
++        "etcd_sha256": "{{ user `etcd_sha256` }}",
++        "pause_image": "{{ user `pause_image` }}",
++        "kubernetes_cni_host_device_sha256": "{{ user `kubernetes_cni_host_device_sha256` }}"
+       },
+       "version": "{{user `goss_version`}}"
+     }
+diff --git a/images/capi/packer/qemu/packer.json b/images/capi/packer/qemu/packer.json
+index 728879af6..dd93fc8da 100644
+--- a/images/capi/packer/qemu/packer.json
++++ b/images/capi/packer/qemu/packer.json
+@@ -141,7 +141,12 @@
+         "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
+         "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0  }}",
+         "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
+-        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}"
++        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}",
++        "etcdadm_version": "{{ user `etcdadm_version` }}",
++        "etcd_version": "{{ user `etcd_version` }}",
++        "etcd_sha256": "{{ user `etcd_sha256` }}",
++        "pause_image": "{{ user `pause_image` }}",
++        "kubernetes_cni_host_device_sha256": "{{ user `kubernetes_cni_host_device_sha256` }}"
+       },
+       "version": "{{user `goss_version`}}"
+     }
+diff --git a/images/capi/packer/raw/packer.json b/images/capi/packer/raw/packer.json
+index 152041455..a04be4e8f 100644
+--- a/images/capi/packer/raw/packer.json
++++ b/images/capi/packer/raw/packer.json
+@@ -126,7 +126,12 @@
+         "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
+         "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0  }}",
+         "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
+-        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}"
++        "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}",
++        "etcdadm_version": "{{ user `etcdadm_version` }}",
++        "etcd_version": "{{ user `etcd_version` }}",
++        "etcd_sha256": "{{ user `etcd_sha256` }}",
++        "pause_image": "{{ user `pause_image` }}",
++        "kubernetes_cni_host_device_sha256": "{{ user `kubernetes_cni_host_device_sha256` }}"
+       },
+       "version": "{{user `goss_version`}}"
+     }
+-- 
+2.34.1
+
