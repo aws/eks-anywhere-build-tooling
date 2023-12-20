@@ -26,7 +26,7 @@ about calling breaking changes and other upgrade gotchas between release. Please
 about changes necessary to eks-anywhere to support the new version and/or automatically update between 
 eks-anywhere version reach out to @jiayiwang7 or @danbudris
 1. Compare the old tag to the new, looking specifically for Makefile changes. 
-ex: [v1.0.0 compared to v1.2.3](https://github.com/fluxcd/source-controller/compare/v1.0.0...v1.2.0). Check the `build` target for
+ex: [v1.2.2 compared to v1.2.3](https://github.com/fluxcd/source-controller/compare/v1.2.2...v1.2.3). Check the `build` target for
 any build flag changes, tag changes, dependencies, etc.
 1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.  There is also
 a [dockerfile](https://github.com/fluxcd/source-controller/blob/main/Dockerfile#L2) they use for building which has it defined.
@@ -35,3 +35,4 @@ added runtime deps.
 1. Since source-controller requires cgo it is built in the builder base. Update checksums and attribution using `make build` from the source-controller folder.
 1. Update the version at the top of this Readme.
 1. Run `make generate` from the root of the repo to update the UPSTREAM_PROJECTS.yaml file.
+1. When upgrading source-controller to a new version, make sure to upgrade the fluxcd/flux2 project to a release that supports this version of source-controller.
