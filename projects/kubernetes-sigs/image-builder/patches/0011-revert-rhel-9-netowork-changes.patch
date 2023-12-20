@@ -1,0 +1,36 @@
+From 677289481bfd4171247b81cd26e60c0d31374d70 Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Mon, 8 Jan 2024 22:11:25 +0000
+Subject: [PATCH 11/11] revert rhel 9 netowork changes
+
+In https://github.com/kubernetes-sigs/image-builder/pull/1332 upstream
+added support for rockylinux 9 and based on this issue posted by the
+nutanix team
+https://github.com/kubernetes-sigs/image-builder/issues/1367 this may
+actually break rhel 9.
+
+This patch is meant to be temporary to revert this part of the change
+just in case.
+---
+ images/capi/ansible/roles/sysprep/tasks/redhat.yml | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/images/capi/ansible/roles/sysprep/tasks/redhat.yml b/images/capi/ansible/roles/sysprep/tasks/redhat.yml
+index e099ba972..5b09bc5b9 100644
+--- a/images/capi/ansible/roles/sysprep/tasks/redhat.yml
++++ b/images/capi/ansible/roles/sysprep/tasks/redhat.yml
+@@ -75,11 +75,6 @@
+ 
+ - name: Reset network interface IDs
+   shell: sed -i '/^\(HWADDR\|UUID\)=/d' /etc/sysconfig/network-scripts/ifcfg-*
+-  when: packer_builder_type != "googlecompute" and ansible_distribution_major_version|int != 9
+-
+-- name: Reset network interface IDs
+-  shell: sed -i '/^\(uuid\)=/d' /etc/NetworkManager/system-connections/*.nmconnection
+-  when: packer_builder_type != "googlecompute" and ansible_distribution_major_version|int == 9
+ 
+ - name: Remove the kickstart log
+   file:
+-- 
+2.34.1
+

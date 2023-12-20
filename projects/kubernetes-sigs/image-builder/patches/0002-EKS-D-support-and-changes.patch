@@ -1,7 +1,7 @@
-From 9f2eebaa6a0bd12027f6f645c9b6643bfe0929a4 Mon Sep 17 00:00:00 2001
+From 99556f6b0698a98721a06ccfc193bc3309d79228 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 18:36:56 -0800
-Subject: [PATCH 2/10] EKS-D support and changes
+Subject: [PATCH 02/11] EKS-D support and changes
 
 - Add goss validations for EKS-D artifacts
 - Add etcdadm and etcd.tar.gz to image for unstacked etcd support
@@ -27,7 +27,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  12 files changed, 102 insertions(+), 23 deletions(-)
 
 diff --git a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
-index 9ae4f81b1..1ef16318a 100644
+index 4330798da..1ca1d756e 100644
 --- a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
 +++ b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
 @@ -12,23 +12,10 @@
@@ -38,25 +38,25 @@ index 9ae4f81b1..1ef16318a 100644
 -  get_url:
 -    url: "{{ crictl_sha256 }}"
 -    dest: /tmp/crictl.tar.gz.sha256
--    mode: 0600
+-    mode: "0600"
 -
 -- name: Register checksum value for crictl
 -  slurp:
 -    src: /tmp/crictl.tar.gz.sha256
 -  register: csum
 -
- - name: download crictl
+ - name: Download crictl
 -  vars:
 -    sha256: "{{ csum['content'] | b64decode | trim }}"
    get_url:
      url: "{{ crictl_url }}"
--    checksum: "sha256:{{ sha256 }}"
+-    checksum: sha256:{{ sha256 }}
 +    checksum: "sha256:{{ crictl_sha256 }}"
      dest: /tmp/crictl.tar.gz
-     mode: 0600
+     mode: "0600"
  
 diff --git a/images/capi/ansible/roles/kubernetes/tasks/url.yml b/images/capi/ansible/roles/kubernetes/tasks/url.yml
-index 83de5a486..99bf2f843 100644
+index 22c64b892..c09139060 100644
 --- a/images/capi/ansible/roles/kubernetes/tasks/url.yml
 +++ b/images/capi/ansible/roles/kubernetes/tasks/url.yml
 @@ -12,6 +12,41 @@
@@ -109,12 +109,12 @@ index 83de5a486..99bf2f843 100644
 +    url: "{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_goarch }}-{{ kubernetes_cni_semver }}.tar.gz"
      checksum: "{{ kubernetes_cni_http_checksum }}"
      dest: /tmp/cni.tar.gz
-     mode: 0755
+     mode: "0755"
 diff --git a/images/capi/packer/ami/packer.json b/images/capi/packer/ami/packer.json
-index 3117354cd..27a4ebfd6 100644
+index 4768a8720..1b97328e3 100644
 --- a/images/capi/packer/ami/packer.json
 +++ b/images/capi/packer/ami/packer.json
-@@ -133,7 +133,12 @@
+@@ -135,7 +135,12 @@
          "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
          "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0 }}",
          "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
@@ -162,10 +162,10 @@ index 9cce0a96a..37fd9e4eb 100644
    "kubernetes_series": "v1.26",
    "kubernetes_source_type": "pkg",
 diff --git a/images/capi/packer/goss/goss-command.yaml b/images/capi/packer/goss/goss-command.yaml
-index 0fec04c4e..2afdd2ff2 100644
+index b4ca17905..a21aa7f4f 100644
 --- a/images/capi/packer/goss/goss-command.yaml
 +++ b/images/capi/packer/goss/goss-command.yaml
-@@ -32,6 +32,11 @@ command:
+@@ -37,6 +37,11 @@ command:
      stderr: [ ]
      timeout: 0
  {{end}}
@@ -177,7 +177,7 @@ index 0fec04c4e..2afdd2ff2 100644
  {{if eq .Vars.kubernetes_source_type "pkg"}}
  {{if eq .Vars.kubernetes_cni_source_type "pkg"}}
    crictl images | grep -v 'IMAGE ID' | awk -F'[ /]' '{print $2}' | sed 's/-{{ .Vars.arch }}//g' | sort:
-@@ -43,15 +48,21 @@ command:
+@@ -48,15 +53,21 @@ command:
  {{end}}
  {{if and (eq .Vars.kubernetes_source_type "http") (eq .Vars.kubernetes_cni_source_type "http") (not .Vars.kubernetes_load_additional_imgs)}}
  # The second last pipe of awk is to take out arch from kube-apiserver-amd64 (i.e. amd64 or any other arch)
@@ -201,7 +201,7 @@ index 0fec04c4e..2afdd2ff2 100644
      exit-status: 0
      stderr: []
      timeout: 0
-@@ -88,6 +99,11 @@ command:
+@@ -93,6 +104,11 @@ command:
      stderr: []
      timeout: 0
  {{end}}
@@ -246,7 +246,7 @@ index a7878bfa2..8dd593110 100644
  kubernetes_install_path: ""
  windows_service_manager: ""
 diff --git a/images/capi/packer/nutanix/packer.json b/images/capi/packer/nutanix/packer.json
-index b27eb7d86..a4b752397 100644
+index 959005df8..2d88c2fb6 100644
 --- a/images/capi/packer/nutanix/packer.json
 +++ b/images/capi/packer/nutanix/packer.json
 @@ -103,7 +103,12 @@
@@ -264,10 +264,10 @@ index b27eb7d86..a4b752397 100644
        "version": "{{user `goss_version`}}"
      }
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index a0d2591ec..4c0892fa6 100644
+index 96bcc4b2e..4eac5edf8 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
-@@ -462,7 +462,12 @@
+@@ -464,7 +464,12 @@
          "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
          "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0  }}",
          "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
@@ -282,10 +282,10 @@ index a0d2591ec..4c0892fa6 100644
        "version": "{{user `goss_version`}}"
      }
 diff --git a/images/capi/packer/qemu/packer.json b/images/capi/packer/qemu/packer.json
-index 728879af6..dd93fc8da 100644
+index 8c201c17d..e17436a9d 100644
 --- a/images/capi/packer/qemu/packer.json
 +++ b/images/capi/packer/qemu/packer.json
-@@ -141,7 +141,12 @@
+@@ -142,7 +142,12 @@
          "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
          "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0  }}",
          "kubernetes_source_type": "{{user `kubernetes_source_type`}}",

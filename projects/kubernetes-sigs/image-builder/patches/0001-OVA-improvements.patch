@@ -1,7 +1,7 @@
-From 5d24708a478702444bebc8ce433ad6a0db368a80 Mon Sep 17 00:00:00 2001
+From 8af6fc269a89789873f389fbff5371e1f07c39bc Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 21:05:13 -0800
-Subject: [PATCH 1/10] OVA improvements
+Subject: [PATCH 01/11] OVA improvements
 
 - Creat /etc/pki/tls/certs dir as part of image-builds
 - Tweak Product info in OVF
@@ -11,11 +11,11 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
  .../capi/ansible/roles/sysprep/tasks/main.yml |  9 +++++
  images/capi/hack/ovf_template.xml             | 10 +----
- images/capi/packer/ova/packer-node.json       | 37 +++++++++++++------
- 3 files changed, 36 insertions(+), 20 deletions(-)
+ images/capi/packer/ova/packer-node.json       | 38 +++++++++++++------
+ 3 files changed, 37 insertions(+), 20 deletions(-)
 
 diff --git a/images/capi/ansible/roles/sysprep/tasks/main.yml b/images/capi/ansible/roles/sysprep/tasks/main.yml
-index 975506921..0aab7f565 100644
+index 2acc8a10f..7adde2a03 100644
 --- a/images/capi/ansible/roles/sysprep/tasks/main.yml
 +++ b/images/capi/ansible/roles/sysprep/tasks/main.yml
 @@ -27,6 +27,15 @@
@@ -61,7 +61,7 @@ index 316427ec3..ca23db5f9 100644
        <Property ovf:userConfigurable="false" ovf:value="${BUILD_TIMESTAMP}" ovf:type="string" ovf:key="BUILD_TIMESTAMP"/>
        <Property ovf:userConfigurable="false" ovf:value="${BUILD_DATE}" ovf:type="string" ovf:key="BUILD_DATE"/>
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 64eb272cb..a0d2591ec 100644
+index 1b7b2d13d..96bcc4b2e 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
 @@ -184,6 +184,12 @@
@@ -89,7 +89,7 @@ index 64eb272cb..a0d2591ec 100644
        "firmware": "{{user `firmware`}}",
        "floppy_dirs": "{{ user `floppy_dirs`}}",
        "folder": "{{user `folder`}}",
-@@ -246,6 +247,12 @@
+@@ -248,6 +249,12 @@
          }
        ],
        "type": "vsphere-iso",
@@ -102,7 +102,7 @@ index 64eb272cb..a0d2591ec 100644
        "username": "{{user `username`}}",
        "vcenter_server": "{{user `vcenter_server`}}",
        "vm_name": "{{user `build_version`}}",
-@@ -261,11 +268,6 @@
+@@ -263,11 +270,6 @@
        "create_snapshot": "{{user `create_snapshot`}}",
        "datacenter": "{{user `datacenter`}}",
        "datastore": "{{user `datastore`}}",
@@ -114,7 +114,7 @@ index 64eb272cb..a0d2591ec 100644
        "folder": "{{user `folder`}}",
        "host": "{{user `host`}}",
        "insecure_connection": "{{user `insecure_connection`}}",
-@@ -288,6 +290,13 @@
+@@ -290,6 +292,13 @@
      }
    ],
    "post-processors": [
@@ -128,19 +128,20 @@ index 64eb272cb..a0d2591ec 100644
      {
        "custom_data": {
          "build_date": "{{isotime}}",
-@@ -323,7 +332,10 @@
+@@ -324,7 +333,11 @@
+         "vsphere-iso-base"
        ],
        "inline": [
-         "cd {{user `output_dir`}}",
--        "../../hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ../../hack/ovf_eula.txt --ovf_template ../../hack/ovf_template.xml --vmdk_file {{user `build_version`}}-disk-0.vmdk"
+-        "./hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ./hack/ovf_eula.txt --ovf_template ./hack/ovf_template.xml --vmdk_file {{user `build_version`}}-disk-0.vmdk {{user `output_dir`}}"
 +        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}.ovf",
 +        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-1.vmdk",
++        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-2.nvram",
 +        "govc library.rm /{{user `vsphere_library_name`}}/{{user `build_version`}}",
-+        "../hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ../hack/ovf_eula.txt --ovf_template ../hack/ovf_template.xml --vmdk_file {{user `build_version`}}-1.vmdk"
++        "./hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ./hack/ovf_eula.txt --ovf_template ./hack/ovf_template.xml --vmdk_file {{user `build_version`}}-1.vmdk {{user `output_dir`}}"
        ],
        "name": "vsphere",
        "type": "shell-local"
-@@ -508,6 +520,7 @@
+@@ -509,6 +522,7 @@
      "resource_pool": "",
      "username": "",
      "vcenter_server": "",
