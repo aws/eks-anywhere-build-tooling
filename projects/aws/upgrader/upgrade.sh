@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -o errexit
 set -o nounset
@@ -53,10 +53,9 @@ kubeadm_in_first_cp(){
   kubeadm_config_backup="${components_dir}/kubeadm-config.backup.yaml"
   new_kubeadm_config="${components_dir}/kubeadm-config.yaml"
   kubectl get cm -n kube-system kubeadm-config -ojsonpath='{.data.ClusterConfiguration}' --kubeconfig /etc/kubernetes/admin.conf > "$kubeadm_config_backup"
-  cp "$kubeadm_config_backup" "$new_kubeadm_config"
 
-  if [ "$etcd_version" -ne "NO_UPDATE" ]; then
-    sed -zE "s/(imageRepository: public.ecr.aws\/eks-distro\/etcd-io\n\s+imageTag: )[^\n]*/\1${etcd_version}/" "$new_kubeadm_config" >> "$new_kubeadm_config"
+  if [ "$etcd_version" != "NO_UPDATE" ]; then
+    sed -zE "s/(imageRepository: public.ecr.aws\/eks-distro\/etcd-io\n\s+imageTag: )[^\n]*/\1${etcd_version}/" "$kubeadm_config_backup" > "$new_kubeadm_config"
   fi
 
   # the kubelet config appears to lose values, in the case of a kind cluster the failSwapOn:false
