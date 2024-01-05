@@ -1,29 +1,27 @@
-From e95d120c8fb1f3fe52078a2ae1d3ccca0253eca7 Mon Sep 17 00:00:00 2001
+From fc85050abf26cc3042b597794cdfbed75ae3aa1e Mon Sep 17 00:00:00 2001
 From: "Ostosh, Ivy" <ivyjin@amazon.com>
 Date: Fri, 27 Jan 2023 14:54:12 -0600
-Subject: [PATCH] Update default values
+Subject: [PATCH 3/3] Update default values
 
 ---
- .../values.schema.json                        |  5 +-
+ .../values.schema.json                        |  3 +-
  charts/opentelemetry-collector/values.yaml    | 57 +------------------
- 2 files changed, 4 insertions(+), 58 deletions(-)
+ 2 files changed, 4 insertions(+), 56 deletions(-)
 
 diff --git a/charts/opentelemetry-collector/values.schema.json b/charts/opentelemetry-collector/values.schema.json
-index eedb8e7..f2d7323 100644
+index 5d78b61..cd8aab6 100644
 --- a/charts/opentelemetry-collector/values.schema.json
 +++ b/charts/opentelemetry-collector/values.schema.json
-@@ -772,8 +772,5 @@
-         }
-       }
+@@ -914,6 +914,5 @@
+     "useGOMEMLIMIT": {
+       "type": "boolean"
      }
 -  },
--  "required": [
--    "mode"
--  ]
+-  "required": ["mode"]
 +  }
  }
 diff --git a/charts/opentelemetry-collector/values.yaml b/charts/opentelemetry-collector/values.yaml
-index 2f7da11..ff37ea3 100644
+index e5df2a6..970bd27 100644
 --- a/charts/opentelemetry-collector/values.yaml
 +++ b/charts/opentelemetry-collector/values.yaml
 @@ -8,7 +8,7 @@ fullnameOverride: ""
@@ -33,49 +31,49 @@ index 2f7da11..ff37ea3 100644
 -mode: ""
 +mode: "daemonset"
  
- # Handles basic configuration of components that
- # also require k8s modifications to work correctly.
-@@ -64,7 +64,8 @@ configMap:
- # For example, {{ REDACTED_EMAIL }} becomes {{` {{ REDACTED_EMAIL }} `}}.
- config:
-   exporters:
+ # Specify which namespace should be used to deploy the resources into
+ namespaceOverride: ""
+@@ -91,7 +91,8 @@ config:
+     debug: {}
+     # Will be removed in a future release.
+     # Use the debug exporter instead.
 -    logging: {}
 +    logging:
 +      loglevel: info
    extensions:
      # The health_check extension is mandatory for this chart.
      # Without the health_check extension the collector will fail the readiness and liveliness probes.
-@@ -76,14 +77,6 @@ config:
+@@ -103,14 +104,6 @@ config:
      # If set to null, will be overridden with values based on k8s resource limits
      memory_limiter: null
    receivers:
 -    jaeger:
 -      protocols:
 -        grpc:
--          endpoint: ${MY_POD_IP}:14250
+-          endpoint: ${env:MY_POD_IP}:14250
 -        thrift_http:
--          endpoint: ${MY_POD_IP}:14268
+-          endpoint: ${env:MY_POD_IP}:14268
 -        thrift_compact:
--          endpoint: ${MY_POD_IP}:6831
+-          endpoint: ${env:MY_POD_IP}:6831
      otlp:
        protocols:
          grpc:
-@@ -98,8 +91,6 @@ config:
+@@ -125,8 +118,6 @@ config:
              static_configs:
                - targets:
-                   - ${MY_POD_IP}:8888
+                   - ${env:MY_POD_IP}:8888
 -    zipkin:
--      endpoint: ${MY_POD_IP}:9411
+-      endpoint: ${env:MY_POD_IP}:9411
    service:
      telemetry:
        metrics:
-@@ -108,14 +99,6 @@ config:
+@@ -135,14 +126,6 @@ config:
        - health_check
        - memory_ballast
      pipelines:
 -      logs:
 -        exporters:
--          - logging
+-          - debug
 -        processors:
 -          - memory_limiter
 -          - batch
@@ -83,14 +81,14 @@ index 2f7da11..ff37ea3 100644
 -          - otlp
        metrics:
          exporters:
-           - logging
-@@ -125,16 +108,6 @@ config:
+           - debug
+@@ -152,16 +135,6 @@ config:
          receivers:
            - otlp
            - prometheus
 -      traces:
 -        exporters:
--          - logging
+-          - debug
 -        processors:
 -          - memory_limiter
 -          - batch
@@ -101,7 +99,7 @@ index 2f7da11..ff37ea3 100644
  
  image:
    # If you want to use the core image `otel/opentelemetry-collector`, you also need to change `command.name` value to `otelcol`.
-@@ -225,30 +198,6 @@ ports:
+@@ -254,30 +227,6 @@ ports:
      servicePort: 4318
      hostPort: 4318
      protocol: TCP
@@ -133,5 +131,5 @@ index 2f7da11..ff37ea3 100644
      # The metrics port is disabled by default. However you need to enable the port
      # in order to use the ServiceMonitor (serviceMonitor.enabled) or PodMonitor (podMonitor.enabled).
 -- 
-2.31.0
+2.43.0
 
