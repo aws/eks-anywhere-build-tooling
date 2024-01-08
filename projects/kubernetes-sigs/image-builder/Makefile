@@ -147,7 +147,7 @@ BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload
 BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) $(if $(filter true,$(SKIP_METAL_INSTANCE_TEST)),,metal-instance-test)
 
 # cloud stack node images
-BUILD_CLOUDSTACK_TARGETS=build-cloudstack-redhat-8 $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,cloudstack,redhat-8) upload-artifacts-cloudstack-redhat-8
+BUILD_CLOUDSTACK_TARGETS=$(foreach os, redhat-8 redhat-9,build-cloudstack-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,cloudstack,$(os)) upload-artifacts-cloudstack-$(os))
 
 # nutanix node images
 BUILD_NUTANIX_TARGETS=build-nutanix-ubuntu-2004 build-nutanix-ubuntu-2204
@@ -505,7 +505,9 @@ release-raw-ubuntu-2204:
 release-raw-redhat-8:
 
 build-cloudstack-redhat-8:
+build-cloudstack-redhat-9:
 release-cloudstack-redhat-8:
+release-cloudstack-redhat-9:
 
 upload-bottlerocket-1-ova:
 upload-bottlerocket-1-raw:
