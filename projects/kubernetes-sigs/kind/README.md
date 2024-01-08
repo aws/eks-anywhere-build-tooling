@@ -59,8 +59,6 @@ any build flag changes, tag changes, dependencies, etc in the `Makefile` in the 
 If new yum packages are added to the base image, update the [minimal-base-kind](https://github.com/aws/eks-distro-build-tooling/blob/main/eks-distro-base/Dockerfile.minimal-base-kind)
 image to include it (this is not a blocker for updating). Review changes to [buildcontext.go](https://github.com/kubernetes-sigs/kind/blob/main/pkg/build/nodeimage/buildcontext.go)
 closely to ensure there are no changes neccessary in our build scripts.
-1. Update the `manifests/kindnet.yaml` file to match [upstream](https://github.com/kubernetes-sigs/kind/blob/main/pkg/build/nodeimage/const_cni.go#L28). The kindnetd image tag should match
-our new kind GIT_TAG.
 1. Verify the golang version has not changed. The version specified in `.go-version` should be the source of truth.
 1. Update checksums and attribution using `make attribution checksums`.
 1. Validate images build locally (will take a while) using the steps above.

@@ -163,9 +163,10 @@ $(ORGANIZE_BINARIES_ARM64_TARGET): $(HANDLE_DEPENDENCIES_TARGET)
 $(ARM_ENV_CONF_TARGET):
 	@cp -rf images/node/files/* $(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/
 
-$(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml:
+$(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml: $(GIT_PATCH_TARGET)
 	@mkdir -p $(@D)
-	cp manifests/kindnetd.yaml $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml
+	grep -zo -- '# kindnetd networking manifest.*' $(REPO)/pkg/build/nodeimage/const_cni.go | head -n -2 > $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml
+	sed -i 's/` + kindnetdImage + `/public.ecr.aws\/eks-anywhere\/kubernetes-sigs\/kind\/kindnetd:$(GIT_TAG)/g' $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml
 	sed -i -e 's/{{ .PodSubnet }}/192.168.0.0\/16/' $(ARTIFACTS_PATH)/manifests/kindnetd/$(GIT_TAG)/kindnetd.yaml 
 
 $(FIX_LICENSES_KINDNETD_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)

@@ -526,7 +526,7 @@ function build::common::copy_if_source_destination_different() {
 
   if [ -n "$destination_inode" ] && [ "$source_inode" = "$destination_inode" ]; then
     echo "Source and destination are the same file"
-    exit 0
+    return
   fi
 
   cp -rf $source $destination
