@@ -77,7 +77,7 @@ SIMPLE_CREATE_TARBALLS=false
 SKIP_METAL_INSTANCE_TEST?=false
 
 # to support a no op attribution target
-TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution update-dependency-versions validate-dependency-versions-raw
+TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution update-dependency-versions validate-dependency-versions-raw validate-dependency-versions-cloudstack
 
 IMAGE_OS_DIR=$(IMAGE_OS)/$(IMAGE_OS_VERSION)
 IMAGE_OS_WITH_VER=$(IMAGE_OS)-$(IMAGE_OS_VERSION)
@@ -106,7 +106,7 @@ CONVERT_TO_UPSTREAM_TARGET=$(strip \
 	$(eval _NEW_TARGET:=$(subst validate-ova-,validate-node-ova-local-,$(_NEW_TARGET))) \
 	$(eval _NEW_TARGET:=$(subst build-ova-,build-node-ova-vsphere-,$(_NEW_TARGET))) \
 	$(eval _NEW_TARGET:=$(subst -redhat-,-rhel-,$(_NEW_TARGET))) \
-	$(eval _NEW_TARGET:=$(subst -cloudstack-,-qemu-,$(_NEW_TARGET))) \
+	$(eval _NEW_TARGET:=$(subst -cloudstack,-qemu,$(_NEW_TARGET))) \
 	$(eval _NEW_TARGET:=$(if $(findstring raw-ubuntu,$(_NEW_TARGET)),$(_NEW_TARGET)-efi,$(_NEW_TARGET))) \
 	$(_NEW_TARGET) \
 )
