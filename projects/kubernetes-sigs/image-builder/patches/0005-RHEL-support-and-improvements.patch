@@ -1,28 +1,155 @@
-From 4e1086adafdb2b6b8462b0da2b18cc9b926e7ec0 Mon Sep 17 00:00:00 2001
+From 5bd56bd23692f84b4fcfb99ed331831edde522f4 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
-Date: Fri, 11 Aug 2023 11:59:20 -0500
-Subject: [PATCH 19/27] Add proxy, register with satellite, and pull packages
- from satellite support to redhat subscription manager
+Date: Tue, 6 Dec 2022 15:42:02 -0600
+Subject: [PATCH 05/11] RHEL support and improvements
 
-When pulling from satellite the os version must be set using `rhsm_server_release_version`
+- Exclude kernel and cloud-init from yum updates
+- Patch cloud-init systemd unit to wait for network manager online
+- Fix redhat 9 cloud-init feature flags bug
+- Fix ensure iptables present for rhel
+- disable gpg for extra rpms
+- Remove old kernels
+- Add dracut cmd to generate initramfs with all drivers for rhel raw
+- Add proxy, register with satellite, and pull packages from satellite support to redhat subscription manager
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
- .../capi/ansible/roles/setup/tasks/redhat.yml | 68 +++++++++++++++++++
+ images/capi/ansible/roles/node/tasks/main.yml |  3 +
+ .../capi/ansible/roles/node/tasks/redhat.yml  | 32 +++++++
+ .../cloud-init.service.d/boot-order.conf      |  2 +
+ .../ansible/roles/providers/tasks/main.yml    | 28 ++++++-
+ .../capi/ansible/roles/setup/tasks/redhat.yml | 84 +++++++++++++++++++
  images/capi/packer/config/ansible-args.json   |  2 +-
- 2 files changed, 69 insertions(+), 1 deletion(-)
+ 6 files changed, 148 insertions(+), 3 deletions(-)
+ create mode 100644 images/capi/ansible/roles/node/tasks/redhat.yml
+ create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/cloud-init.service.d/boot-order.conf
 
+diff --git a/images/capi/ansible/roles/node/tasks/main.yml b/images/capi/ansible/roles/node/tasks/main.yml
+index e0513f565..f2094927f 100644
+--- a/images/capi/ansible/roles/node/tasks/main.yml
++++ b/images/capi/ansible/roles/node/tasks/main.yml
+@@ -18,6 +18,9 @@
+ - import_tasks: amazonLinux2.yml
+   when: ansible_distribution == "Amazon"
+ 
++- import_tasks: redhat.yml
++  when: ansible_distribution == "RedHat"
++
+ # This is required until https://github.com/ansible/ansible/issues/77537 is fixed and used.
+ - name: Override Flatcar's OS family
+   set_fact:
+diff --git a/images/capi/ansible/roles/node/tasks/redhat.yml b/images/capi/ansible/roles/node/tasks/redhat.yml
+new file mode 100644
+index 000000000..b2133b6f1
+--- /dev/null
++++ b/images/capi/ansible/roles/node/tasks/redhat.yml
+@@ -0,0 +1,32 @@
++# Copyright 2020 The Kubernetes Authors.
++
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++
++# http://www.apache.org/licenses/LICENSE-2.0
++
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++---
++- name: Get the list of installed kernels
++  ansible.builtin.shell: "rpm -q kernel --qf '%{version}-%{release}\n' | sort -V"
++  register: installed_kernels
++
++- name: Get the current running kernel
++  ansible.builtin.command: "uname -r"
++  register: current_kernel
++
++- name: Filter out the current kernels
++  set_fact:
++    old_kernels: "{{ installed_kernels.stdout_lines | difference([current_kernel.stdout]) |list }}"
++
++- name: Remove old kernels
++  ansible.builtin.yum:
++    name: "kernel-{{ item }}"
++    state: absent
++  loop: "{{ old_kernels }}"
+\ No newline at end of file
+diff --git a/images/capi/ansible/roles/providers/files/etc/systemd/system/cloud-init.service.d/boot-order.conf b/images/capi/ansible/roles/providers/files/etc/systemd/system/cloud-init.service.d/boot-order.conf
+new file mode 100644
+index 000000000..e1059e3eb
+--- /dev/null
++++ b/images/capi/ansible/roles/providers/files/etc/systemd/system/cloud-init.service.d/boot-order.conf
+@@ -0,0 +1,2 @@
++[Unit]
++After=NetworkManager-wait-online.service
+\ No newline at end of file
+diff --git a/images/capi/ansible/roles/providers/tasks/main.yml b/images/capi/ansible/roles/providers/tasks/main.yml
+index b802566f4..74fa5964f 100644
+--- a/images/capi/ansible/roles/providers/tasks/main.yml
++++ b/images/capi/ansible/roles/providers/tasks/main.yml
+@@ -81,6 +81,21 @@
+     mode: "0644"
+   when: ansible_os_family != "Flatcar"
+ 
++- name: Creates unit file directory for cloud-init
++  file:
++    path: /etc/systemd/system/cloud-init.service.d
++    state: directory
++  when: ansible_os_family == "RedHat"
++
++- name: Create cloud-init boot order drop in file
++  copy:
++    dest: /etc/systemd/system/cloud-init.service.d/boot-order.conf
++    src: etc/systemd/system/cloud-init.service.d/boot-order.conf
++    owner: root
++    group: root
++    mode: "0755"
++  when: ansible_os_family == "RedHat"
++
+ # Some OS might disable cloud-final service on boot (rhel 7).
+ # Enable all cloud-init services on boot.
+ - name: Make sure all cloud init services are enabled
+@@ -112,15 +127,24 @@
+     mode: "0644"
+   when: ansible_os_family == "Debian"
+ 
+-- name: Set cloudinit feature flags for redhat
++- name: Set cloudinit feature flags for redhat 8
+   copy:
+     src: usr/lib/python3/site-packages/cloudinit/feature_overrides.py
+     dest: /usr/lib/python3.6/site-packages/cloudinit/feature_overrides.py
+     owner: root
+     group: root
+     mode: "0644"
+-  when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat"
++  when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat" and ansible_distribution_major_version == "8"
+ 
++- name: set cloudinit feature flags for redhat 9
++  copy:
++    src: usr/lib/python3/site-packages/cloudinit/feature_overrides.py
++    dest: /usr/lib/python3.9/site-packages/cloudinit/feature_overrides.py
++    owner: root
++    group: root
++    mode: 0644
++  when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat" and ansible_distribution_major_version == "9"
++ 
+ - name: Ensure chrony is running
+   systemd:
+     enabled: true
 diff --git a/images/capi/ansible/roles/setup/tasks/redhat.yml b/images/capi/ansible/roles/setup/tasks/redhat.yml
-index 0961f37d4..345aeaa33 100644
+index 74329afd4..4ebe7d732 100644
 --- a/images/capi/ansible/roles/setup/tasks/redhat.yml
 +++ b/images/capi/ansible/roles/setup/tasks/redhat.yml
-@@ -22,6 +22,74 @@
+@@ -22,7 +22,75 @@
      - ansible_distribution == "RedHat"
      - lookup('env', 'RHSM_USER') | length > 0
      - lookup('env', 'RHSM_PASS') | length > 0
 +    - rhsm_server_hostname == ""
 +    - rhsm_server_proxy_hostname == ""
-+
+ 
 +- name: RHEL subscription with proxy
 +  redhat_subscription:
 +    state: present
@@ -88,9 +215,37 @@ index 0961f37d4..345aeaa33 100644
 +    - lookup('env', 'RHSM_ORG_ID') | length > 0
 +    - rhsm_server_hostname != ""
 +    - rhsm_server_proxy_hostname != ""
++   
+ - name: Perform dnf clean
+   command: /usr/bin/yum -y clean all
  
- - name: import epel gpg key
-   rpm_key:
+@@ -45,6 +113,7 @@
+   yum:
+     name: "*"
+     state: latest
++    exclude: cloud-init*
+     lock_timeout: 60
+ 
+ - name: Install baseline dependencies
+@@ -58,3 +127,18 @@
+     name: "{{ extra_rpms.split() }}"
+     state: present
+     lock_timeout: 60
++    disable_gpg_check: true
++
++- name: ensure iptables present for redhat 8
++  yum:
++    name: "iptables"
++    state: present
++    lock_timeout: 60
++  when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat" and ansible_distribution_major_version == "8"
++
++- name: ensure iptables present for redhat 9
++  yum:
++    name: "iptables-nft"
++    state: present
++    lock_timeout: 60
++  when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat" and ansible_distribution_major_version == "9"
 diff --git a/images/capi/packer/config/ansible-args.json b/images/capi/packer/config/ansible-args.json
 index 4176c8ff9..a9b90e83c 100644
 --- a/images/capi/packer/config/ansible-args.json
@@ -103,5 +258,5 @@ index 4176c8ff9..a9b90e83c 100644
    "ansible_scp_extra_args": "{{env `ANSIBLE_SCP_EXTRA_ARGS`}}"
  }
 -- 
-2.39.2
+2.34.1
 

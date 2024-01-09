@@ -1,5 +1,5 @@
 ## **Image Builder**
-![Version](https://img.shields.io/badge/version-v0.1.19-blue)
+![Version](https://img.shields.io/badge/version-v0.1.21-blue)
 | Artifact | Build Status |
 | --- | --- |
 | 1-24 OVA | ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoid2wreW55NTlKclBJZ3NzR3FmQnppdmZOVmErSnZhL2NzQW1ycFgwanVTTEhrR20vRmVQYU9TWWFtWlVCQWs2elhyRmwrZ0dxeW9sbERHWnBESzh0MWxBPSIsIml2UGFyYW1ldGVyU3BlYyI6IlZzOENKNnhHbENYMElsTG4iLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main) |
@@ -34,6 +34,8 @@ EKS-A CLI project uses these images as the node image when constructing workload
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes. If any of the make targets used in projects/kubernetes-sigs/image-builder/Makefile to call upstream make changed, make those appropriate changes.
 1. Update the version at the top of this Readme.
+1. Ensure [REQUIRED_DEPENDENCY_VERSIONS.yaml](./REQUIRED_DEPENDENCY_VERSIONS.yaml) is updated, by running `make update-dependency-versions`, with the newly required python/ansible/packer/plugins versions. Uses these versions to update the [builder-base](https://github.com/aws/eks-distro-build-tooling/blob/main/builder-base/versions.yaml)
+    which will need to be done before presubmits will pass. Before merging, also update the ECImageBuilder recipe in the build account and generate a new AMI we use for raw image builds.
 1. Monitor node image builds and e2e tests as updates to this project can potentially break cluster create and update process.
 
 ### RedHat Satellite Support

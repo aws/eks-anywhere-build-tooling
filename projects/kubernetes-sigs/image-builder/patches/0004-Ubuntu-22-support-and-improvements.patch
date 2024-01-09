@@ -1,17 +1,26 @@
-From 515ed374314c8bad6b49719666c6efbad64bb954 Mon Sep 17 00:00:00 2001
+From 8738e1efde20437daecdc8053a1f759e962ed19e Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
-Date: Fri, 16 Jun 2023 15:27:15 -0500
-Subject: [PATCH 15/27] adds support for raw ubuntu 22.04 builds
+Date: Fri, 23 Jun 2023 10:50:08 -0500
+Subject: [PATCH 04/11] Ubuntu 22 support and improvements
 
+- uses latest ubuntu 22.04 iso
+- adds support for raw ubuntu 22.04 builds
+- Ubuntu switch to offline-install when mirrors are unavailable
+- sets OS_VERSION for goss validation on raw image builds
 ---
  images/capi/Makefile                          |   6 +-
+ images/capi/packer/ova/ubuntu-2204-efi.json   |   4 +-
+ images/capi/packer/ova/ubuntu-2204.json       |   4 +-
  .../raw/linux/ubuntu/http/22.04.efi/meta-data |   0
- .../raw/linux/ubuntu/http/22.04.efi/user-data | 113 ++++++++++++++++++
+ .../raw/linux/ubuntu/http/22.04.efi/user-data | 115 ++++++++++++++++++
  .../raw/linux/ubuntu/http/22.04/meta-data     |   0
- .../raw/linux/ubuntu/http/22.04/user-data     |  92 ++++++++++++++
- .../capi/packer/raw/raw-ubuntu-2204-efi.json  |  13 ++
- images/capi/packer/raw/raw-ubuntu-2204.json   |  12 ++
- 7 files changed, 235 insertions(+), 1 deletion(-)
+ .../raw/linux/ubuntu/http/22.04/user-data     |  94 ++++++++++++++
+ images/capi/packer/raw/packer.json            |   1 +
+ .../capi/packer/raw/raw-ubuntu-2004-efi.json  |   1 +
+ images/capi/packer/raw/raw-ubuntu-2004.json   |   1 +
+ .../capi/packer/raw/raw-ubuntu-2204-efi.json  |  14 +++
+ images/capi/packer/raw/raw-ubuntu-2204.json   |  13 ++
+ 12 files changed, 248 insertions(+), 5 deletions(-)
  create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data
  create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
  create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04/meta-data
@@ -20,10 +29,10 @@ Subject: [PATCH 15/27] adds support for raw ubuntu 22.04 builds
  create mode 100644 images/capi/packer/raw/raw-ubuntu-2204.json
 
 diff --git a/images/capi/Makefile b/images/capi/Makefile
-index 2b190b755..f841eac48 100644
+index a8c15d24c..bcfe47937 100644
 --- a/images/capi/Makefile
 +++ b/images/capi/Makefile
-@@ -359,7 +359,7 @@ QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2204-efi qem
+@@ -372,7 +372,7 @@ QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2304 qemu-ub
  
  QEMU_KUBEVIRT_BUILD_NAMES	:= $(addprefix kubevirt-,$(QEMU_BUILD_NAMES))
  
@@ -32,7 +41,7 @@ index 2b190b755..f841eac48 100644
  VBOX_BUILD_NAMES			?=      vbox-windows-2019
  
  POWERVS_BUILD_NAMES         ?= powervs-centos-8
-@@ -746,6 +746,8 @@ build-qemu-all: $(QEMU_BUILD_TARGETS) ## Builds all Qemu images
+@@ -775,6 +775,8 @@ build-qemu-all: $(QEMU_BUILD_TARGETS) ## Builds all Qemu images
  build-raw-flatcar: ## Builds Flatcar RAW image
  build-raw-ubuntu-2004: ## Builds Ubuntu 20.04 RAW image
  build-raw-ubuntu-2004-efi: ## Builds Ubuntu 20.04 RAW image that EFI boots
@@ -41,7 +50,7 @@ index 2b190b755..f841eac48 100644
  build-raw-rhel-8: ## Builds RHEL 8 RAW image
  build-raw-all: $(RAW_BUILD_TARGETS) ## Builds all RAW images
  
-@@ -880,6 +882,8 @@ validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
+@@ -913,6 +915,8 @@ validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
  validate-raw-flatcar: ## Validates Flatcar RAW image packer config
  validate-raw-ubuntu-2004: ## Validates Ubuntu 20.04 RAW image packer config
  validate-raw-ubuntu-2004-efi: ## Validates Ubuntu 20.04 RAW EFI image packer config
@@ -50,15 +59,47 @@ index 2b190b755..f841eac48 100644
  validate-raw-rhel-8: ## Validates RHEL 8 RAW image packer config
  validate-raw-all: $(RAW_VALIDATE_TARGETS) ## Validates all RAW Packer config
  
+diff --git a/images/capi/packer/ova/ubuntu-2204-efi.json b/images/capi/packer/ova/ubuntu-2204-efi.json
+index 0bc473353..5d199b8b0 100644
+--- a/images/capi/packer/ova/ubuntu-2204-efi.json
++++ b/images/capi/packer/ova/ubuntu-2204-efi.json
+@@ -9,9 +9,9 @@
+   "firmware": "efi",
+   "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
+   "guest_os_type": "ubuntu-64",
+-  "iso_checksum": "10f19c5b2b8d6db711582e0e27f5116296c34fe4b313ba45f9b201a5007056cb",
++  "iso_checksum": "5e38b55d57d94ff029719342357325ed3bda38fa80054f9330dc789cd2d43931",
+   "iso_checksum_type": "sha256",
+-  "iso_url": "https://old-releases.ubuntu.com/releases/jammy/ubuntu-22.04.1-live-server-amd64.iso",
++  "iso_url": "https://old-releases.ubuntu.com/releases/jammy/ubuntu-22.04.2-live-server-amd64.iso",
+   "os_display_name": "Ubuntu 22.04",
+   "shutdown_command": "shutdown -P now",
+   "vsphere_guest_os_type": "ubuntu64Guest"
+diff --git a/images/capi/packer/ova/ubuntu-2204.json b/images/capi/packer/ova/ubuntu-2204.json
+index badbf1045..38efb01c8 100644
+--- a/images/capi/packer/ova/ubuntu-2204.json
++++ b/images/capi/packer/ova/ubuntu-2204.json
+@@ -8,9 +8,9 @@
+   "distro_version": "22.04",
+   "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
+   "guest_os_type": "ubuntu-64",
+-  "iso_checksum": "10f19c5b2b8d6db711582e0e27f5116296c34fe4b313ba45f9b201a5007056cb",
++  "iso_checksum": "5e38b55d57d94ff029719342357325ed3bda38fa80054f9330dc789cd2d43931",
+   "iso_checksum_type": "sha256",
+-  "iso_url": "https://old-releases.ubuntu.com/releases/jammy/ubuntu-22.04.1-live-server-amd64.iso",
++  "iso_url": "https://old-releases.ubuntu.com/releases/jammy/ubuntu-22.04.2-live-server-amd64.iso",
+   "os_display_name": "Ubuntu 22.04",
+   "shutdown_command": "shutdown -P now",
+   "vsphere_guest_os_type": "ubuntu64Guest"
 diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data
 new file mode 100644
 index 000000000..e69de29bb
 diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
 new file mode 100644
-index 000000000..8b699a18a
+index 000000000..d14d0fa49
 --- /dev/null
 +++ b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,115 @@
 +#cloud-config
 +# Copyright 2022 The Kubernetes Authors.
 +#
@@ -140,6 +181,8 @@ index 000000000..8b699a18a
 +      device: format-0
 +      type: mount
 +      id: mount-0
++  apt:
++    fallback: offline-install
 +  updates: "all"
 +  ssh:
 +    install-server: true
@@ -177,10 +220,10 @@ new file mode 100644
 index 000000000..e69de29bb
 diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data b/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data
 new file mode 100644
-index 000000000..e2838e3c4
+index 000000000..a5ed32346
 --- /dev/null
 +++ b/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,94 @@
 +#cloud-config
 +# Copyright 2022 The Kubernetes Authors.
 +#
@@ -241,6 +284,8 @@ index 000000000..e2838e3c4
 +        id: mount-0
 +        device: format-0
 +        path: /
++  apt:
++    fallback: offline-install
 +  updates: 'all'
 +  ssh:
 +    install-server: true
@@ -273,17 +318,54 @@ index 000000000..e2838e3c4
 +    - curtin in-target --target=/target -- apt-get purge --auto-remove -y
 +    - curtin in-target --target=/target -- apt-get clean
 +    - curtin in-target --target=/target -- rm -rf /var/lib/apt/lists/*
+diff --git a/images/capi/packer/raw/packer.json b/images/capi/packer/raw/packer.json
+index a04be4e8f..83aa6b4fb 100644
+--- a/images/capi/packer/raw/packer.json
++++ b/images/capi/packer/raw/packer.json
+@@ -117,6 +117,7 @@
+       "vars_inline": {
+         "ARCH": "amd64",
+         "OS": "{{user `distro_name` | lower}}",
++        "OS_VERSION": "{{user `distro_version` | lower}}",
+         "PROVIDER": "raw",
+         "containerd_version": "{{user `containerd_version`}}",
+         "kubernetes_cni_deb_version": "{{ user `kubernetes_cni_deb_version` }}",
+diff --git a/images/capi/packer/raw/raw-ubuntu-2004-efi.json b/images/capi/packer/raw/raw-ubuntu-2004-efi.json
+index 7ed3ac8a3..421fe6976 100644
+--- a/images/capi/packer/raw/raw-ubuntu-2004-efi.json
++++ b/images/capi/packer/raw/raw-ubuntu-2004-efi.json
+@@ -4,6 +4,7 @@
+   "build_name": "ubuntu-2004",
+   "build_target": "raw",
+   "distro_name": "ubuntu",
++  "distro_version": "20.04",
+   "firmware": "OVMF.fd",
+   "guest_os_type": "ubuntu-64",
+   "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
+diff --git a/images/capi/packer/raw/raw-ubuntu-2004.json b/images/capi/packer/raw/raw-ubuntu-2004.json
+index 9e78e6384..cbcfbc6f3 100644
+--- a/images/capi/packer/raw/raw-ubuntu-2004.json
++++ b/images/capi/packer/raw/raw-ubuntu-2004.json
+@@ -4,6 +4,7 @@
+   "build_name": "ubuntu-2004",
+   "build_target": "raw",
+   "distro_name": "ubuntu",
++  "distro_version": "20.04",
+   "guest_os_type": "ubuntu-64",
+   "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
+   "iso_checksum_type": "sha256",
 diff --git a/images/capi/packer/raw/raw-ubuntu-2204-efi.json b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
 new file mode 100644
-index 000000000..3de116312
+index 000000000..6839cc2d0
 --- /dev/null
 +++ b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,14 @@
 +{
 +  "boot_command_prefix": "c<wait>linux /casper/vmlinuz --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/22.04.efi/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
 +  "build_name": "ubuntu-2204",
 +  "build_target": "raw",
 +  "distro_name": "ubuntu",
++  "distro_version": "22.04",
 +  "firmware": "OVMF.fd",
 +  "guest_os_type": "ubuntu-64",
 +  "iso_checksum": "5e38b55d57d94ff029719342357325ed3bda38fa80054f9330dc789cd2d43931",
@@ -294,15 +376,16 @@ index 000000000..3de116312
 +  }
 diff --git a/images/capi/packer/raw/raw-ubuntu-2204.json b/images/capi/packer/raw/raw-ubuntu-2204.json
 new file mode 100644
-index 000000000..e03f336cd
+index 000000000..c9cfe7381
 --- /dev/null
 +++ b/images/capi/packer/raw/raw-ubuntu-2204.json
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,13 @@
 +{
 +  "boot_command_prefix": "c<wait>linux /casper/vmlinuz --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/22.04/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
 +  "build_name": "ubuntu-2204",
 +  "build_target": "raw",
 +  "distro_name": "ubuntu",
++  "distro_version": "22.04",
 +  "guest_os_type": "ubuntu-64",
 +  "iso_checksum": "5e38b55d57d94ff029719342357325ed3bda38fa80054f9330dc789cd2d43931",
 +  "iso_checksum_type": "sha256",
@@ -311,5 +394,5 @@ index 000000000..e03f336cd
 +  "shutdown_command": "shutdown -P now"
 +  }
 -- 
-2.39.2
+2.34.1
 
