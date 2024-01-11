@@ -160,20 +160,53 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
         if [ -z $PACKER_ACTIVE_INTERFACE ]; then
             echo "Finding interface for Packer temporary HTTP server"
             if [ "$(uname -s)" = "Linux" ]; then
-                if command -v route &> /dev/null; then
-                    PACKER_ACTIVE_INTERFACE=$(route |awk '/^default/{print $NF}')
+                # Linux distros nowadays should have /proc/net/route with route info as follow,
+                #
+                # (Amazon Linux 2, RHEL, Ubuntu, ...)
+                # $ cat /proc/net/route
+                # Iface    Destination    Gateway     Flags       RefCnt    Use    Metric    Mask        MTU    Window    IRTT
+                # eth0     00000000       01201FAC    0003        0         0      0         00000000    0      0         0
+                # ...
+                #
+                # With systemd v197 (or newer) comes with predictable interface name feature so the interface name,
+                # a reliable mechanism to determine which interface have default route associated would be required.
+                #
+                # However, not all Linux distro comes with binary tools like `ip` or `route` (e.g., Ubuntu don't have `route` command by default)
+                # so here we leverage the info from `/proc/net/route` which is more reliable and trustworthy.
+                #
+                # References:
+                # - https://systemd.io/PREDICTABLE_INTERFACE_NAMES/
+                # - https://www.freedesktop.org/wiki/Software/systemd/PredictableNetworkInterfaceNames/
+                # - https://en.wikipedia.org/wiki/Consistent_Network_Device_Naming
+                IFACE_WITH_DEFAULT_ROUTE=$(cat /proc/net/route | awk '$2 == "00000000" && $8 == "00000000" { print $1 }' | head -1) # Only the one with lowest "Metric" route would be taken.
+                if [ -n $IFACE_WITH_DEFAULT_ROUTE ]; then
+                    PACKER_ACTIVE_INTERFACE=$IFACE_WITH_DEFAULT_ROUTE
                 else
-                    INTERFACES=($(ls /sys/class/net))
-                    for interface in "${INTERFACES[@]}"; do
-                        if [ "$interface" = "eth0" ] || [ "$interface" = "en0" ] || [ "$interface" = "eno1" ]; then
-                            PACKER_ACTIVE_INTERFACE=$interface
-                            echo "Found interface: $interface"
+                    for interface in $(cat /proc/net/route | awk '! /Iface/{print $1}' | sort | uniq); do
+                        predictable_ifnames=(
+                            "eth0"
+                            "en0"
+                            "eno1"
+                            "ens5"
+                        )
+
+                        matched=0
+                        for iface in "${predictable_ifnames[@]}"; do
+                            if [[ "$iface" == "$interface" ]]; then
+                                matched=1
+                                PACKER_ACTIVE_INTERFACE=$iface
+                                echo "Found interface: $iface"
+                                break
+                            fi
+                        done
+
+                        if [[ $matched -eq 1 ]]; then
                             break
                         fi
                     done
                 fi
             elif [ "$(uname -s)" = "Darwin" ]; then
-                PACKER_ACTIVE_INTERFACE=$(route -n get default | grep 'interface:' | grep -o '[^ ]*$')
+                PACKER_ACTIVE_INTERFACE=$(route -n get default | awk '/interface: /{print $2}')
             fi
         fi
 
@@ -183,7 +216,7 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
         fi
 
         if [ "$(uname -s)" = "Linux" ]; then
-            PACKER_HTTP_SERVER_IP=$(ip a l $PACKER_ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
+            PACKER_HTTP_SERVER_IP=$(ip addr show dev $PACKER_ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
         elif
             [ "$(uname -s)" = "Darwin" ]; then
             PACKER_HTTP_SERVER_IP=$(ifconfig $PACKER_ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
