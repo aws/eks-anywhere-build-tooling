@@ -1,6 +1,6 @@
-From 32556a93991bbee29e0173186a4d2d7863556476 Mon Sep 17 00:00:00 2001
-From: Prow Bot <prow@amazonaws.com>
-Date: Wed, 21 Sep 2022 10:01:23 -0400
+From c26cf573b57dc9df70187969b9c97dd2cf6bdea7 Mon Sep 17 00:00:00 2001
+From: Abhinav Pandey <abhinavmpandey08@gmail.com>
+Date: Wed, 10 Jan 2024 16:58:40 -0800
 Subject: [PATCH] packages patches
 
 ---
@@ -14,20 +14,20 @@ Subject: [PATCH] packages patches
  charts/metallb/templates/_helpers.tpl         |   9 +
  .../metallb/templates/bgpadvertisements.yaml  |  15 +
  charts/metallb/templates/bgppeers.yaml        |  13 +
- charts/metallb/templates/controller.yaml      |   7 +-
+ charts/metallb/templates/controller.yaml      |   8 +-
  charts/metallb/templates/ipaddresspools.yaml  |  11 +
  .../metallb/templates/l2advertisements.yaml   |  15 +
  charts/metallb/templates/podmonitor.yaml      |   7 +-
  charts/metallb/templates/prometheusrules.yaml |   1 +
- charts/metallb/templates/rbac.yaml            |   8 +-
+ charts/metallb/templates/rbac.yaml            |  14 +-
  charts/metallb/templates/secret.yaml          |  16 +
- .../metallb/templates/service-accounts.yaml   |   2 +
- charts/metallb/templates/servicemonitor.yaml  |  10 +-
- charts/metallb/templates/speaker.yaml         | 308 +-----------------
- charts/metallb/templates/webhooks.yaml        |  16 +-
- charts/metallb/values.schema.json             |  40 +--
- charts/metallb/values.yaml                    |  38 +--
- 23 files changed, 133 insertions(+), 398 deletions(-)
+ .../metallb/templates/service-accounts.yaml   |   4 +-
+ charts/metallb/templates/servicemonitor.yaml  |  14 +-
+ charts/metallb/templates/speaker.yaml         | 351 +-----------------
+ charts/metallb/templates/webhooks.yaml        |  18 +-
+ charts/metallb/values.schema.json             |  40 +-
+ charts/metallb/values.yaml                    |  42 +--
+ 23 files changed, 136 insertions(+), 457 deletions(-)
  rename charts/{metallb/charts => }/crds/.helmignore (100%)
  rename charts/{metallb/charts => }/crds/Chart.yaml (100%)
  rename charts/{metallb/charts => }/crds/README.md (100%)
@@ -56,7 +56,7 @@ diff --git a/charts/metallb/charts/crds/templates/crds.yaml b/charts/crds/templa
 similarity index 99%
 rename from charts/metallb/charts/crds/templates/crds.yaml
 rename to charts/crds/templates/crds.yaml
-index 1cc88898..6351377e 100644
+index 9b415acf..34a34b52 100644
 --- a/charts/metallb/charts/crds/templates/crds.yaml
 +++ b/charts/crds/templates/crds.yaml
 @@ -22,7 +22,7 @@ spec:
@@ -86,18 +86,18 @@ index 00000000..98176443
 +defaultNamespace: "metallb-system"
 diff --git a/charts/metallb/Chart.lock b/charts/metallb/Chart.lock
 deleted file mode 100644
-index 6b9329ac..00000000
+index 425c50fd..00000000
 --- a/charts/metallb/Chart.lock
 +++ /dev/null
 @@ -1,6 +0,0 @@
 -dependencies:
 -- name: crds
 -  repository: ""
--  version: 0.13.7
--digest: sha256:d555da4a45e655d8095364bfcf05d588d8b6e86eb929e6d7ca0aba34be7e0262
--generated: "2022-10-17T16:22:46.162181761+02:00"
+-  version: 0.13.12
+-digest: sha256:bc3d2abdac552d6a886bd1d533eef9a432e5809a0dda4a85c7de4fdf2094cdb0
+-generated: "2023-10-20T16:56:55.333731157+02:00"
 diff --git a/charts/metallb/Chart.yaml b/charts/metallb/Chart.yaml
-index c5f11ffb..077ea59f 100644
+index eb1d4c7c..447f3abe 100644
 --- a/charts/metallb/Chart.yaml
 +++ b/charts/metallb/Chart.yaml
 @@ -5,10 +5,6 @@ home: https://metallb.universe.tf
@@ -107,7 +107,7 @@ index c5f11ffb..077ea59f 100644
 -dependencies:
 -- name: crds
 -  condition: crds.enabled
--  version: 0.13.7
+-  version: 0.13.12
  
  # A chart can be either an 'application' or a 'library' chart.
  #
@@ -169,18 +169,19 @@ index 00000000..1bacdcb9
 +---
 +{{- end }}
 diff --git a/charts/metallb/templates/controller.yaml b/charts/metallb/templates/controller.yaml
-index efb51c9d..4a177cee 100644
+index 2b522d1b..55579570 100644
 --- a/charts/metallb/templates/controller.yaml
 +++ b/charts/metallb/templates/controller.yaml
-@@ -3,6 +3,7 @@ apiVersion: apps/v1
+@@ -3,7 +3,7 @@ apiVersion: apps/v1
  kind: Deployment
  metadata:
    name: {{ template "metallb.fullname" . }}-controller
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
      app.kubernetes.io/component: controller
-@@ -45,7 +46,7 @@ spec:
+@@ -52,7 +52,7 @@ spec:
  {{- end }}
        containers:
        - name: controller
@@ -189,7 +190,7 @@ index efb51c9d..4a177cee 100644
          {{- if .Values.controller.image.pullPolicy }}
          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
          {{- end }}
-@@ -72,10 +73,6 @@ spec:
+@@ -79,10 +79,6 @@ spec:
          - name: METALLB_DEPLOYMENT
            value: {{ template "metallb.fullname" . }}-controller
          {{- end }}
@@ -285,7 +286,7 @@ index 93a7fd69..908c63cc 100644
    apiGroup: rbac.authorization.k8s.io
    kind: Role
 diff --git a/charts/metallb/templates/prometheusrules.yaml b/charts/metallb/templates/prometheusrules.yaml
-index 29ae85aa..524dd83c 100644
+index 463aacaf..877eaf6e 100644
 --- a/charts/metallb/templates/prometheusrules.yaml
 +++ b/charts/metallb/templates/prometheusrules.yaml
 @@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
@@ -297,26 +298,28 @@ index 29ae85aa..524dd83c 100644
      {{- include "metallb.labels" . | nindent 4 }}
      {{- if .Values.prometheus.prometheusRule.additionalLabels }}
 diff --git a/charts/metallb/templates/rbac.yaml b/charts/metallb/templates/rbac.yaml
-index 1869e44f..7d76ae07 100644
+index ed6b8260..e1149dfa 100644
 --- a/charts/metallb/templates/rbac.yaml
 +++ b/charts/metallb/templates/rbac.yaml
-@@ -59,6 +59,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+@@ -71,7 +71,7 @@ apiVersion: rbac.authorization.k8s.io/v1
  kind: Role
  metadata:
    name: {{ include "metallb.fullname" . }}-pod-lister
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels: {{- include "metallb.labels" . | nindent 4 }}
  rules:
  - apiGroups: [""]
-@@ -93,6 +94,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+@@ -109,7 +109,7 @@ apiVersion: rbac.authorization.k8s.io/v1
  kind: Role
  metadata:
    name: {{ include "metallb.fullname" . }}-controller
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels: {{- include "metallb.labels" . | nindent 4 }}
  rules:
  {{- if .Values.speaker.memberlist.enabled }}
-@@ -142,7 +144,7 @@ metadata:
+@@ -159,7 +159,7 @@ metadata:
  subjects:
  - kind: ServiceAccount
    name: {{ template "metallb.controller.serviceAccountName" . }}
@@ -325,7 +328,7 @@ index 1869e44f..7d76ae07 100644
  roleRef:
    apiGroup: rbac.authorization.k8s.io
    kind: ClusterRole
-@@ -157,7 +159,7 @@ metadata:
+@@ -174,7 +174,7 @@ metadata:
  subjects:
  - kind: ServiceAccount
    name: {{ template "metallb.speaker.serviceAccountName" . }}
@@ -334,22 +337,36 @@ index 1869e44f..7d76ae07 100644
  roleRef:
    apiGroup: rbac.authorization.k8s.io
    kind: ClusterRole
-@@ -167,6 +169,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+@@ -184,7 +184,7 @@ apiVersion: rbac.authorization.k8s.io/v1
  kind: RoleBinding
  metadata:
    name: {{ include "metallb.fullname" . }}-pod-lister
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels: {{- include "metallb.labels" . | nindent 4 }}
  roleRef:
    apiGroup: rbac.authorization.k8s.io
-@@ -180,6 +183,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+@@ -193,12 +193,13 @@ roleRef:
+ subjects:
+ - kind: ServiceAccount
+   name: {{ include "metallb.speaker.serviceAccountName" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+ ---
+ apiVersion: rbac.authorization.k8s.io/v1
  kind: RoleBinding
  metadata:
    name: {{ include "metallb.fullname" . }}-controller
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels: {{- include "metallb.labels" . | nindent 4 }}
  roleRef:
    apiGroup: rbac.authorization.k8s.io
+@@ -207,4 +208,5 @@ roleRef:
+ subjects:
+ - kind: ServiceAccount
+   name: {{ include "metallb.controller.serviceAccountName" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+ {{- end -}}
 diff --git a/charts/metallb/templates/secret.yaml b/charts/metallb/templates/secret.yaml
 new file mode 100644
 index 00000000..5ef8eaa7
@@ -373,38 +390,41 @@ index 00000000..5ef8eaa7
 +{{ end }}
 +{{ end }}
 diff --git a/charts/metallb/templates/service-accounts.yaml b/charts/metallb/templates/service-accounts.yaml
-index 95609e5e..a478458e 100644
+index 9615acf3..a478458e 100644
 --- a/charts/metallb/templates/service-accounts.yaml
 +++ b/charts/metallb/templates/service-accounts.yaml
-@@ -4,6 +4,7 @@ apiVersion: v1
+@@ -4,7 +4,7 @@ apiVersion: v1
  kind: ServiceAccount
  metadata:
    name: {{ template "metallb.controller.serviceAccountName" . }}
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
      app.kubernetes.io/component: controller
-@@ -18,6 +19,7 @@ apiVersion: v1
+@@ -19,7 +19,7 @@ apiVersion: v1
  kind: ServiceAccount
  metadata:
    name: {{ template "metallb.speaker.serviceAccountName" . }}
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
      app.kubernetes.io/component: speaker
 diff --git a/charts/metallb/templates/servicemonitor.yaml b/charts/metallb/templates/servicemonitor.yaml
-index 5c2ab422..f400f943 100644
+index 1cfc0c43..98705c41 100644
 --- a/charts/metallb/templates/servicemonitor.yaml
 +++ b/charts/metallb/templates/servicemonitor.yaml
-@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
+@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
  kind: ServiceMonitor
  metadata:
    name: {{ template "metallb.fullname" . }}-speaker-monitor
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
      app.kubernetes.io/component: speaker
-@@ -54,7 +55,7 @@ spec:
+@@ -55,7 +55,7 @@ spec:
    jobLabel: {{ .Values.prometheus.serviceMonitor.jobLabel | quote }}
    namespaceSelector:
      matchNames:
@@ -413,23 +433,25 @@ index 5c2ab422..f400f943 100644
    selector:
      matchLabels:
        name: {{ template "metallb.fullname" . }}-speaker-monitor-service
-@@ -78,6 +79,7 @@ metadata:
+@@ -71,7 +71,7 @@ metadata:
    labels:
      name: {{ template "metallb.fullname" . }}-speaker-monitor-service
    name: {{ template "metallb.fullname" . }}-speaker-monitor-service
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
  spec:
    selector:
-       {{- include "metallb.selectorLabels" . | nindent 6 }}
-@@ -99,6 +101,7 @@ apiVersion: monitoring.coreos.com/v1
+     {{- include "metallb.selectorLabels" . | nindent 4 }}
+@@ -93,7 +93,7 @@ apiVersion: monitoring.coreos.com/v1
  kind: ServiceMonitor
  metadata:
    name: {{ template "metallb.fullname" . }}-controller-monitor
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
      app.kubernetes.io/component: speaker
-@@ -127,7 +130,7 @@ spec:
+@@ -130,7 +130,7 @@ spec:
    jobLabel: {{ .Values.prometheus.serviceMonitor.jobLabel | quote }}
    namespaceSelector:
      matchNames:
@@ -438,35 +460,29 @@ index 5c2ab422..f400f943 100644
    selector:
      matchLabels:
        name: {{ template "metallb.fullname" . }}-controller-monitor-service
-@@ -151,6 +154,7 @@ metadata:
-   labels:
-     name: {{ template "metallb.fullname" . }}-controller-monitor-service
-   name: {{ template "metallb.fullname" . }}-controller-monitor-service
-+  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
- spec:
-   selector:
-       {{- include "metallb.selectorLabels" . | nindent 6 }}
-@@ -168,6 +172,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+@@ -163,7 +163,7 @@ apiVersion: rbac.authorization.k8s.io/v1
  kind: Role
  metadata:
    name: {{ template "metallb.fullname" . }}-prometheus
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
  rules:
    - apiGroups:
        - ""
-@@ -184,6 +189,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+@@ -180,7 +180,7 @@ apiVersion: rbac.authorization.k8s.io/v1
  kind: RoleBinding
  metadata:
    name: {{ template "metallb.fullname" . }}-prometheus
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
  roleRef:
    apiGroup: rbac.authorization.k8s.io
    kind: Role
 diff --git a/charts/metallb/templates/speaker.yaml b/charts/metallb/templates/speaker.yaml
-index 9e18a49c..5ada21c5 100644
+index 1a4c7b2a..c16d6f03 100644
 --- a/charts/metallb/templates/speaker.yaml
 +++ b/charts/metallb/templates/speaker.yaml
-@@ -1,112 +1,9 @@
+@@ -1,114 +1,9 @@
 -{{- if .Values.speaker.frr.enabled }}
 -# FRR expects to have these files owned by frr:frr on startup.
 -# Having them in a ConfigMap allows us to modify behaviors: for example enabling more daemons on startup.
@@ -474,6 +490,7 @@ index 9e18a49c..5ada21c5 100644
 -kind: ConfigMap
 -metadata:
 -  name: {{ template "metallb.fullname" . }}-frr-startup
+-  namespace: {{ .Release.Namespace | quote }}
 -  labels:
 -    {{- include "metallb.labels" . | nindent 4 }}
 -    app.kubernetes.io/component: speaker
@@ -576,14 +593,27 @@ index 9e18a49c..5ada21c5 100644
  kind: DaemonSet
  metadata:
    name: {{ template "metallb.fullname" . }}-speaker
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
      app.kubernetes.io/component: speaker
-@@ -147,55 +44,9 @@ spec:
+@@ -155,67 +50,9 @@ spec:
        terminationGracePeriodSeconds: 0
        hostNetwork: true
        volumes:
+-      {{- if .Values.speaker.memberlist.enabled }}
+-        - name: memberlist
+-          secret:
+-            secretName: {{ include "metallb.secretName" . }}
+-            defaultMode: 420
+-      {{- end }}
+-      {{- if .Values.speaker.excludeInterfaces.enabled }}
+-        - name: metallb-excludel2
+-          configMap:
+-            defaultMode: 256
+-            name: metallb-excludel2
+-      {{- end }}
 -      {{- if .Values.speaker.frr.enabled }}
 -        - name: frr-sockets
 -          emptyDir: {}
@@ -637,9 +667,9 @@ index 9e18a49c..5ada21c5 100644
          {{- if .Values.speaker.image.pullPolicy }}
          imagePullPolicy: {{ .Values.speaker.image.pullPolicy }}
          {{- end }}
-@@ -235,14 +86,6 @@ spec:
-               name: {{ include "metallb.secretName" . }}
-               key: secretkey
+@@ -252,14 +89,6 @@ spec:
+         - name: METALLB_ML_SECRET_KEY_PATH
+           value: "{{ .Values.speaker.memberlist.mlSecretKeyPath }}"
          {{- end }}
 -        {{- if .Values.speaker.frr.enabled }}
 -        - name: FRR_CONFIG_FILE
@@ -652,15 +682,25 @@ index 9e18a49c..5ada21c5 100644
          ports:
          - name: monitoring
            containerPort: {{ .Values.prometheus.metricsPort }}
-@@ -288,153 +131,6 @@ spec:
+@@ -305,182 +134,6 @@ spec:
              - ALL
              add:
              - NET_RAW
--        {{- if .Values.speaker.frr.enabled }}
+-        {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled .Values.speaker.excludeInterfaces.enabled }}
 -        volumeMounts:
+-          {{- if .Values.speaker.memberlist.enabled }}
+-          - name: memberlist 
+-            mountPath: {{ .Values.speaker.memberlist.mlSecretKeyPath }}
+-          {{- end }}
+-          {{- if .Values.speaker.frr.enabled }}
 -          - name: reloader
 -            mountPath: /etc/frr_reloader
--         {{- end }}
+-          {{- end }}
+-          {{- if .Values.speaker.excludeInterfaces.enabled }}
+-          - name: metallb-excludel2
+-            mountPath: /etc/metallb
+-          {{- end }}
+-        {{- end }}
 -      {{- if .Values.speaker.frr.enabled }}
 -      - name: frr
 -        securityContext:
@@ -699,6 +739,25 @@ index 9e18a49c..5ada21c5 100644
 -        {{- with .Values.speaker.frr.resources }}
 -        resources:
 -          {{- toYaml . | nindent 12 }}
+-        {{- end }}
+-        {{- if .Values.speaker.livenessProbe.enabled }}
+-        livenessProbe:
+-          httpGet:
+-            path: /livez
+-            port: {{ .Values.speaker.frr.metricsPort }}
+-          initialDelaySeconds: {{ .Values.speaker.livenessProbe.initialDelaySeconds }}
+-          periodSeconds: {{ .Values.speaker.livenessProbe.periodSeconds }}
+-          timeoutSeconds: {{ .Values.speaker.livenessProbe.timeoutSeconds }}
+-          successThreshold: {{ .Values.speaker.livenessProbe.successThreshold }}
+-          failureThreshold: {{ .Values.speaker.livenessProbe.failureThreshold }}
+-        {{- end }}
+-        {{- if .Values.speaker.startupProbe.enabled }}
+-        startupProbe:
+-          httpGet:
+-            path: /livez
+-            port: {{ .Values.speaker.frr.metricsPort }}
+-          failureThreshold: {{ .Values.speaker.startupProbe.failureThreshold }}
+-          periodSeconds: {{ .Values.speaker.startupProbe.periodSeconds }}
 -        {{- end }}
 -      - name: reloader
 -        image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
@@ -740,7 +799,7 @@ index 9e18a49c..5ada21c5 100644
 -      {{- if .Values.prometheus.secureMetricsPort }}
 -      - name: kube-rbac-proxy
 -        image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag }}
--        imagePullPolicy: IfNotPresent
+-        imagePullPolicy: {{ .Values.prometheus.rbacProxy.pullPolicy }}
 -        args:
 -          - --logtostderr
 -          - --secure-listen-address=:{{ .Values.prometheus.secureMetricsPort }}
@@ -773,7 +832,7 @@ index 9e18a49c..5ada21c5 100644
 -      {{- if .Values.speaker.frr.secureMetricsPort }}
 -      - name: kube-rbac-proxy-frr
 -        image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag | default .Chart.AppVersion }}
--        imagePullPolicy: IfNotPresent
+-        imagePullPolicy: {{ .Values.prometheus.rbacProxy.pullPolicy }}
 -        args:
 -          - --logtostderr
 -          - --secure-listen-address=:{{ .Values.speaker.frr.secureMetricsPort }}
@@ -807,7 +866,7 @@ index 9e18a49c..5ada21c5 100644
          "kubernetes.io/os": linux
          {{- with .Values.speaker.nodeSelector }}
 diff --git a/charts/metallb/templates/webhooks.yaml b/charts/metallb/templates/webhooks.yaml
-index 3f3d5ed7..3c668779 100644
+index 3b587a42..3c668779 100644
 --- a/charts/metallb/templates/webhooks.yaml
 +++ b/charts/metallb/templates/webhooks.yaml
 @@ -10,7 +10,7 @@ webhooks:
@@ -873,23 +932,25 @@ index 3f3d5ed7..3c668779 100644
        path: /validate-metallb-io-v1beta1-l2advertisement
    failurePolicy: {{ .Values.crds.validationFailurePolicy }}
    name: l2advertisementvalidationwebhook.metallb.io
-@@ -150,6 +150,7 @@ apiVersion: v1
+@@ -150,7 +150,7 @@ apiVersion: v1
  kind: Service
  metadata:
    name: metallb-webhook-service
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
  spec:
-@@ -164,5 +165,6 @@ apiVersion: v1
+@@ -165,6 +165,6 @@ apiVersion: v1
  kind: Secret
  metadata:
    name: webhook-server-cert
+-  namespace: {{ .Release.Namespace | quote }}
 +  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
 diff --git a/charts/metallb/values.schema.json b/charts/metallb/values.schema.json
-index 552860c0..2c9842c5 100644
+index 5a92e56a..14ba5134 100644
 --- a/charts/metallb/values.schema.json
 +++ b/charts/metallb/values.schema.json
 @@ -62,11 +62,8 @@
@@ -906,7 +967,7 @@ index 552860c0..2c9842c5 100644
              },
              "pullPolicy": {
                "anyOf": [
-@@ -333,35 +330,6 @@
+@@ -344,35 +341,6 @@
              },
              "secretName": {
                "type": "string"
@@ -942,7 +1003,7 @@ index 552860c0..2c9842c5 100644
              }
            },
            "required": [ "tolerateMaster" ]
-@@ -372,10 +340,6 @@
+@@ -383,10 +351,6 @@
        "description": "CRD configuration",
        "type": "object",
        "properties": {
@@ -954,7 +1015,7 @@ index 552860c0..2c9842c5 100644
            "description": "Failure policy to use with validating webhooks",
            "type": "string",
 diff --git a/charts/metallb/values.yaml b/charts/metallb/values.yaml
-index ac384ee0..8050b1c0 100644
+index be8cf112..c90e66a9 100644
 --- a/charts/metallb/values.yaml
 +++ b/charts/metallb/values.yaml
 @@ -6,6 +6,16 @@ imagePullSecrets: []
@@ -974,7 +1035,25 @@ index ac384ee0..8050b1c0 100644
  
  # To configure MetalLB, you must specify ONE of the following two
  # options.
-@@ -196,8 +206,8 @@ controller:
+@@ -79,7 +89,7 @@ prometheus:
+     # 	metric relabel configs to apply to samples before ingestion.
+     metricRelabelings: []
+     # - action: keep
+-    #   regex: 'kube_(daemonset|deployment|pod|namespace|node|statefulset).+'
++    #   regex: 'kube_(daemonset|deployment|pod|namespace|node|statefulset).'
+     #   sourceLabels: [__name__]
+ 
+     # 	relabel configs to apply to samples before ingestion.
+@@ -126,7 +136,7 @@ prometheus:
+     # 	metric relabel configs to apply to samples before ingestion.
+     metricRelabelings: []
+     # - action: keep
+-    #   regex: 'kube_(daemonset|deployment|pod|namespace|node|statefulset).+'
++    #   regex: 'kube_(daemonset|deployment|pod|namespace|node|statefulset).'
+     #   sourceLabels: [__name__]
+ 
+     # 	relabel configs to apply to samples before ingestion.
+@@ -197,8 +207,8 @@ controller:
    # command: /controller
    # webhookMode: enabled
    image:
@@ -985,9 +1064,9 @@ index ac384ee0..8050b1c0 100644
      pullPolicy:
    ## @param controller.updateStrategy.type Metallb controller deployment strategy type.
    ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
-@@ -259,7 +269,8 @@ speaker:
+@@ -264,7 +274,8 @@ speaker:
+   excludeInterfaces:
      enabled: true
-     mlBindPort: 7946
    image:
 -    repository: quay.io/metallb/speaker
 +    repository: metallb/speaker
@@ -995,17 +1074,17 @@ index ac384ee0..8050b1c0 100644
      tag:
      pullPolicy:
    ## @param speaker.updateStrategy.type Speaker daemonset strategy type
-@@ -306,27 +317,6 @@ speaker:
-     periodSeconds: 10
-     successThreshold: 1
-     timeoutSeconds: 1
+@@ -316,27 +327,6 @@ speaker:
+     enabled: true
+     failureThreshold: 30
+     periodSeconds: 5
 -  # frr contains configuration specific to the MetalLB FRR container,
 -  # for speaker running alongside FRR.
 -  frr:
--    enabled: false
+-    enabled: true
 -    image:
--      repository: frrouting/frr
--      tag: v7.5.1
+-      repository: quay.io/frrouting/frr
+-      tag: 8.5.2
 -      pullPolicy:
 -    metricsPort: 7473
 -    resources: {}
@@ -1024,5 +1103,5 @@ index ac384ee0..8050b1c0 100644
 -  enabled: true
    validationFailurePolicy: Fail
 -- 
-2.34.1
+2.42.0
 
