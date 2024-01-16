@@ -1,0 +1,34 @@
+From 038a28ac09a546c838ddefc86192d4236e8bedc3 Mon Sep 17 00:00:00 2001
+From: Jackson West <jaxesn@gmail.com>
+Date: Tue, 16 Jan 2024 21:33:24 +0000
+Subject: [PATCH] Revert "libctr/cgroups: don't take init's cgroup into
+ account"
+
+This reverts commit 10cfd816317789da4393d70ead92ec7c203e1926.
+---
+ libcontainer/cgroups/systemd/v1.go | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/libcontainer/cgroups/systemd/v1.go b/libcontainer/cgroups/systemd/v1.go
+index a574552d..57384780 100644
+--- a/libcontainer/cgroups/systemd/v1.go
++++ b/libcontainer/cgroups/systemd/v1.go
+@@ -274,7 +274,14 @@ func getSubsystemPath(slice, unit, subsystem string) (string, error) {
+ 		return "", err
+ 	}
+ 
+-	return filepath.Join(mountpoint, slice, unit), nil
++	initPath, err := cgroups.GetInitCgroup(subsystem)
++	if err != nil {
++		return "", err
++	}
++	// if pid 1 is systemd 226 or later, it will be in init.scope, not the root
++	initPath = strings.TrimSuffix(filepath.Clean(initPath), "init.scope")
++
++	return filepath.Join(mountpoint, initPath, slice, unit), nil
+ }
+ 
+ func (m *legacyManager) Freeze(state configs.FreezerState) error {
+-- 
+2.34.1
+
