@@ -1,19 +1,18 @@
-From 4ffd8799d7ba582d09dbcbc8fe1ea382a728754b Mon Sep 17 00:00:00 2001
+From 2dcea73beae6dfd47e4eccc29ef9b76778cf6b14 Mon Sep 17 00:00:00 2001
 From: ahreehong <46465244+ahreehong@users.noreply.github.com>
 Date: Tue, 12 Dec 2023 15:01:07 -0800
 Subject: [PATCH 10/11] Adds support for cloudstack rhel 9
 
 Signed-off-by: ahreehong <46465244+ahreehong@users.noreply.github.com>
 ---
- images/capi/Makefile                          |  6 +-
- .../packer/qemu/linux/centos/http/9/ks.cfg    | 73 +++++++++++++++++++
- images/capi/packer/qemu/qemu-rhel-9.json      | 16 ++++
- 3 files changed, 93 insertions(+), 2 deletions(-)
- create mode 100644 images/capi/packer/qemu/linux/centos/http/9/ks.cfg
+ images/capi/Makefile                             |  6 ++++--
+ .../capi/packer/qemu/linux/centos/http/9/ks.cfg  |  2 +-
+ images/capi/packer/qemu/qemu-rhel-9.json         | 16 ++++++++++++++++
+ 3 files changed, 21 insertions(+), 3 deletions(-)
  create mode 100644 images/capi/packer/qemu/qemu-rhel-9.json
 
 diff --git a/images/capi/Makefile b/images/capi/Makefile
-index c588fe8e3..0c6ec1818 100644
+index 8c33b430f..d7f0afc3c 100644
 --- a/images/capi/Makefile
 +++ b/images/capi/Makefile
 @@ -318,7 +318,7 @@ PACKER_POWERVS_NODE_FLAGS := $(foreach f,$(abspath $(COMMON_POWERVS_VAR_FILES)),
@@ -27,16 +26,16 @@ index c588fe8e3..0c6ec1818 100644
  WINDOWS_VERSIONS		:=	windows-2019 windows-2022
 @@ -368,7 +368,7 @@ OPENSTACK_BUILD_NAMES	?=	openstack-ubuntu-2004 openstack-ubuntu-2204 openstack-f
  
- OSC_BUILD_NAMES 			?=	osc-ubuntu-2004
+ OSC_BUILD_NAMES 			?=	osc-ubuntu-2004 osc-ubuntu-2204
  
--QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2304 qemu-ubuntu-2204-efi qemu-centos-7 qemu-ubuntu-2004-efi qemu-rhel-8 qemu-rockylinux-8 qemu-rockylinux-9 qemu-flatcar
-+QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2304 qemu-ubuntu-2204-efi qemu-centos-7 qemu-ubuntu-2004-efi qemu-rhel-8 qemu-rhel-9 qemu-rockylinux-8 qemu-rockylinux-9 qemu-flatcar
+-QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2304 qemu-ubuntu-2204-efi qemu-centos-7 qemu-centos-9 qemu-ubuntu-2004-efi qemu-rhel-8 qemu-rockylinux-8 qemu-rockylinux-9 qemu-flatcar
++QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2304 qemu-ubuntu-2204-efi qemu-centos-7 qemu-centos-9 qemu-ubuntu-2004-efi qemu-rhel-8 qemu-rhel-9 qemu-rockylinux-8 qemu-rockylinux-9 qemu-flatcar
  
  QEMU_KUBEVIRT_BUILD_NAMES	:= $(addprefix kubevirt-,$(QEMU_BUILD_NAMES))
  
-@@ -768,6 +768,7 @@ build-qemu-ubuntu-2204-efi: ## Builds Ubuntu 22.04 QEMU image that EFI boots
- build-qemu-ubuntu-2304: ## Builds Ubuntu 23.04 QEMU image
+@@ -768,6 +768,7 @@ build-qemu-ubuntu-2304: ## Builds Ubuntu 23.04 QEMU image
  build-qemu-centos-7: ## Builds CentOS 7 QEMU image
+ build-qemu-centos-9: ## Builds CentOS 9 Stream QEMU image
  build-qemu-rhel-8: ## Builds RHEL 8 QEMU image
 ++build-qemu-rhel-9: ## Builds RHEL 9 QEMU image
  build-qemu-rockylinux-8: ## Builds Rocky 8 QEMU image
@@ -51,84 +50,18 @@ index c588fe8e3..0c6ec1818 100644
  validate-qemu-rockylinux-9: ## Validates Rocky Linux 9 QEMU image packer config
  validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
 diff --git a/images/capi/packer/qemu/linux/centos/http/9/ks.cfg b/images/capi/packer/qemu/linux/centos/http/9/ks.cfg
-new file mode 100644
-index 000000000..00c9229e0
---- /dev/null
+index c3c6b7e0b..508e728ea 100644
+--- a/images/capi/packer/qemu/linux/centos/http/9/ks.cfg
 +++ b/images/capi/packer/qemu/linux/centos/http/9/ks.cfg
-@@ -0,0 +1,73 @@
-+# version=RHEL9
-+# Install OS instead of upgrade
-+cdrom
-+auth --enableshadow --passalgo=sha512 --kickstart
-+# License agreement
-+eula --agreed
-+# Use text mode install
-+text
-+# Disable Initial Setup on first boot
-+firstboot --disable
-+# Keyboard layout
-+keyboard --vckeymap=us --xlayouts='us'
-+# System language
-+lang en_US.UTF-8
-+# Network information
-+network --bootproto=dhcp --device=link --activate
+@@ -14,7 +14,7 @@ keyboard --vckeymap=us --xlayouts='us'
+ lang en_US.UTF-8
+ # Network information
+ network --bootproto=dhcp --device=link --activate
+-network --hostname=centos9
 +network --hostname=rhel9
-+firewall --disabled
-+# Root password
-+rootpw builder --plaintext
-+# SELinux configuration
-+selinux --permissive
-+# Do not configure the X Window System
-+skipx
-+# System timezone
-+timezone UTC
-+# Add a user named builder
-+user --groups=wheel --name=builder --password=builder --plaintext --gecos="builder"
-+
-+# System bootloader configuration
-+bootloader --location=mbr --boot-drive=sda
-+# Clear the Master Boot Record
-+zerombr
-+clearpart --all --initlabel --drives=sda
-+part / --fstype="ext4" --grow --asprimary --label=slash --ondisk=sda
-+
-+# Reboot after successful installation
-+reboot
-+
-+%packages --ignoremissing --excludedocs
-+# dnf group info minimal-environment
-+@^minimal-environment
-+@core
-+openssh-server
-+sed
-+sudo
-+python3
-+
-+# Exclude unnecessary firmwares
-+-iwl*firmware
-+%end
-+
-+# Enable/disable the following services
-+services --enabled=sshd
-+
-+%post --nochroot --logfile=/mnt/sysimage/root/ks-post.log
-+# Disable quiet boot and splash screen
-+sed --follow-symlinks -i "s/ rhgb quiet//" /mnt/sysimage/etc/default/grub
-+sed --follow-symlinks -i "s/ rhgb quiet//" /mnt/sysimage/boot/grub2/grubenv
-+
-+# Passwordless sudo for the user 'builder'
-+echo "builder ALL=(ALL) NOPASSWD: ALL" >> /mnt/sysimage/etc/sudoers.d/builder
-+# Remove the package cache
-+yum -y clean all
-+
-+# Disable swap
-+swapoff -a
-+rm -f /swapfile
-+sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
-+
-+sed -i '/^\(HWADDR\|UUID\)=/d' /etc/sysconfig/network-scripts/ifcfg-*
-+
-+%end
+ firewall --disabled
+ # Root password
+ rootpw builder --plaintext
 diff --git a/images/capi/packer/qemu/qemu-rhel-9.json b/images/capi/packer/qemu/qemu-rhel-9.json
 new file mode 100644
 index 000000000..e2fcccc88
@@ -152,5 +85,5 @@ index 000000000..e2fcccc88
 +  "shutdown_command": "shutdown -P now"
 +}
 -- 
-2.34.1
+2.39.3 (Apple Git-145)
 
