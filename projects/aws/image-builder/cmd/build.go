@@ -94,7 +94,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		bo.OsVersion = "8"
 	}
 
-	if bo.Hypervisor != builder.Nutanix && bo.Os == builder.RedHat && bo.OsVersion != "8" {
+	if bo.Hypervisor != builder.Nutanix && bo.Hypervisor != builder.CloudStack && bo.Os == builder.RedHat && bo.OsVersion != "8" {
 		log.Fatalf("Invalid OS version for RedHat. Please choose 8")
 	}
 
