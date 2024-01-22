@@ -1,25 +1,26 @@
-From 9363024e4fa1bd7bc2f285a64fc0fcc0161e96a2 Mon Sep 17 00:00:00 2001
+From 3149ef33177d47fc0923bc6b193bbff67e932184 Mon Sep 17 00:00:00 2001
 From: Taylor Neyland <tneyla@amazon.com>
 Date: Wed, 19 Jul 2023 12:51:30 -0500
 Subject: [PATCH 08/11] Disable UDP offload service for Redhat and Ubuntu
 
+Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
- .../system/disable-udp-offload-redhat.service   | 15 +++++++++++++++
+ .../system/disable-nic-offload-redhat.service   | 16 ++++++++++++++++
  .../system/disable-udp-offload-ubuntu.service   | 15 +++++++++++++++
  .../roles/providers/tasks/vmware-redhat.yml     | 17 +++++++++++++++++
  .../roles/providers/tasks/vmware-ubuntu.yml     | 17 +++++++++++++++++
- 4 files changed, 64 insertions(+)
- create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-redhat.service
+ 4 files changed, 65 insertions(+)
+ create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/disable-nic-offload-redhat.service
  create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-ubuntu.service
 
-diff --git a/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-redhat.service b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-redhat.service
+diff --git a/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-nic-offload-redhat.service b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-nic-offload-redhat.service
 new file mode 100644
-index 000000000..d445e4763
+index 000000000..3eb62c94b
 --- /dev/null
-+++ b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-redhat.service
-@@ -0,0 +1,15 @@
++++ b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-nic-offload-redhat.service
+@@ -0,0 +1,16 @@
 +[Unit]
-+Description=Disables UDP offload
++Description=Disables UDP segmentation and TCP checksum offload
 +After=NetworkManager-wait-online.service
 +# Block manual interactions with this service
 +RefuseManualStart=true
@@ -29,6 +30,7 @@ index 000000000..d445e4763
 +Type=oneshot
 +ExecStart=/usr/sbin/ethtool -K eth0 tx-udp_tnl-segmentation off
 +ExecStart=/usr/sbin/ethtool -K eth0 tx-udp_tnl-csum-segmentation off
++ExecStart=/usr/sbin/ethtool -K eth0 rx off tx off
 +RemainAfterExit=true
 +
 +[Install]
@@ -56,7 +58,7 @@ index 000000000..7f5d50a8e
 +WantedBy=network-online.target
 \ No newline at end of file
 diff --git a/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml b/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
-index 17117110a..4174eb9d0 100644
+index 17117110a..152ff0515 100644
 --- a/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
 +++ b/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
 @@ -49,3 +49,20 @@
@@ -64,18 +66,18 @@ index 17117110a..4174eb9d0 100644
      path: /tmp/cloud-init-vmware.sh
      state: absent
 +
-+- name: Create service disable udp offload
++- name: Create service disable udp segmentation offload and tcp checksum offload
 +  copy:
-+    src: files/etc/systemd/system/disable-udp-offload-redhat.service
-+    dest: /etc/systemd/system/disable-udp-offload-redhat.service
++    src: files/etc/systemd/system/disable-nic-offload-redhat.service
++    dest: /etc/systemd/system/disable-nic-offload-redhat.service
 +    owner: root
 +    group: root
 +    mode: 0644
 +  when: ansible_os_family != "Flatcar"
 +
-+- name: Enable disable-udp-offload-redhat.service
++- name: Enable disable-nic-offload-redhat.service
 +  systemd:
-+    name: disable-udp-offload-redhat.service
++    name: disable-nic-offload-redhat.service
 +    daemon_reload: yes
 +    enabled: True
 +    state: stopped
