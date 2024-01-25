@@ -1,4 +1,4 @@
-From 9f66569c7ef0777b0f36e5de437d0a13a75e739e Mon Sep 17 00:00:00 2001
+From 4f22a0f719be7fbb75c1065b1b9311d603056508 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 21:05:13 -0800
 Subject: [PATCH 01/11] OVA improvements
@@ -9,10 +9,10 @@ Subject: [PATCH 01/11] OVA improvements
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
- .../capi/ansible/roles/sysprep/tasks/main.yml |  9 +++++
+ .../capi/ansible/roles/sysprep/tasks/main.yml |  9 ++++
  images/capi/hack/ovf_template.xml             | 10 +----
- images/capi/packer/ova/packer-node.json       | 38 +++++++++++++------
- 3 files changed, 37 insertions(+), 20 deletions(-)
+ images/capi/packer/ova/packer-node.json       | 41 +++++++++++++------
+ 3 files changed, 40 insertions(+), 20 deletions(-)
 
 diff --git a/images/capi/ansible/roles/sysprep/tasks/main.yml b/images/capi/ansible/roles/sysprep/tasks/main.yml
 index a9fa954d5..a526528ea 100644
@@ -61,7 +61,7 @@ index 316427ec3..ca23db5f9 100644
        <Property ovf:userConfigurable="false" ovf:value="${BUILD_TIMESTAMP}" ovf:type="string" ovf:key="BUILD_TIMESTAMP"/>
        <Property ovf:userConfigurable="false" ovf:value="${BUILD_DATE}" ovf:type="string" ovf:key="BUILD_DATE"/>
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 1b7b2d13d..e85dbe077 100644
+index 1b7b2d13d..f46df3cee 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
 @@ -184,6 +184,12 @@
@@ -128,11 +128,14 @@ index 1b7b2d13d..e85dbe077 100644
      {
        "custom_data": {
          "build_date": "{{isotime}}",
-@@ -324,7 +333,11 @@
+@@ -324,7 +333,14 @@
          "vsphere-iso-base"
        ],
        "inline": [
 -        "./hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ./hack/ovf_eula.txt --ovf_template ./hack/ovf_template.xml --vmdk_file {{user `build_version`}}-disk-0.vmdk {{user `output_dir`}}"
++        "while true; do govc library.session.ls &> /dev/null || true; sleep 2m; done &",
++        "PID=$!",
++        "trap \"kill $PID\" EXIT",
 +        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}.ovf {{user `output_dir`}}/{{user `build_version`}}.ovf",
 +        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-1.vmdk {{user `output_dir`}}/{{user `build_version`}}-1.vmdk",
 +        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-2.nvram {{user `output_dir`}}/{{user `build_version`}}-2.nvram",
@@ -141,7 +144,7 @@ index 1b7b2d13d..e85dbe077 100644
        ],
        "name": "vsphere",
        "type": "shell-local"
-@@ -509,6 +522,7 @@
+@@ -509,6 +525,7 @@
      "resource_pool": "",
      "username": "",
      "vcenter_server": "",

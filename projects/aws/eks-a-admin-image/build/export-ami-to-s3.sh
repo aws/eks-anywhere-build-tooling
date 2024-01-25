@@ -122,4 +122,4 @@ done
 INSPECTOR_FINDINGS_REPORT_ID=$(aws inspector2 create-findings-report --filter-criteria '{"resourceId": [{"comparison": "EQUALS", "value": "'"$INSTANCE_ID"'"}], "findingStatus": [{"comparison": "EQUALS", "value": "ACTIVE"}]}' --report-format CSV --s3-destination '{"bucketName": "'"$SNOW_ADMIN_IMAGE_INSPECTOR_BUCKET"'", "kmsKeyArn": "'"$SNOW_ADMIN_IMAGE_INSPECTOR_KMS_KEY_ARN"'"}' --query "reportId" --output text) 
 
 # Make findings report public 
-aws s3api put-object-acl --bucket $SNOW_ADMIN_IMAGE_INSPECTOR_BUCKET --key $INSPECTOR_FINDINGS_REPORT_ID --acl public-read
+aws s3api put-object-acl --bucket $SNOW_ADMIN_IMAGE_INSPECTOR_BUCKET --key $INSPECTOR_FINDINGS_REPORT_ID.csv --acl public-read
