@@ -12,8 +12,8 @@ n=0
 max_attempts=120
 delay=30
 while true; do
-    LATEST_EKSA_VERSION_S3=$(curl $EKSA_RELEASE_MANIFEST_S3_URL | yq e '.spec.latestVersion' -)
-    LATEST_EKSA_VERSION_CLOUDFRONT=$(curl $EKSA_RELEASE_MANIFEST_CDN_URL | yq e '.spec.latestVersion' -)
+    LATEST_EKSA_VERSION_S3=$(curl $EKSA_RELEASE_MANIFEST_S3_URL | yq e '.spec.releases[-1].version' -)
+    LATEST_EKSA_VERSION_CLOUDFRONT=$(curl $EKSA_RELEASE_MANIFEST_CDN_URL | yq e '.spec.releases[-1].version' -)
     [[ "$LATEST_EKSA_VERSION_S3" == "$LATEST_EKSA_VERSION_CLOUDFRONT" ]] && break || {
         if [[ $n -lt $max_attempts ]]; then
             ((n++))
