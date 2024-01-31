@@ -31,7 +31,8 @@ const (
 	BaseRepoHeadRevision        = "refs/remotes/origin/main"
 	PullRequestBody             = `This PR bumps %[1]s/%[2]s to the latest Git revision, along with other updates such as Go version, checksums and attribution files.
 
-[Compare changes](https://github.com/%[1]s/%[2]s/compare/%s...%s)
+[Compare changes](https://github.com/%[1]s/%[2]s/compare/%[3]s...%[4]s)
+[Release notes](https://github.com/%[1]s/%[2]s/releases/%[4]s)
 
 /hold
 /area dependencies
