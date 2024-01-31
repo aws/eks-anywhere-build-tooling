@@ -10,8 +10,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const kubeconfigPath = "/etc/kubernetes/admin.conf"
-
 func controlPlaneJoin() error {
 	err := setHostName(kubeadmJoinFile)
 	if err != nil {
@@ -36,7 +34,7 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error waiting for worker join files")
 	}
 
-	dns, err := getDNSFromJoinConfig("/var/lib/kubelet/config.yaml")
+	dns, err := getDNSFromJoinConfig(kubeletConfigFile)
 	if err != nil {
 		return errors.Wrap(err, "Error getting api server")
 	}
@@ -88,7 +86,7 @@ func controlPlaneJoin() error {
 
 	// Migrate all static pods from this host-container to the bottlerocket host using the apiclient
 	// now that etcd manifest is also created
-	podDefinitions, err := utils.EnableStaticPods("/etc/kubernetes/manifests")
+	podDefinitions, err := utils.EnableStaticPods(staticPodManifestsPath)
 	if err != nil {
 		return errors.Wrap(err, "Error enabling static pods")
 	}

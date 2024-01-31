@@ -9,10 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	kubeadmJoinFile = "/tmp/kubeadm-join-config.yaml"
-)
-
 func workerJoin() error {
 	err := setHostName(kubeadmJoinFile)
 	if err != nil {
@@ -38,7 +34,7 @@ func workerJoin() error {
 	if err != nil {
 		return errors.Wrap(err, "Error reading the ca data")
 	}
-	dns, err := getDNSFromJoinConfig("/var/lib/kubelet/config.yaml")
+	dns, err := getDNSFromJoinConfig(kubeletConfigFile)
 	if err != nil {
 		return errors.Wrap(err, "Error getting dns from kubelet config")
 	}
