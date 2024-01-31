@@ -57,3 +57,16 @@ Finally:
 RELEASE_BRANCH=1-XX make clean
 RELEASE_BRANCH=1-XX make build
 ```
+
+#### Validating Helm Chart And Images
+
+An easy way to validate your build is to install the helm chart to a kind cluster.
+
+Install [kind](https://kind.sigs.k8s.io/) and create a cluster.
+
+Then install the helm chart pointing at your personal registry using the command outputted when the build succeeds. For instance:
+```
+helm install cluster-autoscaler oci://public.ecr.aws/b9u1e4h9/cluster-autoscaler/charts/cluster-autoscaler --version 9.34.0-1.27-6444f7f1d05573c56b00d438af946ab9c36951a1 --set sourceRegistry=public.ecr.aws/a9u1e4h1 --set autoDiscovery.clusterName=foobar
+```
+
+Where `public.ecr.aws/b9u1e4h9` would be your personal registry.
