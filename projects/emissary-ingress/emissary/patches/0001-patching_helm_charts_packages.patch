@@ -1,9 +1,8 @@
-From b8b4086274629b5cbcfbb325eeb629c977978244 Mon Sep 17 00:00:00 2001
-From: Vivek Koppuru <koppv@amazon.com>
-Date: Tue, 10 Oct 2023 17:38:45 -0700
+From 2fbb944f6705aea7806fc1a689313984dd4d3231 Mon Sep 17 00:00:00 2001
+From: ahreehong <46465244+ahreehong@users.noreply.github.com>
+Date: Tue, 30 Jan 2024 17:10:30 -0800
 Subject: [PATCH] patching_helm_charts_packages
 
-Signed-off-by: vivek-koppuru <koppv@amazon.com>
 ---
  Makefile                                      |   12 +-
  build-aux/prelude_go.mk                       |    2 +-
@@ -49,14 +48,14 @@ Signed-off-by: vivek-koppuru <koppv@amazon.com>
  .../emissary-ingress/templates/namespace.yaml |    2 +-
  charts/emissary-ingress/templates/pdb.yaml    |    2 +-
  .../templates/podsecuritypolicy.yaml          |    2 +-
- charts/emissary-ingress/templates/rbac.yaml   |    8 +-
+ charts/emissary-ingress/templates/rbac.yaml   |   10 +-
  .../emissary-ingress/templates/resolvers.yaml |    4 +-
  .../templates/service-canary.yaml             |    4 +-
  .../emissary-ingress/templates/service.yaml   |    4 +-
  .../templates/serviceaccount.yaml             |    2 +-
  .../templates/servicemonitor.yaml             |    4 +-
  .../{values.yaml.in => values.yaml}           |   51 +-
- 51 files changed, 5573 insertions(+), 724 deletions(-)
+ 51 files changed, 5574 insertions(+), 725 deletions(-)
  create mode 100644 charts/crds/.helmignore
  create mode 100644 charts/crds/Chart.yaml
  create mode 100644 charts/crds/README.md
@@ -6698,7 +6697,7 @@ index 7c0a7489f..455fe9d33 100644
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/rbac.yaml b/charts/emissary-ingress/templates/rbac.yaml
-index e36790acd..acc470d41 100644
+index e36790acd..e44fd61d3 100644
 --- a/charts/emissary-ingress/templates/rbac.yaml
 +++ b/charts/emissary-ingress/templates/rbac.yaml
 @@ -35,7 +35,7 @@ roleRef:
@@ -6737,6 +6736,15 @@ index e36790acd..acc470d41 100644
      kind: ServiceAccount
  {{- end }}
  {{- if and .Values.waitForApiext (eq .Values.waitForApiext.enabled true) (eq .Values.waitForApiext.createRoles true) }}
+@@ -170,7 +170,7 @@ roleRef:
+   name: {{ include "ambassador.rbacName" . }}-apiext
+ subjects:
+   - name: {{ include "ambassador.serviceAccountName" . }}
+-    namespace: {{ include "ambassador.namespace" . }}
++    namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+     kind: ServiceAccount
+ ---
+ apiVersion: rbac.authorization.k8s.io/v1
 diff --git a/charts/emissary-ingress/templates/resolvers.yaml b/charts/emissary-ingress/templates/resolvers.yaml
 index 53633ee88..7ecb2fc97 100644
 --- a/charts/emissary-ingress/templates/resolvers.yaml
@@ -6928,5 +6936,5 @@ index abe1dcaa2..cf5939e44 100644
  
  # configure docker to pull from private registry
 -- 
-2.34.1
+2.40.0
 
