@@ -36,7 +36,7 @@ func controlPlaneInit() error {
 		return errors.Wrap(err, "Error comparing kubeadm version with v1.29.0")
 	}
 
-	if k8s129Compare != 1 {
+	if k8s129Compare != -1 {
 		err = patchKubeVipManifest()
 		if err != nil {
 			return errors.Wrapf(err, "Error patching kube-vip manifest")
