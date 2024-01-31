@@ -21,6 +21,7 @@ import (
 const (
 	apiServerManifestPath = "/.bottlerocket/rootfs/etc/kubernetes/manifests/kube-apiserver"
 	ebsInitMarker         = "/tmp/run-ebs-init"
+	kubernetesCACertFile  = "/etc/kubernetes/pki/ca.crt"
 )
 
 func getBootstrapToken() (string, error) {
@@ -36,7 +37,7 @@ func getBootstrapToken() (string, error) {
 }
 
 func getEncodedCA() (string, error) {
-	caFileData, err := ioutil.ReadFile("/etc/kubernetes/pki/ca.crt")
+	caFileData, err := ioutil.ReadFile(kubernetesCACertFile)
 	if err != nil {
 		return "", errors.Wrap(err, "Error reading the ca data")
 	}
@@ -313,4 +314,22 @@ func readAndEncodeFile(filePath string, reader FileReader) (string, error) {
 // isEmpty checks if passed sting is empty
 func isEmpty(str string) bool {
 	return len(str) == 0
+}
+
+func patchKubeVipManifest() error {
+	kubeVipManifest := filepath.Join(staticPodManifestsPath, "kube-vip.yaml")
+	contents, err := ioutil.ReadFile(kubeVipManifest)
+	if err != nil {
+		return errors.Wrapf(err, "Error reading file %s", kubeVipManifest)
+	}
+
+	updatedContents := strings.ReplaceAll(string(contents), "path: /etc/kubernetes/admin.conf", "path: /etc/kubernetes/super-admin.conf")
+	updatedContents = strings.ReplaceAll(string(updatedContents), "path: /var/lib/kubeadm/admin.conf", "path: /var/lib/kubeadm/super-admin.conf")
+
+	err = os.WriteFile(kubeVipManifest, []byte(updatedContents), 0o644)
+	if err != nil {
+		return errors.Wrapf(err, "Error writing file %s", kubeVipManifest)
+	}
+
+	return nil
 }

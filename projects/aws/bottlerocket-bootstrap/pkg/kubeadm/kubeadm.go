@@ -9,6 +9,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	kubeadmFile                      = "/tmp/kubeadm.yaml"
+	kubectl                          = "/opt/bin/kubectl"
+	kubeadmBinary                    = "/opt/bin/kubeadm"
+	kubeconfigPath                   = "/etc/kubernetes/admin.conf"
+	kubeadmJoinFile                  = "/tmp/kubeadm-join-config.yaml"
+	kubeletConfigFile                = "/var/lib/kubelet/config.yaml"
+	staticPodManifestsPath           = "/etc/kubernetes/manifests"
+	bottlerocketRootFSKubeadmPKIPath = "/.bottlerocket/rootfs/var/lib/kubeadm/pki"
+)
+
 type kubeadm struct {
 	userData *utils.UserData
 }
@@ -19,7 +30,7 @@ func New(userData *utils.UserData) *kubeadm {
 
 func (k *kubeadm) InitializeDirectories() error {
 	fmt.Println("Initializing directories")
-	err := os.MkdirAll("/.bottlerocket/rootfs/var/lib/kubeadm/pki", 0o640)
+	err := os.MkdirAll(bottlerocketRootFSKubeadmPKIPath, 0o640)
 	if err != nil {
 		return errors.Wrap(err, "error creating directory")
 	}

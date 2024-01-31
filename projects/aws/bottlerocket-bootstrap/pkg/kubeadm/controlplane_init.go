@@ -12,12 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	kubeadmFile   = "/tmp/kubeadm.yaml"
-	kubectl       = "/opt/bin/kubectl"
-	kubeadmBinary = "/opt/bin/kubeadm"
-)
-
 func controlPlaneInit() error {
 	err := setHostName(kubeadmFile)
 	if err != nil {
@@ -27,10 +21,32 @@ func controlPlaneInit() error {
 	// start optional EBS initialization
 	ebsInitControl := startEbsInit()
 
+	cmd := exec.Command(kubeadmBinary, "version", "-o=short")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "Error running command: %v, Output: %s\n", cmd, string(out))
+	}
+	kubeadmVersion, err := versionutil.ParseSemantic(strings.TrimSuffix(string(out), "\n"))
+	if err != nil {
+		return errors.Wrapf(err, "%s is not a valid kubeadm version", string(out))
+	}
+
+	k8s129Compare, err := kubeadmVersion.Compare("1.29.0")
+	if err != nil {
+		return errors.Wrap(err, "Error comparing kubeadm version with v1.29.0")
+	}
+
+	if k8s129Compare != 1 {
+		err = patchKubeVipManifest()
+		if err != nil {
+			return errors.Wrapf(err, "Error patching kube-vip manifest")
+		}
+	}
+
 	// Generate keys and write all the manifests
 	fmt.Println("Running kubeadm init commands")
-	cmd := exec.Command(kubeadmBinary, utils.LogVerbosity, "init", "phase", "certs", "all", "--config", kubeadmFile)
-	out, err := cmd.CombinedOutput()
+	cmd = exec.Command(kubeadmBinary, utils.LogVerbosity, "init", "phase", "certs", "all", "--config", kubeadmFile)
+	out, err = cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Error running command, out: %s", string(out))
 	}
@@ -55,7 +71,7 @@ func controlPlaneInit() error {
 	fmt.Printf("Running command: %v\n, output: %s\n", cmd, string(out))
 
 	// Migrate all static pods from host-container to bottlerocket host using apiclient
-	podDefinitions, err := utils.EnableStaticPods("/etc/kubernetes/manifests")
+	podDefinitions, err := utils.EnableStaticPods(staticPodManifestsPath)
 	if err != nil {
 		return errors.Wrap(err, "Error enabling static pods")
 	}
@@ -67,7 +83,7 @@ func controlPlaneInit() error {
 	}
 
 	// Get server from admin.conf
-	apiServer, err := utils.GetApiServerFromKubeConfig("/etc/kubernetes/admin.conf")
+	apiServer, err := utils.GetApiServerFromKubeConfig(kubeconfigPath)
 	if err != nil {
 		return errors.Wrap(err, "Error getting api server")
 	}
@@ -137,25 +153,15 @@ func controlPlaneInit() error {
 		return errors.Wrap(err, "Error waiting for kubelet to come up")
 	}
 
-	cmd = exec.Command(kubeadmBinary, "version", "-o=short")
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "Error running command: %v, Output: %s\n", cmd, string(out))
-	}
-	kubeadmVersion, err := versionutil.ParseSemantic(strings.TrimSuffix(string(out), "\n"))
-	if err != nil {
-		return errors.Wrapf(err, "%s is not a valid kubeadm version", string(out))
-	}
-
 	// we compare the kubeadm version to v1.26 because a new phase "show-join-command" was introduced in that version.
 	// this comparison can be removed when we deprecate v1.25.
-	compare, err := kubeadmVersion.Compare("1.26.0")
+	k8s126Compare, err := kubeadmVersion.Compare("1.26.0")
 	if err != nil {
-		return errors.Wrap(err, "Error comparing versions")
+		return errors.Wrap(err, "Error comparing kubeadm version with v1.26.0")
 	}
 
 	// finish kubeadm
-	if compare == -1 {
+	if k8s126Compare == -1 {
 		cmd = exec.Command(kubeadmBinary, utils.LogVerbosity, "init", "--skip-phases", "preflight,kubelet-start,certs,kubeconfig,bootstrap-token,control-plane,etcd",
 			"--config", kubeadmFile)
 	} else {
@@ -168,7 +174,7 @@ func controlPlaneInit() error {
 	}
 
 	// Now that Core DNS is installed, find the cluster DNS IP.
-	dns, err := getDNS("/etc/kubernetes/admin.conf")
+	dns, err := getDNS(kubeconfigPath)
 	if err != nil {
 		return errors.Wrap(err, "Error getting dns ip")
 	}
