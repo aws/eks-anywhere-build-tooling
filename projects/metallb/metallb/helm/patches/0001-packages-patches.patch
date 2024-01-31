@@ -1,4 +1,4 @@
-From c26cf573b57dc9df70187969b9c97dd2cf6bdea7 Mon Sep 17 00:00:00 2001
+From d8ea1aa6e9aa1f70f7f568d08992ed2f06266886 Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 10 Jan 2024 16:58:40 -0800
 Subject: [PATCH] packages patches
@@ -23,11 +23,11 @@ Subject: [PATCH] packages patches
  charts/metallb/templates/secret.yaml          |  16 +
  .../metallb/templates/service-accounts.yaml   |   4 +-
  charts/metallb/templates/servicemonitor.yaml  |  14 +-
- charts/metallb/templates/speaker.yaml         | 351 +-----------------
+ charts/metallb/templates/speaker.yaml         | 326 +-----------------
  charts/metallb/templates/webhooks.yaml        |  18 +-
- charts/metallb/values.schema.json             |  40 +-
+ charts/metallb/values.schema.json             |  40 +--
  charts/metallb/values.yaml                    |  42 +--
- 23 files changed, 136 insertions(+), 457 deletions(-)
+ 23 files changed, 137 insertions(+), 431 deletions(-)
  rename charts/{metallb/charts => }/crds/.helmignore (100%)
  rename charts/{metallb/charts => }/crds/Chart.yaml (100%)
  rename charts/{metallb/charts => }/crds/README.md (100%)
@@ -479,7 +479,7 @@ index 1cfc0c43..98705c41 100644
    apiGroup: rbac.authorization.k8s.io
    kind: Role
 diff --git a/charts/metallb/templates/speaker.yaml b/charts/metallb/templates/speaker.yaml
-index 1a4c7b2a..c16d6f03 100644
+index 1a4c7b2a..7e698b07 100644
 --- a/charts/metallb/templates/speaker.yaml
 +++ b/charts/metallb/templates/speaker.yaml
 @@ -1,114 +1,9 @@
@@ -598,22 +598,10 @@ index 1a4c7b2a..c16d6f03 100644
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
      app.kubernetes.io/component: speaker
-@@ -155,67 +50,9 @@ spec:
-       terminationGracePeriodSeconds: 0
-       hostNetwork: true
-       volumes:
--      {{- if .Values.speaker.memberlist.enabled }}
--        - name: memberlist
--          secret:
--            secretName: {{ include "metallb.secretName" . }}
--            defaultMode: 420
--      {{- end }}
--      {{- if .Values.speaker.excludeInterfaces.enabled }}
--        - name: metallb-excludel2
--          configMap:
--            defaultMode: 256
--            name: metallb-excludel2
--      {{- end }}
+@@ -167,55 +62,9 @@ spec:
+             defaultMode: 256
+             name: metallb-excludel2
+       {{- end }}
 -      {{- if .Values.speaker.frr.enabled }}
 -        - name: frr-sockets
 -          emptyDir: {}
@@ -667,7 +655,7 @@ index 1a4c7b2a..c16d6f03 100644
          {{- if .Values.speaker.image.pullPolicy }}
          imagePullPolicy: {{ .Values.speaker.image.pullPolicy }}
          {{- end }}
-@@ -252,14 +89,6 @@ spec:
+@@ -252,14 +101,6 @@ spec:
          - name: METALLB_ML_SECRET_KEY_PATH
            value: "{{ .Values.speaker.memberlist.mlSecretKeyPath }}"
          {{- end }}
@@ -682,25 +670,19 @@ index 1a4c7b2a..c16d6f03 100644
          ports:
          - name: monitoring
            containerPort: {{ .Values.prometheus.metricsPort }}
-@@ -305,182 +134,6 @@ spec:
+@@ -305,7 +146,7 @@ spec:
              - ALL
              add:
              - NET_RAW
 -        {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled .Values.speaker.excludeInterfaces.enabled }}
--        volumeMounts:
--          {{- if .Values.speaker.memberlist.enabled }}
--          - name: memberlist 
--            mountPath: {{ .Values.speaker.memberlist.mlSecretKeyPath }}
--          {{- end }}
--          {{- if .Values.speaker.frr.enabled }}
--          - name: reloader
--            mountPath: /etc/frr_reloader
--          {{- end }}
--          {{- if .Values.speaker.excludeInterfaces.enabled }}
--          - name: metallb-excludel2
--            mountPath: /etc/metallb
--          {{- end }}
--        {{- end }}
++        {{- if or .Values.speaker.memberlist.enabled .Values.speaker.excludeInterfaces.enabled }}
+         volumeMounts:
+           {{- if .Values.speaker.memberlist.enabled }}
+           - name: memberlist 
+@@ -320,167 +161,6 @@ spec:
+             mountPath: /etc/metallb
+           {{- end }}
+         {{- end }}
 -      {{- if .Values.speaker.frr.enabled }}
 -      - name: frr
 -        securityContext:
