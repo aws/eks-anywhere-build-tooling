@@ -47,6 +47,7 @@ kubeadm_in_first_cp(){
 
   components_dir=$(upgrade_components_kubernetes_bin_dir)
 
+  if is_version_chage "kubeadm" "version"; then
   backup_and_replace /usr/bin/kubeadm "$components_dir" "$components_dir/kubeadm"
 
 
@@ -77,11 +78,13 @@ kubeadm_in_first_cp(){
   kubeadm upgrade apply "$kube_version" --config "$new_kubeadm_config" --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --allow-experimental-upgrades --yes
 
   restore_coredns_config "$components_dir"
+  fi
 }
 
 kubeadm_in_rest_cp(){
   components_dir=$(upgrade_components_kubernetes_bin_dir)
 
+  if is_version_chage "kubeadm" "version"; then
   backup_and_replace /usr/bin/kubeadm "$components_dir" "$components_dir/kubeadm"
 
   # Backup and delete coredns configmap. If the CM doesn't exist, kubeadm will skip its upgrade.
@@ -97,6 +100,7 @@ kubeadm_in_rest_cp(){
   kubeadm version
   kubeadm upgrade node --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration
   restore_coredns_config "$components_dir"
+  fi
 }
 
 backup_and_delete_coredns_config(){
@@ -127,26 +131,30 @@ restore_coredns_config(){
 kubeadm_in_worker() {
   components_dir=$(upgrade_components_kubernetes_bin_dir)
 
+  if is_version_chage "kubeadm" "version"; then
   backup_and_replace /usr/bin/kubeadm "$components_dir" "$components_dir/kubeadm"
 
   kubeadm version
   kubeadm upgrade node 
+  fi
 }
 
 kubelet_and_kubectl() {
   components_dir=$(upgrade_components_kubernetes_bin_dir)
 
+  if is_version_chage "kubectl" "version"; then
   backup_and_replace /usr/bin/kubectl "$components_dir" "$components_dir/kubectl"
 
   systemctl stop kubelet
   backup_and_replace /usr/bin/kubelet "$components_dir" "$components_dir/kubelet"
   systemctl daemon-reload
   systemctl restart kubelet
+  fi
 }
 
 upgrade_containerd() {
   components_dir=$(upgrade_components_bin_dir)
-
+  if [ $(containerd --version) != $(components_dir/containerd --version) ]; then
   containerd --version
 
   # before nsenter, copy /eksa-upgrades to /tmp/eksa-upgrades
@@ -161,7 +169,7 @@ upgrade_containerd() {
   # systemctl stop containerd
 
   systemctl restart containerd
-
+  fi
 }
 
 cni_plugins() {  
@@ -178,6 +186,18 @@ cni_plugins() {
   /opt/cni/bin/loopback --version
 
   # rm -rf /foo/eksa-upgrades
+}
+
+is_version_chage() {
+  components_dir=$(upgrade_components_bin_dir)
+  current_version=$(/usr/bin/$1 $2)
+  new_version=$($components_dir/$1 $2)
+  if [ "$current_version" != "$new_version" ];
+  then 
+    true
+  else
+    false
+  fi
 }
 
 print_status() {
