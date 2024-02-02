@@ -78,6 +78,8 @@ kubeadm_in_first_cp(){
   kubeadm upgrade apply "$kube_version" --config "$new_kubeadm_config" --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --allow-experimental-upgrades --yes
 
   restore_coredns_config "$components_dir"
+  else
+  echo "no version change detected for kubeadm, skipping upgrade"
   fi
 }
 
@@ -100,6 +102,8 @@ kubeadm_in_rest_cp(){
   kubeadm version
   kubeadm upgrade node --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration
   restore_coredns_config "$components_dir"
+  else
+  echo "no version change detected for kubeadm, skipping upgrade"
   fi
 }
 
@@ -136,6 +140,8 @@ kubeadm_in_worker() {
 
   kubeadm version
   kubeadm upgrade node 
+  else
+  echo "no version change detected for kubeadm, skipping upgrade"
   fi
 }
 
@@ -149,12 +155,14 @@ kubelet_and_kubectl() {
   backup_and_replace /usr/bin/kubelet "$components_dir" "$components_dir/kubelet"
   systemctl daemon-reload
   systemctl restart kubelet
+  else
+  echo "no version change detected for kubectl, skipping upgrade"
   fi
 }
 
 upgrade_containerd() {
   components_dir=$(upgrade_components_bin_dir)
-  if [ $(containerd --version) != $(components_dir/containerd --version) ]; then
+  if [ $(containerd --version) != $($components_dir/containerd/usr/local/bin/containerd --version) ]; then
   containerd --version
 
   # before nsenter, copy /eksa-upgrades to /tmp/eksa-upgrades
@@ -169,6 +177,8 @@ upgrade_containerd() {
   # systemctl stop containerd
 
   systemctl restart containerd
+  else
+  echo "no version change detected for containerd, skipping upgrade"
   fi
 }
 
@@ -191,7 +201,7 @@ cni_plugins() {
 is_version_chage() {
   components_dir=$(upgrade_components_bin_dir)
   current_version=$(/usr/bin/$1 $2)
-  new_version=$($components_dir/$1 $2)
+  new_version=$($components_dir/kubernetes/usr/bin/ $1 $2)
   if [ "$current_version" != "$new_version" ];
   then 
     true
