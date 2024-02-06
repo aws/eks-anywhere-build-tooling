@@ -1,16 +1,16 @@
-From 146972a1d190a1317627a80e8b2fdf2418bbc231 Mon Sep 17 00:00:00 2001
+From 12158d086f242c6e7fa2930689fa01ef38ab9ece Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Sat, 20 Jan 2024 22:05:04 +0000
-Subject: [PATCH] Restart controller if RESTMapping outdated cache is detected
- when reconciling external object
+Subject: [PATCH 37/37] Restart controller if RESTMapping outdated cache is
+ detected when reconciling external object
 
 ---
  controllers/external/util.go      |  28 +++++++-
- controllers/external/util_test.go | 104 +++++++++++++++++++++++++++++-
- 2 files changed, 128 insertions(+), 4 deletions(-)
+ controllers/external/util_test.go | 116 +++++++++++++++++++++++++++++-
+ 2 files changed, 140 insertions(+), 4 deletions(-)
 
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index 5b6443c78..a8b8caa11 100644
+index 5b6443c78..62ed07959 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
 @@ -19,13 +19,17 @@ package external
@@ -55,7 +55,7 @@ index 5b6443c78..a8b8caa11 100644
 +	noResourceMatchErr := &meta.NoResourceMatchError{}
 +	return errors.As(err, &discoverFailedErr) &&
 +		errors.As(err, &noResourceMatchErr) && // This is the error that ErrResourceDiscoveryFailed will unwrap when the original error is NotFound.
-+		strings.Contains(err.Error(), "infrastructure.cluster.x-k8s.io/v1alpha4")
++		strings.Contains(err.Error(), "cluster.x-k8s.io/v1alpha4")
 +}
 +
 +func logErrorAndGracefulShutdown(ctx context.Context, err error, msg string) {
@@ -68,7 +68,7 @@ index 5b6443c78..a8b8caa11 100644
  func Delete(ctx context.Context, c client.Writer, ref *corev1.ObjectReference) error {
  	obj := new(unstructured.Unstructured)
 diff --git a/controllers/external/util_test.go b/controllers/external/util_test.go
-index 012445478..13e57306a 100644
+index 012445478..570cd4dae 100644
 --- a/controllers/external/util_test.go
 +++ b/controllers/external/util_test.go
 @@ -17,6 +17,7 @@ limitations under the License.
@@ -99,7 +99,7 @@ index 012445478..13e57306a 100644
  
  const (
  	testClusterName = "test-cluster"
-@@ -323,3 +324,100 @@ func TestCloneTemplateMissingSpecTemplate(t *testing.T) {
+@@ -323,3 +324,112 @@ func TestCloneTemplateMissingSpecTemplate(t *testing.T) {
  	})
  	g.Expect(err).To(HaveOccurred())
  }
@@ -121,13 +121,25 @@ index 012445478..13e57306a 100644
 +			want: true,
 +		},
 +		{
-+			name: "the error we are looking for but wrapped",
++			name: "the error we are looking for infra api for but wrapped",
 +			err: fmt.Errorf("failed to get restmapping: %w",
 +				&apiutil.ErrResourceDiscoveryFailed{
 +					schema.GroupVersion{
 +						Group:   "infrastructure.cluster.x-k8s.io",
 +						Version: "v1alpha4",
 +					}: apierrors.NewNotFound(schema.GroupResource{}, "infrastructure.cluster.x-k8s.io/v1alpha4"),
++				},
++			),
++			want: true,
++		},
++		{
++			name: "the error we are looking for bootstrap api for but wrapped",
++			err: fmt.Errorf("failed to get restmapping: %w",
++				&apiutil.ErrResourceDiscoveryFailed{
++					schema.GroupVersion{
++						Group:   "bootstrap.cluster.x-k8s.io",
++						Version: "v1beta1",
++					}: apierrors.NewNotFound(schema.GroupResource{}, "bootstrap.cluster.x-k8s.io/v1alpha4"),
 +				},
 +			),
 +			want: true,
