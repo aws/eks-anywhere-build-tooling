@@ -1,8 +1,9 @@
-From 2fbb944f6705aea7806fc1a689313984dd4d3231 Mon Sep 17 00:00:00 2001
-From: ahreehong <46465244+ahreehong@users.noreply.github.com>
-Date: Tue, 30 Jan 2024 17:10:30 -0800
+From 2ab92eec6d5d986d0c921b3721801955a686d4a6 Mon Sep 17 00:00:00 2001
+From: Vivek Koppuru <koppv@amazon.com>
+Date: Tue, 10 Oct 2023 17:38:45 -0700
 Subject: [PATCH] patching_helm_charts_packages
 
+Signed-off-by: vivek-koppuru <koppv@amazon.com>
 ---
  Makefile                                      |   12 +-
  build-aux/prelude_go.mk                       |    2 +-
@@ -48,14 +49,14 @@ Subject: [PATCH] patching_helm_charts_packages
  .../emissary-ingress/templates/namespace.yaml |    2 +-
  charts/emissary-ingress/templates/pdb.yaml    |    2 +-
  .../templates/podsecuritypolicy.yaml          |    2 +-
- charts/emissary-ingress/templates/rbac.yaml   |   10 +-
+ charts/emissary-ingress/templates/rbac.yaml   |    8 +-
  .../emissary-ingress/templates/resolvers.yaml |    4 +-
  .../templates/service-canary.yaml             |    4 +-
  .../emissary-ingress/templates/service.yaml   |    4 +-
  .../templates/serviceaccount.yaml             |    2 +-
  .../templates/servicemonitor.yaml             |    4 +-
  .../{values.yaml.in => values.yaml}           |   51 +-
- 51 files changed, 5574 insertions(+), 725 deletions(-)
+ 51 files changed, 5573 insertions(+), 724 deletions(-)
  create mode 100644 charts/crds/.helmignore
  create mode 100644 charts/crds/Chart.yaml
  create mode 100644 charts/crds/README.md
@@ -84,7 +85,7 @@ Subject: [PATCH] patching_helm_charts_packages
  delete mode 100644 charts/emissary-ingress/ci.in/tests/manifests/tls.yaml
  delete mode 100644 charts/emissary-ingress/readme.tpl
  delete mode 100644 charts/emissary-ingress/templates/ambassador-agent.yaml
- rename charts/emissary-ingress/{values.yaml.in => values.yaml} (90%)
+ rename charts/emissary-ingress/{values.yaml.in => values.yaml} (89%)
 
 diff --git a/Makefile b/Makefile
 index 18b45ca1e..87e0153c0 100644
@@ -6546,7 +6547,7 @@ index cd6184dde..4ba1c911a 100644
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/deployment-canary.yaml b/charts/emissary-ingress/templates/deployment-canary.yaml
-index e6e8c2775..17ef7852a 100644
+index 4c8094f14..2fa451574 100644
 --- a/charts/emissary-ingress/templates/deployment-canary.yaml
 +++ b/charts/emissary-ingress/templates/deployment-canary.yaml
 @@ -8,7 +8,7 @@ metadata:
@@ -6558,7 +6559,7 @@ index e6e8c2775..17ef7852a 100644
    labels:
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
-@@ -182,7 +182,7 @@ spec:
+@@ -138,7 +138,7 @@ spec:
            {{- if ne (include "ambassador.canaryImage" .)  "" }}
            image: {{ include "ambassador.canaryImage" . }}
            {{- else }}
@@ -6568,7 +6569,7 @@ index e6e8c2775..17ef7852a 100644
            imagePullPolicy: {{ .Values.image.pullPolicy }}
            ports:
 diff --git a/charts/emissary-ingress/templates/deployment.yaml b/charts/emissary-ingress/templates/deployment.yaml
-index 2c4d17a0a..1a976a852 100644
+index 828da4ef3..95a4be1bb 100644
 --- a/charts/emissary-ingress/templates/deployment.yaml
 +++ b/charts/emissary-ingress/templates/deployment.yaml
 @@ -3,7 +3,7 @@ apiVersion: v1
@@ -6589,7 +6590,7 @@ index 2c4d17a0a..1a976a852 100644
    labels:
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
-@@ -200,7 +200,7 @@ spec:
+@@ -156,7 +156,7 @@ spec:
              {{- toYaml .Values.prometheusExporter.resources | nindent 12 }}
          {{- end }}
          - name: {{ if .Values.containerNameOverride }}{{ .Values.containerNameOverride }}{{ else }}{{ .Chart.Name }}{{ end }}
@@ -6612,10 +6613,10 @@ index c15802767..633a607ce 100644
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/hpa.yaml b/charts/emissary-ingress/templates/hpa.yaml
-index 61c8f8326..035d48895 100644
+index a9fdb2ce0..38a6f3f29 100644
 --- a/charts/emissary-ingress/templates/hpa.yaml
 +++ b/charts/emissary-ingress/templates/hpa.yaml
-@@ -3,7 +3,7 @@ apiVersion: autoscaling/v2{{- if not (.Capabilities.APIVersions.Has "autoscaling
+@@ -3,7 +3,7 @@ apiVersion: autoscaling/v2{{- if semverCompare "<1.23" .Capabilities.KubeVersion
  kind: HorizontalPodAutoscaler
  metadata:
    name: {{ include "ambassador.fullname" . }}
@@ -6647,7 +6648,7 @@ index 033051cc8..671c2444e 100644
    port: 8080
    protocol: HTTP
 diff --git a/charts/emissary-ingress/templates/module.yaml b/charts/emissary-ingress/templates/module.yaml
-index 828275861..4fc8699cc 100644
+index 619f9859b..8a66c6a60 100644
 --- a/charts/emissary-ingress/templates/module.yaml
 +++ b/charts/emissary-ingress/templates/module.yaml
 @@ -3,7 +3,7 @@ apiVersion: getambassador.io/v3alpha1
@@ -6697,7 +6698,7 @@ index 7c0a7489f..455fe9d33 100644
      app.kubernetes.io/name: {{ include "ambassador.name" . }}
      {{- include "ambassador.labels" . | nindent 4 }}
 diff --git a/charts/emissary-ingress/templates/rbac.yaml b/charts/emissary-ingress/templates/rbac.yaml
-index e36790acd..e44fd61d3 100644
+index 306cae99b..5521b7a4b 100644
 --- a/charts/emissary-ingress/templates/rbac.yaml
 +++ b/charts/emissary-ingress/templates/rbac.yaml
 @@ -35,7 +35,7 @@ roleRef:
@@ -6735,16 +6736,7 @@ index e36790acd..e44fd61d3 100644
 +    namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
      kind: ServiceAccount
  {{- end }}
- {{- if and .Values.waitForApiext (eq .Values.waitForApiext.enabled true) (eq .Values.waitForApiext.createRoles true) }}
-@@ -170,7 +170,7 @@ roleRef:
-   name: {{ include "ambassador.rbacName" . }}-apiext
- subjects:
-   - name: {{ include "ambassador.serviceAccountName" . }}
--    namespace: {{ include "ambassador.namespace" . }}
-+    namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
-     kind: ServiceAccount
- ---
- apiVersion: rbac.authorization.k8s.io/v1
+ 
 diff --git a/charts/emissary-ingress/templates/resolvers.yaml b/charts/emissary-ingress/templates/resolvers.yaml
 index 53633ee88..7ecb2fc97 100644
 --- a/charts/emissary-ingress/templates/resolvers.yaml
@@ -6847,10 +6839,10 @@ index b2c8122a1..8f33136cf 100644
      matchLabels:
        service: ambassador-admin
 diff --git a/charts/emissary-ingress/values.yaml.in b/charts/emissary-ingress/values.yaml
-similarity index 90%
+similarity index 89%
 rename from charts/emissary-ingress/values.yaml.in
 rename to charts/emissary-ingress/values.yaml
-index abe1dcaa2..cf5939e44 100644
+index 2a9bfc491..94e66a04b 100644
 --- a/charts/emissary-ingress/values.yaml.in
 +++ b/charts/emissary-ingress/values.yaml
 @@ -2,11 +2,11 @@
@@ -6868,7 +6860,7 @@ index abe1dcaa2..cf5939e44 100644
  # If true, Create a DaemonSet. By default Deployment controller will be created
  daemonSet: false
  # If true, Create a bare Pod instead of a Deployment or DaemonSet; for
-@@ -149,11 +149,13 @@ security:
+@@ -148,11 +148,13 @@ security:
      #   runAsUser:
      #     rule: MustRunAsNonRoot
  
@@ -6886,7 +6878,7 @@ index abe1dcaa2..cf5939e44 100644
    # Pod container image pull policy
    pullPolicy: IfNotPresent
  
-@@ -369,7 +371,6 @@ resolvers: # +doc-gen:break
+@@ -357,7 +359,6 @@ resolvers: # +doc-gen:break
  module:
    diagnostics:
      enabled: false
@@ -6894,7 +6886,7 @@ index abe1dcaa2..cf5939e44 100644
  
  # DEPRECATED: Enabling the prometheus exporter creates a sidecar and configures ambassador to use it
  #
-@@ -405,40 +406,6 @@ prometheusExporter: # +doc-gen:break
+@@ -393,40 +394,6 @@ prometheusExporter: # +doc-gen:break
  # securityContext:
  #   runAsUser: 8888
  
@@ -6936,5 +6928,4 @@ index abe1dcaa2..cf5939e44 100644
  
  # configure docker to pull from private registry
 -- 
-2.40.0
-
+2.39.3 (Apple Git-145)
