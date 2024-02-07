@@ -24,13 +24,13 @@ COPY --from=envoy /usr/bin/envoy /THIRD-PARTY-LICENSES.txt /
 WORKDIR /newroot/buildroot
 
 RUN set -x && \
-    mkdir -p /newroot/ambassador/sidecars /newroot/usr/lib/python3.9/site-packages /newroot/usr/local/bin /ambassador /buildroot && \ 
+    mkdir -p /newroot/ambassador/sidecars /newroot/usr/lib/python3.11/site-packages /newroot/usr/local/bin /ambassador /buildroot && \
     time pip3 install --user --no-cache-dir --no-deps -e . && \
     pip3 install --user --no-cache-dir pip-tools==6.12.1 PyYAML==6.0 orjson==3.8.10 && \ 
     python3 setup.py install --user && \
     mv /envoy /newroot/usr/local/bin/envoy && \
     mv /THIRD-PARTY-LICENSES.txt /newroot/ENVOY_LICENSES.txt && \
-    cp -r /root/.local/lib/python3.9/site-packages /newroot/usr/lib/python3.9 && \
+    cp -r /root/.local/lib/python3.11/site-packages /newroot/usr/lib/python3.11 && \
     cp -r /root/.local/bin /newroot/usr/bin && \
     mkdir -p /newroot/buildroot/manifests/emissary && \
     mv emissary-crds.yaml.in /newroot/buildroot/manifests/emissary/emissary-crds.yaml && \
