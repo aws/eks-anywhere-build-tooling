@@ -286,7 +286,7 @@ func (bo *BuildOptions) getBundle() (*releasev1.Bundles, string, error) {
 	var eksAReleaseVersion, bundleManifestUrl string
 	var foundRelease bool
 	if os.Getenv(eksaUseDevReleaseEnvVar) == "true" {
-		eksAReleaseVersion = devEksaReleaseVersion
+		eksAReleaseVersion = releases.Spec.LatestVersion
 		log.Printf("EKSA_USE_DEV_RELEASE set to true, using EKS-A dev release version: %s", eksAReleaseVersion)
 	} else if bo.EKSAReleaseVersion != "" {
 		eksAReleaseVersion = bo.EKSAReleaseVersion
