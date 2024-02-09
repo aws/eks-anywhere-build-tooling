@@ -62,10 +62,9 @@ const (
 	eksaAnsibleVerbosityEnvVar            string = "EKSA_ANSIBLE_VERBOSITY"
 
 	// Miscellaneous
-	mainBranch            string = "main"
-	devEksaReleaseVersion string = "v0.0.0-dev"
-	amd64                 string = "amd64"
-	arm64                 string = "arm64"
+	mainBranch string = "main"
+	amd64      string = "amd64"
+	arm64      string = "arm64"
 )
 
 var DefaultAMIAdditionalFiles = []File{

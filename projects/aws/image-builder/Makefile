@@ -7,9 +7,9 @@ REPO=image-builder
 REPO_OWNER=aws
 EKS_ANYWHERE_CLONE_URL=https://github.com/aws/eks-anywhere.git
 EKS_ANYWHERE_REPO=eks-anywhere
-EKS_ANYWHERE_REPO_SPARSE_CHECKOUT=release/triggers/bundle-release/development/CLI_MAX_VERSION
-EKS_ANYWHERE_EMBED_VERSION=v0.0.0-dev$(if $(filter main,$(BRANCH_NAME)),,-$(BRANCH_NAME))
+EKS_ANYWHERE_REPO_SPARSE_CHECKOUT=release/triggers/bundle-release/development/CLI_MAX_VERSION scripts/eksa_version.sh
 EKS_ANYWHERE_RELEASE_MANIFEST_URL=https://dev-release-assets.eks-anywhere.model-rocket.aws.dev/$(if $(filter $(BRANCH_NAME),main),,$(BRANCH_NAME)/)eks-a-release.yaml
+EKS_ANYWHERE_EMBED_VERSION=$(shell cd eks-anywhere && source ./scripts/eksa_version.sh && eksa-version::latest_release_verison_in_manifest "$(EKS_ANYWHERE_RELEASE_MANIFEST_URL)")
 
 BINARY_TARGET_FILES=image-builder
 GO_MOD_PATHS=..
