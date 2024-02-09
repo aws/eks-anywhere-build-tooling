@@ -1,7 +1,7 @@
-From 0b9b7569f4fa524a14724e2ab604173252e829bd Mon Sep 17 00:00:00 2001
+From 7b87bf672a38c5e1cb15cf507bf13addf6f2ee5d Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 29 Jun 2023 00:56:53 -0700
-Subject: [PATCH 1/5] Switch to AL2 base image for node image
+Subject: [PATCH] Switch to AL2 base image for node image
 
 ---
  images/base/Dockerfile                        | 215 +++++++-----------
@@ -9,7 +9,7 @@ Subject: [PATCH 1/5] Switch to AL2 base image for node image
  2 files changed, 83 insertions(+), 142 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index eb3f95ad..68e07d1e 100644
+index 58ea3e6f..de5e14a3 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -17,11 +17,19 @@
@@ -19,7 +19,7 @@ index eb3f95ad..68e07d1e 100644
 -# start from debian slim, this image is reasonably small as a starting point
 -# for a kubernetes node image, it doesn't contain much (anything?) we don't need
 -# this stage will install basic files and packages
--ARG BASE_IMAGE=debian:bullseye-slim
+-ARG BASE_IMAGE=debian:bookworm-slim
 -FROM $BASE_IMAGE as base
 +# start from ubuntu, this image is reasonably small as a starting point
 +# for a kubernetes node image, it doesn't contain much we don't need
@@ -37,7 +37,7 @@ index eb3f95ad..68e07d1e 100644
  
  # copy in static files
  # all scripts are 0755 (rwx r-x r-x)
-@@ -71,10 +79,11 @@ COPY --chmod=0644 files/etc/systemd/system/kubelet.service.d/* /etc/systemd/syst
+@@ -72,10 +80,11 @@ COPY --chmod=0644 files/etc/systemd/system/kubelet.service.d/* /etc/systemd/syst
  RUN echo "Installing Packages ..." \
      && DEBIAN_FRONTEND=noninteractive clean-install \
        systemd \
@@ -52,7 +52,7 @@ index eb3f95ad..68e07d1e 100644
      && find /lib/systemd/system/sysinit.target.wants/ -name "systemd-tmpfiles-setup.service" -delete \
      && rm -f /lib/systemd/system/multi-user.target.wants/* \
      && rm -f /etc/systemd/system/*.wants/* \
-@@ -83,7 +92,12 @@ RUN echo "Installing Packages ..." \
+@@ -84,7 +93,12 @@ RUN echo "Installing Packages ..." \
      && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
      && rm -f /lib/systemd/system/basic.target.wants/* \
      && echo "ReadKMsg=no" >> /etc/systemd/journald.conf \
@@ -66,7 +66,7 @@ index eb3f95ad..68e07d1e 100644
  
  RUN echo "Enabling services ... " \
      && systemctl enable kubelet.service \
-@@ -93,138 +107,67 @@ RUN echo "Enabling services ... " \
+@@ -94,138 +108,67 @@ RUN echo "Enabling services ... " \
  RUN echo "Ensuring /etc/kubernetes/manifests" \
      && mkdir -p /etc/kubernetes/manifests
  
@@ -94,7 +94,7 @@ index eb3f95ad..68e07d1e 100644
 -# stage for building containerd
 -FROM go-build as build-containerd
 -ARG TARGETARCH GO_VERSION
--ARG CONTAINERD_VERSION="v1.7.1"
+-ARG CONTAINERD_VERSION="v1.7.13"
 -ARG CONTAINERD_CLONE_URL="https://github.com/containerd/containerd"
 -# we don't build with optional snapshotters, we never select any of these
 -# they're not ideal inside kind anyhow, and we save some disk space
@@ -111,7 +111,7 @@ index eb3f95ad..68e07d1e 100644
 -# stage for building runc
 -FROM go-build as build-runc
 -ARG TARGETARCH GO_VERSION
--ARG RUNC_VERSION="v1.1.7"
+-ARG RUNC_VERSION="v1.1.12"
 -ARG RUNC_CLONE_URL="https://github.com/opencontainers/runc"
 -RUN git clone --filter=tree:0 "${RUNC_CLONE_URL}" /runc \
 -    && cd /runc \
@@ -125,7 +125,7 @@ index eb3f95ad..68e07d1e 100644
 -FROM go-build as build-crictl
 -ARG TARGETARCH GO_VERSION
 -ARG CRI_TOOLS_CLONE_URL="https://github.com/kubernetes-sigs/cri-tools"
--ARG CRICTL_VERSION="v1.27.0"
+-ARG CRICTL_VERSION="v1.28.0"
 -RUN git clone --filter=tree:0 "${CRI_TOOLS_CLONE_URL}" /cri-tools \
 -    && cd /cri-tools \
 -    && git checkout "${CRICTL_VERSION}" \
@@ -157,7 +157,7 @@ index eb3f95ad..68e07d1e 100644
 -# stage for building containerd-fuse-overlayfs
 -FROM go-build as build-fuse-overlayfs
 -ARG TARGETARCH GO_VERSION
--ARG CONTAINERD_FUSE_OVERLAYFS_VERSION="v1.0.5"
+-ARG CONTAINERD_FUSE_OVERLAYFS_VERSION="v1.0.6"
 -ARG CONTAINERD_FUSE_OVERLAYFS_CLONE_URL="https://github.com/containerd/fuse-overlayfs-snapshotter"
 -RUN git clone --filter=tree:0 "${CONTAINERD_FUSE_OVERLAYFS_CLONE_URL}" /fuse-overlayfs-snapshotter \
 -    && cd /fuse-overlayfs-snapshotter \
@@ -288,5 +288,5 @@ index b0b861c3..f1d714a6 100755
 -   /usr/share/local/*
 +   /usr/share/local/* || true
 -- 
-2.34.1
+2.39.3 (Apple Git-145)
 
