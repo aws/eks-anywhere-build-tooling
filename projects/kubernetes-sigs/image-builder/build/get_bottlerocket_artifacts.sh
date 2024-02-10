@@ -61,12 +61,18 @@ BOTTLEROCKET_TARGETS_URL="https://updates.bottlerocket.aws/targets/"
 OS_DOWNLOAD_PATH=${BOTTLEROCKET_DOWNLOAD_PATH}/${FORMAT}
 rm -rf $OS_DOWNLOAD_PATH
 
-# Downloading the TARGET from the Bottlerocket target location using Tuftool
-build::common::echo_and_run tuftool download "${OS_DOWNLOAD_PATH}" \
-    --target-name "${TARGET}" \
-    --root "${BOTTLEROCKET_DOWNLOAD_PATH}/root.json" \
-    --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
-    --targets-url "${BOTTLEROCKET_TARGETS_URL}"
+# If TARGET image is available at CloudFront URL, download it from CloudFront
+if [[ "$(build::common::echo_and_run curl -I -L -s -o /dev/null -w "%{http_code}" https://$BOTTLEROCKET_CLOUDFRONT_ENDPOINT/$TARGET)" == "200" ]]; then
+  mkdir $OS_DOWNLOAD_PATH
+  build::common::echo_and_run curl -L -s https://$BOTTLEROCKET_CLOUDFRONT_ENDPOINT/$TARGET -o $OS_DOWNLOAD_PATH/$TARGET
+else
+  # Otherwise download the TARGET from the Bottlerocket target location using Tuftool
+  build::common::echo_and_run tuftool download "${OS_DOWNLOAD_PATH}" \
+      --target-name "${TARGET}" \
+      --root "${BOTTLEROCKET_DOWNLOAD_PATH}/root.json" \
+      --metadata-url "${BOTTLEROCKET_METADATA_URL}" \
+      --targets-url "${BOTTLEROCKET_TARGETS_URL}"
+fi
 
 # Post processing for aws and metal variants
 if [[ $VARIANT == "aws" ]] || [[ $VARIANT == "metal" ]]; then
