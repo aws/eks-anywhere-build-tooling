@@ -1,0 +1,217 @@
+From 12158d086f242c6e7fa2930689fa01ef38ab9ece Mon Sep 17 00:00:00 2001
+From: Guillermo Gaston <gaslor@amazon.com>
+Date: Sat, 20 Jan 2024 22:05:04 +0000
+Subject: [PATCH 37/37] Restart controller if RESTMapping outdated cache is
+ detected when reconciling external object
+
+---
+ controllers/external/util.go      |  28 +++++++-
+ controllers/external/util_test.go | 116 +++++++++++++++++++++++++++++-
+ 2 files changed, 140 insertions(+), 4 deletions(-)
+
+diff --git a/controllers/external/util.go b/controllers/external/util.go
+index 5b6443c78..62ed07959 100644
+--- a/controllers/external/util.go
++++ b/controllers/external/util.go
+@@ -19,13 +19,17 @@ package external
+ import (
+ 	"context"
+ 	"strings"
++	"syscall"
+ 
+ 	"github.com/pkg/errors"
+ 	corev1 "k8s.io/api/core/v1"
++	"k8s.io/apimachinery/pkg/api/meta"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+ 	"k8s.io/apiserver/pkg/storage/names"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
++	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
++	"sigs.k8s.io/controller-runtime/pkg/log"
+ 
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ )
+@@ -40,12 +44,34 @@ func Get(ctx context.Context, c client.Reader, ref *corev1.ObjectReference, name
+ 	obj.SetKind(ref.Kind)
+ 	obj.SetName(ref.Name)
+ 	key := client.ObjectKey{Name: obj.GetName(), Namespace: namespace}
+-	if err := c.Get(ctx, key, obj); err != nil {
++	err := c.Get(ctx, key, obj)
++	if isV1alpha4NotFoundFromDiscoveryError(err) {
++		logErrorAndGracefulShutdown(
++			ctx,
++			err,
++			"Client RESTMapper returned an error from an invalid cache referencing infrastructure.cluster.x-k8s.io/v1alpha4, exiting the program to force a new cache to be built",
++		)
++	}
++	if err != nil {
+ 		return nil, errors.Wrapf(err, "failed to retrieve %s external object %q/%q", obj.GetKind(), key.Namespace, key.Name)
+ 	}
+ 	return obj, nil
+ }
+ 
++func isV1alpha4NotFoundFromDiscoveryError(err error) bool {
++	discoverFailedErr := &apiutil.ErrResourceDiscoveryFailed{}
++	noResourceMatchErr := &meta.NoResourceMatchError{}
++	return errors.As(err, &discoverFailedErr) &&
++		errors.As(err, &noResourceMatchErr) && // This is the error that ErrResourceDiscoveryFailed will unwrap when the original error is NotFound.
++		strings.Contains(err.Error(), "cluster.x-k8s.io/v1alpha4")
++}
++
++func logErrorAndGracefulShutdown(ctx context.Context, err error, msg string) {
++	logger := log.FromContext(ctx)
++	logger.Error(err, msg)
++	syscall.Kill(syscall.Getpid(), syscall.SIGINT)
++}
++
+ // Delete uses the client and reference to delete an external, unstructured object.
+ func Delete(ctx context.Context, c client.Writer, ref *corev1.ObjectReference) error {
+ 	obj := new(unstructured.Unstructured)
+diff --git a/controllers/external/util_test.go b/controllers/external/util_test.go
+index 012445478..570cd4dae 100644
+--- a/controllers/external/util_test.go
++++ b/controllers/external/util_test.go
+@@ -17,6 +17,7 @@ limitations under the License.
+ package external
+ 
+ import (
++	"fmt"
+ 	"testing"
+ 
+ 	. "github.com/onsi/gomega"
+@@ -25,16 +26,16 @@ import (
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
++	"k8s.io/apimachinery/pkg/runtime/schema"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
++	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+ 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+ 
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ )
+ 
+-var (
+-	ctx = ctrl.SetupSignalHandler()
+-)
++var ctx = ctrl.SetupSignalHandler()
+ 
+ const (
+ 	testClusterName = "test-cluster"
+@@ -323,3 +324,112 @@ func TestCloneTemplateMissingSpecTemplate(t *testing.T) {
+ 	})
+ 	g.Expect(err).To(HaveOccurred())
+ }
++
++func TestIsV1alpha4NotFoundFromDiscoveryError(t *testing.T) {
++	tests := []struct {
++		name string
++		err  error
++		want bool
++	}{
++		{
++			name: "the error we are looking for",
++			err: &apiutil.ErrResourceDiscoveryFailed{
++				schema.GroupVersion{
++					Group:   "infrastructure.cluster.x-k8s.io",
++					Version: "v1alpha4",
++				}: apierrors.NewNotFound(schema.GroupResource{}, "infrastructure.cluster.x-k8s.io/v1alpha4"),
++			},
++			want: true,
++		},
++		{
++			name: "the error we are looking for infra api for but wrapped",
++			err: fmt.Errorf("failed to get restmapping: %w",
++				&apiutil.ErrResourceDiscoveryFailed{
++					schema.GroupVersion{
++						Group:   "infrastructure.cluster.x-k8s.io",
++						Version: "v1alpha4",
++					}: apierrors.NewNotFound(schema.GroupResource{}, "infrastructure.cluster.x-k8s.io/v1alpha4"),
++				},
++			),
++			want: true,
++		},
++		{
++			name: "the error we are looking for bootstrap api for but wrapped",
++			err: fmt.Errorf("failed to get restmapping: %w",
++				&apiutil.ErrResourceDiscoveryFailed{
++					schema.GroupVersion{
++						Group:   "bootstrap.cluster.x-k8s.io",
++						Version: "v1beta1",
++					}: apierrors.NewNotFound(schema.GroupResource{}, "bootstrap.cluster.x-k8s.io/v1alpha4"),
++				},
++			),
++			want: true,
++		},
++		{
++			name: "v1alpha4 not found with different group",
++			err: &apiutil.ErrResourceDiscoveryFailed{
++				schema.GroupVersion{
++					Group:   "different.group",
++					Version: "v1alpha4",
++				}: apierrors.NewNotFound(schema.GroupResource{}, "different.group/v1alpha4"),
++			},
++			want: false,
++		},
++		{
++			name: "infrastructure.cluster.x-k8s.io not found error with different version",
++			err: &apiutil.ErrResourceDiscoveryFailed{
++				schema.GroupVersion{
++					Group:   "infrastructure.cluster.x-k8s.io",
++					Version: "differentkind",
++				}: apierrors.NewNotFound(schema.GroupResource{}, "infrastructure.cluster.x-k8s.io/differentkind"),
++			},
++			want: false,
++		},
++		{
++			name: "infrastructure.cluster.x-k8s.io/v1alpha4 but different error that is not NotFound",
++			err: &apiutil.ErrResourceDiscoveryFailed{
++				schema.GroupVersion{
++					Group:   "infrastructure.cluster.x-k8s.io",
++					Version: "v1alpha4",
++				}: errors.New("some other error"),
++			},
++			want: false,
++		},
++		{
++			name: "plain not found error",
++			err: &apierrors.StatusError{
++				ErrStatus: metav1.Status{
++					Reason: metav1.StatusReasonNotFound,
++				},
++			},
++			want: false,
++		},
++		{
++			name: "infrastructure.cluster.x-k8s.io/v1alpha4 not found error",
++			err: &apierrors.StatusError{
++				ErrStatus: metav1.Status{
++					Reason:  metav1.StatusReasonNotFound,
++					Message: "infrastructure.cluster.x-k8s.io/v1alpha4",
++				},
++			},
++			want: false,
++		},
++		{
++			name: "not error",
++			err:  nil,
++			want: false,
++		},
++		{
++			name: "other error",
++			err:  errors.New("some other error"),
++			want: false,
++		},
++	}
++
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			g := NewWithT(t)
++			g.Expect(isV1alpha4NotFoundFromDiscoveryError(test.err)).To(Equal(test.want))
++		})
++	}
++}
+-- 
+2.34.1
+
