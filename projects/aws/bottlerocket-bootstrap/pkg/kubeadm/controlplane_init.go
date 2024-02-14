@@ -37,6 +37,7 @@ func controlPlaneInit() error {
 	}
 
 	if k8s129Compare != -1 {
+		fmt.Println("Kubernetes version is v1.29 or above")
 		err = patchKubeVipManifest()
 		if err != nil {
 			return errors.Wrapf(err, "Error patching kube-vip manifest")
