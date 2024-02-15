@@ -75,6 +75,11 @@ kubeadm_in_first_cp(){
   kubeadm version
   kubeadm upgrade plan --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --config "$new_kubeadm_config"
   kubeadm upgrade apply "$kube_version" --config "$new_kubeadm_config" --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --allow-experimental-upgrades --yes
+  
+  new_kubevip_config_path="$(upgrade_components_dir)/kube-vip.yaml"
+  static_kubevip_path="/etc/kubernetes/manifests/kube-vip.yaml"
+  cp "${static_kubevip_path}" "$(upgrade_components_dir)/kube-vip.backup.yaml"
+  cp "${new_kubevip_config_path}" "${static_kubevip_path}"
 
   restore_coredns_config "$components_dir"
 }
@@ -88,7 +93,7 @@ kubeadm_in_rest_cp(){
   # This is desirable for 2 reasons:
   # - CAPI already takes care of coredns upgrades
   # - kubeadm will fail when verifying the current version of coredns bc the image tag created by
-  #   eks-s is not recognised by the migration verification logic https://github.com/coredns/corefile-migration/blob/master/migration/versions.go
+  #   eks-a is not recognised by the migration verification logic https://github.com/coredns/corefile-migration/blob/master/migration/versions.go
   # Ideally we will instruct kubeadm to just skip coredns upgrade during this phase, but
   # it doesn't seem like there is an option.
   # TODO: consider using --skip-phases to skip addons/coredns once the feature flag is supported in kubeadm upgrade command
@@ -96,6 +101,12 @@ kubeadm_in_rest_cp(){
 
   kubeadm version
   kubeadm upgrade node --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration
+
+  new_kubevip_config_path="$(upgrade_components_dir)/kube-vip.yaml"
+  static_kubevip_path="/etc/kubernetes/manifests/kube-vip.yaml"
+  cp "${static_kubevip_path}" "$(upgrade_components_dir)/kube-vip.backup.yaml"
+  cp "${new_kubevip_config_path}" "${static_kubevip_path}"
+  
   restore_coredns_config "$components_dir"
 }
 
@@ -105,7 +116,7 @@ backup_and_delete_coredns_config(){
   # This is desirable for 2 reasons:
   # - CAPI already takes care of coredns upgrades
   # - kubeadm will fail when verifying the current version of coredns bc the image tag created by
-  #   eks-s is not recognised by the migration verification logic https://github.com/coredns/corefile-migration/blob/master/migration/versions.go
+  #   eks-a is not recognised by the migration verification logic https://github.com/coredns/corefile-migration/blob/master/migration/versions.go
   # Ideally we will instruct kubeadm to just skip coredns upgrade during this phase, but
   # it doesn't seem like there is an option.
   # TODO: consider using --skip-phases to skip addons/coredns once the feature flag is supported in kubeadm upgrade command
