@@ -1,0 +1,97 @@
+From 4c16d5689eb67b4d756ec53f28d83d7b07cfb6c4 Mon Sep 17 00:00:00 2001
+From: Guillermo Gaston <gaslor@amazon.com>
+Date: Thu, 15 Feb 2024 15:04:46 +0000
+Subject: [PATCH 40/40] Use controller-runtime patch for restmapper cache
+
+This fixes the issue with a race condition when making v1alpha4 not
+served.
+
+Using a merged but unreleased change. Will update to the release tag
+once this is cut.
+---
+ go.mod            | 2 ++
+ go.sum            | 4 ++--
+ hack/tools/go.mod | 2 ++
+ hack/tools/go.sum | 4 ++--
+ test/go.mod       | 2 ++
+ test/go.sum       | 4 ++--
+ 6 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/go.mod b/go.mod
+index 5fd1ce90d..ef3b70d54 100644
+--- a/go.mod
++++ b/go.mod
+@@ -185,3 +185,5 @@ require (
+ 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3 // indirect
+ 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
+ )
++
++replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a
+diff --git a/go.sum b/go.sum
+index d8012dfe8..554e1f742 100644
+--- a/go.sum
++++ b/go.sum
+@@ -1042,8 +1042,8 @@ rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
+ rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 h1:trsWhjU5jZrx6UvFu4WzQDrN7Pga4a7Qg+zcfcj64PA=
+ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2/go.mod h1:+qG7ISXqCDVVcyO8hLn12AKVYYUjM7ftlqsqmrhMZE0=
+-sigs.k8s.io/controller-runtime v0.16.3 h1:2TuvuokmfXvDUamSx1SuAOO3eTyye+47mJCigwG62c4=
+-sigs.k8s.io/controller-runtime v0.16.3/go.mod h1:j7bialYoSn142nv9sCOJmQgDXQXxnroFU4VnX/brVJ0=
++sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a h1:1veEwfhXsw2Afqx7EkhS9wOslyLuw6O8sRfGx23PfWs=
++sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a/go.mod h1:j7bialYoSn142nv9sCOJmQgDXQXxnroFU4VnX/brVJ0=
+ sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd h1:EDPBXCAspyGV4jQlpZSudPeMmr1bNJefnuqLsRAsHZo=
+ sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd/go.mod h1:B8JuhiUyNFVKdsE8h686QcCxMaH6HrOAZj4vswFpcB0=
+ sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3 h1:XX3Ajgzov2RKUdc5jW3t5jwY7Bo7dcRm+tFxT+NfgY0=
+diff --git a/hack/tools/go.mod b/hack/tools/go.mod
+index 9ef6f6fa0..7e50e43e6 100644
+--- a/hack/tools/go.mod
++++ b/hack/tools/go.mod
+@@ -139,3 +139,5 @@ require (
+ 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3 // indirect
+ 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
+ )
++
++replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a
+diff --git a/hack/tools/go.sum b/hack/tools/go.sum
+index 5fdaed1bd..e8a5d2fc6 100644
+--- a/hack/tools/go.sum
++++ b/hack/tools/go.sum
+@@ -747,8 +747,8 @@ k8s.io/utils v0.0.0-20230406110748-d93618cff8a2/go.mod h1:OLgZIPagt7ERELqWJFomSt
+ rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
+ rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
+ rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+-sigs.k8s.io/controller-runtime v0.16.3 h1:2TuvuokmfXvDUamSx1SuAOO3eTyye+47mJCigwG62c4=
+-sigs.k8s.io/controller-runtime v0.16.3/go.mod h1:j7bialYoSn142nv9sCOJmQgDXQXxnroFU4VnX/brVJ0=
++sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a h1:1veEwfhXsw2Afqx7EkhS9wOslyLuw6O8sRfGx23PfWs=
++sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a/go.mod h1:j7bialYoSn142nv9sCOJmQgDXQXxnroFU4VnX/brVJ0=
+ sigs.k8s.io/controller-tools v0.13.0 h1:NfrvuZ4bxyolhDBt/rCZhDnx3M2hzlhgo5n3Iv2RykI=
+ sigs.k8s.io/controller-tools v0.13.0/go.mod h1:5vw3En2NazbejQGCeWKRrE7q4P+CW8/klfVqP8QZkgA=
+ sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd h1:EDPBXCAspyGV4jQlpZSudPeMmr1bNJefnuqLsRAsHZo=
+diff --git a/test/go.mod b/test/go.mod
+index 320e9d4de..cf2a4829e 100644
+--- a/test/go.mod
++++ b/test/go.mod
+@@ -161,3 +161,5 @@ require (
+ 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
+ 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
+ )
++
++replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a
+diff --git a/test/go.sum b/test/go.sum
+index 88a2ba2a8..31c05ac35 100644
+--- a/test/go.sum
++++ b/test/go.sum
+@@ -865,8 +865,8 @@ rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
+ rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2 h1:trsWhjU5jZrx6UvFu4WzQDrN7Pga4a7Qg+zcfcj64PA=
+ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2/go.mod h1:+qG7ISXqCDVVcyO8hLn12AKVYYUjM7ftlqsqmrhMZE0=
+-sigs.k8s.io/controller-runtime v0.16.3 h1:2TuvuokmfXvDUamSx1SuAOO3eTyye+47mJCigwG62c4=
+-sigs.k8s.io/controller-runtime v0.16.3/go.mod h1:j7bialYoSn142nv9sCOJmQgDXQXxnroFU4VnX/brVJ0=
++sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a h1:1veEwfhXsw2Afqx7EkhS9wOslyLuw6O8sRfGx23PfWs=
++sigs.k8s.io/controller-runtime v0.16.5-0.20240215143111-dca5e8b2b00a/go.mod h1:j7bialYoSn142nv9sCOJmQgDXQXxnroFU4VnX/brVJ0=
+ sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd h1:EDPBXCAspyGV4jQlpZSudPeMmr1bNJefnuqLsRAsHZo=
+ sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd/go.mod h1:B8JuhiUyNFVKdsE8h686QcCxMaH6HrOAZj4vswFpcB0=
+ sigs.k8s.io/kind v0.20.0 h1:f0sc3v9mQbGnjBUaqSFST1dwIuiikKVGgoTwpoP33a8=
+-- 
+2.34.1
+
