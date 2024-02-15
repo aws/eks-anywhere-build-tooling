@@ -26,7 +26,7 @@ func controlPlaneInit() error {
 	if err != nil {
 		return errors.Wrapf(err, "Error running command: %v, Output: %s\n", cmd, string(out))
 	}
-	kubeadmVersion, err := versionutil.ParseSemantic(strings.TrimSuffix(string(out), "\n"))
+	kubeadmVersion, err := versionutil.ParseGeneric(strings.TrimSuffix(string(out), "\n"))
 	if err != nil {
 		return errors.Wrapf(err, "%s is not a valid kubeadm version", string(out))
 	}
