@@ -1,4 +1,4 @@
-From 16237155012948448730535cd16b5070bf38c182 Mon Sep 17 00:00:00 2001
+From 7c58664fcf657c96a4b64b61daa0c022588627bf Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Thu, 5 Jan 2023 14:56:09 -0500
 Subject: [PATCH 22/40] Make bottlerocket admin, control, custom bootstrap
@@ -10,12 +10,12 @@ Subject: [PATCH 22/40] Make bottlerocket admin, control, custom bootstrap
  2 files changed, 60 insertions(+)
 
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-index f5252b3a0..45ad0eaa9 100644
+index 477aef2e2..553220d8a 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-@@ -163,6 +163,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -164,6 +164,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{"metadata", "*"},
- 		{spec, kubeadmConfigSpec, "useExperimentalRetryJoin"},
+ 		// spec.kubeadmConfigSpec.clusterConfiguration
  		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketAdmin", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketControl", "*"},
@@ -23,21 +23,21 @@ index f5252b3a0..45ad0eaa9 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
-@@ -189,6 +192,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
- 		{spec, kubeadmConfigSpec, joinConfiguration, patches},
- 		{spec, kubeadmConfigSpec, joinConfiguration, skipPhases},
+@@ -206,6 +209,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "discovery"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "discovery", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketAdmin", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
+ 		// spec.kubeadmConfigSpec
  		{spec, kubeadmConfigSpec, preKubeadmCommands},
- 		{spec, kubeadmConfigSpec, postKubeadmCommands},
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-index 17cef9eab..4d1e21823 100644
+index 275f2cb12..0fb9025d1 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-@@ -725,6 +725,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -717,6 +717,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
  	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
  
@@ -62,7 +62,7 @@ index 17cef9eab..4d1e21823 100644
  	tests := []struct {
  		name                  string
  		enableIgnitionFeature bool
-@@ -1095,6 +1113,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1069,6 +1087,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateClusterConfBRBootstrapImage,
  		},
@@ -87,7 +87,7 @@ index 17cef9eab..4d1e21823 100644
  		{
  			name:      "should allow changes to join configuration pause image",
  			expectErr: false,
-@@ -1107,6 +1143,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1081,6 +1117,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateJoinConfBRBootstrapImage,
  		},
@@ -113,5 +113,5 @@ index 17cef9eab..4d1e21823 100644
  
  	for _, tt := range tests {
 -- 
-2.34.1
+2.39.3 (Apple Git-145)
 

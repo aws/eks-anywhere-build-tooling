@@ -1,4 +1,4 @@
-From 1d498a38d41885888474b1a697fef69e43de1733 Mon Sep 17 00:00:00 2001
+From 37cad853d2554664b634ee982d3cb3da34f76e9f Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/40] Add unstacked etcd support
@@ -76,7 +76,6 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  controllers/external/util.go                  |  10 ++
  controlplane/kubeadm/config/rbac/role.yaml    |   9 ++
  .../internal/controllers/controller.go        |  51 ++++++-
- .../webhooks/kubeadm_control_plane.go         |   1 +
  .../controllers/cluster/cluster_controller.go |  90 +++++++++++-
  .../cluster/cluster_controller_phases.go      | 108 ++++++++++++++
  .../cluster/cluster_controller_test.go        | 136 ++++++++++++++++++
@@ -88,7 +87,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 22 files changed, 782 insertions(+), 22 deletions(-)
+ 21 files changed, 781 insertions(+), 22 deletions(-)
 
 diff --git a/api/v1alpha4/cluster_types.go b/api/v1alpha4/cluster_types.go
 index d4ee0658e..207cdcf76 100644
@@ -495,18 +494,6 @@ index f71bdec07..9bdafa7ec 100644
  	allMachinePools := &expv1.MachinePoolList{}
  	// Get all machine pools.
  	if feature.Gates.Enabled(feature.MachinePool) {
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-index 37607583b..0647e2ccf 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-@@ -165,6 +165,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs", "*"},
-+		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "external", "endpoints"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageRepository"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageTag"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "imageRepository"},
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
 index 7654b788a..269007490 100644
 --- a/internal/controllers/cluster/cluster_controller.go
@@ -1357,5 +1344,5 @@ index d72947ecf..e830011d9 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.34.1
+2.39.3 (Apple Git-145)
 
