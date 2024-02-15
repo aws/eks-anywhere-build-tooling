@@ -1,4 +1,4 @@
-From 06aab5673027315adc4a1bdf80033fbb983fcddb Mon Sep 17 00:00:00 2001
+From ddb83ecee534a1d7e941ef148e3eaf9c39951b48 Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Tue, 31 Aug 2021 15:56:28 +0000
 Subject: [PATCH 05/40] Make pause and bottlerocket bootstrap images updatable
@@ -11,32 +11,32 @@ cr: https://code.amazon.com/reviews/CR-56335855
  2 files changed, 40 insertions(+)
 
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-index 0647e2ccf..12b0389de 100644
+index 4338b8b11..230b0bebb 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-@@ -161,6 +161,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
- 	allowedPaths := [][]string{
+@@ -162,6 +162,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		// metadata
  		{"metadata", "*"},
- 		{spec, kubeadmConfigSpec, "useExperimentalRetryJoin"},
+ 		// spec.kubeadmConfigSpec.clusterConfiguration
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs"},
-@@ -185,6 +187,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
- 		{spec, kubeadmConfigSpec, joinConfiguration, patches, directory},
- 		{spec, kubeadmConfigSpec, joinConfiguration, patches},
- 		{spec, kubeadmConfigSpec, joinConfiguration, skipPhases},
+@@ -202,6 +204,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "controlPlane", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "discovery"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "discovery", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
+ 		// spec.kubeadmConfigSpec
  		{spec, kubeadmConfigSpec, preKubeadmCommands},
  		{spec, kubeadmConfigSpec, postKubeadmCommands},
- 		{spec, kubeadmConfigSpec, files},
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-index cd8830e56..17cef9eab 100644
+index bc6dcc07f..275f2cb12 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-@@ -713,6 +713,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -705,6 +705,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	updateUseExperimentalRetryJoin := before.DeepCopy()
  	updateUseExperimentalRetryJoin.Spec.KubeadmConfigSpec.UseExperimentalRetryJoin = false //nolint:staticcheck
  
@@ -55,7 +55,7 @@ index cd8830e56..17cef9eab 100644
  	tests := []struct {
  		name                  string
  		enableIgnitionFeature bool
-@@ -1071,6 +1083,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1045,6 +1057,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    beforeUseExperimentalRetryJoin,
  			kcp:       updateUseExperimentalRetryJoin,
  		},
@@ -87,5 +87,5 @@ index cd8830e56..17cef9eab 100644
  
  	for _, tt := range tests {
 -- 
-2.34.1
+2.39.3 (Apple Git-145)
 

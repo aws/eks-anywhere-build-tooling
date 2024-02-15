@@ -1,4 +1,4 @@
-From 3c0d51d3fde4e22bc504a7e1a7a4da3fc8f0d0f3 Mon Sep 17 00:00:00 2001
+From 5bd04353b086a1cca114b7bb3ff0f59e0d61a372 Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Thu, 2 Mar 2023 10:18:07 -0800
 Subject: [PATCH 27/40] Add bottlerocket k8s settings support
@@ -1144,10 +1144,10 @@ index 658f3a05e..cbab7c7a4 100644
  
  // bottlerocket configuration accepts taints in the format
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index e98f13f1a..98a8d2c15 100644
+index 4f6bc18af..b63a64589 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -483,6 +483,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -484,6 +484,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
  			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
  			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
@@ -1155,7 +1155,7 @@ index e98f13f1a..98a8d2c15 100644
  			Hostname:                              machine.Name,
  		}
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
-@@ -507,7 +508,6 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -508,7 +509,6 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		if scope.Config.Spec.NTP != nil && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
  			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
  		}
@@ -1163,7 +1163,7 @@ index e98f13f1a..98a8d2c15 100644
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
-@@ -708,6 +708,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -709,6 +709,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
  			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
  			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
@@ -1171,7 +1171,7 @@ index e98f13f1a..98a8d2c15 100644
  			Hostname:                              machine.Name,
  		}
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
-@@ -854,6 +855,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -855,6 +856,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
  			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
  			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
@@ -1377,10 +1377,10 @@ index e7647e47a..90ddceaaf 100644
                                  description: BottlerocketAdmin holds the image source
                                    for admin container This is only for bottlerocket
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-index 45ad0eaa9..3df461bc8 100644
+index 553220d8a..0aaf0c3a5 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-@@ -166,6 +166,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -167,6 +167,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketAdmin", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketControl", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketCustomBootstrapContainers"},
@@ -1388,14 +1388,14 @@ index 45ad0eaa9..3df461bc8 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
-@@ -195,6 +196,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -212,6 +213,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketAdmin", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketSettings", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
+ 		// spec.kubeadmConfigSpec
  		{spec, kubeadmConfigSpec, preKubeadmCommands},
- 		{spec, kubeadmConfigSpec, postKubeadmCommands},
 -- 
-2.34.1
+2.39.3 (Apple Git-145)
 
