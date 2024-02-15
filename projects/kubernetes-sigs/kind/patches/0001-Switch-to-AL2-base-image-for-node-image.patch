@@ -1,7 +1,7 @@
-From 7b87bf672a38c5e1cb15cf507bf13addf6f2ee5d Mon Sep 17 00:00:00 2001
+From 837d152313b94cc43d13ba79dec12dc1ef48ca51 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 29 Jun 2023 00:56:53 -0700
-Subject: [PATCH] Switch to AL2 base image for node image
+Subject: [PATCH 1/5] Switch to AL2 base image for node image
 
 ---
  images/base/Dockerfile                        | 215 +++++++-----------
@@ -9,7 +9,7 @@ Subject: [PATCH] Switch to AL2 base image for node image
  2 files changed, 83 insertions(+), 142 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index 58ea3e6f..de5e14a3 100644
+index e9440cb1..75adc427 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -17,11 +17,19 @@
@@ -36,9 +36,9 @@ index 58ea3e6f..de5e14a3 100644
 +FROM base-$TARGETARCH as base
  
  # copy in static files
- # all scripts are 0755 (rwx r-x r-x)
-@@ -72,10 +80,11 @@ COPY --chmod=0644 files/etc/systemd/system/kubelet.service.d/* /etc/systemd/syst
- RUN echo "Installing Packages ..." \
+ # all scripts and directories are 0755 (rwx r-x r-x)
+@@ -73,10 +81,11 @@ RUN chmod 755 /kind/bin && \
+     echo "Installing Packages ..." \
      && DEBIAN_FRONTEND=noninteractive clean-install \
        systemd \
 -      conntrack iptables iproute2 ethtool util-linux mount ebtables kmod \
@@ -52,7 +52,7 @@ index 58ea3e6f..de5e14a3 100644
      && find /lib/systemd/system/sysinit.target.wants/ -name "systemd-tmpfiles-setup.service" -delete \
      && rm -f /lib/systemd/system/multi-user.target.wants/* \
      && rm -f /etc/systemd/system/*.wants/* \
-@@ -84,7 +93,12 @@ RUN echo "Installing Packages ..." \
+@@ -85,7 +94,12 @@ RUN chmod 755 /kind/bin && \
      && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
      && rm -f /lib/systemd/system/basic.target.wants/* \
      && echo "ReadKMsg=no" >> /etc/systemd/journald.conf \
@@ -64,9 +64,9 @@ index 58ea3e6f..de5e14a3 100644
 +    && systemctl mask getty@tty1.service
 +
  
- RUN echo "Enabling services ... " \
-     && systemctl enable kubelet.service \
-@@ -94,138 +108,67 @@ RUN echo "Enabling services ... " \
+ # NOTE: systemd-binfmt.service will register things into binfmt_misc which is kernel-global
+ RUN echo "Enabling / Disabling services ... " \
+@@ -97,138 +111,67 @@ RUN echo "Enabling / Disabling services ... " \
  RUN echo "Ensuring /etc/kubernetes/manifests" \
      && mkdir -p /etc/kubernetes/manifests
  
