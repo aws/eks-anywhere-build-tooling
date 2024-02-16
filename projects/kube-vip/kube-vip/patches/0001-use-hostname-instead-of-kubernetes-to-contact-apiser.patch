@@ -1,18 +1,18 @@
-From 70b4589874f8ec94848af247bdd46554c70c164f Mon Sep 17 00:00:00 2001
+From 8676d62c73a67e54140b9c1a5397165933c1b1fe Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 2 Mar 2022 16:40:11 -0800
 Subject: [PATCH] use hostname instead of "kubernetes" to contact apiserver
 
 ---
  pkg/kubevip/config_generator.go | 7 -------
- pkg/manager/manager.go          | 6 +++++-
- 2 files changed, 5 insertions(+), 8 deletions(-)
+ pkg/manager/manager.go          | 7 +++++--
+ 2 files changed, 5 insertions(+), 9 deletions(-)
 
 diff --git a/pkg/kubevip/config_generator.go b/pkg/kubevip/config_generator.go
-index dad9594..45712d2 100644
+index 3d6e537..0fb48b1 100644
 --- a/pkg/kubevip/config_generator.go
 +++ b/pkg/kubevip/config_generator.go
-@@ -403,13 +403,6 @@ func generatePodSpec(c *Config, imageVersion string, inCluster bool) *corev1.Pod
+@@ -557,13 +557,6 @@ func generatePodSpec(c *Config, imageVersion string, inCluster bool) *corev1.Pod
  			},
  		}
  		newManifest.Spec.Volumes = append(newManifest.Spec.Volumes, adminConfVolume)
@@ -27,22 +27,23 @@ index dad9594..45712d2 100644
  
  	if c.ProviderConfig != "" {
 diff --git a/pkg/manager/manager.go b/pkg/manager/manager.go
-index 9375bfd..086823c 100644
+index bf266c7..4d90c7a 100644
 --- a/pkg/manager/manager.go
 +++ b/pkg/manager/manager.go
-@@ -68,7 +68,11 @@ func New(configMap string, config *kubevip.Config) (*Manager, error) {
- 			// If this is a control plane host it will likely have started as a static pod or won't have the
- 			// VIP up before trying to connect to the API server, we set the API endpoint to this machine to
- 			// ensure connectivity.
--			clientset, err = k8s.NewClientset(adminConfigPath, false, fmt.Sprintf("kubernetes:%v", config.Port))
-+			hostname, err := os.Hostname()
-+			if err != nil {
-+				return nil, err
-+			}
-+			clientset, err = k8s.NewClientset(adminConfigPath, false, fmt.Sprintf("%s:%v", hostname, config.Port))
+@@ -78,8 +78,11 @@ func New(configMap string, config *kubevip.Config) (*Manager, error) {
+ 			if config.DetectControlPlane {
+ 				clientset, err = k8s.FindWorkingKubernetesAddress(adminConfigPath, false)
+ 			} else {
+-				// This will attempt to use kubernetes as the hostname (this should be passed as a host alias) in the pod manifest
+-				clientset, err = k8s.NewClientset(adminConfigPath, false, fmt.Sprintf("kubernetes:%v", config.Port))
++				hostname, err := os.Hostname()
++				if err != nil {
++					return nil, err
++				}
++				clientset, err = k8s.NewClientset(adminConfigPath, false, fmt.Sprintf("%s:%v", hostname, config.Port))
+ 			}
  		} else {
  			clientset, err = k8s.NewClientset(adminConfigPath, false, "")
- 		}
 -- 
-2.39.2
+2.39.3 (Apple Git-145)
 
