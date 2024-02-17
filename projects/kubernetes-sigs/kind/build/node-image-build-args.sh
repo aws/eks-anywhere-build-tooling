@@ -51,13 +51,13 @@ ETCD_VERSION=$(build::eksd_releases::get_eksd_component_version "etcd" $EKSD_REL
 
 # Expected versions provided by kind which are replaced in the docker build with our versions
 # when updating kind check the following, they may need to be updated
-# https://github.com/kubernetes-sigs/kind/blob/v0.20.0/pkg/build/nodeimage/const_cni.go#L23
-KINDNETD_IMAGE_TAG="docker.io/kindest/kindnetd:v20230511-dc714da8"
-# https://github.com/kubernetes-sigs/kind/blob/v0.20.0/pkg/build/nodeimage/const_storage.go#L28
-LOCAL_PATH_PROVISONER_IMAGE_TAG="docker.io/kindest/local-path-provisioner:v20230511-dc714da8"
-# https://github.com/kubernetes-sigs/kind/blob/v0.20.0/pkg/build/nodeimage/const_storage.go#L29
+# https://github.com/kubernetes-sigs/kind/blob/v0.22.0/pkg/build/nodeimage/const_cni.go#L23
+KINDNETD_IMAGE_TAG="docker.io/kindest/kindnetd:v20240202-8f1494ea"
+# https://github.com/kubernetes-sigs/kind/blob/v0.22.0/pkg/build/nodeimage/const_storage.go#L28
+LOCAL_PATH_PROVISONER_IMAGE_TAG="docker.io/kindest/local-path-provisioner:v20240202-8f1494ea"
+# https://github.com/kubernetes-sigs/kind/blob/v0.22.0/pkg/build/nodeimage/const_storage.go#L29
 LOCAL_PATH_HELPER_IMAGE_TAG="docker.io/kindest/local-path-helper:v20230510-486859a6"
-# https://github.com/kubernetes-sigs/kind/blob/v0.20.0/images/base/files/etc/containerd/config.toml#L37
+# https://github.com/kubernetes-sigs/kind/blob/v0.22.0/images/base/files/etc/containerd/config.toml#L37
 PAUSE_IMAGE_TAG="registry.k8s.io/pause:3.7"
 
 mkdir -p $(dirname $OUTPUT_FILE)

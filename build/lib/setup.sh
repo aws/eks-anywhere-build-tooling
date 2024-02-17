@@ -28,6 +28,10 @@ cp config/policy.json /root/.config/containers/policy.json
 git config ${GIT_CONFIG_SCOPE} credential.helper '!aws codecommit credential-helper $@'
 git config ${GIT_CONFIG_SCOPE} credential.UseHttpPath true
 
+# Since the build environment is AL2, we need to use iptables in legacy mode
+# as it doesn't have nftables.
+update-alternatives --set iptables /usr/sbin/iptables-legacy
+update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
 start::dockerd
 wait::for::dockerd
 
