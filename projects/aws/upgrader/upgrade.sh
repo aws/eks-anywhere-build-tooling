@@ -165,13 +165,18 @@ kubelet_and_kubectl() {
 }
 
 update_kubelet_extra_args() {
-  kubelet_extra_args=$(cat /etc/sysconfig/kubelet)
+  kubelet_conf="/etc/sysconfig/kubelet"
+  if [ ! -f kubelet_conf ]; then
+    echo "kubelet config file ${kubelet_conf} not found, skipping"
+    return
+  fi
+  kubelet_extra_args=$(cat ${kubelet_conf})
   feature_gate=" --feature-gates=KubeletCredentialProviders=true"
   if [[ $kubelet_extra_args == *$feature_gate* ]]; then
     kubelet_extra_args=${kubelet_extra_args//"$feature_gate"/}
     mkdir "$components_dir/extraargs"
-    backup_file /etc/sysconfig/kubelet "$components_dir/extraargs"
-    echo "$kubelet_extra_args" > /etc/sysconfig/kubelet
+    backup_file ${kubelet_conf} "$components_dir/extraargs"
+    echo "$kubelet_extra_args" > ${kubelet_conf}
   fi
 }
 
