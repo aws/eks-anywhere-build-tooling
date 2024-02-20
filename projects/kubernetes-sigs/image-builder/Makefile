@@ -79,8 +79,8 @@ SKIP_METAL_INSTANCE_TEST?=false
 # to support a no op attribution target
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH=binaries checksums attribution update-dependency-versions validate-dependency-versions-raw validate-dependency-versions-cloudstack
 
-IMAGE_OS_DIR=$(IMAGE_OS)/$(IMAGE_OS_VERSION)
-IMAGE_OS_WITH_VER=$(IMAGE_OS)-$(IMAGE_OS_VERSION)
+IMAGE_OS_DIR?=$(IMAGE_OS)/$(IMAGE_OS_VERSION)
+IMAGE_OS_WITH_VER?=$(IMAGE_OS)-$(IMAGE_OS_VERSION)
 
 OVA_FORMAT_EXT=ova
 RAW_FORMAT_EXT=gz
