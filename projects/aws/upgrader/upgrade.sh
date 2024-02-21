@@ -166,7 +166,7 @@ kubelet_and_kubectl() {
 
 update_kubelet_extra_args() {
   kubelet_conf="/etc/sysconfig/kubelet"
-  if [ ! -f kubelet_conf ]; then
+  if [ ! -f ${kubelet_conf} ]; then
     echo "kubelet config file ${kubelet_conf} not found, skipping"
     return
   fi
