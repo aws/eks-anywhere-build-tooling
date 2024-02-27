@@ -14,8 +14,11 @@ import (
 
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
 	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/kubeadm/etcd"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	// etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
 const (
@@ -335,5 +338,39 @@ func patchKubeVipManifest() error {
 	fmt.Printf("Patched kube-vip manifest: \n%s\n", updatedContents)
 	fmt.Println("-------------------------------")
 
+	return nil
+}
+
+type EtcdClient interface {
+
+	// MemberList lists the current cluster membership.
+	MemberList(ctx context.Context) (*clientv3.MemberListResponse, error)
+
+	// MemberPromote promotes a member from raft learner (non-voting) to raft voting member.
+	MemberPromote(ctx context.Context, id uint64) (*clientv3.MemberPromoteResponse, error)
+}
+
+func NewEtcdClient(certificatesDir string, manifestsDir string) (*etcd.Client, error) {
+	// ToDo: use the certificates directory to read certs/keys into variables and pass to client
+	endpoints := []string{} // extract endpoints from the etcd static pod manifests, rip off the code in pods.go EnableStaticPods if you need to
+	client, err := etcd.New(endpoints, "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+// func promoteEtcdLearner(client clientset.Interface, endpoint *kubeadmapi.APIEndpoint, certificatesDir string) error {
+func promoteEtcdLearner(client *etcd.Client, peerUrl string) error {
+
+	memberID, err := client.GetMemberID(peerUrl)
+	if err != nil {
+		return err
+	}
+
+	err = client.MemberPromote(memberID)
+	if err != nil {
+		return err
+	}
 	return nil
 }

@@ -91,6 +91,11 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error enabling static pods")
 	}
 
+	etcdClient, err := NewEtcdClient("/var/lib/kubeadm/pki/etcd/", staticPodManifestsPath)
+	peerUrl := "" // find a way to pull this out of the etcd static pod manifest too
+	promoteEtcdLearner(etcdClient, peerUrl)
+
+
 	// Now that etcd is up and running, check for other pod liveness
 	err = utils.WaitForPods(podDefinitions)
 	if err != nil {

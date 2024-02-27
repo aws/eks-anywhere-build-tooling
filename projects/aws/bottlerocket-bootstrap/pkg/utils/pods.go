@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"io/ioutil"
-	"os/exec"
+	// "os/exec"
 	"path/filepath"
 	"strings"
 
@@ -39,12 +39,12 @@ func EnableStaticPods(path string) ([]*v1.Pod, error) {
 		fmt.Printf("Manifest string: \n%s\n", string(fileData))
 		fmt.Println("-------------------------------")
 		fmt.Printf("Encoded string: \n%s\n", b64Manifest)
-		cmd := exec.Command("bash", "-c", "apiclient set \"kubernetes.static-pods."+baseFileName+".manifest\"=\""+b64Manifest+"\" \"kubernetes.static-pods."+baseFileName+".enabled\"=true")
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Apiclient command for static pod failed, output: %s\n", string(out))
-			return podDefinitions, errors.Wrapf(err, "error running apiclient command for static pod: %v", err)
-		}
+		// cmd := exec.Command("bash", "-c", "apiclient set \"kubernetes.static-pods."+baseFileName+".manifest\"=\""+b64Manifest+"\" \"kubernetes.static-pods."+baseFileName+".enabled\"=true")
+		// out, err := cmd.CombinedOutput()
+		// if err != nil {
+		// 	fmt.Printf("Apiclient command for static pod failed, output: %s\n", string(out))
+		// 	return podDefinitions, errors.Wrapf(err, "error running apiclient command for static pod: %v", err)
+		// }
 
 		// Parse manifest from file and add to array
 		podDef, err := UnmarshalPodDefinition(fileData)
@@ -56,7 +56,7 @@ func EnableStaticPods(path string) ([]*v1.Pod, error) {
 	return podDefinitions, nil
 }
 
-var podFileExtensions = map[string]struct{}{".yaml": {}, ".manifest": {}}
+var podFileExtensions = map[string]struct{}{".yaml": {}, ".manifest": {}, "": {}}
 
 func isPodFile(f fs.FileInfo) bool {
 	_, ok := podFileExtensions[filepath.Ext(f.Name())]

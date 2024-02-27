@@ -3,8 +3,10 @@ package kubeadm
 import (
 	"os"
 	"testing"
+	"fmt"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 )
 
 const localEtcdClusterConf = `'apiServer:
@@ -214,4 +216,19 @@ func TestReadKubeletTlsConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateEtcdClient(t *testing.T) {
+
+	podDefinitions, err := utils.EnableStaticPods("testdata/manifests/")
+	if err != nil {
+		t.Fail()
+		// t.Fail(errors.Wrap(err, "Error enabling static pods"))
+	}
+	for _, p := range podDefinitions {
+		fmt.Println(p.Kind)
+		fmt.Println(p.Annotations["kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint"])
+	}
+
+	t.Fail()
 }
