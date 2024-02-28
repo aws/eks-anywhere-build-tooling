@@ -1,0 +1,1096 @@
+From f478ad851ae6b6d1c6465a828eecb8195a30d880 Mon Sep 17 00:00:00 2001
+From: Abhinav Pandey <abhinavmpandey08@gmail.com>
+Date: Tue, 27 Feb 2024 22:37:00 -0800
+Subject: [PATCH] enable kubeadm feature flags mutation
+
+---
+ .../internal/controllers/controller_test.go   |   3 +-
+ .../internal/controllers/fakes_test.go        |  10 +-
+ .../kubeadm/internal/controllers/upgrade.go   |  56 +++-----
+ .../webhooks/kubeadm_control_plane.go         |   3 +
+ .../webhooks/kubeadm_control_plane_test.go    |   4 +-
+ .../kubeadm/internal/workload_cluster.go      |  67 +++++----
+ .../internal/workload_cluster_coredns.go      |   8 +-
+ .../internal/workload_cluster_coredns_test.go |  12 +-
+ .../kubeadm/internal/workload_cluster_etcd.go |  27 ++--
+ .../internal/workload_cluster_etcd_test.go    | 105 ++++++++------
+ .../kubeadm/internal/workload_cluster_test.go | 132 +++++++++++++-----
+ 11 files changed, 262 insertions(+), 165 deletions(-)
+
+diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
+index d352f7863..b531719ca 100644
+--- a/controlplane/kubeadm/internal/controllers/controller_test.go
++++ b/controlplane/kubeadm/internal/controllers/controller_test.go
+@@ -1284,7 +1284,8 @@ dns:
+   type: CoreDNS
+ imageRepository: registry.k8s.io
+ kind: ClusterConfiguration
+-kubernetesVersion: metav1.16.1`,
++kubernetesVersion: metav1.16.1
++`,
+ 		},
+ 	}
+ 	g.Expect(env.Create(ctx, kubeadmCM)).To(Succeed())
+diff --git a/controlplane/kubeadm/internal/controllers/fakes_test.go b/controlplane/kubeadm/internal/controllers/fakes_test.go
+index 3c7348bc4..cf9fcbafe 100644
+--- a/controlplane/kubeadm/internal/controllers/fakes_test.go
++++ b/controlplane/kubeadm/internal/controllers/fakes_test.go
+@@ -108,11 +108,11 @@ func (f fakeWorkloadCluster) ReconcileKubeletRBACBinding(_ context.Context, _ se
+ 	return nil
+ }
+ 
+-func (f fakeWorkloadCluster) UpdateKubernetesVersionInKubeadmConfigMap(_ context.Context, _ semver.Version) error {
++func (f fakeWorkloadCluster) UpdateKubernetesVersionInKubeadmConfigMap(semver.Version) func(*bootstrapv1.ClusterConfiguration) {
+ 	return nil
+ }
+ 
+-func (f fakeWorkloadCluster) UpdateEtcdVersionInKubeadmConfigMap(_ context.Context, _, _ string, _ semver.Version) error {
++func (f fakeWorkloadCluster) UpdateEtcdLocalInKubeadmConfigMap(*bootstrapv1.LocalEtcd) func(*bootstrapv1.ClusterConfiguration) {
+ 	return nil
+ }
+ 
+@@ -132,13 +132,17 @@ func (f fakeWorkloadCluster) EtcdMembers(_ context.Context) ([]string, error) {
+ 	return f.EtcdMembersResult, nil
+ }
+ 
++func (f fakeWorkloadCluster) UpdateClusterConfiguration(context.Context, semver.Version, ...func(*bootstrapv1.ClusterConfiguration)) error {
++	return nil
++}
++
+ type fakeMigrator struct {
+ 	migrateCalled    bool
+ 	migrateErr       error
+ 	migratedCorefile string
+ }
+ 
+-func (m *fakeMigrator) Migrate(_, _, _ string, _ bool) (string, error) {
++func (m *fakeMigrator) Migrate(string, string, string, bool) (string, error) {
+ 	m.migrateCalled = true
+ 	if m.migrateErr != nil {
+ 		return "", m.migrateErr
+diff --git a/controlplane/kubeadm/internal/controllers/upgrade.go b/controlplane/kubeadm/internal/controllers/upgrade.go
+index e436eb546..ff8df3c9a 100644
+--- a/controlplane/kubeadm/internal/controllers/upgrade.go
++++ b/controlplane/kubeadm/internal/controllers/upgrade.go
+@@ -24,6 +24,7 @@ import (
+ 	"github.com/pkg/errors"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+ 
++	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
+ 	controlplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+ 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
+ 	"sigs.k8s.io/cluster-api/util"
+@@ -75,9 +76,8 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
+ 		return ctrl.Result{}, errors.Wrap(err, "failed to set cluster-admin ClusterRoleBinding for kubeadm")
+ 	}
+ 
+-	if err := workloadCluster.UpdateKubernetesVersionInKubeadmConfigMap(ctx, parsedVersion); err != nil {
+-		return ctrl.Result{}, errors.Wrap(err, "failed to update the kubernetes version in the kubeadm config map")
+-	}
++	kubeadmCMMutators := make([]func(*bootstrapv1.ClusterConfiguration), 0)
++	kubeadmCMMutators = append(kubeadmCMMutators, workloadCluster.UpdateKubernetesVersionInKubeadmConfigMap(parsedVersion))
+ 
+ 	if controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration != nil {
+ 		// We intentionally only parse major/minor/patch so that the subsequent code
+@@ -86,44 +86,30 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
+ 		if err != nil {
+ 			return ctrl.Result{}, errors.Wrapf(err, "failed to parse kubernetes version %q", controlPlane.KCP.Spec.Version)
+ 		}
++
+ 		// Get the imageRepository or the correct value if nothing is set and a migration is necessary.
+ 		imageRepository := internal.ImageRepositoryFromClusterConfig(controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration, parsedVersionTolerant)
+ 
+-		if err := workloadCluster.UpdateImageRepositoryInKubeadmConfigMap(ctx, imageRepository, parsedVersion); err != nil {
+-			return ctrl.Result{}, errors.Wrap(err, "failed to update the image repository in the kubeadm config map")
++		kubeadmCMMutators = append(kubeadmCMMutators,
++			workloadCluster.UpdateImageRepositoryInKubeadmConfigMap(imageRepository),
++			workloadCluster.UpdateFeatureGatesInKubeadmConfigMap(controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.FeatureGates),
++			workloadCluster.UpdateAPIServerInKubeadmConfigMap(controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer),
++			workloadCluster.UpdateControllerManagerInKubeadmConfigMap(controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.ControllerManager),
++			workloadCluster.UpdateSchedulerInKubeadmConfigMap(controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Scheduler))
++
++		// Etcd local and external are mutually exclusive and they cannot be switched, once set.
++		if controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.Local != nil {
++			kubeadmCMMutators = append(kubeadmCMMutators,
++				workloadCluster.UpdateEtcdLocalInKubeadmConfigMap(controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.Local))
++		} else {
++			kubeadmCMMutators = append(kubeadmCMMutators,
++				workloadCluster.UpdateEtcdExternalInKubeadmConfigMap(controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External))
+ 		}
+ 	}
+ 
+-	if controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration != nil && controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.Local != nil {
+-		meta := controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.Local.ImageMeta
+-		if err := workloadCluster.UpdateEtcdVersionInKubeadmConfigMap(ctx, meta.ImageRepository, meta.ImageTag, parsedVersion); err != nil {
+-			return ctrl.Result{}, errors.Wrap(err, "failed to update the etcd version in the kubeadm config map")
+-		}
+-
+-		extraArgs := controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.Local.ExtraArgs
+-		if err := workloadCluster.UpdateEtcdExtraArgsInKubeadmConfigMap(ctx, extraArgs, parsedVersion); err != nil {
+-			return ctrl.Result{}, errors.Wrap(err, "failed to update the etcd extra args in the kubeadm config map")
+-		}
+-	}
+-
+-	if controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration != nil && controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External != nil {
+-		if err := workloadCluster.UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx, controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints, parsedVersion); err != nil {
+-			return ctrl.Result{}, errors.Wrap(err, "failed to update the external etcd endpoints in the kubeadm config map")
+-		}
+-	}
+-
+-	if controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration != nil {
+-		if err := workloadCluster.UpdateAPIServerInKubeadmConfigMap(ctx, controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer, parsedVersion); err != nil {
+-			return ctrl.Result{}, errors.Wrap(err, "failed to update api server in the kubeadm config map")
+-		}
+-
+-		if err := workloadCluster.UpdateControllerManagerInKubeadmConfigMap(ctx, controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.ControllerManager, parsedVersion); err != nil {
+-			return ctrl.Result{}, errors.Wrap(err, "failed to update controller manager in the kubeadm config map")
+-		}
+-
+-		if err := workloadCluster.UpdateSchedulerInKubeadmConfigMap(ctx, controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration.Scheduler, parsedVersion); err != nil {
+-			return ctrl.Result{}, errors.Wrap(err, "failed to update scheduler in the kubeadm config map")
+-		}
++	// collectively update Kubeadm config map
++	if err = workloadCluster.UpdateClusterConfiguration(ctx, parsedVersion, kubeadmCMMutators...); err != nil {
++		return ctrl.Result{}, err
+ 	}
+ 
+ 	if err := workloadCluster.UpdateKubeletConfigMap(ctx, parsedVersion); err != nil {
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+index 39d22a6a4..cd9909827 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+@@ -151,6 +151,7 @@ const (
+ 	ntp                  = "ntp"
+ 	ignition             = "ignition"
+ 	diskSetup            = "diskSetup"
++	featureGates         = "featureGates"
+ )
+ 
+ const minimumCertificatesExpiryDays = 7
+@@ -183,6 +184,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageRepository"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "dns", "imageTag"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "imageRepository"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, featureGates},
++		{spec, kubeadmConfigSpec, clusterConfiguration, featureGates, "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, apiServer},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, apiServer, "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, controllerManager},
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
+index efccae0a0..ea5288aea 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
+@@ -936,8 +936,8 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			kcp:       imageRepository,
+ 		},
+ 		{
+-			name:      "should fail when making a change to the cluster config's featureGates",
+-			expectErr: true,
++			name:      "should succeed when making a change to the cluster config's featureGates",
++			expectErr: false,
+ 			before:    before,
+ 			kcp:       featureGates,
+ 		},
+diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
+index cf6675f2f..9034dd1e0 100644
+--- a/controlplane/kubeadm/internal/workload_cluster.go
++++ b/controlplane/kubeadm/internal/workload_cluster.go
+@@ -105,14 +105,14 @@ type WorkloadCluster interface {
+ 	// Upgrade related tasks.
+ 	ReconcileKubeletRBACBinding(ctx context.Context, version semver.Version) error
+ 	ReconcileKubeletRBACRole(ctx context.Context, version semver.Version) error
+-	UpdateKubernetesVersionInKubeadmConfigMap(ctx context.Context, version semver.Version) error
+-	UpdateImageRepositoryInKubeadmConfigMap(ctx context.Context, imageRepository string, version semver.Version) error
+-	UpdateEtcdVersionInKubeadmConfigMap(ctx context.Context, imageRepository, imageTag string, version semver.Version) error
+-	UpdateEtcdExtraArgsInKubeadmConfigMap(ctx context.Context, extraArgs map[string]string, version semver.Version) error
+-	UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx context.Context, endpoints []string, version semver.Version) error
+-	UpdateAPIServerInKubeadmConfigMap(ctx context.Context, apiServer bootstrapv1.APIServer, version semver.Version) error
+-	UpdateControllerManagerInKubeadmConfigMap(ctx context.Context, controllerManager bootstrapv1.ControlPlaneComponent, version semver.Version) error
+-	UpdateSchedulerInKubeadmConfigMap(ctx context.Context, scheduler bootstrapv1.ControlPlaneComponent, version semver.Version) error
++	UpdateKubernetesVersionInKubeadmConfigMap(version semver.Version) func(*bootstrapv1.ClusterConfiguration)
++	UpdateImageRepositoryInKubeadmConfigMap(imageRepository string) func(*bootstrapv1.ClusterConfiguration)
++	UpdateFeatureGatesInKubeadmConfigMap(featureGates map[string]bool) func(*bootstrapv1.ClusterConfiguration)
++	UpdateEtcdLocalInKubeadmConfigMap(localEtcd *bootstrapv1.LocalEtcd) func(*bootstrapv1.ClusterConfiguration)
++	UpdateEtcdExternalInKubeadmConfigMap(externalEtcd *bootstrapv1.ExternalEtcd) func(*bootstrapv1.ClusterConfiguration)
++	UpdateAPIServerInKubeadmConfigMap(apiServer bootstrapv1.APIServer) func(*bootstrapv1.ClusterConfiguration)
++	UpdateControllerManagerInKubeadmConfigMap(controllerManager bootstrapv1.ControlPlaneComponent) func(*bootstrapv1.ClusterConfiguration)
++	UpdateSchedulerInKubeadmConfigMap(scheduler bootstrapv1.ControlPlaneComponent) func(*bootstrapv1.ClusterConfiguration)
+ 	UpdateKubeletConfigMap(ctx context.Context, version semver.Version) error
+ 	UpdateKubeProxyImageInfo(ctx context.Context, kcp *controlplanev1.KubeadmControlPlane, version semver.Version) error
+ 	UpdateCoreDNS(ctx context.Context, kcp *controlplanev1.KubeadmControlPlane, version semver.Version) error
+@@ -122,6 +122,7 @@ type WorkloadCluster interface {
+ 	ForwardEtcdLeadership(ctx context.Context, machine *clusterv1.Machine, leaderCandidate *clusterv1.Machine) error
+ 	AllowBootstrapTokensToGetNodes(ctx context.Context) error
+ 	AllowClusterAdminPermissions(ctx context.Context, version semver.Version) error
++	UpdateClusterConfiguration(ctx context.Context, version semver.Version, mutators ...func(*bootstrapv1.ClusterConfiguration)) error
+ 
+ 	// State recovery tasks.
+ 	ReconcileEtcdMembers(ctx context.Context, nodeNames []string, version semver.Version) ([]string, error)
+@@ -174,20 +175,30 @@ func (w *Workload) getConfigMap(ctx context.Context, configMap ctrlclient.Object
+ }
+ 
+ // UpdateImageRepositoryInKubeadmConfigMap updates the image repository in the kubeadm config map.
+-func (w *Workload) UpdateImageRepositoryInKubeadmConfigMap(ctx context.Context, imageRepository string, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++func (w *Workload) UpdateImageRepositoryInKubeadmConfigMap(imageRepository string) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
+ 		if imageRepository == "" {
+ 			return
+ 		}
++
+ 		c.ImageRepository = imageRepository
+-	}, version)
++	}
++}
++
++// UpdateFeatureGatesInKubeadmConfigMap updates the feature gates in the kubeadm config map.
++func (w *Workload) UpdateFeatureGatesInKubeadmConfigMap(featureGates map[string]bool) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
++		// Even if featureGates is nil, reset it to ClusterConfiguration
++		// to override any previously set feature gates.
++		c.FeatureGates = featureGates
++	}
+ }
+ 
+ // UpdateKubernetesVersionInKubeadmConfigMap updates the kubernetes version in the kubeadm config map.
+-func (w *Workload) UpdateKubernetesVersionInKubeadmConfigMap(ctx context.Context, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++func (w *Workload) UpdateKubernetesVersionInKubeadmConfigMap(version semver.Version) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
+ 		c.KubernetesVersion = fmt.Sprintf("v%s", version.String())
+-	}, version)
++	}
+ }
+ 
+ // UpdateKubeletConfigMap will create a new kubelet-config-1.x config map for a new version of the kubelet.
+@@ -271,24 +282,24 @@ func (w *Workload) UpdateKubeletConfigMap(ctx context.Context, version semver.Ve
+ }
+ 
+ // UpdateAPIServerInKubeadmConfigMap updates api server configuration in kubeadm config map.
+-func (w *Workload) UpdateAPIServerInKubeadmConfigMap(ctx context.Context, apiServer bootstrapv1.APIServer, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++func (w *Workload) UpdateAPIServerInKubeadmConfigMap(apiServer bootstrapv1.APIServer) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
+ 		c.APIServer = apiServer
+-	}, version)
++	}
+ }
+ 
+ // UpdateControllerManagerInKubeadmConfigMap updates controller manager configuration in kubeadm config map.
+-func (w *Workload) UpdateControllerManagerInKubeadmConfigMap(ctx context.Context, controllerManager bootstrapv1.ControlPlaneComponent, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++func (w *Workload) UpdateControllerManagerInKubeadmConfigMap(controllerManager bootstrapv1.ControlPlaneComponent) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
+ 		c.ControllerManager = controllerManager
+-	}, version)
++	}
+ }
+ 
+ // UpdateSchedulerInKubeadmConfigMap updates scheduler configuration in kubeadm config map.
+-func (w *Workload) UpdateSchedulerInKubeadmConfigMap(ctx context.Context, scheduler bootstrapv1.ControlPlaneComponent, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++func (w *Workload) UpdateSchedulerInKubeadmConfigMap(scheduler bootstrapv1.ControlPlaneComponent) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
+ 		c.Scheduler = scheduler
+-	}, version)
++	}
+ }
+ 
+ // RemoveMachineFromKubeadmConfigMap removes the entry for the machine from the kubeadm configmap.
+@@ -351,11 +362,11 @@ func (w *Workload) updateClusterStatus(ctx context.Context, mutator func(status
+ 	})
+ }
+ 
+-// updateClusterConfiguration gets the ClusterConfiguration kubeadm-config ConfigMap, converts it to the
++// UpdateClusterConfiguration gets the ClusterConfiguration kubeadm-config ConfigMap, converts it to the
+ // Cluster API representation, and then applies a mutation func; if changes are detected, the
+ // data are converted back into the Kubeadm API version in use for the target Kubernetes version and the
+ // kubeadm-config ConfigMap updated.
+-func (w *Workload) updateClusterConfiguration(ctx context.Context, mutator func(*bootstrapv1.ClusterConfiguration), version semver.Version) error {
++func (w *Workload) UpdateClusterConfiguration(ctx context.Context, version semver.Version, mutators ...func(*bootstrapv1.ClusterConfiguration)) error {
+ 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+ 		key := ctrlclient.ObjectKey{Name: kubeadmConfigKey, Namespace: metav1.NamespaceSystem}
+ 		configMap, err := w.getConfigMap(ctx, key)
+@@ -374,7 +385,9 @@ func (w *Workload) updateClusterConfiguration(ctx context.Context, mutator func(
+ 		}
+ 
+ 		updatedObj := currentObj.DeepCopy()
+-		mutator(updatedObj)
++		for i := range mutators {
++			mutators[i](updatedObj)
++		}
+ 
+ 		if !reflect.DeepEqual(currentObj, updatedObj) {
+ 			updatedData, err := kubeadmtypes.MarshalClusterConfigurationForVersion(updatedObj, version)
+@@ -383,7 +396,7 @@ func (w *Workload) updateClusterConfiguration(ctx context.Context, mutator func(
+ 			}
+ 			configMap.Data[clusterConfigurationKey] = updatedData
+ 			if err := w.Client.Update(ctx, configMap); err != nil {
+-				return errors.Wrap(err, "failed to upgrade the kubeadmConfigMap")
++				return errors.Wrap(err, "failed to upgrade cluster configuration in the kubeadmConfigMap")
+ 			}
+ 		}
+ 		return nil
+diff --git a/controlplane/kubeadm/internal/workload_cluster_coredns.go b/controlplane/kubeadm/internal/workload_cluster_coredns.go
+index 5699c9c06..deb5d712d 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_coredns.go
++++ b/controlplane/kubeadm/internal/workload_cluster_coredns.go
+@@ -145,7 +145,7 @@ func (w *Workload) UpdateCoreDNS(ctx context.Context, kcp *controlplanev1.Kubead
+ 	}
+ 
+ 	// Perform the upgrade.
+-	if err := w.updateCoreDNSImageInfoInKubeadmConfigMap(ctx, &clusterConfig.DNS, version); err != nil {
++	if err := w.UpdateClusterConfiguration(ctx, version, w.updateCoreDNSImageInfoInKubeadmConfigMap(&clusterConfig.DNS)); err != nil {
+ 		return err
+ 	}
+ 	if err := w.updateCoreDNSCorefile(ctx, info); err != nil {
+@@ -270,11 +270,11 @@ func (w *Workload) updateCoreDNSDeployment(ctx context.Context, info *coreDNSInf
+ }
+ 
+ // updateCoreDNSImageInfoInKubeadmConfigMap updates the kubernetes version in the kubeadm config map.
+-func (w *Workload) updateCoreDNSImageInfoInKubeadmConfigMap(ctx context.Context, dns *bootstrapv1.DNS, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++func (w *Workload) updateCoreDNSImageInfoInKubeadmConfigMap(dns *bootstrapv1.DNS) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
+ 		c.DNS.ImageRepository = dns.ImageRepository
+ 		c.DNS.ImageTag = dns.ImageTag
+-	}, version)
++	}
+ }
+ 
+ // updateCoreDNSClusterRole updates the CoreDNS ClusterRole when necessary.
+diff --git a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
+index 141ef0ae6..96c3a711b 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
++++ b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
+@@ -32,7 +32,7 @@ import (
+ 
+ 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
+ 	controlplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+-	"sigs.k8s.io/cluster-api/util/yaml"
++	utilyaml "sigs.k8s.io/cluster-api/util/yaml"
+ )
+ 
+ func TestUpdateCoreDNS(t *testing.T) {
+@@ -124,7 +124,7 @@ func TestUpdateCoreDNS(t *testing.T) {
+ 			Namespace: metav1.NamespaceSystem,
+ 		},
+ 		Data: map[string]string{
+-			"ClusterConfiguration": yaml.Raw(`
++			"ClusterConfiguration": utilyaml.Raw(`
+ 				apiServer:
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				dns:
+@@ -140,7 +140,7 @@ func TestUpdateCoreDNS(t *testing.T) {
+ 			Namespace: metav1.NamespaceSystem,
+ 		},
+ 		Data: map[string]string{
+-			"ClusterConfiguration": yaml.Raw(`
++			"ClusterConfiguration": utilyaml.Raw(`
+ 				apiServer:
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				dns:
+@@ -1410,7 +1410,7 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+ 	}{
+ 		{
+ 			name: "it should set the DNS image config",
+-			clusterConfigurationData: yaml.Raw(`
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				`),
+@@ -1420,7 +1420,7 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+ 					ImageTag:        "v1.2.3",
+ 				},
+ 			},
+-			wantClusterConfiguration: yaml.Raw(`
++			wantClusterConfiguration: utilyaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				bottlerocketBootstrap: {}
+@@ -1456,7 +1456,7 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.updateCoreDNSImageInfoInKubeadmConfigMap(ctx, &tt.newDNS, semver.MustParse("1.19.1"))
++			err := w.UpdateClusterConfiguration(ctx, semver.MustParse("1.19.1"), w.updateCoreDNSImageInfoInKubeadmConfigMap(&tt.newDNS))
+ 			g.Expect(err).ToNot(HaveOccurred())
+ 
+ 			var actualConfig corev1.ConfigMap
+diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd.go b/controlplane/kubeadm/internal/workload_cluster_etcd.go
+index d2850c14e..fcf4beb69 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_etcd.go
++++ b/controlplane/kubeadm/internal/workload_cluster_etcd.go
+@@ -92,31 +92,30 @@ loopmembers:
+ 	return removedMembers, errs
+ }
+ 
+-// UpdateEtcdVersionInKubeadmConfigMap sets the imageRepository or the imageTag or both in the kubeadm config map.
+-func (w *Workload) UpdateEtcdVersionInKubeadmConfigMap(ctx context.Context, imageRepository, imageTag string, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++// UpdateEtcdLocalInKubeadmConfigMap sets etcd local configuration in the kubeadm config map.
++func (w *Workload) UpdateEtcdLocalInKubeadmConfigMap(etcdLocal *bootstrapv1.LocalEtcd) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
+ 		if c.Etcd.Local != nil {
+-			c.Etcd.Local.ImageRepository = imageRepository
+-			c.Etcd.Local.ImageTag = imageTag
++			c.Etcd.Local = etcdLocal
+ 		}
+-	}, version)
++	}
+ }
+ 
+-// UpdateEtcdExtraArgsInKubeadmConfigMap sets extraArgs in the kubeadm config map.
+-func (w *Workload) UpdateEtcdExtraArgsInKubeadmConfigMap(ctx context.Context, extraArgs map[string]string, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
+-		if c.Etcd.Local != nil {
+-			c.Etcd.Local.ExtraArgs = extraArgs
++// UpdateEtcdExternalInKubeadmConfigMap sets etcd external configuration in the kubeadm config map.
++func (w *Workload) UpdateEtcdExternalInKubeadmConfigMap(etcdExternal *bootstrapv1.ExternalEtcd) func(*bootstrapv1.ClusterConfiguration) {
++	return func(c *bootstrapv1.ClusterConfiguration) {
++		if c.Etcd.External != nil {
++			c.Etcd.External = etcdExternal
+ 		}
+-	}, version)
++	}
+ }
+ 
+ func (w *Workload) UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx context.Context, endpoints []string, version semver.Version) error {
+-	return w.updateClusterConfiguration(ctx, func(c *bootstrapv1.ClusterConfiguration) {
++	return w.UpdateClusterConfiguration(ctx, version, func(c *bootstrapv1.ClusterConfiguration) {
+ 		if c.Etcd.External != nil {
+ 			c.Etcd.External.Endpoints = endpoints
+ 		}
+-	}, version)
++	})
+ }
+ 
+ // RemoveEtcdMemberForMachine removes the etcd member from the target cluster's etcd cluster.
+diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
+index e1bb84967..e764b606b 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
++++ b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
+@@ -32,30 +32,34 @@ import (
+ 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+ 
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
++	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
+ 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal/etcd"
+ 	fake2 "sigs.k8s.io/cluster-api/controlplane/kubeadm/internal/etcd/fake"
+-	"sigs.k8s.io/cluster-api/util/yaml"
++	utilyaml "sigs.k8s.io/cluster-api/util/yaml"
+ )
+ 
+-func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
++func TestUpdateEtcdExternalInKubeadmConfigMap(t *testing.T) {
+ 	tests := []struct {
+ 		name                     string
+ 		clusterConfigurationData string
+-		newImageRepository       string
+-		newImageTag              string
++		externalEtcd             *bootstrapv1.ExternalEtcd
+ 		wantClusterConfiguration string
+ 	}{
+ 		{
+-			name: "it should set etcd version when local etcd",
+-			clusterConfigurationData: yaml.Raw(`
++			name: "it should set external etcd configuration with external etcd",
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				etcd:
+-				  local: {}
++				  external: {}
+ 				`),
+-			newImageRepository: "example.com/k8s",
+-			newImageTag:        "v1.6.0",
+-			wantClusterConfiguration: yaml.Raw(`
++			externalEtcd: &bootstrapv1.ExternalEtcd{
++				Endpoints: []string{"1.2.3.4"},
++				CAFile:    "/tmp/ca_file.pem",
++				CertFile:  "/tmp/cert_file.crt",
++				KeyFile:   "/tmp/key_file.key",
++			},
++			wantClusterConfiguration: utilyaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				bottlerocketBootstrap: {}
+@@ -63,9 +67,12 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
+ 				controllerManager: {}
+ 				dns: {}
+ 				etcd:
+-				  local:
+-				    imageRepository: example.com/k8s
+-				    imageTag: v1.6.0
++				  external:
++				    caFile: /tmp/ca_file.pem
++				    certFile: /tmp/cert_file.crt
++				    endpoints:
++				    - 1.2.3.4
++				    keyFile: /tmp/key_file.key
+ 				kind: ClusterConfiguration
+ 				networking: {}
+ 				pause: {}
+@@ -75,20 +82,24 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
+ 				`),
+ 		},
+ 		{
+-			name: "no op when external etcd",
+-			clusterConfigurationData: yaml.Raw(`
++			name: "no op when local etcd configuration already exists",
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				etcd:
+-				  external: {}
++				  local: {}
+ 				`),
+-			newImageRepository: "example.com/k8s",
+-			newImageTag:        "v1.6.0",
+-			wantClusterConfiguration: yaml.Raw(`
++			externalEtcd: &bootstrapv1.ExternalEtcd{
++				Endpoints: []string{"1.2.3.4"},
++				CAFile:    "/tmp/ca_file.pem",
++				CertFile:  "/tmp/cert_file.crt",
++				KeyFile:   "/tmp/key_file.key",
++			},
++			wantClusterConfiguration: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				etcd:
+-				  external: {}
++				  local: {}
+ 				`),
+ 		},
+ 	}
+@@ -109,7 +120,7 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.UpdateEtcdVersionInKubeadmConfigMap(ctx, tt.newImageRepository, tt.newImageTag, semver.MustParse("1.19.1"))
++			err := w.UpdateClusterConfiguration(ctx, semver.MustParse("1.19.1"), w.UpdateEtcdExternalInKubeadmConfigMap(tt.externalEtcd))
+ 			g.Expect(err).ToNot(HaveOccurred())
+ 
+ 			var actualConfig corev1.ConfigMap
+@@ -123,25 +134,31 @@ func TestUpdateEtcdVersionInKubeadmConfigMap(t *testing.T) {
+ 	}
+ }
+ 
+-func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
++func TestUpdateEtcdLocalInKubeadmConfigMap(t *testing.T) {
+ 	tests := []struct {
+ 		name                     string
+ 		clusterConfigurationData string
+-		newExtraArgs             map[string]string
++		localEtcd                *bootstrapv1.LocalEtcd
+ 		wantClusterConfiguration string
+ 	}{
+ 		{
+-			name: "it should set etcd extraArgs when local etcd",
+-			clusterConfigurationData: yaml.Raw(`
++			name: "it should set local etcd configuration with local etcd",
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				etcd:
+ 				  local: {}
+ 				`),
+-			newExtraArgs: map[string]string{
+-				"foo": "bar",
++			localEtcd: &bootstrapv1.LocalEtcd{
++				ImageMeta: bootstrapv1.ImageMeta{
++					ImageRepository: "example.com/k8s",
++					ImageTag:        "v1.6.0",
++				},
++				ExtraArgs: map[string]string{
++					"foo": "bar",
++				},
+ 			},
+-			wantClusterConfiguration: yaml.Raw(`
++			wantClusterConfiguration: utilyaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				bottlerocketBootstrap: {}
+@@ -152,6 +169,8 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
+ 				  local:
+ 				    extraArgs:
+ 				      foo: bar
++				    imageRepository: example.com/k8s
++				    imageTag: v1.6.0
+ 				kind: ClusterConfiguration
+ 				networking: {}
+ 				pause: {}
+@@ -161,17 +180,23 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
+ 				`),
+ 		},
+ 		{
+-			name: "no op when external etcd",
+-			clusterConfigurationData: yaml.Raw(`
++			name: "no op when external etcd configuration already exists",
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				etcd:
+ 				  external: {}
+ 				`),
+-			newExtraArgs: map[string]string{
+-				"foo": "bar",
++			localEtcd: &bootstrapv1.LocalEtcd{
++				ImageMeta: bootstrapv1.ImageMeta{
++					ImageRepository: "example.com/k8s",
++					ImageTag:        "v1.6.0",
++				},
++				ExtraArgs: map[string]string{
++					"foo": "bar",
++				},
+ 			},
+-			wantClusterConfiguration: yaml.Raw(`
++			wantClusterConfiguration: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				etcd:
+@@ -196,7 +221,7 @@ func TestUpdateEtcdExtraArgsInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.UpdateEtcdExtraArgsInKubeadmConfigMap(ctx, tt.newExtraArgs, semver.MustParse("1.19.1"))
++			err := w.UpdateClusterConfiguration(ctx, semver.MustParse("1.19.1"), w.UpdateEtcdLocalInKubeadmConfigMap(tt.localEtcd))
+ 			g.Expect(err).ToNot(HaveOccurred())
+ 
+ 			var actualConfig corev1.ConfigMap
+@@ -544,7 +569,7 @@ func TestReconcileEtcdMembers(t *testing.T) {
+ 			Namespace: metav1.NamespaceSystem,
+ 		},
+ 		Data: map[string]string{
+-			clusterStatusKey: yaml.Raw(`
++			clusterStatusKey: utilyaml.Raw(`
+ 				apiEndpoints:
+ 				  ip-10-0-0-1.ec2.internal:
+ 				    advertiseAddress: 10.0.0.1
+@@ -620,7 +645,7 @@ func TestReconcileEtcdMembers(t *testing.T) {
+ 					client.ObjectKey{Name: kubeadmConfigKey, Namespace: metav1.NamespaceSystem},
+ 					&actualConfig,
+ 				)).To(Succeed())
+-				expectedOutput := yaml.Raw(`
++				expectedOutput := utilyaml.Raw(`
+ 					apiEndpoints:
+ 					  ip-10-0-0-1.ec2.internal:
+ 					    advertiseAddress: 10.0.0.1
+@@ -712,7 +737,7 @@ func TestRemoveNodeFromKubeadmConfigMap(t *testing.T) {
+ 		{
+ 			name:        "removes the api endpoint",
+ 			apiEndpoint: "ip-10-0-0-2.ec2.internal",
+-			clusterStatusData: yaml.Raw(`
++			clusterStatusData: utilyaml.Raw(`
+ 				apiEndpoints:
+ 				  ip-10-0-0-1.ec2.internal:
+ 				    advertiseAddress: 10.0.0.1
+@@ -723,7 +748,7 @@ func TestRemoveNodeFromKubeadmConfigMap(t *testing.T) {
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterStatus
+ 				`),
+-			wantClusterStatus: yaml.Raw(`
++			wantClusterStatus: utilyaml.Raw(`
+ 				apiEndpoints:
+ 				  ip-10-0-0-1.ec2.internal:
+ 				    advertiseAddress: 10.0.0.1
+@@ -735,7 +760,7 @@ func TestRemoveNodeFromKubeadmConfigMap(t *testing.T) {
+ 		{
+ 			name:        "no op if the api endpoint does not exists",
+ 			apiEndpoint: "ip-10-0-0-2.ec2.internal",
+-			clusterStatusData: yaml.Raw(`
++			clusterStatusData: utilyaml.Raw(`
+ 				apiEndpoints:
+ 				  ip-10-0-0-1.ec2.internal:
+ 				    advertiseAddress: 10.0.0.1
+@@ -743,7 +768,7 @@ func TestRemoveNodeFromKubeadmConfigMap(t *testing.T) {
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterStatus
+ 				`),
+-			wantClusterStatus: yaml.Raw(`
++			wantClusterStatus: utilyaml.Raw(`
+ 				apiEndpoints:
+ 				  ip-10-0-0-1.ec2.internal:
+ 				    advertiseAddress: 10.0.0.1
+diff --git a/controlplane/kubeadm/internal/workload_cluster_test.go b/controlplane/kubeadm/internal/workload_cluster_test.go
+index 56d79d966..906923e3d 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_test.go
++++ b/controlplane/kubeadm/internal/workload_cluster_test.go
+@@ -30,12 +30,13 @@ import (
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+ 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
++	"sigs.k8s.io/yaml"
+ 
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
+ 	controlplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+ 	"sigs.k8s.io/cluster-api/util/version"
+-	"sigs.k8s.io/cluster-api/util/yaml"
++	utilyaml "sigs.k8s.io/cluster-api/util/yaml"
+ )
+ 
+ func TestGetControlPlaneNodes(t *testing.T) {
+@@ -262,7 +263,7 @@ func TestRemoveMachineFromKubeadmConfigMap(t *testing.T) {
+ 			Namespace: metav1.NamespaceSystem,
+ 		},
+ 		Data: map[string]string{
+-			clusterStatusKey: yaml.Raw(`
++			clusterStatusKey: utilyaml.Raw(`
+ 				apiEndpoints:
+ 				  ip-10-0-0-1.ec2.internal:
+ 				    advertiseAddress: 10.0.0.1
+@@ -327,7 +328,7 @@ func TestRemoveMachineFromKubeadmConfigMap(t *testing.T) {
+ 			machine:           machine,
+ 			objs:              []client.Object{kubeadmConfig},
+ 			expectErr:         false,
+-			expectedEndpoints: yaml.Raw(`
++			expectedEndpoints: utilyaml.Raw(`
+ 				apiEndpoints:
+ 				  ip-10-0-0-2.ec2.internal:
+ 				    advertiseAddress: 10.0.0.2
+@@ -397,7 +398,7 @@ func TestUpdateKubeletConfigMap(t *testing.T) {
+ 					ResourceVersion: "some-resource-version",
+ 				},
+ 				Data: map[string]string{
+-					kubeletConfigKey: yaml.Raw(`
++					kubeletConfigKey: utilyaml.Raw(`
+ 						apiVersion: kubelet.config.k8s.io/v1beta1
+ 						kind: KubeletConfiguration
+ 						foo: bar
+@@ -416,7 +417,7 @@ func TestUpdateKubeletConfigMap(t *testing.T) {
+ 					ResourceVersion: "some-resource-version",
+ 				},
+ 				Data: map[string]string{
+-					kubeletConfigKey: yaml.Raw(`
++					kubeletConfigKey: utilyaml.Raw(`
+ 						apiVersion: kubelet.config.k8s.io/v1beta1
+ 						kind: KubeletConfiguration
+ 						foo: bar
+@@ -435,7 +436,7 @@ func TestUpdateKubeletConfigMap(t *testing.T) {
+ 					ResourceVersion: "some-resource-version",
+ 				},
+ 				Data: map[string]string{
+-					kubeletConfigKey: yaml.Raw(`
++					kubeletConfigKey: utilyaml.Raw(`
+ 						apiVersion: kubelet.config.k8s.io/v1beta1
+ 						kind: KubeletConfiguration
+ 						foo: bar
+@@ -453,7 +454,7 @@ func TestUpdateKubeletConfigMap(t *testing.T) {
+ 					ResourceVersion: "some-resource-version",
+ 				},
+ 				Data: map[string]string{
+-					kubeletConfigKey: yaml.Raw(`
++					kubeletConfigKey: utilyaml.Raw(`
+ 						apiVersion: kubelet.config.k8s.io/v1beta1
+ 						kind: KubeletConfiguration
+ 						foo: bar
+@@ -473,7 +474,7 @@ func TestUpdateKubeletConfigMap(t *testing.T) {
+ 					ResourceVersion: "some-resource-version",
+ 				},
+ 				Data: map[string]string{
+-					kubeletConfigKey: yaml.Raw(`
++					kubeletConfigKey: utilyaml.Raw(`
+ 						apiVersion: kubelet.config.k8s.io/v1beta1
+ 						kind: KubeletConfiguration
+ 						cgroupDriver: cgroupfs
+@@ -576,7 +577,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterConfigurationKey: yaml.Raw(`
++					clusterConfigurationKey: utilyaml.Raw(`
+ 						apiVersion: kubeadm.k8s.io/v1beta2
+ 						kind: ClusterConfiguration
+ 						kubernetesVersion: v1.16.1
+@@ -590,7 +591,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterConfigurationKey: yaml.Raw(`
++					clusterConfigurationKey: utilyaml.Raw(`
+ 						apiVersion: kubeadm.k8s.io/v1beta2
+ 						kind: ClusterConfiguration
+ 						kubernetesVersion: v1.16.1
+@@ -607,7 +608,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterConfigurationKey: yaml.Raw(`
++					clusterConfigurationKey: utilyaml.Raw(`
+ 						apiVersion: kubeadm.k8s.io/v1beta2
+ 						kind: ClusterConfiguration
+ 						kubernetesVersion: v1.16.1
+@@ -623,7 +624,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterConfigurationKey: yaml.Raw(`
++					clusterConfigurationKey: utilyaml.Raw(`
+ 						apiServer: {}
+ 						apiVersion: kubeadm.k8s.io/v1beta2
+ 						bottlerocketBootstrap: {}
+@@ -651,7 +652,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterConfigurationKey: yaml.Raw(`
++					clusterConfigurationKey: utilyaml.Raw(`
+ 						apiVersion: kubeadm.k8s.io/v1beta2
+ 						kind: ClusterConfiguration
+ 						kubernetesVersion: v1.16.1
+@@ -667,7 +668,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterConfigurationKey: yaml.Raw(`
++					clusterConfigurationKey: utilyaml.Raw(`
+ 						apiServer: {}
+ 						apiVersion: kubeadm.k8s.io/v1beta3
+ 						bottlerocketBootstrap: {}
+@@ -696,7 +697,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.updateClusterConfiguration(ctx, tt.mutator, tt.version)
++			err := w.UpdateClusterConfiguration(ctx, tt.version, tt.mutator)
+ 			if tt.wantErr {
+ 				g.Expect(err).To(HaveOccurred())
+ 				return
+@@ -764,7 +765,7 @@ func TestUpdateUpdateClusterStatusInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterStatusKey: yaml.Raw(`
++					clusterStatusKey: utilyaml.Raw(`
+ 						apiEndpoints:
+ 						  ip-10-0-0-1.ec2.internal:
+ 						    advertiseAddress: 10.0.0.1
+@@ -781,7 +782,7 @@ func TestUpdateUpdateClusterStatusInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterStatusKey: yaml.Raw(`
++					clusterStatusKey: utilyaml.Raw(`
+ 						apiEndpoints:
+ 						  ip-10-0-0-1.ec2.internal:
+ 						    advertiseAddress: 10.0.0.1
+@@ -801,7 +802,7 @@ func TestUpdateUpdateClusterStatusInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterStatusKey: yaml.Raw(`
++					clusterStatusKey: utilyaml.Raw(`
+ 						apiEndpoints:
+ 						  ip-10-0-0-1.ec2.internal:
+ 						    advertiseAddress: 10.0.0.1
+@@ -820,7 +821,7 @@ func TestUpdateUpdateClusterStatusInKubeadmConfigMap(t *testing.T) {
+ 					Namespace: metav1.NamespaceSystem,
+ 				},
+ 				Data: map[string]string{
+-					clusterStatusKey: yaml.Raw(`
++					clusterStatusKey: utilyaml.Raw(`
+ 						apiEndpoints:
+ 						  ip-10-0-0-1.ec2.internal:
+ 						    advertiseAddress: 10.0.0.1
+@@ -869,7 +870,7 @@ func TestUpdateKubernetesVersionInKubeadmConfigMap(t *testing.T) {
+ 		{
+ 			name:    "updates the config map and changes the kubeadm API version",
+ 			version: semver.MustParse("1.17.2"),
+-			clusterConfigurationData: yaml.Raw(`
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				kubernetesVersion: v1.16.1`),
+@@ -892,7 +893,8 @@ func TestUpdateKubernetesVersionInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.UpdateKubernetesVersionInKubeadmConfigMap(ctx, tt.version)
++
++			err := w.UpdateClusterConfiguration(ctx, tt.version, w.UpdateKubernetesVersionInKubeadmConfigMap(tt.version))
+ 			g.Expect(err).ToNot(HaveOccurred())
+ 
+ 			var actualConfig corev1.ConfigMap
+@@ -915,7 +917,7 @@ func TestUpdateImageRepositoryInKubeadmConfigMap(t *testing.T) {
+ 	}{
+ 		{
+ 			name: "it should set the image repository",
+-			clusterConfigurationData: yaml.Raw(`
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration`),
+ 			newImageRepository:  "example.com/k8s",
+@@ -923,7 +925,7 @@ func TestUpdateImageRepositoryInKubeadmConfigMap(t *testing.T) {
+ 		},
+ 		{
+ 			name: "it should preserve the existing image repository if then new value is empty",
+-			clusterConfigurationData: yaml.Raw(`
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				imageRepository: foo.bar/baz.io`),
+@@ -948,7 +950,7 @@ func TestUpdateImageRepositoryInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.UpdateImageRepositoryInKubeadmConfigMap(ctx, tt.newImageRepository, semver.MustParse("1.19.1"))
++			err := w.UpdateClusterConfiguration(ctx, semver.MustParse("1.19.1"), w.UpdateImageRepositoryInKubeadmConfigMap(tt.newImageRepository))
+ 			g.Expect(err).ToNot(HaveOccurred())
+ 
+ 			var actualConfig corev1.ConfigMap
+@@ -971,7 +973,7 @@ func TestUpdateApiServerInKubeadmConfigMap(t *testing.T) {
+ 	}{
+ 		{
+ 			name: "it should set the api server config",
+-			clusterConfigurationData: yaml.Raw(`
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				`),
+@@ -990,7 +992,7 @@ func TestUpdateApiServerInKubeadmConfigMap(t *testing.T) {
+ 					},
+ 				},
+ 			},
+-			wantClusterConfiguration: yaml.Raw(`
++			wantClusterConfiguration: utilyaml.Raw(`
+ 				apiServer:
+ 				  extraArgs:
+ 				    bar: baz
+@@ -1031,7 +1033,7 @@ func TestUpdateApiServerInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.UpdateAPIServerInKubeadmConfigMap(ctx, tt.newAPIServer, semver.MustParse("1.19.1"))
++			err := w.UpdateClusterConfiguration(ctx, semver.MustParse("1.19.1"), w.UpdateAPIServerInKubeadmConfigMap(tt.newAPIServer))
+ 			g.Expect(err).ToNot(HaveOccurred())
+ 
+ 			var actualConfig corev1.ConfigMap
+@@ -1054,7 +1056,7 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+ 	}{
+ 		{
+ 			name: "it should set the controller manager config",
+-			clusterConfigurationData: yaml.Raw(`
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				`),
+@@ -1071,7 +1073,7 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+ 					},
+ 				},
+ 			},
+-			wantClusterConfiguration: yaml.Raw(`
++			wantClusterConfiguration: utilyaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				bottlerocketBootstrap: {}
+@@ -1112,7 +1114,7 @@ func TestUpdateControllerManagerInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.UpdateControllerManagerInKubeadmConfigMap(ctx, tt.newControllerManager, semver.MustParse("1.19.1"))
++			err := w.UpdateClusterConfiguration(ctx, semver.MustParse("1.19.1"), w.UpdateControllerManagerInKubeadmConfigMap(tt.newControllerManager))
+ 			g.Expect(err).ToNot(HaveOccurred())
+ 
+ 			var actualConfig corev1.ConfigMap
+@@ -1135,7 +1137,7 @@ func TestUpdateSchedulerInKubeadmConfigMap(t *testing.T) {
+ 	}{
+ 		{
+ 			name: "it should set the scheduler config",
+-			clusterConfigurationData: yaml.Raw(`
++			clusterConfigurationData: utilyaml.Raw(`
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				kind: ClusterConfiguration
+ 				`),
+@@ -1152,7 +1154,7 @@ func TestUpdateSchedulerInKubeadmConfigMap(t *testing.T) {
+ 					},
+ 				},
+ 			},
+-			wantClusterConfiguration: yaml.Raw(`
++			wantClusterConfiguration: utilyaml.Raw(`
+ 				apiServer: {}
+ 				apiVersion: kubeadm.k8s.io/v1beta2
+ 				bottlerocketBootstrap: {}
+@@ -1192,7 +1194,7 @@ func TestUpdateSchedulerInKubeadmConfigMap(t *testing.T) {
+ 			w := &Workload{
+ 				Client: fakeClient,
+ 			}
+-			err := w.UpdateSchedulerInKubeadmConfigMap(ctx, tt.newScheduler, semver.MustParse("1.19.1"))
++			err := w.UpdateClusterConfiguration(ctx, semver.MustParse("1.19.1"), w.UpdateSchedulerInKubeadmConfigMap(tt.newScheduler))
+ 			g.Expect(err).ToNot(HaveOccurred())
+ 
+ 			var actualConfig corev1.ConfigMap
+@@ -1285,6 +1287,70 @@ func TestClusterStatus(t *testing.T) {
+ 	}
+ }
+ 
++func TestUpdateFeatureGatesInKubeadmConfigMap(t *testing.T) {
++	tests := []struct {
++		name                     string
++		clusterConfigurationData string
++		newFeatureGates          map[string]bool
++		wantFeatureGates         map[string]bool
++	}{
++		{
++			name: "it updates feature gates",
++			clusterConfigurationData: utilyaml.Raw(`
++				apiVersion: kubeadm.k8s.io/v1beta2
++				kind: ClusterConfiguration`),
++			newFeatureGates:  map[string]bool{"EtcdLearnerMode": true},
++			wantFeatureGates: map[string]bool{"EtcdLearnerMode": true},
++		},
++		{
++			name: "it should override feature gates even if new value is nil",
++			clusterConfigurationData: utilyaml.Raw(`
++				apiVersion: kubeadm.k8s.io/v1beta2
++				kind: ClusterConfiguration
++				featureGates:
++				  EtcdLearnerMode: true
++				`),
++			newFeatureGates:  nil,
++			wantFeatureGates: nil,
++		},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			g := NewWithT(t)
++			fakeClient := fake.NewClientBuilder().WithObjects(&corev1.ConfigMap{
++				ObjectMeta: metav1.ObjectMeta{
++					Name:      kubeadmConfigKey,
++					Namespace: metav1.NamespaceSystem,
++				},
++				Data: map[string]string{
++					clusterConfigurationKey: tt.clusterConfigurationData,
++				},
++			}).Build()
++
++			w := &Workload{
++				Client: fakeClient,
++			}
++			err := w.UpdateClusterConfiguration(ctx, semver.MustParse("1.19.1"), w.UpdateFeatureGatesInKubeadmConfigMap(tt.newFeatureGates))
++			g.Expect(err).ToNot(HaveOccurred())
++
++			var actualConfig corev1.ConfigMap
++			g.Expect(w.Client.Get(
++				ctx,
++				client.ObjectKey{Name: kubeadmConfigKey, Namespace: metav1.NamespaceSystem},
++				&actualConfig,
++			)).To(Succeed())
++
++			actualConfiguration := bootstrapv1.ClusterConfiguration{}
++			err = yaml.Unmarshal([]byte(actualConfig.Data[clusterConfigurationKey]), &actualConfiguration)
++			if err != nil {
++				return
++			}
++			g.Expect(actualConfiguration.FeatureGates).Should(Equal(tt.wantFeatureGates))
++		})
++	}
++}
++
+ func getProxyImageInfo(ctx context.Context, c client.Client) (string, error) {
+ 	ds := &appsv1.DaemonSet{}
+ 
+-- 
+2.42.0
+
