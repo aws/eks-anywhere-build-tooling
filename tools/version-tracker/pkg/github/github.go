@@ -331,7 +331,7 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 }
 
 // CreatePullRequest creates a pull request from the head branch to the base branch on the base repository.
-func CreatePullRequest(client *github.Client, org, repo, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, projectHasPatches bool) error {
+func CreatePullRequest(client *github.Client, org, repo, title, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, projectHasPatches bool) error {
 	logger.V(6).Info(fmt.Sprintf("Creating pull request with updated versions for [%s/%s] repository\n", org, repo))
 
 	pullRequests, _, err := client.PullRequests.List(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, &github.PullRequestListOptions{
@@ -346,7 +346,7 @@ func CreatePullRequest(client *github.Client, org, repo, baseRepoOwner, baseBran
 	}
 
 	newPR := &github.NewPullRequest{
-		Title:               github.String(fmt.Sprintf("Bump %s/%s to latest release", org, repo)),
+		Title:               github.String(title),
 		Head:                github.String(fmt.Sprintf("%s:%s", headRepoOwner, headBranch)),
 		Base:                github.String(baseBranch),
 		Body:                github.String(fmt.Sprintf(constants.PullRequestBody, org, repo, currentRevision, latestRevision)),

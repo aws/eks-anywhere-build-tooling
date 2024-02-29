@@ -6,30 +6,34 @@ import (
 
 // Constants used across the version-tracker source code.
 const (
-	BaseRepoOwnerEnvvar         = "BASE_REPO_OWNER"
-	HeadRepoOwnerEnvvar         = "HEAD_REPO_OWNER"
-	GitHubTokenEnvvar           = "GITHUB_TOKEN"
-	CommitAuthorNameEnvvar      = "COMMIT_AUTHOR_NAME"
-	CommitAuthorEmailEnvvar     = "COMMIT_AUTHOR_EMAIL"
-	DefaultCommitAuthorName     = "EKS Distro PR Bot"
-	DefaultCommitAuthorEmail    = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
-	BuildToolingRepoName        = "eks-anywhere-build-tooling"
-	BuildToolingRepoURL         = "https://github.com/aws/eks-anywhere-build-tooling"
-	ReadmeFile                  = "README.md"
-	ReadmeUpdateScriptFile      = "build/lib/readme_check.sh"
-	LicenseBoilerplateFile      = "hack/boilerplate.yq.txt"
-	SkippedProjectsFile         = "SKIPPED_PROJECTS"
-	UpstreamProjectsTrackerFile = "UPSTREAM_PROJECTS.yaml"
-	GitTagFile                  = "GIT_TAG"
-	GoVersionFile               = "GOLANG_VERSION"
-	ChecksumsFile               = "CHECKSUMS"
-	AttributionsFilePattern     = "*ATTRIBUTION.txt"
-	PatchesDirectory            = "patches"
-	GithubPerPage               = 100
-	datetimeFormat              = "%Y-%m-%dT%H:%M:%SZ"
-	MainBranchName              = "main"
-	BaseRepoHeadRevision        = "refs/remotes/origin/main"
-	PullRequestBody             = `This PR bumps %[1]s/%[2]s to the latest Git revision, along with other updates such as Go version, checksums and attribution files.
+	BaseRepoOwnerEnvvar                      = "BASE_REPO_OWNER"
+	HeadRepoOwnerEnvvar                      = "HEAD_REPO_OWNER"
+	GitHubTokenEnvvar                        = "GITHUB_TOKEN"
+	CommitAuthorNameEnvvar                   = "COMMIT_AUTHOR_NAME"
+	CommitAuthorEmailEnvvar                  = "COMMIT_AUTHOR_EMAIL"
+	DefaultCommitAuthorName                  = "EKS Distro PR Bot"
+	DefaultCommitAuthorEmail                 = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
+	BuildToolingRepoName                     = "eks-anywhere-build-tooling"
+	DefaultBaseRepoOwner                     = "aws"
+	BuildToolingRepoURL                      = "https://github.com/%s/eks-anywhere-build-tooling"
+	ReadmeFile                               = "README.md"
+	ReadmeUpdateScriptFile                   = "build/lib/readme_check.sh"
+	LicenseBoilerplateFile                   = "hack/boilerplate.yq.txt"
+	SkippedProjectsFile                      = "SKIPPED_PROJECTS"
+	UpstreamProjectsTrackerFile              = "UPSTREAM_PROJECTS.yaml"
+	GitTagFile                               = "GIT_TAG"
+	GoVersionFile                            = "GOLANG_VERSION"
+	ChecksumsFile                            = "CHECKSUMS"
+	AttributionsFilePattern                  = "*ATTRIBUTION.txt"
+	PatchesDirectory                         = "patches"
+	BottlerocketReleasesFile                 = "BOTTLEROCKET_RELEASES"
+	BottlerocketAdminContainerMetadataFile   = "BOTTLEROCKET_ADMIN_CONTAINER_METADATA"
+	BottlerocketControlContainerMetadataFile = "BOTTLEROCKET_CONTROL_CONTAINER_METADATA"
+	GithubPerPage                            = 100
+	datetimeFormat                           = "%Y-%m-%dT%H:%M:%SZ"
+	MainBranchName                           = "main"
+	BaseRepoHeadRevision                     = "refs/remotes/origin/main"
+	PullRequestBody                          = `This PR bumps %[1]s/%[2]s to the latest Git revision, along with other updates such as Go version, checksums and attribution files.
 
 [Compare changes](https://github.com/%[1]s/%[2]s/compare/%[3]s...%[4]s)
 [Release notes](https://github.com/%[1]s/%[2]s/releases/%[4]s)
@@ -218,4 +222,13 @@ var (
 			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)"`,
 		},
 	}
+
+	ProjectsWithUnconventionalUpgradeFlows = []string{
+		"cilium/cilium",
+		"kubernetes-sigs/image-builder",
+	}
+
+	BottlerocketImageFormats = []string{"ami", "ova", "raw"}
+
+	BottlerocketHostContainers = []string{"admin", "control"}
 )

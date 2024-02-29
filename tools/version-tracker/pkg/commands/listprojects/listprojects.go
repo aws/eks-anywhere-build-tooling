@@ -23,7 +23,7 @@ func Run() error {
 
 	// Clone the eks-anywhere-build-tooling repository.
 	buildToolingRepoPath := filepath.Join(cwd, constants.BuildToolingRepoName)
-	_, _, err = git.CloneRepo(constants.BuildToolingRepoURL, buildToolingRepoPath, "")
+	_, _, err = git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, constants.DefaultBaseRepoOwner), buildToolingRepoPath, "")
 	if err != nil {
 		return fmt.Errorf("cloning build-tooling repo: %v", err)
 	}
