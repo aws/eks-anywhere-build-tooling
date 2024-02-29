@@ -78,7 +78,7 @@ func Checkout(worktree *git.Worktree, branch string) error {
 
 	err := worktree.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(branch),
-		Force:  true,
+		Keep:   true,
 		Create: true,
 	})
 	if err != nil {
