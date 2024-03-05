@@ -108,6 +108,19 @@ func getCommitDateEpoch(client *github.Client, org, repo, commitSHA string) (int
 	return (*commit.Commit.Author.Date).Unix(), nil
 }
 
+func GetFileContents(client *github.Client, org, repo, filePath, ref string) ([]byte, error) {
+	contents, _, _, err := client.Repositories.GetContents(context.Background(), org, repo, filePath, &github.RepositoryContentGetOptions{Ref: ref})
+	if err != nil {
+		return nil, fmt.Errorf("getting contents of file [%s]: %v", filePath, err)
+	}
+	contentsDecoded, err := base64.StdEncoding.DecodeString(*contents.Content)
+	if err != nil {
+		return nil, fmt.Errorf("decoding contents of file [%s]: %v", filePath, err)
+	}
+
+	return contentsDecoded, nil
+}
+
 // GetLatestRevision returns the latest revision (GitHub release or tag) for a given GitHub repository.
 func GetLatestRevision(client *github.Client, org, repo, currentRevision string) (string, bool, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository\n", org, repo))
@@ -313,16 +326,13 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 		}
 	} else if _, ok := constants.ProjectGoVersionSourceOfTruth[projectFullName]; ok {
 		projectGoVersionSourceOfTruthFile := constants.ProjectGoVersionSourceOfTruth[projectFullName].SourceOfTruthFile
-		workflowContents, _, _, err := client.Repositories.GetContents(context.Background(), org, repo, projectGoVersionSourceOfTruthFile, &github.RepositoryContentGetOptions{Ref: latestRevision})
+		workflowContents, err := GetFileContents(client, org, repo, projectGoVersionSourceOfTruthFile, latestRevision)
 		if err != nil {
 			return "", fmt.Errorf("getting contents of file [%s]: %v", projectGoVersionSourceOfTruthFile, err)
 		}
-		workflowContentsDecoded, err := base64.StdEncoding.DecodeString(*workflowContents.Content)
-		if err != nil {
-			return "", fmt.Errorf("decoding contents of file [%s]: %v", projectGoVersionSourceOfTruthFile, err)
-		}
+
 		pattern := regexp.MustCompile(constants.ProjectGoVersionSourceOfTruth[projectFullName].GoVersionSearchString)
-		matches := pattern.FindStringSubmatch(string(workflowContentsDecoded))
+		matches := pattern.FindStringSubmatch(string(workflowContents))
 
 		goVersion = matches[1]
 	}
@@ -331,7 +341,7 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 }
 
 // CreatePullRequest creates a pull request from the head branch to the base branch on the base repository.
-func CreatePullRequest(client *github.Client, org, repo, title, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, projectHasPatches bool) error {
+func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, projectHasPatches bool) error {
 	logger.V(6).Info(fmt.Sprintf("Creating pull request with updated versions for [%s/%s] repository\n", org, repo))
 
 	pullRequests, _, err := client.PullRequests.List(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, &github.PullRequestListOptions{
@@ -349,7 +359,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, baseRepoOwner, b
 		Title:               github.String(title),
 		Head:                github.String(fmt.Sprintf("%s:%s", headRepoOwner, headBranch)),
 		Base:                github.String(baseBranch),
-		Body:                github.String(fmt.Sprintf(constants.PullRequestBody, org, repo, currentRevision, latestRevision)),
+		Body:                github.String(body),
 		MaintainerCanModify: github.Bool(true),
 	}
 

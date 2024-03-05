@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -117,6 +118,7 @@ func Commit(worktree *git.Worktree, commitMessage string) error {
 		Author: &object.Signature{
 			Name:  commitAuthorName,
 			Email: commitAuthorEmail,
+			When:  time.Now(),
 		},
 	})
 	if err != nil {
