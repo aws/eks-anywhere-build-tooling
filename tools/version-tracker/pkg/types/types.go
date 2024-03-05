@@ -65,3 +65,15 @@ type ImageMetadata struct {
 	Tag         string `yaml:"tag,omitempty"`
 	ImageDigest string `yaml:"imageDigest,omitempty"`
 }
+
+type EKSDistroRelease struct {
+	Branch      string `json:"branch"`
+	KubeVersion string `json:"kubeVersion"`
+	Number      int    `json:"number"`
+	Dev         *bool  `json:"dev,omitempty"`
+}
+
+type EKSDistroLatestReleases struct {
+	Releases []EKSDistroRelease `json:"releases"`
+	Latest   string             `json:"latest"`
+}

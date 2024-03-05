@@ -6,37 +6,70 @@ import (
 
 // Constants used across the version-tracker source code.
 const (
-	BaseRepoOwnerEnvvar                      = "BASE_REPO_OWNER"
-	HeadRepoOwnerEnvvar                      = "HEAD_REPO_OWNER"
-	GitHubTokenEnvvar                        = "GITHUB_TOKEN"
-	CommitAuthorNameEnvvar                   = "COMMIT_AUTHOR_NAME"
-	CommitAuthorEmailEnvvar                  = "COMMIT_AUTHOR_EMAIL"
-	DefaultCommitAuthorName                  = "EKS Distro PR Bot"
-	DefaultCommitAuthorEmail                 = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
-	BuildToolingRepoName                     = "eks-anywhere-build-tooling"
-	DefaultBaseRepoOwner                     = "aws"
-	BuildToolingRepoURL                      = "https://github.com/%s/eks-anywhere-build-tooling"
-	ReadmeFile                               = "README.md"
-	ReadmeUpdateScriptFile                   = "build/lib/readme_check.sh"
-	LicenseBoilerplateFile                   = "hack/boilerplate.yq.txt"
-	SkippedProjectsFile                      = "SKIPPED_PROJECTS"
-	UpstreamProjectsTrackerFile              = "UPSTREAM_PROJECTS.yaml"
-	GitTagFile                               = "GIT_TAG"
-	GoVersionFile                            = "GOLANG_VERSION"
-	ChecksumsFile                            = "CHECKSUMS"
-	AttributionsFilePattern                  = "*ATTRIBUTION.txt"
-	PatchesDirectory                         = "patches"
-	BottlerocketReleasesFile                 = "BOTTLEROCKET_RELEASES"
-	BottlerocketAdminContainerMetadataFile   = "BOTTLEROCKET_ADMIN_CONTAINER_METADATA"
-	BottlerocketControlContainerMetadataFile = "BOTTLEROCKET_CONTROL_CONTAINER_METADATA"
-	GithubPerPage                            = 100
-	datetimeFormat                           = "%Y-%m-%dT%H:%M:%SZ"
-	MainBranchName                           = "main"
-	BaseRepoHeadRevision                     = "refs/remotes/origin/main"
-	PullRequestBody                          = `This PR bumps %[1]s/%[2]s to the latest Git revision, along with other updates such as Go version, checksums and attribution files.
+	BaseRepoOwnerEnvvar                     = "BASE_REPO_OWNER"
+	HeadRepoOwnerEnvvar                     = "HEAD_REPO_OWNER"
+	GitHubTokenEnvvar                       = "GITHUB_TOKEN"
+	CommitAuthorNameEnvvar                  = "COMMIT_AUTHOR_NAME"
+	CommitAuthorEmailEnvvar                 = "COMMIT_AUTHOR_EMAIL"
+	DefaultCommitAuthorName                 = "EKS Distro PR Bot"
+	DefaultCommitAuthorEmail                = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
+	BuildToolingRepoName                    = "eks-anywhere-build-tooling"
+	DefaultBaseRepoOwner                    = "aws"
+	BuildToolingRepoURL                     = "https://github.com/%s/eks-anywhere-build-tooling"
+	ReadmeFile                              = "README.md"
+	ReadmeUpdateScriptFile                  = "build/lib/readme_check.sh"
+	LicenseBoilerplateFile                  = "hack/boilerplate.yq.txt"
+	EKSDistroLatestReleasesFile             = "EKSD_LATEST_RELEASES"
+	EKSDistroProdReleaseNumberFileFormat    = "release/%s/production/RELEASE"
+	KubernetesGitTagFileFormat              = "projects/kubernetes/kubernetes/%s/GIT_TAG"
+	SkippedProjectsFile                     = "SKIPPED_PROJECTS"
+	UpstreamProjectsTrackerFile             = "UPSTREAM_PROJECTS.yaml"
+	SupportedReleaseBranchesFile            = "release/SUPPORTED_RELEASE_BRANCHES"
+	GitTagFile                              = "GIT_TAG"
+	GoVersionFile                           = "GOLANG_VERSION"
+	ChecksumsFile                           = "CHECKSUMS"
+	AttributionsFilePattern                 = "*ATTRIBUTION.txt"
+	PatchesDirectory                        = "patches"
+	BottlerocketReleasesFile                = "BOTTLEROCKET_RELEASES"
+	BottlerocketContainerMetadataFileFormat = "BOTTLEROCKET_%s_CONTAINER_METADATA"
+	BottlerocketHostContainersTOMLFile      = "sources/models/shared-defaults/public-host-containers.toml"
+	CiliumImageRepository                   = "public.ecr.aws/isovalent/cilium"
+	GithubPerPage                           = 100
+	datetimeFormat                          = "%Y-%m-%dT%H:%M:%SZ"
+	MainBranchName                          = "main"
+	BaseRepoHeadRevision                    = "refs/remotes/origin/main"
+	EKSDistroUpgradePullRequestBody         = `This PR bumps EKS Distro releases to the latest available release versions.
+
+/hold
+/area dependencies
+
+By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
+	DefaultUpgradePullRequestBody = `This PR bumps %[1]s/%[2]s to the latest Git revision.
 
 [Compare changes](https://github.com/%[1]s/%[2]s/compare/%[3]s...%[4]s)
 [Release notes](https://github.com/%[1]s/%[2]s/releases/%[4]s)
+
+/hold
+/area dependencies
+
+By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
+	BottlerocketUpgradePullRequestBody = `This PR bumps Bottlerocket releases to the latest Git revision.
+
+[Compare changes](https://github.com/bottlerocket-os/bottlerocket/compare/%[1]s...%[2]s)
+[Release notes](https://github.com/bottlerocket-os/bottlerocket/releases/%[2]s)
+
+/hold
+/area dependencies
+
+By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
+
+	CombinedImageBuilderBottlerocketUpgradePullRequestBody = `This PR bumps kubernetes-sigs/image-builder and Bottlerocket releases to the latest Git revision.
+
+[Compare changes for image-builder](https://github.com/kubernetes-sigs/image-builder/compare/%[1]s...%[2]s)
+[Release notes for image-builder](https://github.com/kubernetes-sigs/image-builder/releases/%[2]s)
+
+[Compare changes for Bottlerocket](https://github.com/bottlerocket-os/bottlerocket/compare/%[3]s...%[4]s)
+[Release notes for Bottlerocket](https://github.com/bottlerocket-os/bottlerocket/releases/%[4]s)
 
 /hold
 /area dependencies
@@ -231,4 +264,6 @@ var (
 	BottlerocketImageFormats = []string{"ami", "ova", "raw"}
 
 	BottlerocketHostContainers = []string{"admin", "control"}
+
+	CiliumImageDirectories = []string{"cilium", "operator-generic", "cilium-chart"}
 )
