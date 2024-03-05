@@ -56,7 +56,7 @@ func Run(displayOptions *types.DisplayOptions) error {
 	var projectsList types.ProjectsList
 	err = yaml.Unmarshal(contents, &projectsList)
 	if err != nil {
-		return fmt.Errorf("unmarshaling upstream projects tracker file to YAML: %v", err)
+		return fmt.Errorf("unmarshalling upstream projects tracker file: %v", err)
 	}
 
 	var projectVersionInfoList []types.ProjectVersionInfo
