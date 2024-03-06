@@ -186,6 +186,14 @@ var (
 
 	// ProjectGoVersionSourceOfTruth is the mapping of project name to Go version source of truth files configuration.
 	ProjectGoVersionSourceOfTruth = map[string]types.GoVersionSourceOfTruth{
+		"aws/etcdadm-bootstrap-provider": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"aws/etcdadm-controller": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
 		"brancz/kube-rbac-proxy": {
 			SourceOfTruthFile:     ".github/workflows/build.yml",
 			GoVersionSearchString: `go-version: '(1\.\d\d)\.\d+'`,
