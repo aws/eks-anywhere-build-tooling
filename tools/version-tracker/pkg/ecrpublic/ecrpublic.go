@@ -1,11 +1,10 @@
 package ecrpublic
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
-	//"regexp"
-	"encoding/json"
 
 	"github.com/aws/eks-anywhere/pkg/semver"
 
