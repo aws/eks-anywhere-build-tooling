@@ -298,22 +298,22 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 			return "", fmt.Errorf("downloading release tarball from URL [%s]: %v", tarballUrl, err)
 		}
 
+		binaryName := projectReleaseAsset.BinaryName
+		if strings.Count(binaryName, "%s") > 0 {
+			binaryName = fmt.Sprintf(binaryName, assetVersionReplacement)
+		}
 		if projectReleaseAsset.Extract {
 			tarballFile, err := os.Open(tarballFilePath)
 			if err != nil {
 				return "", fmt.Errorf("opening tarball filepath: %v", err)
 			}
 
-			err = tar.ExtractTarGz(tarballDownloadPath, tarballFile)
+			err = tar.ExtractFileFromTarball(tarballDownloadPath, tarballFile, binaryName)
 			if err != nil {
 				return "", fmt.Errorf("extracting tarball file: %v", err)
 			}
 		}
 
-		binaryName := projectReleaseAsset.BinaryName
-		if strings.Count(binaryName, "%s") > 0 {
-			binaryName = fmt.Sprintf(binaryName, assetVersionReplacement)
-		}
 		binaryFilePath := filepath.Join(tarballDownloadPath, binaryName)
 		goVersion, err = version.GetGoVersion(binaryFilePath)
 		if err != nil {

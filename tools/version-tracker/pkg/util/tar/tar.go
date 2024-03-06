@@ -7,10 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-// ExtractTarGz extracts the contents of the given tarball.
-func ExtractTarGz(tarballDownloadPath string, gzipStream io.Reader) error {
+// ExtractFileFromTarball extracts the specified file from the given tarball.
+func ExtractFileFromTarball(tarballDownloadPath string, gzipStream io.Reader, targetFile string) error {
 	uncompressedStream, err := gzip.NewReader(gzipStream)
 	if err != nil {
 		return err
@@ -19,12 +20,13 @@ func ExtractTarGz(tarballDownloadPath string, gzipStream io.Reader) error {
 	tarReader := tar.NewReader(uncompressedStream)
 	var header *tar.Header
 	for header, err = tarReader.Next(); err == nil; header, err = tarReader.Next() {
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.Mkdir(filepath.Join(tarballDownloadPath, header.Name), 0o755); err != nil {
-				return fmt.Errorf("creating directory from archive: %v", err)
+		if header.Name == targetFile {
+			if strings.Contains(header.Name, "/") {
+				err = os.MkdirAll(filepath.Join(tarballDownloadPath, filepath.Dir(header.Name)), 0o755)
+				if err != nil {
+					return fmt.Errorf("creating parent directory for archive contents: %v", err)
+				}
 			}
-		case tar.TypeReg:
 			outFile, err := os.Create(filepath.Join(tarballDownloadPath, header.Name))
 			if err != nil {
 				return fmt.Errorf("creating file from archive: %v", err)
@@ -37,8 +39,6 @@ func ExtractTarGz(tarballDownloadPath string, gzipStream io.Reader) error {
 			if err := outFile.Close(); err != nil {
 				return fmt.Errorf("closing output destination file descriptor: %v", err)
 			}
-		default:
-			return fmt.Errorf("unknown type in tar header: %b in %s", header.Typeflag, header.Name)
 		}
 	}
 	if err != io.EOF {
