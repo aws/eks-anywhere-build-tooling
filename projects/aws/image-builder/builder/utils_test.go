@@ -114,7 +114,7 @@ func TestDownloadFile(t *testing.T) {
 		t.Fatalf("Error getting current working dir: %v", err)
 	}
 	testDir := filepath.Join(cwd, "testdata")
-	os.MkdirAll(testDir, 0755)
+	os.MkdirAll(testDir, 0o755)
 	testcases := []struct {
 		name    string
 		path    string
