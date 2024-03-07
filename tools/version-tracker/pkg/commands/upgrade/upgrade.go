@@ -283,14 +283,14 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 						}
 					}
 				}
-			}
 
-			if projectName == "cilium/cilium" {
-				updatedCiliumImageDigestFiles, err := updateCiliumImageDigestFiles(projectRootFilepath, projectPath)
-				if err != nil {
-					return fmt.Errorf("updating Cilium image digest files: %v", err)
+				if projectName == "cilium/cilium" {
+					updatedCiliumImageDigestFiles, err := updateCiliumImageDigestFiles(projectRootFilepath, projectPath)
+					if err != nil {
+						return fmt.Errorf("updating Cilium image digest files: %v", err)
+					}
+					updatedFiles = append(updatedFiles, updatedCiliumImageDigestFiles...)
 				}
-				updatedFiles = append(updatedFiles, updatedCiliumImageDigestFiles...)
 			}
 
 			if projectName == "kubernetes-sigs/image-builder" {
