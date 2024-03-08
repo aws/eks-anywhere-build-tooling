@@ -1,18 +1,16 @@
-From 4f22a0f719be7fbb75c1065b1b9311d603056508 Mon Sep 17 00:00:00 2001
+From df0fd823551a8daea918118f26dac217f1f2d4da Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 21:05:13 -0800
-Subject: [PATCH 01/11] OVA improvements
+Subject: [PATCH 01/10] OVA improvements
 
-- Creat /etc/pki/tls/certs dir as part of image-builds
+- Create /etc/pki/tls/certs dir as part of image-builds
 - Tweak Product info in OVF
-- Output vsphere builds to content library instead of exports
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
- .../capi/ansible/roles/sysprep/tasks/main.yml |  9 ++++
- images/capi/hack/ovf_template.xml             | 10 +----
- images/capi/packer/ova/packer-node.json       | 41 +++++++++++++------
- 3 files changed, 40 insertions(+), 20 deletions(-)
+ images/capi/ansible/roles/sysprep/tasks/main.yml |  9 +++++++++
+ images/capi/hack/ovf_template.xml                | 10 ++--------
+ 2 files changed, 11 insertions(+), 8 deletions(-)
 
 diff --git a/images/capi/ansible/roles/sysprep/tasks/main.yml b/images/capi/ansible/roles/sysprep/tasks/main.yml
 index a9fa954d5..a526528ea 100644
@@ -60,99 +58,6 @@ index 316427ec3..ca23db5f9 100644
        <Category>Cluster API Provider (CAPI)</Category>
        <Property ovf:userConfigurable="false" ovf:value="${BUILD_TIMESTAMP}" ovf:type="string" ovf:key="BUILD_TIMESTAMP"/>
        <Property ovf:userConfigurable="false" ovf:value="${BUILD_DATE}" ovf:type="string" ovf:key="BUILD_DATE"/>
-diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 1b7b2d13d..f46df3cee 100644
---- a/images/capi/packer/ova/packer-node.json
-+++ b/images/capi/packer/ova/packer-node.json
-@@ -184,6 +184,12 @@
-         }
-       ],
-       "type": "vsphere-iso",
-+       "content_library_destination": {
-+         "name": "{{user `build_version`}}",
-+         "library": "{{user `vsphere_library_name`}}",
-+         "ovf": true,
-+         "destroy": true
-+      },
-       "username": "{{user `username`}}",
-       "vcenter_server": "{{user `vcenter_server`}}",
-       "vm_name": "{{user `base_build_version`}}",
-@@ -207,11 +213,6 @@
-       "datastore": "{{user `datastore`}}",
-       "destroy": "{{user `destroy`}}",
-       "disk_controller_type": "{{user `disk_controller_type`}}",
--      "export": {
--        "force": true,
--        "manifest": "{{ user `export_manifest`}}",
--        "output_directory": "{{user `output_dir`}}"
--      },
-       "firmware": "{{user `firmware`}}",
-       "floppy_dirs": "{{ user `floppy_dirs`}}",
-       "folder": "{{user `folder`}}",
-@@ -248,6 +249,12 @@
-         }
-       ],
-       "type": "vsphere-iso",
-+      "content_library_destination": {
-+        "name": "{{user `build_version`}}",
-+        "library": "{{user `vsphere_library_name`}}",
-+        "ovf": true,
-+        "destroy": true
-+      },
-       "username": "{{user `username`}}",
-       "vcenter_server": "{{user `vcenter_server`}}",
-       "vm_name": "{{user `build_version`}}",
-@@ -263,11 +270,6 @@
-       "create_snapshot": "{{user `create_snapshot`}}",
-       "datacenter": "{{user `datacenter`}}",
-       "datastore": "{{user `datastore`}}",
--      "export": {
--        "force": true,
--        "manifest": "{{ user `export_manifest`}}",
--        "output_directory": "{{user `output_dir`}}"
--      },
-       "folder": "{{user `folder`}}",
-       "host": "{{user `host`}}",
-       "insecure_connection": "{{user `insecure_connection`}}",
-@@ -290,6 +292,13 @@
-     }
-   ],
-   "post-processors": [
-+    {
-+      "inline": [
-+        "mkdir -p {{user `output_dir`}}"
-+      ],
-+      "name": "create-output-dir",
-+      "type": "shell-local"
-+    },
-     {
-       "custom_data": {
-         "build_date": "{{isotime}}",
-@@ -324,7 +333,14 @@
-         "vsphere-iso-base"
-       ],
-       "inline": [
--        "./hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ./hack/ovf_eula.txt --ovf_template ./hack/ovf_template.xml --vmdk_file {{user `build_version`}}-disk-0.vmdk {{user `output_dir`}}"
-+        "while true; do govc library.session.ls &> /dev/null || true; sleep 2m; done &",
-+        "PID=$!",
-+        "trap \"kill $PID\" EXIT",
-+        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}.ovf {{user `output_dir`}}/{{user `build_version`}}.ovf",
-+        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-1.vmdk {{user `output_dir`}}/{{user `build_version`}}-1.vmdk",
-+        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-2.nvram {{user `output_dir`}}/{{user `build_version`}}-2.nvram",
-+        "govc library.rm /{{user `vsphere_library_name`}}/{{user `build_version`}}",
-+        "./hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ./hack/ovf_eula.txt --ovf_template ./hack/ovf_template.xml --vmdk_file {{user `build_version`}}-1.vmdk {{user `output_dir`}}"
-       ],
-       "name": "vsphere",
-       "type": "shell-local"
-@@ -509,6 +525,7 @@
-     "resource_pool": "",
-     "username": "",
-     "vcenter_server": "",
--    "vsphere_guest_os_type": null
-+    "vsphere_guest_os_type": null,
-+    "vsphere_library_name": ""
-   }
- }
 -- 
-2.39.3 (Apple Git-145)
+2.39.3 (Apple Git-146)
 

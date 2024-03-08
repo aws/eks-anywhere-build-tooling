@@ -237,7 +237,6 @@ include $(BASE_DIRECTORY)/Common.mk
 
 
 export PATH:=$(MAKE_ROOT)/$(IMAGE_BUILDER_DIR)/.local/bin:$(PATH)
-export GOVC_INSECURE?=true
 
 ######################## DEPS #################################
 .PHONY: setup-ami-share
