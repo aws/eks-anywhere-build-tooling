@@ -21,9 +21,15 @@ func Run() error {
 		return fmt.Errorf("retrieving current working directory: %v", err)
 	}
 
+	// Get base repository owner environment variable if set.
+	baseRepoOwner := os.Getenv(constants.BaseRepoOwnerEnvvar)
+	if baseRepoOwner == "" {
+		baseRepoOwner = constants.DefaultBaseRepoOwner
+	}
+
 	// Clone the eks-anywhere-build-tooling repository.
 	buildToolingRepoPath := filepath.Join(cwd, constants.BuildToolingRepoName)
-	_, _, err = git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, constants.DefaultBaseRepoOwner), buildToolingRepoPath, "")
+	_, _, err = git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, baseRepoOwner), buildToolingRepoPath, "")
 	if err != nil {
 		return fmt.Errorf("cloning build-tooling repo: %v", err)
 	}
