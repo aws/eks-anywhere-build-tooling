@@ -1,5 +1,5 @@
 ## **Image Builder Tool**
-![Version](https://img.shields.io/badge/version-v0.4.0-blue)
+![Version](https://img.shields.io/badge/version-v0.4.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiRHQ0UnNzTElaQyt5eDI5OG9XYUhYQW85WXE5RzI3Sjd5YWFwK2d2aHBVb2R4dS8xek5aeUcrVHJFN05JR2JnbWx2aGRURlAxdDZrNFQwMFRaMzY4MWU0PSIsIml2UGFyYW1ldGVyU3BlYyI6InIxUHNId1RQcCs3SzlFWWQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 Image Builder Tool is a cli that builds EKS-A compatible Kubernetes node images. The tool is based on upstream
@@ -92,11 +92,7 @@ sudo apt install jq unzip make ansible -y
 sudo snap install yq
 ```
 2. Build or download the image builder tool
-3. Create a content library on vSphere
-```
-govc library.create "<library name>"
-```
-4. Create vsphere-connection.json config file
+3. Create vsphere-connection.json config file
 ```
 {
   "cluster":"<vsphere cluster used for image building>",
@@ -112,10 +108,9 @@ govc library.create "<library name>"
   "resource_pool":"<resource pool used for image building vm>",
   "username":"<vcenter username>",
   "vcenter_server":"<vcenter fqdn>",
-  "vsphere_library_name": "<vsphere content library name>"
 }
 ```
-5. Run the image builder tool for appropriate release channel
+4. Run the image builder tool for appropriate release channel
 ```
 image-builder build --os ubuntu --hypervisor vsphere --vsphere-config <path to above json file> --release-channel <release channel, ex 1-23>
 ```
