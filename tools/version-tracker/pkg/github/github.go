@@ -359,6 +359,12 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 		pullRequest = pullRequests[0]
 		logger.Info(fmt.Sprintf("A pull request already exists for %s:%s\n", headRepoOwner, headBranch), "Pull request", *pullRequest.HTMLURL)
 
+		pullRequest.Body = github.String(body)
+		pullRequest, _, err = client.PullRequests.Edit(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, pullRequest)
+		if err != nil {
+			return fmt.Errorf("editing existing pull request %s: %v", pullRequest.HTMLURL, err)
+		}
+
 		// If patches to the project failed to apply, check if the PR already has a comment warning about
 		// the incomplete PR and patches needing to be regenerated.
 		if !patchApplySucceeded {
@@ -381,7 +387,6 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 			Body:                github.String(body),
 			MaintainerCanModify: github.Bool(true),
 		}
-
 		pullRequest, _, err = client.PullRequests.Create(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, newPR)
 		if err != nil {
 			return fmt.Errorf("creating pull request with updated versions from %s to %s: %v", headBranch, baseBranch, err)
