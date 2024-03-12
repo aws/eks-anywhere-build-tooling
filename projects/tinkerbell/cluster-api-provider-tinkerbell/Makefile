@@ -20,7 +20,7 @@ s3-artifacts: create-manifests
 
 .PHONY: create-manifests
 create-manifests: tarballs | ensure-yq $$(ENABLE_DOCKER)
-	@build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG)
+	@build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
 
 
 ########### DO NOT EDIT #############################
