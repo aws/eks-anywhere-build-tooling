@@ -30,6 +30,9 @@ const (
 	ChecksumsFile                           = "CHECKSUMS"
 	AttributionsFilePattern                 = "*ATTRIBUTION.txt"
 	PatchesDirectory                        = "patches"
+	FailedPatchApplyMarker                  = "patch does not apply"
+	FailedPatchApplyRegex                   = "Patch failed at .*"
+	FailedPatchFilesRegex                   = "error: (.*): patch does not apply"
 	BottlerocketReleasesFile                = "BOTTLEROCKET_RELEASES"
 	BottlerocketContainerMetadataFileFormat = "BOTTLEROCKET_%s_CONTAINER_METADATA"
 	BottlerocketHostContainersTOMLFile      = "sources/models/shared-defaults/public-host-containers.toml"
@@ -76,6 +79,12 @@ By submitting this pull request, I confirm that you can use, modify, copy, and r
 
 By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
 	PatchesCommentBody = `# This pull request is incomplete!
+## Failed patch details
+**Only %s/%d patches were applied!**
+%s
+The following files in the above patch did not apply successfully:
+%s
+
 The project being upgraded in this pull request needs changes to patches that cannot be handled automatically. A developer will need to regenerate the patches locally and update the pull request. In addition to patches, the checksums and attribution file(s) corresponding to the project will need to be updated.`
 )
 
