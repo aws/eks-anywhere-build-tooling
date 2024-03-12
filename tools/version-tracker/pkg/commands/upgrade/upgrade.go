@@ -452,7 +452,9 @@ func getLatestEKSDistroRelease(client *gogithub.Client, branch string) (int, str
 		return 0, "", fmt.Errorf("error converting release number to integer: %v", err)
 	}
 
-	return releaseNumberInt, string(kubeVersion), nil
+	kubeVersionTrimmed := strings.TrimRight(string(kubeVersion), "\n")
+
+	return releaseNumberInt, kubeVersionTrimmed, nil
 }
 
 // updateProjectVersionFile updates the version information stored in a specific file.
