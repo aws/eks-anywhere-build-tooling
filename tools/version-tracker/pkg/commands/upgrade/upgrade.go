@@ -266,38 +266,42 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 				}
 				updatedFiles = append(updatedFiles, projectReadmePath)
 
-				// Update the checksums file and attribution file(s) corresponding to the project.
+				// If project has patches, attempt to apply them. Track failed patches and files that failed to apply, if any.
 				if projectHasPatches {
 					appliedPatchesCount, failedPatch, applyFailedFiles, patchApplySucceeded, err := applyPatchesToRepo(projectRootFilepath, projectRepo, latestRevision)
 					if err != nil {
 						return fmt.Errorf("applying patches to repository: %v", err)
 					}
-					if patchApplySucceeded {
-						if _, err := os.Stat(filepath.Join(projectRootFilepath, constants.ChecksumsFile)); err == nil {
-							logger.Info("Updating project checksums and attribution files")
-							projectChecksumsFileRelativePath := filepath.Join(projectPath, constants.ChecksumsFile)
-							err = updateChecksumsAttributionFiles(projectRootFilepath)
-							if err != nil {
-								return fmt.Errorf("updating project checksums and attribution files: %v", err)
-							}
-							updatedFiles = append(updatedFiles, projectChecksumsFileRelativePath)
-
-							// Attribution files can have a binary name prefix so we use a common prefix regular expression
-							// and glob them to cover all possibilities.
-							projectAttributionFileGlob, err := filepath.Glob(filepath.Join(projectRootFilepath, constants.AttributionsFilePattern))
-							if err != nil {
-								return fmt.Errorf("finding filenames matching attribution file pattern [%s]: %v", constants.AttributionsFilePattern, err)
-							}
-							for _, attributionFile := range projectAttributionFileGlob {
-								attributionFileRelativePath, err := filepath.Rel(buildToolingRepoPath, attributionFile)
-								if err != nil {
-									return fmt.Errorf("getting relative path for attribution file: %v", err)
-								}
-								updatedFiles = append(updatedFiles, attributionFileRelativePath)
-							}
-						}
-					} else {
+					if !patchApplySucceeded {
 						patchesWarningComment = fmt.Sprintf(constants.PatchesCommentBody, appliedPatchesCount, totalPatchCount, failedPatch, applyFailedFiles)
+					}
+				}
+
+				// If project doesn't have patches, or it does and they were applied successfully, then update the checksums file
+				// and attribution file(s) corresponding to the project.
+				if !projectHasPatches || patchApplySucceeded {
+					if _, err := os.Stat(filepath.Join(projectRootFilepath, constants.ChecksumsFile)); err == nil {
+						logger.Info("Updating project checksums and attribution files")
+						projectChecksumsFileRelativePath := filepath.Join(projectPath, constants.ChecksumsFile)
+						err = updateChecksumsAttributionFiles(projectRootFilepath)
+						if err != nil {
+							return fmt.Errorf("updating project checksums and attribution files: %v", err)
+						}
+						updatedFiles = append(updatedFiles, projectChecksumsFileRelativePath)
+
+						// Attribution files can have a binary name prefix so we use a common prefix regular expression
+						// and glob them to cover all possibilities.
+						projectAttributionFileGlob, err := filepath.Glob(filepath.Join(projectRootFilepath, constants.AttributionsFilePattern))
+						if err != nil {
+							return fmt.Errorf("finding filenames matching attribution file pattern [%s]: %v", constants.AttributionsFilePattern, err)
+						}
+						for _, attributionFile := range projectAttributionFileGlob {
+							attributionFileRelativePath, err := filepath.Rel(buildToolingRepoPath, attributionFile)
+							if err != nil {
+								return fmt.Errorf("getting relative path for attribution file: %v", err)
+							}
+							updatedFiles = append(updatedFiles, attributionFileRelativePath)
+						}
 					}
 				}
 
