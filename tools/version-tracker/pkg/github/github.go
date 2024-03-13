@@ -348,7 +348,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 
 	// Check if there is already a pull request from the head branch to the base branch.
 	pullRequests, _, err := client.PullRequests.List(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, &github.PullRequestListOptions{
-		Base: fmt.Sprintf("%s:%s", baseRepoOwner, baseBranch),
+		Base: baseBranch,
 		Head: fmt.Sprintf("%s:%s", headRepoOwner, headBranch),
 	})
 	if err != nil {
