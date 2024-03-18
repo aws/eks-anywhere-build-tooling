@@ -1,7 +1,7 @@
-From 769673a5f47de94093308675d846f4462577317a Mon Sep 17 00:00:00 2001
+From 14e9850d7760f5c0d94d74cab875c6abf110607e Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 21:05:13 -0800
-Subject: [PATCH 01/10] OVA improvements
+Subject: [PATCH 01/11] OVA improvements
 
 - Create /etc/pki/tls/certs dir as part of image-builds
 - Tweak Product info in OVF
@@ -15,11 +15,11 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  3 files changed, 12 insertions(+), 9 deletions(-)
 
 diff --git a/images/capi/ansible/roles/sysprep/tasks/main.yml b/images/capi/ansible/roles/sysprep/tasks/main.yml
-index a9fa954d5..a526528ea 100644
+index c1293deb9..d4249d974 100644
 --- a/images/capi/ansible/roles/sysprep/tasks/main.yml
 +++ b/images/capi/ansible/roles/sysprep/tasks/main.yml
 @@ -27,6 +27,15 @@
- - import_tasks: photon.yml
+ - ansible.builtin.import_tasks: photon.yml
    when: ansible_os_family == "VMware Photon OS"
  
 +- name: Get stats of the /etc/pki folder
@@ -32,7 +32,7 @@ index a9fa954d5..a526528ea 100644
 +  when: pki.stat.isdir is defined and pki.stat.isdir
 +
  - name: Remove containerd http proxy conf file if needed
-   file:
+   ansible.builtin.file:
      path: /etc/systemd/system/containerd.service.d/http-proxy.conf
 diff --git a/images/capi/hack/ovf_template.xml b/images/capi/hack/ovf_template.xml
 index 316427ec3..ca23db5f9 100644

@@ -1,7 +1,7 @@
-From 48ff6678b232a40aaff06c8551dcac607351b481 Mon Sep 17 00:00:00 2001
+From bc6fd9449092348f1db3a9c1088860602e515858 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 18:36:56 -0800
-Subject: [PATCH 02/10] EKS-D support and changes
+Subject: [PATCH 02/11] EKS-D support and changes
 
 - Add goss validations for EKS-D artifacts
 - Add etcdadm and etcd.tar.gz to image for unstacked etcd support
@@ -27,7 +27,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  12 files changed, 102 insertions(+), 23 deletions(-)
 
 diff --git a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
-index 4330798da..1ca1d756e 100644
+index 615a441e6..33101f6f1 100644
 --- a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
 +++ b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
 @@ -12,23 +12,10 @@
@@ -35,20 +35,20 @@ index 4330798da..1ca1d756e 100644
  # limitations under the License.
  ---
 -- name: Download crictl checksum
--  get_url:
+-  ansible.builtin.get_url:
 -    url: "{{ crictl_sha256 }}"
 -    dest: /tmp/crictl.tar.gz.sha256
 -    mode: "0600"
 -
 -- name: Register checksum value for crictl
--  slurp:
+-  ansible.builtin.slurp:
 -    src: /tmp/crictl.tar.gz.sha256
 -  register: csum
 -
  - name: Download crictl
 -  vars:
 -    sha256: "{{ csum['content'] | b64decode | trim }}"
-   get_url:
+   ansible.builtin.get_url:
      url: "{{ crictl_url }}"
 -    checksum: sha256:{{ sha256 }}
 +    checksum: "sha256:{{ crictl_sha256 }}"
@@ -56,7 +56,7 @@ index 4330798da..1ca1d756e 100644
      mode: "0600"
  
 diff --git a/images/capi/ansible/roles/kubernetes/tasks/url.yml b/images/capi/ansible/roles/kubernetes/tasks/url.yml
-index 22c64b892..c09139060 100644
+index d18e79b4f..b191df4b9 100644
 --- a/images/capi/ansible/roles/kubernetes/tasks/url.yml
 +++ b/images/capi/ansible/roles/kubernetes/tasks/url.yml
 @@ -12,6 +12,41 @@
@@ -99,12 +99,12 @@ index 22c64b892..c09139060 100644
 +    group: root
 +
  - name: Create CNI directory
-   file:
+   ansible.builtin.file:
      state: directory
 @@ -22,7 +57,7 @@
  
  - name: Download CNI tarball
-   get_url:
+   ansible.builtin.get_url:
 -    url: "{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_goarch }}-{{ kubernetes_cni_semver }}.tgz"
 +    url: "{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_goarch }}-{{ kubernetes_cni_semver }}.tar.gz"
      checksum: "{{ kubernetes_cni_http_checksum }}"
@@ -229,10 +229,10 @@ index 278f403fa..eb92570cc 100644
    {{ $name }}:
      exists: {{ $vers.exists }}
 diff --git a/images/capi/packer/goss/goss-vars.yaml b/images/capi/packer/goss/goss-vars.yaml
-index a7878bfa2..8dd593110 100644
+index da180514a..aeeeb0ea2 100644
 --- a/images/capi/packer/goss/goss-vars.yaml
 +++ b/images/capi/packer/goss/goss-vars.yaml
-@@ -105,6 +105,12 @@ kubernetes_cni_rpm_version: ""
+@@ -110,6 +110,12 @@ kubernetes_cni_rpm_version: ""
  # When k8s and k8s cni source is http
  kubernetes_load_additional_imgs: false
  
@@ -264,7 +264,7 @@ index 959005df8..2d88c2fb6 100644
        "version": "{{user `goss_version`}}"
      }
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 1b7b2d13d..a55c78038 100644
+index 7b5ef1369..5132b5e21 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
 @@ -451,7 +451,12 @@
