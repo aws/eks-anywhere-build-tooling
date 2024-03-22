@@ -30,6 +30,10 @@ var SupportedRedHatVersions = []string{
 	"9",
 }
 
+var SupportedRedHatEfiVersions = []string{
+	"9",
+}
+
 var SupportedFirmwares = []string{
 	BIOS,
 	EFI,

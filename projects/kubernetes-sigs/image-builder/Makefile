@@ -187,7 +187,7 @@ DEFAULT_REDHAT_VERSION=8
 ALLOWED_BOTTLEROCKET_VERSIONS=1
 DEFAULT_BOTTLEROCKET_VERSION=1
 
-ALLOWED_EFI_OS_FORMATS=ubuntu-ova
+ALLOWED_EFI_OS_FORMATS=ubuntu-ova redhat-raw
 
 # run image os/format validation before running release target(s)
 RELEASE_TARGETS=validate-supported-image-all
@@ -426,8 +426,8 @@ validate-supported-image-%:
 	elif  [ -n "$(IMAGE_OS_FIRMWARE)" ] && [[ "$(IMAGE_OS_FIRMWARE)" != "efi" ]]; then \
 		echo "efi is the only supported custom firmware"; \
 		exit 1; \
-	elif [ -n "$(IMAGE_OS_FIRMWARE)" ] && [[ "$(ALLOWED_EFI_OS_FORMATS)" != *"$(IMAGE_OS)-$(IMAGE_FORMAT)" ]]; then \
-		echo "EFI is only supported for Ubuntu OVAs"; \
+	elif [ -n "$(IMAGE_OS_FIRMWARE)" ] && [[ "$(ALLOWED_EFI_OS_FORMATS)" != *"$(IMAGE_OS)-$(IMAGE_FORMAT)"* ]]; then \
+		echo "EFI is only supported for Ubuntu OVAs and Redhat RAW builds"; \
 		exit 1; \
 	fi
 
@@ -462,6 +462,10 @@ local-build-ova-rhel-8: local-build-ova-redhat-8
 
 .PHONY: local-build-raw-rhel-8
 local-build-raw-rhel-8: local-build-raw-redhat-8
+	@echo Done building $@
+
+.PHONY: local-build-raw-rhel-9-efi
+local-build-raw-rhel-9: local-build-raw-redhat-9-efi
 	@echo Done building $@
 
 .PHONY: local-build-qemu-rhel-8
@@ -520,9 +524,11 @@ release-ova-redhat-8:
 build-raw-ubuntu-2004:
 build-raw-ubuntu-2204:
 build-raw-redhat-8:
+build-raw-redhat-9-efi:
 release-raw-ubuntu-2004:
 release-raw-ubuntu-2204:
 release-raw-redhat-8:
+release-raw-redhat-9-efi:
 
 build-cloudstack-redhat-8:
 build-cloudstack-redhat-9:

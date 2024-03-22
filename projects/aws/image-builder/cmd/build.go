@@ -51,7 +51,7 @@ func init() {
 	buildCmd.Flags().StringVar(&additionalFilesConfigFile, "files-config", "", "Path to Config file specifying additional files to be copied into EKS-A node image")
 	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-27", "EKS-D Release channel for node image. Can be 1-24, 1-25, 1-26, 1-27 or 1-28")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
-	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA and Raw builds.")
+	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA & Raw, and Redhat 9 RAW builds.")
 	buildCmd.Flags().StringVar(&bo.EKSAReleaseVersion, "eksa-release", "", "The EKS-A CLI version to build images for")
 	buildCmd.Flags().StringVar(&bo.ManifestTarball, "manifest-tarball", "", "Path to Image Builder built EKS-D/A manifest tarball")
 	buildCmd.Flags().IntVar(&bo.AnsibleVerbosity, "ansible-verbosity", 0, "Verbosity level for the Ansible tasks run during image building, should be in the range 0-6")
@@ -94,7 +94,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		bo.OsVersion = "8"
 	}
 
-	if bo.Hypervisor != builder.Nutanix && bo.Hypervisor != builder.CloudStack && bo.Os == builder.RedHat && bo.OsVersion != "8" {
+	if bo.Hypervisor != builder.Nutanix && bo.Hypervisor != builder.CloudStack && bo.Hypervisor != builder.Baremetal && bo.Os == builder.RedHat && bo.OsVersion != "8" {
 		log.Fatalf("Invalid OS version for RedHat. Please choose 8")
 	}
 
@@ -102,7 +102,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		log.Fatal(err.Error())
 	}
 
-	if err = validateFirmware(bo.Firmware, bo.Os, bo.Hypervisor); err != nil {
+	if err = validateFirmware(bo.Firmware, bo.Os, bo.OsVersion, bo.Hypervisor); err != nil {
 		log.Fatal(err.Error())
 	}
 
@@ -382,7 +382,7 @@ func validateOSVersion(os, osVersion string) error {
 	return nil
 }
 
-func validateFirmware(firmware, os, hypervisor string) error {
+func validateFirmware(firmware, os, osVersion, hypervisor string) error {
 	if firmware == "" {
 		return nil
 	}
@@ -391,8 +391,21 @@ func validateFirmware(firmware, os, hypervisor string) error {
 		return fmt.Errorf("%s is not a firmware. Please select one of %s", firmware, strings.Join(builder.SupportedFirmwares, ","))
 	}
 
-	if firmware == builder.EFI && (os != builder.Ubuntu || !builder.SliceContains([]string{builder.VSphere, builder.Baremetal}, hypervisor)) {
-		return fmt.Errorf("EFI firmware is only supported for Ubuntu OVA and Raw builds.")
+	if firmware == builder.EFI {
+		if os == builder.Ubuntu && !builder.SliceContains([]string{builder.VSphere, builder.Baremetal}, hypervisor) {
+			return fmt.Errorf("For Ubuntu, EFI firmware is only supported for OVA and Raw builds")
+		}
+		if os == builder.RedHat {
+			if hypervisor != builder.Baremetal {
+				return fmt.Errorf("For RedHat, EFI firmware is only supported for Raw builds")
+			}
+			if !builder.SliceContains(builder.SupportedRedHatEfiVersions, osVersion) {
+				return fmt.Errorf("Only RedHat version 9 supports EFI firmware")
+			}
+		}
+		if !builder.SliceContains([]string{builder.RedHat, builder.Ubuntu}, os) {
+			return fmt.Errorf("EFI firmware is only support for Ubuntu and Redhat OS")
+		}
 	}
 
 	if firmware == builder.BIOS && os == builder.Ubuntu && hypervisor == builder.Baremetal {
