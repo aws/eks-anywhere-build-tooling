@@ -173,6 +173,7 @@ func TestValidateFirmware(t *testing.T) {
 			testName: "Ubuntu ova with efi",
 			buildOptions: builder.BuildOptions{
 				Os:         "ubuntu",
+				OsVersion:  "22",
 				Hypervisor: "vsphere",
 				Firmware:   "efi",
 			},
@@ -182,6 +183,7 @@ func TestValidateFirmware(t *testing.T) {
 			testName: "Ubuntu raw with efi",
 			buildOptions: builder.BuildOptions{
 				Os:         "ubuntu",
+				OsVersion:  "22",
 				Hypervisor: "baremetal",
 				Firmware:   "efi",
 			},
@@ -191,6 +193,7 @@ func TestValidateFirmware(t *testing.T) {
 			testName: "Ubuntu raw with bios",
 			buildOptions: builder.BuildOptions{
 				Os:         "ubuntu",
+				OsVersion:  "20",
 				Hypervisor: "baremetal",
 				Firmware:   "bios",
 			},
@@ -200,15 +203,17 @@ func TestValidateFirmware(t *testing.T) {
 			testName: "Redhat raw with efi",
 			buildOptions: builder.BuildOptions{
 				Os:         "redhat",
+				OsVersion:  "9",
 				Hypervisor: "baremetal",
 				Firmware:   "efi",
 			},
-			wantErr: "EFI firmware is only supported for Ubuntu OVA and Raw builds.",
+			wantErr: "",
 		},
 		{
 			testName: "Redhat raw with no bios",
 			buildOptions: builder.BuildOptions{
 				Os:         "redhat",
+				OsVersion:  "8",
 				Hypervisor: "baremetal",
 				Firmware:   "",
 			},
@@ -223,11 +228,21 @@ func TestValidateFirmware(t *testing.T) {
 			},
 			wantErr: "bad is not a firmware. Please select one of bios,efi",
 		},
+		{
+			testName: "Redhat raw with unsupported efi version",
+			buildOptions: builder.BuildOptions{
+				Os:         "redhat",
+				OsVersion:  "8",
+				Hypervisor: "baremetal",
+				Firmware:   "efi",
+			},
+			wantErr: "Only RedHat version 9 supports EFI firmware",
+		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.testName, func(t *testing.T) {
-			err := validateFirmware(tt.buildOptions.Firmware, tt.buildOptions.Os, tt.buildOptions.Hypervisor)
+			err := validateFirmware(tt.buildOptions.Firmware, tt.buildOptions.Os, tt.buildOptions.OsVersion, tt.buildOptions.Hypervisor)
 			if tt.wantErr == "" {
 				assert.NoError(t, err)
 			} else {
