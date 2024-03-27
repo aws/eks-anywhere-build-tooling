@@ -12,7 +12,7 @@ import (
 var upgradeStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Upgrade status",
-	Long:  "Use InPlace Upgrader upgrade status to get status of upgrade components on the node",
+	Long:  "Use InPlace Upgrader upgrade status to get status of upgraded components on the node",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := upgradeStatus(cmd.Context())
 		if err != nil {

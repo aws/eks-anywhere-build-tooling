@@ -14,7 +14,7 @@ const (
 func TestKubeletKubectlUpgrade(t *testing.T) {
 	ctx := context.TODO()
 	tt := newUpgraderTest(t)
-	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/scripts", nil).Times(1)
+	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).Times(1)
 	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubectl")).Return(nil, nil)
 	tt.s.EXPECT().ExecCommand(ctx, "systemctl", "stop", "kubelet").Return(nil, nil)
 	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubelet")).Return(nil, nil)

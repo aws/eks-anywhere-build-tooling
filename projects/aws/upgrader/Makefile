@@ -1,4 +1,5 @@
 BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 
 REPO=upgrader
 REPO_OWNER=aws
@@ -12,6 +13,14 @@ EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 # for the staging buildspec generation
 BUILDSPEC_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 kubernetes_sigs_cri_tools
 
+BINARY_TARGET_FILES=upgrader
+SOURCE_PATTERNS=. 
+GO_MOD_PATHS=..
+
+GIT_CHECKOUT_TARGET=main.go
+FAKE_GIT_REPO_TARGET=.git
+REPO_NO_CLONE=true
+
 BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
@@ -19,8 +28,6 @@ BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
 BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
 BUILDSPEC_2_DEPENDS_ON_OVERRIDE=aws_upgrader_linux_amd64 aws_upgrader_linux_arm64
 
-REPO_NO_CLONE=true
-HAS_LICENSES=false
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-nsenter
 IMAGE_NAMES=upgrader

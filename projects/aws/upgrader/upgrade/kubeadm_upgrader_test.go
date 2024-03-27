@@ -31,7 +31,8 @@ const (
 		imageTag: v3.5.10-eks-1-28-11
 	imageRepository: public.ecr.aws/eks-distro/kubernetes
 	kind: ClusterConfiguration
-	kubernetesVersion: v1.29.1-eks-1-29-6`
+	kubernetesVersion: v1.29.1-eks-1-29-6
+	`
 	updatedClusterConfig = `
 	apiServer:
 		extraArgs:
@@ -50,7 +51,8 @@ const (
 		imageTag: v3.5.10-eks-1-29-6
 	imageRepository: public.ecr.aws/eks-distro/kubernetes
 	kind: ClusterConfiguration
-	kubernetesVersion: v1.29.1-eks-1-29-6`
+	kubernetesVersion: v1.29.1-eks-1-29-6
+	`
 	kubeletConfig = `
 	apiVersion: kubelet.config.k8s.io/v1beta1
 	cgroupDriver: systemd
@@ -63,7 +65,8 @@ const (
 		flushFrequency: 0
 	resolvConf: /run/systemd/resolve/resolv.conf
 	rotateCertificates: true
-	staticPodPath: /etc/kubernetes/manifests`
+	staticPodPath: /etc/kubernetes/manifests
+	`
 	upgCompBinDir = "/foo/binaries/kubernetes/usr/bin"
 	kubeVipBackup = "/foo/kube-vip.backup.yaml"
 	newKubeVip    = "/foo/kube-vip.yaml"
@@ -74,10 +77,10 @@ func TestKubeAdmFistCP(t *testing.T) {
 	kubeAdmConfigBackUp := fmt.Sprintf("%s/kubeadm-config.backup.yaml", upgCompBinDir)
 	newKubeAdmConfig := fmt.Sprintf("%s/kubeadm-config.yaml", upgCompBinDir)
 	clusterConfigBytes := []byte(clusterConfig)
-	appendedKubeletConfigBytes := []byte(fmt.Sprintf("%s%s%s", clusterConfig, "---", kubeletConfig))
+	appendedKubeletConfigBytes := []byte(fmt.Sprintf("%s%s%s", clusterConfig, "---\n", kubeletConfig))
 	ctx := context.TODO()
 	tt := newUpgraderTest(t, upgrade.WithKubernetesVersion("v1.29.1-eks-1-29-6"), upgrade.WithEtcdVersion("v3.5.10-eks-1-29-6"))
-	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/scripts", nil).AnyTimes()
+	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
 	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, nil)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fs.FileMode(0o640)).Return(nil).Times(1)
@@ -102,7 +105,7 @@ func TestKubeAdmFistCP(t *testing.T) {
 func TestKubeAdmRestCP(t *testing.T) {
 	ctx := context.TODO()
 	tt := newUpgraderTest(t)
-	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/scripts", nil).AnyTimes()
+	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
 	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, nil)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
@@ -119,7 +122,7 @@ func TestKubeAdmRestCP(t *testing.T) {
 func TestKubeAdmWorker(t *testing.T) {
 	ctx := context.TODO()
 	tt := newUpgraderTest(t)
-	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/scripts", nil).AnyTimes()
+	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
 	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, nil)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node").Return(nil, nil).Times(1)

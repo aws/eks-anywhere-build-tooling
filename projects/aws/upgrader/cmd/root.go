@@ -5,7 +5,6 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/logger"
@@ -23,15 +22,6 @@ func init() {
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		log.Fatalf("failed to bind flags for root: %v", err)
 	}
-}
-
-func prerunCmdBindFlags(cmd *cobra.Command, args []string) {
-	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		err := viper.BindPFlag(flag.Name, flag)
-		if err != nil {
-			log.Fatalf("Error initializing flags: %v", err)
-		}
-	})
 }
 
 func rootPersistentPreRun(cmd *cobra.Command, args []string) {

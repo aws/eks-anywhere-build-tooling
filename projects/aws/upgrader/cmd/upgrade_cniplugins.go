@@ -12,7 +12,7 @@ import (
 var upgradeCniPluginsCmd = &cobra.Command{
 	Use:   "cni-plugins",
 	Short: "Upgrade cni-plugins",
-	Long:  "Use InPlace Upgrader upgrade cni-plugins to run update cni-plugins on the node",
+	Long:  "Use InPlace Upgrader upgrade cni-plugins to upgrade cni-plugins on the node",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := upgradeCniPlugins(cmd.Context())
 		if err != nil {

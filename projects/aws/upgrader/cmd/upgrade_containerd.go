@@ -12,7 +12,7 @@ import (
 var upgradeContainerdCmd = &cobra.Command{
 	Use:   "containerd",
 	Short: "Upgrade containerd",
-	Long:  "Use InPlace Upgrader upgrade containerd to run update kubelet and kubectl on the node",
+	Long:  "Use InPlace Upgrader upgrade containerd to upgrade containerd on the node",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := upgradeContainerd(cmd.Context())
 		if err != nil {
