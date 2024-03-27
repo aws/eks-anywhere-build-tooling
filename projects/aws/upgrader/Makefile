@@ -20,6 +20,7 @@ GO_MOD_PATHS=..
 GIT_CHECKOUT_TARGET=main.go
 FAKE_GIT_REPO_TARGET=.git
 REPO_NO_CLONE=true
+HAS_LICENSES=false
 SKIP_CHECKSUM_VALIDATION=true
 
 BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
