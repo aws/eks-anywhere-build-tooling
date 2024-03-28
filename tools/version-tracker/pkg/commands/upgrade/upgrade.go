@@ -32,7 +32,7 @@ import (
 // Run contains the business logic to execute the `upgrade` subcommand.
 func Run(upgradeOptions *types.UpgradeOptions) error {
 	var currentRevision, latestRevision string
-	var patchApplySucceeded bool
+	var patchApplySucceeded, addPatchWarningComment bool
 	var totalPatchCount int
 	var updatedFiles []string
 	patchesWarningComment := constants.PatchesCommentBody
@@ -179,7 +179,6 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		// Upgrade project if latest commit was made after current commit and the semver of the latest revision is
 		// greater than the semver of the current version.
 		if needsUpgrade || slices.Contains(constants.ProjectsWithUnconventionalUpgradeFlows, projectName) {
-
 			// Checkout a new branch to keep track of version upgrade chaneges.
 			err = git.Checkout(worktree, headBranchName)
 			if err != nil {
@@ -273,6 +272,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 						return fmt.Errorf("applying patches to repository: %v", err)
 					}
 					if !patchApplySucceeded {
+						addPatchWarningComment = true
 						patchesWarningComment = fmt.Sprintf(constants.PatchesCommentBody, appliedPatchesCount, totalPatchCount, failedPatch, applyFailedFiles)
 					}
 				}
@@ -368,7 +368,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 		// Create a pull request from the bramch in the head repository to the target branch in the aws/eks-anywhere-build-tooling repository.
 		logger.Info("Creating pull request with updated files")
-		err = github.CreatePullRequest(client, projectOrg, projectRepo, commitMessage, pullRequestBody, baseRepoOwner, baseBranchName, headRepoOwner, headBranchName, currentRevision, latestRevision, patchApplySucceeded, patchesWarningComment)
+		err = github.CreatePullRequest(client, projectOrg, projectRepo, commitMessage, pullRequestBody, baseRepoOwner, baseBranchName, headRepoOwner, headBranchName, currentRevision, latestRevision, addPatchWarningComment, patchesWarningComment)
 		if err != nil {
 			return fmt.Errorf("creating pull request to %s repository: %v", constants.BuildToolingRepoName, err)
 		}

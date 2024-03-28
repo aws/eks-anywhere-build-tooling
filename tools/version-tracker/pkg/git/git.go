@@ -19,7 +19,7 @@ import (
 
 // CloneRepo clones the remote repository to a destination folder and creates a Git remote.
 func CloneRepo(cloneURL, destination, headRepoOwner string) (*git.Repository, string, error) {
-	logger.V(6).Info(fmt.Sprintf("Cloning repository [%s] to %s directory\n", cloneURL, destination))
+	logger.V(6).Info(fmt.Sprintf("Cloning repository [%s] to %s directory", cloneURL, destination))
 	progress := io.Discard
 	if logger.Verbosity >= 6 {
 		progress = os.Stdout
@@ -30,8 +30,11 @@ func CloneRepo(cloneURL, destination, headRepoOwner string) (*git.Repository, st
 	})
 	if err != nil {
 		if err == git.ErrRepositoryAlreadyExists {
-			logger.V(6).Info(fmt.Sprintf("Repo already exists at %s\n", destination))
+			logger.V(6).Info(fmt.Sprintf("Repo already exists at %s", destination))
 			repo, err = git.PlainOpen(destination)
+			if err != nil {
+				return nil, "", fmt.Errorf("opening repo from %s directory: %v", destination, err)
+			}
 		} else {
 			return nil, "", fmt.Errorf("cloning repo %s to %s directory: %v", cloneURL, destination, err)
 		}
@@ -75,7 +78,7 @@ func ResetToMain(worktree *git.Worktree, baseRepoHeadCommit string) error {
 
 // Checkout checks out the working tree at the given branch, creating a new branch if necessary.
 func Checkout(worktree *git.Worktree, branch string) error {
-	logger.V(6).Info(fmt.Sprintf("Checking out branch [%s] in local worktree\n", branch))
+	logger.V(6).Info(fmt.Sprintf("Checking out branch [%s] in local worktree", branch))
 
 	err := worktree.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(branch),
