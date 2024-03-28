@@ -108,6 +108,7 @@ CONVERT_TO_UPSTREAM_TARGET=$(strip \
 	$(eval _NEW_TARGET:=$(subst -redhat-,-rhel-,$(_NEW_TARGET))) \
 	$(eval _NEW_TARGET:=$(subst -cloudstack,-qemu,$(_NEW_TARGET))) \
 	$(eval _NEW_TARGET:=$(if $(findstring raw-ubuntu,$(_NEW_TARGET)),$(_NEW_TARGET)-efi,$(_NEW_TARGET))) \
+	$(eval _NEW_TARGET:=$(if $(findstring raw-rhel-9,$(_NEW_TARGET)),$(_NEW_TARGET)-efi,$(_NEW_TARGET))) \
 	$(_NEW_TARGET) \
 )
 
@@ -144,7 +145,7 @@ BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload
 
 # only running release-raw-ubuntu-2004 on presubmit here since we are just validating the instance creation and do not need to run for every OS
 # tinkerbell/bare metal node images
-BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) $(if $(filter true,$(SKIP_METAL_INSTANCE_TEST)),,metal-instance-test)
+BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8 redhat-9,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) $(if $(filter true,$(SKIP_METAL_INSTANCE_TEST)),,metal-instance-test)
 
 # cloud stack node images
 BUILD_CLOUDSTACK_TARGETS=$(foreach os, redhat-8 redhat-9,build-cloudstack-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,cloudstack,$(os)) upload-artifacts-cloudstack-$(os))
