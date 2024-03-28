@@ -63,14 +63,14 @@ $(TOOLS_BIN_DIR):
 	@mkdir -p $(TOOLS_BIN_DIR)
 
 $(MOCKGEN): $(TOOLS_BIN_DIR)
-	GOBIN=$(TOOLS_BIN_DIR) go install github.com/golang/mock/mockgen@v1.6.0
+	GOBIN=$(TOOLS_BIN_DIR) build::common::use_go_version $(GOLANG_VERSION) install github.com/golang/mock/mockgen@v1.6.0
 
 unit-test: | $$(ENABLE_DOCKER)
-	@go test ./...
+	build::common::use_go_version $(GOLANG_VERSION) test ./...
 
 .PHONY: mocks
 mocks: $(MOCKGEN)
-	go generate ./...
+	build::common::use_go_version $(GOLANG_VERSION) generate ./...
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
