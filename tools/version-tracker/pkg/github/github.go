@@ -21,7 +21,7 @@ import (
 
 // getReleasesForRepo retrieves the list of releases for the given GitHub repository.
 func getReleasesForRepo(client *github.Client, org, repo string) ([]*github.RepositoryRelease, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting releases for [%s/%s] repository\n", org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting releases for [%s/%s] repository", org, repo))
 	var allReleases []*github.RepositoryRelease
 	listReleasesOptions := &github.ListOptions{
 		PerPage: constants.GithubPerPage,
@@ -48,7 +48,7 @@ func getReleasesForRepo(client *github.Client, org, repo string) ([]*github.Repo
 
 // getTagsForRepo retrieves the list of tags for the given GitHub repository.
 func getTagsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryTag, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting tags for [%s/%s] repository\n", org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting tags for [%s/%s] repository", org, repo))
 	var allTags []*github.RepositoryTag
 	listTagOptions := &github.ListOptions{
 		PerPage: constants.GithubPerPage,
@@ -72,7 +72,7 @@ func getTagsForRepo(client *github.Client, org, repo string) ([]*github.Reposito
 
 // getCommitsForRepo retrieves the list of commits for the given GitHub repository.
 func getCommitsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryCommit, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting commits for [%s/%s] repository\n", org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting commits for [%s/%s] repository", org, repo))
 	var allCommits []*github.RepositoryCommit
 	listCommitOptions := &github.CommitsListOptions{
 		ListOptions: github.ListOptions{
@@ -98,7 +98,7 @@ func getCommitsForRepo(client *github.Client, org, repo string) ([]*github.Repos
 
 // getCommitDateEpoch gets the Unix epoch time equivalent of a given Github commit's date.
 func getCommitDateEpoch(client *github.Client, org, repo, commitSHA string) (int64, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting date for commit %s in [%s/%s] repository\n", commitSHA, org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting date for commit %s in [%s/%s] repository", commitSHA, org, repo))
 
 	commit, _, err := client.Repositories.GetCommit(context.Background(), org, repo, commitSHA, nil)
 	if err != nil {
@@ -123,7 +123,7 @@ func GetFileContents(client *github.Client, org, repo, filePath, ref string) ([]
 
 // GetLatestRevision returns the latest revision (GitHub release or tag) for a given GitHub repository.
 func GetLatestRevision(client *github.Client, org, repo, currentRevision string) (string, bool, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository\n", org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository", org, repo))
 	var latestRevision string
 	needsUpgrade := false
 
@@ -247,7 +247,7 @@ func getCommitForTag(allTags []*github.RepositoryTag, searchTag string) string {
 
 // GetGoVersionForLatestRevision gets the Go version used to build the latest revision of the project.
 func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevision string) (string, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting Go version corresponding to latest revision %s for [%s/%s] repository\n", latestRevision, org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting Go version corresponding to latest revision %s for [%s/%s] repository", latestRevision, org, repo))
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("retrieving current working directory: %v", err)
@@ -341,10 +341,9 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 }
 
 // CreatePullRequest creates a pull request from the head branch to the base branch on the base repository.
-func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, patchApplySucceeded bool, patchesWarningComment string) error {
+func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, addPatchWarningComment bool, patchesWarningComment string) error {
 	var pullRequest *github.PullRequest
 	var patchWarningCommentExists bool
-	logger.V(6).Info(fmt.Sprintf("Creating pull request with updated versions for [%s/%s] repository\n", org, repo))
 
 	// Check if there is already a pull request from the head branch to the base branch.
 	pullRequests, _, err := client.PullRequests.List(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, &github.PullRequestListOptions{
@@ -357,7 +356,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 
 	if len(pullRequests) > 0 {
 		pullRequest = pullRequests[0]
-		logger.Info(fmt.Sprintf("A pull request already exists for %s:%s\n", headRepoOwner, headBranch), "Pull request", *pullRequest.HTMLURL)
+		logger.Info(fmt.Sprintf("A pull request already exists for %s:%s", headRepoOwner, headBranch), "Pull request", *pullRequest.HTMLURL)
 
 		pullRequest.Body = github.String(body)
 		pullRequest, _, err = client.PullRequests.Edit(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, pullRequest)
@@ -367,7 +366,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 
 		// If patches to the project failed to apply, check if the PR already has a comment warning about
 		// the incomplete PR and patches needing to be regenerated.
-		if !patchApplySucceeded {
+		if addPatchWarningComment {
 			pullRequestComments, _, err := client.Issues.ListComments(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, nil)
 			if err != nil {
 				return fmt.Errorf("listing comments on pull request [%s]: %v", pullRequest.HTMLURL, err)
@@ -380,6 +379,8 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 			}
 		}
 	} else {
+		logger.V(6).Info(fmt.Sprintf("Creating pull request with updated versions for [%s/%s] repository", org, repo))
+
 		newPR := &github.NewPullRequest{
 			Title:               github.String(title),
 			Head:                github.String(fmt.Sprintf("%s:%s", headRepoOwner, headBranch)),
@@ -391,11 +392,13 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 		if err != nil {
 			return fmt.Errorf("creating pull request with updated versions from %s to %s: %v", headBranch, baseBranch, err)
 		}
+
+		logger.Info(fmt.Sprintf("Created pull request: %s", *pullRequest.HTMLURL))
 	}
 
 	// If patches failed to apply and no patch warning comment exists (always the case for a new PR), then add a comment with the
 	// warning.
-	if !patchApplySucceeded && !patchWarningCommentExists {
+	if addPatchWarningComment && !patchWarningCommentExists {
 		patchWarningComment := &github.IssueComment{
 			Body: github.String(patchesWarningComment),
 		}
