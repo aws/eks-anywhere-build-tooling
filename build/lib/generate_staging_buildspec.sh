@@ -217,9 +217,14 @@ for project in "${PROJECTS[@]}"; do
                     for val2 in "${ARR_2[@]}"; do
                         BUILDSPEC_NAME=$(basename $buildspec .yml)
                         IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}_${val2//-/_}_${BUILDSPEC_NAME//-/_}
+                        # TODO: revisit this to make it more dynamic if other projects need it in the future
+                        EXTRA_VARS=""
+                        if [[ "$IDENTIFIER" =~ "kubernetes_sigs_image_builder_bottlerocket" ]]; then
+                            EXTRA_VARS+=",\"IMAGE_OS_VERSION\":\"1\""
+                        fi
                         ALL_PROJECT_IDS+="\"$IDENTIFIER\","
                         yq eval -i -P \
-                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"}}}]" \
+                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"$EXTRA_VARS}}}]" \
                             $STAGING_BUILDSPEC_FILE 
                     done
                 done
