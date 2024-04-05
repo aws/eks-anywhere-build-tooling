@@ -80,7 +80,7 @@ By submitting this pull request, I confirm that you can use, modify, copy, and r
 By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
 	PatchesCommentBody = `# This pull request is incomplete!
 ## Failed patch details
-**Only %s/%d patches were applied!**
+**Only %d/%d patches were applied!**
 %s
 The following files in the above patch did not apply successfully:
 %s
