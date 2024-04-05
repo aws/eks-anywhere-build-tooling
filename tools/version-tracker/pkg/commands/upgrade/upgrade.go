@@ -267,7 +267,10 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 				// If project has patches, attempt to apply them. Track failed patches and files that failed to apply, if any.
 				if projectHasPatches {
-					appliedPatchesCount, failedPatch, applyFailedFiles, patchApplySucceeded, err := applyPatchesToRepo(projectRootFilepath, projectRepo, latestRevision)
+					appliedPatchesCount, failedPatch, applyFailedFiles, err := applyPatchesToRepo(projectRootFilepath, projectRepo, latestRevision, totalPatchCount)
+					if appliedPatchesCount == totalPatchCount {
+						patchApplySucceeded = true
+					}
 					if err != nil {
 						return fmt.Errorf("applying patches to repository: %v", err)
 					}
@@ -453,7 +456,7 @@ func getLatestEKSDistroRelease(client *gogithub.Client, branch string) (int, str
 
 	releaseNumberInt, err := strconv.Atoi(strings.TrimRight(string(releaseNumber), "\n"))
 	if err != nil {
-		return 0, "", fmt.Errorf("error converting release number to integer: %v", err)
+		return 0, "", fmt.Errorf("converting release number to integer: %v", err)
 	}
 
 	kubeVersionTrimmed := strings.TrimRight(string(kubeVersion), "\n")
@@ -545,8 +548,9 @@ func updateUpstreamProjectsTrackerFile(projectsList *types.ProjectsList, targetR
 
 // applyPatchesToRepo runs a Make command to apply patches to the cloned repository of the project
 // being upgraded.
-func applyPatchesToRepo(projectRootFilepath, projectRepo, latestVersion string) (string, string, string, bool, error) {
-	var patchesApplied, failedPatch, failedFilesInPatch string
+func applyPatchesToRepo(projectRootFilepath, projectRepo, latestVersion string, totalPatchCount int) (int, string, string, error) {
+	var patchesApplied int
+	var failedPatch, failedFilesInPatch string
 	patchApplySucceeded := true
 
 	applyPatchesCommandSequence := fmt.Sprintf("make -C %s patch-repo", projectRootFilepath)
@@ -556,23 +560,26 @@ func applyPatchesToRepo(projectRootFilepath, projectRepo, latestVersion string) 
 		if strings.Contains(applyPatchesOutput, constants.FailedPatchApplyMarker) {
 			patchApplySucceeded = false
 		} else {
-			return "", "", "", false, fmt.Errorf("running patch-repo Make command: %v", err)
+			return 0, "", "", fmt.Errorf("running patch-repo Make command: %v", err)
 		}
 	}
 
-	if !patchApplySucceeded {
+	if patchApplySucceeded {
+		patchesApplied = totalPatchCount
+	} else {
 		failedFiles := []string{}
 		gitDescribeRegex := regexp.MustCompile(fmt.Sprintf("%s(-([0-9]+)-g.*)?", latestVersion))
 		gitDescribeCmd := exec.Command("git", "-C", filepath.Join(projectRootFilepath, projectRepo), "describe", "--tag")
 		gitDescribeOutput, err := command.ExecCommand(gitDescribeCmd)
 		if err != nil {
-			return "", "", "", false, fmt.Errorf("running git describe command: %v", err)
+			return 0, "", "", fmt.Errorf("running git describe command: %v", err)
 		}
 		gitDescribeMatches := gitDescribeRegex.FindStringSubmatch(gitDescribeOutput)
-		if gitDescribeMatches[1] == "" {
-			patchesApplied = "0"
-		} else {
-			patchesApplied = gitDescribeMatches[2]
+		if gitDescribeMatches[1] != "" {
+			patchesApplied, err = strconv.Atoi(gitDescribeMatches[2])
+			if err != nil {
+				return 0, "", "", fmt.Errorf("converting patch count to integer %v", err)
+			}
 		}
 
 		failedPatchRegex := regexp.MustCompile(constants.FailedPatchApplyRegex)
@@ -587,7 +594,7 @@ func applyPatchesToRepo(projectRootFilepath, projectRepo, latestVersion string) 
 		failedFilesInPatch = strings.Join(failedFiles, ",")
 	}
 
-	return patchesApplied, failedPatch, failedFilesInPatch, patchApplySucceeded, nil
+	return patchesApplied, failedPatch, failedFilesInPatch, nil
 }
 
 // updateChecksumsAttributionFiles runs a Make command to update the checksums and attribution files
