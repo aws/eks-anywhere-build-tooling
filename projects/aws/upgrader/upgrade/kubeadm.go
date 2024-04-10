@@ -46,7 +46,7 @@ func (u *InPlaceUpgrader) KubeAdmInFirstCP(ctx context.Context) error {
 	}
 
 	trimmedOut := strings.Trim(string(out), "`'")
-	err = u.WriteFile(kubeAdmConfigBackUp, []byte(trimmedOut), fileMode416)
+	err = u.WriteFile(kubeAdmConfigBackUp, []byte(trimmedOut), fileMode640)
 	if err != nil {
 		return fmt.Errorf("writing kubeadm config to backup file: %v", err)
 	}
@@ -216,7 +216,7 @@ func (u *InPlaceUpgrader) updateEtcdVersion(oldKubeAdmConf, newKubeAdmConf, vers
 		}
 	}
 	updatedConf := strings.Join(lines, "\n")
-	err = u.WriteFile(newKubeAdmConf, []byte(updatedConf), fileMode416)
+	err = u.WriteFile(newKubeAdmConf, []byte(updatedConf), fileMode640)
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ func (u *InPlaceUpgrader) appendKubeletConfig(ctx context.Context, kubeAdmConf s
 
 	trimmedOut := strings.Trim(string(out), "`'")
 	conf = append(conf, []byte(trimmedOut)...)
-	err = u.WriteFile(kubeAdmConf, []byte(conf), fileMode416)
+	err = u.WriteFile(kubeAdmConf, []byte(conf), fileMode640)
 	if err != nil {
 		return fmt.Errorf("writing kubelet config to kubeadm file: %v", err)
 	}
@@ -267,7 +267,7 @@ func (u *InPlaceUpgrader) backUpAndDeleteCoreDNSConfig(ctx context.Context, cmpD
 	}
 	if len(coreDNSConf) > 0 {
 		logger.Info("coreDNS config as string", "out", string(coreDNSConf))
-		err = u.WriteFile(coreDNSBackup, coreDNSConf, fileMode416)
+		err = u.WriteFile(coreDNSBackup, coreDNSConf, fileMode640)
 		if err != nil {
 			return err
 		}

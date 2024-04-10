@@ -18,7 +18,7 @@ const (
 	kubeletConf                    = "/etc/sysconfig/kubelet"
 	kubeletCredProviderFeatureGate = " --feature-gates=KubeletCredentialProviders=true"
 	extraArgs                      = "extra_args"
-	fileMode493                    = fs.FileMode(0o755)
+	fileMode755                    = fs.FileMode(0o755)
 )
 
 // KubeletKubectlUpgrade upgrades kubelet and kubectl on the node
@@ -94,14 +94,14 @@ func (u *InPlaceUpgrader) updateKubeletExtraArgs(cmpDir string) error {
 	newConf := bytes.ReplaceAll(conf, []byte(kubeletCredProviderFeatureGate), []byte(""))
 
 	extraArgsDir := fmt.Sprintf("%s/%s", cmpDir, extraArgs)
-	if err = u.MkdirAll(extraArgsDir, fileMode493); err != nil {
+	if err = u.MkdirAll(extraArgsDir, fileMode755); err != nil {
 		return fmt.Errorf("creating folder: %v", err)
 	}
 	kubeletConfBackupFile := fmt.Sprintf("%s/kubelet.bk", extraArgsDir)
 	if err = u.copy(kubeletConf, kubeletConfBackupFile); err != nil {
 		return copyError(kubeletConf, kubeletConfBackupFile, err)
 	}
-	if err := u.WriteFile(kubeletConf, newConf, fileMode416); err != nil {
+	if err := u.WriteFile(kubeletConf, newConf, fileMode640); err != nil {
 		return fmt.Errorf("writing updated kubelet config to file: %v", err)
 	}
 

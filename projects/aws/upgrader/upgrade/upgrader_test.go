@@ -124,9 +124,9 @@ func TestBackUpAndReplace(t *testing.T) {
 				tt.s.EXPECT().ReadFile(oldFile).Return(nil, errors.New(tc.returnErr))
 			} else {
 				tt.s.EXPECT().ReadFile(oldFile).Return([]byte{}, nil)
-				tt.s.EXPECT().WriteFile(fmt.Sprintf("%s/%s", backUpFolder, newFile), []byte{}, fileMode416).Return(nil)
+				tt.s.EXPECT().WriteFile(fmt.Sprintf("%s/%s", backUpFolder, newFile), []byte{}, fileMode640).Return(nil)
 				tt.s.EXPECT().ReadFile(newFile).Return([]byte{}, nil)
-				tt.s.EXPECT().WriteFile(oldFile, []byte{}, fileMode416).Return(nil)
+				tt.s.EXPECT().WriteFile(oldFile, []byte{}, fileMode640).Return(nil)
 			}
 			err := tt.u.BackUpAndReplace(oldFile, backUpFolder, newFile)
 			if tc.ifErr {

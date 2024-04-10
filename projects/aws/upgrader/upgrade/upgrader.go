@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	fileMode416 = fs.FileMode(0o640)
+	fileMode640 = fs.FileMode(0o640)
 )
 
 type InPlaceUpgrader struct {
@@ -107,7 +107,7 @@ func (u *InPlaceUpgrader) copy(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	if err := u.WriteFile(dst, data, fileMode416); err != nil {
+	if err := u.WriteFile(dst, data, fileMode640); err != nil {
 		return err
 	}
 
