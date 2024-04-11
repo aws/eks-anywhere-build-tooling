@@ -131,7 +131,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			projectHasPatches = true
 			patchFiles, err := os.ReadDir(filepath.Join(projectRootFilepath, constants.PatchesDirectory))
 			if err != nil {
-				return fmt.Errorf("reading patch directory", err)
+				return fmt.Errorf("reading patch directory: %v", err)
 			}
 			totalPatchCount = len(patchFiles)
 		}
@@ -445,13 +445,13 @@ func getLatestEKSDistroRelease(client *gogithub.Client, branch string) (int, str
 	eksDistroProdReleaseNumberFile := fmt.Sprintf(constants.EKSDistroProdReleaseNumberFileFormat, branch)
 	releaseNumber, err := github.GetFileContents(client, "aws", "eks-distro", eksDistroProdReleaseNumberFile, constants.MainBranchName)
 	if err != nil {
-		return 0, "", fmt.Errorf("getting contents of EKS Distro prod release number file: %v", eksDistroProdReleaseNumberFile, err)
+		return 0, "", fmt.Errorf("getting contents of EKS Distro prod release number file: %v", err)
 	}
 
 	kubernetesGitTagFile := fmt.Sprintf(constants.KubernetesGitTagFileFormat, branch)
 	kubeVersion, err := github.GetFileContents(client, "aws", "eks-distro", kubernetesGitTagFile, constants.MainBranchName)
 	if err != nil {
-		return 0, "", fmt.Errorf("getting contents of Kubernetes Git tag file: %v", eksDistroProdReleaseNumberFile, err)
+		return 0, "", fmt.Errorf("getting contents of Kubernetes Git tag file: %v", err)
 	}
 
 	releaseNumberInt, err := strconv.Atoi(strings.TrimRight(string(releaseNumber), "\n"))
@@ -777,7 +777,7 @@ func updateBottlerocketHostContainerMetadata(client *gogithub.Client, projectRoo
 	updatedHostContainerFiles := []string{}
 	hostContainersTOMLContents, err := github.GetFileContents(client, "bottlerocket-os", "bottlerocket", constants.BottlerocketHostContainersTOMLFile, latestBottlerocketVersion)
 	if err != nil {
-		return nil, fmt.Errorf("getting contents of Bottlerocket host containers file: %v", constants.BottlerocketHostContainersTOMLFile, err)
+		return nil, fmt.Errorf("getting contents of Bottlerocket host containers file: %v", err)
 	}
 
 	var hostContainersTOMLMap interface{}

@@ -62,8 +62,8 @@ type GoVersionSourceOfTruth struct {
 }
 
 type ImageMetadata struct {
-	Tag         string `yaml:"tag,omitempty"`
-	ImageDigest string `yaml:"imageDigest,omitempty"`
+	Tag         string `json:"tag,omitempty"`
+	ImageDigest string `json:"imageDigest,omitempty"`
 }
 
 type EKSDistroRelease struct {

@@ -361,7 +361,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 		pullRequest.Body = github.String(body)
 		pullRequest, _, err = client.PullRequests.Edit(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, pullRequest)
 		if err != nil {
-			return fmt.Errorf("editing existing pull request %s: %v", pullRequest.HTMLURL, err)
+			return fmt.Errorf("editing existing pull request %s: %v", *pullRequest.HTMLURL, err)
 		}
 
 		// If patches to the project failed to apply, check if the PR already has a comment warning about
@@ -369,7 +369,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 		if addPatchWarningComment {
 			pullRequestComments, _, err := client.Issues.ListComments(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, nil)
 			if err != nil {
-				return fmt.Errorf("listing comments on pull request [%s]: %v", pullRequest.HTMLURL, err)
+				return fmt.Errorf("listing comments on pull request [%s]: %v", *pullRequest.HTMLURL, err)
 			}
 
 			for _, comment := range pullRequestComments {
