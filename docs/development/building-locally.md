@@ -11,7 +11,7 @@ To force running targets on the host: `export FORCE_GO_BUILD_ON_HOST=true`.
 * Docker
 	* `sudo yum install -y docker && sudo usermod -a -G docker ec2-user && id ec2-user && newgrp docker`
 	* `sudo systemctl enable docker.service && sudo systemctl start docker.service`
-* Common utils required git
+* Common utils required
 	* `sudo yum -y install bc jq git-core make lz4 rsync`
 * `yq` is required by a number of targets
 	* `sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$([ "x86_64" = "$(uname -m)" ] && echo amd64 || echo arm64) && sudo chmod +x /usr/local/bin/yq`
@@ -85,6 +85,30 @@ Each project folder contains a Makefile with the following build targets.
 		* `export BUILDKIT_HOST=docker-container://buildkitd`
 		* `make stop-buildkit-and-registry` to cleanup
 * See [docker-auth.md](./docker-auth.md) for helpful tips for configuring, securing, and using your AWS credentials with the targets in this project.
+	* The following is a basic docker config for ecr-helper:
+		* `~/.docker/config.json`
+		```
+		{
+			"auths": {},
+			"credsStore": "ecr-login"
+		}
+
+		```
+	* If building packages with helm charts, skopeo auth has to be setup. The following is a basic skopeo config for ecr-helper:
+		* ` ~/.config/containers/registries.conf`
+		```
+		credential-helpers = ["ecr-login"]
+		```
+		* `~/.config/containers/policy.json`
+		```
+		{
+			"default": [
+				{
+					"type": "insecureAcceptAnything"
+				}
+			]
+		}
+		```
 * By default, `IMAGE_REPO` will be set to your AWS account's private ECR registry based on your AWS_REGION. If you want to create the neccessary registeries
 for the current project:
 	* `make create-ecr-repos`
