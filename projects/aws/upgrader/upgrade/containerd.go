@@ -22,6 +22,7 @@ func (u *InPlaceUpgrader) ContainerdUpgrade(ctx context.Context) error {
 	if err != nil {
 		return execError(containerdVersionCmd, string(out))
 	}
+	logger.Info("current version of containerd", "version", string(out))
 
 	cpCmd := []string{"cp", "-rf", fmt.Sprintf("%s/containerd/.", cmpDir), "/"}
 	out, err = u.ExecCommand(ctx, cpCmd[0], cpCmd[1:]...)

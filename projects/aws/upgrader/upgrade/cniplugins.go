@@ -19,6 +19,7 @@ func (u *InPlaceUpgrader) CNIPluginsUpgrade(ctx context.Context) error {
 	if err != nil {
 		return execError(cniVersionCmd, string(out))
 	}
+	logger.Info("current version of cni plugins", "version", string(out))
 
 	cpCmd := []string{"cp", "-rf", fmt.Sprintf("%s/cni-plugins/.", cmpDir), "/"}
 	out, err = u.ExecCommand(ctx, cpCmd[0], cpCmd[1:]...)
