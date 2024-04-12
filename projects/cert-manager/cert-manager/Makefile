@@ -25,7 +25,7 @@ CERT_MANAGER_ACMESOLVER_ATTRIBUTION_OVERRIDE=cert-manager-acmesolver
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=deploy/charts/cert-manager
-HELM_IMAGE_LIST=cert-manager/cert-manager-cainjector cert-manager/cert-manager-controller cert-manager/cert-manager-webhook cert-manager/cert-manager-ctl
+HELM_IMAGE_LIST=cert-manager/cert-manager-cainjector cert-manager/cert-manager-controller cert-manager/cert-manager-webhook cert-manager/cert-manager-ctl cert-manager/cert-manager-acmesolver
 
 HAS_S3_ARTIFACTS=true
 
