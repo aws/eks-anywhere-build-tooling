@@ -1,4 +1,4 @@
-From 37cad853d2554664b634ee982d3cb3da34f76e9f Mon Sep 17 00:00:00 2001
+From bae12aae7aa733b4fea934cca2d072c084dfcc14 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/40] Add unstacked etcd support
@@ -68,26 +68,30 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
 ---
  api/v1alpha4/cluster_types.go                 |  14 ++
  api/v1beta1/cluster_types.go                  |  14 ++
- api/v1beta1/condition_consts.go               |  16 +++
+ api/v1beta1/condition_consts.go               |  16 ++
  api/v1beta1/machine_types.go                  |   3 +
  cmd/clusterctl/client/cluster/mover.go        |   3 +-
- .../crd/bases/cluster.x-k8s.io_clusters.yaml  |  96 +++++++++++++
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 144 ++++++++++++++++++
  config/rbac/role.yaml                         |  15 ++
  controllers/external/util.go                  |  10 ++
  controlplane/kubeadm/config/rbac/role.yaml    |   9 ++
  .../internal/controllers/controller.go        |  51 ++++++-
- .../controllers/cluster/cluster_controller.go |  90 +++++++++++-
- .../cluster/cluster_controller_phases.go      | 108 ++++++++++++++
- .../cluster/cluster_controller_test.go        | 136 ++++++++++++++++++
- .../machine/machine_controller_noderef.go     |   8 ++
+ internal/apis/core/v1alpha3/cluster_types.go  |  14 ++
+ .../apis/core/v1alpha3/condition_consts.go    |  16 ++
+ internal/apis/core/v1alpha3/conversion.go     |  12 ++
+ .../core/v1alpha3/zz_generated.conversion.go  |   6 +
+ .../controllers/cluster/cluster_controller.go |  90 ++++++++++-
+ .../cluster/cluster_controller_phases.go      | 108 +++++++++++++
+ .../cluster/cluster_controller_test.go        | 136 +++++++++++++++++
+ .../machine/machine_controller_noderef.go     |   8 +
  .../machine_controller_noderef_test.go        |  43 ++++++
- .../machine/machine_controller_phases.go      | 115 +++++++++++++++
+ .../machine/machine_controller_phases.go      | 115 ++++++++++++++
  .../controllers/dockermachine_controller.go   |  35 +++--
  util/collections/machine_filters.go           |  26 ++++
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 21 files changed, 781 insertions(+), 22 deletions(-)
+ 25 files changed, 877 insertions(+), 22 deletions(-)
 
 diff --git a/api/v1alpha4/cluster_types.go b/api/v1alpha4/cluster_types.go
 index d4ee0658e..207cdcf76 100644
@@ -209,10 +213,10 @@ index ea9c742ab..61270d3a7 100644
  		}
  	}
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index f8bd0a426..ab514c177 100644
+index f052a5b8e..a10bee3ce 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -174,6 +174,45 @@ spec:
+@@ -169,6 +169,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -258,7 +262,7 @@ index f8bd0a426..ab514c177 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -391,6 +430,15 @@ spec:
+@@ -261,6 +300,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -274,7 +278,7 @@ index f8bd0a426..ab514c177 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -569,6 +617,45 @@ spec:
+@@ -432,6 +480,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -320,7 +324,69 @@ index f8bd0a426..ab514c177 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -1369,6 +1456,15 @@ spec:
+@@ -649,6 +736,15 @@ spec:
+                 description: InfrastructureReady is the state of the infrastructure
+                   provider.
+                 type: boolean
++              managedExternalEtcdInitialized:
++                description: ManagedExternalEtcdInitialized indicates that first etcd
++                  member's IP address is set by machine controller, so remaining etcd
++                  members can lookup the address to join the cluster
++                type: boolean
++              managedExternalEtcdReady:
++                description: ManagedExternalEtcdReady indicates external etcd cluster
++                  is fully provisioned
++                type: boolean
+               observedGeneration:
+                 description: ObservedGeneration is the latest generation observed
+                   by the controller.
+@@ -827,6 +923,45 @@ spec:
+                     type: string
+                 type: object
+                 x-kubernetes-map-type: atomic
++              managedExternalEtcdRef:
++                description: ManagedExternalEtcdRef is an optional reference to an
++                  etcd provider resource that holds details for provisioning an external
++                  etcd cluster
++                properties:
++                  apiVersion:
++                    description: API version of the referent.
++                    type: string
++                  fieldPath:
++                    description: 'If referring to a piece of an object instead of
++                      an entire object, this string should contain a valid JSON/Go
++                      field access statement, such as desiredState.manifest.containers[2].
++                      For example, if the object reference is to a container within
++                      a pod, this would take on a value like: "spec.containers{name}"
++                      (where "name" refers to the name of the container that triggered
++                      the event) or if no container name is specified "spec.containers[2]"
++                      (container with index 2 in this pod). This syntax is chosen
++                      only to have some well-defined way of referencing a part of
++                      an object. TODO: this design is not final and this field is
++                      subject to change in the future.'
++                    type: string
++                  kind:
++                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
++                    type: string
++                  name:
++                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
++                    type: string
++                  namespace:
++                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
++                    type: string
++                  resourceVersion:
++                    description: 'Specific resourceVersion to which this reference
++                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
++                    type: string
++                  uid:
++                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
++                    type: string
++                type: object
++                x-kubernetes-map-type: atomic
+               paused:
+                 description: Paused can be used to prevent controllers from processing
+                   the Cluster and all its associated objects.
+@@ -1627,6 +1762,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -494,6 +560,130 @@ index f71bdec07..9bdafa7ec 100644
  	allMachinePools := &expv1.MachinePoolList{}
  	// Get all machine pools.
  	if feature.Gates.Enabled(feature.MachinePool) {
+diff --git a/internal/apis/core/v1alpha3/cluster_types.go b/internal/apis/core/v1alpha3/cluster_types.go
+index 2421a2796..88f945742 100644
+--- a/internal/apis/core/v1alpha3/cluster_types.go
++++ b/internal/apis/core/v1alpha3/cluster_types.go
+@@ -55,6 +55,11 @@ type ClusterSpec struct {
+ 	// +optional
+ 	ControlPlaneRef *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
+ 
++	// ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
++	// for provisioning an external etcd cluster
++	// +optional
++	ManagedExternalEtcdRef *corev1.ObjectReference `json:"managedExternalEtcdRef,omitempty"`
++
+ 	// InfrastructureRef is a reference to a provider-specific resource that holds the details
+ 	// for provisioning infrastructure for a cluster in said provider.
+ 	// +optional
+@@ -146,6 +151,15 @@ type ClusterStatus struct {
+ 	// ObservedGeneration is the latest generation observed by the controller.
+ 	// +optional
+ 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
++
++	// ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
++	// so remaining etcd members can lookup the address to join the cluster
++	// +optional
++	ManagedExternalEtcdInitialized bool `json:"managedExternalEtcdInitialized"`
++
++	// ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned
++	// +optional
++	ManagedExternalEtcdReady bool `json:"managedExternalEtcdReady"`
+ }
+ 
+ // ANCHOR_END: ClusterStatus
+diff --git a/internal/apis/core/v1alpha3/condition_consts.go b/internal/apis/core/v1alpha3/condition_consts.go
+index 3c0b6195e..c9fd9e27e 100644
+--- a/internal/apis/core/v1alpha3/condition_consts.go
++++ b/internal/apis/core/v1alpha3/condition_consts.go
+@@ -184,3 +184,19 @@ const (
+ 	// from making any further remediations.
+ 	TooManyUnhealthyReason = "TooManyUnhealthy"
+ )
++
++// Conditions used by the Etcd provider objects
++const (
++	// ManagedExternalEtcdClusterInitializedCondition is set once the first member of an etcd cluster is provisioned and running
++	ManagedExternalEtcdClusterInitializedCondition ConditionType = "ManagedEtcdInitialized"
++
++	// ManagedExternalEtcdClusterReadyCondition indicates if the etcd cluster is ready and all members have passed healthchecks.
++	ManagedExternalEtcdClusterReadyCondition ConditionType = "ManagedEtcdReady"
++
++	// WaitingForEtcdClusterInitializedReason (Severity=Info) documents a cluster waiting for the etcd cluster
++	// to report successful etcd cluster initialization.
++	WaitingForEtcdClusterInitializedReason = "WaitingForEtcdClusterProviderInitialized"
++
++	// EtcdHealthCheckFailedReason (Severity=Error) documents that healthcheck on an etcd member failed
++	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
++)
+diff --git a/internal/apis/core/v1alpha3/conversion.go b/internal/apis/core/v1alpha3/conversion.go
+index 9352eb4de..39dfffb4e 100644
+--- a/internal/apis/core/v1alpha3/conversion.go
++++ b/internal/apis/core/v1alpha3/conversion.go
+@@ -39,6 +39,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
+ 		conditions.MarkTrue(dst, clusterv1.ControlPlaneInitializedCondition)
+ 	}
+ 
++	if src.Status.ManagedExternalEtcdInitialized {
++		conditions.MarkTrue(dst, clusterv1.ManagedExternalEtcdClusterInitializedCondition)
++	}
++
++	if src.Status.ManagedExternalEtcdReady {
++		conditions.MarkTrue(dst, clusterv1.ManagedExternalEtcdClusterReadyCondition)
++	}
++
+ 	// Manually restore data.
+ 	restored := &clusterv1.Cluster{}
+ 	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+@@ -49,6 +57,10 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
+ 		dst.Spec.Topology = restored.Spec.Topology
+ 	}
+ 
++	if restored.Spec.ManagedExternalEtcdRef != nil {
++		dst.Spec.ManagedExternalEtcdRef = restored.Spec.ManagedExternalEtcdRef
++	}
++
+ 	return nil
+ }
+ 
+diff --git a/internal/apis/core/v1alpha3/zz_generated.conversion.go b/internal/apis/core/v1alpha3/zz_generated.conversion.go
+index c7ea14ba3..30a689e8e 100644
+--- a/internal/apis/core/v1alpha3/zz_generated.conversion.go
++++ b/internal/apis/core/v1alpha3/zz_generated.conversion.go
+@@ -510,6 +510,7 @@ func autoConvert_v1alpha3_ClusterSpec_To_v1beta1_ClusterSpec(in *ClusterSpec, ou
+ 		return err
+ 	}
+ 	out.ControlPlaneRef = (*v1.ObjectReference)(unsafe.Pointer(in.ControlPlaneRef))
++	out.ManagedExternalEtcdRef = (*v1.ObjectReference)(unsafe.Pointer(in.ManagedExternalEtcdRef))
+ 	out.InfrastructureRef = (*v1.ObjectReference)(unsafe.Pointer(in.InfrastructureRef))
+ 	return nil
+ }
+@@ -526,6 +527,7 @@ func autoConvert_v1beta1_ClusterSpec_To_v1alpha3_ClusterSpec(in *v1beta1.Cluster
+ 		return err
+ 	}
+ 	out.ControlPlaneRef = (*v1.ObjectReference)(unsafe.Pointer(in.ControlPlaneRef))
++	out.ManagedExternalEtcdRef = (*v1.ObjectReference)(unsafe.Pointer(in.ManagedExternalEtcdRef))
+ 	out.InfrastructureRef = (*v1.ObjectReference)(unsafe.Pointer(in.InfrastructureRef))
+ 	// WARNING: in.Topology requires manual conversion: does not exist in peer-type
+ 	return nil
+@@ -541,6 +543,8 @@ func autoConvert_v1alpha3_ClusterStatus_To_v1beta1_ClusterStatus(in *ClusterStat
+ 	out.ControlPlaneReady = in.ControlPlaneReady
+ 	out.Conditions = *(*v1beta1.Conditions)(unsafe.Pointer(&in.Conditions))
+ 	out.ObservedGeneration = in.ObservedGeneration
++	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
++	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
+ 	return nil
+ }
+ 
+@@ -553,6 +557,8 @@ func autoConvert_v1beta1_ClusterStatus_To_v1alpha3_ClusterStatus(in *v1beta1.Clu
+ 	out.ControlPlaneReady = in.ControlPlaneReady
+ 	out.Conditions = *(*Conditions)(unsafe.Pointer(&in.Conditions))
+ 	out.ObservedGeneration = in.ObservedGeneration
++	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
++	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
+ 	return nil
+ }
+ 
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
 index 7654b788a..269007490 100644
 --- a/internal/controllers/cluster/cluster_controller.go
@@ -1062,7 +1252,7 @@ index 0bcaaa1d0..f3586efa5 100644
 +	}
 +}
 diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
-index 5e34f8904..8eae496e0 100644
+index 8c197b4c1..e22977cc0 100644
 --- a/internal/controllers/machine/machine_controller_phases.go
 +++ b/internal/controllers/machine/machine_controller_phases.go
 @@ -19,6 +19,7 @@ package machine
@@ -1073,7 +1263,7 @@ index 5e34f8904..8eae496e0 100644
  	"time"
  
  	"github.com/pkg/errors"
-@@ -70,6 +71,13 @@ func (r *Reconciler) reconcilePhase(_ context.Context, m *clusterv1.Machine) {
+@@ -68,6 +69,13 @@ func (r *Reconciler) reconcilePhase(_ context.Context, m *clusterv1.Machine) {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
  	}
  
@@ -1087,7 +1277,7 @@ index 5e34f8904..8eae496e0 100644
  	// Set the phase to "failed" if any of Status.FailureReason or Status.FailureMessage is not-nil.
  	if m.Status.FailureReason != nil || m.Status.FailureMessage != nil {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseFailed)
-@@ -307,6 +315,113 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+@@ -321,6 +329,113 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
  		return ctrl.Result{}, errors.Wrapf(err, "failed to retrieve addresses from infrastructure provider for Machine %q in namespace %q", m.Name, m.Namespace)
  	}
  
@@ -1344,5 +1534,5 @@ index d72947ecf..e830011d9 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.39.3 (Apple Git-145)
+2.42.0
 
