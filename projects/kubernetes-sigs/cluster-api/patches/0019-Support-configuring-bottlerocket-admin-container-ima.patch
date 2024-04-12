@@ -1,0 +1,1089 @@
+From 53074d3ab3f3bdd81b4679ff14636289f28f22cc Mon Sep 17 00:00:00 2001
+From: Jiayi Wang <jiayiwang7@yahoo.com>
+Date: Wed, 23 Nov 2022 09:26:28 -0500
+Subject: [PATCH 19/40] Support configuring bottlerocket admin container image
+
+---
+ .../kubeadm/api/v1alpha4/kubeadm_types.go     | 17 ++++
+ .../api/v1alpha4/zz_generated.conversion.go   | 46 +++++++++
+ .../api/v1alpha4/zz_generated.deepcopy.go     | 18 ++++
+ .../kubeadm/api/v1beta1/kubeadm_types.go      | 17 ++++
+ .../api/v1beta1/zz_generated.deepcopy.go      | 18 ++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 90 +++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 96 +++++++++++++++++++
+ .../internal/bottlerocket/bootstrap_test.go   | 82 +++++++++++++++-
+ .../internal/bottlerocket/bottlerocket.go     |  2 +
+ .../controllers/kubeadmconfig_controller.go   |  3 +
+ .../kubeadm/types/upstreamv1beta1/types.go    | 17 ++++
+ .../upstreamv1beta1/zz_generated.deepcopy.go  | 18 ++++
+ .../zz_generated.conversion.go                |  2 +
+ .../zz_generated.conversion.go                |  2 +
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 96 +++++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 68 +++++++++++++
+ 16 files changed, 590 insertions(+), 2 deletions(-)
+
+diff --git a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
+index 592c257b8..f1e5eee19 100644
+--- a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
+@@ -71,6 +71,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketAdmin holds the image source for admin container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketAdmin BottlerocketAdmin `json:"bottlerocketAdmin,omitempty"`
++
+ 	// BottlerocketControl holds the image source for control container
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -177,6 +182,13 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// BottlerocketAdmin holds the settings of admin container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketAdmin struct {
++	// ImageMeta allows to customize the image used for the BottlerocketAdmin component
++	ImageMeta `json:",inline"`
++}
++
+ // BottlerocketControl holds the settings of control container for bottlerocket nodes
+ // This setting is ONLY for bottlerocket nodes.
+ type BottlerocketControl struct {
+@@ -422,6 +434,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketAdmin holds the image source for admin container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketAdmin BottlerocketAdmin `json:"bottlerocketAdmin,omitempty"`
++
+ 	// BottlerocketControl holds the image source for control container
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
+index 2b70d0c11..c3bdb3831 100644
+--- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
+@@ -90,6 +90,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketAdmin)(nil), (*v1beta1.BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_BottlerocketAdmin_To_v1beta1_BottlerocketAdmin(a.(*BottlerocketAdmin), b.(*v1beta1.BottlerocketAdmin), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketAdmin)(nil), (*BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketAdmin_To_v1alpha4_BottlerocketAdmin(a.(*v1beta1.BottlerocketAdmin), b.(*BottlerocketAdmin), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketBootstrap)(nil), (*v1beta1.BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(a.(*BottlerocketBootstrap), b.(*v1beta1.BottlerocketBootstrap), scope)
+ 	}); err != nil {
+@@ -611,6 +621,30 @@ func Convert_v1beta1_BootstrapTokenString_To_v1alpha4_BootstrapTokenString(in *v
+ 	return autoConvert_v1beta1_BootstrapTokenString_To_v1alpha4_BootstrapTokenString(in, out, s)
+ }
+ 
++func autoConvert_v1alpha4_BottlerocketAdmin_To_v1beta1_BottlerocketAdmin(in *BottlerocketAdmin, out *v1beta1.BottlerocketAdmin, s conversion.Scope) error {
++	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1alpha4_BottlerocketAdmin_To_v1beta1_BottlerocketAdmin is an autogenerated conversion function.
++func Convert_v1alpha4_BottlerocketAdmin_To_v1beta1_BottlerocketAdmin(in *BottlerocketAdmin, out *v1beta1.BottlerocketAdmin, s conversion.Scope) error {
++	return autoConvert_v1alpha4_BottlerocketAdmin_To_v1beta1_BottlerocketAdmin(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketAdmin_To_v1alpha4_BottlerocketAdmin(in *v1beta1.BottlerocketAdmin, out *BottlerocketAdmin, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_v1alpha4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketAdmin_To_v1alpha4_BottlerocketAdmin is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketAdmin_To_v1alpha4_BottlerocketAdmin(in *v1beta1.BottlerocketAdmin, out *BottlerocketAdmin, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketAdmin_To_v1alpha4_BottlerocketAdmin(in, out, s)
++}
++
+ func autoConvert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
+ 	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
+ 		return err
+@@ -728,6 +762,9 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(i
+ 	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1alpha4_BottlerocketAdmin_To_v1beta1_BottlerocketAdmin(&in.BottlerocketAdmin, &out.BottlerocketAdmin, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+@@ -778,6 +815,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketAdmin_To_v1alpha4_BottlerocketAdmin(&in.BottlerocketAdmin, &out.BottlerocketAdmin, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+@@ -1166,6 +1206,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
+ 	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1alpha4_BottlerocketAdmin_To_v1beta1_BottlerocketAdmin(&in.BottlerocketAdmin, &out.BottlerocketAdmin, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+@@ -1200,6 +1243,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketAdmin_To_v1alpha4_BottlerocketAdmin(&in.BottlerocketAdmin, &out.BottlerocketAdmin, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
+index c7f644c8f..4688180f0 100644
+--- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
+@@ -142,6 +142,22 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketAdmin) DeepCopyInto(out *BottlerocketAdmin) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketAdmin.
++func (in *BottlerocketAdmin) DeepCopy() *BottlerocketAdmin {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketAdmin)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
+ 	*out = *in
+@@ -212,6 +228,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketAdmin = in.BottlerocketAdmin
+ 	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+@@ -591,6 +608,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketAdmin = in.BottlerocketAdmin
+ 	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+index 48e5f4b8e..409d724b3 100644
+--- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
++++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
+@@ -83,6 +83,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketAdmin holds the image source for admin container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketAdmin BottlerocketAdmin `json:"bottlerocketAdmin,omitempty"`
++
+ 	// BottlerocketControl holds the image source for control container
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -196,6 +201,13 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// BottlerocketAdmin holds the settings of admin container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketAdmin struct {
++	// ImageMeta allows to customize the image used for the BottlerocketAdmin component
++	ImageMeta `json:",inline"`
++}
++
+ // BottlerocketControl holds the settings of control container for bottlerocket nodes
+ // This setting is ONLY for bottlerocket nodes.
+ type BottlerocketControl struct {
+@@ -498,6 +510,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketAdmin holds the image source for admin container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketAdmin BottlerocketAdmin `json:"bottlerocketAdmin,omitempty"`
++
+ 	// BottlerocketControl holds the image source for control container
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
+index 64e4eeff7..ca5525885 100644
+--- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
+@@ -142,6 +142,22 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketAdmin) DeepCopyInto(out *BottlerocketAdmin) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketAdmin.
++func (in *BottlerocketAdmin) DeepCopy() *BottlerocketAdmin {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketAdmin)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
+ 	*out = *in
+@@ -212,6 +228,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketAdmin = in.BottlerocketAdmin
+ 	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+@@ -636,6 +653,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketAdmin = in.BottlerocketAdmin
+ 	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index b395ccd39..aad4846c8 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -103,6 +103,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketAdmin:
++                    description: BottlerocketAdmin holds the image source for admin
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   bottlerocketBootstrap:
+                     description: BottlerocketBootstrap holds the image source for
+                       kubeadm bootstrap container This is only for bottlerocket
+@@ -815,6 +830,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketAdmin:
++                    description: BottlerocketAdmin holds the image source for admin
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   bottlerocketBootstrap:
+                     description: BottlerocketBootstrap holds the image source for
+                       kubeadm bootstrap container This is only for bottlerocket
+@@ -1406,6 +1436,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketAdmin:
++                    description: BottlerocketAdmin holds the image source for admin
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   bottlerocketBootstrap:
+                     description: BottlerocketBootstrap holds the image source for
+                       kubeadm bootstrap container This is only for bottlerocket
+@@ -2114,6 +2159,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketAdmin:
++                    description: BottlerocketAdmin holds the image source for admin
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   bottlerocketBootstrap:
+                     description: BottlerocketBootstrap holds the image source for
+                       kubeadm bootstrap container This is only for bottlerocket
+@@ -2703,6 +2763,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketAdmin:
++                    description: BottlerocketAdmin holds the image source for admin
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   bottlerocketBootstrap:
+                     description: BottlerocketBootstrap holds the image source for
+                       kubeadm bootstrap container This is only for bottlerocket
+@@ -3480,6 +3555,21 @@ spec:
+                       schemas to the latest internal value, and may reject unrecognized
+                       values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                     type: string
++                  bottlerocketAdmin:
++                    description: BottlerocketAdmin holds the image source for admin
++                      container This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: ImageRepository sets the container registry to
++                          pull images from. if not set, the ImageRepository defined
++                          in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically
++                          the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   bottlerocketBootstrap:
+                     description: BottlerocketBootstrap holds the image source for
+                       kubeadm bootstrap container This is only for bottlerocket
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 866c5de60..67d0f44e5 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -111,6 +111,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketAdmin:
++                            description: BottlerocketAdmin holds the image source
++                              for admin container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           bottlerocketBootstrap:
+                             description: BottlerocketBootstrap holds the image source
+                               for kubeadm bootstrap container This is only for bottlerocket
+@@ -868,6 +884,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketAdmin:
++                            description: BottlerocketAdmin holds the image source
++                              for admin container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           bottlerocketBootstrap:
+                             description: BottlerocketBootstrap holds the image source
+                               for kubeadm bootstrap container This is only for bottlerocket
+@@ -1424,6 +1456,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketAdmin:
++                            description: BottlerocketAdmin holds the image source
++                              for admin container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           bottlerocketBootstrap:
+                             description: BottlerocketBootstrap holds the image source
+                               for kubeadm bootstrap container This is only for bottlerocket
+@@ -2179,6 +2227,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketAdmin:
++                            description: BottlerocketAdmin holds the image source
++                              for admin container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           bottlerocketBootstrap:
+                             description: BottlerocketBootstrap holds the image source
+                               for kubeadm bootstrap container This is only for bottlerocket
+@@ -2758,6 +2822,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketAdmin:
++                            description: BottlerocketAdmin holds the image source
++                              for admin container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           bottlerocketBootstrap:
+                             description: BottlerocketBootstrap holds the image source
+                               for kubeadm bootstrap container This is only for bottlerocket
+@@ -3590,6 +3670,22 @@ spec:
+                               convert recognized schemas to the latest internal value,
+                               and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                             type: string
++                          bottlerocketAdmin:
++                            description: BottlerocketAdmin holds the image source
++                              for admin container This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: ImageRepository sets the container registry
++                                  to pull images from. if not set, the ImageRepository
++                                  defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: ImageTag allows to specify a tag for
++                                  the image. In case this value is set, kubeadm does
++                                  not change automatically the version of the above
++                                  components during upgrades.
++                                type: string
++                            type: object
+                           bottlerocketBootstrap:
+                             description: BottlerocketBootstrap holds the image source
+                               for kubeadm bootstrap container This is only for bottlerocket
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+index 9065a7c58..5ee1b0d45 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+@@ -8,7 +8,44 @@ import (
+ 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
+ )
+ 
+-const userData = `
++const userDataFullSetting = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++source = "REPO:TAG"
++user-data = "B64USERDATA"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "REPO:TAG"
++user-data = "B64USERDATA"
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE"
++provider-id = "PROVIDERID"
++
++[settings.bootstrap-containers.BOOTSTRAP]
++essential = false
++mode = "MODE"
++user-data = "B64USERDATA"
++[settings.network]
++https-proxy = "PROXY"
++no-proxy = []
++[settings.container-registry.mirrors]
++"public.ecr.aws" = ["https://REGISTRYENDPOINT"]
++[settings.pki.registry-mirror-ca]
++data = "REGISTRYCA"
++trusted=true
++[settings.kubernetes.node-labels]
++KEY=VAR
++[settings.kubernetes.node-taints]
++KEY=VAR`
++
++const userDataNoAdminImage = `
+ [settings.host-containers.admin]
+ enabled = true
+ superpowered = true
+@@ -66,6 +103,47 @@ func TestGenerateUserData(t *testing.T) {
+ 					{
+ 						Name:         "admin",
+ 						Superpowered: true,
++						ImageMeta: bootstrapv1.ImageMeta{
++							ImageRepository: "REPO",
++							ImageTag:        "TAG",
++						},
++						UserData: "B64USERDATA",
++					},
++					{
++						Name:         "kubeadm-bootstrap",
++						Superpowered: true,
++						ImageMeta: bootstrapv1.ImageMeta{
++							ImageRepository: "REPO",
++							ImageTag:        "TAG",
++						},
++						UserData: "B64USERDATA",
++					},
++				},
++				BootstrapContainers: []bootstrapv1.BottlerocketBootstrapContainer{
++					{
++						Name:     "BOOTSTRAP",
++						Mode:     "MODE",
++						UserData: "B64USERDATA",
++					},
++				},
++			},
++			output: userDataFullSetting,
++		},
++		{
++			name: "no admin image meta",
++			input: &BottlerocketSettingsInput{
++				PauseContainerSource:   "PAUSE",
++				HTTPSProxyEndpoint:     "PROXY",
++				RegistryMirrorEndpoint: "REGISTRYENDPOINT",
++				RegistryMirrorCACert:   "REGISTRYCA",
++				NodeLabels:             "KEY=VAR",
++				Taints:                 "KEY=VAR",
++				ProviderId:             "PROVIDERID",
++				HostContainers: []bootstrapv1.BottlerocketHostContainer{
++					{
++						Name:         "admin",
++						Superpowered: true,
++						ImageMeta:    bootstrapv1.ImageMeta{},
+ 						UserData:     "B64USERDATA",
+ 					},
+ 					{
+@@ -86,7 +164,7 @@ func TestGenerateUserData(t *testing.T) {
+ 					},
+ 				},
+ 			},
+-			output: userData,
++			output: userDataNoAdminImage,
+ 		},
+ 	}
+ 	for _, testcase := range testcases {
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index e504684a0..9848f47e8 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -25,6 +25,7 @@ const (
+ type BottlerocketConfig struct {
+ 	Pause                                 bootstrapv1.Pause
+ 	BottlerocketBootstrap                 bootstrapv1.BottlerocketBootstrap
++	BottlerocketAdmin                     bootstrapv1.BottlerocketAdmin
+ 	BottlerocketControl                   bootstrapv1.BottlerocketControl
+ 	ProxyConfiguration                    bootstrapv1.ProxyConfiguration
+ 	RegistryMirrorConfiguration           bootstrapv1.RegistryMirrorConfiguration
+@@ -160,6 +161,7 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 		{
+ 			Name:         "admin",
+ 			Superpowered: true,
++			ImageMeta:    config.BottlerocketAdmin.ImageMeta,
+ 			UserData:     b64AdminContainerUserData,
+ 		},
+ 		{
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 7cc63012c..f4f3624c4 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -475,6 +475,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+ 			Pause:                                 scope.Config.Spec.ClusterConfiguration.Pause,
+ 			BottlerocketBootstrap:                 scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketAdmin:                     scope.Config.Spec.ClusterConfiguration.BottlerocketAdmin,
+ 			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
+@@ -682,6 +683,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+ 			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
+ 			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketAdmin:                     scope.Config.Spec.JoinConfiguration.BottlerocketAdmin,
+ 			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
+@@ -811,6 +813,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+ 			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
+ 			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketAdmin:                     scope.Config.Spec.JoinConfiguration.BottlerocketAdmin,
+ 			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/types.go b/bootstrap/kubeadm/types/upstreamv1beta1/types.go
+index f35b90a43..43b0bf856 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/types.go
+@@ -65,6 +65,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketAdmin holds the image source for admin container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketAdmin BottlerocketAdmin `json:"bottlerocketAdmin,omitempty"`
++
+ 	// BottlerocketControl holds the image source for control container
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -175,6 +180,13 @@ type BottlerocketBootstrap struct {
+ 	ImageMeta `json:",inline"`
+ }
+ 
++// BottlerocketAdmin holds the settings of admin container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketAdmin struct {
++	// ImageMeta allows to customize the image used for the BottlerocketAdmin component
++	ImageMeta `json:",inline"`
++}
++
+ // BottlerocketControl holds the settings of control container for bottlerocket nodes
+ // This setting is ONLY for bottlerocket nodes.
+ type BottlerocketControl struct {
+@@ -411,6 +423,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
+ 
++	// BottlerocketAdmin holds the image source for admin container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketAdmin BottlerocketAdmin `json:"bottlerocketAdmin,omitempty"`
++
+ 	// BottlerocketControl holds the image source for control container
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
+index 531086227..ecbb70ea6 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
+@@ -141,6 +141,22 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketAdmin) DeepCopyInto(out *BottlerocketAdmin) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketAdmin.
++func (in *BottlerocketAdmin) DeepCopy() *BottlerocketAdmin {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketAdmin)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
+ 	*out = *in
+@@ -211,6 +227,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketAdmin = in.BottlerocketAdmin
+ 	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+@@ -490,6 +507,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketAdmin = in.BottlerocketAdmin
+ 	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+index 2e3bc99ea..8b6475592 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+@@ -528,6 +528,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfigur
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	// WARNING: in.BottlerocketAdmin requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+@@ -844,6 +845,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	// WARNING: in.BottlerocketAdmin requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index 1b2d94a1d..4584e6266 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -532,6 +532,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	// WARNING: in.BottlerocketAdmin requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+@@ -836,6 +837,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	// WARNING: in.BottlerocketAdmin requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 83e45839a..119558689 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -178,6 +178,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketAdmin:
++                        description: BottlerocketAdmin holds the image source for
++                          admin container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       bottlerocketBootstrap:
+                         description: BottlerocketBootstrap holds the image source
+                           for kubeadm bootstrap container This is only for bottlerocket
+@@ -919,6 +935,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketAdmin:
++                        description: BottlerocketAdmin holds the image source for
++                          admin container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       bottlerocketBootstrap:
+                         description: BottlerocketBootstrap holds the image source
+                           for kubeadm bootstrap container This is only for bottlerocket
+@@ -1646,6 +1678,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketAdmin:
++                        description: BottlerocketAdmin holds the image source for
++                          admin container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       bottlerocketBootstrap:
+                         description: BottlerocketBootstrap holds the image source
+                           for kubeadm bootstrap container This is only for bottlerocket
+@@ -2384,6 +2432,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketAdmin:
++                        description: BottlerocketAdmin holds the image source for
++                          admin container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       bottlerocketBootstrap:
+                         description: BottlerocketBootstrap holds the image source
+                           for kubeadm bootstrap container This is only for bottlerocket
+@@ -3195,6 +3259,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketAdmin:
++                        description: BottlerocketAdmin holds the image source for
++                          admin container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       bottlerocketBootstrap:
+                         description: BottlerocketBootstrap holds the image source
+                           for kubeadm bootstrap container This is only for bottlerocket
+@@ -4006,6 +4086,22 @@ spec:
+                           schemas to the latest internal value, and may reject unrecognized
+                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                         type: string
++                      bottlerocketAdmin:
++                        description: BottlerocketAdmin holds the image source for
++                          admin container This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: ImageRepository sets the container registry
++                              to pull images from. if not set, the ImageRepository
++                              defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: ImageTag allows to specify a tag for the
++                              image. In case this value is set, kubeadm does not change
++                              automatically the version of the above components during
++                              upgrades.
++                            type: string
++                        type: object
+                       bottlerocketBootstrap:
+                         description: BottlerocketBootstrap holds the image source
+                           for kubeadm bootstrap container This is only for bottlerocket
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 8ddae49c7..66e39e74a 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -125,6 +125,23 @@ spec:
+                                   value, and may reject unrecognized values. More
+                                   info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                                 type: string
++                              bottlerocketAdmin:
++                                description: BottlerocketAdmin holds the image source
++                                  for admin container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               bottlerocketBootstrap:
+                                 description: BottlerocketBootstrap holds the image
+                                   source for kubeadm bootstrap container This is only
+@@ -913,6 +930,23 @@ spec:
+                                   value, and may reject unrecognized values. More
+                                   info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                                 type: string
++                              bottlerocketAdmin:
++                                description: BottlerocketAdmin holds the image source
++                                  for admin container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               bottlerocketBootstrap:
+                                 description: BottlerocketBootstrap holds the image
+                                   source for kubeadm bootstrap container This is only
+@@ -1658,6 +1692,23 @@ spec:
+                                   value, and may reject unrecognized values. More
+                                   info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                                 type: string
++                              bottlerocketAdmin:
++                                description: BottlerocketAdmin holds the image source
++                                  for admin container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               bottlerocketBootstrap:
+                                 description: BottlerocketBootstrap holds the image
+                                   source for kubeadm bootstrap container This is only
+@@ -2525,6 +2576,23 @@ spec:
+                                   value, and may reject unrecognized values. More
+                                   info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                                 type: string
++                              bottlerocketAdmin:
++                                description: BottlerocketAdmin holds the image source
++                                  for admin container This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: ImageRepository sets the container
++                                      registry to pull images from. if not set, the
++                                      ImageRepository defined in ClusterConfiguration
++                                      will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: ImageTag allows to specify a tag
++                                      for the image. In case this value is set, kubeadm
++                                      does not change automatically the version of
++                                      the above components during upgrades.
++                                    type: string
++                                type: object
+                               bottlerocketBootstrap:
+                                 description: BottlerocketBootstrap holds the image
+                                   source for kubeadm bootstrap container This is only
+-- 
+2.42.0
+
