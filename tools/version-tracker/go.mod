@@ -1,6 +1,6 @@
 module github.com/aws/eks-anywhere-build-tooling/tools/version-tracker
 
-go 1.20
+go 1.22
 
 require (
 	github.com/aws/eks-anywhere v0.18.3

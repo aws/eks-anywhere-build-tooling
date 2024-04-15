@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/command"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/file"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/logger"
-	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/slices"
 )
 
 // Run contains the business logic to execute the `upgrade` subcommand.
@@ -93,9 +93,9 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 	var headBranchName, baseBranchName, commitMessage, pullRequestBody string
 	if isEKSDistroUpgrade(projectName) {
-		headBranchName = "update-eks-d-latest-releases"
+		headBranchName = "update-eks-distro-latest-releases"
 		baseBranchName = constants.MainBranchName
-		commitMessage = fmt.Sprintf("Bump EKS-D releases to latest")
+		commitMessage = "Bump EKS Distro releases to latest"
 		pullRequestBody = constants.EKSDistroUpgradePullRequestBody
 
 		// Checkout a new branch to keep track of version upgrade chaneges.
@@ -131,14 +131,10 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			projectHasPatches = true
 			patchFiles, err := os.ReadDir(filepath.Join(projectRootFilepath, constants.PatchesDirectory))
 			if err != nil {
-				return fmt.Errorf("reading patch directory: %v", err)
+				return fmt.Errorf("reading patches directory: %v", err)
 			}
 			totalPatchCount = len(patchFiles)
 		}
-
-		headBranchName = fmt.Sprintf("update-%s-%s", projectOrg, projectRepo)
-		baseBranchName = constants.MainBranchName
-		commitMessage = fmt.Sprintf("Bump %s to latest release", projectName)
 
 		// Load upstream projects tracker file.
 		upstreamProjectsTrackerFilePath := filepath.Join(buildToolingRepoPath, constants.UpstreamProjectsTrackerFile)
@@ -148,16 +144,38 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		}
 
 		// Validate whether the given project is release-branched.
+		var isReleaseBranched bool
+		var releaseBranch string
+		var currentVersion types.Version
+		var versionIndex int
 		if len(targetRepo.Versions) > 1 {
-			return fmt.Errorf("release-branched projects not supported at this time")
+			isReleaseBranched = true
 		}
+		if isReleaseBranched {
+			supportedReleaseBranches, err := getSupportedReleaseBranches(buildToolingRepoPath)
+			if err != nil {
+				return fmt.Errorf("getting supported EKS Distro release branches: %v", err)
+			}
+			releaseBranch = os.Getenv(constants.ReleaseBranchEnvvar)
+			versionIndex = slices.Index(supportedReleaseBranches, releaseBranch)
+		} else {
+			versionIndex = 0
+		}
+		currentVersion = targetRepo.Versions[versionIndex]
 
-		currentVersion := targetRepo.Versions[0]
 		// Validate whether the project builds off a commit hash instead of a tag.
 		if currentVersion.Tag == "" {
 			return fmt.Errorf("projects tracked with commit hashes not supported at this time")
 		}
 		currentRevision := currentVersion.Tag
+
+		headBranchName = fmt.Sprintf("update-%s-%s", projectOrg, projectRepo)
+		baseBranchName = constants.MainBranchName
+		commitMessage = fmt.Sprintf("Bump %s to latest release", projectName)
+		if isReleaseBranched {
+			headBranchName = fmt.Sprintf("update-%s-%s-%s", projectOrg, projectRepo, releaseBranch)
+			commitMessage = fmt.Sprintf("Bump %s %s release branch to latest release", projectName, releaseBranch)
+		}
 
 		var latestRevision string
 		var needsUpgrade bool
@@ -168,7 +186,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			}
 		} else {
 			// Get latest revision for the project from GitHub.
-			latestRevision, needsUpgrade, err = github.GetLatestRevision(client, projectOrg, projectRepo, currentRevision)
+			latestRevision, needsUpgrade, err = github.GetLatestRevision(client, projectOrg, projectRepo, currentRevision, isReleaseBranched)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from GitHub: %v", err)
 			}
@@ -200,11 +218,11 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 				if err != nil {
 					return fmt.Errorf("reloading upstream projects tracker file: %v", err)
 				}
-				targetRepo.Versions[0].Tag = latestRevision
+				targetRepo.Versions[versionIndex].Tag = latestRevision
 
 				// Update the Git tag file corresponding to the project
 				logger.Info("Updating Git tag file corresponding to the project")
-				projectGitTagRelativePath, err := updateProjectVersionFile(buildToolingRepoPath, constants.GitTagFile, projectName, latestRevision)
+				projectGitTagRelativePath, err := updateProjectVersionFile(buildToolingRepoPath, constants.GitTagFile, projectName, latestRevision, releaseBranch, isReleaseBranched)
 				if err != nil {
 					return fmt.Errorf("updating project GIT_TAG file: %v", err)
 				}
@@ -234,10 +252,10 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					// If the Go version has been updated in the latest revision, then update the Go version file corresponding to the project.
 					if latestGoMinorVersion > currentGoMinorVersion {
 						logger.Info("Project Go version needs to be updated.", "Current Go version", currentGoVersion, "Latest Go version", latestGoVersion)
-						targetRepo.Versions[0].GoVersion = latestGoVersion
+						targetRepo.Versions[versionIndex].GoVersion = latestGoVersion
 
 						logger.Info("Updating Go version file corresponding to the project")
-						projectGoVersionRelativePath, err := updateProjectVersionFile(buildToolingRepoPath, constants.GoVersionFile, projectName, latestGoVersion)
+						projectGoVersionRelativePath, err := updateProjectVersionFile(buildToolingRepoPath, constants.GoVersionFile, projectName, latestGoVersion, releaseBranch, isReleaseBranched)
 						if err != nil {
 							return fmt.Errorf("updating project GOLANG_VERSION file: %v", err)
 						}
@@ -245,7 +263,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					}
 				} else {
 					latestGoVersion = "N/A"
-					targetRepo.Versions[0].GoVersion = latestGoVersion
+					targetRepo.Versions[versionIndex].GoVersion = latestGoVersion
 				}
 
 				// Update the tag and Go version in the section of the upstream projects tracker file corresponding to the given project.
@@ -283,9 +301,16 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 				// If project doesn't have patches, or it does and they were applied successfully, then update the checksums file
 				// and attribution file(s) corresponding to the project.
 				if !projectHasPatches || patchApplySucceeded {
-					if _, err := os.Stat(filepath.Join(projectRootFilepath, constants.ChecksumsFile)); err == nil {
+					projectChecksumsFile := filepath.Join(projectRootFilepath, constants.ChecksumsFile)
+					projectChecksumsFileRelativePath := filepath.Join(projectPath, constants.ChecksumsFile)
+					projectAttributionFileGlob := filepath.Join(projectRootFilepath, constants.AttributionsFilePattern)
+					if isReleaseBranched {
+						projectChecksumsFile = filepath.Join(projectRootFilepath, releaseBranch, constants.ChecksumsFile)
+						projectChecksumsFileRelativePath = filepath.Join(projectPath, releaseBranch, constants.ChecksumsFile)
+						projectAttributionFileGlob = filepath.Join(projectRootFilepath, releaseBranch, constants.AttributionsFilePattern)
+					}
+					if _, err := os.Stat(projectChecksumsFile); err == nil {
 						logger.Info("Updating project checksums and attribution files")
-						projectChecksumsFileRelativePath := filepath.Join(projectPath, constants.ChecksumsFile)
 						err = updateChecksumsAttributionFiles(projectRootFilepath)
 						if err != nil {
 							return fmt.Errorf("updating project checksums and attribution files: %v", err)
@@ -294,7 +319,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 						// Attribution files can have a binary name prefix so we use a common prefix regular expression
 						// and glob them to cover all possibilities.
-						projectAttributionFileGlob, err := filepath.Glob(filepath.Join(projectRootFilepath, constants.AttributionsFilePattern))
+						projectAttributionFileGlob, err := filepath.Glob(projectAttributionFileGlob)
 						if err != nil {
 							return fmt.Errorf("finding filenames matching attribution file pattern [%s]: %v", constants.AttributionsFilePattern, err)
 						}
@@ -465,8 +490,11 @@ func getLatestEKSDistroRelease(client *gogithub.Client, branch string) (int, str
 }
 
 // updateProjectVersionFile updates the version information stored in a specific file.
-func updateProjectVersionFile(buildToolingRepoPath, filename, projectName, value string) (string, error) {
+func updateProjectVersionFile(buildToolingRepoPath, filename, projectName, value, releaseBranch string, isReleaseBranched bool) (string, error) {
 	fileRelativepath := filepath.Join("projects", projectName, filename)
+	if isReleaseBranched {
+		fileRelativepath = filepath.Join("projects", projectName, releaseBranch, filename)
+	}
 	fileAbsolutepath := filepath.Join(buildToolingRepoPath, fileRelativepath)
 	fileAbsolutePathStat, err := os.Stat(fileAbsolutepath)
 	if err != nil {
@@ -610,7 +638,7 @@ func updateChecksumsAttributionFiles(projectRootFilepath string) error {
 	return nil
 }
 
-// updateChecksumsAttributionFiles runs a script to update the version in the README file corresponding
+// updateProjectReadmeVersion runs a script to update the version in the README file corresponding
 // to the project being upgraded.
 func updateProjectReadmeVersion(buildToolingRepoPath, projectOrg, projectRepo string) error {
 	readmeUpdateScriptFilepath := filepath.Join(buildToolingRepoPath, constants.ReadmeUpdateScriptFile)
@@ -668,7 +696,7 @@ func updateBottlerocketVersionFiles(client *gogithub.Client, projectRootFilepath
 		}
 	}
 
-	latestBottlerocketVersion, needsUpgrade, err := github.GetLatestRevision(client, "bottlerocket-os", "bottlerocket", currentBottlerocketVersion)
+	latestBottlerocketVersion, needsUpgrade, err := github.GetLatestRevision(client, "bottlerocket-os", "bottlerocket", currentBottlerocketVersion, false)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("getting latest Bottlerocket version from GitHub: %v", err)
 	}

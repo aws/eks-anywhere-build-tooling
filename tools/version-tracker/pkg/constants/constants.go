@@ -11,6 +11,7 @@ const (
 	GitHubTokenEnvvar                       = "GITHUB_TOKEN"
 	CommitAuthorNameEnvvar                  = "COMMIT_AUTHOR_NAME"
 	CommitAuthorEmailEnvvar                 = "COMMIT_AUTHOR_EMAIL"
+	ReleaseBranchEnvvar                     = "RELEASE_BRANCH"
 	DefaultCommitAuthorName                 = "EKS Distro PR Bot"
 	DefaultCommitAuthorEmail                = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
 	BuildToolingRepoName                    = "eks-anywhere-build-tooling"
@@ -234,6 +235,18 @@ var (
 		"kube-vip/kube-vip": {
 			SourceOfTruthFile:     "Dockerfile",
 			GoVersionSearchString: `golang:(1\.\d\d)`,
+		},
+		"kubernetes/autoscaler": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"kubernetes/cloud-provider-aws": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"kubernetes/cloud-provider-vsphere": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
 		},
 		"kubernetes-sigs/cluster-api-provider-cloudstack": {
 			SourceOfTruthFile:     "go.mod",

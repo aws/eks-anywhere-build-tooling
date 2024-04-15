@@ -19,33 +19,6 @@ import (
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/version"
 )
 
-// getReleasesForRepo retrieves the list of releases for the given GitHub repository.
-func getReleasesForRepo(client *github.Client, org, repo string) ([]*github.RepositoryRelease, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting releases for [%s/%s] repository", org, repo))
-	var allReleases []*github.RepositoryRelease
-	listReleasesOptions := &github.ListOptions{
-		PerPage: constants.GithubPerPage,
-	}
-
-	for {
-		releases, resp, err := client.Repositories.ListReleases(context.Background(), org, repo, listReleasesOptions)
-		if err != nil {
-			return nil, fmt.Errorf("calling ListReleases API for [%s/%s] repository: %v", org, repo, err)
-		}
-		for _, release := range releases {
-			if !*release.Prerelease {
-				allReleases = append(allReleases, release)
-			}
-		}
-		if resp.NextPage == 0 {
-			break
-		}
-		listReleasesOptions.Page = resp.NextPage
-	}
-
-	return allReleases, nil
-}
-
 // getTagsForRepo retrieves the list of tags for the given GitHub repository.
 func getTagsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryTag, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting tags for [%s/%s] repository", org, repo))
@@ -122,16 +95,10 @@ func GetFileContents(client *github.Client, org, repo, filePath, ref string) ([]
 }
 
 // GetLatestRevision returns the latest revision (GitHub release or tag) for a given GitHub repository.
-func GetLatestRevision(client *github.Client, org, repo, currentRevision string) (string, bool, error) {
+func GetLatestRevision(client *github.Client, org, repo, currentRevision string, releaseBranched bool) (string, bool, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository", org, repo))
 	var latestRevision string
 	needsUpgrade := false
-
-	// Get all GitHub releases for this project.
-	allReleases, err := getReleasesForRepo(client, org, repo)
-	if err != nil {
-		return "", false, fmt.Errorf("getting all releases for [%s/%s] repository: %v", org, repo, err)
-	}
 
 	// Get all GitHub tags for this project.
 	allTags, err := getTagsForRepo(client, org, repo)
@@ -148,16 +115,40 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string)
 		return "", false, fmt.Errorf("getting epoch time corresponding to current revision commit: %v", err)
 	}
 
+	currentRevisionForSemver := currentRevision
+	if org == "kubernetes" && repo == "autoscaler" {
+		currentRevisionForSemver = strings.ReplaceAll(currentRevisionForSemver, "cluster-autoscaler-", "")
+	}
 	// Get SemVer construct corresponding to the current revision tag.
-	currentRevisionSemver, err := semver.New(currentRevision)
+	currentRevisionSemver, err := semver.New(currentRevisionForSemver)
 	if err != nil {
 		return "", false, fmt.Errorf("getting semver for current version: %v", err)
 	}
 
-	// If the project has GitHub releases, determine the latest from among them.
-	if len(allReleases) > 0 {
-		for _, release := range allReleases {
-			latestRevision = *release.TagName
+	// If the project doesn't have GitHub releases but has tags on GitHub, determine the latest from among them.
+	if len(allTags) > 0 {
+		for _, tag := range allTags {
+			tagName := *tag.Name
+			tagNameForSemver := tagName
+			if org == "kubernetes" && repo == "autoscaler" {
+				if !strings.HasPrefix(tagName, "cluster-autoscaler-") {
+					continue
+				}
+				tagNameForSemver = strings.ReplaceAll(tagNameForSemver, "cluster-autoscaler-", "")
+			}
+			semverRegex := regexp.MustCompile(`v?\d+\.\d+\.\d+`)
+			if !semverRegex.MatchString(tagNameForSemver) {
+				continue
+			}
+			if releaseBranched {
+				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
+				releaseNumber := strings.Split(releaseBranch, "-")[1]
+				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v?1.%s.\d$`, releaseNumber))
+				if !tagRegex.MatchString(tagNameForSemver) {
+					continue
+				}
+			}
+			latestRevision = tagName
 
 			// Determine if upgrade is required based on current and latest revisions
 			upgradeRequired, shouldBreak, err := isUpgradeRequired(client, org, repo, latestRevision, currentRevisionCommitEpoch, currentRevisionSemver, allTags)
@@ -170,30 +161,13 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string)
 			}
 		}
 	} else {
-		// If the project doesn't have GitHub releases but has tags on GitHub, determine the latest from among them.
-		if len(allTags) > 0 {
-			for _, tag := range allTags {
-				latestRevision = *tag.Name
-
-				// Determine if upgrade is required based on current and latest revisions
-				upgradeRequired, shouldBreak, err := isUpgradeRequired(client, org, repo, latestRevision, currentRevisionCommitEpoch, currentRevisionSemver, allTags)
-				if err != nil {
-					return "", false, fmt.Errorf("determining if upgrade is required for project: %v", err)
-				}
-				if shouldBreak {
-					needsUpgrade = upgradeRequired
-					break
-				}
-			}
-		} else {
-			// If the project has neither Github releases nor tags, pick the latest commit.
-			allCommits, err := getCommitsForRepo(client, org, repo)
-			if err != nil {
-				return "", false, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
-			}
-			latestRevision = *allCommits[0].SHA
-			needsUpgrade = true
+		// If the project has neither Github releases nor tags, pick the latest commit.
+		allCommits, err := getCommitsForRepo(client, org, repo)
+		if err != nil {
+			return "", false, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
 		}
+		latestRevision = *allCommits[0].SHA
+		needsUpgrade = true
 	}
 
 	return latestRevision, needsUpgrade, nil
@@ -216,8 +190,12 @@ func isUpgradeRequired(client *github.Client, org, repo, latestRevision string, 
 		return false, false, fmt.Errorf("getting epoch time corresponding to latest revision commit: %v", err)
 	}
 
+	latestRevisionForSemver := latestRevision
+	if org == "kubernetes" && repo == "autoscaler" {
+		latestRevisionForSemver = strings.ReplaceAll(latestRevisionForSemver, "cluster-autoscaler-", "")
+	}
 	// Get SemVer construct corresponding to the latest revision tag.
-	latestRevisionSemver, err := semver.New(latestRevision)
+	latestRevisionSemver, err := semver.New(latestRevisionForSemver)
 	if err != nil {
 		return false, false, fmt.Errorf("getting semver for latest version: %v", err)
 	}
@@ -361,7 +339,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 		pullRequest.Body = github.String(body)
 		pullRequest, _, err = client.PullRequests.Edit(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, pullRequest)
 		if err != nil {
-			return fmt.Errorf("editing existing pull request %s: %v", *pullRequest.HTMLURL, err)
+			return fmt.Errorf("editing existing pull request [%s]: %v", *pullRequest.HTMLURL, err)
 		}
 
 		// If patches to the project failed to apply, check if the PR already has a comment warning about
