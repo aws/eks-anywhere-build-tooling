@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	gogithub "github.com/google/go-github/v53/github"
@@ -70,20 +71,36 @@ func Run(displayOptions *types.DisplayOptions) error {
 		org := project.Org
 		for _, repo := range project.Repos {
 			repoName := repo.Name
-			currentVersion := repo.Versions[len(repo.Versions)-1]
+			fullRepoName := fmt.Sprintf("%s/%s", org, repoName)
+			if displayOptions.ProjectName != "" && displayOptions.ProjectName != fullRepoName {
+				continue
+			}
+			var releaseBranched bool
+			var currentVersion types.Version
+			if len(repo.Versions) > 1 {
+				releaseBranched = true
+			}
+			if releaseBranched {
+				supportedReleaseBranches, err := getSupportedReleaseBranches(buildToolingRepoPath)
+				if err != nil {
+					return fmt.Errorf("getting supported EKS Distro release branches: %v", err)
+				}
+				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
+				releaseBranchIndex := slices.Index(supportedReleaseBranches, releaseBranch)
+				currentVersion = repo.Versions[releaseBranchIndex]
+			} else {
+				currentVersion = repo.Versions[0]
+			}
+
 			var currentRevision string
 			if currentVersion.Tag != "" {
 				currentRevision = currentVersion.Tag
 			} else if currentVersion.Commit != "" {
 				currentRevision = currentVersion.Commit
 			}
-			fullRepoName := fmt.Sprintf("%s/%s", org, repoName)
-			if displayOptions.ProjectName != "" && displayOptions.ProjectName != fullRepoName {
-				continue
-			}
 
 			// Get latest revision for the project from GitHub.
-			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision)
+			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision, releaseBranched)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from GitHub: %v", err)
 			}
@@ -112,4 +129,16 @@ func Run(displayOptions *types.DisplayOptions) error {
 	tbl.Print()
 
 	return nil
+}
+
+func getSupportedReleaseBranches(buildToolingRepoPath string) ([]string, error) {
+	supportedReleaseBranchesFilepath := filepath.Join(buildToolingRepoPath, constants.SupportedReleaseBranchesFile)
+
+	supportedReleaseBranchesFileContents, err := os.ReadFile(supportedReleaseBranchesFilepath)
+	if err != nil {
+		return nil, fmt.Errorf("reading supported release branches file: %v", err)
+	}
+	supportedK8sVersions := strings.Split(strings.TrimRight(string(supportedReleaseBranchesFileContents), "\n"), "\n")
+
+	return supportedK8sVersions, nil
 }
