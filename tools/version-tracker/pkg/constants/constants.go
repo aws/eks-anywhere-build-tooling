@@ -284,6 +284,10 @@ var (
 			SourceOfTruthFile:     ".github/workflows/ci.yaml",
 			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)"`,
 		},
+		"tinkerbell/rufio": {
+			SourceOfTruthFile:     ".github/workflows/ci.yaml",
+			GoVersionSearchString: `GO_VERSION: '(1\.\d\d)'`,
+		},
 	}
 
 	ProjectsWithUnconventionalUpgradeFlows = []string{
