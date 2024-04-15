@@ -1,5 +1,5 @@
 ## **Hegel**
-![Version](https://img.shields.io/badge/version-v0.10.1-blue)
+![Version](https://img.shields.io/badge/version-v0.12.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUFJ0a1NyeGo1SXlHVzFMWFp3YytQTk0zeXMrSE9oYUw2VFM2MUlpa0tkbmh5S3RGYUQwTzI5VC9KVUJ6ZUJYK3NZb05ZaU15SGVMMzFNSTdmL3lzUlBjPSIsIml2UGFyYW1ldGVyU3BlYyI6IllOR29JZFNSRUFoL2ROUkIiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Hegel](https://github.com/tinkerbell/hegel) is a gRPC and HTTP metadata service for Tinkerbell. Subscribes to changes in metadata, get notified when data is added/removed, etc.
