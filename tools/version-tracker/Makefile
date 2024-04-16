@@ -1,6 +1,11 @@
+SHELL := bash
+.SHELLFLAGS:=-eux -o pipefail -c
+BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
+
 BINARY_NAME?=version-tracker
 BINARY_PATH?=bin/$(BINARY_NAME)
-GO?=$(shell which go)
+GOLANG_VERSION=1.22
+GO ?= $(shell source $(BASE_DIRECTORY)/build/lib/common.sh && build::common::get_go_path $(GOLANG_VERSION))/go
 DRY_RUN?=false
 VERBOSITY?=0
 
