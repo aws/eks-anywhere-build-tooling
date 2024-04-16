@@ -1,0 +1,48 @@
+From f13510723306d174b108f76e6b0bd482905a99f8 Mon Sep 17 00:00:00 2001
+From: Ahree Hong <ahreeh@amazon.com>
+Date: Tue, 16 Apr 2024 17:31:46 -0700
+Subject: [PATCH] Remove .ONESHELL from Makefile
+
+Signed-off-by: Ahree Hong <ahreeh@amazon.com>
+---
+ Makefile | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index b29fe5c..bfa60fa 100644
+--- a/Makefile
++++ b/Makefile
+@@ -6,7 +6,6 @@ PATH  := $(PATH):$(PWD)/bin
+ # Use bash instead of plain sh and treat the shell as one shell script invocation.
+ SHELL 		:= bash
+ .SHELLFLAGS := -o pipefail -euc
+-.ONESHELL:
+ 
+ # Second expansion is used by the image targets to depend on their respective binaries. It is
+ # necessary because automatic variables are not set on first expansion.
+@@ -159,15 +158,16 @@ out/release/default/kustomization.yaml: config/default/kustomization.yaml
+ 	mkdir -p out/
+ 	cp -a config/ out/release/
+ 
+-out/release/tink.yaml: generate-manifests out/release/default/kustomization.yaml
+-	(
+-		cd out/release/default && \
+-		$(KUSTOMIZE) edit set image server=$(TINK_SERVER_IMAGE):$(TINK_CONTROLLER_TAG) controller=$(TINK_CONTROLLER_IMAGE):$(TINK_CONTROLLER_TAG) && \
+-		$(KUSTOMIZE) edit set namespace $(NAMESPACE) \
+-	)
++out/release/tink.yaml: generate-manifests out/release/default/kustomization.yaml set-manifest
+ 	$(KUSTOMIZE) build out/release/default -o $@
+ 	prettier --write $@
+ 
++.PHONY: set-manifest
++set-manifest:
++	cd out/release/default && \
++	$(KUSTOMIZE) edit set image server=$(TINK_SERVER_IMAGE):$(TINK_CONTROLLER_TAG) controller=$(TINK_CONTROLLER_IMAGE):$(TINK_CONTROLLER_TAG) && \
++	$(KUSTOMIZE) edit set namespace $(NAMESPACE)
++
+ .PHONY: release-manifests
+ release-manifests: out/release/tink.yaml ## Builds the manifests to publish with a release.
+ 
+-- 
+2.40.0
+
