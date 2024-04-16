@@ -32,7 +32,7 @@ You can find the latest version of this image [on ECR Public Gallery](https://ga
    1. Run `git format-patch <commit>`, where `<commit>` is the last upstream commit on that tag. Move the generated patches under the patches/ folder in this repo.
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes.
-   ex: [1.7.0 compared to 1.7.4](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/compare/v1.7.0...v1.8.5). Check if the [manifest-modification](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/blob/27368586949f746c6830a47dc2439cd5ebe57dd2/Makefile#L568) or [release-manifests](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/blob/27368586949f746c6830a47dc2439cd5ebe57dd2/Makefile#L577C9-L577C26)
+   ex: [1.7.0 compared to 1.7.4](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/compare/v1.7.0...v1.9.3). Check if the [manifest-modification](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/blob/27368586949f746c6830a47dc2439cd5ebe57dd2/Makefile#L568) or [release-manifests](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/blob/27368586949f746c6830a47dc2439cd5ebe57dd2/Makefile#L577C9-L577C26)
    targets have changed in the Makefile, and make the required changes in create_manifests.sh
 1. Check the go.mod file to see if the golang version has changed when updating a version. Update the field `GOLANG_VERSION` in
    Makefile to match the version upstream.
