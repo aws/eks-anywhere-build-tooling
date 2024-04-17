@@ -56,7 +56,7 @@ func getCommitsForRepo(client *github.Client, org, repo string) ([]*github.Repos
 	for {
 		commits, resp, err := client.Repositories.ListCommits(context.Background(), org, repo, listCommitOptions)
 		if err != nil {
-			return nil, fmt.Errorf("calling ListCommits for [%s/%s] repository: %v", org, repo, err)
+			return nil, fmt.Errorf("calling ListCommits API for [%s/%s] repository: %v", org, repo, err)
 		}
 		allCommits = append(allCommits, commits...)
 
@@ -148,6 +148,14 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 					continue
 				}
 			}
+			releaseForTag, _, err := client.Repositories.GetReleaseByTag(context.Background(), org, repo, tagName)
+			if err != nil {
+				return "", false, fmt.Errorf("calling GetReleaseByTag API for tag %s in [%s/%s] repository: %v", tagName, org, repo, err)
+			}
+			if *releaseForTag.Prerelease {
+				continue
+			}
+
 			latestRevision = tagName
 
 			// Determine if upgrade is required based on current and latest revisions
@@ -161,7 +169,7 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 			}
 		}
 	} else {
-		// If the project has neither Github releases nor tags, pick the latest commit.
+		// If the project does not have Github tags, pick the latest commit.
 		allCommits, err := getCommitsForRepo(client, org, repo)
 		if err != nil {
 			return "", false, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
@@ -202,7 +210,7 @@ func isUpgradeRequired(client *github.Client, org, repo, latestRevision string, 
 
 	// If the latest revision comes after the current revision both chronologically and semantically, then declare that
 	// an upgrade is required
-	if latestRevisionCommitEpoch > currentRevisionCommitEpoch && latestRevisionSemver.GreaterThan(currentRevisionSemver) {
+	if latestRevisionSemver.GreaterThan(currentRevisionSemver) || latestRevisionCommitEpoch > currentRevisionCommitEpoch {
 		needsUpgrade = true
 		shouldBreak = true
 	} else if latestRevisionSemver.Equal(currentRevisionSemver) {
@@ -236,7 +244,7 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 	if _, ok := constants.ProjectReleaseAssets[projectFullName]; ok {
 		release, _, err := client.Repositories.GetReleaseByTag(context.Background(), org, repo, latestRevision)
 		if err != nil {
-			return "", fmt.Errorf("calling GetReleaseByTag for tag %s in [%s/%s] repository: %v", latestRevision, org, repo, err)
+			return "", fmt.Errorf("calling GetReleaseByTag API for tag %s in [%s/%s] repository: %v", latestRevision, org, repo, err)
 		}
 		var tarballName, tarballUrl string
 		projectReleaseAsset := constants.ProjectReleaseAssets[projectFullName]
