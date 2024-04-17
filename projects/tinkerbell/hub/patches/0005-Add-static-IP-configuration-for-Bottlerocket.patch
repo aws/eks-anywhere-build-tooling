@@ -1,19 +1,23 @@
-From decdec5c435935fcb1365872bea492e40257ebc3 Mon Sep 17 00:00:00 2001
-From: Jacob Weinstock <jakobweinstock@gmail.com>
-Date: Thu, 8 Dec 2022 19:35:32 -0700
-Subject: [PATCH] Add static IP configuration for Bottlerocket:
+From dff6baf346690eec9589b52458eaaa2fd40c25b0 Mon Sep 17 00:00:00 2001
+From: Ahree Hong <ahreeh@amazon.com>
+Date: Thu, 2 May 2024 12:47:50 -0700
+Subject: [PATCH 5/6] Add static IP configuration for Bottlerocket
 
 Static IPs provide more reliable IP handling.
+Since Bottlerocket v1.11.0 we can use the MAC
+address to define the network config. This will
+make the network config more flexible across
+hardware.
 
-Signed-off-by: Jacob Weinstock <jakobweinstock@gmail.com>
+Signed-off-by: Ahree Hong <ahreeh@amazon.com>
 ---
- actions/writefile/v1/main.go | 127 ++++++++++++++++++++++++++++-------
- 1 file changed, 102 insertions(+), 25 deletions(-)
+ writefile/main.go | 128 +++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 103 insertions(+), 25 deletions(-)
 
-diff --git a/actions/writefile/v1/main.go b/actions/writefile/v1/main.go
-index 339dedd..d2a5ff2 100644
---- a/actions/writefile/v1/main.go
-+++ b/actions/writefile/v1/main.go
+diff --git a/writefile/main.go b/writefile/main.go
+index e724375..a64e696 100644
+--- a/writefile/main.go
++++ b/writefile/main.go
 @@ -31,6 +31,7 @@ const (
  	mountAction          = "/mountAction"
  	bootConfigAction     = "/usr/bin/bootconfig"
@@ -31,12 +35,12 @@ index 339dedd..d2a5ff2 100644
  
 +var bottlerocketNetTOMLTemplate = `# Version is required, it will change as we support
 +# additional settings
-+version = 2
++version = 3
 +
-+[{{ .IFName }}.static4]
++["{{ .IFName }}".static4]
 +addresses = ["{{ ToString .IPAddr }}"]
 +
-+[[{{ .IFName }}.route]]
++[["{{ .IFName }}".route]]
 +to = "default"
 +via = "{{ ToString .Gateway }}"
 +route-metric = 100
@@ -70,7 +74,7 @@ index 339dedd..d2a5ff2 100644
  func main() {
  	fmt.Printf("WriteFile - Write file to disk\n------------------------\n")
  
-@@ -69,23 +109,6 @@ func main() {
+@@ -69,23 +109,7 @@ func main() {
  				log.Errorf("Invalid DHCP_TIMEOUT: %s, using default: %v", t, timeout)
  			}
  		}
@@ -91,10 +95,11 @@ index 339dedd..d2a5ff2 100644
 -                  via: {{ ToString .Gateway }}
 -            {{- end }}
 -`
- 		if name, template, err := vlanEnabled("/proc/cmdline"); err == nil {
++
+ 		if n, template, err := vlanEnabled("/proc/cmdline"); err == nil {
  			netplanTemplate = template
- 			ifname = name
-@@ -117,8 +140,8 @@ func main() {
+ 			ifname = n
+@@ -117,8 +141,8 @@ func main() {
  			validationCount++
  		}
  	}
@@ -105,7 +110,7 @@ index 339dedd..d2a5ff2 100644
  	}
  
  	fileMode := os.FileMode(modePrime)
-@@ -199,6 +222,38 @@ func main() {
+@@ -204,6 +228,38 @@ func main() {
  		}
  	}
  
@@ -125,7 +130,7 @@ index 339dedd..d2a5ff2 100644
 +			log.Fatal(err, " IFName=", ifn)
 +		}
 +		i := translate(d)
-+		i.IFName = os.Getenv("IFNAME")
++		i.IFName = d.ClientHWAddr.String()
 +		contents, err = doTemplating(bottlerocketNetTOMLTemplate, i)
 +		if err != nil {
 +			log.Fatal(err)
@@ -141,10 +146,10 @@ index 339dedd..d2a5ff2 100644
 +		}
 +	}
 +
- 	// If bootconfig is set, contents will be empty and will serve as output initrd file provided
- 	// to bootconfig tool
- 	fqFilePath := filepath.Join(mountAction, filePath)
-@@ -231,6 +286,19 @@ func main() {
+ 	if contents == "" && bootconfig == "" {
+ 		log.Fatal("No content. Either the CONTENTS or BOOTCONFIG_CONTENTS env vars were not set or a data retrieval action failed.")
+ 	}
+@@ -240,6 +296,19 @@ func main() {
  	log.Infof("Successfully wrote file [%s] to device [%s]", filePath, blockDevice)
  }
  
@@ -164,7 +169,7 @@ index 339dedd..d2a5ff2 100644
  func determineNetIF() string {
  	runtime.LockOSThread()
  	defer runtime.UnlockOSThread()
-@@ -404,7 +472,7 @@ func vlanEnabled(f string) (ifname, netplanTemplate string, err error) {
+@@ -391,7 +460,7 @@ func vlanEnabled(f string) (ifname, netplanTemplate string, err error) {
  	return ifname, netplanTemplate, nil
  }
  
@@ -173,7 +178,7 @@ index 339dedd..d2a5ff2 100644
  	// After locking a goroutine to its current OS thread with runtime.LockOSThread()
  	// and changing its network namespace, any new subsequent goroutine won't be scheduled
  	// on that thread while it's locked. Therefore, the new goroutine will run in a
-@@ -418,22 +486,31 @@ func dhcpAndWriteNetplan(ifname string, dhcpTimeout time.Duration, netplanTempla
+@@ -405,22 +474,31 @@ func dhcpAndWriteNetplan(ifname string, dhcpTimeout time.Duration, netplanTempla
  	// Change to PID 1 network namespace so we can do a DHCP using the host's interface.
  	ns1, err := netns.GetFromPid(1)
  	if err != nil {
@@ -208,7 +213,7 @@ index 339dedd..d2a5ff2 100644
  }
  
  func netIPToString(ip []net.IP, sep string) string {
-@@ -457,8 +534,8 @@ func netToString(v interface{}) string {
+@@ -444,8 +522,8 @@ func netToString(v interface{}) string {
  	return fmt.Sprintf("%v", v)
  }
  
@@ -220,5 +225,5 @@ index 339dedd..d2a5ff2 100644
  		return "", err
  	}
 -- 
-2.34.1
+2.40.0
 

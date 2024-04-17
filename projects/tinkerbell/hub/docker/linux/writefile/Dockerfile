@@ -7,7 +7,7 @@ ARG TARGETOS
 ARG ATTRIBUTION_FILE
 
 COPY _output/bin/hub/$TARGETOS-$TARGETARCH/writefile /usr/bin/writefile
-COPY _output/writefile/LICENSES /LICENSES
+COPY _output/LICENSES /LICENSES
 COPY $ATTRIBUTION_FILE /ATTRIBUTION.txt
 
 COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/torvalds/linux/tools/bootconfig /usr/bin/bootconfig

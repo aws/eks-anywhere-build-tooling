@@ -1,21 +1,22 @@
-From c1c0cc0dec41e6dacea3e2fffa3bfa37a9a60679 Mon Sep 17 00:00:00 2001
-From: Vignesh Goutham Ganesh <vgg@amazon.com>
-Date: Thu, 19 May 2022 12:56:33 -0700
-Subject: [PATCH] Get user-data from Hegel and write to disk
+From bf184a742d070d1dd80726a56259b3dc4b1bf9c7 Mon Sep 17 00:00:00 2001
+From: Ahree Hong <ahreeh@amazon.com>
+Date: Thu, 2 May 2024 12:20:47 -0700
+Subject: [PATCH 2/6] Get user-data from Hegel and write to disk
 
-Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
+Signed-off-by: Ahree Hong <ahreeh@amazon.com>
 ---
- actions/writefile/v1/main.go | 38 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 36 insertions(+), 2 deletions(-)
+ writefile/main.go | 69 ++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 65 insertions(+), 4 deletions(-)
 
-diff --git a/actions/writefile/v1/main.go b/actions/writefile/v1/main.go
-index 5e91045..83562d4 100644
---- a/actions/writefile/v1/main.go
-+++ b/actions/writefile/v1/main.go
-@@ -4,8 +4,11 @@ import (
+diff --git a/writefile/main.go b/writefile/main.go
+index 9e7d78f..67dd63e 100644
+--- a/writefile/main.go
++++ b/writefile/main.go
+@@ -3,19 +3,25 @@ package main
+ import (
  	"errors"
  	"fmt"
- 	"io/ioutil"
++	"io"
 +	"net/http"
 +	"net/url"
  	"os"
@@ -24,69 +25,101 @@ index 5e91045..83562d4 100644
  	"path/filepath"
  	"strconv"
  	"strings"
-@@ -17,6 +20,7 @@ import (
+ 	"syscall"
++	"time"
+ 
+ 	log "github.com/sirupsen/logrus"
+ )
+ 
  const (
- 	mountAction = "/mountAction"
- 	bootConfigAction = "/usr/bin/bootconfig"
+-	mountAction = "/mountAction"
+-	bootConfigAction = "/usr/bin/bootconfig"
++	mountAction          = "/mountAction"
++	bootConfigAction     = "/usr/bin/bootconfig"
 +	hegelUserDataVersion = "2009-04-04"
  )
  
  func main() {
-@@ -28,6 +32,7 @@ func main() {
+@@ -27,6 +33,7 @@ func main() {
  
  	contents := os.Getenv("CONTENTS")
  	bootconfig := os.Getenv("BOOTCONFIG_CONTENTS")
-+	hegelUrl := os.Getenv("HEGEL_URL")
++	hegelUrls := os.Getenv("HEGEL_URLS")
  	uid := os.Getenv("UID")
  	gid := os.Getenv("GID")
  	mode := os.Getenv("MODE")
-@@ -47,8 +52,15 @@ func main() {
+@@ -46,8 +53,15 @@ func main() {
  		log.Fatalf("Could not parse mode: %v", err)
  	}
  
 -	if bootconfig != "" && contents != "" {
 -		log.Fatal("Both BOOTCONFIG_CONTENTS and CONTENTS cannot be set.")
-+	// Only set one of contents, bootconfig or hegelUrl
++	// Only set one of contents, bootconfig or hegelUrls
 +	validationCount := 0
-+	for _, envVar := range []string{contents, bootconfig, hegelUrl} {
++	for _, envVar := range []string{contents, bootconfig, hegelUrls} {
 +		if envVar != "" {
 +			validationCount++
 +		}
 +	}
 +	if validationCount != 1 {
-+		log.Fatal("Only one environment vars of CONTENTS, BOOTCONFIG_CONTENTS, HEGEL_URL can be set")
++		log.Fatal("Only one environment vars of CONTENTS, BOOTCONFIG_CONTENTS, HEGEL_URLS can be set")
  	}
  
  	fileMode := os.FileMode(modePrime)
-@@ -91,6 +103,28 @@ func main() {
+@@ -90,6 +104,53 @@ func main() {
  		log.Fatalf("Failed to ensure directory exists: %v", err)
  	}
  
-+	// If hegelUrl is set, get the user-data from hegel and set it to contents
-+	if hegelUrl != "" {
-+		userDataServiceUrl, err := url.Parse(hegelUrl)
-+		if err != nil {
-+			log.Fatalf("Error parsing hegel url: %v", err)
-+		}
-+		userDataServiceUrl.Path = path.Join(userDataServiceUrl.Path, hegelUserDataVersion, "user-data")
-+		resp, err := http.Get(userDataServiceUrl.String())
-+		if err != nil {
-+			log.Fatalf("Error with HTTP GET call: %v", err)
-+		}
-+		defer resp.Body.Close()
++	if hegelUrls != "" {
++		success := false
++		// go through all urls in hegelUrls, and attempt to retrieve userdata from them
++		// upon a successful userdata retrieval, this loop will exit and populate the userdata contents in contents
++		for _, hegelUrl := range strings.Split(hegelUrls, ",") {
++			userDataServiceUrl, err := url.ParseRequestURI(hegelUrl)
++			if err != nil {
++				log.Warnf("Error parsing hegel url: %v", err)
++				continue
++			}
++			userDataServiceUrl.Path = path.Join(userDataServiceUrl.Path, hegelUserDataVersion, "user-data")
++			client := http.Client{
++				Timeout: time.Second * 10,
++			}
++			resp, err := client.Get(userDataServiceUrl.String())
++			if err != nil {
++				log.Warnf("Error with HTTP GET call: %v", err)
++				continue
++			}
++			defer resp.Body.Close()
 +
-+		respBody, err := ioutil.ReadAll(resp.Body)
-+		if err != nil {
-+			log.Fatalf("Error reading HTTP GET response body: %v", err)
++			// Ensure non-200 responses are considered an error and move to the next metadata server.
++			if resp.StatusCode != http.StatusOK {
++				continue
++			}
++
++			respBody, err := io.ReadAll(resp.Body)
++			if err != nil {
++				log.Warnf("Error reading HTTP GET response body: %v", err)
++				continue
++			}
++
++			// Set contents to be the user-data
++			contents = string(respBody)
++			success = true
++			break
 +		}
 +
-+		// Set contents to be the user-data
-+		contents = string(respBody)
++		if !success {
++			log.Fatalf("Failed to read user-data, exhausted all the urls defined in HEGEL_URLS: {%v}", hegelUrls)
++		}
++	}
++
++	if contents == "" && bootconfig == "" {
++		log.Fatal("No content. Either the CONTENTS or BOOTCONFIG_CONTENTS env vars were not set or a data retrieval action failed.")
 +	}
 +
  	// If bootconfig is set, contents will be empty and will serve as output initrd file provided
  	// to bootconfig tool
  	fqFilePath := filepath.Join(mountAction, filePath)
 -- 
-2.24.3 (Apple Git-128)
+2.40.0
 
