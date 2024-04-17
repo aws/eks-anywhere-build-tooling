@@ -1,0 +1,117 @@
+From 7e9f681fe40d6fd13caa33d37f9e21df41528753 Mon Sep 17 00:00:00 2001
+From: Jiayi Wang <jiayiwang7@yahoo.com>
+Date: Thu, 5 Jan 2023 14:56:09 -0500
+Subject: [PATCH 19/37] Make bottlerocket admin, control, custom bootstrap
+ container images updatable in webhook
+
+---
+ .../webhooks/kubeadm_control_plane.go         |  6 +++
+ .../webhooks/kubeadm_control_plane_test.go    | 54 +++++++++++++++++++
+ 2 files changed, 60 insertions(+)
+
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+index c76cb3073..0ddcda3d7 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+@@ -165,6 +165,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		{"metadata", "*"},
+ 		// spec.kubeadmConfigSpec.clusterConfiguration
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketAdmin", "*"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketControl", "*"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketCustomBootstrapContainers"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
+@@ -209,6 +212,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "discovery"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "discovery", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketAdmin", "*"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
+ 		// spec.kubeadmConfigSpec
+ 		{spec, kubeadmConfigSpec, preKubeadmCommands},
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
+index d92a27d14..36a152e6e 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
+@@ -717,6 +717,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
+ 	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
+ 
++		validUpdateClusterConfBRAdminImage := before.DeepCopy()
++	validUpdateClusterConfBRAdminImage.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketAdmin = bootstrapv1.BottlerocketAdmin{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++
++	validUpdateClusterConfBRControlImage := before.DeepCopy()
++	validUpdateClusterConfBRControlImage.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketControl = bootstrapv1.BottlerocketControl{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++
++	validUpdateClusterConfBRCustomBootstrapContainers := before.DeepCopy()
++	validUpdateClusterConfBRCustomBootstrapContainers.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketCustomBootstrapContainers = []bootstrapv1.BottlerocketBootstrapContainer{{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}}
++
++	validUpdateJoinConfBRAdminImage := before.DeepCopy()
++	validUpdateJoinConfBRAdminImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketAdmin = bootstrapv1.BottlerocketAdmin{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++
++	validUpdateJoinConfBRControlImage := before.DeepCopy()
++	validUpdateJoinConfBRControlImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketControl = bootstrapv1.BottlerocketControl{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++
++	validUpdateJoinConfBRCustomBootstrapContainers := before.DeepCopy()
++	validUpdateJoinConfBRCustomBootstrapContainers.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketCustomBootstrapContainers = []bootstrapv1.BottlerocketBootstrapContainer{{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}}
++
+ 	tests := []struct {
+ 		name                  string
+ 		enableIgnitionFeature bool
+@@ -1069,6 +1087,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before:    before,
+ 			kcp:       validUpdateClusterConfBRBootstrapImage,
+ 		},
++		{
++			name:      "should allow changes to cluster configuration bottlerocket admin image",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfBRAdminImage,
++		},
++		{
++			name:      "should allow changes to cluster configuration bottlerocket control image",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfBRControlImage,
++		},
++		{
++			name:      "should allow changes to cluster configuration bottlerocket custom bootstrap containers",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfBRCustomBootstrapContainers,
++		},
+ 		{
+ 			name:      "should allow changes to join configuration pause image",
+ 			expectErr: false,
+@@ -1081,6 +1117,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before:    before,
+ 			kcp:       validUpdateJoinConfBRBootstrapImage,
+ 		},
++		{
++			name:      "should allow changes to join configuration bottlerocket admin image",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfBRAdminImage,
++		},
++		{
++			name:      "should allow changes to join configuration bottlerocket control image",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfBRControlImage,
++		},
++		{
++			name:      "should allow changes to join configuration bottlerocket custom bootstrap containers",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfBRCustomBootstrapContainers,
++		},
+ 	}
+ 
+ 	for _, tt := range tests {
+-- 
+2.42.0
+
