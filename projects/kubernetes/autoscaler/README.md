@@ -1,11 +1,10 @@
 ## **Kubernetes Cluster Autoscaler**
-![1.23 Version](https://img.shields.io/badge/1--23%20version-v1.23.1-blue)
-![1.24 Version](https://img.shields.io/badge/1--24%20version-f69e14b5de2e595b55f4ee4dc64952e00e7c7ee9-blue)
 ![1.25 Version](https://img.shields.io/badge/1--25%20version-cluster--autoscaler--1.25.3-blue)
 ![1.26 Version](https://img.shields.io/badge/1--26%20version-cluster--autoscaler--1.26.6-blue)
 ![1.27 Version](https://img.shields.io/badge/1--27%20version-cluster--autoscaler--1.27.5-blue)
 ![1.28 Version](https://img.shields.io/badge/1--28%20version-cluster--autoscaler--1.28.2-blue)
-![1.29 Version](https://img.shields.io/badge/1--28%20version-cluster--autoscaler--1.29.0-blue)
+![1.29 Version](https://img.shields.io/badge/1--29%20version-cluster--autoscaler--1.29.0-blue)
+![1.30 Version](https://img.shields.io/badge/1--30%20version-cluster--autoscaler--1.29.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiL0tWckptdkxsZEd1cXNiNTBncjRNVU5oekpZRlBkTDNBcFVvZkFOVHZwbTBKUm91QkR6RVN4QlhJWk42cXF3L29FMmdnTXUrVndiay8zVUQ0YjJsc21vPSIsIml2UGFyYW1ldGVyU3BlYyI6Ik1Gd2UwbmRXVWxSRTMvUHQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Autoscaler](https://github.com/kubernetes/autoscaler) defines the cluster autoscaler.
