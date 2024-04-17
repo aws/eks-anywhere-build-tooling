@@ -1,0 +1,2050 @@
+From 4d04bfc5e05b2d4846b91e875935877a43a7b255 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Sun, 21 Nov 2021 20:59:58 -0800
+Subject: [PATCH 08/37] Add bottlerocket changes to capbk v1alpha4 api
+
+---
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 119 ++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 123 +++++++++++
+ .../kubeadm/types/upstreamv1beta2/types.go    |  72 ++++++
+ .../zz_generated.conversion.go                | 188 +++++++++++++++-
+ .../upstreamv1beta2/zz_generated.deepcopy.go  |  75 +++++++
+ .../kubeadm/types/upstreamv1beta3/types.go    |  72 ++++++
+ .../zz_generated.conversion.go                | 188 +++++++++++++++-
+ .../upstreamv1beta3/zz_generated.deepcopy.go  |  75 +++++++
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 123 +++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 123 +++++++++++
+ .../kubeadm/v1alpha4/kubeadm_types.go         |  72 ++++++
+ .../kubeadm/v1alpha4/kubeadmconfig_types.go   |   2 +-
+ .../v1alpha4/zz_generated.conversion.go       | 208 +++++++++++++++---
+ .../kubeadm/v1alpha4/zz_generated.deepcopy.go |  75 +++++++
+ .../core/v1alpha4/zz_generated.deepcopy.go    |   5 +
+ 15 files changed, 1477 insertions(+), 43 deletions(-)
+
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index da0f86d84..f27cbc4a9 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -1250,6 +1250,22 @@ spec:
+                       may reject unrecognized values.
+                       More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                     type: string
++                  bottlerocketBootstrap:
++                    description: |-
++                      BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          ImageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: |-
++                          ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   certificatesDir:
+                     description: |-
+                       CertificatesDir specifies where to store or look for all required certificates.
+@@ -1457,6 +1473,49 @@ spec:
+                           to "10.96.0.0/12" if that's unset.
+                         type: string
+                     type: object
++                  pause:
++                    description: |-
++                      Pause holds the image source for pause container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          ImageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: |-
++                          ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        type: string
++                    type: object
++                  proxy:
++                    description: |-
++                      Proxy holds the https and no proxy information
++                      This is only for bottlerocket
++                    properties:
++                      httpsProxy:
++                        description: HTTPS proxy
++                        type: string
++                      noProxy:
++                        description: No proxy, list of ips that should not use proxy
++                        items:
++                          type: string
++                        type: array
++                    type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                   scheduler:
+                     description: Scheduler contains extra settings for the scheduler
+                       control plane component
+@@ -1642,6 +1701,7 @@ spec:
+                 description: Format specifies the output format of the bootstrap data
+                 enum:
+                 - cloud-config
++                - bottlerocket
+                 type: string
+               initConfiguration:
+                 description: InitConfiguration along with ClusterConfiguration are
+@@ -1808,6 +1868,22 @@ spec:
+                       may reject unrecognized values.
+                       More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                     type: string
++                  bottlerocketBootstrap:
++                    description: |-
++                      BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          ImageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: |-
++                          ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: |-
+                       CACertPath is the path to the SSL certificate authority used to
+@@ -1975,6 +2051,49 @@ spec:
+                           type: object
+                         type: array
+                     type: object
++                  pause:
++                    description: |-
++                      Pause holds the image source for pause container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          ImageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: |-
++                          ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        type: string
++                    type: object
++                  proxy:
++                    description: |-
++                      Proxy holds the https and no proxy information
++                      This is only for bottlerocket
++                    properties:
++                      httpsProxy:
++                        description: HTTPS proxy
++                        type: string
++                      noProxy:
++                        description: No proxy, list of ips that should not use proxy
++                        items:
++                          type: string
++                        type: array
++                    type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                 type: object
+               mounts:
+                 description: Mounts specifies a list of mount points to be setup.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 8a1574b1d..19fed6b15 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -1216,6 +1216,22 @@ spec:
+                               may reject unrecognized values.
+                               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                             type: string
++                          bottlerocketBootstrap:
++                            description: |-
++                              BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  ImageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: |-
++                                  ImageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                type: string
++                            type: object
+                           certificatesDir:
+                             description: |-
+                               CertificatesDir specifies where to store or look for all required certificates.
+@@ -1427,6 +1443,51 @@ spec:
+                                   to "10.96.0.0/12" if that's unset.
+                                 type: string
+                             type: object
++                          pause:
++                            description: |-
++                              Pause holds the image source for pause container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  ImageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: |-
++                                  ImageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                type: string
++                            type: object
++                          proxy:
++                            description: |-
++                              Proxy holds the https and no proxy information
++                              This is only for bottlerocket
++                            properties:
++                              httpsProxy:
++                                description: HTTPS proxy
++                                type: string
++                              noProxy:
++                                description: No proxy, list of ips that should not
++                                  use proxy
++                                items:
++                                  type: string
++                                type: array
++                            type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                           scheduler:
+                             description: Scheduler contains extra settings for the
+                               scheduler control plane component
+@@ -1620,6 +1681,7 @@ spec:
+                           data
+                         enum:
+                         - cloud-config
++                        - bottlerocket
+                         type: string
+                       initConfiguration:
+                         description: InitConfiguration along with ClusterConfiguration
+@@ -1787,6 +1849,22 @@ spec:
+                               may reject unrecognized values.
+                               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                             type: string
++                          bottlerocketBootstrap:
++                            description: |-
++                              BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  ImageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: |-
++                                  ImageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: |-
+                               CACertPath is the path to the SSL certificate authority used to
+@@ -1957,6 +2035,51 @@ spec:
+                                   type: object
+                                 type: array
+                             type: object
++                          pause:
++                            description: |-
++                              Pause holds the image source for pause container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  ImageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: |-
++                                  ImageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                type: string
++                            type: object
++                          proxy:
++                            description: |-
++                              Proxy holds the https and no proxy information
++                              This is only for bottlerocket
++                            properties:
++                              httpsProxy:
++                                description: HTTPS proxy
++                                type: string
++                              noProxy:
++                                description: No proxy, list of ips that should not
++                                  use proxy
++                                items:
++                                  type: string
++                                type: array
++                            type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                         type: object
+                       mounts:
+                         description: Mounts specifies a list of mount points to be
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/types.go b/bootstrap/kubeadm/types/upstreamv1beta2/types.go
+index 413f6fe9b..ff9a01d04 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/types.go
+@@ -64,6 +64,26 @@ type InitConfiguration struct {
+ type ClusterConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// Etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -138,6 +158,38 @@ type ClusterConfiguration struct {
+ 	ClusterName string `json:"clusterName,omitempty"`
+ }
+ 
++// Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
++// This setting is ONLY for bottlerocket nodes, as this needs to be set pre-boot time along with user-data
++type Pause struct {
++	// ImageMeta allows to customize the image used for the Pause component
++	ImageMeta `json:",inline"`
++}
++
++// BottlerocketBootstrap holds the settings of kubeadm bootstrap container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketBootstrap struct {
++	// ImageMeta allows to customize the image used for the BottlerocketBootstrap component
++	ImageMeta `json:",inline"`
++}
++
++// ProxyConfiguration holds the settings for proxying bottlerocket services
++type ProxyConfiguration struct {
++	// HTTPS proxy
++	HTTPSProxy string `json:"httpsProxy,omitempty"`
++
++	// No proxy, list of ips that should not use proxy
++	NoProxy []string `json:"noProxy,omitempty"`
++}
++
++// RegistryMirrorConfiguration holds the settings for image registry mirror
++type RegistryMirrorConfiguration struct {
++	// Endpoint defines the registry mirror endpoint to use for pulling images
++	Endpoint string `json:"endpoint,omitempty"`
++
++	// CACert defines the CA cert for the registry mirror
++	CACert string `json:"caCert,omitempty"`
++}
++
+ // ControlPlaneComponent holds settings common to control plane component of the cluster.
+ type ControlPlaneComponent struct {
+ 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+@@ -349,6 +401,26 @@ type ExternalEtcd struct {
+ type JoinConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+index 99cf9a8ff..ae1158152 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
+@@ -88,6 +88,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketBootstrap)(nil), (*v1beta1.BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(a.(*BottlerocketBootstrap), b.(*v1beta1.BottlerocketBootstrap), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketBootstrap)(nil), (*BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(a.(*v1beta1.BottlerocketBootstrap), b.(*BottlerocketBootstrap), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -213,6 +223,36 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*Pause)(nil), (*v1beta1.Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta2_Pause_To_v1beta1_Pause(a.(*Pause), b.(*v1beta1.Pause), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.Pause)(nil), (*Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_Pause_To_upstreamv1beta2_Pause(a.(*v1beta1.Pause), b.(*Pause), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*ProxyConfiguration)(nil), (*v1beta1.ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(a.(*ProxyConfiguration), b.(*v1beta1.ProxyConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.ProxyConfiguration)(nil), (*ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(a.(*v1beta1.ProxyConfiguration), b.(*ProxyConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*RegistryMirrorConfiguration)(nil), (*v1beta1.RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(a.(*RegistryMirrorConfiguration), b.(*v1beta1.RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.RegistryMirrorConfiguration)(nil), (*RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta2_RegistryMirrorConfiguration(a.(*v1beta1.RegistryMirrorConfiguration), b.(*RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -379,7 +419,43 @@ func Convert_v1beta1_BootstrapTokenString_To_upstreamv1beta2_BootstrapTokenStrin
+ 	return autoConvert_v1beta1_BootstrapTokenString_To_upstreamv1beta2_BootstrapTokenString(in, out, s)
+ }
+ 
++func autoConvert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta2_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap is an autogenerated conversion function.
++func Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(in *v1beta1.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_upstreamv1beta2_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(in *v1beta1.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(in, out, s)
++}
++
+ func autoConvert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta2_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -409,10 +485,18 @@ func autoConvert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfigur
+ }
+ 
+ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfiguration(in *v1beta1.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+-	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+-	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+-	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
+-	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
++	if err := Convert_v1beta1_Pause_To_upstreamv1beta2_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_Etcd_To_upstreamv1beta2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -677,6 +761,18 @@ func autoConvert_v1beta1_InitConfiguration_To_upstreamv1beta2_InitConfiguration(
+ }
+ 
+ func autoConvert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinConfiguration, out *v1beta1.JoinConfiguration, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta2_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta2_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -702,10 +798,18 @@ func Convert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *
+ }
+ 
+ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+-	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+-	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+-	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
+-	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
++	if err := Convert_v1beta1_Pause_To_upstreamv1beta2_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_NodeRegistrationOptions_To_upstreamv1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -826,3 +930,71 @@ func autoConvert_v1beta1_NodeRegistrationOptions_To_upstreamv1beta2_NodeRegistra
+ 	// WARNING: in.ImagePullPolicy requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
++
++func autoConvert_upstreamv1beta2_Pause_To_v1beta1_Pause(in *Pause, out *v1beta1.Pause, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta2_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_upstreamv1beta2_Pause_To_v1beta1_Pause is an autogenerated conversion function.
++func Convert_upstreamv1beta2_Pause_To_v1beta1_Pause(in *Pause, out *v1beta1.Pause, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta2_Pause_To_v1beta1_Pause(in, out, s)
++}
++
++func autoConvert_v1beta1_Pause_To_upstreamv1beta2_Pause(in *v1beta1.Pause, out *Pause, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_upstreamv1beta2_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_Pause_To_upstreamv1beta2_Pause is an autogenerated conversion function.
++func Convert_v1beta1_Pause_To_upstreamv1beta2_Pause(in *v1beta1.Pause, out *Pause, s conversion.Scope) error {
++	return autoConvert_v1beta1_Pause_To_upstreamv1beta2_Pause(in, out, s)
++}
++
++func autoConvert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *ProxyConfiguration, out *v1beta1.ProxyConfiguration, s conversion.Scope) error {
++	out.HTTPSProxy = in.HTTPSProxy
++	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
++	return nil
++}
++
++// Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration is an autogenerated conversion function.
++func Convert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *ProxyConfiguration, out *v1beta1.ProxyConfiguration, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(in *v1beta1.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
++	out.HTTPSProxy = in.HTTPSProxy
++	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
++	return nil
++}
++
++// Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration is an autogenerated conversion function.
++func Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(in *v1beta1.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta1_ProxyConfiguration_To_upstreamv1beta2_ProxyConfiguration(in, out, s)
++}
++
++func autoConvert_upstreamv1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta1.RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_upstreamv1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_upstreamv1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta1.RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta2_RegistryMirrorConfiguration(in *v1beta1.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta2_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta2_RegistryMirrorConfiguration(in *v1beta1.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta2_RegistryMirrorConfiguration(in, out, s)
++}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
+index c4cecbaad..1caece2f9 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
+@@ -141,10 +141,30 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootstrap.
++func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootstrap)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -409,6 +429,10 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -533,3 +557,54 @@ func (in *NodeRegistrationOptions) DeepCopy() *NodeRegistrationOptions {
+ 	in.DeepCopyInto(out)
+ 	return out
+ }
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *Pause) DeepCopyInto(out *Pause) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Pause.
++func (in *Pause) DeepCopy() *Pause {
++	if in == nil {
++		return nil
++	}
++	out := new(Pause)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *ProxyConfiguration) DeepCopyInto(out *ProxyConfiguration) {
++	*out = *in
++	if in.NoProxy != nil {
++		in, out := &in.NoProxy, &out.NoProxy
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ProxyConfiguration.
++func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(ProxyConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+index abc993a88..42bda5ca0 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+@@ -73,6 +73,26 @@ type InitConfiguration struct {
+ type ClusterConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// Etcd holds configuration for etcd.
+ 	// +optional
+ 	Etcd Etcd `json:"etcd,omitempty"`
+@@ -135,6 +155,38 @@ type ClusterConfiguration struct {
+ 	ClusterName string `json:"clusterName,omitempty"`
+ }
+ 
++// Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
++// This setting is ONLY for bottlerocket nodes, as this needs to be set pre-boot time along with user-data
++type Pause struct {
++	// ImageMeta allows to customize the image used for the Pause component
++	ImageMeta `json:",inline"`
++}
++
++// BottlerocketBootstrap holds the settings of kubeadm bootstrap container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketBootstrap struct {
++	// ImageMeta allows to customize the image used for the BottlerocketBootstrap component
++	ImageMeta `json:",inline"`
++}
++
++// ProxyConfiguration holds the settings for proxying bottlerocket services
++type ProxyConfiguration struct {
++	// HTTPS proxy
++	HTTPSProxy string `json:"httpsProxy,omitempty"`
++
++	// No proxy, list of ips that should not use proxy
++	NoProxy []string `json:"noProxy,omitempty"`
++}
++
++// RegistryMirrorConfiguration holds the settings for image registry mirror
++type RegistryMirrorConfiguration struct {
++	// Endpoint defines the registry mirror endpoint to use for pulling images
++	Endpoint string `json:"endpoint,omitempty"`
++
++	// CACert defines the CA cert for the registry mirror
++	CACert string `json:"caCert,omitempty"`
++}
++
+ // ControlPlaneComponent holds settings common to control plane component of the cluster.
+ type ControlPlaneComponent struct {
+ 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+@@ -335,6 +387,26 @@ type ExternalEtcd struct {
+ type JoinConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
+ 	// +optional
+ 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index d9a815828..9b0c13356 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -88,6 +88,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketBootstrap)(nil), (*v1beta1.BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(a.(*BottlerocketBootstrap), b.(*v1beta1.BottlerocketBootstrap), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketBootstrap)(nil), (*BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(a.(*v1beta1.BottlerocketBootstrap), b.(*BottlerocketBootstrap), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -228,6 +238,36 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*Pause)(nil), (*v1beta1.Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_Pause_To_v1beta1_Pause(a.(*Pause), b.(*v1beta1.Pause), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.Pause)(nil), (*Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_Pause_To_upstreamv1beta3_Pause(a.(*v1beta1.Pause), b.(*Pause), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*ProxyConfiguration)(nil), (*v1beta1.ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(a.(*ProxyConfiguration), b.(*v1beta1.ProxyConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.ProxyConfiguration)(nil), (*ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(a.(*v1beta1.ProxyConfiguration), b.(*ProxyConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*RegistryMirrorConfiguration)(nil), (*v1beta1.RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(a.(*RegistryMirrorConfiguration), b.(*v1beta1.RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.RegistryMirrorConfiguration)(nil), (*RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(a.(*v1beta1.RegistryMirrorConfiguration), b.(*RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*InitConfiguration)(nil), (*v1beta1.InitConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_InitConfiguration_To_v1beta1_InitConfiguration(a.(*InitConfiguration), b.(*v1beta1.InitConfiguration), scope)
+ 	}); err != nil {
+@@ -379,7 +419,43 @@ func Convert_v1beta1_BootstrapTokenString_To_upstreamv1beta3_BootstrapTokenStrin
+ 	return autoConvert_v1beta1_BootstrapTokenString_To_upstreamv1beta3_BootstrapTokenString(in, out, s)
+ }
+ 
++func autoConvert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta3_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap is an autogenerated conversion function.
++func Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(in *v1beta1.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_upstreamv1beta3_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(in *v1beta1.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(in, out, s)
++}
++
+ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta3_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta3_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -413,10 +489,18 @@ func Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguratio
+ }
+ 
+ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in *v1beta1.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+-	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+-	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+-	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
+-	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
++	if err := Convert_v1beta1_Pause_To_upstreamv1beta3_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -672,6 +756,18 @@ func Convert_v1beta1_InitConfiguration_To_upstreamv1beta3_InitConfiguration(in *
+ }
+ 
+ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinConfiguration, out *v1beta1.JoinConfiguration, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta3_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta3_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -694,10 +790,18 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
+ }
+ 
+ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+-	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+-	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+-	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
+-	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
++	if err := Convert_v1beta1_Pause_To_upstreamv1beta3_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_NodeRegistrationOptions_To_upstreamv1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -844,3 +948,71 @@ func autoConvert_v1beta1_Patches_To_upstreamv1beta3_Patches(in *v1beta1.Patches,
+ func Convert_v1beta1_Patches_To_upstreamv1beta3_Patches(in *v1beta1.Patches, out *Patches, s conversion.Scope) error {
+ 	return autoConvert_v1beta1_Patches_To_upstreamv1beta3_Patches(in, out, s)
+ }
++
++func autoConvert_upstreamv1beta3_Pause_To_v1beta1_Pause(in *Pause, out *v1beta1.Pause, s conversion.Scope) error {
++	if err := Convert_upstreamv1beta3_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_upstreamv1beta3_Pause_To_v1beta1_Pause is an autogenerated conversion function.
++func Convert_upstreamv1beta3_Pause_To_v1beta1_Pause(in *Pause, out *v1beta1.Pause, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta3_Pause_To_v1beta1_Pause(in, out, s)
++}
++
++func autoConvert_v1beta1_Pause_To_upstreamv1beta3_Pause(in *v1beta1.Pause, out *Pause, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_upstreamv1beta3_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_Pause_To_upstreamv1beta3_Pause is an autogenerated conversion function.
++func Convert_v1beta1_Pause_To_upstreamv1beta3_Pause(in *v1beta1.Pause, out *Pause, s conversion.Scope) error {
++	return autoConvert_v1beta1_Pause_To_upstreamv1beta3_Pause(in, out, s)
++}
++
++func autoConvert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *ProxyConfiguration, out *v1beta1.ProxyConfiguration, s conversion.Scope) error {
++	out.HTTPSProxy = in.HTTPSProxy
++	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
++	return nil
++}
++
++// Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration is an autogenerated conversion function.
++func Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *ProxyConfiguration, out *v1beta1.ProxyConfiguration, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta3_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(in *v1beta1.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
++	out.HTTPSProxy = in.HTTPSProxy
++	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
++	return nil
++}
++
++// Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration is an autogenerated conversion function.
++func Convert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(in *v1beta1.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta1_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(in, out, s)
++}
++
++func autoConvert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta1.RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta1.RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in *v1beta1.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in *v1beta1.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in, out, s)
++}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
+index 77bc8ac51..b7b976a49 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
+@@ -141,10 +141,30 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootstrap.
++func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootstrap)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -388,6 +408,10 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -537,3 +561,54 @@ func (in *Patches) DeepCopy() *Patches {
+ 	in.DeepCopyInto(out)
+ 	return out
+ }
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *Pause) DeepCopyInto(out *Pause) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Pause.
++func (in *Pause) DeepCopy() *Pause {
++	if in == nil {
++		return nil
++	}
++	out := new(Pause)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *ProxyConfiguration) DeepCopyInto(out *ProxyConfiguration) {
++	*out = *in
++	if in.NoProxy != nil {
++		in, out := &in.NoProxy, &out.NoProxy
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ProxyConfiguration.
++func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(ProxyConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 07c5d6c85..0d23a71cc 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -1478,6 +1478,22 @@ spec:
+                           may reject unrecognized values.
+                           More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                         type: string
++                      bottlerocketBootstrap:
++                        description: |-
++                          BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              ImageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: |-
++                              ImageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            type: string
++                        type: object
+                       certificatesDir:
+                         description: |-
+                           CertificatesDir specifies where to store or look for all required certificates.
+@@ -1687,6 +1703,51 @@ spec:
+                               to "10.96.0.0/12" if that's unset.
+                             type: string
+                         type: object
++                      pause:
++                        description: |-
++                          Pause holds the image source for pause container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              ImageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: |-
++                              ImageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            type: string
++                        type: object
++                      proxy:
++                        description: |-
++                          Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                       scheduler:
+                         description: Scheduler contains extra settings for the scheduler
+                           control plane component
+@@ -1877,6 +1938,7 @@ spec:
+                       data
+                     enum:
+                     - cloud-config
++                    - bottlerocket
+                     type: string
+                   initConfiguration:
+                     description: InitConfiguration along with ClusterConfiguration
+@@ -2044,6 +2106,22 @@ spec:
+                           may reject unrecognized values.
+                           More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                         type: string
++                      bottlerocketBootstrap:
++                        description: |-
++                          BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              ImageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: |-
++                              ImageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: |-
+                           CACertPath is the path to the SSL certificate authority used to
+@@ -2212,6 +2290,51 @@ spec:
+                               type: object
+                             type: array
+                         type: object
++                      pause:
++                        description: |-
++                          Pause holds the image source for pause container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              ImageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: |-
++                              ImageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            type: string
++                        type: object
++                      proxy:
++                        description: |-
++                          Proxy holds the https and no proxy information
++                          This is only for bottlerocket
++                        properties:
++                          httpsProxy:
++                            description: HTTPS proxy
++                            type: string
++                          noProxy:
++                            description: No proxy, list of ips that should not use
++                              proxy
++                            items:
++                              type: string
++                            type: array
++                        type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                     type: object
+                   mounts:
+                     description: Mounts specifies a list of mount points to be setup.
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 883a32273..76ca445aa 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -134,6 +134,22 @@ spec:
+                                   may reject unrecognized values.
+                                   More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                                 type: string
++                              bottlerocketBootstrap:
++                                description: |-
++                                  BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      ImageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      ImageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    type: string
++                                type: object
+                               certificatesDir:
+                                 description: |-
+                                   CertificatesDir specifies where to store or look for all required certificates.
+@@ -347,6 +363,51 @@ spec:
+                                       to "10.96.0.0/12" if that's unset.
+                                     type: string
+                                 type: object
++                              pause:
++                                description: |-
++                                  Pause holds the image source for pause container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      ImageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      ImageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    type: string
++                                type: object
++                              proxy:
++                                description: |-
++                                  Proxy holds the https and no proxy information
++                                  This is only for bottlerocket
++                                properties:
++                                  httpsProxy:
++                                    description: HTTPS proxy
++                                    type: string
++                                  noProxy:
++                                    description: No proxy, list of ips that should
++                                      not use proxy
++                                    items:
++                                      type: string
++                                    type: array
++                                type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                               scheduler:
+                                 description: Scheduler contains extra settings for
+                                   the scheduler control plane component
+@@ -544,6 +605,7 @@ spec:
+                               bootstrap data
+                             enum:
+                             - cloud-config
++                            - bottlerocket
+                             type: string
+                           initConfiguration:
+                             description: InitConfiguration along with ClusterConfiguration
+@@ -711,6 +773,22 @@ spec:
+                                   may reject unrecognized values.
+                                   More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                                 type: string
++                              bottlerocketBootstrap:
++                                description: |-
++                                  BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      ImageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      ImageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    type: string
++                                type: object
+                               caCertPath:
+                                 description: |-
+                                   CACertPath is the path to the SSL certificate authority used to
+@@ -881,6 +959,51 @@ spec:
+                                       type: object
+                                     type: array
+                                 type: object
++                              pause:
++                                description: |-
++                                  Pause holds the image source for pause container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      ImageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      ImageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    type: string
++                                type: object
++                              proxy:
++                                description: |-
++                                  Proxy holds the https and no proxy information
++                                  This is only for bottlerocket
++                                properties:
++                                  httpsProxy:
++                                    description: HTTPS proxy
++                                    type: string
++                                  noProxy:
++                                    description: No proxy, list of ips that should
++                                      not use proxy
++                                    items:
++                                      type: string
++                                    type: array
++                                type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                             type: object
+                           mounts:
+                             description: Mounts specifies a list of mount points to
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+index 6e91e00ae..29df78f5c 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+@@ -61,6 +61,26 @@ type InitConfiguration struct {
+ type ClusterConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// Etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -128,6 +148,38 @@ type ClusterConfiguration struct {
+ 	ClusterName string `json:"clusterName,omitempty"`
+ }
+ 
++// Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
++// This setting is ONLY for bottlerocket nodes, as this needs to be set pre-boot time along with user-data
++type Pause struct {
++	// ImageMeta allows to customize the image used for the Pause component
++	ImageMeta `json:",inline"`
++}
++
++// BottlerocketBootstrap holds the settings of kubeadm bootstrap container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketBootstrap struct {
++	// ImageMeta allows to customize the image used for the BottlerocketBootstrap component
++	ImageMeta `json:",inline"`
++}
++
++// ProxyConfiguration holds the settings for proxying bottlerocket services
++type ProxyConfiguration struct {
++	// HTTPS proxy
++	HTTPSProxy string `json:"httpsProxy,omitempty"`
++
++	// No proxy, list of ips that should not use proxy
++	NoProxy []string `json:"noProxy,omitempty"`
++}
++
++// RegistryMirrorConfiguration holds the settings for image registry mirror
++type RegistryMirrorConfiguration struct {
++	// Endpoint defines the registry mirror endpoint to use for pulling images
++	Endpoint string `json:"endpoint,omitempty"`
++
++	// CACert defines the CA cert for the registry mirror
++	CACert string `json:"caCert,omitempty"`
++}
++
+ // ControlPlaneComponent holds settings common to control plane component of the cluster.
+ type ControlPlaneComponent struct {
+ 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+@@ -338,6 +390,26 @@ type ExternalEtcd struct {
+ type JoinConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
+index 64425edf6..a231641e4 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
+@@ -23,7 +23,7 @@ import (
+ )
+ 
+ // Format specifies the output format of the bootstrap data
+-// +kubebuilder:validation:Enum=cloud-config
++// +kubebuilder:validation:Enum=cloud-config;bottlerocket
+ type Format string
+ 
+ const (
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+index 68ff783ce..9c1b31ed0 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+@@ -90,6 +90,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketBootstrap)(nil), (*v1beta1.BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(a.(*BottlerocketBootstrap), b.(*v1beta1.BottlerocketBootstrap), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketBootstrap)(nil), (*BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(a.(*v1beta1.BottlerocketBootstrap), b.(*BottlerocketBootstrap), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -360,6 +370,36 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*Pause)(nil), (*v1beta1.Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_Pause_To_v1beta1_Pause(a.(*Pause), b.(*v1beta1.Pause), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.Pause)(nil), (*Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_Pause_To_v1alpha4_Pause(a.(*v1beta1.Pause), b.(*Pause), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*ProxyConfiguration)(nil), (*v1beta1.ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(a.(*ProxyConfiguration), b.(*v1beta1.ProxyConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.ProxyConfiguration)(nil), (*ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(a.(*v1beta1.ProxyConfiguration), b.(*ProxyConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*RegistryMirrorConfiguration)(nil), (*v1beta1.RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(a.(*RegistryMirrorConfiguration), b.(*v1beta1.RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.RegistryMirrorConfiguration)(nil), (*RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(a.(*v1beta1.RegistryMirrorConfiguration), b.(*RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*SecretFileSource)(nil), (*v1beta1.SecretFileSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1alpha4_SecretFileSource_To_v1beta1_SecretFileSource(a.(*SecretFileSource), b.(*v1beta1.SecretFileSource), scope)
+ 	}); err != nil {
+@@ -541,7 +581,43 @@ func Convert_v1beta1_BootstrapTokenString_To_v1alpha4_BootstrapTokenString(in *v
+ 	return autoConvert_v1beta1_BootstrapTokenString_To_v1alpha4_BootstrapTokenString(in, out, s)
+ }
+ 
++func autoConvert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
++	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap is an autogenerated conversion function.
++func Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
++	return autoConvert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in *v1beta1.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_v1alpha4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in *v1beta1.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in, out, s)
++}
++
+ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
++	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1alpha4_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -575,10 +651,18 @@ func Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *C
+ }
+ 
+ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in *v1beta1.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+-	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+-	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+-	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
+-	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
++	if err := Convert_v1beta1_Pause_To_v1alpha4_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_Etcd_To_v1alpha4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -955,6 +1039,18 @@ func autoConvert_v1beta1_InitConfiguration_To_v1alpha4_InitConfiguration(in *v1b
+ }
+ 
+ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinConfiguration, out *v1beta1.JoinConfiguration, s conversion.Scope) error {
++	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1alpha4_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -972,10 +1068,18 @@ func Convert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinCon
+ }
+ 
+ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+-	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+-	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+-	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
+-	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
++	if err := Convert_v1beta1_Pause_To_v1alpha4_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -1088,15 +1192,7 @@ func Convert_v1beta1_KubeadmConfigList_To_v1alpha4_KubeadmConfigList(in *v1beta1
+ }
+ 
+ func autoConvert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *KubeadmConfigSpec, out *v1beta1.KubeadmConfigSpec, s conversion.Scope) error {
+-	if in.ClusterConfiguration != nil {
+-		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
+-		*out = new(v1beta1.ClusterConfiguration)
+-		if err := Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(*in, *out, s); err != nil {
+-			return err
+-		}
+-	} else {
+-		out.ClusterConfiguration = nil
+-	}
++	out.ClusterConfiguration = (*v1beta1.ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
+ 	if in.InitConfiguration != nil {
+ 		in, out := &in.InitConfiguration, &out.InitConfiguration
+ 		*out = new(v1beta1.InitConfiguration)
+@@ -1154,15 +1250,7 @@ func Convert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *Kubeadm
+ }
+ 
+ func autoConvert_v1beta1_KubeadmConfigSpec_To_v1alpha4_KubeadmConfigSpec(in *v1beta1.KubeadmConfigSpec, out *KubeadmConfigSpec, s conversion.Scope) error {
+-	if in.ClusterConfiguration != nil {
+-		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
+-		*out = new(ClusterConfiguration)
+-		if err := Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(*in, *out, s); err != nil {
+-			return err
+-		}
+-	} else {
+-		out.ClusterConfiguration = nil
+-	}
++	out.ClusterConfiguration = (*ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
+ 	if in.InitConfiguration != nil {
+ 		in, out := &in.InitConfiguration, &out.InitConfiguration
+ 		*out = new(InitConfiguration)
+@@ -1505,6 +1593,74 @@ func Convert_v1beta1_Partition_To_v1alpha4_Partition(in *v1beta1.Partition, out
+ 	return autoConvert_v1beta1_Partition_To_v1alpha4_Partition(in, out, s)
+ }
+ 
++func autoConvert_v1alpha4_Pause_To_v1beta1_Pause(in *Pause, out *v1beta1.Pause, s conversion.Scope) error {
++	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1alpha4_Pause_To_v1beta1_Pause is an autogenerated conversion function.
++func Convert_v1alpha4_Pause_To_v1beta1_Pause(in *Pause, out *v1beta1.Pause, s conversion.Scope) error {
++	return autoConvert_v1alpha4_Pause_To_v1beta1_Pause(in, out, s)
++}
++
++func autoConvert_v1beta1_Pause_To_v1alpha4_Pause(in *v1beta1.Pause, out *Pause, s conversion.Scope) error {
++	if err := Convert_v1beta1_ImageMeta_To_v1alpha4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	return nil
++}
++
++// Convert_v1beta1_Pause_To_v1alpha4_Pause is an autogenerated conversion function.
++func Convert_v1beta1_Pause_To_v1alpha4_Pause(in *v1beta1.Pause, out *Pause, s conversion.Scope) error {
++	return autoConvert_v1beta1_Pause_To_v1alpha4_Pause(in, out, s)
++}
++
++func autoConvert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *ProxyConfiguration, out *v1beta1.ProxyConfiguration, s conversion.Scope) error {
++	out.HTTPSProxy = in.HTTPSProxy
++	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
++	return nil
++}
++
++// Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration is an autogenerated conversion function.
++func Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *ProxyConfiguration, out *v1beta1.ProxyConfiguration, s conversion.Scope) error {
++	return autoConvert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1beta1.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
++	out.HTTPSProxy = in.HTTPSProxy
++	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
++	return nil
++}
++
++// Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration is an autogenerated conversion function.
++func Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1beta1.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in, out, s)
++}
++
++func autoConvert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta1.RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta1.RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in *v1beta1.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in *v1beta1.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in, out, s)
++}
++
+ func autoConvert_v1alpha4_SecretFileSource_To_v1beta1_SecretFileSource(in *SecretFileSource, out *v1beta1.SecretFileSource, s conversion.Scope) error {
+ 	out.Name = in.Name
+ 	out.Key = in.Key
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+index dbae328d9..d7b753a82 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+@@ -142,10 +142,30 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootstrap.
++func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootstrap)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -510,6 +530,10 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -960,6 +984,57 @@ func (in *Partition) DeepCopy() *Partition {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *Pause) DeepCopyInto(out *Pause) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Pause.
++func (in *Pause) DeepCopy() *Pause {
++	if in == nil {
++		return nil
++	}
++	out := new(Pause)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *ProxyConfiguration) DeepCopyInto(out *ProxyConfiguration) {
++	*out = *in
++	if in.NoProxy != nil {
++		in, out := &in.NoProxy, &out.NoProxy
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ProxyConfiguration.
++func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(ProxyConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
+ 	*out = *in
+diff --git a/internal/apis/core/v1alpha4/zz_generated.deepcopy.go b/internal/apis/core/v1alpha4/zz_generated.deepcopy.go
+index ac1ae21e3..7aa525c07 100644
+--- a/internal/apis/core/v1alpha4/zz_generated.deepcopy.go
++++ b/internal/apis/core/v1alpha4/zz_generated.deepcopy.go
+@@ -247,6 +247,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+ 		*out = new(v1.ObjectReference)
+ 		**out = **in
+ 	}
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(v1.ObjectReference)
++		**out = **in
++	}
+ 	if in.InfrastructureRef != nil {
+ 		in, out := &in.InfrastructureRef, &out.InfrastructureRef
+ 		*out = new(v1.ObjectReference)
+-- 
+2.42.0
+

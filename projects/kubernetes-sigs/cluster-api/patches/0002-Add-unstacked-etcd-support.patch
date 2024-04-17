@@ -1,7 +1,7 @@
-From bae12aae7aa733b4fea934cca2d072c084dfcc14 Mon Sep 17 00:00:00 2001
+From 84d971991787d5f4a445432f58704d9216b8983d Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 02/40] Add unstacked etcd support
+Subject: [PATCH 02/37] Add unstacked etcd support
 
 Unstacked etcd: API and config changes
 
@@ -66,7 +66,6 @@ It needs update permission on etcdadmcluster object for this.
 We previously had added this permission, it got dropped while rebasing
 commits on the new 1.0.1 branch. This commit adds back the permission.
 ---
- api/v1alpha4/cluster_types.go                 |  14 ++
  api/v1beta1/cluster_types.go                  |  14 ++
  api/v1beta1/condition_consts.go               |  16 ++
  api/v1beta1/machine_types.go                  |   3 +
@@ -80,53 +79,22 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  .../apis/core/v1alpha3/condition_consts.go    |  16 ++
  internal/apis/core/v1alpha3/conversion.go     |  12 ++
  .../core/v1alpha3/zz_generated.conversion.go  |   6 +
+ internal/apis/core/v1alpha4/cluster_types.go  |  14 ++
  .../controllers/cluster/cluster_controller.go |  90 ++++++++++-
  .../cluster/cluster_controller_phases.go      | 108 +++++++++++++
  .../cluster/cluster_controller_test.go        | 136 +++++++++++++++++
  .../machine/machine_controller_noderef.go     |   8 +
- .../machine_controller_noderef_test.go        |  43 ++++++
+ .../machine_controller_noderef_test.go        |  48 ++++++
  .../machine/machine_controller_phases.go      | 115 ++++++++++++++
  .../controllers/dockermachine_controller.go   |  35 +++--
  util/collections/machine_filters.go           |  26 ++++
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 25 files changed, 877 insertions(+), 22 deletions(-)
+ 25 files changed, 882 insertions(+), 22 deletions(-)
 
-diff --git a/api/v1alpha4/cluster_types.go b/api/v1alpha4/cluster_types.go
-index d4ee0658e..207cdcf76 100644
---- a/api/v1alpha4/cluster_types.go
-+++ b/api/v1alpha4/cluster_types.go
-@@ -56,6 +56,11 @@ type ClusterSpec struct {
- 	// +optional
- 	ControlPlaneRef *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
- 
-+	// ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
-+	// for provisioning an external etcd cluster
-+	// +optional
-+	ManagedExternalEtcdRef *corev1.ObjectReference `json:"managedExternalEtcdRef,omitempty"`
-+
- 	// InfrastructureRef is a reference to a provider-specific resource that holds the details
- 	// for provisioning infrastructure for a cluster in said provider.
- 	// +optional
-@@ -222,6 +227,15 @@ type ClusterStatus struct {
- 	// ObservedGeneration is the latest generation observed by the controller.
- 	// +optional
- 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-+
-+	// ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
-+	// so remaining etcd members can lookup the address to join the cluster
-+	// +optional
-+	ManagedExternalEtcdInitialized bool `json:"managedExternalEtcdInitialized"`
-+
-+	// ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned
-+	// +optional
-+	ManagedExternalEtcdReady bool `json:"managedExternalEtcdReady"`
- }
- 
- // ANCHOR_END: ClusterStatus
 diff --git a/api/v1beta1/cluster_types.go b/api/v1beta1/cluster_types.go
-index 456d83622..dcfa7e198 100644
+index 12c258f22..680e99731 100644
 --- a/api/v1beta1/cluster_types.go
 +++ b/api/v1beta1/cluster_types.go
 @@ -60,6 +60,11 @@ type ClusterSpec struct {
@@ -158,10 +126,10 @@ index 456d83622..dcfa7e198 100644
  
  // ANCHOR_END: ClusterStatus
 diff --git a/api/v1beta1/condition_consts.go b/api/v1beta1/condition_consts.go
-index 5e2bc212e..960ad2d12 100644
+index 57d8324c1..15d67d77b 100644
 --- a/api/v1beta1/condition_consts.go
 +++ b/api/v1beta1/condition_consts.go
-@@ -269,6 +269,22 @@ const (
+@@ -286,6 +286,22 @@ const (
  	ScalingDownReason = "ScalingDown"
  )
  
@@ -199,7 +167,7 @@ index e6e0fa8fe..07395019e 100644
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index ea9c742ab..61270d3a7 100644
+index 0232aba2b..4910963e6 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -270,7 +270,8 @@ func (o *objectMover) checkProvisioningCompleted(ctx context.Context, graph *obj
@@ -213,10 +181,10 @@ index ea9c742ab..61270d3a7 100644
  		}
  	}
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index f052a5b8e..a10bee3ce 100644
+index 1e04b861c..5d9abbe89 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -169,6 +169,45 @@ spec:
+@@ -189,6 +189,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -262,7 +230,7 @@ index f052a5b8e..a10bee3ce 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -261,6 +300,15 @@ spec:
+@@ -283,6 +322,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -278,7 +246,7 @@ index f052a5b8e..a10bee3ce 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -432,6 +480,45 @@ spec:
+@@ -478,6 +526,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -324,7 +292,7 @@ index f052a5b8e..a10bee3ce 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -649,6 +736,15 @@ spec:
+@@ -696,6 +783,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -340,7 +308,7 @@ index f052a5b8e..a10bee3ce 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -827,6 +923,45 @@ spec:
+@@ -895,6 +991,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -386,7 +354,7 @@ index f052a5b8e..a10bee3ce 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -1627,6 +1762,15 @@ spec:
+@@ -1670,6 +1805,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -429,10 +397,10 @@ index 55346c81b..b111f3d67 100644
    - bootstrap.cluster.x-k8s.io
    - controlplane.cluster.x-k8s.io
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index 896474544..7e0fd392a 100644
+index 4efdb9c13..182d680e2 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
-@@ -244,3 +244,13 @@ func IsInitialized(obj *unstructured.Unstructured) (bool, error) {
+@@ -256,3 +256,13 @@ func IsInitialized(obj *unstructured.Unstructured) (bool, error) {
  	}
  	return initialized && found, nil
  }
@@ -447,10 +415,10 @@ index 896474544..7e0fd392a 100644
 +	return endpoints, found, nil
 +}
 diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
-index 8bae8c0a1..19055ca2a 100644
+index c79787ee7..2f2554b62 100644
 --- a/controlplane/kubeadm/config/rbac/role.yaml
 +++ b/controlplane/kubeadm/config/rbac/role.yaml
-@@ -81,3 +81,12 @@ rules:
+@@ -87,3 +87,12 @@ rules:
    - patch
    - update
    - watch
@@ -464,7 +432,7 @@ index 8bae8c0a1..19055ca2a 100644
 +  - update
 +  - watch
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index f71bdec07..9bdafa7ec 100644
+index 22ba4f0ae..a3a67dadd 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -19,6 +19,8 @@ package controllers
@@ -484,15 +452,15 @@ index f71bdec07..9bdafa7ec 100644
  	"sigs.k8s.io/cluster-api/controllers/remote"
  	controlplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
  	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
-@@ -68,6 +71,7 @@ const (
- // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
+@@ -69,6 +72,7 @@ const (
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch;create;update;patch;delete
+ // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machinepools,verbs=list
  // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 +// +kubebuilder:rbac:groups=etcdcluster.cluster.x-k8s.io,resources=*,verbs=get;list;watch;update
  
  // KubeadmControlPlaneReconciler reconciles a KubeadmControlPlane object.
  type KubeadmControlPlaneReconciler struct {
-@@ -169,6 +173,32 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -170,6 +174,32 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  		return ctrl.Result{Requeue: true}, nil
  	}
  
@@ -549,7 +517,7 @@ index f71bdec07..9bdafa7ec 100644
  		controllerutil.RemoveFinalizer(controlPlane.KCP, controlplanev1.KubeadmControlPlaneFinalizer)
 @@ -530,12 +575,6 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
  	// all the machines are deleted in parallel.
- 	conditions.SetAggregate(controlPlane.KCP, controlplanev1.MachinesReadyCondition, controlPlane.Machines.ConditionGetters(), conditions.AddSourceRef(), conditions.WithStepCounterIf(false))
+ 	conditions.SetAggregate(controlPlane.KCP, controlplanev1.MachinesReadyCondition, controlPlane.Machines.ConditionGetters(), conditions.AddSourceRef())
  
 -	// Gets all machines, not just control plane machines.
 -	allMachines, err := r.managementCluster.GetMachinesForCluster(ctx, controlPlane.Cluster)
@@ -684,6 +652,38 @@ index c7ea14ba3..30a689e8e 100644
  	return nil
  }
  
+diff --git a/internal/apis/core/v1alpha4/cluster_types.go b/internal/apis/core/v1alpha4/cluster_types.go
+index 019329d7c..6e4069b73 100644
+--- a/internal/apis/core/v1alpha4/cluster_types.go
++++ b/internal/apis/core/v1alpha4/cluster_types.go
+@@ -56,6 +56,11 @@ type ClusterSpec struct {
+ 	// +optional
+ 	ControlPlaneRef *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
+ 
++	// ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
++	// for provisioning an external etcd cluster
++	// +optional
++	ManagedExternalEtcdRef *corev1.ObjectReference `json:"managedExternalEtcdRef,omitempty"`
++
+ 	// InfrastructureRef is a reference to a provider-specific resource that holds the details
+ 	// for provisioning infrastructure for a cluster in said provider.
+ 	// +optional
+@@ -222,6 +227,15 @@ type ClusterStatus struct {
+ 	// ObservedGeneration is the latest generation observed by the controller.
+ 	// +optional
+ 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
++
++	// ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
++	// so remaining etcd members can lookup the address to join the cluster
++	// +optional
++	ManagedExternalEtcdInitialized bool `json:"managedExternalEtcdInitialized"`
++
++	// ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned
++	// +optional
++	ManagedExternalEtcdReady bool `json:"managedExternalEtcdReady"`
+ }
+ 
+ // ANCHOR_END: ClusterStatus
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
 index 7654b788a..269007490 100644
 --- a/internal/controllers/cluster/cluster_controller.go
@@ -860,7 +860,7 @@ index 7654b788a..269007490 100644
 +	}}
 +}
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 4266a212d..590967dd6 100644
+index c70d3389d..73ff4f789 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -19,6 +19,8 @@ package cluster
@@ -993,7 +993,7 @@ index 4266a212d..590967dd6 100644
  	log := ctrl.LoggerFrom(ctx)
  
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index f6a35071c..bce99a762 100644
+index 7e505b7d1..0439ca397 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
 @@ -537,6 +537,124 @@ func TestClusterReconcilerNodeRef(t *testing.T) {
@@ -1175,10 +1175,10 @@ index f6a35071c..bce99a762 100644
  
  	g.Expect(actual).To(BeComparableTo(expected))
 diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 7f32c72c4..e6a9374f6 100644
+index 719e7d411..4f3404aa2 100644
 --- a/internal/controllers/machine/machine_controller_noderef.go
 +++ b/internal/controllers/machine/machine_controller_noderef.go
-@@ -53,6 +53,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
+@@ -55,6 +55,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
  		return ctrl.Result{}, err
  	}
  
@@ -1194,10 +1194,18 @@ index 7f32c72c4..e6a9374f6 100644
  	if machine.Spec.ProviderID == nil || *machine.Spec.ProviderID == "" {
  		log.Info("Waiting for infrastructure provider to report spec.providerID", machine.Spec.InfrastructureRef.Kind, klog.KRef(machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name))
 diff --git a/internal/controllers/machine/machine_controller_noderef_test.go b/internal/controllers/machine/machine_controller_noderef_test.go
-index 0bcaaa1d0..f3586efa5 100644
+index 48ebcabf3..9a150640d 100644
 --- a/internal/controllers/machine/machine_controller_noderef_test.go
 +++ b/internal/controllers/machine/machine_controller_noderef_test.go
-@@ -35,6 +35,7 @@ import (
+@@ -26,6 +26,7 @@ import (
+ 	corev1 "k8s.io/api/core/v1"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
++	"k8s.io/utils/pointer"
+ 	"k8s.io/utils/ptr"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+@@ -35,6 +36,7 @@ import (
  	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
  	"sigs.k8s.io/cluster-api/controllers/remote"
  	"sigs.k8s.io/cluster-api/util"
@@ -1205,8 +1213,8 @@ index 0bcaaa1d0..f3586efa5 100644
  	"sigs.k8s.io/cluster-api/util/kubeconfig"
  )
  
-@@ -770,3 +771,45 @@ func TestPatchNode(t *testing.T) {
- 		})
+@@ -996,3 +998,49 @@ func newFakeMachineDeployment(namespace, clusterName string) *clusterv1.MachineD
+ 		},
  	}
  }
 +
@@ -1245,14 +1253,18 @@ index 0bcaaa1d0..f3586efa5 100644
 +		t.Run(tc.name, func(t *testing.T) {
 +			g := NewWithT(t)
 +			r := Reconciler{Client: env}
++			s := &scope{
++				cluster: &clusterv1.Cluster{},
++				machine: tc.machine,
++			}
 +
-+			g.Expect(r.reconcileNode(ctx, &clusterv1.Cluster{}, tc.machine)).To(Equal(ctrl.Result{}))
++			g.Expect(r.reconcileNode(ctx, s)).To(Equal(ctrl.Result{}))
 +			g.Expect(conditions.Get(tc.machine, clusterv1.MachineNodeHealthyCondition)).To(BeNil())
 +		})
 +	}
 +}
 diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
-index 8c197b4c1..e22977cc0 100644
+index 1bd41f4d8..32cddef3d 100644
 --- a/internal/controllers/machine/machine_controller_phases.go
 +++ b/internal/controllers/machine/machine_controller_phases.go
 @@ -19,6 +19,7 @@ package machine
@@ -1392,10 +1404,10 @@ index 8c197b4c1..e22977cc0 100644
  	var failureDomain string
  	err = util.UnstructuredUnmarshalField(infraConfig, &failureDomain, "spec", "failureDomain")
 diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-index 68b3553ff..30128dcc4 100644
+index 8b517275a..029c5614b 100644
 --- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 +++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-@@ -408,23 +408,27 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -415,23 +415,27 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
  	// set to true after a control plane machine has a node ref. If we would requeue here in this case, the
  	// Machine will never get a node ref as ProviderID is required to set the node ref, so we would get a deadlock.
  	if cluster.Spec.ControlPlaneRef != nil &&
@@ -1436,7 +1448,7 @@ index 68b3553ff..30128dcc4 100644
  	}
  	// Set ProviderID so the Cluster API Machine Controller can pull it
  	providerID := externalMachine.ProviderID()
-@@ -599,3 +603,8 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
+@@ -606,3 +610,8 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
  
  	return nil
  }
@@ -1446,7 +1458,7 @@ index 68b3553ff..30128dcc4 100644
 +	return ok
 +}
 diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
-index 12c2e20f8..ec46466ec 100644
+index 775e9a8b8..0e52c4f45 100644
 --- a/util/collections/machine_filters.go
 +++ b/util/collections/machine_filters.go
 @@ -122,6 +122,18 @@ func ControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) b
@@ -1490,10 +1502,10 @@ index 12c2e20f8..ec46466ec 100644
  func MatchesKubernetesVersion(kubernetesVersion string) Func {
  	return func(machine *clusterv1.Machine) bool {
 diff --git a/util/secret/certificates.go b/util/secret/certificates.go
-index 7e9d211dc..60f37ced3 100644
+index b1d553c52..0fc42c3b8 100644
 --- a/util/secret/certificates.go
 +++ b/util/secret/certificates.go
-@@ -427,6 +427,9 @@ func (c Certificates) AsFiles() []bootstrapv1.File {
+@@ -431,6 +431,9 @@ func (c Certificates) AsFiles() []bootstrapv1.File {
  	if serviceAccountKey := c.GetByPurpose(ServiceAccount); serviceAccountKey != nil {
  		certFiles = append(certFiles, serviceAccountKey.AsFiles()...)
  	}
@@ -1517,10 +1529,10 @@ index d50062da3..043764325 100644
  
  var (
 diff --git a/util/util.go b/util/util.go
-index d72947ecf..e830011d9 100644
+index 1648cb3d1..f967e7b37 100644
 --- a/util/util.go
 +++ b/util/util.go
-@@ -146,6 +146,12 @@ func IsNodeReady(node *corev1.Node) bool {
+@@ -147,6 +147,12 @@ func IsNodeReady(node *corev1.Node) bool {
  	return false
  }
  
