@@ -1,7 +1,7 @@
-From 1a511864eb2ada9796e05a31155b0a156ac7b449 Mon Sep 17 00:00:00 2001
+From 3c5aa5ce07532bf7ac7360e4858eebc12d4adae6 Mon Sep 17 00:00:00 2001
 From: Victor Pineda <vgonzla@amazon.com>
 Date: Tue, 21 Jun 2022 07:50:19 -0700
-Subject: [PATCH 17/40] Add feature to specifiy additional host containers in
+Subject: [PATCH 16/37] Add feature to specifiy additional host containers in
  BR
 
 Host containers are a feature within BR that allows us to pull images
@@ -18,16 +18,12 @@ template to be reused as much as a user wants to.
 SIM: https://i.amazon.com/P66557529
 cr: https://code.amazon.com/reviews/CR-71408825
 ---
- bootstrap/kubeadm/api/v1alpha4/conversion.go  |   5 +
- .../kubeadm/api/v1alpha4/kubeadm_types.go     |  25 ++
- .../api/v1alpha4/zz_generated.conversion.go   |  77 +++++-
- .../api/v1alpha4/zz_generated.deepcopy.go     |  26 ++
  .../kubeadm/api/v1beta1/kubeadm_types.go      |  25 ++
  .../api/v1beta1/zz_generated.deepcopy.go      |  26 ++
- ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 252 +++++++++++++++++
- ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 258 ++++++++++++++++++
- .../internal/bottlerocket/bootstrap.go        |  44 ++-
- .../internal/bottlerocket/bottlerocket.go     | 105 ++++---
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 246 ++++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 246 ++++++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        |  44 ++--
+ .../internal/bottlerocket/bottlerocket.go     | 105 +++++---
  .../controllers/kubeadmconfig_controller.go   |  21 +-
  .../kubeadm/types/upstreamv1beta1/types.go    |  25 ++
  .../upstreamv1beta1/zz_generated.deepcopy.go  |  26 ++
@@ -35,272 +31,16 @@ cr: https://code.amazon.com/reviews/CR-71408825
  .../zz_generated.conversion.go                |  17 +-
  .../types/upstreamv1beta3/conversion.go       |  10 +
  .../zz_generated.conversion.go                |  32 +--
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 258 ++++++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 180 ++++++++++++
- 19 files changed, 1302 insertions(+), 115 deletions(-)
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 246 ++++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 168 ++++++++++++
+ .../bootstrap/kubeadm/v1alpha4/conversion.go  |   5 +
+ .../kubeadm/v1alpha4/kubeadm_types.go         |  25 ++
+ .../v1alpha4/zz_generated.conversion.go       |  77 +++++-
+ .../kubeadm/v1alpha4/zz_generated.deepcopy.go |  26 ++
+ 19 files changed, 1260 insertions(+), 115 deletions(-)
 
-diff --git a/bootstrap/kubeadm/api/v1alpha4/conversion.go b/bootstrap/kubeadm/api/v1alpha4/conversion.go
-index 576fceebd..5457cd58d 100644
---- a/bootstrap/kubeadm/api/v1alpha4/conversion.go
-+++ b/bootstrap/kubeadm/api/v1alpha4/conversion.go
-@@ -210,6 +210,11 @@ func Convert_v1beta1_User_To_v1alpha4_User(in *bootstrapv1.User, out *User, s ap
- 	return autoConvert_v1beta1_User_To_v1alpha4_User(in, out, s)
- }
- 
-+func Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in *bootstrapv1.ClusterConfiguration, out *ClusterConfiguration, s apiconversion.Scope) error {
-+	// ClusterConfiguration.BottlerocketCustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in v1alpha4
-+	return autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in, out, s)
-+}
-+
- func Convert_v1beta1_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(in *bootstrapv1.NodeRegistrationOptions, out *NodeRegistrationOptions, s apiconversion.Scope) error {
- 	// NodeRegistrationOptions.ImagePullPolicy does not exit in
- 	// kubeadm v1alpha4 API.
-diff --git a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
-index 9027f336f..7f54b3b1d 100644
---- a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
-+++ b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
-@@ -151,6 +151,11 @@ type ClusterConfiguration struct {
- 	// The cluster name
- 	// +optional
- 	ClusterName string `json:"clusterName,omitempty"`
-+
-+	// BottlerocketHostContainers contains the information of any additional images
-+	// that we will deploy as host containers in the CPIs
-+	// +optional
-+	BottlerocketHostContainers []BottlerocketHostContainer `json:"bottlerocketCustomHostContainers,omitempty"`
- }
- 
- // Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
-@@ -449,6 +454,26 @@ type JoinConfiguration struct {
- 	// If nil, no additional control plane instance will be deployed.
- 	// +optional
- 	ControlPlane *JoinControlPlane `json:"controlPlane,omitempty"`
-+
-+	// BottlerocketCustomHostContainers contains the information of any additional images
-+	// that we will deploy as host containers in the CPIs
-+	// +optional
-+	BottlerocketCustomHostContainers []BottlerocketHostContainer `json:"bottlerocketCustomHostContainers,omitempty"`
-+}
-+
-+// BottlerocketHostContainer describes a host image for Bottlerocket
-+type BottlerocketHostContainer struct {
-+	// Name is the host container name that will be given to the container in BR's `apiserver`
-+	// +kubebuilder:validation:Required
-+	Name string `json:"name"`
-+	// Superpowered indicates if the container will be superpowered
-+	// +kubebuilder:validation:Required
-+	Superpowered bool `json:"superpowered"`
-+	// ImageMeta is the actual location of the container image
-+	ImageMeta `json:"source"`
-+	// UserData is the userdata that will be attached to the image.
-+	// +optional
-+	UserData string `json:"userData,omitempty"`
- }
- 
- // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
-diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-index 5c36c5ca4..02edbefcf 100644
---- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-@@ -110,13 +110,18 @@ func RegisterConversions(s *runtime.Scheme) error {
- 	}); err != nil {
- 		return err
- 	}
--	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
--		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
-+	if err := s.AddGeneratedConversionFunc((*BottlerocketHostContainer)(nil), (*v1beta1.BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer(a.(*BottlerocketHostContainer), b.(*v1beta1.BottlerocketHostContainer), scope)
- 	}); err != nil {
- 		return err
- 	}
--	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
--		return Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
-+	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketHostContainer)(nil), (*BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer(a.(*v1beta1.BottlerocketHostContainer), b.(*BottlerocketHostContainer), scope)
-+	}); err != nil {
-+		return err
-+	}
-+	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
- 	}); err != nil {
- 		return err
- 	}
-@@ -425,6 +430,11 @@ func RegisterConversions(s *runtime.Scheme) error {
- 	}); err != nil {
- 		return err
- 	}
-+	if err := s.AddConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
-+	}); err != nil {
-+		return err
-+	}
- 	if err := s.AddConversionFunc((*v1beta1.File)(nil), (*File)(nil), func(a, b interface{}, scope conversion.Scope) error {
- 		return Convert_v1beta1_File_To_v1alpha4_File(a.(*v1beta1.File), b.(*File), scope)
- 	}); err != nil {
-@@ -639,6 +649,36 @@ func Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(in *v1b
- 	return autoConvert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(in, out, s)
- }
- 
-+func autoConvert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer(in *BottlerocketHostContainer, out *v1beta1.BottlerocketHostContainer, s conversion.Scope) error {
-+	out.Name = in.Name
-+	out.Superpowered = in.Superpowered
-+	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
-+		return err
-+	}
-+	out.UserData = in.UserData
-+	return nil
-+}
-+
-+// Convert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer is an autogenerated conversion function.
-+func Convert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer(in *BottlerocketHostContainer, out *v1beta1.BottlerocketHostContainer, s conversion.Scope) error {
-+	return autoConvert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer(in, out, s)
-+}
-+
-+func autoConvert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer(in *v1beta1.BottlerocketHostContainer, out *BottlerocketHostContainer, s conversion.Scope) error {
-+	out.Name = in.Name
-+	out.Superpowered = in.Superpowered
-+	if err := Convert_v1beta1_ImageMeta_To_v1alpha4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
-+		return err
-+	}
-+	out.UserData = in.UserData
-+	return nil
-+}
-+
-+// Convert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer is an autogenerated conversion function.
-+func Convert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer(in *v1beta1.BottlerocketHostContainer, out *BottlerocketHostContainer, s conversion.Scope) error {
-+	return autoConvert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer(in, out, s)
-+}
-+
- func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
- 	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
- 		return err
-@@ -679,6 +719,7 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(i
- 	out.ImageRepository = in.ImageRepository
- 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
- 	out.ClusterName = in.ClusterName
-+	out.BottlerocketHostContainers = *(*[]v1beta1.BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketHostContainers))
- 	return nil
- }
- 
-@@ -727,14 +768,10 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
- 	out.ImageRepository = in.ImageRepository
- 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
- 	out.ClusterName = in.ClusterName
-+	out.BottlerocketHostContainers = *(*[]BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketHostContainers))
- 	return nil
- }
- 
--// Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration is an autogenerated conversion function.
--func Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in *v1beta1.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
--	return autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in, out, s)
--}
--
- func autoConvert_v1alpha4_ClusterStatus_To_v1beta1_ClusterStatus(in *ClusterStatus, out *v1beta1.ClusterStatus, s conversion.Scope) error {
- 	out.APIEndpoints = *(*map[string]v1beta1.APIEndpoint)(unsafe.Pointer(&in.APIEndpoints))
- 	return nil
-@@ -1102,6 +1139,7 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
- 		return err
- 	}
- 	out.ControlPlane = (*v1beta1.JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
-+	out.BottlerocketCustomHostContainers = *(*[]v1beta1.BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketCustomHostContainers))
- 	return nil
- }
- 
-@@ -1136,6 +1174,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
- 	out.ControlPlane = (*JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
- 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
- 	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
-+	out.BottlerocketCustomHostContainers = *(*[]BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketCustomHostContainers))
- 	return nil
- }
- 
-@@ -1238,7 +1277,15 @@ func Convert_v1beta1_KubeadmConfigList_To_v1alpha4_KubeadmConfigList(in *v1beta1
- }
- 
- func autoConvert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *KubeadmConfigSpec, out *v1beta1.KubeadmConfigSpec, s conversion.Scope) error {
--	out.ClusterConfiguration = (*v1beta1.ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
-+	if in.ClusterConfiguration != nil {
-+		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
-+		*out = new(v1beta1.ClusterConfiguration)
-+		if err := Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(*in, *out, s); err != nil {
-+			return err
-+		}
-+	} else {
-+		out.ClusterConfiguration = nil
-+	}
- 	if in.InitConfiguration != nil {
- 		in, out := &in.InitConfiguration, &out.InitConfiguration
- 		*out = new(v1beta1.InitConfiguration)
-@@ -1296,7 +1343,15 @@ func Convert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *Kubeadm
- }
- 
- func autoConvert_v1beta1_KubeadmConfigSpec_To_v1alpha4_KubeadmConfigSpec(in *v1beta1.KubeadmConfigSpec, out *KubeadmConfigSpec, s conversion.Scope) error {
--	out.ClusterConfiguration = (*ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
-+	if in.ClusterConfiguration != nil {
-+		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
-+		*out = new(ClusterConfiguration)
-+		if err := Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(*in, *out, s); err != nil {
-+			return err
-+		}
-+	} else {
-+		out.ClusterConfiguration = nil
-+	}
- 	if in.InitConfiguration != nil {
- 		in, out := &in.InitConfiguration, &out.InitConfiguration
- 		*out = new(InitConfiguration)
-diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
-index 5bf4e0d97..f8a680800 100644
---- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
-+++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
-@@ -174,6 +174,22 @@ func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
- 	return out
- }
- 
-+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
-+func (in *BottlerocketHostContainer) DeepCopyInto(out *BottlerocketHostContainer) {
-+	*out = *in
-+	out.ImageMeta = in.ImageMeta
-+}
-+
-+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketHostContainer.
-+func (in *BottlerocketHostContainer) DeepCopy() *BottlerocketHostContainer {
-+	if in == nil {
-+		return nil
-+	}
-+	out := new(BottlerocketHostContainer)
-+	in.DeepCopyInto(out)
-+	return out
-+}
-+
- // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
- func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
- 	*out = *in
-@@ -196,6 +212,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
- 			(*out)[key] = val
- 		}
- 	}
-+	if in.BottlerocketHostContainers != nil {
-+		in, out := &in.BottlerocketHostContainers, &out.BottlerocketHostContainers
-+		*out = make([]BottlerocketHostContainer, len(*in))
-+		copy(*out, *in)
-+	}
- }
- 
- // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterConfiguration.
-@@ -559,6 +580,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
- 		*out = new(JoinControlPlane)
- 		**out = **in
- 	}
-+	if in.BottlerocketCustomHostContainers != nil {
-+		in, out := &in.BottlerocketCustomHostContainers, &out.BottlerocketCustomHostContainers
-+		*out = make([]BottlerocketHostContainer, len(*in))
-+		copy(*out, *in)
-+	}
- }
- 
- // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 8c9dcac00..44ffa00f3 100644
+index 988074aec..34b0d9575 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -170,6 +170,11 @@ type ClusterConfiguration struct {
@@ -394,17 +134,17 @@ index 80d9362bb..8da1eb4c5 100644
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index f0e8338be..b2b01cb68 100644
+index 871582862..aa63477a9 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -133,6 +133,48 @@ spec:
-                           the version of the above components during upgrades.
+@@ -146,6 +146,47 @@ spec:
+                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                          type: string
                      type: object
 +                  bottlerocketCustomHostContainers:
-+                    description: BottlerocketHostContainers contains the information
-+                      of any additional images that we will deploy as host containers
-+                      in the CPIs
++                    description: |-
++                      BottlerocketHostContainers contains the information of any additional images
++                      that we will deploy as host containers in the CPIs
 +                    items:
 +                      description: BottlerocketHostContainer describes a host image
 +                        for Bottlerocket
@@ -418,15 +158,14 @@ index f0e8338be..b2b01cb68 100644
 +                            image
 +                          properties:
 +                            imageRepository:
-+                              description: ImageRepository sets the container registry
-+                                to pull images from. if not set, the ImageRepository
-+                                defined in ClusterConfiguration will be used instead.
++                              description: |-
++                                ImageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                              type: string
 +                            imageTag:
-+                              description: ImageTag allows to specify a tag for the
-+                                image. In case this value is set, kubeadm does not
-+                                change automatically the version of the above components
-+                                during upgrades.
++                              description: |-
++                                ImageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                              type: string
 +                          type: object
 +                        superpowered:
@@ -444,16 +183,16 @@ index f0e8338be..b2b01cb68 100644
 +                      type: object
 +                    type: array
                    certificatesDir:
-                     description: 'CertificatesDir specifies where to store or look
-                       for all required certificates. NB: if not provided, this will
-@@ -761,6 +803,48 @@ spec:
-                           the version of the above components during upgrades.
+                     description: |-
+                       CertificatesDir specifies where to store or look for all required certificates.
+@@ -784,6 +825,47 @@ spec:
+                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                          type: string
                      type: object
 +                  bottlerocketCustomHostContainers:
-+                    description: BottlerocketCustomHostContainers contains the information
-+                      of any additional images that we will deploy as host containers
-+                      in the CPIs
++                    description: |-
++                      BottlerocketCustomHostContainers contains the information of any additional images
++                      that we will deploy as host containers in the CPIs
 +                    items:
 +                      description: BottlerocketHostContainer describes a host image
 +                        for Bottlerocket
@@ -467,15 +206,14 @@ index f0e8338be..b2b01cb68 100644
 +                            image
 +                          properties:
 +                            imageRepository:
-+                              description: ImageRepository sets the container registry
-+                                to pull images from. if not set, the ImageRepository
-+                                defined in ClusterConfiguration will be used instead.
++                              description: |-
++                                ImageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                              type: string
 +                            imageTag:
-+                              description: ImageTag allows to specify a tag for the
-+                                image. In case this value is set, kubeadm does not
-+                                change automatically the version of the above components
-+                                during upgrades.
++                              description: |-
++                                ImageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                              type: string
 +                          type: object
 +                        superpowered:
@@ -493,16 +231,16 @@ index f0e8338be..b2b01cb68 100644
 +                      type: object
 +                    type: array
                    caCertPath:
-                     description: 'CACertPath is the path to the SSL certificate authority
-                       used to secure comunications between node and control-plane.
-@@ -1268,6 +1352,48 @@ spec:
-                           the version of the above components during upgrades.
+                     description: |-
+                       CACertPath is the path to the SSL certificate authority used to
+@@ -1314,6 +1396,47 @@ spec:
+                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                          type: string
                      type: object
 +                  bottlerocketCustomHostContainers:
-+                    description: BottlerocketHostContainers contains the information
-+                      of any additional images that we will deploy as host containers
-+                      in the CPIs
++                    description: |-
++                      BottlerocketHostContainers contains the information of any additional images
++                      that we will deploy as host containers in the CPIs
 +                    items:
 +                      description: BottlerocketHostContainer describes a host image
 +                        for Bottlerocket
@@ -516,15 +254,14 @@ index f0e8338be..b2b01cb68 100644
 +                            image
 +                          properties:
 +                            imageRepository:
-+                              description: ImageRepository sets the container registry
-+                                to pull images from. if not set, the ImageRepository
-+                                defined in ClusterConfiguration will be used instead.
++                              description: |-
++                                ImageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                              type: string
 +                            imageTag:
-+                              description: ImageTag allows to specify a tag for the
-+                                image. In case this value is set, kubeadm does not
-+                                change automatically the version of the above components
-+                                during upgrades.
++                              description: |-
++                                ImageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                              type: string
 +                          type: object
 +                        superpowered:
@@ -542,16 +279,16 @@ index f0e8338be..b2b01cb68 100644
 +                      type: object
 +                    type: array
                    certificatesDir:
-                     description: 'CertificatesDir specifies where to store or look
-                       for all required certificates. NB: if not provided, this will
-@@ -1892,6 +2018,48 @@ spec:
-                           the version of the above components during upgrades.
+                     description: |-
+                       CertificatesDir specifies where to store or look for all required certificates.
+@@ -1948,6 +2071,47 @@ spec:
+                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                          type: string
                      type: object
 +                  bottlerocketCustomHostContainers:
-+                    description: BottlerocketCustomHostContainers contains the information
-+                      of any additional images that we will deploy as host containers
-+                      in the CPIs
++                    description: |-
++                      BottlerocketCustomHostContainers contains the information of any additional images
++                      that we will deploy as host containers in the CPIs
 +                    items:
 +                      description: BottlerocketHostContainer describes a host image
 +                        for Bottlerocket
@@ -565,15 +302,14 @@ index f0e8338be..b2b01cb68 100644
 +                            image
 +                          properties:
 +                            imageRepository:
-+                              description: ImageRepository sets the container registry
-+                                to pull images from. if not set, the ImageRepository
-+                                defined in ClusterConfiguration will be used instead.
++                              description: |-
++                                ImageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                              type: string
 +                            imageTag:
-+                              description: ImageTag allows to specify a tag for the
-+                                image. In case this value is set, kubeadm does not
-+                                change automatically the version of the above components
-+                                during upgrades.
++                              description: |-
++                                ImageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                              type: string
 +                          type: object
 +                        superpowered:
@@ -591,16 +327,16 @@ index f0e8338be..b2b01cb68 100644
 +                      type: object
 +                    type: array
                    caCertPath:
-                     description: 'CACertPath is the path to the SSL certificate authority
-                       used to secure comunications between node and control-plane.
-@@ -2397,6 +2565,48 @@ spec:
-                           the version of the above components during upgrades.
+                     description: |-
+                       CACertPath is the path to the SSL certificate authority used to
+@@ -2470,6 +2634,47 @@ spec:
+                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                          type: string
                      type: object
 +                  bottlerocketCustomHostContainers:
-+                    description: BottlerocketHostContainers contains the information
-+                      of any additional images that we will deploy as host containers
-+                      in the CPIs
++                    description: |-
++                      BottlerocketHostContainers contains the information of any additional images
++                      that we will deploy as host containers in the CPIs
 +                    items:
 +                      description: BottlerocketHostContainer describes a host image
 +                        for Bottlerocket
@@ -614,15 +350,14 @@ index f0e8338be..b2b01cb68 100644
 +                            image
 +                          properties:
 +                            imageRepository:
-+                              description: ImageRepository sets the container registry
-+                                to pull images from. if not set, the ImageRepository
-+                                defined in ClusterConfiguration will be used instead.
++                              description: |-
++                                ImageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                              type: string
 +                            imageTag:
-+                              description: ImageTag allows to specify a tag for the
-+                                image. In case this value is set, kubeadm does not
-+                                change automatically the version of the above components
-+                                during upgrades.
++                              description: |-
++                                ImageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                              type: string
 +                          type: object
 +                        superpowered:
@@ -640,16 +375,16 @@ index f0e8338be..b2b01cb68 100644
 +                      type: object
 +                    type: array
                    certificatesDir:
-                     description: 'CertificatesDir specifies where to store or look
-                       for all required certificates. NB: if not provided, this will
-@@ -3090,6 +3300,48 @@ spec:
-                           the version of the above components during upgrades.
+                     description: |-
+                       CertificatesDir specifies where to store or look for all required certificates.
+@@ -3175,6 +3380,47 @@ spec:
+                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                          type: string
                      type: object
 +                  bottlerocketCustomHostContainers:
-+                    description: BottlerocketCustomHostContainers contains the information
-+                      of any additional images that we will deploy as host containers
-+                      in the CPIs
++                    description: |-
++                      BottlerocketCustomHostContainers contains the information of any additional images
++                      that we will deploy as host containers in the CPIs
 +                    items:
 +                      description: BottlerocketHostContainer describes a host image
 +                        for Bottlerocket
@@ -663,15 +398,14 @@ index f0e8338be..b2b01cb68 100644
 +                            image
 +                          properties:
 +                            imageRepository:
-+                              description: ImageRepository sets the container registry
-+                                to pull images from. if not set, the ImageRepository
-+                                defined in ClusterConfiguration will be used instead.
++                              description: |-
++                                ImageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                              type: string
 +                            imageTag:
-+                              description: ImageTag allows to specify a tag for the
-+                                image. In case this value is set, kubeadm does not
-+                                change automatically the version of the above components
-+                                during upgrades.
++                              description: |-
++                                ImageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                              type: string
 +                          type: object
 +                        superpowered:
@@ -689,20 +423,20 @@ index f0e8338be..b2b01cb68 100644
 +                      type: object
 +                    type: array
                    caCertPath:
-                     description: 'CACertPath is the path to the SSL certificate authority
-                       used to secure comunications between node and control-plane.
+                     description: |-
+                       CACertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 6586d0dbf..311b5d79f 100644
+index a105eda5c..c46e9cec0 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -143,6 +143,49 @@ spec:
-                                   components during upgrades.
+@@ -154,6 +154,47 @@ spec:
+                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                  type: string
                              type: object
 +                          bottlerocketCustomHostContainers:
-+                            description: BottlerocketHostContainers contains the information
-+                              of any additional images that we will deploy as host
-+                              containers in the CPIs
++                            description: |-
++                              BottlerocketHostContainers contains the information of any additional images
++                              that we will deploy as host containers in the CPIs
 +                            items:
 +                              description: BottlerocketHostContainer describes a host
 +                                image for Bottlerocket
@@ -716,16 +450,14 @@ index 6586d0dbf..311b5d79f 100644
 +                                    the container image
 +                                  properties:
 +                                    imageRepository:
-+                                      description: ImageRepository sets the container
-+                                        registry to pull images from. if not set,
-+                                        the ImageRepository defined in ClusterConfiguration
-+                                        will be used instead.
++                                      description: |-
++                                        ImageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                      type: string
 +                                    imageTag:
-+                                      description: ImageTag allows to specify a tag
-+                                        for the image. In case this value is set,
-+                                        kubeadm does not change automatically the
-+                                        version of the above components during upgrades.
++                                      description: |-
++                                        ImageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                      type: string
 +                                  type: object
 +                                superpowered:
@@ -743,16 +475,16 @@ index 6586d0dbf..311b5d79f 100644
 +                              type: object
 +                            type: array
                            certificatesDir:
-                             description: 'CertificatesDir specifies where to store
-                               or look for all required certificates. NB: if not provided,
-@@ -810,6 +853,49 @@ spec:
-                                   components during upgrades.
+                             description: |-
+                               CertificatesDir specifies where to store or look for all required certificates.
+@@ -806,6 +847,47 @@ spec:
+                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                  type: string
                              type: object
 +                          bottlerocketCustomHostContainers:
-+                            description: BottlerocketCustomHostContainers contains
-+                              the information of any additional images that we will
-+                              deploy as host containers in the CPIs
++                            description: |-
++                              BottlerocketCustomHostContainers contains the information of any additional images
++                              that we will deploy as host containers in the CPIs
 +                            items:
 +                              description: BottlerocketHostContainer describes a host
 +                                image for Bottlerocket
@@ -766,16 +498,14 @@ index 6586d0dbf..311b5d79f 100644
 +                                    the container image
 +                                  properties:
 +                                    imageRepository:
-+                                      description: ImageRepository sets the container
-+                                        registry to pull images from. if not set,
-+                                        the ImageRepository defined in ClusterConfiguration
-+                                        will be used instead.
++                                      description: |-
++                                        ImageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                      type: string
 +                                    imageTag:
-+                                      description: ImageTag allows to specify a tag
-+                                        for the image. In case this value is set,
-+                                        kubeadm does not change automatically the
-+                                        version of the above components during upgrades.
++                                      description: |-
++                                        ImageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                      type: string
 +                                  type: object
 +                                superpowered:
@@ -793,16 +523,16 @@ index 6586d0dbf..311b5d79f 100644
 +                              type: object
 +                            type: array
                            caCertPath:
-                             description: 'CACertPath is the path to the SSL certificate
-                               authority used to secure comunications between node
-@@ -1276,6 +1362,49 @@ spec:
-                                   components during upgrades.
+                             description: |-
+                               CACertPath is the path to the SSL certificate authority used to
+@@ -1280,6 +1362,47 @@ spec:
+                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                  type: string
                              type: object
 +                          bottlerocketCustomHostContainers:
-+                            description: BottlerocketHostContainers contains the information
-+                              of any additional images that we will deploy as host
-+                              containers in the CPIs
++                            description: |-
++                              BottlerocketHostContainers contains the information of any additional images
++                              that we will deploy as host containers in the CPIs
 +                            items:
 +                              description: BottlerocketHostContainer describes a host
 +                                image for Bottlerocket
@@ -816,16 +546,14 @@ index 6586d0dbf..311b5d79f 100644
 +                                    the container image
 +                                  properties:
 +                                    imageRepository:
-+                                      description: ImageRepository sets the container
-+                                        registry to pull images from. if not set,
-+                                        the ImageRepository defined in ClusterConfiguration
-+                                        will be used instead.
++                                      description: |-
++                                        ImageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                      type: string
 +                                    imageTag:
-+                                      description: ImageTag allows to specify a tag
-+                                        for the image. In case this value is set,
-+                                        kubeadm does not change automatically the
-+                                        version of the above components during upgrades.
++                                      description: |-
++                                        ImageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                      type: string
 +                                  type: object
 +                                superpowered:
@@ -843,16 +571,16 @@ index 6586d0dbf..311b5d79f 100644
 +                              type: object
 +                            type: array
                            certificatesDir:
-                             description: 'CertificatesDir specifies where to store
-                               or look for all required certificates. NB: if not provided,
-@@ -1941,6 +2070,49 @@ spec:
-                                   components during upgrades.
+                             description: |-
+                               CertificatesDir specifies where to store or look for all required certificates.
+@@ -1929,6 +2052,47 @@ spec:
+                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                  type: string
                              type: object
 +                          bottlerocketCustomHostContainers:
-+                            description: BottlerocketCustomHostContainers contains
-+                              the information of any additional images that we will
-+                              deploy as host containers in the CPIs
++                            description: |-
++                              BottlerocketCustomHostContainers contains the information of any additional images
++                              that we will deploy as host containers in the CPIs
 +                            items:
 +                              description: BottlerocketHostContainer describes a host
 +                                image for Bottlerocket
@@ -866,16 +594,14 @@ index 6586d0dbf..311b5d79f 100644
 +                                    the container image
 +                                  properties:
 +                                    imageRepository:
-+                                      description: ImageRepository sets the container
-+                                        registry to pull images from. if not set,
-+                                        the ImageRepository defined in ClusterConfiguration
-+                                        will be used instead.
++                                      description: |-
++                                        ImageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                      type: string
 +                                    imageTag:
-+                                      description: ImageTag allows to specify a tag
-+                                        for the image. In case this value is set,
-+                                        kubeadm does not change automatically the
-+                                        version of the above components during upgrades.
++                                      description: |-
++                                        ImageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                      type: string
 +                                  type: object
 +                                superpowered:
@@ -893,16 +619,16 @@ index 6586d0dbf..311b5d79f 100644
 +                              type: object
 +                            type: array
                            caCertPath:
-                             description: 'CACertPath is the path to the SSL certificate
-                               authority used to secure comunications between node
-@@ -2430,6 +2602,49 @@ spec:
-                                   components during upgrades.
+                             description: |-
+                               CACertPath is the path to the SSL certificate authority used to
+@@ -2426,6 +2590,47 @@ spec:
+                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                  type: string
                              type: object
 +                          bottlerocketCustomHostContainers:
-+                            description: BottlerocketHostContainers contains the information
-+                              of any additional images that we will deploy as host
-+                              containers in the CPIs
++                            description: |-
++                              BottlerocketHostContainers contains the information of any additional images
++                              that we will deploy as host containers in the CPIs
 +                            items:
 +                              description: BottlerocketHostContainer describes a host
 +                                image for Bottlerocket
@@ -916,16 +642,14 @@ index 6586d0dbf..311b5d79f 100644
 +                                    the container image
 +                                  properties:
 +                                    imageRepository:
-+                                      description: ImageRepository sets the container
-+                                        registry to pull images from. if not set,
-+                                        the ImageRepository defined in ClusterConfiguration
-+                                        will be used instead.
++                                      description: |-
++                                        ImageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                      type: string
 +                                    imageTag:
-+                                      description: ImageTag allows to specify a tag
-+                                        for the image. In case this value is set,
-+                                        kubeadm does not change automatically the
-+                                        version of the above components during upgrades.
++                                      description: |-
++                                        ImageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                      type: string
 +                                  type: object
 +                                superpowered:
@@ -943,16 +667,16 @@ index 6586d0dbf..311b5d79f 100644
 +                              type: object
 +                            type: array
                            certificatesDir:
-                             description: 'CertificatesDir specifies where to store
-                               or look for all required certificates. NB: if not provided,
-@@ -3172,6 +3387,49 @@ spec:
-                                   components during upgrades.
+                             description: |-
+                               CertificatesDir specifies where to store or look for all required certificates.
+@@ -3148,6 +3353,47 @@ spec:
+                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                  type: string
                              type: object
 +                          bottlerocketCustomHostContainers:
-+                            description: BottlerocketCustomHostContainers contains
-+                              the information of any additional images that we will
-+                              deploy as host containers in the CPIs
++                            description: |-
++                              BottlerocketCustomHostContainers contains the information of any additional images
++                              that we will deploy as host containers in the CPIs
 +                            items:
 +                              description: BottlerocketHostContainer describes a host
 +                                image for Bottlerocket
@@ -966,16 +690,14 @@ index 6586d0dbf..311b5d79f 100644
 +                                    the container image
 +                                  properties:
 +                                    imageRepository:
-+                                      description: ImageRepository sets the container
-+                                        registry to pull images from. if not set,
-+                                        the ImageRepository defined in ClusterConfiguration
-+                                        will be used instead.
++                                      description: |-
++                                        ImageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                      type: string
 +                                    imageTag:
-+                                      description: ImageTag allows to specify a tag
-+                                        for the image. In case this value is set,
-+                                        kubeadm does not change automatically the
-+                                        version of the above components during upgrades.
++                                      description: |-
++                                        ImageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                      type: string
 +                                  type: object
 +                                superpowered:
@@ -993,8 +715,8 @@ index 6586d0dbf..311b5d79f 100644
 +                              type: object
 +                            type: array
                            caCertPath:
-                             description: 'CACertPath is the path to the SSL certificate
-                               authority used to secure comunications between node
+                             description: |-
+                               CACertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index efdb51fef..bc5094eb1 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
@@ -1219,10 +941,10 @@ index c9391fedb..0e6124b4c 100644
  
  	var taintsToml strings.Builder
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index fd96264ea..8eb1d6c02 100644
+index 77583e23e..8b4f92fd9 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -473,9 +473,10 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -505,9 +505,10 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		}
  
  		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
@@ -1236,7 +958,7 @@ index fd96264ea..8eb1d6c02 100644
  		}
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -678,9 +679,10 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -710,9 +711,10 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		})
  	case bootstrapv1.Bottlerocket:
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
@@ -1250,7 +972,7 @@ index fd96264ea..8eb1d6c02 100644
  		}
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -805,9 +807,10 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -839,9 +841,10 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		})
  	case bootstrapv1.Bottlerocket:
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
@@ -1522,17 +1244,17 @@ index 197c2ef74..d290e4d94 100644
  	if err := Convert_upstreamv1beta3_APIEndpoint_To_v1beta1_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
  		return err
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index b207309b9..77ca12b3b 100644
+index 1de21de6c..56937c7bc 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -210,6 +210,49 @@ spec:
-                               upgrades.
+@@ -230,6 +230,47 @@ spec:
+                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                              type: string
                          type: object
 +                      bottlerocketCustomHostContainers:
-+                        description: BottlerocketHostContainers contains the information
-+                          of any additional images that we will deploy as host containers
-+                          in the CPIs
++                        description: |-
++                          BottlerocketHostContainers contains the information of any additional images
++                          that we will deploy as host containers in the CPIs
 +                        items:
 +                          description: BottlerocketHostContainer describes a host
 +                            image for Bottlerocket
@@ -1546,16 +1268,14 @@ index b207309b9..77ca12b3b 100644
 +                                container image
 +                              properties:
 +                                imageRepository:
-+                                  description: ImageRepository sets the container
-+                                    registry to pull images from. if not set, the
-+                                    ImageRepository defined in ClusterConfiguration
-+                                    will be used instead.
++                                  description: |-
++                                    ImageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                  type: string
 +                                imageTag:
-+                                  description: ImageTag allows to specify a tag for
-+                                    the image. In case this value is set, kubeadm
-+                                    does not change automatically the version of the
-+                                    above components during upgrades.
++                                  description: |-
++                                    ImageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                  type: string
 +                              type: object
 +                            superpowered:
@@ -1573,16 +1293,16 @@ index b207309b9..77ca12b3b 100644
 +                          type: object
 +                        type: array
                        certificatesDir:
-                         description: 'CertificatesDir specifies where to store or
-                           look for all required certificates. NB: if not provided,
-@@ -862,6 +905,49 @@ spec:
-                               upgrades.
+                         description: |-
+                           CertificatesDir specifies where to store or look for all required certificates.
+@@ -877,6 +918,47 @@ spec:
+                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                              type: string
                          type: object
 +                      bottlerocketCustomHostContainers:
-+                        description: BottlerocketCustomHostContainers contains the
-+                          information of any additional images that we will deploy
-+                          as host containers in the CPIs
++                        description: |-
++                          BottlerocketCustomHostContainers contains the information of any additional images
++                          that we will deploy as host containers in the CPIs
 +                        items:
 +                          description: BottlerocketHostContainer describes a host
 +                            image for Bottlerocket
@@ -1596,16 +1316,14 @@ index b207309b9..77ca12b3b 100644
 +                                container image
 +                              properties:
 +                                imageRepository:
-+                                  description: ImageRepository sets the container
-+                                    registry to pull images from. if not set, the
-+                                    ImageRepository defined in ClusterConfiguration
-+                                    will be used instead.
++                                  description: |-
++                                    ImageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                  type: string
 +                                imageTag:
-+                                  description: ImageTag allows to specify a tag for
-+                                    the image. In case this value is set, kubeadm
-+                                    does not change automatically the version of the
-+                                    above components during upgrades.
++                                  description: |-
++                                    ImageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                  type: string
 +                              type: object
 +                            superpowered:
@@ -1623,16 +1341,16 @@ index b207309b9..77ca12b3b 100644
 +                          type: object
 +                        type: array
                        caCertPath:
-                         description: 'CACertPath is the path to the SSL certificate
-                           authority used to secure comunications between node and
-@@ -1500,6 +1586,49 @@ spec:
-                               upgrades.
+                         description: |-
+                           CACertPath is the path to the SSL certificate authority used to
+@@ -1542,6 +1624,47 @@ spec:
+                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                              type: string
                          type: object
 +                      bottlerocketCustomHostContainers:
-+                        description: BottlerocketHostContainers contains the information
-+                          of any additional images that we will deploy as host containers
-+                          in the CPIs
++                        description: |-
++                          BottlerocketHostContainers contains the information of any additional images
++                          that we will deploy as host containers in the CPIs
 +                        items:
 +                          description: BottlerocketHostContainer describes a host
 +                            image for Bottlerocket
@@ -1646,16 +1364,14 @@ index b207309b9..77ca12b3b 100644
 +                                container image
 +                              properties:
 +                                imageRepository:
-+                                  description: ImageRepository sets the container
-+                                    registry to pull images from. if not set, the
-+                                    ImageRepository defined in ClusterConfiguration
-+                                    will be used instead.
++                                  description: |-
++                                    ImageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                  type: string
 +                                imageTag:
-+                                  description: ImageTag allows to specify a tag for
-+                                    the image. In case this value is set, kubeadm
-+                                    does not change automatically the version of the
-+                                    above components during upgrades.
++                                  description: |-
++                                    ImageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                  type: string
 +                              type: object
 +                            superpowered:
@@ -1673,16 +1389,16 @@ index b207309b9..77ca12b3b 100644
 +                          type: object
 +                        type: array
                        certificatesDir:
-                         description: 'CertificatesDir specifies where to store or
-                           look for all required certificates. NB: if not provided,
-@@ -2149,6 +2278,49 @@ spec:
-                               upgrades.
+                         description: |-
+                           CertificatesDir specifies where to store or look for all required certificates.
+@@ -2186,6 +2309,47 @@ spec:
+                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                              type: string
                          type: object
 +                      bottlerocketCustomHostContainers:
-+                        description: BottlerocketCustomHostContainers contains the
-+                          information of any additional images that we will deploy
-+                          as host containers in the CPIs
++                        description: |-
++                          BottlerocketCustomHostContainers contains the information of any additional images
++                          that we will deploy as host containers in the CPIs
 +                        items:
 +                          description: BottlerocketHostContainer describes a host
 +                            image for Bottlerocket
@@ -1696,16 +1412,14 @@ index b207309b9..77ca12b3b 100644
 +                                container image
 +                              properties:
 +                                imageRepository:
-+                                  description: ImageRepository sets the container
-+                                    registry to pull images from. if not set, the
-+                                    ImageRepository defined in ClusterConfiguration
-+                                    will be used instead.
++                                  description: |-
++                                    ImageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                  type: string
 +                                imageTag:
-+                                  description: ImageTag allows to specify a tag for
-+                                    the image. In case this value is set, kubeadm
-+                                    does not change automatically the version of the
-+                                    above components during upgrades.
++                                  description: |-
++                                    ImageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                  type: string
 +                              type: object
 +                            superpowered:
@@ -1723,16 +1437,16 @@ index b207309b9..77ca12b3b 100644
 +                          type: object
 +                        type: array
                        caCertPath:
-                         description: 'CACertPath is the path to the SSL certificate
-                           authority used to secure comunications between node and
-@@ -2871,6 +3043,49 @@ spec:
-                               upgrades.
+                         description: |-
+                           CACertPath is the path to the SSL certificate authority used to
+@@ -2945,6 +3109,47 @@ spec:
+                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                              type: string
                          type: object
 +                      bottlerocketCustomHostContainers:
-+                        description: BottlerocketHostContainers contains the information
-+                          of any additional images that we will deploy as host containers
-+                          in the CPIs
++                        description: |-
++                          BottlerocketHostContainers contains the information of any additional images
++                          that we will deploy as host containers in the CPIs
 +                        items:
 +                          description: BottlerocketHostContainer describes a host
 +                            image for Bottlerocket
@@ -1746,16 +1460,14 @@ index b207309b9..77ca12b3b 100644
 +                                container image
 +                              properties:
 +                                imageRepository:
-+                                  description: ImageRepository sets the container
-+                                    registry to pull images from. if not set, the
-+                                    ImageRepository defined in ClusterConfiguration
-+                                    will be used instead.
++                                  description: |-
++                                    ImageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                  type: string
 +                                imageTag:
-+                                  description: ImageTag allows to specify a tag for
-+                                    the image. In case this value is set, kubeadm
-+                                    does not change automatically the version of the
-+                                    above components during upgrades.
++                                  description: |-
++                                    ImageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                  type: string
 +                              type: object
 +                            superpowered:
@@ -1773,16 +1485,16 @@ index b207309b9..77ca12b3b 100644
 +                          type: object
 +                        type: array
                        certificatesDir:
-                         description: 'CertificatesDir specifies where to store or
-                           look for all required certificates. NB: if not provided,
-@@ -3593,6 +3808,49 @@ spec:
-                               upgrades.
+                         description: |-
+                           CertificatesDir specifies where to store or look for all required certificates.
+@@ -3660,6 +3865,47 @@ spec:
+                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                              type: string
                          type: object
 +                      bottlerocketCustomHostContainers:
-+                        description: BottlerocketCustomHostContainers contains the
-+                          information of any additional images that we will deploy
-+                          as host containers in the CPIs
++                        description: |-
++                          BottlerocketCustomHostContainers contains the information of any additional images
++                          that we will deploy as host containers in the CPIs
 +                        items:
 +                          description: BottlerocketHostContainer describes a host
 +                            image for Bottlerocket
@@ -1796,16 +1508,14 @@ index b207309b9..77ca12b3b 100644
 +                                container image
 +                              properties:
 +                                imageRepository:
-+                                  description: ImageRepository sets the container
-+                                    registry to pull images from. if not set, the
-+                                    ImageRepository defined in ClusterConfiguration
-+                                    will be used instead.
++                                  description: |-
++                                    ImageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                  type: string
 +                                imageTag:
-+                                  description: ImageTag allows to specify a tag for
-+                                    the image. In case this value is set, kubeadm
-+                                    does not change automatically the version of the
-+                                    above components during upgrades.
++                                  description: |-
++                                    ImageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                  type: string
 +                              type: object
 +                            superpowered:
@@ -1823,20 +1533,20 @@ index b207309b9..77ca12b3b 100644
 +                          type: object
 +                        type: array
                        caCertPath:
-                         description: 'CACertPath is the path to the SSL certificate
-                           authority used to secure comunications between node and
+                         description: |-
+                           CACertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 1d69bbe38..2f9941558 100644
+index 7a0b638bd..5c7b6820f 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -160,6 +160,51 @@ spec:
-                                       the above components during upgrades.
+@@ -166,6 +166,48 @@ spec:
+                                       In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                      type: string
                                  type: object
 +                              bottlerocketCustomHostContainers:
-+                                description: BottlerocketHostContainers contains the
-+                                  information of any additional images that we will
-+                                  deploy as host containers in the CPIs
++                                description: |-
++                                  BottlerocketHostContainers contains the information of any additional images
++                                  that we will deploy as host containers in the CPIs
 +                                items:
 +                                  description: BottlerocketHostContainer describes
 +                                    a host image for Bottlerocket
@@ -1851,17 +1561,14 @@ index 1d69bbe38..2f9941558 100644
 +                                        of the container image
 +                                      properties:
 +                                        imageRepository:
-+                                          description: ImageRepository sets the container
-+                                            registry to pull images from. if not set,
-+                                            the ImageRepository defined in ClusterConfiguration
-+                                            will be used instead.
++                                          description: |-
++                                            ImageRepository sets the container registry to pull images from.
++                                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                          type: string
 +                                        imageTag:
-+                                          description: ImageTag allows to specify
-+                                            a tag for the image. In case this value
-+                                            is set, kubeadm does not change automatically
-+                                            the version of the above components during
-+                                            upgrades.
++                                          description: |-
++                                            ImageTag allows to specify a tag for the image.
++                                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                          type: string
 +                                      type: object
 +                                    superpowered:
@@ -1879,16 +1586,16 @@ index 1d69bbe38..2f9941558 100644
 +                                  type: object
 +                                type: array
                                certificatesDir:
-                                 description: 'CertificatesDir specifies where to store
-                                   or look for all required certificates. NB: if not
-@@ -853,6 +898,51 @@ spec:
-                                       the above components during upgrades.
+                                 description: |-
+                                   CertificatesDir specifies where to store or look for all required certificates.
+@@ -821,6 +863,48 @@ spec:
+                                       In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                      type: string
                                  type: object
 +                              bottlerocketCustomHostContainers:
-+                                description: BottlerocketCustomHostContainers contains
-+                                  the information of any additional images that we
-+                                  will deploy as host containers in the CPIs
++                                description: |-
++                                  BottlerocketCustomHostContainers contains the information of any additional images
++                                  that we will deploy as host containers in the CPIs
 +                                items:
 +                                  description: BottlerocketHostContainer describes
 +                                    a host image for Bottlerocket
@@ -1903,17 +1610,14 @@ index 1d69bbe38..2f9941558 100644
 +                                        of the container image
 +                                      properties:
 +                                        imageRepository:
-+                                          description: ImageRepository sets the container
-+                                            registry to pull images from. if not set,
-+                                            the ImageRepository defined in ClusterConfiguration
-+                                            will be used instead.
++                                          description: |-
++                                            ImageRepository sets the container registry to pull images from.
++                                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                          type: string
 +                                        imageTag:
-+                                          description: ImageTag allows to specify
-+                                            a tag for the image. In case this value
-+                                            is set, kubeadm does not change automatically
-+                                            the version of the above components during
-+                                            upgrades.
++                                          description: |-
++                                            ImageTag allows to specify a tag for the image.
++                                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                          type: string
 +                                      type: object
 +                                    superpowered:
@@ -1931,16 +1635,16 @@ index 1d69bbe38..2f9941558 100644
 +                                  type: object
 +                                type: array
                                caCertPath:
-                                 description: 'CACertPath is the path to the SSL certificate
-                                   authority used to secure comunications between node
-@@ -1503,6 +1593,51 @@ spec:
-                                       the above components during upgrades.
+                                 description: |-
+                                   CACertPath is the path to the SSL certificate authority used to
+@@ -1474,6 +1558,48 @@ spec:
+                                       In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                      type: string
                                  type: object
 +                              bottlerocketCustomHostContainers:
-+                                description: BottlerocketHostContainers contains the
-+                                  information of any additional images that we will
-+                                  deploy as host containers in the CPIs
++                                description: |-
++                                  BottlerocketHostContainers contains the information of any additional images
++                                  that we will deploy as host containers in the CPIs
 +                                items:
 +                                  description: BottlerocketHostContainer describes
 +                                    a host image for Bottlerocket
@@ -1955,17 +1659,14 @@ index 1d69bbe38..2f9941558 100644
 +                                        of the container image
 +                                      properties:
 +                                        imageRepository:
-+                                          description: ImageRepository sets the container
-+                                            registry to pull images from. if not set,
-+                                            the ImageRepository defined in ClusterConfiguration
-+                                            will be used instead.
++                                          description: |-
++                                            ImageRepository sets the container registry to pull images from.
++                                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                          type: string
 +                                        imageTag:
-+                                          description: ImageTag allows to specify
-+                                            a tag for the image. In case this value
-+                                            is set, kubeadm does not change automatically
-+                                            the version of the above components during
-+                                            upgrades.
++                                          description: |-
++                                            ImageTag allows to specify a tag for the image.
++                                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                          type: string
 +                                      type: object
 +                                    superpowered:
@@ -1983,16 +1684,16 @@ index 1d69bbe38..2f9941558 100644
 +                                  type: object
 +                                type: array
                                certificatesDir:
-                                 description: 'CertificatesDir specifies where to store
-                                   or look for all required certificates. NB: if not
-@@ -2275,6 +2410,51 @@ spec:
-                                       the above components during upgrades.
+                                 description: |-
+                                   CertificatesDir specifies where to store or look for all required certificates.
+@@ -2202,6 +2328,48 @@ spec:
+                                       In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
                                      type: string
                                  type: object
 +                              bottlerocketCustomHostContainers:
-+                                description: BottlerocketCustomHostContainers contains
-+                                  the information of any additional images that we
-+                                  will deploy as host containers in the CPIs
++                                description: |-
++                                  BottlerocketCustomHostContainers contains the information of any additional images
++                                  that we will deploy as host containers in the CPIs
 +                                items:
 +                                  description: BottlerocketHostContainer describes
 +                                    a host image for Bottlerocket
@@ -2007,17 +1708,14 @@ index 1d69bbe38..2f9941558 100644
 +                                        of the container image
 +                                      properties:
 +                                        imageRepository:
-+                                          description: ImageRepository sets the container
-+                                            registry to pull images from. if not set,
-+                                            the ImageRepository defined in ClusterConfiguration
-+                                            will be used instead.
++                                          description: |-
++                                            ImageRepository sets the container registry to pull images from.
++                                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
 +                                          type: string
 +                                        imageTag:
-+                                          description: ImageTag allows to specify
-+                                            a tag for the image. In case this value
-+                                            is set, kubeadm does not change automatically
-+                                            the version of the above components during
-+                                            upgrades.
++                                          description: |-
++                                            ImageTag allows to specify a tag for the image.
++                                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 +                                          type: string
 +                                      type: object
 +                                    superpowered:
@@ -2035,8 +1733,268 @@ index 1d69bbe38..2f9941558 100644
 +                                  type: object
 +                                type: array
                                caCertPath:
-                                 description: 'CACertPath is the path to the SSL certificate
-                                   authority used to secure comunications between node
+                                 description: |-
+                                   CACertPath is the path to the SSL certificate authority used to
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/conversion.go b/internal/apis/bootstrap/kubeadm/v1alpha4/conversion.go
+index 576fceebd..5457cd58d 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/conversion.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/conversion.go
+@@ -210,6 +210,11 @@ func Convert_v1beta1_User_To_v1alpha4_User(in *bootstrapv1.User, out *User, s ap
+ 	return autoConvert_v1beta1_User_To_v1alpha4_User(in, out, s)
+ }
+ 
++func Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in *bootstrapv1.ClusterConfiguration, out *ClusterConfiguration, s apiconversion.Scope) error {
++	// ClusterConfiguration.BottlerocketCustomHostContainers exists in bootstrapv1.ClusterConfiguration but not in v1alpha4
++	return autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in, out, s)
++}
++
+ func Convert_v1beta1_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(in *bootstrapv1.NodeRegistrationOptions, out *NodeRegistrationOptions, s apiconversion.Scope) error {
+ 	// NodeRegistrationOptions.ImagePullPolicy does not exit in
+ 	// kubeadm v1alpha4 API.
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+index 9027f336f..7f54b3b1d 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+@@ -151,6 +151,11 @@ type ClusterConfiguration struct {
+ 	// The cluster name
+ 	// +optional
+ 	ClusterName string `json:"clusterName,omitempty"`
++
++	// BottlerocketHostContainers contains the information of any additional images
++	// that we will deploy as host containers in the CPIs
++	// +optional
++	BottlerocketHostContainers []BottlerocketHostContainer `json:"bottlerocketCustomHostContainers,omitempty"`
+ }
+ 
+ // Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
+@@ -449,6 +454,26 @@ type JoinConfiguration struct {
+ 	// If nil, no additional control plane instance will be deployed.
+ 	// +optional
+ 	ControlPlane *JoinControlPlane `json:"controlPlane,omitempty"`
++
++	// BottlerocketCustomHostContainers contains the information of any additional images
++	// that we will deploy as host containers in the CPIs
++	// +optional
++	BottlerocketCustomHostContainers []BottlerocketHostContainer `json:"bottlerocketCustomHostContainers,omitempty"`
++}
++
++// BottlerocketHostContainer describes a host image for Bottlerocket
++type BottlerocketHostContainer struct {
++	// Name is the host container name that will be given to the container in BR's `apiserver`
++	// +kubebuilder:validation:Required
++	Name string `json:"name"`
++	// Superpowered indicates if the container will be superpowered
++	// +kubebuilder:validation:Required
++	Superpowered bool `json:"superpowered"`
++	// ImageMeta is the actual location of the container image
++	ImageMeta `json:"source"`
++	// UserData is the userdata that will be attached to the image.
++	// +optional
++	UserData string `json:"userData,omitempty"`
+ }
+ 
+ // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+index 5342a596c..facd5de61 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+@@ -110,13 +110,18 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
++	if err := s.AddGeneratedConversionFunc((*BottlerocketHostContainer)(nil), (*v1beta1.BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer(a.(*BottlerocketHostContainer), b.(*v1beta1.BottlerocketHostContainer), scope)
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
++	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketHostContainer)(nil), (*BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer(a.(*v1beta1.BottlerocketHostContainer), b.(*BottlerocketHostContainer), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
+ 	}); err != nil {
+ 		return err
+ 	}
+@@ -425,6 +430,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta1.File)(nil), (*File)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_File_To_v1alpha4_File(a.(*v1beta1.File), b.(*File), scope)
+ 	}); err != nil {
+@@ -639,6 +649,36 @@ func Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(in *v1b
+ 	return autoConvert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(in, out, s)
+ }
+ 
++func autoConvert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer(in *BottlerocketHostContainer, out *v1beta1.BottlerocketHostContainer, s conversion.Scope) error {
++	out.Name = in.Name
++	out.Superpowered = in.Superpowered
++	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	out.UserData = in.UserData
++	return nil
++}
++
++// Convert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer is an autogenerated conversion function.
++func Convert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer(in *BottlerocketHostContainer, out *v1beta1.BottlerocketHostContainer, s conversion.Scope) error {
++	return autoConvert_v1alpha4_BottlerocketHostContainer_To_v1beta1_BottlerocketHostContainer(in, out, s)
++}
++
++func autoConvert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer(in *v1beta1.BottlerocketHostContainer, out *BottlerocketHostContainer, s conversion.Scope) error {
++	out.Name = in.Name
++	out.Superpowered = in.Superpowered
++	if err := Convert_v1beta1_ImageMeta_To_v1alpha4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
++		return err
++	}
++	out.UserData = in.UserData
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer(in *v1beta1.BottlerocketHostContainer, out *BottlerocketHostContainer, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketHostContainer_To_v1alpha4_BottlerocketHostContainer(in, out, s)
++}
++
+ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
+ 	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
+ 		return err
+@@ -679,6 +719,7 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(i
+ 	out.ImageRepository = in.ImageRepository
+ 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+ 	out.ClusterName = in.ClusterName
++	out.BottlerocketHostContainers = *(*[]v1beta1.BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketHostContainers))
+ 	return nil
+ }
+ 
+@@ -727,14 +768,10 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+ 	out.ImageRepository = in.ImageRepository
+ 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+ 	out.ClusterName = in.ClusterName
++	out.BottlerocketHostContainers = *(*[]BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketHostContainers))
+ 	return nil
+ }
+ 
+-// Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration is an autogenerated conversion function.
+-func Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in *v1beta1.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+-	return autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in, out, s)
+-}
+-
+ func autoConvert_v1alpha4_ClusterStatus_To_v1beta1_ClusterStatus(in *ClusterStatus, out *v1beta1.ClusterStatus, s conversion.Scope) error {
+ 	out.APIEndpoints = *(*map[string]v1beta1.APIEndpoint)(unsafe.Pointer(&in.APIEndpoints))
+ 	return nil
+@@ -1102,6 +1139,7 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
+ 		return err
+ 	}
+ 	out.ControlPlane = (*v1beta1.JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
++	out.BottlerocketCustomHostContainers = *(*[]v1beta1.BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketCustomHostContainers))
+ 	return nil
+ }
+ 
+@@ -1136,6 +1174,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+ 	out.ControlPlane = (*JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
+ 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
++	out.BottlerocketCustomHostContainers = *(*[]BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketCustomHostContainers))
+ 	return nil
+ }
+ 
+@@ -1238,7 +1277,15 @@ func Convert_v1beta1_KubeadmConfigList_To_v1alpha4_KubeadmConfigList(in *v1beta1
+ }
+ 
+ func autoConvert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *KubeadmConfigSpec, out *v1beta1.KubeadmConfigSpec, s conversion.Scope) error {
+-	out.ClusterConfiguration = (*v1beta1.ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
++	if in.ClusterConfiguration != nil {
++		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
++		*out = new(v1beta1.ClusterConfiguration)
++		if err := Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(*in, *out, s); err != nil {
++			return err
++		}
++	} else {
++		out.ClusterConfiguration = nil
++	}
+ 	if in.InitConfiguration != nil {
+ 		in, out := &in.InitConfiguration, &out.InitConfiguration
+ 		*out = new(v1beta1.InitConfiguration)
+@@ -1296,7 +1343,15 @@ func Convert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *Kubeadm
+ }
+ 
+ func autoConvert_v1beta1_KubeadmConfigSpec_To_v1alpha4_KubeadmConfigSpec(in *v1beta1.KubeadmConfigSpec, out *KubeadmConfigSpec, s conversion.Scope) error {
+-	out.ClusterConfiguration = (*ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
++	if in.ClusterConfiguration != nil {
++		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
++		*out = new(ClusterConfiguration)
++		if err := Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(*in, *out, s); err != nil {
++			return err
++		}
++	} else {
++		out.ClusterConfiguration = nil
++	}
+ 	if in.InitConfiguration != nil {
+ 		in, out := &in.InitConfiguration, &out.InitConfiguration
+ 		*out = new(InitConfiguration)
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+index 5aec0f4bf..caed0611e 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+@@ -174,6 +174,22 @@ func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketHostContainer) DeepCopyInto(out *BottlerocketHostContainer) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketHostContainer.
++func (in *BottlerocketHostContainer) DeepCopy() *BottlerocketHostContainer {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketHostContainer)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+@@ -196,6 +212,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 			(*out)[key] = val
+ 		}
+ 	}
++	if in.BottlerocketHostContainers != nil {
++		in, out := &in.BottlerocketHostContainers, &out.BottlerocketHostContainers
++		*out = make([]BottlerocketHostContainer, len(*in))
++		copy(*out, *in)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterConfiguration.
+@@ -559,6 +580,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 		*out = new(JoinControlPlane)
+ 		**out = **in
+ 	}
++	if in.BottlerocketCustomHostContainers != nil {
++		in, out := &in.BottlerocketCustomHostContainers, &out.BottlerocketCustomHostContainers
++		*out = make([]BottlerocketHostContainer, len(*in))
++		copy(*out, *in)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
 -- 
 2.42.0
 

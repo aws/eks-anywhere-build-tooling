@@ -1,7 +1,7 @@
-From 8cdc5a1a602948c5393358d38147549b50c75e07 Mon Sep 17 00:00:00 2001
+From 67d623b4578573af4507485d11cdc77751ba62d7 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 16 May 2023 11:03:09 -0500
-Subject: [PATCH 30/40] CAPI Move Cluster Filter
+Subject: [PATCH 29/37] CAPI Move Cluster Filter
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
@@ -15,7 +15,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  7 files changed, 214 insertions(+), 33 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index 61270d3a7..ca2757e7f 100644
+index 4910963e6..547a9beda 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -51,13 +51,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
@@ -113,7 +113,7 @@ index 61270d3a7..ca2757e7f 100644
  	}
  
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index dee567918..78776c5b4 100644
+index 40255c3c2..41f6c2b27 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
 @@ -738,7 +738,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
@@ -207,7 +207,7 @@ index dee567918..78776c5b4 100644
  			backoff := wait.Backoff{
  				Steps: 1,
 diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
-index 454ec27a8..42e1e2ef1 100644
+index 942d1fc09..cb436dc83 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph.go
 @@ -417,8 +417,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
@@ -504,7 +504,7 @@ index 83ad30d67..f5c516859 100644
  	return f.fromDirectoryErr
  }
 diff --git a/cmd/clusterctl/cmd/move.go b/cmd/clusterctl/cmd/move.go
-index c8316b376..7ba98b264 100644
+index 2a51bf2c0..55ca608ec 100644
 --- a/cmd/clusterctl/cmd/move.go
 +++ b/cmd/clusterctl/cmd/move.go
 @@ -31,6 +31,7 @@ type moveOptions struct {

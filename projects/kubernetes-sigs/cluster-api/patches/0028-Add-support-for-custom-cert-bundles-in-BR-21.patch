@@ -1,7 +1,7 @@
-From 3a2f54810f88c77f125a1d4226f7f928123e0fe1 Mon Sep 17 00:00:00 2001
+From 3cd2343abf92e4265e6273766defa6e8278c0d44 Mon Sep 17 00:00:00 2001
 From: ahreehong <46465244+ahreehong@users.noreply.github.com>
 Date: Fri, 19 May 2023 16:29:08 -0400
-Subject: [PATCH 29/40] Add support for custom cert bundles in BR (#21)
+Subject: [PATCH 28/37] Add support for custom cert bundles in BR (#21)
 
 * add support for custom cert bundles br
 
@@ -9,9 +9,7 @@ Subject: [PATCH 29/40] Add support for custom cert bundles in BR (#21)
 
 Signed-off-by: Ahree Hong <ahreeh@amazon.com>
 ---
- .../kubeadm/api/v1alpha4/kubeadm_types.go     |  17 +++
- .../api/v1alpha4/zz_generated.conversion.go   |  36 +++++++
- .../api/v1alpha4/zz_generated.deepcopy.go     |  25 +++++
+ api/v1beta1/zz_generated.openapi.go           |   6 --
  .../kubeadm/api/v1beta1/kubeadm_types.go      |  17 +++
  .../api/v1beta1/zz_generated.deepcopy.go      |  25 +++++
  ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  96 +++++++++++++++++
@@ -27,184 +25,30 @@ Signed-off-by: Ahree Hong <ahreeh@amazon.com>
  .../zz_generated.conversion.go                |   2 +
  ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  96 +++++++++++++++++
  ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  68 ++++++++++++
- 18 files changed, 656 insertions(+)
+ .../kubeadm/v1alpha4/kubeadm_types.go         |  17 +++
+ .../v1alpha4/zz_generated.conversion.go       |  36 +++++++
+ .../kubeadm/v1alpha4/zz_generated.deepcopy.go |  25 +++++
+ 19 files changed, 656 insertions(+), 6 deletions(-)
 
-diff --git a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
-index 010efa948..3d43cae72 100644
---- a/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
-+++ b/bootstrap/kubeadm/api/v1alpha4/kubeadm_types.go
-@@ -171,6 +171,10 @@ type ClusterConfiguration struct {
- 	// This is only for bottlerocket.
- 	// +optional
- 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
-+
-+	// CertBundles holds additional trusted cert bundles.
-+	// +optional
-+	CertBundles []CertBundle `json:"certBundles,omitempty"`
- }
- 
- // BottlerocketSettings define bottlerocket settings that can be configured on bottlerocket nodes.
-@@ -534,6 +538,10 @@ type JoinConfiguration struct {
- 	// This is only for bottlerocket.
- 	// +optional
- 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
-+
-+	// CertBundles holds additional trusted cert bundles.
-+	// +optional
-+	CertBundles []CertBundle `json:"certBundles,omitempty"`
- }
- 
- // BottlerocketHostContainer describes a host image for Bottlerocket
-@@ -574,6 +582,15 @@ type BottlerocketBootstrapContainer struct {
- 	UserData string `json:"userData,omitempty"`
- }
- 
-+// CertBundle holds the cert data.
-+type CertBundle struct {
-+	// Name is the name of the cert bundle.
-+	Name string `json:"name"`
-+
-+	// Data is the actual cert.
-+	Data string `json:"data"`
-+}
-+
- // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
- type JoinControlPlane struct {
- 	// LocalAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
-diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-index 8f36b6a13..c02aee696 100644
---- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.conversion.go
-@@ -180,6 +180,16 @@ func RegisterConversions(s *runtime.Scheme) error {
- 	}); err != nil {
- 		return err
- 	}
-+	if err := s.AddGeneratedConversionFunc((*CertBundle)(nil), (*v1beta1.CertBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1alpha4_CertBundle_To_v1beta1_CertBundle(a.(*CertBundle), b.(*v1beta1.CertBundle), scope)
-+	}); err != nil {
-+		return err
-+	}
-+	if err := s.AddGeneratedConversionFunc((*v1beta1.CertBundle)(nil), (*CertBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1beta1_CertBundle_To_v1alpha4_CertBundle(a.(*v1beta1.CertBundle), b.(*CertBundle), scope)
-+	}); err != nil {
-+		return err
-+	}
- 	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
- 		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
- 	}); err != nil {
-@@ -883,6 +893,28 @@ func Convert_v1beta1_BottlerocketSettings_To_v1alpha4_BottlerocketSettings(in *v
- 	return autoConvert_v1beta1_BottlerocketSettings_To_v1alpha4_BottlerocketSettings(in, out, s)
- }
- 
-+func autoConvert_v1alpha4_CertBundle_To_v1beta1_CertBundle(in *CertBundle, out *v1beta1.CertBundle, s conversion.Scope) error {
-+	out.Name = in.Name
-+	out.Data = in.Data
-+	return nil
-+}
-+
-+// Convert_v1alpha4_CertBundle_To_v1beta1_CertBundle is an autogenerated conversion function.
-+func Convert_v1alpha4_CertBundle_To_v1beta1_CertBundle(in *CertBundle, out *v1beta1.CertBundle, s conversion.Scope) error {
-+	return autoConvert_v1alpha4_CertBundle_To_v1beta1_CertBundle(in, out, s)
-+}
-+
-+func autoConvert_v1beta1_CertBundle_To_v1alpha4_CertBundle(in *v1beta1.CertBundle, out *CertBundle, s conversion.Scope) error {
-+	out.Name = in.Name
-+	out.Data = in.Data
-+	return nil
-+}
-+
-+// Convert_v1beta1_CertBundle_To_v1alpha4_CertBundle is an autogenerated conversion function.
-+func Convert_v1beta1_CertBundle_To_v1alpha4_CertBundle(in *v1beta1.CertBundle, out *CertBundle, s conversion.Scope) error {
-+	return autoConvert_v1beta1_CertBundle_To_v1alpha4_CertBundle(in, out, s)
-+}
-+
- func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
- 	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
- 		return err
-@@ -929,6 +961,7 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(i
- 	out.BottlerocketHostContainers = *(*[]v1beta1.BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketHostContainers))
- 	out.BottlerocketCustomBootstrapContainers = *(*[]v1beta1.BottlerocketBootstrapContainer)(unsafe.Pointer(&in.BottlerocketCustomBootstrapContainers))
- 	out.Bottlerocket = (*v1beta1.BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
-+	out.CertBundles = *(*[]v1beta1.CertBundle)(unsafe.Pointer(&in.CertBundles))
- 	return nil
- }
- 
-@@ -983,6 +1016,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
- 	out.BottlerocketHostContainers = *(*[]BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketHostContainers))
- 	out.BottlerocketCustomBootstrapContainers = *(*[]BottlerocketBootstrapContainer)(unsafe.Pointer(&in.BottlerocketCustomBootstrapContainers))
- 	out.Bottlerocket = (*BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
-+	out.CertBundles = *(*[]CertBundle)(unsafe.Pointer(&in.CertBundles))
- 	return nil
- }
- 
-@@ -1359,6 +1393,7 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
- 	out.BottlerocketCustomHostContainers = *(*[]v1beta1.BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketCustomHostContainers))
- 	out.BottlerocketCustomBootstrapContainers = *(*[]v1beta1.BottlerocketBootstrapContainer)(unsafe.Pointer(&in.BottlerocketCustomBootstrapContainers))
- 	out.Bottlerocket = (*v1beta1.BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
-+	out.CertBundles = *(*[]v1beta1.CertBundle)(unsafe.Pointer(&in.CertBundles))
- 	return nil
- }
- 
-@@ -1399,6 +1434,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
- 	out.BottlerocketCustomHostContainers = *(*[]BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketCustomHostContainers))
- 	out.BottlerocketCustomBootstrapContainers = *(*[]BottlerocketBootstrapContainer)(unsafe.Pointer(&in.BottlerocketCustomBootstrapContainers))
- 	out.Bottlerocket = (*BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
-+	out.CertBundles = *(*[]CertBundle)(unsafe.Pointer(&in.CertBundles))
- 	return nil
- }
- 
-diff --git a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
-index f8d8004c0..4c3225e59 100644
---- a/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
-+++ b/bootstrap/kubeadm/api/v1alpha4/zz_generated.deepcopy.go
-@@ -330,6 +330,21 @@ func (in *BottlerocketSettings) DeepCopy() *BottlerocketSettings {
- 	return out
- }
- 
-+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
-+func (in *CertBundle) DeepCopyInto(out *CertBundle) {
-+	*out = *in
-+}
-+
-+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new CertBundle.
-+func (in *CertBundle) DeepCopy() *CertBundle {
-+	if in == nil {
-+		return nil
-+	}
-+	out := new(CertBundle)
-+	in.DeepCopyInto(out)
-+	return out
-+}
-+
- // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
- func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
- 	*out = *in
-@@ -368,6 +383,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
- 		*out = new(BottlerocketSettings)
- 		(*in).DeepCopyInto(*out)
- 	}
-+	if in.CertBundles != nil {
-+		in, out := &in.CertBundles, &out.CertBundles
-+		*out = make([]CertBundle, len(*in))
-+		copy(*out, *in)
-+	}
- }
- 
- // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterConfiguration.
-@@ -747,6 +767,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
- 		*out = new(BottlerocketSettings)
- 		(*in).DeepCopyInto(*out)
- 	}
-+	if in.CertBundles != nil {
-+		in, out := &in.CertBundles, &out.CertBundles
-+		*out = make([]CertBundle, len(*in))
-+		copy(*out, *in)
-+	}
- }
- 
- // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
+diff --git a/api/v1beta1/zz_generated.openapi.go b/api/v1beta1/zz_generated.openapi.go
+index 9e16acde8..9db7f3712 100644
+--- a/api/v1beta1/zz_generated.openapi.go
++++ b/api/v1beta1/zz_generated.openapi.go
+@@ -803,12 +803,6 @@ func schema_sigsk8sio_cluster_api_api_v1beta1_ClusterSpec(ref common.ReferenceCa
+ 							Ref:         ref("k8s.io/api/core/v1.ObjectReference"),
+ 						},
+ 					},
+-					"managedExternalEtcdRef": {
+-						SchemaProps: spec.SchemaProps{
+-							Description: "ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details for provisioning an external etcd cluster",
+-							Ref:         ref("k8s.io/api/core/v1.ObjectReference"),
+-						},
+-					},
+ 					"infrastructureRef": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "InfrastructureRef is a reference to a provider-specific resource that holds the details for provisioning infrastructure for a cluster in said provider.",
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 434d2c088..ed965709a 100644
+index 68dd4b9a9..6b228b547 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -190,6 +190,10 @@ type ClusterConfiguration struct {
@@ -296,10 +140,10 @@ index c89d4aa1f..9fefdcb62 100644
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 0591279db..3b4cbbf3f 100644
+index 662a68087..fbdd8a47a 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -280,6 +280,22 @@ spec:
+@@ -295,6 +295,22 @@ spec:
                        - superpowered
                        type: object
                      type: array
@@ -320,11 +164,11 @@ index 0591279db..3b4cbbf3f 100644
 +                      type: object
 +                    type: array
                    certificatesDir:
-                     description: 'CertificatesDir specifies where to store or look
-                       for all required certificates. NB: if not provided, this will
-@@ -1061,6 +1077,22 @@ spec:
-                       Defaults to "/etc/kubernetes/pki/ca.crt". TODO: revisit when
-                       there is defaulting from k/k'
+                     description: |-
+                       CertificatesDir specifies where to store or look for all required certificates.
+@@ -1089,6 +1105,22 @@ spec:
+                       Defaults to "/etc/kubernetes/pki/ca.crt".
+                       TODO: revisit when there is defaulting from k/k
                      type: string
 +                  certBundles:
 +                    description: CertBundles holds additional trusted cert bundles.
@@ -343,9 +187,9 @@ index 0591279db..3b4cbbf3f 100644
 +                      type: object
 +                    type: array
                    controlPlane:
-                     description: ControlPlane defines the additional control plane
-                       instance to be deployed on the joining node. If nil, no additional
-@@ -1709,6 +1741,22 @@ spec:
+                     description: |-
+                       ControlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -1761,6 +1793,22 @@ spec:
                        - superpowered
                        type: object
                      type: array
@@ -366,11 +210,11 @@ index 0591279db..3b4cbbf3f 100644
 +                      type: object
 +                    type: array
                    certificatesDir:
-                     description: 'CertificatesDir specifies where to store or look
-                       for all required certificates. NB: if not provided, this will
-@@ -2486,6 +2534,22 @@ spec:
-                       Defaults to "/etc/kubernetes/pki/ca.crt". TODO: revisit when
-                       there is defaulting from k/k'
+                     description: |-
+                       CertificatesDir specifies where to store or look for all required certificates.
+@@ -2551,6 +2599,22 @@ spec:
+                       Defaults to "/etc/kubernetes/pki/ca.crt".
+                       TODO: revisit when there is defaulting from k/k
                      type: string
 +                  certBundles:
 +                    description: CertBundles holds additional trusted cert bundles.
@@ -389,9 +233,9 @@ index 0591279db..3b4cbbf3f 100644
 +                      type: object
 +                    type: array
                    controlPlane:
-                     description: ControlPlane defines the additional control plane
-                       instance to be deployed on the joining node. If nil, no additional
-@@ -3132,6 +3196,22 @@ spec:
+                     description: |-
+                       ControlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -3215,6 +3279,22 @@ spec:
                        - superpowered
                        type: object
                      type: array
@@ -412,11 +256,11 @@ index 0591279db..3b4cbbf3f 100644
 +                      type: object
 +                    type: array
                    certificatesDir:
-                     description: 'CertificatesDir specifies where to store or look
-                       for all required certificates. NB: if not provided, this will
-@@ -3978,6 +4058,22 @@ spec:
-                       Defaults to "/etc/kubernetes/pki/ca.crt". TODO: revisit when
-                       there is defaulting from k/k'
+                     description: |-
+                       CertificatesDir specifies where to store or look for all required certificates.
+@@ -4076,6 +4156,22 @@ spec:
+                       Defaults to "/etc/kubernetes/pki/ca.crt".
+                       TODO: revisit when there is defaulting from k/k
                      type: string
 +                  certBundles:
 +                    description: CertBundles holds additional trusted cert bundles.
@@ -435,13 +279,13 @@ index 0591279db..3b4cbbf3f 100644
 +                      type: object
 +                    type: array
                    controlPlane:
-                     description: ControlPlane defines the additional control plane
-                       instance to be deployed on the joining node. If nil, no additional
+                     description: |-
+                       ControlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 75574d5e7..e25795947 100644
+index 01f1b0d6d..88f5085e0 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -298,6 +298,23 @@ spec:
+@@ -305,6 +305,23 @@ spec:
                                - superpowered
                                type: object
                              type: array
@@ -463,11 +307,11 @@ index 75574d5e7..e25795947 100644
 +                              type: object
 +                            type: array
                            certificatesDir:
-                             description: 'CertificatesDir specifies where to store
-                               or look for all required certificates. NB: if not provided,
-@@ -1126,6 +1143,23 @@ spec:
-                               and control-plane. Defaults to "/etc/kubernetes/pki/ca.crt".
-                               TODO: revisit when there is defaulting from k/k'
+                             description: |-
+                               CertificatesDir specifies where to store or look for all required certificates.
+@@ -1115,6 +1132,23 @@ spec:
+                               Defaults to "/etc/kubernetes/pki/ca.crt".
+                               TODO: revisit when there is defaulting from k/k
                              type: string
 +                          certBundles:
 +                            description: CertBundles holds additional trusted cert
@@ -487,9 +331,9 @@ index 75574d5e7..e25795947 100644
 +                              type: object
 +                            type: array
                            controlPlane:
-                             description: ControlPlane defines the additional control
-                               plane instance to be deployed on the joining node. If
-@@ -1741,6 +1775,23 @@ spec:
+                             description: |-
+                               ControlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -1733,6 +1767,23 @@ spec:
                                - superpowered
                                type: object
                              type: array
@@ -511,11 +355,11 @@ index 75574d5e7..e25795947 100644
 +                              type: object
 +                            type: array
                            certificatesDir:
-                             description: 'CertificatesDir specifies where to store
-                               or look for all required certificates. NB: if not provided,
-@@ -2567,6 +2618,23 @@ spec:
-                               and control-plane. Defaults to "/etc/kubernetes/pki/ca.crt".
-                               TODO: revisit when there is defaulting from k/k'
+                             description: |-
+                               CertificatesDir specifies where to store or look for all required certificates.
+@@ -2540,6 +2591,23 @@ spec:
+                               Defaults to "/etc/kubernetes/pki/ca.crt".
+                               TODO: revisit when there is defaulting from k/k
                              type: string
 +                          certBundles:
 +                            description: CertBundles holds additional trusted cert
@@ -535,9 +379,9 @@ index 75574d5e7..e25795947 100644
 +                              type: object
 +                            type: array
                            controlPlane:
-                             description: ControlPlane defines the additional control
-                               plane instance to be deployed on the joining node. If
-@@ -3205,6 +3273,23 @@ spec:
+                             description: |-
+                               ControlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -3181,6 +3249,23 @@ spec:
                                - superpowered
                                type: object
                              type: array
@@ -559,11 +403,11 @@ index 75574d5e7..e25795947 100644
 +                              type: object
 +                            type: array
                            certificatesDir:
-                             description: 'CertificatesDir specifies where to store
-                               or look for all required certificates. NB: if not provided,
-@@ -4108,6 +4193,23 @@ spec:
-                               and control-plane. Defaults to "/etc/kubernetes/pki/ca.crt".
-                               TODO: revisit when there is defaulting from k/k'
+                             description: |-
+                               CertificatesDir specifies where to store or look for all required certificates.
+@@ -4061,6 +4146,23 @@ spec:
+                               Defaults to "/etc/kubernetes/pki/ca.crt".
+                               TODO: revisit when there is defaulting from k/k
                              type: string
 +                          certBundles:
 +                            description: CertBundles holds additional trusted cert
@@ -583,8 +427,8 @@ index 75574d5e7..e25795947 100644
 +                              type: object
 +                            type: array
                            controlPlane:
-                             description: ControlPlane defines the additional control
-                               plane instance to be deployed on the joining node. If
+                             description: |-
+                               ControlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index 901db1cb7..df222b943 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
@@ -736,10 +580,10 @@ index 7b7131829..ce796f206 100644
  	return generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
  }
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index b63a64589..4e8b7c5e0 100644
+index 64213e5be..e64be18ea 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -509,6 +509,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -541,6 +541,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		if scope.Config.Spec.NTP != nil && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
  			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
  		}
@@ -749,7 +593,7 @@ index b63a64589..4e8b7c5e0 100644
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
-@@ -734,6 +737,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -766,6 +769,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		if scope.Config.Spec.NTP != nil && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
  			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
  		}
@@ -759,7 +603,7 @@ index b63a64589..4e8b7c5e0 100644
  		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -881,6 +887,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -915,6 +921,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		if scope.Config.Spec.NTP != nil && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
  			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
  		}
@@ -984,10 +828,10 @@ index c613bdd12..6d812f516 100644
  }
  
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index fc37c0601..fc1332eef 100644
+index b5e63af3d..bb8edc495 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -363,6 +363,22 @@ spec:
+@@ -380,6 +380,22 @@ spec:
                            - superpowered
                            type: object
                          type: array
@@ -1008,11 +852,11 @@ index fc37c0601..fc1332eef 100644
 +                          type: object
 +                        type: array
                        certificatesDir:
-                         description: 'CertificatesDir specifies where to store or
-                           look for all required certificates. NB: if not provided,
-@@ -1174,6 +1190,22 @@ spec:
-                           control-plane. Defaults to "/etc/kubernetes/pki/ca.crt".
-                           TODO: revisit when there is defaulting from k/k'
+                         description: |-
+                           CertificatesDir specifies where to store or look for all required certificates.
+@@ -1184,6 +1200,22 @@ spec:
+                           Defaults to "/etc/kubernetes/pki/ca.crt".
+                           TODO: revisit when there is defaulting from k/k
                          type: string
 +                      certBundles:
 +                        description: CertBundles holds additional trusted cert bundles.
@@ -1031,9 +875,9 @@ index fc37c0601..fc1332eef 100644
 +                          type: object
 +                        type: array
                        controlPlane:
-                         description: ControlPlane defines the additional control plane
-                           instance to be deployed on the joining node. If nil, no
-@@ -1959,6 +1991,22 @@ spec:
+                         description: |-
+                           ControlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -1992,6 +2024,22 @@ spec:
                            - superpowered
                            type: object
                          type: array
@@ -1054,11 +898,11 @@ index fc37c0601..fc1332eef 100644
 +                          type: object
 +                        type: array
                        certificatesDir:
-                         description: 'CertificatesDir specifies where to store or
-                           look for all required certificates. NB: if not provided,
-@@ -2767,6 +2815,22 @@ spec:
-                           control-plane. Defaults to "/etc/kubernetes/pki/ca.crt".
-                           TODO: revisit when there is defaulting from k/k'
+                         description: |-
+                           CertificatesDir specifies where to store or look for all required certificates.
+@@ -2793,6 +2841,22 @@ spec:
+                           Defaults to "/etc/kubernetes/pki/ca.crt".
+                           TODO: revisit when there is defaulting from k/k
                          type: string
 +                      certBundles:
 +                        description: CertBundles holds additional trusted cert bundles.
@@ -1077,9 +921,9 @@ index fc37c0601..fc1332eef 100644
 +                          type: object
 +                        type: array
                        controlPlane:
-                         description: ControlPlane defines the additional control plane
-                           instance to be deployed on the joining node. If nil, no
-@@ -3636,6 +3700,22 @@ spec:
+                         description: |-
+                           ControlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -3695,6 +3759,22 @@ spec:
                            - superpowered
                            type: object
                          type: array
@@ -1100,11 +944,11 @@ index fc37c0601..fc1332eef 100644
 +                          type: object
 +                        type: array
                        certificatesDir:
-                         description: 'CertificatesDir specifies where to store or
-                           look for all required certificates. NB: if not provided,
-@@ -4517,6 +4597,22 @@ spec:
-                           control-plane. Defaults to "/etc/kubernetes/pki/ca.crt".
-                           TODO: revisit when there is defaulting from k/k'
+                         description: |-
+                           CertificatesDir specifies where to store or look for all required certificates.
+@@ -4567,6 +4647,22 @@ spec:
+                           Defaults to "/etc/kubernetes/pki/ca.crt".
+                           TODO: revisit when there is defaulting from k/k
                          type: string
 +                      certBundles:
 +                        description: CertBundles holds additional trusted cert bundles.
@@ -1123,13 +967,13 @@ index fc37c0601..fc1332eef 100644
 +                          type: object
 +                        type: array
                        controlPlane:
-                         description: ControlPlane defines the additional control plane
-                           instance to be deployed on the joining node. If nil, no
+                         description: |-
+                           ControlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index c09d11044..ee4180f67 100644
+index 2653f0a36..8ba0071b1 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -323,6 +323,23 @@ spec:
+@@ -321,6 +321,23 @@ spec:
                                    - superpowered
                                    type: object
                                  type: array
@@ -1151,11 +995,11 @@ index c09d11044..ee4180f67 100644
 +                                  type: object
 +                                type: array
                                certificatesDir:
-                                 description: 'CertificatesDir specifies where to store
-                                   or look for all required certificates. NB: if not
-@@ -1185,6 +1202,23 @@ spec:
-                                   and control-plane. Defaults to "/etc/kubernetes/pki/ca.crt".
-                                   TODO: revisit when there is defaulting from k/k'
+                                 description: |-
+                                   CertificatesDir specifies where to store or look for all required certificates.
+@@ -1138,6 +1155,23 @@ spec:
+                                   Defaults to "/etc/kubernetes/pki/ca.crt".
+                                   TODO: revisit when there is defaulting from k/k
                                  type: string
 +                              certBundles:
 +                                description: CertBundles holds additional trusted
@@ -1175,9 +1019,9 @@ index c09d11044..ee4180f67 100644
 +                                  type: object
 +                                type: array
                                controlPlane:
-                                 description: ControlPlane defines the additional control
-                                   plane instance to be deployed on the joining node.
-@@ -1992,6 +2026,23 @@ spec:
+                                 description: |-
+                                   ControlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -1939,6 +1973,23 @@ spec:
                                    - superpowered
                                    type: object
                                  type: array
@@ -1199,11 +1043,11 @@ index c09d11044..ee4180f67 100644
 +                                  type: object
 +                                type: array
                                certificatesDir:
-                                 description: 'CertificatesDir specifies where to store
-                                   or look for all required certificates. NB: if not
-@@ -2933,6 +2984,23 @@ spec:
-                                   and control-plane. Defaults to "/etc/kubernetes/pki/ca.crt".
-                                   TODO: revisit when there is defaulting from k/k'
+                                 description: |-
+                                   CertificatesDir specifies where to store or look for all required certificates.
+@@ -2829,6 +2880,23 @@ spec:
+                                   Defaults to "/etc/kubernetes/pki/ca.crt".
+                                   TODO: revisit when there is defaulting from k/k
                                  type: string
 +                              certBundles:
 +                                description: CertBundles holds additional trusted
@@ -1223,8 +1067,182 @@ index c09d11044..ee4180f67 100644
 +                                  type: object
 +                                type: array
                                controlPlane:
-                                 description: ControlPlane defines the additional control
-                                   plane instance to be deployed on the joining node.
+                                 description: |-
+                                   ControlPlane defines the additional control plane instance to be deployed on the joining node.
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+index 010efa948..3d43cae72 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+@@ -171,6 +171,10 @@ type ClusterConfiguration struct {
+ 	// This is only for bottlerocket.
+ 	// +optional
+ 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
++
++	// CertBundles holds additional trusted cert bundles.
++	// +optional
++	CertBundles []CertBundle `json:"certBundles,omitempty"`
+ }
+ 
+ // BottlerocketSettings define bottlerocket settings that can be configured on bottlerocket nodes.
+@@ -534,6 +538,10 @@ type JoinConfiguration struct {
+ 	// This is only for bottlerocket.
+ 	// +optional
+ 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
++
++	// CertBundles holds additional trusted cert bundles.
++	// +optional
++	CertBundles []CertBundle `json:"certBundles,omitempty"`
+ }
+ 
+ // BottlerocketHostContainer describes a host image for Bottlerocket
+@@ -574,6 +582,15 @@ type BottlerocketBootstrapContainer struct {
+ 	UserData string `json:"userData,omitempty"`
+ }
+ 
++// CertBundle holds the cert data.
++type CertBundle struct {
++	// Name is the name of the cert bundle.
++	Name string `json:"name"`
++
++	// Data is the actual cert.
++	Data string `json:"data"`
++}
++
+ // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+ type JoinControlPlane struct {
+ 	// LocalAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+index 4fcb86e9b..57400b3c0 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+@@ -180,6 +180,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*CertBundle)(nil), (*v1beta1.CertBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_CertBundle_To_v1beta1_CertBundle(a.(*CertBundle), b.(*v1beta1.CertBundle), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta1.CertBundle)(nil), (*CertBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_CertBundle_To_v1alpha4_CertBundle(a.(*v1beta1.CertBundle), b.(*CertBundle), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -883,6 +893,28 @@ func Convert_v1beta1_BottlerocketSettings_To_v1alpha4_BottlerocketSettings(in *v
+ 	return autoConvert_v1beta1_BottlerocketSettings_To_v1alpha4_BottlerocketSettings(in, out, s)
+ }
+ 
++func autoConvert_v1alpha4_CertBundle_To_v1beta1_CertBundle(in *CertBundle, out *v1beta1.CertBundle, s conversion.Scope) error {
++	out.Name = in.Name
++	out.Data = in.Data
++	return nil
++}
++
++// Convert_v1alpha4_CertBundle_To_v1beta1_CertBundle is an autogenerated conversion function.
++func Convert_v1alpha4_CertBundle_To_v1beta1_CertBundle(in *CertBundle, out *v1beta1.CertBundle, s conversion.Scope) error {
++	return autoConvert_v1alpha4_CertBundle_To_v1beta1_CertBundle(in, out, s)
++}
++
++func autoConvert_v1beta1_CertBundle_To_v1alpha4_CertBundle(in *v1beta1.CertBundle, out *CertBundle, s conversion.Scope) error {
++	out.Name = in.Name
++	out.Data = in.Data
++	return nil
++}
++
++// Convert_v1beta1_CertBundle_To_v1alpha4_CertBundle is an autogenerated conversion function.
++func Convert_v1beta1_CertBundle_To_v1alpha4_CertBundle(in *v1beta1.CertBundle, out *CertBundle, s conversion.Scope) error {
++	return autoConvert_v1beta1_CertBundle_To_v1alpha4_CertBundle(in, out, s)
++}
++
+ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
+ 	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
+ 		return err
+@@ -929,6 +961,7 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(i
+ 	out.BottlerocketHostContainers = *(*[]v1beta1.BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketHostContainers))
+ 	out.BottlerocketCustomBootstrapContainers = *(*[]v1beta1.BottlerocketBootstrapContainer)(unsafe.Pointer(&in.BottlerocketCustomBootstrapContainers))
+ 	out.Bottlerocket = (*v1beta1.BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
++	out.CertBundles = *(*[]v1beta1.CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	return nil
+ }
+ 
+@@ -983,6 +1016,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+ 	out.BottlerocketHostContainers = *(*[]BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketHostContainers))
+ 	out.BottlerocketCustomBootstrapContainers = *(*[]BottlerocketBootstrapContainer)(unsafe.Pointer(&in.BottlerocketCustomBootstrapContainers))
+ 	out.Bottlerocket = (*BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
++	out.CertBundles = *(*[]CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	return nil
+ }
+ 
+@@ -1359,6 +1393,7 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
+ 	out.BottlerocketCustomHostContainers = *(*[]v1beta1.BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketCustomHostContainers))
+ 	out.BottlerocketCustomBootstrapContainers = *(*[]v1beta1.BottlerocketBootstrapContainer)(unsafe.Pointer(&in.BottlerocketCustomBootstrapContainers))
+ 	out.Bottlerocket = (*v1beta1.BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
++	out.CertBundles = *(*[]v1beta1.CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	return nil
+ }
+ 
+@@ -1399,6 +1434,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+ 	out.BottlerocketCustomHostContainers = *(*[]BottlerocketHostContainer)(unsafe.Pointer(&in.BottlerocketCustomHostContainers))
+ 	out.BottlerocketCustomBootstrapContainers = *(*[]BottlerocketBootstrapContainer)(unsafe.Pointer(&in.BottlerocketCustomBootstrapContainers))
+ 	out.Bottlerocket = (*BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
++	out.CertBundles = *(*[]CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	return nil
+ }
+ 
+diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+index e3e959285..7331e32eb 100644
+--- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
++++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+@@ -330,6 +330,21 @@ func (in *BottlerocketSettings) DeepCopy() *BottlerocketSettings {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *CertBundle) DeepCopyInto(out *CertBundle) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new CertBundle.
++func (in *CertBundle) DeepCopy() *CertBundle {
++	if in == nil {
++		return nil
++	}
++	out := new(CertBundle)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+@@ -368,6 +383,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 		*out = new(BottlerocketSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.CertBundles != nil {
++		in, out := &in.CertBundles, &out.CertBundles
++		*out = make([]CertBundle, len(*in))
++		copy(*out, *in)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterConfiguration.
+@@ -747,6 +767,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 		*out = new(BottlerocketSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.CertBundles != nil {
++		in, out := &in.CertBundles, &out.CertBundles
++		*out = make([]CertBundle, len(*in))
++		copy(*out, *in)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
 -- 
 2.42.0
 
