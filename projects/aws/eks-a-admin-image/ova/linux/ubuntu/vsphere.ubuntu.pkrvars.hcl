@@ -20,9 +20,9 @@ vm_disk_thin_provisioned = true
 vm_network_card          = "vmxnet3"
 
 // Removable Media Settings
-iso_url           = "https://releases.ubuntu.com/20.04/ubuntu-20.04.4-live-server-amd64.iso"
+iso_url            = "https://releases.ubuntu.com/20.04/ubuntu-20.04.6-live-server-amd64.iso"
 iso_checksum_type  = "sha256"
-iso_checksum_value = "28ccdb56450e643bad03bb7bcf7507ce3d8d90e8bf09e38f6bd9ac298a98eaad"
+iso_checksum_value = "b8f31413336b9393ad5d8ef0282717b2ab19f007df2e9ed5196c13d8f9153c8b"
 
 // Boot Settings
 vm_boot_order = "disk,cdrom"

@@ -109,7 +109,7 @@ build-ova: KIND_URL?=$(shell ./build/get_kind_url.sh $(ARTIFACTS_BUCKET) )
 build-ova: export PKR_VAR_kind-url=$(KIND_URL)
 build-ova: $(PACKER) init clean-ova $(OVA_OUTPUT_DIR)
 	echo $(VSPHERE_PASSWORD) $(VSPHERE_USERNAME)
-	$(PACKER) build -only='*.vsphere-iso.*' -var-file=ova/linux/ubuntu/vsphere.ubuntu.pkrvars.hcl .
+	DEBUG=1 $(PACKER) build -force -only='*.vsphere-iso.*' -var-file=ova/linux/ubuntu/vsphere.ubuntu.pkrvars.hcl .
 
 .PHONY: release-ova
 release-ova: build-ova publish-ova-to-s3
