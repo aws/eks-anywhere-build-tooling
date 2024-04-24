@@ -128,7 +128,7 @@ else
             echo "Ensure container registry and repository exists!!"
             echo "Try running make create-ecr-repos to create ecr repositories in your aws account."
             echo "******************************************************"
-        elif [ "$CMD" = "docker buildx" ] && grep -i -q "\(multiple platforms\|OCI exporter\) feature is currently not supported" $log_file; then
+        elif [ "$CMD" = "docker buildx" ] && grep -i -q "\(multiple platforms\|OCI exporter\|Multi-platform\)" $log_file; then
             echo "******************************************************"
             echo "When using docker buildx with multiple platforms you can not use the default builder."
             echo "You need to create another builder using the docker-container or remote driver."
