@@ -149,10 +149,17 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 				}
 			}
 			releaseForTag, _, err := client.Repositories.GetReleaseByTag(context.Background(), org, repo, tagName)
+			preRelease := false
 			if err != nil {
-				return "", false, fmt.Errorf("calling GetReleaseByTag API for tag %s in [%s/%s] repository: %v", tagName, org, repo, err)
+				if strings.Contains(err.Error(), "404 Not Found") {
+					preRelease = false
+				} else {
+					return "", false, fmt.Errorf("calling GetReleaseByTag API for tag %s in [%s/%s] repository: %v", tagName, org, repo, err)
+				}
+			} else {
+				preRelease = *releaseForTag.Prerelease
 			}
-			if *releaseForTag.Prerelease {
+			if preRelease {
 				continue
 			}
 
