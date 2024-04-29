@@ -237,7 +237,7 @@ var (
 			GoVersionSearchString: `golang:(1\.\d\d)`,
 		},
 		"kubernetes/autoscaler": {
-			SourceOfTruthFile:     "go.mod",
+			SourceOfTruthFile:     "cluster-autoscaler/go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
 		"kubernetes/cloud-provider-aws": {
