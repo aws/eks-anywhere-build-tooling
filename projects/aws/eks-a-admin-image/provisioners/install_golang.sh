@@ -6,7 +6,7 @@ set -o nounset
 set -o pipefail
 
 if [[ "$GO_VERSION" == "latest" ]]; then
-    GO_VERSION="$(curl --silent https://go.dev/VERSION?m=text)";
+    GO_VERSION="$(curl --silent https://go.dev/VERSION?m=text | head -n 1)";
     GO_URL="https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz"
 else
     GO_URL="https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
