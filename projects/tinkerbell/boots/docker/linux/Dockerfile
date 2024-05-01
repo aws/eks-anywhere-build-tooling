@@ -4,7 +4,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/bin/boots/$TARGETOS-$TARGETARCH/boots /usr/bin/boots
+COPY _output/bin/boots/$TARGETOS-$TARGETARCH/smee /usr/bin/boots
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 

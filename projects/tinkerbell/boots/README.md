@@ -1,5 +1,5 @@
 ## **Boots**
-![Version](https://img.shields.io/badge/version-v0.8.1-blue)
+![Version](https://img.shields.io/badge/version-v0.11.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiTGRiNmxQbk5RTnZNbU41WW53bEdSTXRpVDRLaGxDRXJ1UEFnWkdlMVRGekhwdSttbXhmUWpNVFdOM200UkZZbTR3b3dTWkNXb2R1dnZDUHowQU1tU0VRPSIsIml2UGFyYW1ldGVyU3BlYyI6IjlnMlRWSTlpeXNLYmY3cmIiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Boots](https://github.com/tinkerbell/boots) service handles DHCP, PXE, tftp, and iPXE for provisions in the Tinkerbell stack.
