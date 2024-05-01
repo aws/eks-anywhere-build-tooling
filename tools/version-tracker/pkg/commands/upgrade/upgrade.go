@@ -32,7 +32,7 @@ import (
 // Run contains the business logic to execute the `upgrade` subcommand.
 func Run(upgradeOptions *types.UpgradeOptions) error {
 	var currentRevision, latestRevision string
-	var patchApplySucceeded, addPatchWarningComment bool
+	var isTrackedByCommitHash, patchApplySucceeded, addPatchWarningComment bool
 	var totalPatchCount int
 	var updatedFiles []string
 	patchesWarningComment := constants.PatchesCommentBody
@@ -163,11 +163,12 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		}
 		currentVersion = targetRepo.Versions[versionIndex]
 
-		// Validate whether the project builds off a commit hash instead of a tag.
-		if currentVersion.Tag == "" {
-			return fmt.Errorf("projects tracked with commit hashes not supported at this time")
+		if currentVersion.Tag != "" {
+			currentRevision = currentVersion.Tag
+		} else if currentVersion.Commit != "" {
+			currentRevision = currentVersion.Commit
+			isTrackedByCommitHash = true
 		}
-		currentRevision := currentVersion.Tag
 
 		headBranchName = fmt.Sprintf("update-%s-%s", projectOrg, projectRepo)
 		baseBranchName = constants.MainBranchName
@@ -186,7 +187,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			}
 		} else {
 			// Get latest revision for the project from GitHub.
-			latestRevision, needsUpgrade, err = github.GetLatestRevision(client, projectOrg, projectRepo, currentRevision, isReleaseBranched)
+			latestRevision, needsUpgrade, err = github.GetLatestRevision(client, projectOrg, projectRepo, currentRevision, isTrackedByCommitHash, isReleaseBranched)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from GitHub: %v", err)
 			}
@@ -218,7 +219,11 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 				if err != nil {
 					return fmt.Errorf("reloading upstream projects tracker file: %v", err)
 				}
-				targetRepo.Versions[versionIndex].Tag = latestRevision
+				if isTrackedByCommitHash {
+					targetRepo.Versions[versionIndex].Commit = latestRevision
+				} else {
+					targetRepo.Versions[versionIndex].Tag = latestRevision
+				}
 
 				// Update the Git tag file corresponding to the project
 				logger.Info("Updating Git tag file corresponding to the project")
@@ -596,7 +601,7 @@ func applyPatchesToRepo(projectRootFilepath, projectRepo, latestVersion string, 
 		patchesApplied = totalPatchCount
 	} else {
 		failedFiles := []string{}
-		gitDescribeRegex := regexp.MustCompile(fmt.Sprintf("%s(-([0-9]+)-g.*)?", latestVersion))
+		gitDescribeRegex := regexp.MustCompile(`v?\d+\.\d+\.\d+(-([0-9]+)-g.*)?`)
 		gitDescribeCmd := exec.Command("git", "-C", filepath.Join(projectRootFilepath, projectRepo), "describe", "--tag")
 		gitDescribeOutput, err := command.ExecCommand(gitDescribeCmd)
 		if err != nil {
@@ -696,7 +701,7 @@ func updateBottlerocketVersionFiles(client *gogithub.Client, projectRootFilepath
 		}
 	}
 
-	latestBottlerocketVersion, needsUpgrade, err := github.GetLatestRevision(client, "bottlerocket-os", "bottlerocket", currentBottlerocketVersion, false)
+	latestBottlerocketVersion, needsUpgrade, err := github.GetLatestRevision(client, "bottlerocket-os", "bottlerocket", currentBottlerocketVersion, false, false)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("getting latest Bottlerocket version from GitHub: %v", err)
 	}
