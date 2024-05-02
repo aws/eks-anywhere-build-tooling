@@ -129,10 +129,9 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 		latestRevision = *allCommits[0].SHA
 		needsUpgrade = true
 	} else {
-		currentRevisionForSemver := currentRevision
-		if org == "kubernetes" && repo == "autoscaler" {
-			currentRevisionForSemver = strings.ReplaceAll(currentRevisionForSemver, "cluster-autoscaler-", "")
-		}
+		semverRegex := regexp.MustCompile(constants.SemverRegex)
+		currentRevisionForSemver := semverRegex.FindString(currentRevision)
+
 		// Get SemVer construct corresponding to the current revision tag.
 		currentRevisionSemver, err := semver.New(currentRevisionForSemver)
 		if err != nil {
@@ -141,17 +140,13 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 
 		for _, tag := range allTags {
 			tagName := *tag.Name
-			tagNameForSemver := tagName
 			if org == "kubernetes" && repo == "autoscaler" {
 				if !strings.HasPrefix(tagName, "cluster-autoscaler-") {
 					continue
 				}
-				tagNameForSemver = strings.ReplaceAll(tagNameForSemver, "cluster-autoscaler-", "")
 			}
-			semverRegex := regexp.MustCompile(`v?\d+\.\d+\.\d+`)
-			if !semverRegex.MatchString(tagNameForSemver) {
-				continue
-			}
+			tagNameForSemver := semverRegex.FindString(tagName)
+
 			if releaseBranched {
 				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
 				releaseNumber := strings.Split(releaseBranch, "-")[1]
@@ -160,18 +155,12 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 					continue
 				}
 			}
-			releaseForTag, _, err := client.Repositories.GetReleaseByTag(context.Background(), org, repo, tagName)
-			preRelease := false
+
+			revisionSemver, err := semver.New(tagNameForSemver)
 			if err != nil {
-				if strings.Contains(err.Error(), "404 Not Found") {
-					preRelease = false
-				} else {
-					return "", false, fmt.Errorf("calling GetReleaseByTag API for tag %s in [%s/%s] repository: %v", tagName, org, repo, err)
-				}
-			} else {
-				preRelease = *releaseForTag.Prerelease
+				return "", false, fmt.Errorf("getting semver for the version under consideration: %v", err)
 			}
-			if preRelease {
+			if revisionSemver.Prerelease != "" {
 				continue
 			}
 
@@ -209,10 +198,9 @@ func isUpgradeRequired(client *github.Client, org, repo, latestRevision string, 
 		return false, false, fmt.Errorf("getting epoch time corresponding to latest revision commit: %v", err)
 	}
 
-	latestRevisionForSemver := latestRevision
-	if org == "kubernetes" && repo == "autoscaler" {
-		latestRevisionForSemver = strings.ReplaceAll(latestRevisionForSemver, "cluster-autoscaler-", "")
-	}
+	semverRegex := regexp.MustCompile(constants.SemverRegex)
+	latestRevisionForSemver := semverRegex.FindString(latestRevision)
+
 	// Get SemVer construct corresponding to the latest revision tag.
 	latestRevisionSemver, err := semver.New(latestRevisionForSemver)
 	if err != nil {
