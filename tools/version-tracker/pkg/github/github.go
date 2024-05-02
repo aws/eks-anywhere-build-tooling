@@ -95,9 +95,9 @@ func GetFileContents(client *github.Client, org, repo, filePath, ref string) ([]
 }
 
 // GetLatestRevision returns the latest revision (GitHub release or tag) for a given GitHub repository.
-func GetLatestRevision(client *github.Client, org, repo, currentRevision string, releaseBranched bool) (string, bool, error) {
+func GetLatestRevision(client *github.Client, org, repo, currentRevision string, isTrackedUsingCommitHash, releaseBranched bool) (string, bool, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository", org, repo))
-	var latestRevision string
+	var currentRevisionCommit, latestRevision string
 	needsUpgrade := false
 
 	// Get all GitHub tags for this project.
@@ -107,7 +107,11 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 	}
 
 	// Get commit hash corresponding to current revision tag.
-	currentRevisionCommit := getCommitForTag(allTags, currentRevision)
+	if isTrackedUsingCommitHash {
+		currentRevisionCommit = currentRevision
+	} else {
+		currentRevisionCommit = getCommitForTag(allTags, currentRevision)
+	}
 
 	// Get Unix timestamp for current revision's commit.
 	currentRevisionCommitEpoch, err := getCommitDateEpoch(client, org, repo, currentRevisionCommit)
@@ -115,18 +119,26 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 		return "", false, fmt.Errorf("getting epoch time corresponding to current revision commit: %v", err)
 	}
 
-	currentRevisionForSemver := currentRevision
-	if org == "kubernetes" && repo == "autoscaler" {
-		currentRevisionForSemver = strings.ReplaceAll(currentRevisionForSemver, "cluster-autoscaler-", "")
-	}
-	// Get SemVer construct corresponding to the current revision tag.
-	currentRevisionSemver, err := semver.New(currentRevisionForSemver)
-	if err != nil {
-		return "", false, fmt.Errorf("getting semver for current version: %v", err)
-	}
+	// If the project is tracked using a commit hash, upgrade to the latest commit.
+	if isTrackedUsingCommitHash {
+		// If the project does not have Github tags, pick the latest commit.
+		allCommits, err := getCommitsForRepo(client, org, repo)
+		if err != nil {
+			return "", false, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
+		}
+		latestRevision = *allCommits[0].SHA
+		needsUpgrade = true
+	} else {
+		currentRevisionForSemver := currentRevision
+		if org == "kubernetes" && repo == "autoscaler" {
+			currentRevisionForSemver = strings.ReplaceAll(currentRevisionForSemver, "cluster-autoscaler-", "")
+		}
+		// Get SemVer construct corresponding to the current revision tag.
+		currentRevisionSemver, err := semver.New(currentRevisionForSemver)
+		if err != nil {
+			return "", false, fmt.Errorf("getting semver for current version: %v", err)
+		}
 
-	// If the project doesn't have GitHub releases but has tags on GitHub, determine the latest from among them.
-	if len(allTags) > 0 {
 		for _, tag := range allTags {
 			tagName := *tag.Name
 			tagNameForSemver := tagName
@@ -175,14 +187,6 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 				break
 			}
 		}
-	} else {
-		// If the project does not have Github tags, pick the latest commit.
-		allCommits, err := getCommitsForRepo(client, org, repo)
-		if err != nil {
-			return "", false, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
-		}
-		latestRevision = *allCommits[0].SHA
-		needsUpgrade = true
 	}
 
 	return latestRevision, needsUpgrade, nil
