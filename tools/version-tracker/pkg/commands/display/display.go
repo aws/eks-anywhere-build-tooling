@@ -93,14 +93,16 @@ func Run(displayOptions *types.DisplayOptions) error {
 			}
 
 			var currentRevision string
+			var isTrackedByCommitHash bool
 			if currentVersion.Tag != "" {
 				currentRevision = currentVersion.Tag
 			} else if currentVersion.Commit != "" {
 				currentRevision = currentVersion.Commit
+				isTrackedByCommitHash = true
 			}
 
 			// Get latest revision for the project from GitHub.
-			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision, releaseBranched)
+			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision, isTrackedByCommitHash, releaseBranched)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from GitHub: %v", err)
 			}
