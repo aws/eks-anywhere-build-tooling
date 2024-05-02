@@ -1,4 +1,4 @@
-From 84d971991787d5f4a445432f58704d9216b8983d Mon Sep 17 00:00:00 2001
+From f248f2cd01d1b22ccbee25fa986998fe71e56ebc Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/37] Add unstacked etcd support
@@ -85,13 +85,13 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  .../cluster/cluster_controller_test.go        | 136 +++++++++++++++++
  .../machine/machine_controller_noderef.go     |   8 +
  .../machine_controller_noderef_test.go        |  48 ++++++
- .../machine/machine_controller_phases.go      | 115 ++++++++++++++
+ .../machine/machine_controller_phases.go      | 123 +++++++++++++++
  .../controllers/dockermachine_controller.go   |  35 +++--
  util/collections/machine_filters.go           |  26 ++++
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 25 files changed, 882 insertions(+), 22 deletions(-)
+ 25 files changed, 890 insertions(+), 22 deletions(-)
 
 diff --git a/api/v1beta1/cluster_types.go b/api/v1beta1/cluster_types.go
 index 12c258f22..680e99731 100644
@@ -1264,7 +1264,7 @@ index 48ebcabf3..9a150640d 100644
 +	}
 +}
 diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
-index 1bd41f4d8..32cddef3d 100644
+index 1bd41f4d8..e3cbf6932 100644
 --- a/internal/controllers/machine/machine_controller_phases.go
 +++ b/internal/controllers/machine/machine_controller_phases.go
 @@ -19,6 +19,7 @@ package machine
@@ -1289,7 +1289,7 @@ index 1bd41f4d8..32cddef3d 100644
  	// Set the phase to "failed" if any of Status.FailureReason or Status.FailureMessage is not-nil.
  	if m.Status.FailureReason != nil || m.Status.FailureMessage != nil {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseFailed)
-@@ -321,6 +329,113 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+@@ -321,6 +329,121 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
  		return ctrl.Result{}, errors.Wrapf(err, "failed to retrieve addresses from infrastructure provider for Machine %q in namespace %q", m.Name, m.Namespace)
  	}
  
@@ -1320,21 +1320,29 @@ index 1bd41f4d8..32cddef3d 100644
 +			if err := r.Client.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: etcdSecretName}, existingSecret); err != nil {
 +				if apierrors.IsNotFound(err) {
 +					// secret doesn't exist, so create it for the init machine
-+					var machineIP string
++					var internalIP, internalDNS, externalIP, externalDNS, machineIP string
 +					for _, address := range m.Status.Addresses {
-+						if address.Type == clusterv1.MachineInternalIP || address.Type == clusterv1.MachineInternalDNS {
-+							machineIP = address.Address
-+							break
++						switch address.Type {
++						case clusterv1.MachineInternalIP:
++							internalIP = address.Address
++						case clusterv1.MachineInternalDNS:
++							internalDNS = address.Address
++						case clusterv1.MachineExternalIP:
++							externalIP = address.Address
++						case clusterv1.MachineExternalDNS:
++							externalDNS = address.Address
 +						}
 +					}
 +
-+					if machineIP == "" {
-+						for _, address := range m.Status.Addresses {
-+							if address.Type == clusterv1.MachineExternalIP || address.Type == clusterv1.MachineExternalDNS {
-+								machineIP = address.Address
-+								break
-+							}
-+						}
++					// The order of these checks determines the precedence of the address to use
++					if externalDNS != "" {
++						machineIP = externalDNS
++					} else if externalIP != "" {
++						machineIP = externalIP
++					} else if internalDNS != "" {
++						machineIP = internalDNS
++					} else if internalIP != "" {
++						machineIP = internalIP
 +					}
 +
 +					if machineIP == "" {
@@ -1458,7 +1466,7 @@ index 8b517275a..029c5614b 100644
 +	return ok
 +}
 diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
-index 775e9a8b8..0e52c4f45 100644
+index 6c0c7813a..aa585b6ec 100644
 --- a/util/collections/machine_filters.go
 +++ b/util/collections/machine_filters.go
 @@ -122,6 +122,18 @@ func ControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) b
@@ -1480,7 +1488,7 @@ index 775e9a8b8..0e52c4f45 100644
  // AdoptableControlPlaneMachines returns a filter to find all un-controlled control plane machines.
  // Usage: GetFilteredMachinesForCluster(ctx, client, cluster, AdoptableControlPlaneMachines(cluster.Name, controlPlane)).
  func AdoptableControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) bool {
-@@ -225,6 +237,20 @@ func ControlPlaneSelectorForCluster(clusterName string) labels.Selector {
+@@ -261,6 +273,20 @@ func ControlPlaneSelectorForCluster(clusterName string) labels.Selector {
  	)
  }
  
@@ -1547,3 +1555,4 @@ index 1648cb3d1..f967e7b37 100644
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
 2.42.0
+
