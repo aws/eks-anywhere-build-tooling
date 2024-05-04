@@ -118,7 +118,7 @@ var (
 			TrimLeadingVersionPrefix: true,
 		},
 		"cert-manager/cert-manager": {
-			AssetName:  "cmctl-linux-amd64.tar.gz",
+			AssetName:  "cert-manager-cmctl-linux-amd64.tar.gz",
 			BinaryName: "cmctl",
 			Extract:    true,
 		},
