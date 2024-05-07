@@ -233,6 +233,7 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
       SED=gsed
     fi
     find ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova -type f -name '*.json' | xargs $SED -i "s/{{ .HTTPIP }}/$PACKER_HTTP_SERVER_IP/g"
+    echo "Packer HTTP server ip has been replaced with $PACKER_HTTP_SERVER_IP "
 fi
 
 # If the image format is AMI and our Packer config specifies a non-gp3 volume, then
