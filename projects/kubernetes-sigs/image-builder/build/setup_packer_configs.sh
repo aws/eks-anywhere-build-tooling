@@ -214,6 +214,7 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
             echo "PACKER_ACTIVE_INTERFACE cannot be automatically determined. Please export PACKER_ACTIVE_INTERFACE=<Current Host's primary network interface>"
             exit 1
         fi
+        echo "Active interface for Packer has been decided: $PACKER_ACTIVE_INTERFACE"
 
         if [ "$(uname -s)" = "Linux" ]; then
             PACKER_HTTP_SERVER_IP=$(ip addr show dev $PACKER_ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
