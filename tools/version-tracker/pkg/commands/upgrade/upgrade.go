@@ -125,17 +125,6 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			return fmt.Errorf("invalid project name %s", projectName)
 		}
 
-		// Check if project to be upgraded has patches
-		projectHasPatches := false
-		if _, err := os.Stat(filepath.Join(projectRootFilepath, constants.PatchesDirectory)); err == nil {
-			projectHasPatches = true
-			patchFiles, err := os.ReadDir(filepath.Join(projectRootFilepath, constants.PatchesDirectory))
-			if err != nil {
-				return fmt.Errorf("reading patches directory: %v", err)
-			}
-			totalPatchCount = len(patchFiles)
-		}
-
 		// Load upstream projects tracker file.
 		upstreamProjectsTrackerFilePath := filepath.Join(buildToolingRepoPath, constants.UpstreamProjectsTrackerFile)
 		_, targetRepo, err := loadUpstreamProjectsTrackerFile(upstreamProjectsTrackerFilePath, projectOrg, projectRepo)
@@ -168,6 +157,21 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		} else if currentVersion.Commit != "" {
 			currentRevision = currentVersion.Commit
 			isTrackedByCommitHash = true
+		}
+
+		// Check if project to be upgraded has patches
+		projectHasPatches := false
+		patchesDirectory := filepath.Join(projectRootFilepath, constants.PatchesDirectory)
+		if isReleaseBranched {
+			patchesDirectory = filepath.Join(projectRootFilepath, releaseBranch, constants.PatchesDirectory)
+		}
+		if _, err := os.Stat(patchesDirectory); err == nil {
+			projectHasPatches = true
+			patchFiles, err := os.ReadDir(patchesDirectory)
+			if err != nil {
+				return fmt.Errorf("reading patches directory: %v", err)
+			}
+			totalPatchCount = len(patchFiles)
 		}
 
 		headBranchName = fmt.Sprintf("update-%s-%s", projectOrg, projectRepo)
