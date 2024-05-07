@@ -52,7 +52,8 @@ function retry_image_builder() {
   local delay=30
   local failed=""
   declare -A retryable_messages=(
-    ["Timeout waiting for IP."]="Failed waiting for IP" 
+    ["Timeout waiting for IP."]="Failed waiting for IP"
+    ["Timeout waiting for SSH"]="Wrong VM IP might be fetched"
     ["Cancelling provisioner after a timeout"]="Provisioner timed out")
 
   until [ $n -eq $max ]; do
