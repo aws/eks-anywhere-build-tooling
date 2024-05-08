@@ -301,4 +301,6 @@ var (
 	BottlerocketHostContainers = []string{"admin", "control"}
 
 	CiliumImageDirectories = []string{"cilium", "operator-generic", "cilium-chart"}
+
+	ProjectsSupportingPrereleaseTags = []string{"kubernetes-sigs/cluster-api-provider-cloudstack"}
 )

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aws/eks-anywhere/pkg/semver"
@@ -146,6 +147,9 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 				}
 			}
 			tagNameForSemver := semverRegex.FindString(tagName)
+			if tagNameForSemver == "" {
+				continue
+			}
 
 			if releaseBranched {
 				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
@@ -160,7 +164,7 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 			if err != nil {
 				return "", false, fmt.Errorf("getting semver for the version under consideration: %v", err)
 			}
-			if revisionSemver.Prerelease != "" {
+			if !slices.Contains(constants.ProjectsSupportingPrereleaseTags, fmt.Sprintf("%s/%s", org, repo)) && revisionSemver.Prerelease != "" {
 				continue
 			}
 
