@@ -14,29 +14,20 @@ WRITEFILE_IMAGE_COMPONENT=tinkerbell/hub/writefile
 REBOOT_IMAGE_COMPONENT=tinkerbell/hub/reboot
 
 BINARY_TARGET_FILES=cexec kexec image2disk oci2disk writefile
-GO_MOD_PATHS=actions/cexec/v1 actions/kexec/v1 actions/image2disk/v1 actions/oci2disk/v1 actions/writefile/v1
-# by default the first target is assumed to be the primary and will produce a attribution with no prefix
-# for this build we want to prefix all the files
-CEXEC_ATTRIBUTION_OVERRIDE=cexec
+SOURCE_PATTERNS=./cexec ./kexec ./image2disk ./oci2disk ./writefile
+GO_MOD_PATHS=. . . . .
 
 IMAGE_NAMES=$(BINARY_TARGET_FILES) reboot
 
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
-IMAGE_BUILD_ARGS=ATTRIBUTION_FILE
-ATTRIBUTION_FILE=$(call TO_UPPER,$(IMAGE_NAME))_ATTRIBUTION.txt
-
 PROJECT_DEPENDENCIES=eksa/torvalds/linux
 BUILDSPEC_DEPENDS_ON_OVERRIDE=torvalds_linux_linux_amd64 torvalds_linux_linux_arm64
-
-FIX_LICENSES=$(foreach path,$(GO_MOD_PATHS),$(REPO)/$(path)/LICENSE)
 
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
 
 # reboot action image requires touch.
 # We are using eks-distro-minimal-base-glibc as the base to install touch

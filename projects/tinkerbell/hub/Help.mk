@@ -60,11 +60,7 @@ run-in-docker/checksums: ## Run `checksums` in docker builder container
 run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
-run-in-docker/hub/actions/cexec/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/cexec/v1/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/hub/actions/kexec/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/kexec/v1/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/hub/actions/image2disk/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/image2disk/v1/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/hub/actions/oci2disk/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/oci2disk/v1/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/hub/actions/writefile/v1/eks-anywhere-go-mod-download: ## Run `hub/actions/writefile/v1/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/hub/eks-anywhere-go-mod-download: ## Run `hub/eks-anywhere-go-mod-download` in docker builder container
 run-in-docker/_output/bin/hub/linux-amd64/cexec: ## Run `_output/bin/hub/linux-amd64/cexec` in docker builder container
 run-in-docker/_output/bin/hub/linux-amd64/kexec: ## Run `_output/bin/hub/linux-amd64/kexec` in docker builder container
 run-in-docker/_output/bin/hub/linux-amd64/image2disk: ## Run `_output/bin/hub/linux-amd64/image2disk` in docker builder container
@@ -75,11 +71,11 @@ run-in-docker/_output/bin/hub/linux-arm64/kexec: ## Run `_output/bin/hub/linux-a
 run-in-docker/_output/bin/hub/linux-arm64/image2disk: ## Run `_output/bin/hub/linux-arm64/image2disk` in docker builder container
 run-in-docker/_output/bin/hub/linux-arm64/oci2disk: ## Run `_output/bin/hub/linux-arm64/oci2disk` in docker builder container
 run-in-docker/_output/bin/hub/linux-arm64/writefile: ## Run `_output/bin/hub/linux-arm64/writefile` in docker builder container
-run-in-docker/_output/cexec/attribution/go-license.csv: ## Run `_output/cexec/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/kexec/attribution/go-license.csv: ## Run `_output/kexec/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/image2disk/attribution/go-license.csv: ## Run `_output/image2disk/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/oci2disk/attribution/go-license.csv: ## Run `_output/oci2disk/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/writefile/attribution/go-license.csv: ## Run `_output/writefile/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
 
 ##@ License Targets
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses

@@ -7,7 +7,7 @@ ARG TARGETOS
 ARG ATTRIBUTION_FILE
 
 COPY _output/bin/hub/$TARGETOS-$TARGETARCH/image2disk /usr/bin/image2disk
-COPY _output/image2disk/LICENSES /LICENSES
+COPY _output/LICENSES /LICENSES
 COPY $ATTRIBUTION_FILE /ATTRIBUTION.txt
 
 ENTRYPOINT ["/usr/bin/image2disk"]
