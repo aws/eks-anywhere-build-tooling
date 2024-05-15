@@ -14,10 +14,12 @@ import (
 	"strconv"
 	"strings"
 
+	eksdistrorelease "github.com/aws/eks-distro-build-tooling/release/api/v1alpha1"
 	"github.com/ghodss/yaml"
 	gogithub "github.com/google/go-github/v53/github"
 	"github.com/pelletier/go-toml/v2"
 	goyamlv3 "gopkg.in/yaml.v3"
+	sigsyaml "sigs.k8s.io/yaml"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/ecrpublic"
@@ -112,7 +114,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 		isUpdated, err := updateEKSDistroReleasesFile(client, buildToolingRepoPath)
 		if err != nil {
-			return fmt.Errorf("updating EKS Distro releases file  : %v", err)
+			return fmt.Errorf("updating EKS Distro releases file: %v", err)
 		}
 		if isUpdated {
 			updatedFiles = append(updatedFiles, constants.EKSDistroLatestReleasesFile)
@@ -436,7 +438,7 @@ func updateEKSDistroReleasesFile(client *gogithub.Client, buildToolingRepoPath s
 
 	for i := range eksDistroLatestReleases.Releases {
 		if slices.Contains(supportedReleaseBranches, eksDistroLatestReleases.Releases[i].Branch) {
-			number, kubeVersion, err := getLatestEKSDistroRelease(client, eksDistroLatestReleases.Releases[i].Branch)
+			number, kubeVersion, err := getLatestEKSDistroRelease(eksDistroLatestReleases.Releases[i].Branch)
 			if err != nil {
 				return false, fmt.Errorf("getting latest EKS Distro release for %s branch: %v", eksDistroLatestReleases.Releases[i].Branch, err)
 			}
@@ -475,27 +477,41 @@ func getSupportedReleaseBranches(buildToolingRepoPath string) ([]string, error) 
 	return supportedK8sVersions, nil
 }
 
-func getLatestEKSDistroRelease(client *gogithub.Client, branch string) (int, string, error) {
-	eksDistroProdReleaseNumberFile := fmt.Sprintf(constants.EKSDistroProdReleaseNumberFileFormat, branch)
-	releaseNumber, err := github.GetFileContents(client, "aws", "eks-distro", eksDistroProdReleaseNumberFile, constants.MainBranchName)
+func getLatestEKSDistroRelease(branch string) (int, string, error) {
+	var eksDistroReleaseChannel eksdistrorelease.ReleaseChannel
+	var eksDistroRelease eksdistrorelease.Release
+	var kubeVersion string
+
+	eksDistroReleaseChannelsFileURL := fmt.Sprintf(constants.EKSDistroReleaseChannelsFileURLFormat, branch)
+	eksDistroReleaseChannelsFileContents, err := file.ReadURL(eksDistroReleaseChannelsFileURL)
 	if err != nil {
-		return 0, "", fmt.Errorf("getting contents of EKS Distro prod release number file: %v", err)
+		return 0, "", fmt.Errorf("reading EKS Distro ReleaseChannels file URL: %v", err)
 	}
 
-	kubernetesGitTagFile := fmt.Sprintf(constants.KubernetesGitTagFileFormat, branch)
-	kubeVersion, err := github.GetFileContents(client, "aws", "eks-distro", kubernetesGitTagFile, constants.MainBranchName)
+	err = sigsyaml.Unmarshal(eksDistroReleaseChannelsFileContents, &eksDistroReleaseChannel)
 	if err != nil {
-		return 0, "", fmt.Errorf("getting contents of Kubernetes Git tag file: %v", err)
+		return 0, "", fmt.Errorf("unmarshalling EKS Distro ReleaseChannels file: %v", err)
+	}
+	releaseNumber := eksDistroReleaseChannel.Status.LatestRelease
+
+	eksDistroReleaseManifestURL := fmt.Sprintf(constants.EKSDistroReleaseManifestURLFormat, branch, releaseNumber)
+	eksDistroReleaseManifestContents, err := file.ReadURL(eksDistroReleaseManifestURL)
+	if err != nil {
+		return 0, "", fmt.Errorf("reading EKS Distro release manifest URL: %v", err)
 	}
 
-	releaseNumberInt, err := strconv.Atoi(strings.TrimRight(string(releaseNumber), "\n"))
+	err = sigsyaml.Unmarshal(eksDistroReleaseManifestContents, &eksDistroRelease)
 	if err != nil {
-		return 0, "", fmt.Errorf("converting release number to integer: %v", err)
+		return 0, "", fmt.Errorf("unmarshalling EKS Distro release manifest: %v", err)
+	}
+	for _, component := range eksDistroRelease.Status.Components {
+		if component.Name == "kubernetes" {
+			kubeVersion = component.GitTag
+			break
+		}
 	}
 
-	kubeVersionTrimmed := strings.TrimRight(string(kubeVersion), "\n")
-
-	return releaseNumberInt, kubeVersionTrimmed, nil
+	return releaseNumber, kubeVersion, nil
 }
 
 // updateProjectVersionFile updates the version information stored in a specific file.
