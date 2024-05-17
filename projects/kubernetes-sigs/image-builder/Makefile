@@ -32,6 +32,7 @@ REDHAT_CONFIG_TARGET=redhat-config.json
 IF_REDHAT_CONFIG_TARGET=$(if $(filter redhat,$(IMAGE_OS)),$(REDHAT_CONFIG_TARGET),)
 
 VSPHERE_CONNECTION_DATA?={}
+NUTANIX_CONNECTION_DATA?={}
 # Aws accounts to share built AMI with
 DEV_ACCOUNTS?=
 
@@ -87,10 +88,7 @@ OVA_FORMAT_EXT=ova
 RAW_FORMAT_EXT=gz
 AMI_FORMAT_EXT=gz
 CLOUDSTACK_FORMAT_EXT=qcow2
-
-# there is no file produced during nutanix builds, defining to avoid
-# missing variable warning
-NUTANIX_FORMAT_EXT=
+NUTANIX_FORMAT_EXT=img
 
 # $1- image_format
 # $2 - image_os
@@ -152,7 +150,7 @@ BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8 redhat-9,build-r
 BUILD_CLOUDSTACK_TARGETS=$(foreach os, redhat-8 redhat-9,build-cloudstack-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,cloudstack,$(os)) upload-artifacts-cloudstack-$(os))
 
 # nutanix node images
-BUILD_NUTANIX_TARGETS=build-nutanix-ubuntu-2004 build-nutanix-ubuntu-2204
+BUILD_NUTANIX_TARGETS=packer/nutanix/nutanix.json $(foreach os,ubuntu-2004 ubuntu-2204 redhat-8 redhat-9,build-nutanix-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,nutanix,$(os)) upload-artifacts-nutanix-$(os))
 
 ifneq ($(BOTTLEROCKET_AMI_RELEASE_VERSION),null)
 	BUILD_AMI_TARGETS+=upload-bottlerocket-1-ami
@@ -253,17 +251,26 @@ REDHAT_8_VERSION=8.4
 REDHAT_9_VERSION=9.3
 REDHAT_8_ISO_CHECKSUM=ea5f349d492fed819e5086d351de47261c470fc794f7124805d176d69ddf1fcd
 REDHAT_9_ISO_CHECKSUM=5c802147aa58429b21e223ee60e347e850d6b0d8680930c4ffb27340ffb687a8
+NUTANIX_REDHAT_8_VERSION=8.8
+NUTANIX_REDHAT_9_VERSION=9.3
 
 $(REDHAT_CONFIG_TARGET):
-	@echo $(IMAGE_OS_VERSION)
-	jq --null-input \
-		--arg rhel_username "$(RHSM_USERNAME)" \
-		--arg rhel_password "$(RHSM_PASSWORD)" \
-		--arg iso_url "$(if $(filter 9,$(IMAGE_OS_VERSION)),$$(aws s3 presign redhat-iso-pdx/$(REDHAT_9_VERSION)/rhel-$(REDHAT_9_VERSION)-x86_64-dvd.iso),$$(aws s3 presign redhat-iso-pdx/$(REDHAT_8_VERSION)/rhel-$(REDHAT_8_VERSION)-x86_64-dvd.iso))" \
-		--arg extra_rpms "$(if $(filter raw,$(IMAGE_FORMAT)),$$(aws s3 presign redhat-iso-pdx/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm),)" \
-		--arg iso_checksum_type "sha256" \
-		--arg iso_checksum "$(if $(filter 9,$(IMAGE_OS_VERSION)),$(REDHAT_9_ISO_CHECKSUM),$(REDHAT_8_ISO_CHECKSUM))" \
-		'{"rhel_username": $$rhel_username, "rhel_password": $$rhel_password, "iso_url": $$iso_url, "iso_checksum_type": $$iso_checksum_type, "iso_checksum": $$iso_checksum, "extra_rpms": $$extra_rpms}' > $@
+	@if [[ "$(IMAGE_FORMAT)" == "nutanix" ]]; then \
+		jq --null-input \
+			--arg rhel_username "$(RHSM_USERNAME)" \
+			--arg rhel_password "$(RHSM_PASSWORD)" \
+			--arg image_url "$(if $(filter 9,$(IMAGE_OS_VERSION)),https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/$(NUTANIX_REDHAT_9_VERSION)/rhel-$(NUTANIX_REDHAT_9_VERSION).qcow2,https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/$(NUTANIX_REDHAT_8_VERSION)/rhel-$(NUTANIX_REDHAT_8_VERSION).qcow2)" \
+			'{"rhel_username": $$rhel_username, "rhel_password": $$rhel_password, "image_url": $$image_url}' > $@; \
+	else \
+		jq --null-input \
+			--arg rhel_username "$(RHSM_USERNAME)" \
+			--arg rhel_password "$(RHSM_PASSWORD)" \
+			--arg iso_url "$(if $(filter 9,$(IMAGE_OS_VERSION)),$$(aws s3 presign redhat-iso-pdx/$(REDHAT_9_VERSION)/rhel-$(REDHAT_9_VERSION)-x86_64-dvd.iso),$$(aws s3 presign redhat-iso-pdx/$(REDHAT_8_VERSION)/rhel-$(REDHAT_8_VERSION)-x86_64-dvd.iso))" \
+			--arg extra_rpms "$(if $(filter raw,$(IMAGE_FORMAT)),$$(aws s3 presign redhat-iso-pdx/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm),)" \
+			--arg iso_checksum_type "sha256" \
+			--arg iso_checksum "$(if $(filter 9,$(IMAGE_OS_VERSION)),$(REDHAT_9_ISO_CHECKSUM),$(REDHAT_8_ISO_CHECKSUM))" \
+			'{"rhel_username": $$rhel_username, "rhel_password": $$rhel_password, "iso_url": $$iso_url, "iso_checksum_type": $$iso_checksum_type, "iso_checksum": $$iso_checksum, "extra_rpms": $$extra_rpms}' > $@; \
+	fi
 ##############################################################
 
 ########################### FAKE TARGETS ###############################
@@ -274,6 +281,9 @@ fake-%: | $$(ENABLE_LOGGING)
 	@touch $(@) $(PACKER_LOG_PATH)
 
 packer/ova/vsphere.json:
+	echo "{}" > $@
+
+packer/nutanix/nutanix.json:
 	echo "{}" > $@
 
 ########################################################################
@@ -362,6 +372,10 @@ release-raw-%: release-image-build-on-metal-%
 release-cloudstack-%: IMAGE_FORMAT=cloudstack
 release-cloudstack-%: release-image-build-on-metal-%
 	@echo Done building $@
+
+release-nutanix-%: IMAGE_FORMAT=nutanix
+release-nutanix-%: validate-supported-image-% $(IF_REDHAT_CONFIG_TARGET) | ensure-jq $$(ENABLE_LOGGING)
+	@build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST) $(IMAGE_OS_FIRMWARE)
 
 # used for cloudstack and raw
 # clone the repo first since its scp'd to the temporary instance which runs kvm

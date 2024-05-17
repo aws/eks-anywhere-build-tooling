@@ -18,6 +18,7 @@ set -o errexit
 set -o nounset
 
 MAKE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "${MAKE_ROOT}/../../../build/lib/common.sh"
 
 image_os="${1?Specify the first argument - image os}"
 image_os_version="${2?Specify the second argument - image os version}"
@@ -40,7 +41,7 @@ if [ ! -f "${HOME}/image-builder" ]; then
     ARCH="amd64"
   fi
 
-  cp "$MAKE_ROOT/../../aws/image-builder/_output/bin/image-builder/linux-$ARCH/image-builder" "${HOME}" 
+  cp "$MAKE_ROOT/../../aws/image-builder/_output/bin/image-builder/linux-$ARCH/image-builder" "${HOME}"
 fi
 
 image_builder_config_file="${HOME}/image_builder_config_file"
@@ -69,7 +70,7 @@ function retry_image_builder() {
 
       local retry="false"
       local message=""
-      for key in "${!retryable_messages[@]}"; do 
+      for key in "${!retryable_messages[@]}"; do
         if grep -q "$key" "$log_file"; then
           message="${retryable_messages[$key]}"
           retry="true"
@@ -98,7 +99,7 @@ if [[ $image_format == "ova" ]]; then
   vsphere_config_file="${HOME}/vsphere_config_file"
   echo "${VSPHERE_CONNECTION_DATA}" > $vsphere_config_file
 
-  # Run image-builder cli
+  echo "Creating VSphere image-builder config"
   if [[ $image_os == "redhat" ]]; then
     jq -s add $vsphere_config_file $redhat_config_file > $image_builder_config_file
   else
@@ -109,15 +110,20 @@ if [[ $image_format == "ova" ]]; then
   if [ -n "$firmware" ] && [[ "$image_os" == "ubuntu" ]]; then
     firmware_arg="--firmware $firmware"
   fi
+  cat $image_builder_config_file
 
+  # Run image-builder CLI
   retry_image_builder build --hypervisor vsphere --os $image_os $image_os_version_arg --vsphere-config $image_builder_config_file --release-channel $release_channel $firmware_arg
 elif [[ $image_format == "raw" ]]; then
-  # Run image-builder cli
+  echo "Creating Bare metal image-builder config"
   if [[ $image_os == "ubuntu" ]]; then
+    # Run image-builder CLI
     retry_image_builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel
-    echo "done with image builder"
   elif [[ $image_os == "redhat" ]]; then
     image_builder_config_file=$redhat_config_file
+    cat $image_builder_config_file
+
+    # Run image-builder CLI
     retry_image_builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel --baremetal-config $image_builder_config_file
   fi
 elif [[ $image_format == "cloudstack" ]]; then
@@ -126,8 +132,11 @@ elif [[ $image_format == "cloudstack" ]]; then
     exit 1
   fi
 
-  echo "Creating cloudstack config"
+  echo "Creating Cloudstack image-builder config"
   image_builder_config_file=$redhat_config_file
+  cat $image_builder_config_file
+
+  # Run image-builder CLI
   retry_image_builder build --hypervisor cloudstack --os $image_os $image_os_version_arg --release-channel $release_channel --cloudstack-config $image_builder_config_file
 elif [[ $image_format == "ami" ]]; then
   if [[ $image_os != "ubuntu" ]]; then
@@ -135,10 +144,30 @@ elif [[ $image_format == "ami" ]]; then
     exit 1
   fi
 
-  echo "Creating AMI config"
+  echo "Creating AMI image-builder config"
   jq --null-input \
     --arg ami_filter_owners "099720109477" \
     --arg manifest_output "$MANIFEST_OUTPUT" \
     '{"ami_filter_owners": $ami_filter_owners, "manifest_output": $manifest_output}' > $image_builder_config_file
+  cat $image_builder_config_file
+
+  # Run image-builder CLI
   retry_image_builder build --hypervisor ami --os $image_os $image_os_version_arg --release-channel $release_channel --ami-config $image_builder_config_file
+elif [[ $image_format == "nutanix" ]]; then
+  # Setup nutanix config
+  nutanix_config_file="${HOME}/nutanix_config_file"
+  echo "${NUTANIX_CONNECTION_DATA}" > $nutanix_config_file
+  image_name=${image_os}-${image_os_version}-kube-v${release_channel}
+  build::jq::update_in_place $nutanix_config_file '.image_name = '"\"$image_name\""'' 
+
+  echo "Creating Nutanix image-builder config"
+  if [[ $image_os == "redhat" ]]; then
+    jq -s add $nutanix_config_file $redhat_config_file > $image_builder_config_file
+  else
+    image_builder_config_file=$nutanix_config_file
+  fi
+  cat $image_builder_config_file
+
+  # Run image-builder CLI
+  retry_image_builder build --hypervisor nutanix --os $image_os $image_os_version_arg --nutanix-config $image_builder_config_file --release-channel $release_channel
 fi
