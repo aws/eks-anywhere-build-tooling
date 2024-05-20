@@ -214,6 +214,7 @@ Usage:
   version-tracker upgrade --project <project name> [flags]
 
 Flags:
+      --dry-run          Upgrade the project locally but do not push changes and create PR
   -h, --help             help for upgrade
       --project string   Specify the project name to upgrade versions for
 

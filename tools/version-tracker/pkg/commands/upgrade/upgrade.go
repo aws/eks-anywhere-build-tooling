@@ -16,7 +16,7 @@ import (
 
 	eksdistrorelease "github.com/aws/eks-distro-build-tooling/release/api/v1alpha1"
 	"github.com/ghodss/yaml"
-	gogithub "github.com/google/go-github/v53/github"
+	gogithub "github.com/google/go-github/v62/github"
 	"github.com/pelletier/go-toml/v2"
 	goyamlv3 "gopkg.in/yaml.v3"
 	sigsyaml "sigs.k8s.io/yaml"

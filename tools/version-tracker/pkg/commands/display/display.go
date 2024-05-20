@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	gogithub "github.com/google/go-github/v53/github"
+	gogithub "github.com/google/go-github/v62/github"
 	"github.com/rodaine/table"
 	"gopkg.in/yaml.v3"
 

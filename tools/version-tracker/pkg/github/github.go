@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/aws/eks-anywhere/pkg/semver"
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v62/github"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/file"
