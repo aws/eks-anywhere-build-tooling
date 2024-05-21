@@ -1,5 +1,5 @@
 ## **Image Builder**
-![Version](https://img.shields.io/badge/version-a216372fe9f91ac6f8fd5b0d733e979d70845b73-blue)
+![Version](https://img.shields.io/badge/version-e0b6711aaaf73520be2e1f765e66ae3c64fd4551-blue)
 | Artifact | Build Status |
 | --- | --- |
 | 1-24 OVA | ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoid2wreW55NTlKclBJZ3NzR3FmQnppdmZOVmErSnZhL2NzQW1ycFgwanVTTEhrR20vRmVQYU9TWWFtWlVCQWs2elhyRmwrZ0dxeW9sbERHWnBESzh0MWxBPSIsIml2UGFyYW1ldGVyU3BlYyI6IlZzOENKNnhHbENYMElsTG4iLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main) |
