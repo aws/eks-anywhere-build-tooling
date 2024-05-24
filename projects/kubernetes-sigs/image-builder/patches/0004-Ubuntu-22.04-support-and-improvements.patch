@@ -1,7 +1,7 @@
-From ad3a07c50e5cbe2f458dc5717a3e4c582e7f383a Mon Sep 17 00:00:00 2001
+From 9fb1df53369b29ea244e04b706c157aff0f0701a Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Fri, 23 Jun 2023 10:50:08 -0500
-Subject: [PATCH 04/11] Ubuntu 22 support and improvements
+Subject: [PATCH 4/8] Ubuntu 22.04 support and improvements
 
 - adds support for raw ubuntu 22.04 builds
 - Ubuntu switch to offline-install when mirrors are unavailable
@@ -28,19 +28,19 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  create mode 100644 images/capi/packer/raw/raw-ubuntu-2204.json
 
 diff --git a/images/capi/Makefile b/images/capi/Makefile
-index d008d81a6..e9c0e28b4 100644
+index 773c89e4a..4a87e4b36 100644
 --- a/images/capi/Makefile
 +++ b/images/capi/Makefile
-@@ -372,7 +372,7 @@ QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2304 qemu-ub
+@@ -365,7 +365,7 @@ QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2304 qemu-ub
  
  QEMU_KUBEVIRT_BUILD_NAMES	:= $(addprefix kubevirt-,$(QEMU_BUILD_NAMES))
  
 -RAW_BUILD_NAMES				?=      raw-ubuntu-2004 raw-ubuntu-2004-efi raw-flatcar raw-rhel-8 raw-rhel-9 raw-rhel-9-efi
 +RAW_BUILD_NAMES				?=      raw-ubuntu-2004 raw-ubuntu-2004-efi raw-flatcar raw-rhel-8 raw-rhel-9 raw-rhel-9-efi raw-ubuntu-2204 raw-ubuntu-2204-efi
- VBOX_BUILD_NAMES			?=      vbox-windows-2019
  
  POWERVS_BUILD_NAMES         ?= powervs-centos-8
-@@ -784,6 +784,8 @@ build-qemu-all: $(QEMU_BUILD_TARGETS) ## Builds all Qemu images
+ 
+@@ -778,6 +778,8 @@ build-qemu-all: $(QEMU_BUILD_TARGETS) ## Builds all Qemu images
  build-raw-flatcar: ## Builds Flatcar RAW image
  build-raw-ubuntu-2004: ## Builds Ubuntu 20.04 RAW image
  build-raw-ubuntu-2004-efi: ## Builds Ubuntu 20.04 RAW image that EFI boots
@@ -49,7 +49,7 @@ index d008d81a6..e9c0e28b4 100644
  build-raw-rhel-8: ## Builds RHEL 8 RAW image
  build-raw-rhel-9: ## Builds RHEL 9 RAW image
  build-raw-rhel-9-efi: ## Builds RHEL 9 RAW image that EFI boots
-@@ -928,6 +930,8 @@ validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
+@@ -937,6 +939,8 @@ validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
  validate-raw-flatcar: ## Validates Flatcar RAW image packer config
  validate-raw-ubuntu-2004: ## Validates Ubuntu 20.04 RAW image packer config
  validate-raw-ubuntu-2004-efi: ## Validates Ubuntu 20.04 RAW EFI image packer config
@@ -298,7 +298,7 @@ index 29a3b34c2..3b61117df 100644
          "containerd_version": "{{user `containerd_version`}}",
          "kubernetes_cni_deb_version": "{{ user `kubernetes_cni_deb_version` }}",
 diff --git a/images/capi/packer/raw/raw-ubuntu-2004-efi.json b/images/capi/packer/raw/raw-ubuntu-2004-efi.json
-index e8ad83891..efd64aacb 100644
+index 7ed3ac8a3..421fe6976 100644
 --- a/images/capi/packer/raw/raw-ubuntu-2004-efi.json
 +++ b/images/capi/packer/raw/raw-ubuntu-2004-efi.json
 @@ -4,6 +4,7 @@
@@ -308,9 +308,9 @@ index e8ad83891..efd64aacb 100644
 +  "distro_version": "20.04",
    "firmware": "OVMF.fd",
    "guest_os_type": "ubuntu-64",
-   "iso_checksum": "5035be37a7e9abbdc09f0d257f3e33416c1a0fb322ba860d42d74aa75c3468d4",
+   "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
 diff --git a/images/capi/packer/raw/raw-ubuntu-2004.json b/images/capi/packer/raw/raw-ubuntu-2004.json
-index 9ab9bd993..cd0ca68f3 100644
+index 9e78e6384..cbcfbc6f3 100644
 --- a/images/capi/packer/raw/raw-ubuntu-2004.json
 +++ b/images/capi/packer/raw/raw-ubuntu-2004.json
 @@ -4,6 +4,7 @@
@@ -319,11 +319,11 @@ index 9ab9bd993..cd0ca68f3 100644
    "distro_name": "ubuntu",
 +  "distro_version": "20.04",
    "guest_os_type": "ubuntu-64",
-   "iso_checksum": "5035be37a7e9abbdc09f0d257f3e33416c1a0fb322ba860d42d74aa75c3468d4",
+   "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
    "iso_checksum_type": "sha256",
 diff --git a/images/capi/packer/raw/raw-ubuntu-2204-efi.json b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
 new file mode 100644
-index 000000000..f720c91c4
+index 000000000..8c4217c26
 --- /dev/null
 +++ b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
 @@ -0,0 +1,14 @@
@@ -335,15 +335,15 @@ index 000000000..f720c91c4
 +  "distro_version": "22.04",
 +  "firmware": "OVMF.fd",
 +  "guest_os_type": "ubuntu-64",
-+  "iso_checksum": "a4acfda10b18da50e2ec50ccaf860d7f20b389df8765611142305c0e911d16fd",
++  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
 +  "iso_checksum_type": "sha256",
-+  "iso_url": "https://old-releases.ubuntu.com/releases/22.04/ubuntu-22.04.3-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
 +  "os_display_name": "Ubuntu 22.04",
 +  "shutdown_command": "shutdown -P now"
 +  }
 diff --git a/images/capi/packer/raw/raw-ubuntu-2204.json b/images/capi/packer/raw/raw-ubuntu-2204.json
 new file mode 100644
-index 000000000..19d571e97
+index 000000000..9317900f5
 --- /dev/null
 +++ b/images/capi/packer/raw/raw-ubuntu-2204.json
 @@ -0,0 +1,13 @@
@@ -354,9 +354,9 @@ index 000000000..19d571e97
 +  "distro_name": "ubuntu",
 +  "distro_version": "22.04",
 +  "guest_os_type": "ubuntu-64",
-+  "iso_checksum": "a4acfda10b18da50e2ec50ccaf860d7f20b389df8765611142305c0e911d16fd",
++  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
 +  "iso_checksum_type": "sha256",
-+  "iso_url": "https://old-releases.ubuntu.com/releases/22.04/ubuntu-22.04.3-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
 +  "os_display_name": "Ubuntu 22.04",
 +  "shutdown_command": "shutdown -P now"
 +  }
