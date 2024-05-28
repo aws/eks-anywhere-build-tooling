@@ -55,7 +55,9 @@ function retry_image_builder() {
   declare -A retryable_messages=(
     ["Timeout waiting for IP."]="Failed waiting for IP"
     ["Timeout waiting for SSH"]="Wrong VM IP might be fetched"
-    ["Cancelling provisioner after a timeout"]="Provisioner timed out")
+    ["Cancelling provisioner after a timeout"]="Provisioner timed out"
+    ["image size mistmatch"]="Nutanix image size mismatch"
+  )
 
   until [ $n -eq $max ]; do
     failed="false"
