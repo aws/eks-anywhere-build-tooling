@@ -79,5 +79,5 @@ PACKER_PLUGIN_NUTANIX=$(yq ".packer.plugins.nutanix" $DEPENDENCY_YAML)
 if [ "${IMAGE_FORMAT}" = "nutanix" ] && [[ "$(packer plugins installed | grep plugin-nutanix)" != *"v$PACKER_PLUGIN_NUTANIX"* ]]; then
     echo "The version of packer-plugin-nutanix does not match the version ($PACKER_PLUGIN_NUTANIX) which has been tested by the EKS-A team."
     echo "Current plugin: $(packer plugins installed | grep plugin-nutanix)"
-    echo -e "This is unlikely to cause issues, however if you do run into problems you can install the specific version with the following: packer plugins install github.com/nutanix-cloud-native/nutanix $PACKER_PLUGIN_NUTANIX\n"
+    echo -e "This is unlikely to cause issues, however if you do run into problems you can install the specific version with the following: packer plugins install github.com/abhinavmpandey08/nutanix $PACKER_PLUGIN_NUTANIX\n"
 fi
