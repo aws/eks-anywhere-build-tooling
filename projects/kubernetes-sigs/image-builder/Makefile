@@ -277,8 +277,12 @@ $(REDHAT_CONFIG_TARGET):
 # Since we do not build the ova in presubmit but want to validate upload-artifacts behavior
 # ex: fake-ubuntu-2004-raw.gz,fake-ubuntu-2004-ova-efi.ova
 fake-%: PACKER_LOG_PATH=$(ARTIFACTS_PATH)/$(subst -,/,$(basename $(*F)))/packer.log
+fake-%: IMAGE_FORMAT=$(word 3,$(subst -, ,$(word 1,$(subst ., ,$*))))
 fake-%: | $$(ENABLE_LOGGING)
-	@touch $(@) $(PACKER_LOG_PATH)
+	@touch $(PACKER_LOG_PATH)
+	@if [[ "$(IMAGE_FORMAT)" != "nutanix" ]]; then \
+		touch $(@); \
+	fi
 
 packer/ova/vsphere.json:
 	echo "{}" > $@
@@ -319,10 +323,13 @@ upload-bottlerocket-%: $$(FINAL_IMAGE_PATH) | $$(ENABLE_LOGGING)
 ########################### FINAL TARGETS ##############################
 # Moves packer produced file which is in the repo root to final location in artifacts_path
 # $(ARTIFACTS_PATH)/ubuntu/2004/raw/ubuntu.gz
+$(ARTIFACTS_PATH)/%: IMAGE_FORMAT=$(word 3,$(subst /, ,$*))
 $(ARTIFACTS_PATH)/%:
 	@echo -e $(call TARGET_START_LOG)
-	mkdir -p $(@D)
-	mv *$(suffix $(@F)) $(@)
+	@if [[ "$(IMAGE_FORMAT)" != "nutanix" ]]; then \
+		mkdir -p $(@D); \
+		mv *$(suffix $(@F)) $(@); \
+	fi
 	@echo -e $(call TARGET_END_LOG)
 
 #######################################################################
