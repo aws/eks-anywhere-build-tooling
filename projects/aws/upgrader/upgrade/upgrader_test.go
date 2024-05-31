@@ -8,10 +8,11 @@ import (
 	"os"
 	"testing"
 
-	upgrade "github.com/aws/eks-anywhere-build-tooling/projects/aws/upgrader/upgrade"
-	mock_upgrade "github.com/aws/eks-anywhere-build-tooling/projects/aws/upgrader/upgrade/mocks"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/gomega"
+
+	"github.com/aws/eks-anywhere-build-tooling/upgrader/upgrade"
+	mock_upgrade "github.com/aws/eks-anywhere-build-tooling/upgrader/upgrade/mocks"
 )
 
 const (

@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/service"
 	"github.com/golang/mock/gomock"
+
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/service"
 )
 
 // Normal UserData

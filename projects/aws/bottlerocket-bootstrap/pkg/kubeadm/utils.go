@@ -12,10 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
+
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/files"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/utils"
 )
 
 const (
@@ -210,7 +211,6 @@ func startEbsInit() *EbsInitControl {
 					return
 				}
 			}
-
 		}(ctx, okChan)
 
 		return ebsInitControl

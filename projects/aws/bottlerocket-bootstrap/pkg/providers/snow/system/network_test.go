@@ -5,7 +5,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/providers/snow/system"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/providers/snow/system"
 )
 
 var networkConfigTest = []struct {

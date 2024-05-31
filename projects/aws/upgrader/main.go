@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/aws/eks-anywhere-build-tooling/projects/aws/upgrader/cmd"
+	"github.com/aws/eks-anywhere-build-tooling/upgrader/cmd"
 )
 
 func main() {

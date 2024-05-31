@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	upgrade "github.com/aws/eks-anywhere-build-tooling/projects/aws/upgrader/upgrade"
 	. "github.com/onsi/gomega"
+
+	upgrade "github.com/aws/eks-anywhere-build-tooling/upgrader/upgrade"
 )
 
 const (

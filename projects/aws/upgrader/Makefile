@@ -52,7 +52,8 @@ IMAGE_BUILD_ARGS=
 PROJECT_DEPENDENCIES=eksd/kubernetes/client eksd/kubernetes/server eksd/cni-plugins eksa/containerd/containerd eksa/kubernetes-sigs/cri-tools
 TOOLS_BIN_DIR=$(MAKE_ROOT)/hack/tools/bin
 MOCKGEN=$(TOOLS_BIN_DIR)/mockgen
-GO=build::common::use_go_version $(GOLANG_VERSION)
+GO_BIN_PATH=$(shell source $(BUILD_LIB)/common.sh && build::common::get_go_path $(GOLANG_VERSION))
+GO=$(GO_BIN_PATH)/go
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -79,7 +80,7 @@ GIT_TAG:
 	echo 0.0.0 > $@
 
 unit-test: | $$(ENABLE_DOCKER)
-	@$(GO) test ./...
+	$(GO) test ./...
 
 .PHONY: mocks
 mocks: $(MOCKGEN)

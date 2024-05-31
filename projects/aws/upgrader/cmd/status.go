@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/aws/eks-anywhere-build-tooling/projects/aws/upgrader/upgrade"
 	"github.com/spf13/cobra"
+
+	"github.com/aws/eks-anywhere-build-tooling/upgrader/upgrade"
 )
 
 var upgradeStatusCmd = &cobra.Command{

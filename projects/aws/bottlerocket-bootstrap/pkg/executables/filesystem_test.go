@@ -7,8 +7,8 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/gomega"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/executables"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/executables/mocks"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/executables"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/executables/mocks"
 )
 
 type fileSystemTest struct {

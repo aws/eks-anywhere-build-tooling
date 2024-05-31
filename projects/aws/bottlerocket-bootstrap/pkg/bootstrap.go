@@ -6,10 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/etcdadm"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/kubeadm"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
+
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/etcdadm"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/kubeadm"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/utils"
 )
 
 const (

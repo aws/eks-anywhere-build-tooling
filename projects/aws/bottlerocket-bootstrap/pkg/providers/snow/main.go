@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/providers/snow/system"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/providers/snow/system"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/utils"
 )
 
 func main() {

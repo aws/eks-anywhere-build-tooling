@@ -1,4 +1,4 @@
-module github.com/aws/eks-anywhere-build-tooling/projects/aws/upgrader
+module github.com/aws/eks-anywhere-build-tooling/upgrader
 
 go 1.22
 

@@ -125,7 +125,6 @@ func (m mockFileReader) ReadFile(filename string) ([]byte, error) {
 }
 
 func TestReadKubeletTlsConfig(t *testing.T) {
-
 	tests := []struct {
 		testName                 string
 		expectedKubeletTlsConfig *KubeletTlsConfig
