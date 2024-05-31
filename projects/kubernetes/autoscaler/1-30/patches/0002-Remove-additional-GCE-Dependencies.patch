@@ -1,0 +1,54 @@
+From 4d0d7506cfa2ddf252d47d6f906c58469099338e Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Sat, 25 May 2024 00:15:57 +0000
+Subject: [PATCH] Remove additional GCE Dependencies
+
+---
+ cluster-autoscaler/config/autoscaling_options.go | 3 ---
+ cluster-autoscaler/main.go                       | 2 --
+ 2 files changed, 5 deletions(-)
+
+diff --git a/cluster-autoscaler/config/autoscaling_options.go b/cluster-autoscaler/config/autoscaling_options.go
+index a18b1c58f..b335c05dc 100644
+--- a/cluster-autoscaler/config/autoscaling_options.go
++++ b/cluster-autoscaler/config/autoscaling_options.go
+@@ -19,7 +19,6 @@ package config
+ import (
+ 	"time"
+ 
+-	gce_localssdsize "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce/localssdsize"
+ 	kubelet_config "k8s.io/kubernetes/pkg/kubelet/apis/config"
+ 	scheduler_config "k8s.io/kubernetes/pkg/scheduler/apis/config"
+ )
+@@ -64,8 +63,6 @@ type GCEOptions struct {
+ 	MigInstancesMinRefreshWaitTime time.Duration
+ 	// DomainUrl is the GCE url used to make calls to GCE API.
+ 	DomainUrl string
+-	// LocalSSDDiskSizeProvider provides local ssd disk size based on machine type
+-	LocalSSDDiskSizeProvider gce_localssdsize.LocalSSDSizeProvider
+ }
+ 
+ const (
+diff --git a/cluster-autoscaler/main.go b/cluster-autoscaler/main.go
+index d335b8a23..111c9136e 100644
+--- a/cluster-autoscaler/main.go
++++ b/cluster-autoscaler/main.go
+@@ -45,7 +45,6 @@ import (
+ 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+ 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+ 	cloudBuilder "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/builder"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce/localssdsize"
+ 	"k8s.io/autoscaler/cluster-autoscaler/config"
+ 	"k8s.io/autoscaler/cluster-autoscaler/core"
+ 	"k8s.io/autoscaler/cluster-autoscaler/core/podlistprocessor"
+@@ -403,7 +402,6 @@ func createAutoscalingOptions() config.AutoscalingOptions {
+ 		GCEOptions: config.GCEOptions{
+ 			ConcurrentRefreshes:            *concurrentGceRefreshes,
+ 			MigInstancesMinRefreshWaitTime: *gceMigInstancesMinRefreshWaitTime,
+-			LocalSSDDiskSizeProvider:       localssdsize.NewSimpleLocalSSDProvider(),
+ 		},
+ 		ClusterAPICloudConfigAuthoritative: *clusterAPICloudConfigAuthoritative,
+ 		CordonNodeBeforeTerminate:          *cordonNodeBeforeTerminate,
+-- 
+2.40.1
+
