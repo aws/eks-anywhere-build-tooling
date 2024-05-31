@@ -16,7 +16,8 @@ func GetGoVersion(goBinaryLocation string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("running Go version command: %v", err)
 	}
-	pattern := regexp.MustCompile(fmt.Sprintf(`^%s: go(.*)\.\d+\n`, goBinaryLocation))
+	// The first line could be a warning, so no ^ in the sprintf below
+	pattern := regexp.MustCompile(fmt.Sprintf(`%s: go(.*)\.\d+`, goBinaryLocation))
 	matches := pattern.FindStringSubmatch(commandOutput)
 
 	return matches[1], nil
