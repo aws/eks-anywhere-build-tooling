@@ -1,0 +1,1827 @@
+From 4f53430573b75c5b6ae08529389b83d16694e31f Mon Sep 17 00:00:00 2001
+From: Jhaanvi Golani <jhaanvi@amazon.com>
+Date: Mon, 11 Mar 2024 17:32:24 -0700
+Subject: [PATCH] Support re-assignment of another failure domain when the
+ machine failed to provision
+
+Signed-off-by: Jhaanvi Golani <jhaanvi@amazon.com>
+---
+ api/v1beta3/cloudstackmachine_types.go        |  37 +++
+ config/rbac/role.yaml                         |   2 +
+ .../cloudstackaffinitygroup_controller.go     |   2 +-
+ .../cloudstackfailuredomain_controller.go     |   5 +-
+ .../cloudstackisolatednetwork_controller.go   |   2 +-
+ controllers/cloudstackmachine_controller.go   | 118 +++++--
+ .../cloudstackmachine_controller_test.go      |   7 +-
+ ...loudstackmachinestatechecker_controller.go |   2 +-
+ controllers/controllers_suite_test.go         |  18 +-
+ controllers/utils/failuredomains.go           |  44 +--
+ pkg/cloud/instance.go                         |  76 +++--
+ pkg/cloud/network.go                          |  25 ++
+ pkg/errors/cloudstack.go                      |  85 +++++
+ pkg/errors/cloudstack_test.go                 |  62 ++++
+ pkg/errors/errors_suite_test.go               |  29 ++
+ pkg/failuredomains/balancer.go                | 239 +++++++++++++
+ pkg/failuredomains/balancer_test.go           | 314 ++++++++++++++++++
+ pkg/failuredomains/client.go                  |  73 ++++
+ pkg/failuredomains/client_test.go             | 159 +++++++++
+ .../failuredomains_suite_test.go              |  33 ++
+ pkg/metrics/metrics.go                        |  22 +-
+ 21 files changed, 1252 insertions(+), 102 deletions(-)
+ create mode 100644 pkg/errors/cloudstack.go
+ create mode 100644 pkg/errors/cloudstack_test.go
+ create mode 100644 pkg/errors/errors_suite_test.go
+ create mode 100644 pkg/failuredomains/balancer.go
+ create mode 100644 pkg/failuredomains/balancer_test.go
+ create mode 100644 pkg/failuredomains/client.go
+ create mode 100644 pkg/failuredomains/client_test.go
+ create mode 100644 pkg/failuredomains/failuredomains_suite_test.go
+
+diff --git a/api/v1beta3/cloudstackmachine_types.go b/api/v1beta3/cloudstackmachine_types.go
+index 22afe0c..73442f5 100644
+--- a/api/v1beta3/cloudstackmachine_types.go
++++ b/api/v1beta3/cloudstackmachine_types.go
+@@ -26,6 +26,9 @@ import (
+ // The presence of a finalizer prevents CAPI from deleting the corresponding CAPI data.
+ const MachineFinalizer = "cloudstackmachine.infrastructure.cluster.x-k8s.io"
+ 
++const MachineCreateFailedAnnotation = "cluster.x-k8s.io/vm-create-failed"
++const CloudStackJobIDAnnotation = "cluster.x-k8s.io/cs-job-id"
++
+ const (
+ 	ProAffinity  = "pro"
+ 	AntiAffinity = "anti"
+@@ -95,6 +98,40 @@ func (c *CloudStackMachine) CompressUserdata() bool {
+ 	return c.Spec.UncompressedUserData == nil || !*c.Spec.UncompressedUserData
+ }
+ 
++func (c *CloudStackMachine) SetJobID(id string) {
++	if c.Annotations == nil {
++		c.Annotations = map[string]string{}
++	}
++	c.Annotations[CloudStackJobIDAnnotation] = id
++}
++
++func (c *CloudStackMachine) GetJobID() string {
++	if c.Annotations == nil {
++		return ""
++	}
++
++	return c.Annotations[CloudStackJobIDAnnotation]
++}
++
++func (c *CloudStackMachine) ClearJobID() {
++	delete(c.Annotations, CloudStackJobIDAnnotation)
++}
++
++func (c *CloudStackMachine) MarkAsFailed() {
++	if c.Annotations == nil {
++		c.Annotations = map[string]string{}
++	}
++	c.Annotations[MachineCreateFailedAnnotation] = "true"
++}
++
++func (c *CloudStackMachine) ClearFailed() {
++	delete(c.Annotations, MachineCreateFailedAnnotation)
++}
++
++func (c *CloudStackMachine) HasFailed() bool {
++	return c.Annotations != nil && c.Annotations[MachineCreateFailedAnnotation] == "true"
++}
++
+ type CloudStackResourceIdentifier struct {
+ 	// Cloudstack resource ID.
+ 	// +optional
+diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
+index 83ecdc6..187e51c 100644
+--- a/config/rbac/role.yaml
++++ b/config/rbac/role.yaml
+@@ -58,6 +58,8 @@ rules:
+   verbs:
+   - get
+   - list
++  - patch
++  - update
+   - watch
+ - apiGroups:
+   - cluster.x-k8s.io
+diff --git a/controllers/cloudstackaffinitygroup_controller.go b/controllers/cloudstackaffinitygroup_controller.go
+index d825abf..f49dfea 100644
+--- a/controllers/cloudstackaffinitygroup_controller.go
++++ b/controllers/cloudstackaffinitygroup_controller.go
+@@ -61,7 +61,7 @@ func (reconciler *CloudStackAffinityGroupReconciler) Reconcile(ctx context.Conte
+ 	r.UsingBaseReconciler(reconciler.ReconcilerBase).ForRequest(req).WithRequestCtx(ctx)
+ 	r.WithAdditionalCommonStages(
+ 		r.GetFailureDomainByName(func() string { return r.ReconciliationSubject.Spec.FailureDomainName }, r.FailureDomain),
+-		r.AsFailureDomainUser(&r.FailureDomain.Spec))
++		r.AsFailureDomainUser(ctx, &r.FailureDomain.Spec))
+ 	return r.RunBaseReconciliationStages()
+ }
+ 
+diff --git a/controllers/cloudstackfailuredomain_controller.go b/controllers/cloudstackfailuredomain_controller.go
+index 822d4ef..237f778 100644
+--- a/controllers/cloudstackfailuredomain_controller.go
++++ b/controllers/cloudstackfailuredomain_controller.go
+@@ -18,6 +18,8 @@ package controllers
+ 
+ import (
+ 	"context"
++	"sort"
++
+ 	"github.com/pkg/errors"
+ 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+ 	"k8s.io/apimachinery/pkg/runtime/schema"
+@@ -26,7 +28,6 @@ import (
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+ 	"sigs.k8s.io/controller-runtime/pkg/controller"
+ 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+-	"sort"
+ 
+ 	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
+ 	csCtrlrUtils "sigs.k8s.io/cluster-api-provider-cloudstack/controllers/utils"
+@@ -84,7 +85,7 @@ func (reconciler *CloudStackFailureDomainReconciler) Reconcile(ctx context.Conte
+ 
+ // Reconcile on the ReconciliationRunner actually attempts to modify or create the reconciliation subject.
+ func (r *CloudStackFailureDomainReconciliationRunner) Reconcile() (retRes ctrl.Result, retErr error) {
+-	res, err := r.AsFailureDomainUser(&r.ReconciliationSubject.Spec)()
++	res, err := r.AsFailureDomainUser(r.RequestCtx, &r.ReconciliationSubject.Spec)()
+ 	if r.ShouldReturn(res, err) {
+ 		return res, err
+ 	}
+diff --git a/controllers/cloudstackisolatednetwork_controller.go b/controllers/cloudstackisolatednetwork_controller.go
+index eeb33d3..85776fe 100644
+--- a/controllers/cloudstackisolatednetwork_controller.go
++++ b/controllers/cloudstackisolatednetwork_controller.go
+@@ -61,7 +61,7 @@ func (reconciler *CloudStackIsoNetReconciler) Reconcile(ctx context.Context, req
+ 	r.UsingBaseReconciler(reconciler.ReconcilerBase).ForRequest(req).WithRequestCtx(ctx)
+ 	r.WithAdditionalCommonStages(
+ 		r.GetFailureDomainByName(func() string { return r.ReconciliationSubject.Spec.FailureDomainName }, r.FailureDomain),
+-		r.AsFailureDomainUser(&r.FailureDomain.Spec),
++		r.AsFailureDomainUser(r.RequestCtx, &r.FailureDomain.Spec),
+ 	)
+ 	return r.RunBaseReconciliationStages()
+ }
+diff --git a/controllers/cloudstackmachine_controller.go b/controllers/cloudstackmachine_controller.go
+index 0a3483a..8d93981 100644
+--- a/controllers/cloudstackmachine_controller.go
++++ b/controllers/cloudstackmachine_controller.go
+@@ -19,16 +19,16 @@ package controllers
+ import (
+ 	"context"
+ 	"fmt"
+-	"math/rand"
+ 	"reflect"
+ 	"regexp"
+ 
+-	"k8s.io/utils/pointer"
+-
+ 	"github.com/pkg/errors"
+ 	corev1 "k8s.io/api/core/v1"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/types"
++	"k8s.io/client-go/util/retry"
++	"k8s.io/utils/pointer"
++	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ 	"sigs.k8s.io/cluster-api/util"
+ 	"sigs.k8s.io/cluster-api/util/predicates"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+@@ -43,7 +43,8 @@ import (
+ 	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
+ 	"sigs.k8s.io/cluster-api-provider-cloudstack/controllers/utils"
+ 	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/cloud"
+-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
++	cserrors "sigs.k8s.io/cluster-api-provider-cloudstack/pkg/errors"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/failuredomains"
+ )
+ 
+ var (
+@@ -67,7 +68,7 @@ const (
+ // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=cloudstackmachines,verbs=get;list;watch;create;update;patch;delete
+ // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=cloudstackmachines/status,verbs=get;update;patch
+ // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=cloudstackmachines/finalizers,verbs=update
+-// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch
++// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch;patch;update
+ // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machinesets,verbs=get;list;watch
+ // +kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes,verbs=get;list;watch
+ // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+@@ -112,7 +113,7 @@ func (reconciler *CloudStackMachineReconciler) Reconcile(ctx context.Context, re
+ 		r.RequeueIfCloudStackClusterNotReady,
+ 		r.SetFailureDomainOnCSMachine,
+ 		r.GetFailureDomainByName(func() string { return r.ReconciliationSubject.Spec.FailureDomainName }, r.FailureDomain),
+-		r.AsFailureDomainUser(&r.FailureDomain.Spec))
++		r.AsFailureDomainUser(ctx, &r.FailureDomain.Spec))
+ 	return r.RunBaseReconciliationStages()
+ }
+ 
+@@ -172,23 +173,61 @@ func (r *CloudStackMachineReconciliationRunner) ConsiderAffinity() (ctrl.Result,
+ }
+ 
+ // SetFailureDomainOnCSMachine sets the failure domain the machine should launch in.
+-func (r *CloudStackMachineReconciliationRunner) SetFailureDomainOnCSMachine() (retRes ctrl.Result, reterr error) {
+-	if r.ReconciliationSubject.Spec.FailureDomainName == "" {
+-		var name string
+-		// CAPIMachine is null if it's been deleted but we're still reconciling the CS machine.
+-		if r.CAPIMachine != nil && r.CAPIMachine.Spec.FailureDomain != nil &&
+-			(util.IsControlPlaneMachine(r.CAPIMachine) || // Is control plane machine -- CAPI will specify.
+-				*r.CAPIMachine.Spec.FailureDomain != "") { // Or potentially another machine controller specified.
+-			name = *r.CAPIMachine.Spec.FailureDomain
+-			r.ReconciliationSubject.Spec.FailureDomainName = *r.CAPIMachine.Spec.FailureDomain
+-		} else { // Not a control plane machine. Place randomly.
+-			randNum := (rand.Int() % len(r.CSCluster.Spec.FailureDomains)) // #nosec G404 -- weak crypt rand doesn't matter here.
+-			name = r.CSCluster.Spec.FailureDomains[randNum].Name
+-		}
+-		r.ReconciliationSubject.Spec.FailureDomainName = name
+-		r.ReconciliationSubject.Labels[infrav1.FailureDomainLabelName] = infrav1.FailureDomainHashedMetaName(name, r.CAPICluster.Name)
++func (r *CloudStackMachineReconciliationRunner) SetFailureDomainOnCSMachine() (ctrl.Result, error) {
++	if r.CAPIMachine == nil {
++		// CAPIMachine is null if it's been deleted, but we're still reconciling the CS machine.
++		return ctrl.Result{}, nil
+ 	}
+-	return ctrl.Result{}, nil
++
++	currentFailureDomain := r.ReconciliationSubject.Spec.FailureDomainName
++
++	fdBalancer := failuredomains.NewFailureDomainBalancer(r.CloudClientExtension)
++	err := fdBalancer.Assign(r.RequestCtx, r.ReconciliationSubject, r.CAPIMachine, r.CSCluster.Spec.FailureDomains)
++	if err != nil {
++		return ctrl.Result{}, fmt.Errorf("failed to set a failure domain for machine %s: %w", r.CAPIMachine.Name, err)
++	}
++
++	newFailureDomain := r.ReconciliationSubject.Spec.FailureDomainName
++	if currentFailureDomain == newFailureDomain {
++		return ctrl.Result{}, nil
++	}
++
++	if result, err := r.updateFailureDomain(newFailureDomain); err != nil {
++		return result, err
++	}
++
++	return r.updateCAPIFailureDomain(newFailureDomain)
++
++}
++
++func (r *CloudStackMachineReconciliationRunner) updateFailureDomain(newFailureDomain string) (ctrl.Result, error) {
++	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
++		err := r.K8sClient.Get(r.RequestCtx, types.NamespacedName{Name: r.ReconciliationSubject.Name, Namespace: r.ReconciliationSubject.Namespace}, r.ReconciliationSubject)
++		if err != nil {
++			return err
++		}
++
++		r.ReconciliationSubject.Spec.AffinityGroupRef = nil
++		r.ReconciliationSubject.Spec.FailureDomainName = newFailureDomain
++		r.ReconciliationSubject.Labels[infrav1.FailureDomainLabelName] = infrav1.FailureDomainHashedMetaName(newFailureDomain, r.CAPIMachine.Spec.ClusterName)
++		return r.K8sClient.Update(r.RequestCtx, r.ReconciliationSubject)
++	})
++
++	return ctrl.Result{}, err
++}
++
++func (r *CloudStackMachineReconciliationRunner) updateCAPIFailureDomain(newFailureDomain string) (ctrl.Result, error) {
++	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
++		_, err := r.GetParent(r.ReconciliationSubject, r.CAPIMachine)()
++		if err != nil {
++			return err
++		}
++
++		r.CAPIMachine.Spec.FailureDomain = &newFailureDomain
++		return r.K8sClient.Update(r.RequestCtx, r.CAPIMachine)
++	})
++
++	return ctrl.Result{}, err
+ }
+ 
+ // DeleteMachineIfFailuredomainNotExist delete CAPI machine if machine is deployed in a failuredomain that does not exist anymore.
+@@ -226,7 +265,7 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
+ 	// Get the kubeadm bootstrap secret for this machine.
+ 	secret := &corev1.Secret{}
+ 	key := types.NamespacedName{Namespace: r.CAPIMachine.Namespace, Name: *r.CAPIMachine.Spec.Bootstrap.DataSecretName}
+-	if err := r.K8sClient.Get(context.TODO(), key, secret); err != nil {
++	if err := r.K8sClient.Get(r.RequestCtx, key, secret); err != nil {
+ 		return ctrl.Result{}, err
+ 	}
+ 	data, present := secret.Data["value"]
+@@ -238,6 +277,16 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
+ 	err := r.CSUser.GetOrCreateVMInstance(r.ReconciliationSubject, r.CAPIMachine, r.CSCluster, r.FailureDomain, r.AffinityGroup, userData)
+ 	if err != nil {
+ 		r.Recorder.Eventf(r.ReconciliationSubject, "Warning", "Creating", CSMachineCreationFailed, err.Error())
++
++		if !cserrors.IsTerminalDeployVMError(err) {
++			return ctrl.Result{}, err
++		}
++
++		if err := r.markMachineFailed(r.RequestCtx, err); err != nil {
++			return ctrl.Result{}, err
++		}
++	} else if err := r.clearMachineFailed(r.RequestCtx); err != nil {
++		return ctrl.Result{}, err
+ 	}
+ 	if err == nil && !controllerutil.ContainsFinalizer(r.ReconciliationSubject, infrav1.MachineFinalizer) { // Fetched or Created?
+ 		// Adding a finalizer will make reconcile-delete try to destroy the associated VM through instanceID.
+@@ -251,6 +300,29 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
+ 	return ctrl.Result{}, err
+ }
+ 
++func (r *CloudStackMachineReconciliationRunner) markMachineFailed(ctx context.Context, err error) error {
++	r.Log.Error(err, "Marking machine as failed to launch", "csMachine", r.ReconciliationSubject.GetName())
++	r.ReconciliationSubject.MarkAsFailed()
++
++	if _, err := r.ReconcileDelete(); err != nil {
++		return fmt.Errorf("failed to delete failed VM: %w", err)
++	}
++
++	r.ReconciliationSubject.Spec.InstanceID = nil
++
++	return r.K8sClient.Update(ctx, r.ReconciliationSubject)
++}
++
++func (r *CloudStackMachineReconciliationRunner) clearMachineFailed(ctx context.Context) error {
++	if !r.ReconciliationSubject.HasFailed() {
++		return nil
++	}
++
++	r.ReconciliationSubject.ClearFailed()
++
++	return r.K8sClient.Update(ctx, r.ReconciliationSubject)
++}
++
+ func processCustomMetadata(data []byte, r *CloudStackMachineReconciliationRunner) string {
+ 	// since cloudstack metadata does not allow custom data added into meta_data, following line is a workaround to specify a hostname name
+ 	// {{ ds.meta_data.hostname }} is expected to be used as a node name when kubelet register a node
+diff --git a/controllers/cloudstackmachine_controller_test.go b/controllers/cloudstackmachine_controller_test.go
+index e419572..80ac0c3 100644
+--- a/controllers/cloudstackmachine_controller_test.go
++++ b/controllers/cloudstackmachine_controller_test.go
+@@ -27,14 +27,15 @@ import (
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/types"
+ 	"k8s.io/utils/pointer"
+-	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
+-	dummies "sigs.k8s.io/cluster-api-provider-cloudstack/test/dummies/v1beta3"
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ 	"sigs.k8s.io/cluster-api/util/patch"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+ 	"sigs.k8s.io/controller-runtime/pkg/controller"
+ 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
++
++	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
++	dummies "sigs.k8s.io/cluster-api-provider-cloudstack/test/dummies/v1beta3"
+ )
+ 
+ var _ = Describe("CloudStackMachineReconciler", func() {
+@@ -250,7 +251,7 @@ var _ = Describe("CloudStackMachineReconciler", func() {
+ 			setClusterReady(fakeCtrlClient)
+ 
+ 			requestNamespacedName := types.NamespacedName{Namespace: dummies.ClusterNameSpace, Name: dummies.CSMachine1.Name}
+-			MachineReconciler.AsFailureDomainUser(&dummies.CSFailureDomain1.Spec)
++			MachineReconciler.AsFailureDomainUser(ctx, &dummies.CSFailureDomain1.Spec)
+ 			res, err := MachineReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: requestNamespacedName})
+ 			Ω(err).ShouldNot(HaveOccurred())
+ 			Ω(res.RequeueAfter).Should(BeZero())
+diff --git a/controllers/cloudstackmachinestatechecker_controller.go b/controllers/cloudstackmachinestatechecker_controller.go
+index d3eba1e..5621943 100644
+--- a/controllers/cloudstackmachinestatechecker_controller.go
++++ b/controllers/cloudstackmachinestatechecker_controller.go
+@@ -75,7 +75,7 @@ func (r *CloudStackMachineStateCheckerReconciliationRunner) Reconcile() (ctrl.Re
+ 		r.GetParent(r.CSMachine, r.CAPIMachine),
+ 		r.CheckPresent(map[string]client.Object{"CloudStackMachine": r.CSMachine, "Machine": r.CAPIMachine}),
+ 		r.GetFailureDomainByName(func() string { return r.CSMachine.Spec.FailureDomainName }, r.FailureDomain),
+-		r.AsFailureDomainUser(&r.FailureDomain.Spec),
++		r.AsFailureDomainUser(r.RequestCtx, &r.FailureDomain.Spec),
+ 		func() (ctrl.Result, error) {
+ 			if err := r.CSClient.ResolveVMInstanceDetails(r.CSMachine); err != nil {
+ 				if !strings.Contains(strings.ToLower(err.Error()), "no match found") {
+diff --git a/controllers/controllers_suite_test.go b/controllers/controllers_suite_test.go
+index a9776f6..65ad158 100644
+--- a/controllers/controllers_suite_test.go
++++ b/controllers/controllers_suite_test.go
+@@ -21,28 +21,28 @@ import (
+ 	"flag"
+ 	"fmt"
+ 	"go/build"
+-	"k8s.io/client-go/tools/record"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+ 	"regexp"
+-	"sigs.k8s.io/cluster-api-provider-cloudstack/test/fakes"
+ 	"strings"
+ 	"testing"
+ 	"time"
+ 
+-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+-	"k8s.io/klog/v2"
+-	"k8s.io/klog/v2/klogr"
+-
+ 	"github.com/apache/cloudstack-go/v2/cloudstack"
+ 	"github.com/go-logr/logr"
+ 	"github.com/golang/mock/gomock"
+ 	. "github.com/onsi/ginkgo/v2"
+ 	. "github.com/onsi/gomega"
+ 	"github.com/pkg/errors"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/client-go/kubernetes/scheme"
+ 	"k8s.io/client-go/rest"
++	"k8s.io/client-go/tools/record"
++	"k8s.io/klog/v2"
++	"k8s.io/klog/v2/klogr"
++	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
++	"sigs.k8s.io/cluster-api/util/patch"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+ 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+@@ -53,10 +53,8 @@ import (
+ 	csReconcilers "sigs.k8s.io/cluster-api-provider-cloudstack/controllers"
+ 	csCtrlrUtils "sigs.k8s.io/cluster-api-provider-cloudstack/controllers/utils"
+ 	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/mocks"
+-
+ 	dummies "sigs.k8s.io/cluster-api-provider-cloudstack/test/dummies/v1beta3"
+-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+-	"sigs.k8s.io/cluster-api/util/patch"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/test/fakes"
+ 	//+kubebuilder:scaffold:imports
+ )
+ 
+@@ -165,7 +163,7 @@ type MockCtrlrCloudClientImplementation struct {
+ // AsFailureDomainUser is a method used in the reconciliation runner to set up the CloudStack client. Using this here
+ // just sets the CSClient to a mock client.
+ func (m *MockCtrlrCloudClientImplementation) AsFailureDomainUser(
+-	*infrav1.CloudStackFailureDomainSpec) csCtrlrUtils.CloudStackReconcilerMethod {
++	context.Context, *infrav1.CloudStackFailureDomainSpec) csCtrlrUtils.CloudStackReconcilerMethod {
+ 	return func() (ctrl.Result, error) {
+ 		m.CSUser = mockCloudClient
+ 
+diff --git a/controllers/utils/failuredomains.go b/controllers/utils/failuredomains.go
+index 542bb40..5ca3e97 100644
+--- a/controllers/utils/failuredomains.go
++++ b/controllers/utils/failuredomains.go
+@@ -17,18 +17,19 @@ limitations under the License.
+ package utils
+ 
+ import (
++	"context"
+ 	"fmt"
+ 	"strings"
+ 
+-	corev1 "k8s.io/api/core/v1"
+-	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
+-	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/cloud"
+-
+ 	"github.com/pkg/errors"
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+ 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
++
++	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/cloud"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/failuredomains"
+ )
+ 
+ // CreateFailureDomain creates a specified CloudStackFailureDomain CRD owned by the ReconcilationSubject.
+@@ -119,48 +120,37 @@ func (r *ReconciliationRunner) GetFailureDomainsAndRequeueIfMissing(fds *infrav1
+ }
+ 
+ type CloudClientExtension interface {
++	failuredomains.ClientFactory
+ 	RegisterExtension(*ReconciliationRunner) CloudClientExtension
+-	AsFailureDomainUser(*infrav1.CloudStackFailureDomainSpec) CloudStackReconcilerMethod
++	AsFailureDomainUser(context.Context, *infrav1.CloudStackFailureDomainSpec) CloudStackReconcilerMethod
+ }
+ 
+ type CloudClientImplementation struct {
+ 	CloudClientExtension
+ 	*ReconciliationRunner
++	fdClientFactory failuredomains.ClientFactory
+ }
+ 
+ func (c *CloudClientImplementation) RegisterExtension(r *ReconciliationRunner) CloudClientExtension {
+ 	c.ReconciliationRunner = r
++	c.fdClientFactory = failuredomains.NewClientFactory(r.K8sClient)
+ 	return c
+ }
+ 
+ // AsFailureDomainUser uses the credentials specified in the failure domain to set the ReconciliationSubject's CSUser client.
+-func (c *CloudClientImplementation) AsFailureDomainUser(fdSpec *infrav1.CloudStackFailureDomainSpec) CloudStackReconcilerMethod {
++func (c *CloudClientImplementation) AsFailureDomainUser(ctx context.Context, fdSpec *infrav1.CloudStackFailureDomainSpec) CloudStackReconcilerMethod {
+ 	return func() (ctrl.Result, error) {
+-		endpointCredentials := &corev1.Secret{}
+-		key := client.ObjectKey{Name: fdSpec.ACSEndpoint.Name, Namespace: fdSpec.ACSEndpoint.Namespace}
+-		if err := c.K8sClient.Get(c.RequestCtx, key, endpointCredentials); err != nil {
+-			return ctrl.Result{}, errors.Wrapf(err, "getting ACSEndpoint secret with ref: %v", fdSpec.ACSEndpoint)
+-		}
+-
+-		clientConfig := &corev1.ConfigMap{}
+-		key = client.ObjectKey{Name: cloud.ClientConfigMapName, Namespace: cloud.ClientConfigMapNamespace}
+-		_ = c.K8sClient.Get(c.RequestCtx, key, clientConfig)
+-
+ 		var err error
+-		if c.CSClient, err = cloud.NewClientFromK8sSecret(endpointCredentials, clientConfig); err != nil {
+-			return ctrl.Result{}, errors.Wrapf(err, "parsing ACSEndpoint secret with ref: %v", fdSpec.ACSEndpoint)
+-		}
+ 
+-		if fdSpec.Account != "" { // Set r.CSUser CloudStack Client per Account and Domain.
+-			client, err := c.CSClient.NewClientInDomainAndAccount(fdSpec.Domain, fdSpec.Account)
+-			if err != nil {
+-				return ctrl.Result{}, err
+-			}
+-			c.CSUser = client
+-		} else { // Set r.CSUser CloudStack Client to r.CSClient since Account & Domain weren't provided.
+-			c.CSUser = c.CSClient
++		c.CSClient, c.CSUser, err = c.GetCloudClientAndUser(ctx, fdSpec)
++		if err != nil {
++			return ctrl.Result{}, err
+ 		}
+ 
+ 		return ctrl.Result{}, nil
+ 	}
+ }
++
++func (c *CloudClientImplementation) GetCloudClientAndUser(ctx context.Context, fdSpec *infrav1.CloudStackFailureDomainSpec) (csClient cloud.Client, csUser cloud.Client, err error) {
++	return c.fdClientFactory.GetCloudClientAndUser(ctx, fdSpec)
++}
+diff --git a/pkg/cloud/instance.go b/pkg/cloud/instance.go
+index 10956fc..89bfe71 100644
+--- a/pkg/cloud/instance.go
++++ b/pkg/cloud/instance.go
+@@ -22,16 +22,21 @@ import (
+ 	"strconv"
+ 	"strings"
+ 
+-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+-
+-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+-
+ 	"github.com/apache/cloudstack-go/v2/cloudstack"
+ 	"github.com/hashicorp/go-multierror"
+ 	"github.com/pkg/errors"
+ 	corev1 "k8s.io/api/core/v1"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/utils/pointer"
++	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
++
+ 	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
++	cserrors "sigs.k8s.io/cluster-api-provider-cloudstack/pkg/errors"
++)
++
++var (
++	ErrorVMDeletionInProgress = errors.New("VM deletion in progress")
++	ErrorVMDoesNotExist       = errors.New("VM does not exist")
+ )
+ 
+ type VMIface interface {
+@@ -327,24 +332,26 @@ func (c *client) DeployVM(
+ 	if err != nil {
+ 		c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
+ 
++		deployVMError := cserrors.NewDeployVMError(err)
++
+ 		// CloudStack may have created the VM even though it reported an error. We attempt to
+ 		// retrieve the VM so we can populate the CloudStackMachine for the user to manually
+ 		// clean up.
+ 		vm, findErr := findVirtualMachine(c.cs.VirtualMachine, templateID, fd, csMachine)
+ 		if findErr != nil {
+ 			c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(findErr)
+-			return fmt.Errorf("%v; find virtual machine: %v", err, findErr)
++			return fmt.Errorf("failed to deploy VM, and unable to discover the virtual machine %v caused by :%w", findErr, deployVMError)
+ 		}
+ 
+ 		// We didn't find a VM so return the original error.
+ 		if vm == nil {
+-			return err
++			return deployVMError
+ 		}
+ 
+ 		csMachine.Spec.InstanceID = pointer.String(vm.Id)
+ 		csMachine.Status.InstanceState = vm.State
+ 
+-		return fmt.Errorf("incomplete vm deployment (vm_id=%v): %w", vm.Id, err)
++		return fmt.Errorf("incomplete vm deployment (vm_id=%v): %w", vm.Id, deployVMError)
+ 	}
+ 
+ 	csMachine.Spec.InstanceID = pointer.String(deployVMResp.Id)
+@@ -416,36 +423,67 @@ func findVirtualMachine(
+ 
+ // DestroyVMInstance Destroys a VM instance. Assumes machine has been fetched prior and has an instance ID.
+ func (c *client) DestroyVMInstance(csMachine *infrav1.CloudStackMachine) error {
++	if jobID := csMachine.GetJobID(); jobID != "" {
++		if err := c.queryDestroyVMInstanceJob(csMachine, jobID); err != nil {
++			return err
++		}
++	} else if err := c.destroyVMInstance(csMachine); err != nil && errors.Is(err, ErrorVMDoesNotExist) {
++		return nil
++	} else if err != nil {
++		return err
++	}
++
++	if err := c.ResolveVMInstanceDetails(csMachine); err == nil && (csMachine.Status.InstanceState == "Expunging" ||
++		csMachine.Status.InstanceState == "Expunged") {
++		// VM is stopped and getting expunged.  So the desired state is getting satisfied.  Let's move on.
++		csMachine.ClearJobID()
++		return nil
++	} else if err != nil {
++		if strings.Contains(strings.ToLower(err.Error()), "no match found") {
++			// VM doesn't exist.  So the desired state is in effect.  Our work is done here.
++			csMachine.ClearJobID()
++			return nil
++		}
++		return err
++	}
++
++	return ErrorVMDeletionInProgress
++}
++
++// DestroyVMInstance Destroys a VM instance. Assumes machine has been fetched prior and has an instance ID.
++func (c *client) destroyVMInstance(csMachine *infrav1.CloudStackMachine) error {
+ 	// Attempt deletion regardless of machine state.
+ 	p := c.csAsync.VirtualMachine.NewDestroyVirtualMachineParams(*csMachine.Spec.InstanceID)
+ 	volIDs, err := c.listVMInstanceDatadiskVolumeIDs(*csMachine.Spec.InstanceID)
+ 	if err != nil {
+ 		return err
+ 	}
++
+ 	p.SetExpunge(true)
+ 	setArrayIfNotEmpty(volIDs, p.SetVolumeids)
+-	if _, err := c.csAsync.VirtualMachine.DestroyVirtualMachine(p); err != nil &&
++	if destroyResponse, err := c.csAsync.VirtualMachine.DestroyVirtualMachine(p); err != nil &&
+ 		strings.Contains(strings.ToLower(err.Error()), "unable to find uuid for id") {
+-		// VM doesn't exist. Success...
+-		return nil
++		return ErrorVMDoesNotExist
+ 	} else if err != nil {
+ 		c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
+ 		return err
++	} else if destroyResponse != nil {
++		csMachine.SetJobID(destroyResponse.JobID)
+ 	}
+ 
+-	if err := c.ResolveVMInstanceDetails(csMachine); err == nil && (csMachine.Status.InstanceState == "Expunging" ||
+-		csMachine.Status.InstanceState == "Expunged") {
+-		// VM is stopped and getting expunged.  So the desired state is getting satisfied.  Let's move on.
+-		return nil
++	return nil
++}
++
++func (c *client) queryDestroyVMInstanceJob(csMachine *infrav1.CloudStackMachine, jobID string) error {
++	_, err := c.cs.GetAsyncJobResult(jobID, 0)
++	if errors.Is(err, cloudstack.AsyncTimeoutErr) {
++		return ErrorVMDeletionInProgress
+ 	} else if err != nil {
+-		if strings.Contains(strings.ToLower(err.Error()), "no match found") {
+-			// VM doesn't exist.  So the desired state is in effect.  Our work is done here.
+-			return nil
+-		}
++		csMachine.ClearJobID()
+ 		return err
+ 	}
+ 
+-	return errors.New("VM deletion in progress")
++	return nil
+ }
+ 
+ func (c *client) listVMInstanceDatadiskVolumeIDs(instanceID string) ([]string, error) {
+diff --git a/pkg/cloud/network.go b/pkg/cloud/network.go
+index 6828c13..5739f6c 100644
+--- a/pkg/cloud/network.go
++++ b/pkg/cloud/network.go
+@@ -17,14 +17,19 @@ limitations under the License.
+ package cloud
+ 
+ import (
++	"fmt"
++
++	"github.com/apache/cloudstack-go/v2/cloudstack"
+ 	"github.com/hashicorp/go-multierror"
+ 	"github.com/pkg/errors"
++
+ 	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
+ )
+ 
+ type NetworkIface interface {
+ 	ResolveNetwork(*infrav1.Network) error
+ 	RemoveClusterTagFromNetwork(*infrav1.CloudStackCluster, infrav1.Network) error
++	GetPublicIPs(*infrav1.Network) ([]*cloudstack.PublicIpAddress, error)
+ }
+ 
+ const (
+@@ -78,6 +83,26 @@ func (c *client) ResolveNetwork(net *infrav1.Network) (retErr error) {
+ 	return nil
+ }
+ 
++// GetPublicIPs gets public IP addresses for the associated failure domain network
++func (c *client) GetPublicIPs(net *infrav1.Network) ([]*cloudstack.PublicIpAddress, error) {
++	if net.ID == "" {
++		return nil, fmt.Errorf("provided network %s is missing the network ID", net.Name)
++	}
++
++	p := c.cs.Address.NewListPublicIpAddressesParams()
++	p.SetAllocatedonly(false)
++	p.SetForvirtualnetwork(false)
++	p.SetNetworkid(net.ID)
++
++	publicAddresses, err := c.cs.Address.ListPublicIpAddresses(p)
++	if err != nil {
++		c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
++		return nil, err
++	}
++
++	return publicAddresses.PublicIpAddresses, nil
++}
++
+ func generateNetworkTagName(csCluster *infrav1.CloudStackCluster) string {
+ 	return ClusterTagNamePrefix + string(csCluster.UID)
+ }
+diff --git a/pkg/errors/cloudstack.go b/pkg/errors/cloudstack.go
+new file mode 100644
+index 0000000..0e2110e
+--- /dev/null
++++ b/pkg/errors/cloudstack.go
+@@ -0,0 +1,85 @@
++/*
++Copyright 2022 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package errors
++
++import (
++	"os"
++	"regexp"
++	"strings"
++
++	"github.com/pkg/errors"
++)
++
++var (
++	// ACS standard error messages of the form "CloudStack API error 431 (CSExceptionErrorCode: 9999):..."
++	//  This regexp is used to extract CSExceptionCodes from the message.
++	csErrorCodeRegexp, _ = regexp.Compile(".+CSExceptionErrorCode: ([0-9]+).+")
++
++	// List of error codes: https://docs.cloudstack.apache.org/en/latest/developersguide/dev.html#error-handling
++	csTerminalErrorCodes = strings.Split(getEnv("CLOUDSTACK_TERMINAL_FAILURE_CODES", "4250,9999"), ",")
++)
++
++func getEnv(key string, defaultValue string) string {
++	value := os.Getenv(key)
++	if value == "" {
++		return defaultValue
++	}
++	return value
++}
++
++type DeployVMError struct {
++	acsError error
++}
++
++func IsTerminalDeployVMError(err error) bool {
++	deployError := &DeployVMError{}
++	return errors.As(err, &deployError) && deployError.IsTerminal()
++}
++
++func NewDeployVMError(acsError error) error {
++	return &DeployVMError{acsError: acsError}
++}
++
++func (e *DeployVMError) Error() string {
++	if e.acsError == nil {
++		return ""
++	}
++	return e.acsError.Error()
++}
++
++func (e *DeployVMError) IsTerminal() bool {
++	errorCode := GetACSErrorCode(e.acsError)
++	for _, te := range csTerminalErrorCodes {
++		if errorCode == te {
++			return true
++		}
++	}
++	return false
++}
++
++func GetACSErrorCode(acsError error) string {
++	if acsError == nil {
++		return ""
++	}
++
++	matches := csErrorCodeRegexp.FindStringSubmatch(acsError.Error())
++	if len(matches) > 1 {
++		return matches[1]
++	}
++
++	return "No error code"
++}
+diff --git a/pkg/errors/cloudstack_test.go b/pkg/errors/cloudstack_test.go
+new file mode 100644
+index 0000000..35e77da
+--- /dev/null
++++ b/pkg/errors/cloudstack_test.go
+@@ -0,0 +1,62 @@
++/*
++Copyright 2022 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package errors
++
++import (
++	"fmt"
++
++	. "github.com/onsi/ginkgo/v2"
++	. "github.com/onsi/gomega"
++)
++
++var _ = Describe("DeployVM Error", func() {
++
++	Context("a deploy VM error", func() {
++		It("determine an error is terminal", func() {
++			vmError := DeployVMError{fmt.Errorf(`CloudStack API error 530 (CSExceptionErrorCode: 4250): Internal error executing command, please contact your system administrator`)}
++
++			Expect(vmError.IsTerminal()).Should(BeTrue())
++		})
++
++		It("determine an error is NOT terminal", func() {
++			vmError := DeployVMError{fmt.Errorf(`CloudStack API error 400 (CSExceptionErrorCode: 0): Internal error executing command, please contact your system administrator`)}
++
++			Expect(vmError.IsTerminal()).Should(BeFalse())
++		})
++	})
++
++	Context("a deploy VM error helper", func() {
++		It("determine an error is terminal", func() {
++			vmError := &DeployVMError{fmt.Errorf(`CloudStack API error 530 (CSExceptionErrorCode: 4250): Internal error executing command, please contact your system administrator`)}
++
++			Expect(IsTerminalDeployVMError(vmError)).Should(BeTrue())
++		})
++
++		It("determine an error is terminal when wrapped", func() {
++			vmError := &DeployVMError{fmt.Errorf(`CloudStack API error 530 (CSExceptionErrorCode: 4250): Internal error executing command, please contact your system administrator`)}
++
++			Expect(IsTerminalDeployVMError(fmt.Errorf("a wrapped err: %w", vmError))).Should(BeTrue())
++		})
++
++		It("determine an error is NOT terminal", func() {
++			vmError := &DeployVMError{fmt.Errorf(`CloudStack API error 400 (CSExceptionErrorCode: 0): Internal error executing command, please contact your system administrator`)}
++
++			Expect(IsTerminalDeployVMError(vmError)).Should(BeFalse())
++		})
++	})
++
++})
+diff --git a/pkg/errors/errors_suite_test.go b/pkg/errors/errors_suite_test.go
+new file mode 100644
+index 0000000..6eda1fa
+--- /dev/null
++++ b/pkg/errors/errors_suite_test.go
+@@ -0,0 +1,29 @@
++/*
++Copyright 2022 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package errors_test
++
++import (
++	"testing"
++
++	. "github.com/onsi/ginkgo/v2"
++	. "github.com/onsi/gomega"
++)
++
++func TestErrors(t *testing.T) {
++	RegisterFailHandler(Fail)
++	RunSpecs(t, "Errors Suite")
++}
+diff --git a/pkg/failuredomains/balancer.go b/pkg/failuredomains/balancer.go
+new file mode 100644
+index 0000000..866bbdd
+--- /dev/null
++++ b/pkg/failuredomains/balancer.go
+@@ -0,0 +1,239 @@
++/*
++Copyright 2022 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package failuredomains
++
++import (
++	"context"
++	"fmt"
++	"math/rand"
++
++	"github.com/apache/cloudstack-go/v2/cloudstack"
++	"k8s.io/utils/pointer"
++	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
++	"sigs.k8s.io/cluster-api/util"
++	"sigs.k8s.io/controller-runtime/pkg/log"
++
++	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/cloud"
++)
++
++type Balancer interface {
++	Assign(ctx context.Context, csMachine *infrav1.CloudStackMachine, capiMachine *clusterv1.Machine, fds []infrav1.CloudStackFailureDomainSpec) error
++}
++
++func NewFailureDomainBalancer(csClientFactory ClientFactory) Balancer {
++	return newReassigningFailureDomainBalancer(newFallingBackFailureDomainBalancer(
++		newFreeIPValidatingFailureDomainBalancer(csClientFactory),
++		newRandomFailureDomainBalancer(),
++	))
++}
++
++type reassigningFailureDomainBalancer struct {
++	delegate Balancer
++}
++
++func newReassigningFailureDomainBalancer(delegate Balancer) Balancer {
++	return &reassigningFailureDomainBalancer{delegate}
++}
++
++func (r *reassigningFailureDomainBalancer) Assign(ctx context.Context, csMachine *infrav1.CloudStackMachine, capiMachine *clusterv1.Machine, fds []infrav1.CloudStackFailureDomainSpec) error {
++	if csMachine.DeletionTimestamp != nil {
++		return nil
++	}
++
++	logger := log.FromContext(ctx)
++	logger.Info("Checking failure domain for machine", "machineHasFailed", csMachine.HasFailed(), "currentFailureDomain", csMachine.Spec.FailureDomainName)
++
++	if csMachine.Spec.FailureDomainName != "" && !csMachine.HasFailed() {
++		return nil
++	}
++
++	if capiMachineHasFailureDomain(capiMachine) && !csMachine.HasFailed() {
++		csMachine.Spec.FailureDomainName = *capiMachine.Spec.FailureDomain
++		assignFailureDomainLabel(csMachine, capiMachine)
++	} else if err := r.delegate.Assign(ctx, csMachine, capiMachine, fds); err != nil {
++		return err
++	}
++
++	if capiMachineHasFailureDomain(capiMachine) && csMachine.HasFailed() {
++		capiMachine.Spec.FailureDomain = pointer.String(csMachine.Spec.FailureDomainName)
++	}
++
++	return nil
++}
++
++type fallingBackFailureDomainBalancer struct {
++	primary  Balancer
++	fallback Balancer
++}
++
++func newFallingBackFailureDomainBalancer(primary Balancer, fallback Balancer) Balancer {
++	return &fallingBackFailureDomainBalancer{primary, fallback}
++}
++
++func (f *fallingBackFailureDomainBalancer) Assign(ctx context.Context, csMachine *infrav1.CloudStackMachine, capiMachine *clusterv1.Machine, fds []infrav1.CloudStackFailureDomainSpec) error {
++	if err := f.primary.Assign(ctx, csMachine, capiMachine, fds); err != nil {
++		logger := log.FromContext(ctx)
++		logger.Info("Unable to assign failure domain, falling back to the secondary balancer", "error", err)
++		return f.fallback.Assign(ctx, csMachine, capiMachine, fds)
++	}
++
++	return nil
++}
++
++type zoneIPCounts struct {
++	name        string
++	zoneName    string
++	networkName string
++	totalIPs    int
++	freeIPs     int
++}
++
++type randomFailureDomainBalancer struct {
++}
++
++func newRandomFailureDomainBalancer() Balancer {
++	return &randomFailureDomainBalancer{}
++}
++
++func (r *randomFailureDomainBalancer) Assign(_ context.Context, csMachine *infrav1.CloudStackMachine, capiMachine *clusterv1.Machine, fds []infrav1.CloudStackFailureDomainSpec) error {
++	randNum := rand.Int() % len(fds) // #nosec G404 -- weak crypt rand doesn't matter here.
++	csMachine.Spec.FailureDomainName = fds[randNum].Name
++	assignFailureDomainLabel(csMachine, capiMachine)
++
++	return nil
++}
++
++type freeIPValidatingFailureDomainBalancer struct {
++	csClientFactory ClientFactory
++}
++
++func newFreeIPValidatingFailureDomainBalancer(csClientFactory ClientFactory) Balancer {
++	return &freeIPValidatingFailureDomainBalancer{csClientFactory: csClientFactory}
++}
++
++type networkKey string
++
++func (b *freeIPValidatingFailureDomainBalancer) Assign(ctx context.Context, csMachine *infrav1.CloudStackMachine, capiMachine *clusterv1.Machine, fds []infrav1.CloudStackFailureDomainSpec) error {
++	networkAndZones, err := b.discoverFreeIps(ctx, fds)
++	if err != nil {
++		return err
++	}
++
++	zonesWithMostIps := findNetworkWithFreeIps(networkAndZones)
++	if len(zonesWithMostIps) > 0 {
++		randNum := rand.Int() % len(zonesWithMostIps) // #nosec G404 -- weak crypt rand doesn't matter here.
++		selectedZone := zonesWithMostIps[randNum]
++		csMachine.Spec.FailureDomainName = selectedZone.name
++		assignFailureDomainLabel(csMachine, capiMachine)
++	}
++
++	if csMachine.Spec.FailureDomainName == "" {
++		return fmt.Errorf("failed to assign failure domain, no failure domain with free IP addresses found")
++	}
++
++	return nil
++}
++
++func (b *freeIPValidatingFailureDomainBalancer) discoverFreeIps(ctx context.Context, fds []infrav1.CloudStackFailureDomainSpec) (map[networkKey][]zoneIPCounts, error) {
++	counts := map[networkKey][]zoneIPCounts{}
++
++	logger := log.FromContext(ctx)
++	logger.Info("Finding failure domains with most free IPs", "fds", fds)
++
++	for _, fd := range fds {
++		fdSpec := fd
++
++		_, csUser, err := b.csClientFactory.GetCloudClientAndUser(ctx, &fdSpec)
++		if err != nil {
++			return nil, fmt.Errorf("failed to get CS client for failure domain %s: %sv", fd.Name, err)
++		}
++
++		network := fd.Zone.Network.DeepCopy()
++		if network.ID == "" {
++			if err := csUser.ResolveNetwork(network); err != nil {
++				return nil, fmt.Errorf("failed to resolve failure domain network %s: %sv", fd.Name, err)
++			}
++		}
++
++		logger.Info("Resolved failure domain network", "network", network)
++		if network.Type == cloud.NetworkTypeIsolated {
++			continue
++		}
++
++		addresses, err := csUser.GetPublicIPs(network)
++		if err != nil {
++			return nil, fmt.Errorf("failed to determine free IP addressed for failure domain %s: %w", fd.Name, err)
++		}
++
++		countSummary := zoneIPCounts{
++			name:        fd.Name,
++			zoneName:    fd.Zone.Name,
++			networkName: network.Name,
++			totalIPs:    len(addresses),
++			freeIPs:     countFreeIps(addresses),
++		}
++		logger.Info("Resolved failure domain network IP count summary", "domain", fd.Name, "totalIPs", countSummary.totalIPs, "freeIPs", countSummary.freeIPs)
++
++		key := networkKey(network.Name)
++		if _, ok := counts[key]; !ok {
++			counts[key] = []zoneIPCounts{}
++		}
++		counts[key] = append(counts[key], countSummary)
++	}
++
++	return counts, nil
++}
++
++func findNetworkWithFreeIps(counts map[networkKey][]zoneIPCounts) []zoneIPCounts {
++	var keyWithMaxFreeIps networkKey
++	var maxFreeIps int
++
++	for key, cs := range counts {
++		for _, c := range cs {
++			if c.freeIPs > maxFreeIps {
++				maxFreeIps = c.freeIPs
++				keyWithMaxFreeIps = key
++			}
++		}
++	}
++
++	return counts[keyWithMaxFreeIps]
++}
++
++func countFreeIps(addresses []*cloudstack.PublicIpAddress) int {
++	free := 0
++	for _, address := range addresses {
++		if address.State == "Free" {
++			free++
++		}
++	}
++	return free
++}
++
++func capiMachineHasFailureDomain(capiMachine *clusterv1.Machine) bool {
++	return capiMachine != nil && capiMachine.Spec.FailureDomain != nil &&
++		(util.IsControlPlaneMachine(capiMachine) || // Is control plane machine -- CAPI will specify.
++			*capiMachine.Spec.FailureDomain != "") // Or potentially another machine controller specified.
++}
++
++func assignFailureDomainLabel(csMachine *infrav1.CloudStackMachine, capiMachine *clusterv1.Machine) {
++	if csMachine.Labels == nil {
++		csMachine.Labels = map[string]string{}
++	}
++	csMachine.Labels[infrav1.FailureDomainLabelName] = infrav1.FailureDomainHashedMetaName(csMachine.Spec.FailureDomainName, capiMachine.Spec.ClusterName)
++}
+diff --git a/pkg/failuredomains/balancer_test.go b/pkg/failuredomains/balancer_test.go
+new file mode 100644
+index 0000000..e97b6af
+--- /dev/null
++++ b/pkg/failuredomains/balancer_test.go
+@@ -0,0 +1,314 @@
++/*
++Copyright 2022 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package failuredomains
++
++import (
++	"context"
++	"fmt"
++	"strings"
++
++	"github.com/apache/cloudstack-go/v2/cloudstack"
++	"github.com/golang/mock/gomock"
++	. "github.com/onsi/ginkgo/v2"
++	. "github.com/onsi/gomega"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/utils/pointer"
++	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
++
++	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/cloud"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/mocks"
++)
++
++var _ = Describe("Load Balancer", func() {
++
++	var (
++		mockCtrl     *gomock.Controller
++		mockCSClient *mocks.MockClient
++
++		ctx         context.Context
++		capiMachine *clusterv1.Machine
++		csMachine   *infrav1.CloudStackMachine
++	)
++
++	BeforeEach(func() {
++		mockCtrl = gomock.NewController(GinkgoT())
++		mockCSClient = mocks.NewMockClient(mockCtrl)
++
++		ctx = context.TODO()
++		capiMachine = &clusterv1.Machine{
++			ObjectMeta: metav1.ObjectMeta{
++				Name:      "a-machine",
++				Namespace: "default",
++			},
++			Spec: clusterv1.MachineSpec{},
++		}
++		csMachine = &infrav1.CloudStackMachine{
++			Spec: infrav1.CloudStackMachineSpec{},
++		}
++	})
++
++	AfterEach(func() {
++		mockCtrl.Finish()
++	})
++
++	Context("reassigning balancer", func() {
++		It("assign a failure domain when NOT already assigned", func() {
++			balancer := newReassigningFailureDomainBalancer(newRandomFailureDomainBalancer())
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a"},
++			}
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(csMachine.Spec.FailureDomainName).ShouldNot(BeEmpty())
++		})
++
++		It("re-assign a failure domain when already assigned but machine has failed to launch", func() {
++			delegate := &fakeBalancer{"zone-b"}
++			balancer := newReassigningFailureDomainBalancer(delegate)
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a"},
++				{Name: "zone-b"},
++			}
++
++			csMachine.Spec.FailureDomainName = fds[0].Name
++			csMachine.MarkAsFailed()
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(csMachine.Spec.FailureDomainName).Should(Equal(fds[1].Name))
++		})
++
++		It("re-assign a failure domain AND update CAPI machine when already assigned but machine has failed to launch", func() {
++			delegate := &fakeBalancer{"zone-b"}
++
++			balancer := newReassigningFailureDomainBalancer(delegate)
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a"},
++				{Name: "zone-b"},
++			}
++
++			capiMachine.Spec.FailureDomain = pointer.String(fds[0].Name)
++			csMachine.Spec.FailureDomainName = fds[0].Name
++			csMachine.MarkAsFailed()
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(csMachine.Spec.FailureDomainName).Should(Equal(fds[1].Name))
++		})
++
++		It("should NOT re-assign a failure domain when already assigned", func() {
++			balancer := newReassigningFailureDomainBalancer(newRandomFailureDomainBalancer())
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a"},
++				{Name: "zone-b"},
++				{Name: "zone-c"},
++			}
++
++			csMachine.Spec.FailureDomainName = fds[0].Name
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(csMachine.Spec.FailureDomainName).Should(Equal(fds[0].Name))
++		})
++	})
++
++	Context("falling back balancer", func() {
++		It("fallback to secondary balancer", func() {
++			balancer := newFallingBackFailureDomainBalancer(
++				newFailingDomainBalancer(fmt.Errorf("failed to assign a failure domain")),
++				newRandomFailureDomainBalancer(),
++			)
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a"},
++				{Name: "zone-b"},
++			}
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(csMachine.Spec.FailureDomainName).ShouldNot(BeEmpty())
++		})
++
++		It("should NOT assign a failure domain because all balancers failed", func() {
++			balancer := newFallingBackFailureDomainBalancer(
++				newFailingDomainBalancer(fmt.Errorf("primary failed to assign a failure domain")),
++				newFailingDomainBalancer(fmt.Errorf("secondary failed to assign a failure domain")),
++			)
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a"},
++				{Name: "zone-b"},
++			}
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(MatchError("secondary failed to assign a failure domain"))
++		})
++	})
++
++	Context("free ip addresses validating balancer", func() {
++		network1 := "172.16.0.0/24"
++		network2 := "172.16.0.1/24"
++
++		It("assign a failure domain with more free IPs", func() {
++			balancer := newFreeIPValidatingFailureDomainBalancer(&fakeFailureDomainClientFactory{mockCSClient})
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network1}}},
++				{Name: "zone-b", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network2}}},
++			}
++
++			// zone-a
++			mockCSClient.EXPECT().ResolveNetwork(&fds[0].Zone.Network)
++			mockCSClient.EXPECT().GetPublicIPs(&fds[0].Zone.Network).Return([]*cloudstack.PublicIpAddress{
++				{State: "Allocated"},
++				{State: "Free"},
++			}, nil)
++
++			// zone-b
++			mockCSClient.EXPECT().ResolveNetwork(&fds[1].Zone.Network)
++			mockCSClient.EXPECT().GetPublicIPs(&fds[1].Zone.Network).Return([]*cloudstack.PublicIpAddress{
++				{State: "Allocated"},
++				{State: "Free"},
++				{State: "Free"},
++			}, nil)
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(csMachine.Spec.FailureDomainName).Should(Equal("zone-b"))
++		})
++
++		It("assign a failure domain when there are zones with shared networks", func() {
++			balancer := newFreeIPValidatingFailureDomainBalancer(&fakeFailureDomainClientFactory{mockCSClient})
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a-net-1", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network1}}},
++				{Name: "zone-a-net-2", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network2}}},
++				{Name: "zone-b-net-1", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network1}}},
++				{Name: "zone-b-net-2", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network2}}},
++			}
++
++			// zone-a
++			mockCSClient.EXPECT().ResolveNetwork(&fds[0].Zone.Network).Times(2)
++			mockCSClient.EXPECT().GetPublicIPs(&fds[0].Zone.Network).Return([]*cloudstack.PublicIpAddress{
++				{State: "Allocated"},
++				{State: "Free"},
++			}, nil).Times(2)
++
++			// zone-b
++			mockCSClient.EXPECT().ResolveNetwork(&fds[1].Zone.Network).Times(2)
++			mockCSClient.EXPECT().GetPublicIPs(&fds[1].Zone.Network).Return([]*cloudstack.PublicIpAddress{
++				{State: "Allocated"},
++				{State: "Free"},
++				{State: "Free"},
++			}, nil).Times(2)
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(strings.HasSuffix(csMachine.Spec.FailureDomainName, "net-2")).Should(BeTrue())
++		})
++
++		It("assign the first non-zero failure domain with free IPs", func() {
++			balancer := newFreeIPValidatingFailureDomainBalancer(&fakeFailureDomainClientFactory{mockCSClient})
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network1}}},
++				{Name: "zone-b", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network2}}},
++			}
++
++			// zone-a
++			mockCSClient.EXPECT().ResolveNetwork(&fds[0].Zone.Network)
++			mockCSClient.EXPECT().GetPublicIPs(&fds[0].Zone.Network).Return([]*cloudstack.PublicIpAddress{
++				{State: "Free"},
++			}, nil)
++
++			// zone-b
++			mockCSClient.EXPECT().ResolveNetwork(&fds[1].Zone.Network)
++			mockCSClient.EXPECT().GetPublicIPs(&fds[1].Zone.Network).Return([]*cloudstack.PublicIpAddress{
++				{State: "Free"},
++			}, nil)
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(csMachine.Spec.FailureDomainName).Should(Equal("zone-a"))
++		})
++
++		It("should NOT assign a failure domain because all IPs are allocated", func() {
++			balancer := newFreeIPValidatingFailureDomainBalancer(&fakeFailureDomainClientFactory{mockCSClient})
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network1}}},
++				{Name: "zone-b", Zone: infrav1.CloudStackZoneSpec{Network: infrav1.Network{Name: network2}}},
++			}
++
++			// zone-a
++			mockCSClient.EXPECT().ResolveNetwork(&fds[0].Zone.Network)
++			mockCSClient.EXPECT().GetPublicIPs(&fds[0].Zone.Network).Return([]*cloudstack.PublicIpAddress{
++				{State: "Allocated"},
++			}, nil)
++
++			// zone-b
++			mockCSClient.EXPECT().ResolveNetwork(&fds[1].Zone.Network)
++			mockCSClient.EXPECT().GetPublicIPs(&fds[1].Zone.Network).Return([]*cloudstack.PublicIpAddress{
++				{State: "Allocated"},
++			}, nil)
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).
++				Should(MatchError("failed to assign failure domain, no failure domain with free IP addresses found"))
++		})
++	})
++
++	Context("random balancer", func() {
++		It("assign random failure domain", func() {
++			balancer := newRandomFailureDomainBalancer()
++
++			fds := []infrav1.CloudStackFailureDomainSpec{
++				{Name: "zone-a"},
++			}
++
++			Expect(balancer.Assign(ctx, csMachine, capiMachine, fds)).Should(Succeed())
++			Expect(csMachine.Spec.FailureDomainName).Should(Equal("zone-a"))
++		})
++	})
++
++})
++
++type fakeFailureDomainClientFactory struct {
++	cloud.Client
++}
++
++func (f *fakeFailureDomainClientFactory) GetCloudClientAndUser(_ context.Context, _ *infrav1.CloudStackFailureDomainSpec) (csClient cloud.Client, csUser cloud.Client, err error) {
++	return f, f, nil
++}
++
++type failingDomainBalancer struct {
++	failure error
++}
++
++func newFailingDomainBalancer(failure error) Balancer {
++	return &failingDomainBalancer{failure}
++}
++
++func (n *failingDomainBalancer) Assign(_ context.Context, _ *infrav1.CloudStackMachine, _ *clusterv1.Machine, _ []infrav1.CloudStackFailureDomainSpec) error {
++	return n.failure
++}
++
++type fakeBalancer struct {
++	failureDomainName string
++}
++
++func (f *fakeBalancer) Assign(_ context.Context, csMachine *infrav1.CloudStackMachine, _ *clusterv1.Machine, _ []infrav1.CloudStackFailureDomainSpec) error {
++	csMachine.Spec.FailureDomainName = f.failureDomainName
++
++	return nil
++}
+diff --git a/pkg/failuredomains/client.go b/pkg/failuredomains/client.go
+new file mode 100644
+index 0000000..f4dfb72
+--- /dev/null
++++ b/pkg/failuredomains/client.go
+@@ -0,0 +1,73 @@
++/*
++Copyright 2022 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package failuredomains
++
++import (
++	"context"
++
++	"github.com/pkg/errors"
++	corev1 "k8s.io/api/core/v1"
++	"sigs.k8s.io/controller-runtime/pkg/client"
++
++	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/cloud"
++)
++
++type ClientFactory interface {
++	GetCloudClientAndUser(ctx context.Context, fdSpec *infrav1.CloudStackFailureDomainSpec) (csClient cloud.Client, csUser cloud.Client, err error)
++}
++
++func NewClientFactory(k8sClient client.Client) ClientFactory {
++	return newBaseClientFactory(k8sClient)
++}
++
++type baseClientFactory struct {
++	client.Client
++}
++
++func newBaseClientFactory(k8sClient client.Client) ClientFactory {
++	return &baseClientFactory{k8sClient}
++}
++
++func (f *baseClientFactory) GetCloudClientAndUser(ctx context.Context, fdSpec *infrav1.CloudStackFailureDomainSpec) (csClient cloud.Client, csUser cloud.Client, err error) {
++	endpointCredentials := &corev1.Secret{}
++	key := client.ObjectKey{Name: fdSpec.ACSEndpoint.Name, Namespace: fdSpec.ACSEndpoint.Namespace}
++	if err := f.Get(ctx, key, endpointCredentials); err != nil {
++		return nil, nil, errors.Wrapf(err, "getting ACSEndpoint secret with ref: %v", fdSpec.ACSEndpoint)
++	}
++
++	clientConfig := &corev1.ConfigMap{}
++	key = client.ObjectKey{Name: cloud.ClientConfigMapName, Namespace: cloud.ClientConfigMapNamespace}
++	_ = f.Get(ctx, key, clientConfig) // client config is optional, hence we can ignore the error
++
++	csClient, err = cloud.NewClientFromK8sSecret(endpointCredentials, clientConfig)
++	if err != nil {
++		return nil, nil, errors.Wrapf(err, "parsing ACSEndpoint secret with ref: %v", fdSpec.ACSEndpoint)
++	}
++
++	if fdSpec.Account != "" { // Get CloudStack Client per Account and Domain.
++		csClientInDomain, err := csClient.NewClientInDomainAndAccount(fdSpec.Domain, fdSpec.Account)
++		if err != nil {
++			return nil, nil, err
++		}
++		csUser = csClientInDomain
++	} else { // Set r.CSUser CloudStack Client to r.CSClient since Account & Domain weren't provided.
++		csUser = csClient
++	}
++
++	return csClient, csUser, nil
++}
+diff --git a/pkg/failuredomains/client_test.go b/pkg/failuredomains/client_test.go
+new file mode 100644
+index 0000000..d5ddfd6
+--- /dev/null
++++ b/pkg/failuredomains/client_test.go
+@@ -0,0 +1,159 @@
++/*
++Copyright 2022 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package failuredomains
++
++import (
++	"context"
++
++	"github.com/apache/cloudstack-go/v2/cloudstack"
++	"github.com/golang/mock/gomock"
++	. "github.com/onsi/ginkgo/v2"
++	. "github.com/onsi/gomega"
++	corev1 "k8s.io/api/core/v1"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"sigs.k8s.io/controller-runtime/pkg/client"
++	"sigs.k8s.io/controller-runtime/pkg/client/fake"
++
++	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/cloud"
++	dummies "sigs.k8s.io/cluster-api-provider-cloudstack/test/dummies/v1beta1"
++)
++
++var _ = Describe("Client Factory", func() {
++	var (
++		k8sClient  client.Client
++		mockCtrl   *gomock.Controller
++		mockClient *cloudstack.CloudStackClient
++
++		us *cloudstack.MockUserServiceIface
++		ds *cloudstack.MockDomainServiceIface
++		as *cloudstack.MockAccountServiceIface
++
++		ctx                 context.Context
++		endpointCredentials *corev1.Secret
++		clientConfig        *corev1.ConfigMap
++	)
++
++	BeforeEach(func() {
++		mockCtrl = gomock.NewController(GinkgoT())
++		mockClient = cloudstack.NewMockClient(mockCtrl)
++
++		us = mockClient.User.(*cloudstack.MockUserServiceIface)
++		ds = mockClient.Domain.(*cloudstack.MockDomainServiceIface)
++		as = mockClient.Account.(*cloudstack.MockAccountServiceIface)
++
++		ctx = context.TODO()
++
++		dummies.SetDummyUserVars()
++		dummies.AccountName = "test-account"
++
++		endpointCredentials = &corev1.Secret{
++			ObjectMeta: metav1.ObjectMeta{
++				Name:      "zone-a-creds",
++				Namespace: "default",
++			},
++			Data: map[string][]byte{
++				"api-key":    []byte(dummies.Apikey),
++				"secret-key": []byte(dummies.SecretKey),
++				"api-url":    []byte("http://1.2.3.4:8080/client/api"),
++				"verify-ssl": []byte("false"),
++			},
++		}
++
++		clientConfig = &corev1.ConfigMap{}
++
++		cloud.NewAsyncClient = func(apiurl, apikey, secret string, verifyssl bool, options ...cloudstack.ClientOption) *cloudstack.CloudStackClient {
++			return mockClient
++		}
++		cloud.NewClient = func(apiurl, apikey, secret string, verifyssl bool, options ...cloudstack.ClientOption) *cloudstack.CloudStackClient {
++			return mockClient
++		}
++	})
++
++	BeforeEach(func() {
++		asp := &cloudstack.ListAccountsParams{}
++		as.EXPECT().NewListAccountsParams().Return(asp).AnyTimes()
++		as.EXPECT().ListAccounts(asp).Return(&cloudstack.ListAccountsResponse{Count: 1, Accounts: []*cloudstack.Account{{
++			Id:   dummies.AccountID,
++			Name: dummies.AccountName,
++		}}}, nil).AnyTimes()
++
++		fakeListParams := &cloudstack.ListUsersParams{}
++		fakeUser := &cloudstack.User{
++			Id:      dummies.UserID,
++			Account: dummies.AccountName,
++			Domain:  dummies.DomainName,
++		}
++		us.EXPECT().NewListUsersParams().Return(fakeListParams).AnyTimes()
++		us.EXPECT().ListUsers(fakeListParams).Return(&cloudstack.ListUsersResponse{
++			Count: 1, Users: []*cloudstack.User{fakeUser},
++		}, nil).AnyTimes()
++
++		ukp := &cloudstack.GetUserKeysParams{}
++		us.EXPECT().NewGetUserKeysParams(gomock.Any()).Return(ukp).AnyTimes()
++		us.EXPECT().GetUserKeys(ukp).Return(&cloudstack.GetUserKeysResponse{
++			Apikey:    dummies.Apikey,
++			Secretkey: dummies.SecretKey,
++		}, nil).AnyTimes()
++
++		dsp := &cloudstack.ListDomainsParams{}
++		ds.EXPECT().NewListDomainsParams().Return(dsp).AnyTimes()
++		ds.EXPECT().ListDomains(dsp).Return(&cloudstack.ListDomainsResponse{Count: 1, Domains: []*cloudstack.Domain{{
++			Id:   dummies.DomainID,
++			Name: dummies.DomainName,
++			Path: dummies.DomainPath,
++		}}}, nil).AnyTimes()
++	})
++
++	Context("base factory", func() {
++		It("create cloudstack client and user", func() {
++			k8sClient = fake.NewClientBuilder().
++				WithObjects(endpointCredentials, clientConfig).
++				Build()
++
++			fdSpec := &infrav1.CloudStackFailureDomainSpec{Name: "zone-a", ACSEndpoint: corev1.SecretReference{
++				Name:      endpointCredentials.Name,
++				Namespace: endpointCredentials.Namespace,
++			}}
++
++			factory := newBaseClientFactory(k8sClient)
++
++			csClient, csUser, err := factory.GetCloudClientAndUser(ctx, fdSpec)
++			Expect(err).ShouldNot(HaveOccurred())
++			Expect(csClient).ShouldNot(BeNil())
++			Expect(csUser).ShouldNot(BeNil())
++		})
++
++		It("create cloudstack client and user for a specific account in the domain", func() {
++			k8sClient = fake.NewClientBuilder().
++				WithObjects(endpointCredentials, clientConfig).
++				Build()
++
++			fdSpec := &infrav1.CloudStackFailureDomainSpec{Name: "zone-a", Account: dummies.AccountName, ACSEndpoint: corev1.SecretReference{
++				Name:      endpointCredentials.Name,
++				Namespace: endpointCredentials.Namespace,
++			}}
++			factory := newBaseClientFactory(k8sClient)
++
++			csClient, csUser, err := factory.GetCloudClientAndUser(ctx, fdSpec)
++			Expect(err).ShouldNot(HaveOccurred())
++			Expect(csClient).ShouldNot(BeNil())
++			Expect(csUser).ShouldNot(BeNil())
++		})
++	})
++
++})
+diff --git a/pkg/failuredomains/failuredomains_suite_test.go b/pkg/failuredomains/failuredomains_suite_test.go
+new file mode 100644
+index 0000000..0aa97a8
+--- /dev/null
++++ b/pkg/failuredomains/failuredomains_suite_test.go
+@@ -0,0 +1,33 @@
++/*
++Copyright 2022 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package failuredomains_test
++
++import (
++	"testing"
++
++	. "github.com/onsi/ginkgo/v2"
++	. "github.com/onsi/gomega"
++	"k8s.io/client-go/kubernetes/scheme"
++	capiv1 "sigs.k8s.io/cluster-api/api/v1beta1"
++)
++
++func TestFailuredomains(t *testing.T) {
++	RegisterFailHandler(Fail)
++	Expect(capiv1.AddToScheme(scheme.Scheme)).Should(Succeed())
++
++	RunSpecs(t, "Failuredomains Suite")
++}
+diff --git a/pkg/metrics/metrics.go b/pkg/metrics/metrics.go
+index 77e9413..7f7ce3b 100644
+--- a/pkg/metrics/metrics.go
++++ b/pkg/metrics/metrics.go
+@@ -19,14 +19,14 @@ package metrics
+ 
+ import (
+ 	"github.com/prometheus/client_golang/prometheus"
+-	"regexp"
+ 	crtlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
++
++	cserrors "sigs.k8s.io/cluster-api-provider-cloudstack/pkg/errors"
+ )
+ 
+ // AcsCustomMetrics encapsulates all CloudStack custom metrics defined for the controller.
+ type ACSCustomMetrics struct {
+ 	acsReconciliationErrorCount *prometheus.CounterVec
+-	errorCodeRegexp             *regexp.Regexp
+ }
+ 
+ // NewCustomMetrics constructs an ACSCustomMetrics with all desired CloudStack custom metrics and any supporting resources.
+@@ -48,22 +48,14 @@ func NewCustomMetrics() ACSCustomMetrics {
+ 		}
+ 	}
+ 
+-	// ACS standard error messages of the form "CloudStack API error 431 (CSExceptionErrorCode: 9999):..."
+-	//  This regexp is used to extract CSExceptionCodes from the message.
+-	customMetrics.errorCodeRegexp, _ = regexp.Compile(".+CSExceptionErrorCode: ([0-9]+).+")
+-
+ 	return customMetrics
+ }
+ 
+ // EvaluateErrorAndIncrementAcsReconciliationErrorCounter accepts a CloudStack error message and increments
+ // the custom acs_reconciliation_errors counter, labeled with the error code if present in the error message.
+-func (m *ACSCustomMetrics) EvaluateErrorAndIncrementAcsReconciliationErrorCounter(acsError error) {
+-	if acsError != nil {
+-		matches := m.errorCodeRegexp.FindStringSubmatch(acsError.Error())
+-		if len(matches) > 1 {
+-			m.acsReconciliationErrorCount.WithLabelValues(matches[1]).Inc()
+-		} else {
+-			m.acsReconciliationErrorCount.WithLabelValues("No error code").Inc()
+-		}
+-	}
++func (m *ACSCustomMetrics) EvaluateErrorAndIncrementAcsReconciliationErrorCounter(acsError error) string {
++	errorCode := cserrors.GetACSErrorCode(acsError)
++	m.acsReconciliationErrorCount.WithLabelValues(errorCode).Inc()
++
++	return errorCode
+ }
+-- 
+2.44.0
+
