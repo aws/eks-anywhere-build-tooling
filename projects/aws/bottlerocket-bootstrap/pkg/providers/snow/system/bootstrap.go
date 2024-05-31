@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/executables"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/executables"
 )
 
 type APIClient interface {

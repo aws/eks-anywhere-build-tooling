@@ -1,6 +1,6 @@
-module github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap
+module github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap
 
-go 1.20
+go 1.22
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.21.1

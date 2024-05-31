@@ -56,6 +56,8 @@ PROJECT_DEPENDENCIES=eksd/kubernetes/client eksd/kubernetes/server eksa/kubernet
 
 TOOLS_BIN_DIR := $(shell pwd)/hack/tools/bin
 MOCKGEN := $(TOOLS_BIN_DIR)/mockgen
+GO_BIN_PATH=$(shell source $(BUILD_LIB)/common.sh && build::common::get_go_path $(GOLANG_VERSION))
+GO=$(GO_BIN_PATH)/go
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -77,7 +79,7 @@ $(TOOLS_BIN_DIR):
 	@mkdir -p $(TOOLS_BIN_DIR)
 
 $(MOCKGEN): $(TOOLS_BIN_DIR)
-	GOBIN=$(TOOLS_BIN_DIR) go install github.com/golang/mock/mockgen@v1.6.0
+	GOBIN=$(TOOLS_BIN_DIR) $(GO) install github.com/golang/mock/mockgen@v1.6.0
 
 bottlerocket-bootstrap-snow/images/%: DOCKERFILE_FOLDER=./docker/linux/snow
 
@@ -91,11 +93,11 @@ clean-extra:
 clean: clean-extra
 
 unit-test: | $$(ENABLE_DOCKER)
-	@go test ./...
+	$(GO) test ./...
 
 .PHONY: mocks
 mocks: $(MOCKGEN)
-	go generate ./...
+	$(GO) generate ./...
 
 
 ########### DO NOT EDIT #############################

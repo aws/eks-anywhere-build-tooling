@@ -5,8 +5,9 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
+
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/utils"
 )
 
 func waitForKubelet() error {
@@ -49,7 +50,6 @@ func killCmdAfterJoinFilesGeneration(cmd *exec.Cmd) error {
 // checkEbsInit checks the execution of ebs-init goroutine,
 // the goroutine will be stopped if timeout is reached
 func checkEbsInit(ctrl *EbsInitControl) {
-
 	select {
 	case <-ctrl.Timeout:
 		ctrl.Cancel()

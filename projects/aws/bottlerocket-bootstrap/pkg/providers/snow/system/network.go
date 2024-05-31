@@ -14,8 +14,8 @@ import (
 	"github.com/vishvananda/netlink"
 	"gopkg.in/yaml.v2"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/files"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/utils"
 )
 
 //go:embed config/net.toml

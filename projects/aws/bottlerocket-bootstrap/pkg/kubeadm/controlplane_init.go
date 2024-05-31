@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
-	"github.com/pkg/errors"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/utils"
 )
 
 func controlPlaneInit() error {

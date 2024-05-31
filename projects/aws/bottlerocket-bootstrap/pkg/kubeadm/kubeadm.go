@@ -5,8 +5,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
+
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/utils"
 )
 
 const (

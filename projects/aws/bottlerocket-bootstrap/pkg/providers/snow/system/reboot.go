@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/files"
 )
 
 const (

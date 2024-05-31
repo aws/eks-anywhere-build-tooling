@@ -4,9 +4,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/files"
-	"github.com/eks-anywhere-build-tooling/aws/bottlerocket-bootstrap/pkg/utils"
 	"github.com/pkg/errors"
+
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/files"
+	"github.com/aws/eks-anywhere-build-tooling/bottlerocket-bootstrap/pkg/utils"
 )
 
 const (
