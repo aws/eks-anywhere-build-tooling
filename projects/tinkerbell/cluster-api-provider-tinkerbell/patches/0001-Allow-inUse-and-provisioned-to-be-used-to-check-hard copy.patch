@@ -1,0 +1,43 @@
+From e36d3adba1dba2afc716eb2dc32c18a76164e73f Mon Sep 17 00:00:00 2001
+From: Ahree Hong <ahreeh@amazon.com>
+Date: Wed, 12 Jun 2024 12:51:20 -0700
+Subject: [PATCH] Allow inUse and provisioned to be used to check hardware
+ ready
+
+Signed-off-by: Ahree Hong <ahreeh@amazon.com>
+---
+ controllers/machine_reconcile_scope.go | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/controllers/machine_reconcile_scope.go b/controllers/machine_reconcile_scope.go
+index 02ead05..4e5a361 100644
+--- a/controllers/machine_reconcile_scope.go
++++ b/controllers/machine_reconcile_scope.go
+@@ -50,6 +50,8 @@ import (
+ 
+ const (
+ 	providerIDPlaceholder = "PROVIDER_ID"
++	inUse                 = "in_use"
++	provisioned           = "provisioned"
+ )
+ 
+ var (
+@@ -108,13 +110,13 @@ func (scope *machineReconcileScope) addFinalizer() error {
+ func isHardwareReady(hw *tinkv1.Hardware) bool {
+ 	// if allowpxe false for all interface, hardware ready
+ 	if len(hw.Spec.Interfaces) == 0 {
+-		return false
++		return hw.Spec.Metadata.State == inUse && hw.Spec.Metadata.Instance.State == provisioned
+ 	}
+ 
+ 	for _, ifc := range hw.Spec.Interfaces {
+ 		if ifc.Netboot != nil {
+ 			if *ifc.Netboot.AllowPXE {
+-				return false
++				return hw.Spec.Metadata.State == inUse && hw.Spec.Metadata.Instance.State == provisioned
+ 			}
+ 		}
+ 	}
+-- 
+2.45.0
+
