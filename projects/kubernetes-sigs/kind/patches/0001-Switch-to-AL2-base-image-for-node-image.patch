@@ -1,15 +1,15 @@
-From 837d152313b94cc43d13ba79dec12dc1ef48ca51 Mon Sep 17 00:00:00 2001
+From a3c56b7c618160c1518105278d55badb3295a4a9 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 29 Jun 2023 00:56:53 -0700
-Subject: [PATCH 1/5] Switch to AL2 base image for node image
+Subject: [PATCH 1/6] Switch to AL2 base image for node image
 
 ---
- images/base/Dockerfile                        | 215 +++++++-----------
+ images/base/Dockerfile                        | 218 ++++++------------
  images/base/files/usr/local/bin/clean-install |  10 +-
- 2 files changed, 83 insertions(+), 142 deletions(-)
+ 2 files changed, 80 insertions(+), 148 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index e9440cb1..75adc427 100644
+index 6a047999..35a38052 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -17,11 +17,19 @@
@@ -41,10 +41,10 @@ index e9440cb1..75adc427 100644
      echo "Installing Packages ..." \
      && DEBIAN_FRONTEND=noninteractive clean-install \
        systemd \
--      conntrack iptables iproute2 ethtool util-linux mount ebtables kmod \
+-      conntrack iptables nftables iproute2 ethtool util-linux mount kmod \
 -      libseccomp2 pigz fuse-overlayfs \
 -      nfs-common open-iscsi \
-+      conntrack iptables iproute ethtool util-linux ebtables kmod \
++      conntrack iptables nftables iproute ethtool util-linux kmod \
 +      libseccomp pigz \
 +      nfs-utils \
        bash ca-certificates curl jq procps \
@@ -52,7 +52,7 @@ index e9440cb1..75adc427 100644
      && find /lib/systemd/system/sysinit.target.wants/ -name "systemd-tmpfiles-setup.service" -delete \
      && rm -f /lib/systemd/system/multi-user.target.wants/* \
      && rm -f /etc/systemd/system/*.wants/* \
-@@ -85,7 +94,12 @@ RUN chmod 755 /kind/bin && \
+@@ -85,7 +94,11 @@ RUN chmod 755 /kind/bin && \
      && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
      && rm -f /lib/systemd/system/basic.target.wants/* \
      && echo "ReadKMsg=no" >> /etc/systemd/journald.conf \
@@ -62,11 +62,10 @@ index e9440cb1..75adc427 100644
 +    # avoid runaway agetty processes most likely due to al2 being based on older centos 7
 +    # leaving for now, but al23 may not be affected by this issue
 +    && systemctl mask getty@tty1.service
-+
  
  # NOTE: systemd-binfmt.service will register things into binfmt_misc which is kernel-global
  RUN echo "Enabling / Disabling services ... " \
-@@ -97,138 +111,67 @@ RUN echo "Enabling / Disabling services ... " \
+@@ -97,144 +110,65 @@ RUN echo "Enabling / Disabling services ... " \
  RUN echo "Ensuring /etc/kubernetes/manifests" \
      && mkdir -p /etc/kubernetes/manifests
  
@@ -88,13 +87,14 @@ index e9440cb1..75adc427 100644
 -# set by makefile to .go-version
 -ARG GO_VERSION
 -RUN eval "$(gimme "${GO_VERSION}")" \
+-    && export GOTOOLCHAIN="go${GO_VERSION}" \
 -    && GOBIN=/usr/local/bin go install github.com/google/go-licenses@latest
 -
 -
 -# stage for building containerd
 -FROM go-build as build-containerd
 -ARG TARGETARCH GO_VERSION
--ARG CONTAINERD_VERSION="v1.7.13"
+-ARG CONTAINERD_VERSION="v1.7.15"
 -ARG CONTAINERD_CLONE_URL="https://github.com/containerd/containerd"
 -# we don't build with optional snapshotters, we never select any of these
 -# they're not ideal inside kind anyhow, and we save some disk space
@@ -103,6 +103,7 @@ index e9440cb1..75adc427 100644
 -    && cd /containerd \
 -    && git checkout "${CONTAINERD_VERSION}" \
 -    && eval "$(gimme "${GO_VERSION}")" \
+-    && export GOTOOLCHAIN="go${GO_VERSION}" \
 -    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=1 \
 -    && make bin/ctr bin/containerd bin/containerd-shim-runc-v2 \
 -    && GOARCH=$TARGETARCH go-licenses save --save_path=/_LICENSES \
@@ -117,6 +118,7 @@ index e9440cb1..75adc427 100644
 -    && cd /runc \
 -    && git checkout "${RUNC_VERSION}" \
 -    && eval "$(gimme "${GO_VERSION}")" \
+-    && export GOTOOLCHAIN="go${GO_VERSION}" \
 -    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=1 \
 -    && make runc \
 -    && GOARCH=$TARGETARCH go-licenses save --save_path=/_LICENSES .
@@ -125,11 +127,12 @@ index e9440cb1..75adc427 100644
 -FROM go-build as build-crictl
 -ARG TARGETARCH GO_VERSION
 -ARG CRI_TOOLS_CLONE_URL="https://github.com/kubernetes-sigs/cri-tools"
--ARG CRICTL_VERSION="v1.28.0"
+-ARG CRICTL_VERSION="v1.29.0"
 -RUN git clone --filter=tree:0 "${CRI_TOOLS_CLONE_URL}" /cri-tools \
 -    && cd /cri-tools \
 -    && git checkout "${CRICTL_VERSION}" \
 -    && eval "$(gimme "${GO_VERSION}")" \
+-    && export GOTOOLCHAIN="go${GO_VERSION}" \
 -    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=1 \
 -    && make BUILD_BIN_PATH=./build crictl \
 -    && GOARCH=$TARGETARCH go-licenses save --save_path=/_LICENSES ./cmd/crictl
@@ -137,12 +140,13 @@ index e9440cb1..75adc427 100644
 -# stage for building cni-plugins
 -FROM go-build as build-cni
 -ARG TARGETARCH GO_VERSION
--ARG CNI_PLUGINS_VERSION="v1.3.0"
+-ARG CNI_PLUGINS_VERSION="v1.4.1"
 -ARG CNI_PLUGINS_CLONE_URL="https://github.com/containernetworking/plugins"
 -RUN git clone --filter=tree:0 "${CNI_PLUGINS_CLONE_URL}" /cni-plugins \
 -    && cd /cni-plugins \
 -    && git checkout "${CNI_PLUGINS_VERSION}" \
 -    && eval "$(gimme "${GO_VERSION}")" \
+-    && export GOTOOLCHAIN="go${GO_VERSION}" \
 -    && mkdir ./bin \
 -    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=1 \
 -    && go build -o ./bin/host-local -mod=vendor ./plugins/ipam/host-local \
@@ -157,12 +161,13 @@ index e9440cb1..75adc427 100644
 -# stage for building containerd-fuse-overlayfs
 -FROM go-build as build-fuse-overlayfs
 -ARG TARGETARCH GO_VERSION
--ARG CONTAINERD_FUSE_OVERLAYFS_VERSION="v1.0.6"
+-ARG CONTAINERD_FUSE_OVERLAYFS_VERSION="v1.0.8"
 -ARG CONTAINERD_FUSE_OVERLAYFS_CLONE_URL="https://github.com/containerd/fuse-overlayfs-snapshotter"
 -RUN git clone --filter=tree:0 "${CONTAINERD_FUSE_OVERLAYFS_CLONE_URL}" /fuse-overlayfs-snapshotter \
 -    && cd /fuse-overlayfs-snapshotter \
 -    && git checkout "${CONTAINERD_FUSE_OVERLAYFS_VERSION}" \
 -    && eval "$(gimme "${GO_VERSION}")" \
+-    && export GOTOOLCHAIN="go${GO_VERSION}" \
 -    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=1 \
 -    && make bin/containerd-fuse-overlayfs-grpc \
 -    && GOARCH=$TARGETARCH go-licenses save --save_path=/_LICENSES ./cmd/containerd-fuse-overlayfs-grpc
@@ -256,8 +261,6 @@ index e9440cb1..75adc427 100644
 +
 +COPY --from=base-versioned-intermediate / /
 +
-+
-+
  # first tell systemd that it is in docker (it will check for the container env)
  # https://systemd.io/CONTAINER_INTERFACE/
  ENV container docker
@@ -288,5 +291,5 @@ index b0b861c3..f1d714a6 100755
 -   /usr/share/local/*
 +   /usr/share/local/* || true
 -- 
-2.39.3 (Apple Git-145)
+2.34.1
 

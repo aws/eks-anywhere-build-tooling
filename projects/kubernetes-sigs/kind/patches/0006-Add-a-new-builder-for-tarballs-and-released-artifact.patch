@@ -1,0 +1,604 @@
+From e088511c79ee5c9b78f407e5565a820bceb118e4 Mon Sep 17 00:00:00 2001
+From: Davanum Srinivas <davanum@gmail.com>
+Date: Tue, 14 May 2024 16:37:32 -0400
+Subject: [PATCH 6/6] Add a new builder for tarballs and released artifacts
+
+Signed-off-by: Davanum Srinivas <davanum@gmail.com>
+
+Co-authored-by: Antonio Ojea <antonio.ojea.garcia@gmail.com>
+Signed-off-by: Davanum Srinivas <davanum@gmail.com>
+---
+ pkg/build/nodeimage/build.go                  |  98 +++++++++--
+ pkg/build/nodeimage/buildcontext.go           |   3 +-
+ .../nodeimage/internal/kube/builder_remote.go | 156 ++++++++++++++++++
+ .../internal/kube/builder_tarball.go          |  79 +++++++++
+ pkg/build/nodeimage/internal/kube/tar.go      |  69 ++++++++
+ pkg/build/nodeimage/options.go                |  16 +-
+ pkg/cmd/kind/build/nodeimage/nodeimage.go     |  10 +-
+ site/content/docs/user/quick-start.md         |  26 ++-
+ 8 files changed, 436 insertions(+), 21 deletions(-)
+ create mode 100644 pkg/build/nodeimage/internal/kube/builder_remote.go
+ create mode 100644 pkg/build/nodeimage/internal/kube/builder_tarball.go
+ create mode 100644 pkg/build/nodeimage/internal/kube/tar.go
+
+diff --git a/pkg/build/nodeimage/build.go b/pkg/build/nodeimage/build.go
+index 34d68a81..f3fc0e44 100644
+--- a/pkg/build/nodeimage/build.go
++++ b/pkg/build/nodeimage/build.go
+@@ -17,10 +17,14 @@ limitations under the License.
+ package nodeimage
+ 
+ import (
++	"fmt"
++	"net/url"
++	"os"
+ 	"runtime"
+ 
+ 	"sigs.k8s.io/kind/pkg/build/nodeimage/internal/kube"
+ 	"sigs.k8s.io/kind/pkg/errors"
++	"sigs.k8s.io/kind/pkg/internal/version"
+ 	"sigs.k8s.io/kind/pkg/log"
+ )
+ 
+@@ -46,26 +50,100 @@ func Build(options ...Option) error {
+ 		ctx.logger.Warnf("unsupported architecture %q", ctx.arch)
+ 	}
+ 
+-	// locate sources if no kubernetes source was specified
+-	if ctx.kubeRoot == "" {
+-		kubeRoot, err := kube.FindSource()
++	if ctx.buildType == "" {
++		ctx.buildType = detectBuildType(ctx.kubeParam)
++		if ctx.buildType != "" {
++			ctx.logger.V(0).Infof("Detected build type: %q", ctx.buildType)
++		}
++	}
++
++	if ctx.buildType == "url" {
++		ctx.logger.V(0).Infof("Building using URL: %q", ctx.kubeParam)
++		builder, err := kube.NewURLBuilder(ctx.logger, ctx.kubeParam)
+ 		if err != nil {
+-			return errors.Wrap(err, "error finding kuberoot")
++			return err
++		}
++		ctx.builder = builder
++	}
++
++	if ctx.buildType == "file" {
++		ctx.logger.V(0).Infof("Building using local file: %q", ctx.kubeParam)
++		if info, err := os.Stat(ctx.kubeParam); err == nil && info.Mode().IsRegular() {
++			builder, err := kube.NewTarballBuilder(ctx.logger, ctx.kubeParam)
++			if err != nil {
++				return err
++			}
++			ctx.builder = builder
+ 		}
+-		ctx.kubeRoot = kubeRoot
+ 	}
+ 
+-	// initialize bits
+-	builder, err := kube.NewDockerBuilder(ctx.logger, ctx.kubeRoot, ctx.arch)
+-	if err != nil {
+-		return err
++	if ctx.buildType == "release" {
++		ctx.logger.V(0).Infof("Building using release %q artifacts", ctx.kubeParam)
++		kubever, err := version.ParseSemantic(ctx.kubeParam)
++		if err == nil {
++			builder, err := kube.NewReleaseBuilder(ctx.logger, "v"+kubever.String(), ctx.arch)
++			if err != nil {
++				return err
++			}
++			ctx.builder = builder
++		} else {
++			if _, err := os.Stat(ctx.kubeParam); err != nil {
++				ctx.logger.V(0).Infof("%s is not a valid kubernetes version", ctx.kubeParam)
++				return fmt.Errorf("%s is not a valid kubernetes version", ctx.kubeParam)
++			}
++		}
++	}
++
++	if ctx.builder == nil {
++		// locate sources if no kubernetes source was specified
++		if ctx.kubeParam == "" {
++			kubeRoot, err := kube.FindSource()
++			if err != nil {
++				return errors.Wrap(err, "error finding kuberoot")
++			}
++			ctx.kubeParam = kubeRoot
++		}
++		ctx.logger.V(0).Infof("Building using source: %q", ctx.kubeParam)
++
++		// initialize bits
++		builder, err := kube.NewDockerBuilder(ctx.logger, ctx.kubeParam, ctx.arch)
++		if err != nil {
++			return err
++		}
++		ctx.builder = builder
+ 	}
+-	ctx.builder = builder
+ 
+ 	// do the actual build
+ 	return ctx.Build()
+ }
+ 
++// detectBuildType detect the type of build required based on the param passed in the following order
++// url: if the param is a valid http or https url
++// file: if the param refers to an existing regular file
++// source: if the param refers to an existing directory
++// release: if the param is a semantic version expression (does this require the v preprended?
++func detectBuildType(param string) string {
++	u, err := url.ParseRequestURI(param)
++	if err == nil {
++		if u.Scheme == "http" || u.Scheme == "https" {
++			return "url"
++		}
++	}
++	if info, err := os.Stat(param); err == nil {
++		if info.Mode().IsRegular() {
++			return "file"
++		}
++		if info.Mode().IsDir() {
++			return "source"
++		}
++	}
++	_, err = version.ParseSemantic(param)
++	if err == nil {
++		return "release"
++	}
++	return ""
++}
++
+ func supportedArch(arch string) bool {
+ 	switch arch {
+ 	default:
+diff --git a/pkg/build/nodeimage/buildcontext.go b/pkg/build/nodeimage/buildcontext.go
+index a708b217..566a5428 100644
+--- a/pkg/build/nodeimage/buildcontext.go
++++ b/pkg/build/nodeimage/buildcontext.go
+@@ -51,7 +51,8 @@ type buildContext struct {
+ 	baseImage string
+ 	logger    log.Logger
+ 	arch      string
+-	kubeRoot  string
++	buildType string
++	kubeParam string
+ 	// non-option fields
+ 	builder kube.Builder
+ }
+diff --git a/pkg/build/nodeimage/internal/kube/builder_remote.go b/pkg/build/nodeimage/internal/kube/builder_remote.go
+new file mode 100644
+index 00000000..8420559b
+--- /dev/null
++++ b/pkg/build/nodeimage/internal/kube/builder_remote.go
+@@ -0,0 +1,156 @@
++/*
++Copyright 2024 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package kube
++
++import (
++	"context"
++	"fmt"
++	"io"
++	"net"
++	"net/http"
++	"os"
++	"path/filepath"
++	"strings"
++	"time"
++
++	"sigs.k8s.io/kind/pkg/log"
++)
++
++type remoteBuilder struct {
++	version string
++	logger  log.Logger
++	url     string
++}
++
++var _ Builder = &remoteBuilder{}
++
++// NewURLBuilder used to specify a complete url to a gzipped tarball
++func NewURLBuilder(logger log.Logger, url string) (Builder, error) {
++	return &remoteBuilder{
++		version: "",
++		logger:  logger,
++		url:     url,
++	}, nil
++}
++
++// NewReleaseBuilder used to specify a release semver and constructs a url to release artifacts
++func NewReleaseBuilder(logger log.Logger, version, arch string) (Builder, error) {
++	url := "https://dl.k8s.io/" + version + "/kubernetes-server-linux-" + arch + ".tar.gz"
++	return &remoteBuilder{
++		version: version,
++		logger:  logger,
++		url:     url,
++	}, nil
++}
++
++// Build implements Bits.Build
++func (b *remoteBuilder) Build() (Bits, error) {
++
++	tmpDir, err := os.MkdirTemp(os.TempDir(), "k8s-tar-extract-")
++	if err != nil {
++		return nil, fmt.Errorf("error creating temporary directory for tar extraction: %w", err)
++	}
++
++	tgzFile := filepath.Join(tmpDir, "kubernetes-"+b.version+"-server-linux-amd64.tar.gz")
++	err = b.downloadURL(b.url, tgzFile)
++	if err != nil {
++		return nil, fmt.Errorf("error downloading file: %w", err)
++	}
++
++	err = extractTarball(tgzFile, tmpDir, b.logger)
++	if err != nil {
++		return nil, fmt.Errorf("error extracting tgz file: %w", err)
++	}
++
++	binDir := filepath.Join(tmpDir, "kubernetes/server/bin")
++	contents, err := os.ReadFile(filepath.Join(binDir, "kube-apiserver.docker_tag"))
++	if err != nil {
++		return nil, err
++	}
++	sourceVersionRaw := strings.TrimSpace(string(contents))
++	return &bits{
++		binaryPaths: []string{
++			filepath.Join(binDir, "kubeadm"),
++			filepath.Join(binDir, "kubelet"),
++			filepath.Join(binDir, "kubectl"),
++		},
++		imagePaths: []string{
++			filepath.Join(binDir, "kube-apiserver.tar"),
++			filepath.Join(binDir, "kube-controller-manager.tar"),
++			filepath.Join(binDir, "kube-scheduler.tar"),
++			filepath.Join(binDir, "kube-proxy.tar"),
++		},
++		version: sourceVersionRaw,
++	}, nil
++}
++
++func (b *remoteBuilder) downloadURL(url string, destPath string) error {
++	output, err := os.Create(destPath)
++	if err != nil {
++		return fmt.Errorf("error creating file for download %q: %v", destPath, err)
++	}
++	defer output.Close()
++
++	b.logger.V(0).Infof("Downloading %q", url)
++
++	// Create a client with custom timeouts
++	// to avoid idle downloads to hang the program
++	httpClient := &http.Client{
++		Transport: &http.Transport{
++			Proxy: http.ProxyFromEnvironment,
++			DialContext: (&net.Dialer{
++				Timeout:   30 * time.Second,
++				KeepAlive: 30 * time.Second,
++			}).DialContext,
++			TLSHandshakeTimeout:   10 * time.Second,
++			ResponseHeaderTimeout: 30 * time.Second,
++			IdleConnTimeout:       30 * time.Second,
++		},
++	}
++
++	// this will stop slow downloads after 10 minutes
++	// and interrupt reading of the Response.Body
++	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
++	defer cancel()
++
++	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
++	if err != nil {
++		return fmt.Errorf("cannot create request: %v", err)
++	}
++
++	response, err := httpClient.Do(req)
++	if err != nil {
++		return fmt.Errorf("error doing HTTP fetch of %q: %v", url, err)
++	}
++	defer response.Body.Close()
++
++	if response.StatusCode >= 400 {
++		return fmt.Errorf("error response from %q: HTTP %v", url, response.StatusCode)
++	}
++
++	start := time.Now()
++	defer func() {
++		b.logger.V(2).Infof("Copying %q to %q took %q", url, destPath, time.Since(start))
++	}()
++
++	// TODO: we should add some sort of progress indicator
++	_, err = io.Copy(output, response.Body)
++	if err != nil {
++		return fmt.Errorf("error downloading HTTP content from %q: %v", url, err)
++	}
++	return nil
++}
+diff --git a/pkg/build/nodeimage/internal/kube/builder_tarball.go b/pkg/build/nodeimage/internal/kube/builder_tarball.go
+new file mode 100644
+index 00000000..aace6080
+--- /dev/null
++++ b/pkg/build/nodeimage/internal/kube/builder_tarball.go
+@@ -0,0 +1,79 @@
++/*
++Copyright 2024 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package kube
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"sigs.k8s.io/kind/pkg/log"
++	"strings"
++)
++
++// TODO(bentheelder): plumb through arch
++
++// directoryBuilder implements Bits for a local docker-ized make / bash build
++type directoryBuilder struct {
++	tarballPath string
++	logger      log.Logger
++}
++
++var _ Builder = &directoryBuilder{}
++
++// NewTarballBuilder returns a new Bits backed by the docker-ized build,
++// given kubeRoot, the path to the kubernetes source directory
++func NewTarballBuilder(logger log.Logger, tarballPath string) (Builder, error) {
++	return &directoryBuilder{
++		tarballPath: tarballPath,
++		logger:      logger,
++	}, nil
++}
++
++// Build implements Bits.Build
++func (b *directoryBuilder) Build() (Bits, error) {
++	tmpDir, err := os.MkdirTemp(os.TempDir(), "k8s-tar-extract-")
++	if err != nil {
++		return nil, fmt.Errorf("error creating temporary directory for tar extraction: %w", err)
++	}
++
++	b.logger.V(0).Infof("Extracting %q", b.tarballPath)
++	err = extractTarball(b.tarballPath, tmpDir, b.logger)
++	if err != nil {
++		return nil, fmt.Errorf("error extracting tar file: %w", err)
++	}
++
++	binDir := filepath.Join(tmpDir, "kubernetes/server/bin")
++	contents, err := os.ReadFile(filepath.Join(binDir, "kube-apiserver.docker_tag"))
++	if err != nil {
++		return nil, err
++	}
++	sourceVersionRaw := strings.TrimSpace(string(contents))
++	return &bits{
++		binaryPaths: []string{
++			filepath.Join(binDir, "kubeadm"),
++			filepath.Join(binDir, "kubelet"),
++			filepath.Join(binDir, "kubectl"),
++		},
++		imagePaths: []string{
++			filepath.Join(binDir, "kube-apiserver.tar"),
++			filepath.Join(binDir, "kube-controller-manager.tar"),
++			filepath.Join(binDir, "kube-scheduler.tar"),
++			filepath.Join(binDir, "kube-proxy.tar"),
++		},
++		version: sourceVersionRaw,
++	}, nil
++}
+diff --git a/pkg/build/nodeimage/internal/kube/tar.go b/pkg/build/nodeimage/internal/kube/tar.go
+new file mode 100644
+index 00000000..edb1b1a0
+--- /dev/null
++++ b/pkg/build/nodeimage/internal/kube/tar.go
+@@ -0,0 +1,69 @@
++package kube
++
++import (
++	"archive/tar"
++	"compress/gzip"
++	"fmt"
++	"io"
++	"os"
++	"path/filepath"
++
++	"sigs.k8s.io/kind/pkg/log"
++)
++
++// extractTarball takes a gzipped-tarball and extracts the contents into a specified directory
++func extractTarball(tarPath, destDirectory string, logger log.Logger) (err error) {
++	// Open the tar file
++	f, err := os.Open(tarPath)
++	if err != nil {
++		return fmt.Errorf("opening tarball: %w", err)
++	}
++	defer f.Close()
++
++	gzipReader, err := gzip.NewReader(f)
++	if err != nil {
++		return err
++	}
++	tr := tar.NewReader(gzipReader)
++
++	numFiles := 0
++	for {
++		hdr, err := tr.Next()
++		if err == io.EOF {
++			break
++		}
++		if err != nil {
++			return fmt.Errorf("reading tarfile %s: %w", tarPath, err)
++		}
++
++		if hdr.FileInfo().IsDir() {
++			continue
++		}
++
++		if err := os.MkdirAll(
++			filepath.Join(destDirectory, filepath.Dir(hdr.Name)), os.FileMode(0o755),
++		); err != nil {
++			return fmt.Errorf("creating image directory structure: %w", err)
++		}
++
++		f, err := os.Create(filepath.Join(destDirectory, hdr.Name))
++		if err != nil {
++			return fmt.Errorf("creating image layer file: %w", err)
++		}
++
++		if _, err := io.CopyN(f, tr, hdr.Size); err != nil {
++			f.Close()
++			if err == io.EOF {
++				break
++			}
++
++			return fmt.Errorf("extracting image data: %w", err)
++		}
++		f.Close()
++
++		numFiles++
++	}
++
++	logger.V(2).Infof("Successfully extracted %d files from image tarball %s", numFiles, tarPath)
++	return err
++}
+diff --git a/pkg/build/nodeimage/options.go b/pkg/build/nodeimage/options.go
+index 88906e25..f2e6f268 100644
+--- a/pkg/build/nodeimage/options.go
++++ b/pkg/build/nodeimage/options.go
+@@ -47,10 +47,10 @@ func WithBaseImage(image string) Option {
+ 	})
+ }
+ 
+-// WithKuberoot sets the path to the Kubernetes source directory (if empty, the path will be autodetected)
+-func WithKuberoot(root string) Option {
++// WithKubeParam sets the path to the Kubernetes source directory (if empty, the path will be autodetected)
++func WithKubeParam(root string) Option {
+ 	return optionAdapter(func(b *buildContext) error {
+-		b.kubeRoot = root
++		b.kubeParam = root
+ 		return nil
+ 	})
+ }
+@@ -72,3 +72,13 @@ func WithArch(arch string) Option {
+ 		return nil
+ 	})
+ }
++
++// WithArch sets the architecture to build for
++func WithBuildType(buildType string) Option {
++	return optionAdapter(func(b *buildContext) error {
++		if buildType != "" {
++			b.buildType = buildType
++		}
++		return nil
++	})
++}
+diff --git a/pkg/cmd/kind/build/nodeimage/nodeimage.go b/pkg/cmd/kind/build/nodeimage/nodeimage.go
+index ebe89c0b..a8d4d471 100644
+--- a/pkg/cmd/kind/build/nodeimage/nodeimage.go
++++ b/pkg/cmd/kind/build/nodeimage/nodeimage.go
+@@ -50,17 +50,14 @@ func NewCommand(logger log.Logger, streams cmd.IOStreams) *cobra.Command {
+ 				}
+ 				logger.Warn("--kube-root is deprecated, please switch to passing this as an argument")
+ 			}
+-			if cmd.Flags().Lookup("type").Changed {
+-				return errors.New("--type is no longer supported, please remove this flag")
+-			}
+ 			return runE(logger, flags, args)
+ 		},
+ 	}
+ 	cmd.Flags().StringVar(
+ 		&flags.BuildType,
+ 		"type",
+-		"docker",
+-		"build type",
++		"",
++		"optionally specify one of 'url', 'file', 'release' or 'source' as the type of build",
+ 	)
+ 	cmd.Flags().StringVar(
+ 		&flags.Image,
+@@ -97,9 +94,10 @@ func runE(logger log.Logger, flags *flagpole, args []string) error {
+ 	if err := nodeimage.Build(
+ 		nodeimage.WithImage(flags.Image),
+ 		nodeimage.WithBaseImage(flags.BaseImage),
+-		nodeimage.WithKuberoot(kubeRoot),
++		nodeimage.WithKubeParam(kubeRoot),
+ 		nodeimage.WithLogger(logger),
+ 		nodeimage.WithArch(flags.Arch),
++		nodeimage.WithBuildType(flags.BuildType),
+ 	); err != nil {
+ 		return errors.Wrap(err, "error building node image")
+ 	}
+diff --git a/site/content/docs/user/quick-start.md b/site/content/docs/user/quick-start.md
+index 94f10e24..319470a6 100644
+--- a/site/content/docs/user/quick-start.md
++++ b/site/content/docs/user/quick-start.md
+@@ -259,7 +259,7 @@ container.
+ 
+ Currently, kind supports one default way to build a `node-image`
+ if you have the [Kubernetes][kubernetes] source in your host machine
+-(`$GOPATH/src/k8s.io/kubernetes`), by using `docker`.
++(`$GOPATH/src/k8s.io/kubernetes`), by using `source`.
+ 
+ You can also specify a different path to kubernetes source using 
+ ```
+@@ -270,6 +270,30 @@ kind build node-image /path/to/kubernetes/source
+ > Kubernetes requires, we wrap the upstream build. This includes Docker with buildx.
+ > See: https://git.k8s.io/community/contributors/devel/development.md#building-kubernetes-with-docker
+ 
++One shortcut to use a kubernetes release is to specify the version
++directly to pick up the official tar-gzipped files:
++```
++kind build node-image v1.30.0
++```
++
++If you prefer to use existing tar-gzipped files like the ones from the kubernetes
++release, you can specify those as well from a URL or local directory, for example:
++```
++kind build node-image https://dl.k8s.io/v1.30.0/kubernetes-server-linux-arm64.tar.gz
++kind build node-image $HOME/Downloads/kubernetes-server-linux-amd64.tar.gz
++```
++
++To clear any confusion, you can specify the type of build explicitly
++using `--type` parameter, please see the following examples:
++```
++kind build node-image --type url https://dl.k8s.io/v1.30.0/kubernetes-server-linux-arm64.tar.gz
++kind build node-image --type file $HOME/Downloads/kubernetes-server-linux-amd64.tar.gz
++kind build node-image --type release v1.30.0
++kind build node-image --type source $HOME/go/src/k8s.io/kubernetes/
++```
++> **NOTE**: modes other than source directory namely `url`, `file` and `release` are only
++> available in kind v0.24 and above.
++
+ ### Settings for Docker Desktop
+ 
+ If you are building Kubernetes (for example - `kind build node-image`) on MacOS or Windows then you need a minimum of 6GB of RAM
+-- 
+2.34.1
+
