@@ -214,6 +214,7 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
             echo "PACKER_ACTIVE_INTERFACE cannot be automatically determined. Please export PACKER_ACTIVE_INTERFACE=<Current Host's primary network interface>"
             exit 1
         fi
+        echo "Active interface for Packer has been decided: $PACKER_ACTIVE_INTERFACE"
 
         if [ "$(uname -s)" = "Linux" ]; then
             PACKER_HTTP_SERVER_IP=$(ip addr show dev $PACKER_ACTIVE_INTERFACE | awk '/inet / {print $2}' | cut -d/ -f1)
@@ -233,6 +234,7 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
       SED=gsed
     fi
     find ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova -type f -name '*.json' | xargs $SED -i "s/{{ .HTTPIP }}/$PACKER_HTTP_SERVER_IP/g"
+    echo "Packer HTTP server ip has been replaced with $PACKER_HTTP_SERVER_IP"
 fi
 
 # If the image format is AMI and our Packer config specifies a non-gp3 volume, then
