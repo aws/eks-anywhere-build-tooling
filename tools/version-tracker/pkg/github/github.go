@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -237,93 +238,33 @@ func getCommitForTag(allTags []*github.RepositoryTag, searchTag string) string {
 // GetGoVersionForLatestRevision gets the Go version used to build the latest revision of the project.
 func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevision string) (string, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting Go version corresponding to latest revision %s for [%s/%s] repository", latestRevision, org, repo))
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("retrieving current working directory: %v", err)
-	}
 
 	var goVersion string
+	var err error
 	projectFullName := fmt.Sprintf("%s/%s", org, repo)
 	if _, ok := constants.ProjectReleaseAssets[projectFullName]; ok {
-		release, _, err := client.Repositories.GetReleaseByTag(context.Background(), org, repo, latestRevision)
+		release, response, err := client.Repositories.GetReleaseByTag(context.Background(), org, repo, latestRevision)
 		if err != nil {
-			return "", fmt.Errorf("calling GetReleaseByTag API for tag %s in [%s/%s] repository: %v", latestRevision, org, repo, err)
-		}
-		var tarballName, tarballUrl string
-		projectReleaseAsset := constants.ProjectReleaseAssets[projectFullName]
-		searchAssetName := projectReleaseAsset.AssetName
-		assetVersionReplacement := latestRevision
-		if constants.ProjectReleaseAssets[projectFullName].TrimLeadingVersionPrefix {
-			assetVersionReplacement = latestRevision[1:]
-		}
-		if strings.Count(searchAssetName, "%s") > 0 {
-			searchAssetName = fmt.Sprintf(searchAssetName, assetVersionReplacement)
-		}
-		if projectReleaseAsset.OverrideAssetURL != "" {
-			tarballName = searchAssetName
-			tarballUrl = projectReleaseAsset.OverrideAssetURL
-			if strings.Count(tarballUrl, "%s") > 0 {
-				tarballUrl = fmt.Sprintf(tarballUrl, assetVersionReplacement)
+			if response.StatusCode == http.StatusNotFound {
+				logger.V(6).Info(fmt.Sprintf("GitHub release for tag %s not found. Falling back to GitHub source of truth file for Go version", latestRevision))
+				goVersion, err = getGoVersionFromGitHubFile(client, org, repo, projectFullName, latestRevision)
+				if err != nil {
+					return "", fmt.Errorf("getting Go version from GitHub source of truth file: %v", err)
+				}
+			} else {
+				return "", fmt.Errorf("calling GetReleaseByTag API for tag %s in [%s/%s] repository: %v", latestRevision, org, repo, err)
 			}
 		} else {
-			for _, asset := range release.Assets {
-				if *asset.Name == searchAssetName {
-					tarballName = *asset.Name
-					tarballUrl = *asset.BrowserDownloadURL
-					break
-				}
-			}
-		}
-
-		tarballDownloadPath := filepath.Join(cwd, "github-release-downloads")
-		err = os.MkdirAll(tarballDownloadPath, 0o755)
-		if err != nil {
-			return "", fmt.Errorf("failed to create GitHub release downloads folder: %v", err)
-		}
-		tarballFilePath := filepath.Join(tarballDownloadPath, tarballName)
-
-		err = file.Download(tarballUrl, tarballFilePath)
-		if err != nil {
-			return "", fmt.Errorf("downloading release tarball from URL [%s]: %v", tarballUrl, err)
-		}
-
-		binaryName := projectReleaseAsset.BinaryName
-		if strings.Count(binaryName, "%s") > 0 {
-			binaryName = fmt.Sprintf(binaryName, assetVersionReplacement)
-		}
-		if projectReleaseAsset.Extract {
-			tarballFile, err := os.Open(tarballFilePath)
+			goVersion, err = getGoVersionFromGitHubRelease(release, projectFullName, latestRevision)
 			if err != nil {
-				return "", fmt.Errorf("opening tarball filepath: %v", err)
+				return "", fmt.Errorf("getting Go version from GitHub release assets: %v", err)
 			}
-
-			err = tar.ExtractFileFromTarball(tarballDownloadPath, tarballFile, binaryName)
-			if err != nil {
-				return "", fmt.Errorf("extracting tarball file: %v", err)
-			}
-		}
-
-		binaryFilePath := filepath.Join(tarballDownloadPath, binaryName)
-		goVersion, err = version.GetGoVersion(binaryFilePath)
-		if err != nil {
-			return "", fmt.Errorf("getting Go version embedded in binary [%s]: %v", binaryFilePath, err)
-		}
-
-		err = os.RemoveAll(tarballDownloadPath)
-		if err != nil {
-			return "", fmt.Errorf("removing tarball download path: %v", err)
 		}
 	} else if _, ok := constants.ProjectGoVersionSourceOfTruth[projectFullName]; ok {
-		projectGoVersionSourceOfTruthFile := constants.ProjectGoVersionSourceOfTruth[projectFullName].SourceOfTruthFile
-		workflowContents, err := GetFileContents(client, org, repo, projectGoVersionSourceOfTruthFile, latestRevision)
+		goVersion, err = getGoVersionFromGitHubFile(client, org, repo, projectFullName, latestRevision)
 		if err != nil {
-			return "", fmt.Errorf("getting contents of file [%s]: %v", projectGoVersionSourceOfTruthFile, err)
+			return "", fmt.Errorf("getting Go version from GitHub source of truth file: %v", err)
 		}
-
-		pattern := regexp.MustCompile(constants.ProjectGoVersionSourceOfTruth[projectFullName].GoVersionSearchString)
-		matches := pattern.FindStringSubmatch(string(workflowContents))
-
-		goVersion = matches[1]
 	}
 
 	return goVersion, nil
@@ -399,4 +340,91 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 	}
 
 	return nil
+}
+
+func getGoVersionFromGitHubRelease(release *github.RepositoryRelease, projectFullName, latestRevision string) (string, error) {
+	var tarballName, tarballUrl string
+	projectReleaseAsset := constants.ProjectReleaseAssets[projectFullName]
+	searchAssetName := projectReleaseAsset.AssetName
+	assetVersionReplacement := latestRevision
+	if constants.ProjectReleaseAssets[projectFullName].TrimLeadingVersionPrefix {
+		assetVersionReplacement = latestRevision[1:]
+	}
+	if strings.Count(searchAssetName, "%s") > 0 {
+		searchAssetName = fmt.Sprintf(searchAssetName, assetVersionReplacement)
+	}
+	if projectReleaseAsset.OverrideAssetURL != "" {
+		tarballName = searchAssetName
+		tarballUrl = projectReleaseAsset.OverrideAssetURL
+		if strings.Count(tarballUrl, "%s") > 0 {
+			tarballUrl = fmt.Sprintf(tarballUrl, assetVersionReplacement)
+		}
+	} else {
+		for _, asset := range release.Assets {
+			if *asset.Name == searchAssetName {
+				tarballName = *asset.Name
+				tarballUrl = *asset.BrowserDownloadURL
+				break
+			}
+		}
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("retrieving current working directory: %v", err)
+	}
+
+	tarballDownloadPath := filepath.Join(cwd, "github-release-downloads")
+	err = os.MkdirAll(tarballDownloadPath, 0o755)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GitHub release downloads folder: %v", err)
+	}
+	tarballFilePath := filepath.Join(tarballDownloadPath, tarballName)
+
+	err = file.Download(tarballUrl, tarballFilePath)
+	if err != nil {
+		return "", fmt.Errorf("downloading release tarball from URL [%s]: %v", tarballUrl, err)
+	}
+
+	binaryName := projectReleaseAsset.BinaryName
+	if strings.Count(binaryName, "%s") > 0 {
+		binaryName = fmt.Sprintf(binaryName, assetVersionReplacement)
+	}
+	if projectReleaseAsset.Extract {
+		tarballFile, err := os.Open(tarballFilePath)
+		if err != nil {
+			return "", fmt.Errorf("opening tarball filepath: %v", err)
+		}
+
+		err = tar.ExtractFileFromTarball(tarballDownloadPath, tarballFile, binaryName)
+		if err != nil {
+			return "", fmt.Errorf("extracting tarball file: %v", err)
+		}
+	}
+
+	binaryFilePath := filepath.Join(tarballDownloadPath, binaryName)
+	goVersion, err := version.GetGoVersion(binaryFilePath)
+	if err != nil {
+		return "", fmt.Errorf("getting Go version embedded in binary [%s]: %v", binaryFilePath, err)
+	}
+
+	err = os.RemoveAll(tarballDownloadPath)
+	if err != nil {
+		return "", fmt.Errorf("removing tarball download path: %v", err)
+	}
+
+	return goVersion, nil
+}
+
+func getGoVersionFromGitHubFile(client *github.Client, org, repo, projectFullName, latestRevision string) (string, error) {
+	projectGoVersionSourceOfTruthFile := constants.ProjectGoVersionSourceOfTruth[projectFullName].SourceOfTruthFile
+	workflowContents, err := GetFileContents(client, org, repo, projectGoVersionSourceOfTruthFile, latestRevision)
+	if err != nil {
+		return "", fmt.Errorf("getting contents of file [%s]: %v", projectGoVersionSourceOfTruthFile, err)
+	}
+
+	pattern := regexp.MustCompile(constants.ProjectGoVersionSourceOfTruth[projectFullName].GoVersionSearchString)
+	matches := pattern.FindStringSubmatch(string(workflowContents))
+
+	return matches[1], nil
 }
