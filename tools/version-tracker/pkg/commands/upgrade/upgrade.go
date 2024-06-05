@@ -892,7 +892,7 @@ func isEKSDistroUpgrade(projectName string) bool {
 }
 
 func getDefaultReleaseBranch(buildToolingRepoPath string) (string, error) {
-	defaultReleaseBranchCommandSequence := fmt.Sprintf("make -C %s get-default-release-branch", buildToolingRepoPath)
+	defaultReleaseBranchCommandSequence := fmt.Sprintf("make --no-print-directory -C %s get-default-release-branch", buildToolingRepoPath)
 	defaultReleaseBranchCmd := exec.Command("bash", "-c", defaultReleaseBranchCommandSequence)
 	defaultReleaseBranch, err := command.ExecCommand(defaultReleaseBranchCmd)
 	if err != nil {
