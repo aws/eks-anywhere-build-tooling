@@ -12,6 +12,7 @@ SOURCE_PATTERNS=.
 EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api-provider-packet/version)
 
 HAS_S3_ARTIFACTS=true
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
