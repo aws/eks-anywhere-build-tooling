@@ -32,22 +32,51 @@ INTERMEDIATE_NODE_IMAGE="kind/build/node-image:$KUBE_VERSION-$EKSD_RELEASE_BRANC
 FILES_DIR=$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/dependencies/linux-$ARCH/files
 ROOT_FS=$FILES_DIR/rootfs
 
+function build::kind::prepare_bins(){
+    # upstream puts all server bins and image tars in the server.tgz download
+    # the eks-d server.tgz does not contain all the image tars
+    # downloading individual bins and use docker pull/save instead
+    local -r download_dir="$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/eks-d/$ARCH"
+    mkdir -p $download_dir/kubernetes/server/bin
+
+    for binary in "kubeadm" "kubelet" "kubectl"; do
+        local file="$download_dir/kubernetes/server/bin/$binary"
+        if [ ! -f $file ]; then
+            curl -sSL --retry 5 $EKSD_ASSET_URL/bin/linux/$ARCH/$binary -o $file
+            curl -sSL --retry 5 $EKSD_ASSET_URL/bin/linux/$ARCH/$binary.sha256 | awk "{print \$1 \"  $file\"}" | sha256sum --check --status
+        fi
+    done
+
+    # Download container images usng docker since kind expects docker tars but eks-d produces oci tars
+    for container in "kube-apiserver" "kube-controller-manager" "kube-scheduler" "kube-proxy"; do
+        local eksd_tag="$KUBE_VERSION-eks-$EKSD_RELEASE_BRANCH-$EKSD_RELEASE"
+        local tag="$EKSD_IMAGE_REPO/kubernetes/$container:$eksd_tag"
+        local file="$download_dir/kubernetes/server/bin/$container.tar"
+        if [ ! -f $file ]; then
+            build::docker::retry_pull --platform linux/$ARCH $tag
+            docker save $tag -o $file
+            echo $eksd_tag > $(dirname $file)/$container.docker_tag
+        fi
+    done
+}
+
 # Uses kind cli to build node-image, usually the fake kubernetes src
 # to download the eks-d release artifacts instead of building from src
 # ouput image: $INTERMEDIATE_NODE_IMAGE
 function build::kind::build_node_image(){
-    export KUBE_VERSION=$KUBE_VERSION
-    export EKSD_RELEASE_BRANCH=$EKSD_RELEASE_BRANCH
-    export EKSD_RELEASE=$EKSD_RELEASE
-    export EKSD_IMAGE_REPO=$EKSD_IMAGE_REPO
-    export EKSD_ASSET_URL=$EKSD_ASSET_URL
-    export KUBE_ARCH=$ARCH
 
     build::common::check_for_qemu linux/$ARCH
 
+    build::kind::prepare_bins
+
+    local -r tmptar=$(mktemp)
+    tar -czvf $tmptar -C "$MAKE_ROOT/_output/$EKSD_RELEASE_BRANCH/eks-d/$ARCH" .
+
     KIND_PATH="$MAKE_ROOT/_output/bin/kind/$(uname | tr '[:upper:]' '[:lower:]')-$BUILDER_PLATFORM_ARCH/kind"
-    $KIND_PATH build node-image $MAKE_ROOT/images/k8s.io/kubernetes \
-        --base-image $INTERMEDIATE_BASE_IMAGE --image $INTERMEDIATE_NODE_IMAGE --arch $ARCH      
+    $KIND_PATH build node-image --type file $tmptar \
+        --base-image $INTERMEDIATE_BASE_IMAGE --image $INTERMEDIATE_NODE_IMAGE --arch $ARCH
+    
+    rm -f $tmptar 
 }
 
 function build::kind::validate_versions(){
