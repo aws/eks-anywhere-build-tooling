@@ -269,6 +269,10 @@ var (
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
+		"prometheus/prometheus": {
+			SourceOfTruthFile:     ".promu.yml",
+			GoVersionSearchString: `version: (1\.\d\d)`,
+		},
 		"tinkerbell/boots": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
