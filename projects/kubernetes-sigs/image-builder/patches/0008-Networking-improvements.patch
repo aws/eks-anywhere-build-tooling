@@ -1,18 +1,35 @@
-From 61845889801a9f413c3527c4965b90784350cb9e Mon Sep 17 00:00:00 2001
+From 6a5c8d8405bc3acae4d2526adeda6bf24119815f Mon Sep 17 00:00:00 2001
 From: Taylor Neyland <tneyla@amazon.com>
 Date: Wed, 19 Jul 2023 12:51:30 -0500
-Subject: [PATCH 08/11] Disable UDP offload service for Redhat and Ubuntu
+Subject: [PATCH 8/8] Networking improvements
+
+- Disable UDP offload service for Redhat and Ubuntu
+- Default Flatcar version to avoid pulling from internet on every make
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
+ images/capi/Makefile                            |  2 +-
  .../system/disable-nic-offload-redhat.service   | 16 ++++++++++++++++
  .../system/disable-udp-offload-ubuntu.service   | 15 +++++++++++++++
  .../roles/providers/tasks/vmware-redhat.yml     | 17 +++++++++++++++++
  .../roles/providers/tasks/vmware-ubuntu.yml     | 17 +++++++++++++++++
- 4 files changed, 65 insertions(+)
+ 5 files changed, 66 insertions(+), 1 deletion(-)
  create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/disable-nic-offload-redhat.service
  create mode 100644 images/capi/ansible/roles/providers/files/etc/systemd/system/disable-udp-offload-ubuntu.service
 
+diff --git a/images/capi/Makefile b/images/capi/Makefile
+index 4a87e4b36..aa557717b 100644
+--- a/images/capi/Makefile
++++ b/images/capi/Makefile
+@@ -318,7 +318,7 @@ WINDOWS_VERSIONS		:=	windows-2019 windows-2019-efi windows-2022 windows-2022-efi
+ 
+ # Set Flatcar Container Linux channel and version if not supplied
+ FLATCAR_CHANNEL ?= stable
+-FLATCAR_VERSION ?= current
++FLATCAR_VERSION ?= 3510.2.7
+ ifeq ($(FLATCAR_VERSION),current)
+ override FLATCAR_VERSION := $(shell hack/image-grok-latest-flatcar-version.sh $(FLATCAR_CHANNEL))
+ endif
 diff --git a/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-nic-offload-redhat.service b/images/capi/ansible/roles/providers/files/etc/systemd/system/disable-nic-offload-redhat.service
 new file mode 100644
 index 000000000..3eb62c94b
@@ -58,13 +75,13 @@ index 000000000..7f5d50a8e
 +WantedBy=network-online.target
 \ No newline at end of file
 diff --git a/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml b/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
-index 17117110a..152ff0515 100644
+index bfb929a6e..2c881b2d0 100644
 --- a/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
 +++ b/images/capi/ansible/roles/providers/tasks/vmware-redhat.yml
-@@ -49,3 +49,20 @@
-   file:
-     path: /tmp/cloud-init-vmware.sh
-     state: absent
+@@ -68,3 +68,20 @@
+       ansible.builtin.file:
+         path: /tmp/cloud-init-vmware.sh
+         state: absent
 +
 +- name: Create service disable udp segmentation offload and tcp checksum offload
 +  copy:
@@ -83,7 +100,7 @@ index 17117110a..152ff0515 100644
 +    state: stopped
 +  when: ansible_os_family != "Flatcar"
 diff --git a/images/capi/ansible/roles/providers/tasks/vmware-ubuntu.yml b/images/capi/ansible/roles/providers/tasks/vmware-ubuntu.yml
-index b3aeab637..ee1d20c0f 100644
+index 2f65fb1fb..4d6f06333 100644
 --- a/images/capi/ansible/roles/providers/tasks/vmware-ubuntu.yml
 +++ b/images/capi/ansible/roles/providers/tasks/vmware-ubuntu.yml
 @@ -51,3 +51,20 @@

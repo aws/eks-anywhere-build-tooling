@@ -1,25 +1,25 @@
-From 27707ab0da8036102933c099321d5f1fdf0aa70c Mon Sep 17 00:00:00 2001
+From f4f01d01dde536c98331e1e4aad63b50386f4288 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 21:05:13 -0800
-Subject: [PATCH 01/11] OVA improvements
+Subject: [PATCH 1/8] OVA improvements
 
-- Creat /etc/pki/tls/certs dir as part of image-builds
+- Create /etc/pki/tls/certs dir as part of image-builds
 - Tweak Product info in OVF
-- Output vsphere builds to content library instead of exports
+- Delete the VM after the build is complete
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
- .../capi/ansible/roles/sysprep/tasks/main.yml |  9 ++++
- images/capi/hack/ovf_template.xml             | 10 +----
- images/capi/packer/ova/packer-node.json       | 41 +++++++++++++------
- 3 files changed, 40 insertions(+), 20 deletions(-)
+ images/capi/ansible/roles/sysprep/tasks/main.yml |  9 +++++++++
+ images/capi/hack/ovf_template.xml                | 10 ++--------
+ images/capi/packer/ova/packer-node.json          |  2 +-
+ 3 files changed, 12 insertions(+), 9 deletions(-)
 
 diff --git a/images/capi/ansible/roles/sysprep/tasks/main.yml b/images/capi/ansible/roles/sysprep/tasks/main.yml
-index a9fa954d5..a526528ea 100644
+index 62108535a..59e066086 100644
 --- a/images/capi/ansible/roles/sysprep/tasks/main.yml
 +++ b/images/capi/ansible/roles/sysprep/tasks/main.yml
 @@ -27,6 +27,15 @@
- - import_tasks: photon.yml
+ - ansible.builtin.import_tasks: photon.yml
    when: ansible_os_family == "VMware Photon OS"
  
 +- name: Get stats of the /etc/pki folder
@@ -32,7 +32,7 @@ index a9fa954d5..a526528ea 100644
 +  when: pki.stat.isdir is defined and pki.stat.isdir
 +
  - name: Remove containerd http proxy conf file if needed
-   file:
+   ansible.builtin.file:
      path: /etc/systemd/system/containerd.service.d/http-proxy.conf
 diff --git a/images/capi/hack/ovf_template.xml b/images/capi/hack/ovf_template.xml
 index 316427ec3..ca23db5f9 100644
@@ -61,98 +61,18 @@ index 316427ec3..ca23db5f9 100644
        <Property ovf:userConfigurable="false" ovf:value="${BUILD_TIMESTAMP}" ovf:type="string" ovf:key="BUILD_TIMESTAMP"/>
        <Property ovf:userConfigurable="false" ovf:value="${BUILD_DATE}" ovf:type="string" ovf:key="BUILD_DATE"/>
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 1b7b2d13d..fc6fa6488 100644
+index 1b7b2d13d..7b5ef1369 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
-@@ -184,6 +184,12 @@
-         }
-       ],
-       "type": "vsphere-iso",
-+       "content_library_destination": {
-+         "name": "{{user `build_version`}}",
-+         "library": "{{user `vsphere_library_name`}}",
-+         "ovf": true,
-+         "destroy": true
-+      },
-       "username": "{{user `username`}}",
-       "vcenter_server": "{{user `vcenter_server`}}",
-       "vm_name": "{{user `base_build_version`}}",
-@@ -207,11 +213,6 @@
-       "datastore": "{{user `datastore`}}",
-       "destroy": "{{user `destroy`}}",
-       "disk_controller_type": "{{user `disk_controller_type`}}",
--      "export": {
--        "force": true,
--        "manifest": "{{ user `export_manifest`}}",
--        "output_directory": "{{user `output_dir`}}"
--      },
-       "firmware": "{{user `firmware`}}",
-       "floppy_dirs": "{{ user `floppy_dirs`}}",
-       "folder": "{{user `folder`}}",
-@@ -248,6 +249,12 @@
-         }
-       ],
-       "type": "vsphere-iso",
-+      "content_library_destination": {
-+        "name": "{{user `build_version`}}",
-+        "library": "{{user `vsphere_library_name`}}",
-+        "ovf": true,
-+        "destroy": true
-+      },
-       "username": "{{user `username`}}",
-       "vcenter_server": "{{user `vcenter_server`}}",
-       "vm_name": "{{user `build_version`}}",
-@@ -263,11 +270,6 @@
-       "create_snapshot": "{{user `create_snapshot`}}",
-       "datacenter": "{{user `datacenter`}}",
-       "datastore": "{{user `datastore`}}",
--      "export": {
--        "force": true,
--        "manifest": "{{ user `export_manifest`}}",
--        "output_directory": "{{user `output_dir`}}"
--      },
-       "folder": "{{user `folder`}}",
-       "host": "{{user `host`}}",
-       "insecure_connection": "{{user `insecure_connection`}}",
-@@ -290,6 +292,13 @@
-     }
-   ],
-   "post-processors": [
-+    {
-+      "inline": [
-+        "mkdir -p {{user `output_dir`}}"
-+      ],
-+      "name": "create-output-dir",
-+      "type": "shell-local"
-+    },
-     {
-       "custom_data": {
-         "build_date": "{{isotime}}",
-@@ -324,7 +333,14 @@
-         "vsphere-iso-base"
-       ],
-       "inline": [
--        "./hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ./hack/ovf_eula.txt --ovf_template ./hack/ovf_template.xml --vmdk_file {{user `build_version`}}-disk-0.vmdk {{user `output_dir`}}"
-+        "while true; do govc library.session.ls &> /dev/null || true; sleep 2m; done &",
-+        "PID=$!",
-+        "trap \"kill $PID\" EXIT",
-+        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}.ovf {{user `output_dir`}}/{{user `build_version`}}.ovf",
-+        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-1.vmdk {{user `output_dir`}}/{{user `build_version`}}-1.vmdk",
-+        "govc library.export /{{user `vsphere_library_name`}}/{{user `build_version`}}/{{user `build_version`}}-2.nvram {{user `output_dir`}}/{{user `build_version`}}-2.nvram",
-+        "govc library.rm /{{user `vsphere_library_name`}}/{{user `build_version`}}",
-+        "./hack/image-build-ova.py --vmx {{user `vmx_version`}} --eula ./hack/ovf_eula.txt --ovf_template ./hack/ovf_template.xml --vmdk_file {{user `build_version`}}-1.vmdk {{user `output_dir`}}"
-       ],
-       "name": "vsphere",
-       "type": "shell-local"
-@@ -509,6 +525,7 @@
-     "resource_pool": "",
-     "username": "",
-     "vcenter_server": "",
--    "vsphere_guest_os_type": null
-+    "vsphere_guest_os_type": null,
-+    "vsphere_library_name": ""
-   }
- }
+@@ -474,7 +474,7 @@
+     "crictl_url": "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{user `crictl_version`}}/crictl-v{{user `crictl_version`}}-linux-amd64.tar.gz",
+     "crictl_version": null,
+     "datastore": "",
+-    "destroy": "false",
++    "destroy": "true",
+     "disk_size": "20480",
+     "existing_ansible_ssh_args": "{{env `ANSIBLE_SSH_ARGS`}}",
+     "export_manifest": "none",
 -- 
 2.39.3 (Apple Git-146)
 
