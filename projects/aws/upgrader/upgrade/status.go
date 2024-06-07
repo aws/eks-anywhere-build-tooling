@@ -22,7 +22,7 @@ func (u *InPlaceUpgrader) LogStatusAndCleanup(ctx context.Context) error {
 	cleanUpCmd := []string{"rm", "-rf", upgCmpDir}
 	out, err := u.ExecCommand(ctx, cleanUpCmd[0], cleanUpCmd[1:]...)
 	if err != nil {
-		execError(cleanUpCmd, string(out))
+		return execError(cleanUpCmd, string(out))
 	}
 
 	logger.Info("cleaning up leftover upgrade components", "in-place components directory", upgCmpDir)
@@ -47,7 +47,7 @@ func (u *InPlaceUpgrader) logStatus(ctx context.Context) error {
 	kubeAdmVersionCmd := []string{"kubeadm", "version"}
 	out, err = u.ExecCommand(ctx, kubeAdmVersionCmd[0], kubeAdmVersionCmd[1:]...)
 	if err != nil {
-		execError(kubeAdmVersionCmd, string(out))
+		return execError(kubeAdmVersionCmd, string(out))
 	}
 	logger.Info("kubeadm version on the node", "Version", string(out))
 
