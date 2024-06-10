@@ -1,0 +1,22 @@
+version: 0.2
+
+run-as: imagebuilder
+
+env:
+  variables:
+    HOME: "/home/imagebuilder"
+    CLI_FOLDER: "projects/aws/image-builder"
+    GOPATH: "/home/imagebuilder/go"
+  secrets-manager:
+    NUTANIX_CONNECTION_DATA: "nutanix_ci:nutanix_connection_data"
+
+phases:
+  pre_build:
+    run-as: root
+    commands:
+      - git config --global credential.helper '!aws codecommit credential-helper $@'
+      - git config --global credential.UseHttpPath true
+
+  build:
+    commands:      
+      - if make check-for-supported-release-branch IMAGE_OS=$IMAGE_OS IMAGE_FORMAT=nutanix RELEASE_BRANCH=$RELEASE_BRANCH -C $PROJECT_PATH && make check-for-release-branch-skip -C $PROJECT_PATH; then make binaries -C $CLI_FOLDER && make release IMAGE_OS=$IMAGE_OS IMAGE_OS_VERSION=$IMAGE_OS_VERSION IMAGE_FORMAT=nutanix RELEASE_BRANCH=$RELEASE_BRANCH -C $PROJECT_PATH; fi
