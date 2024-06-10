@@ -46,10 +46,14 @@ fi
 
 if [[ $PRODUCT = 'eksd' ]]; then
     if [[ $REPO_OWNER = 'kubernetes' ]]; then
-        TARBALL="kubernetes-$REPO-linux-$ARCH.tar.gz"
+        if [[ $REPO == *.tar.gz ]]; then
+            TARBALL="kubernetes-${REPO%%.*}-linux-$ARCH.tar.gz"
+        else    
+            TARBALL="kubernetes-$REPO-linux-$ARCH.tar.gz"
+            # these tarballs will extra with the kubernetes/{client,server} folders
+            OUTPUT_DIR_FILE=$BINARY_DEPS_DIR/linux-$ARCH/$PRODUCT
+        fi
         URL=$(build::common::echo_and_run build::eksd_releases::get_eksd_kubernetes_asset_url $TARBALL $RELEASE_BRANCH $ARCH)
-        # these tarballs will extra with the kubernetes/{client,server} folders
-        OUTPUT_DIR_FILE=$BINARY_DEPS_DIR/linux-$ARCH/$PRODUCT
     else
         URL=$(build::common::echo_and_run build::eksd_releases::get_eksd_component_url $REPO_OWNER $RELEASE_BRANCH $ARCH)
     fi
