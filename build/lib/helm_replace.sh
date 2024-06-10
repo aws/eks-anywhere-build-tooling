@@ -22,11 +22,10 @@ source "${SCRIPT_ROOT}/common.sh"
 
 SED=$(build::find::gnu_variant_on_mac sed)
 
-HELM_DESTINATION_REPOSITORY="${1?First argument is helm destination repository}"
+HELM_CHART_FOLDER="${1?First argument is helm chart folder}"
 OUTPUT_DIR="${2?Second arguement is output directory}"
 
-CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
-DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
+DEST_DIR=${OUTPUT_DIR}/helm/${HELM_CHART_FOLDER}
 
 #
 # Search and replace
@@ -38,7 +37,7 @@ do
   build::common::echo_and_run $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
 done
 
-if [ -d ${OUTPUT_DIR}/helm/${CHART_NAME}/crds ]; then
+if [ -d ${OUTPUT_DIR}/helm/${HELM_CHART_FOLDER}/crds ]; then
   for file in crds/*.yaml 
   do
     build::common::echo_and_run $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
