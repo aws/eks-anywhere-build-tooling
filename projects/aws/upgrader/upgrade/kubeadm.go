@@ -3,12 +3,13 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/logger"
+	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -23,6 +24,7 @@ const (
 	kubeadmAPIv1beta4        = "kubeadm.k8s.io/v1beta4"
 	kubeadmCMName            = "kubeadm-config"
 	kubeSystemNS             = "kube-system"
+	kubeVersion130           = "v1.30"
 )
 
 // KubeAdmInFirstCP upgrades the first control plane node
@@ -78,16 +80,13 @@ func (u *InPlaceUpgrader) KubeAdmInFirstCP(ctx context.Context) error {
 
 	// K8s version passed to the upgrader object is of the form vMajor.Minor.Patch-eksd-tag
 	// so it's safe to parse the version
-	kubeVersion, err := strconv.ParseFloat(u.kubernetesVersion[1:5], 64)
-	if err != nil {
-		return fmt.Errorf("getting kube version from kubeadm: %v", err)
-	}
+	kubeVersion := semver.MajorMinor(u.kubernetesVersion)
 
 	// From version 1.30 and above kubeadm upgrade needs special handling from legacy flow
 	// as --config flag starts supporting and actual kubeadm upgradeConfiguration type and not cluster configuration type
 	// Ref: https://github.com/kubernetes/kubernetes/pull/123068
 	// Issue: https://github.com/kubernetes/kubeadm/issues/3054
-	if kubeVersion >= 1.30 {
+	if semver.Compare(kubeVersion, kubeVersion130) >= 0 {
 		updatedClusterConfig, err := u.ReadFile(newKubeAdmConfig)
 		if err != nil {
 			return err
@@ -143,7 +142,7 @@ func (u *InPlaceUpgrader) KubeAdmInFirstCP(ctx context.Context) error {
 //  2. Uses a kubeadm UpgradeConfiguration type for the upgrade command with apply and plan configurations
 func (u *InPlaceUpgrader) kubeAdmUpgradeVersion130AndAbove(ctx context.Context, cmpDir, clusterConfig string) error {
 	kubeAdmConfCM := generateKubeAdmConfCM(clusterConfig)
-	kubeAdmConfCMData, err := yaml.Marshal(&kubeAdmConfCM)
+	kubeAdmConfCMData, err := yaml.Marshal(kubeAdmConfCM)
 	if err != nil {
 		return fmt.Errorf("marshaling kubeadm-config config map: %v", err)
 	}
@@ -378,13 +377,8 @@ func (u *InPlaceUpgrader) restoreCoreDNSConfig(ctx context.Context, cmpDir strin
 	return nil
 }
 
-func newTrue() *bool {
-	t := true
-	return &t
-}
-
-func generateKubeAdmConfCM(clusterConfig string) corev1.ConfigMap {
-	return corev1.ConfigMap{
+func generateKubeAdmConfCM(clusterConfig string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
@@ -406,16 +400,16 @@ func generateKubeAdmUpgradeConfig(version string) UpgradeConfiguration {
 		},
 		Apply: UpgradeApplyConfiguration{
 			KubernetesVersion:         version,
-			AllowExperimentalUpgrades: newTrue(),
-			ForceUpgrade:              newTrue(),
-			EtcdUpgrade:               newTrue(),
+			AllowExperimentalUpgrades: ptr.To(true),
+			ForceUpgrade:              ptr.To(true),
+			EtcdUpgrade:               ptr.To(true),
 			IgnorePreflightErrors:     preflightErrorsList,
 		},
 		Plan: UpgradePlanConfiguration{
 			KubernetesVersion:         version,
-			AllowExperimentalUpgrades: newTrue(),
+			AllowExperimentalUpgrades: ptr.To(true),
 			IgnorePreflightErrors:     preflightErrorsList,
-			PrintConfig:               newTrue(),
+			PrintConfig:               ptr.To(true),
 		},
 	}
 }
