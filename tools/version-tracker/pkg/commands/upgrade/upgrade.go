@@ -45,6 +45,12 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 	projectOrg := strings.Split(projectName, "/")[0]
 	projectRepo := strings.Split(projectName, "/")[1]
 
+	// Check if branch name environment variable has been set.
+	branchName, ok := os.LookupEnv(constants.BranchNameEnvVar)
+	if !ok {
+		branchName = constants.MainBranchName
+	}
+
 	// Check if base repository owner environment variable has been set.
 	baseRepoOwner, ok := os.LookupEnv(constants.BaseRepoOwnerEnvvar)
 	if !ok {
@@ -82,7 +88,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 	// Clone the eks-anywhere-build-tooling repository.
 	buildToolingRepoPath := filepath.Join(cwd, constants.BuildToolingRepoName)
-	repo, headCommit, err := git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, baseRepoOwner), buildToolingRepoPath, headRepoOwner)
+	repo, headCommit, err := git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, baseRepoOwner), buildToolingRepoPath, headRepoOwner, branchName)
 	if err != nil {
 		return fmt.Errorf("cloning build-tooling repo: %v", err)
 	}
@@ -93,23 +99,36 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		return fmt.Errorf("getting repo's current worktree: %v", err)
 	}
 
+	// Checkout the eks-anywhere-build-tooling repo at the provided branch name.
+	createBranch := (branchName != constants.MainBranchName)
+	err = git.Checkout(worktree, branchName, createBranch)
+	if err != nil {
+		return fmt.Errorf("checking out worktree at branch %s: %v", branchName, err)
+	}
+
+	// Reset current worktree to get a clean index.
+	err = git.ResetToHEAD(worktree, headCommit)
+	if err != nil {
+		return fmt.Errorf("resetting new branch to [origin/%s] HEAD: %v", branchName, err)
+	}
+
 	var headBranchName, baseBranchName, commitMessage, pullRequestBody string
 	if isEKSDistroUpgrade(projectName) {
-		headBranchName = "update-eks-distro-latest-releases"
-		baseBranchName = constants.MainBranchName
+		headBranchName = fmt.Sprintf("update-eks-distro-latest-releases-%s", branchName)
+		baseBranchName = branchName
 		commitMessage = "Bump EKS Distro releases to latest"
 		pullRequestBody = constants.EKSDistroUpgradePullRequestBody
 
 		// Checkout a new branch to keep track of version upgrade chaneges.
-		err = git.Checkout(worktree, headBranchName)
+		err = git.Checkout(worktree, headBranchName, true)
 		if err != nil {
 			return fmt.Errorf("checking out worktree at branch %s: %v", headBranchName, err)
 		}
 
 		// Reset current worktree to get a clean index.
-		err = git.ResetToMain(worktree, headCommit)
+		err = git.ResetToHEAD(worktree, headCommit)
 		if err != nil {
-			return fmt.Errorf("resetting new branch to [origin/main] HEAD: %v", err)
+			return fmt.Errorf("resetting new branch to [origin/%s] HEAD: %v", branchName, err)
 		}
 
 		isUpdated, err := updateEKSDistroReleasesFile(client, buildToolingRepoPath)
@@ -182,11 +201,11 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			totalPatchCount = len(patchFiles)
 		}
 
-		headBranchName = fmt.Sprintf("update-%s-%s", projectOrg, projectRepo)
-		baseBranchName = constants.MainBranchName
+		headBranchName = fmt.Sprintf("update-%s-%s-%s", projectOrg, projectRepo, branchName)
+		baseBranchName = branchName
 		commitMessage = fmt.Sprintf("Bump %s to latest release", projectName)
 		if isReleaseBranched {
-			headBranchName = fmt.Sprintf("update-%s-%s-%s", projectOrg, projectRepo, releaseBranch)
+			headBranchName = fmt.Sprintf("update-%s-%s-%s-%s", projectOrg, projectRepo, releaseBranch, branchName)
 			commitMessage = fmt.Sprintf("Bump %s %s release branch to latest release", projectName, releaseBranch)
 		}
 
@@ -199,7 +218,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			}
 		} else {
 			// Get latest revision for the project from GitHub.
-			latestRevision, needsUpgrade, err = github.GetLatestRevision(client, projectOrg, projectRepo, currentRevision, isTrackedByCommitHash, isReleaseBranched)
+			latestRevision, needsUpgrade, err = github.GetLatestRevision(client, projectOrg, projectRepo, currentRevision, branchName, isTrackedByCommitHash, isReleaseBranched)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from GitHub: %v", err)
 			}
@@ -211,15 +230,15 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		// greater than the semver of the current version.
 		if needsUpgrade || slices.Contains(constants.ProjectsWithUnconventionalUpgradeFlows, projectName) {
 			// Checkout a new branch to keep track of version upgrade chaneges.
-			err = git.Checkout(worktree, headBranchName)
+			err = git.Checkout(worktree, headBranchName, true)
 			if err != nil {
 				return fmt.Errorf("checking out worktree at branch %s: %v", headBranchName, err)
 			}
 
 			// Reset current worktree to get a clean index.
-			err = git.ResetToMain(worktree, headCommit)
+			err = git.ResetToHEAD(worktree, headCommit)
 			if err != nil {
-				return fmt.Errorf("resetting new branch to [origin/main] HEAD: %v", err)
+				return fmt.Errorf("resetting new branch to [origin/%s] HEAD: %v", branchName, err)
 			}
 
 			if needsUpgrade {
@@ -360,7 +379,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			}
 
 			if projectName == "kubernetes-sigs/image-builder" {
-				currentBottlerocketVersion, latestBottlerocketVersion, updatedBRFiles, err := updateBottlerocketVersionFiles(client, projectRootFilepath, projectPath)
+				currentBottlerocketVersion, latestBottlerocketVersion, updatedBRFiles, err := updateBottlerocketVersionFiles(client, projectRootFilepath, projectPath, branchName)
 				if err != nil {
 					return fmt.Errorf("updating Bottlerocket version and metadata files: %v", err)
 				}
@@ -376,7 +395,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 						pullRequestBody = fmt.Sprintf(constants.CombinedImageBuilderBottlerocketUpgradePullRequestBody, currentRevision, latestRevision, currentBottlerocketVersion, latestBottlerocketVersion)
 					}
 
-					err = git.Checkout(worktree, headBranchName)
+					err = git.Checkout(worktree, headBranchName, true)
 					if err != nil {
 						return fmt.Errorf("checking out worktree at branch %s: %v", headBranchName, err)
 					}
@@ -698,7 +717,7 @@ func updateCiliumImageDigestFiles(projectRootFilepath, projectPath string) ([]st
 	return updateCiliumFiles, nil
 }
 
-func updateBottlerocketVersionFiles(client *gogithub.Client, projectRootFilepath, projectPath string) (string, string, []string, error) {
+func updateBottlerocketVersionFiles(client *gogithub.Client, projectRootFilepath, projectPath, branchName string) (string, string, []string, error) {
 	updatedBRFiles := []string{}
 	var bottlerocketReleaseMap map[string]interface{}
 	bottlerocketReleasesFilePath := filepath.Join(projectRootFilepath, constants.BottlerocketReleasesFile)
@@ -727,7 +746,7 @@ func updateBottlerocketVersionFiles(client *gogithub.Client, projectRootFilepath
 		}
 	}
 
-	latestBottlerocketVersion, needsUpgrade, err := github.GetLatestRevision(client, "bottlerocket-os", "bottlerocket", currentBottlerocketVersion, false, false)
+	latestBottlerocketVersion, needsUpgrade, err := github.GetLatestRevision(client, "bottlerocket-os", "bottlerocket", currentBottlerocketVersion, branchName, false, false)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("getting latest Bottlerocket version from GitHub: %v", err)
 	}
