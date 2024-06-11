@@ -113,7 +113,8 @@ CONVERT_TO_UPSTREAM_TARGET=$(strip \
 
 # ex: $(ARTIFACTS_PATH)/ubuntu/2004/ova/ubuntu.ova, $(ARTIFACTS_PATH)/bottlerocket/1/raw/bottlerocket.img.gz
 FINAL_IMAGE_DIR=$(ARTIFACTS_PATH)/$(IMAGE_OS_DIR)/$(IMAGE_FORMAT)$(FIRMWARE_PATH_SUFFIX)
-FINAL_IMAGE_PATH=$(FINAL_IMAGE_DIR)/$(IMAGE_OS).$(call EXT_FROM_FORMAT,$(IMAGE_FORMAT),$(IMAGE_OS))
+FINAL_IMAGE_FILE_NAME=$(IMAGE_OS).$(call EXT_FROM_FORMAT,$(IMAGE_FORMAT),$(IMAGE_OS))
+FINAL_IMAGE_PATH=$(FINAL_IMAGE_DIR)/$(FINAL_IMAGE_FILE_NAME)
 
 BOTTLEROCKET_AMI_RELEASE_VERSION=$(and $(RELEASE_BRANCH),$(shell yq e ".$(RELEASE_BRANCH).ami-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES))
 BOTTLEROCKET_OVA_RELEASE_VERSION=$(and $(RELEASE_BRANCH),$(shell yq e ".$(RELEASE_BRANCH).ova-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES))
@@ -280,7 +281,9 @@ fake-%: PACKER_LOG_PATH=$(ARTIFACTS_PATH)/$(subst -,/,$(basename $(*F)))/packer.
 fake-%: IMAGE_FORMAT=$(word 3,$(subst -, ,$(word 1,$(subst ., ,$*))))
 fake-%: | $$(ENABLE_LOGGING)
 	@touch $(PACKER_LOG_PATH)
-	@if [[ "$(IMAGE_FORMAT)" != "nutanix" ]]; then \
+	@if [[ "$(IMAGE_FORMAT)" == "ova" ]]; then \
+		build/make_fake_image.sh $(@) $(FULL_OUTPUT_DIR)/config/kubernetes.json; \
+	elif [[ "$(IMAGE_FORMAT)" != "nutanix" ]]; then \
 		touch $(@); \
 	fi
 
@@ -343,6 +346,11 @@ build-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
 build-%: IMAGE_OS_FIRMWARE=$(word 4,$(subst -, ,$*))
 build-%: validate-supported-image-% setup-packer-configs-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,) | $$(ENABLE_LOGGING)
 	@PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,validate-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
+
+validate-ova-kubelet:
+	@echo -e $(call TARGET_START_LOG)
+	build/validate_ova_kubelet.sh $(ARTIFACTS_PATH)/$(FINAL_IMAGE_FILE_NAME) $(RELEASE_BRANCH) $(FULL_OUTPUT_DIR)/config/kubernetes.json
+	@echo -e $(call TARGET_END_LOG)
 #########################################################
 
 ######################## IMAGE BUILDER TARGETS #######################
@@ -424,8 +432,9 @@ validate-dependency-versions-%:
 s3-artifacts-%: $$(FINAL_IMAGE_PATH) | $$(ENABLE_LOGGING)
 	@$(MAKE) -C $(MAKE_ROOT) s3-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
 
+upload-artifacts-%: TARGETS=$(if $(filter ova,$(IMAGE_FORMAT)),validate-ova-kubelet,) upload-artifacts
 upload-artifacts-%: s3-artifacts-% | $$(ENABLE_LOGGING)
-	@$(MAKE) -C $(MAKE_ROOT) upload-artifacts ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
+	@$(MAKE) -C $(MAKE_ROOT) $(TARGETS) ARTIFACTS_PATH=$(ARTIFACTS_PATH_IMAGE_FORMAT) ARTIFACTS_UPLOAD_PATH=$(ARTIFACTS_UPLOAD_PATH_IMAGE_FORMAT) IMAGE_FORMAT=$(IMAGE_FORMAT) IMAGE_OS=$(IMAGE_OS) IMAGE_OS_VERSION=$(IMAGE_OS_VERSION)
 
 #######################################################################
 
