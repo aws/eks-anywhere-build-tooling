@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 
 	upgrade "github.com/aws/eks-anywhere-build-tooling/upgrader/upgrade"
 )
@@ -56,6 +59,46 @@ const (
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.29.1-eks-1-29-6
 	`
+	clusterConfig130 = `
+	apiServer:
+		extraArgs:
+			tls-cipher-suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+	apiVersion: kubeadm.k8s.io/v1beta3
+	certificatesDir: /etc/kubernetes/pki
+	clusterName: dummy-tst
+	controlPlaneEndpoint: 195.17.1.74:6443
+	dns:
+		imageRepository: public.ecr.aws/eks-distro/coredns
+		imageTag: v1.9.3-eks-1-25-34
+	etcd:
+		local:
+		dataDir: /var/lib/etcd
+		imageRepository: public.ecr.aws/eks-distro/etcd-io
+		imageTag: v3.5.10-eks-1-29-11
+	imageRepository: public.ecr.aws/eks-distro/kubernetes
+	kind: ClusterConfiguration
+	kubernetesVersion: v1.30.0-eks-1-30-4
+	`
+	updatedClusterConfig130 = `
+	apiServer:
+		extraArgs:
+			tls-cipher-suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+	apiVersion: kubeadm.k8s.io/v1beta3
+	certificatesDir: /etc/kubernetes/pki
+	clusterName: dummy-tst
+	controlPlaneEndpoint: 195.17.1.74:6443
+	dns:
+		imageRepository: public.ecr.aws/eks-distro/coredns
+		imageTag: v1.9.3-eks-1-25-34
+	etcd:
+		local:
+		dataDir: /var/lib/etcd
+		imageRepository: public.ecr.aws/eks-distro/etcd-io
+		imageTag: v3.5.10-eks-1-30-4
+	imageRepository: public.ecr.aws/eks-distro/kubernetes
+	kind: ClusterConfiguration
+	kubernetesVersion: v1.30.0-eks-1-30-4
+	`
 	kubeletConfig = `
 	apiVersion: kubelet.config.k8s.io/v1beta1
 	cgroupDriver: systemd
@@ -74,6 +117,7 @@ const (
 	kubeVipBackup = "/foo/kube-vip.backup.yaml"
 	newKubeVip    = "/foo/kube-vip.yaml"
 	coreDNSBackup = "/foo/binaries/kubernetes/usr/bin/coredns.yaml"
+	kubeSystemNS  = "kube-system"
 )
 
 func TestKubeAdmFirstCPBackupExist(t *testing.T) {
@@ -85,16 +129,16 @@ func TestKubeAdmFirstCPBackupExist(t *testing.T) {
 	tt := newInPlaceUpgraderTest(t, upgrade.WithKubernetesVersion("v1.29.1-eks-1-29-6"), upgrade.WithEtcdVersion("v3.5.10-eks-1-29-6"))
 	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
 	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte(updatedClusterConfig), fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
@@ -123,18 +167,62 @@ func TestKubeAdmFirstCPBackupDoesNotExist(t *testing.T) {
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
 
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte(updatedClusterConfig), fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
+	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
+
+	err := tt.u.KubeAdmInFirstCP(ctx)
+	tt.Expect(err).To(BeNil())
+}
+
+func TestKubeAdm130FirstCPBackupDoesNotExist(t *testing.T) {
+	kubeAdmConfigBackUp := fmt.Sprintf("%s/kubeadm-config.backup.yaml", upgCompBinDir)
+	newKubeAdmConfig := fmt.Sprintf("%s/kubeadm-config.yaml", upgCompBinDir)
+	kubeAdmBackup := fmt.Sprintf("%s/%s", upgCompBinDir, "kubeadm.bk")
+	newKubeAdm := fmt.Sprintf("%s/%s", upgCompBinDir, "kubeadm")
+	KubeAdmConfCMYaml := fmt.Sprintf("%s/kubeadm-config-cm.yaml", upgCompBinDir)
+	kubeAdmUpgradeConfigYaml := fmt.Sprintf("%s/kubeadm-upgrade-config.yaml", upgCompBinDir)
+	clusterConfigBytes := []byte(clusterConfig130)
+	ctx := context.TODO()
+	tt := newInPlaceUpgraderTest(t, upgrade.WithKubernetesVersion("v1.30.0-eks-1-30-4"), upgrade.WithEtcdVersion("v3.5.10-eks-1-30-4"))
+	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
+	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, errors.New("")).Times(1)
+	tt.s.EXPECT().ReadFile(kubeAdmBinDir).Return([]byte{}, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
+	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
+
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte(updatedClusterConfig130), fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return([]byte(updatedClusterConfig130), nil).Times(1)
+
+	kubeAdmConfCM, kubeAdmUpgConf := generateObjectsFor130Test(updatedClusterConfig130, "v1.30.0-eks-1-30-4")
+	kubeAdmConfCMData, _ := yaml.Marshal(&kubeAdmConfCM)
+	upgradeConfigData, _ := yaml.Marshal(&kubeAdmUpgConf)
+	tt.s.EXPECT().WriteFile(KubeAdmConfCMYaml, kubeAdmConfCMData, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmUpgradeConfigYaml, upgradeConfigData, fileMode640).Return(nil)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "apply", "-f", KubeAdmConfCMYaml, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--config", kubeAdmUpgradeConfigYaml).Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--config", kubeAdmUpgradeConfigYaml).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
@@ -168,7 +256,7 @@ func TestKubeAdmFirstCPGetKCCError(t *testing.T) {
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
 
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return([]byte{}, errors.New("")).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return([]byte{}, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
 	tt.Expect(err).ToNot(BeNil())
@@ -188,7 +276,7 @@ func TestKubeAdmFirstCPKCCBackupError(t *testing.T) {
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
 
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
@@ -209,7 +297,7 @@ func TestKubeAdmFirstCPKCCBackupReadError(t *testing.T) {
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
 
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, errors.New("")).Times(1)
 
@@ -231,7 +319,7 @@ func TestKubeAdmFirstCPEtcdUpdateError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(errors.New("")).Times(1)
@@ -254,10 +342,13 @@ func TestKubeAdmFirstCPAppendKubeletReadError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(nil, errors.New(""))
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
@@ -278,12 +369,15 @@ func TestKubeAdmFirstCPAppendKubeletGetCmdError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(nil, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), errors.New("")).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
 	tt.Expect(err).ToNot(BeNil())
@@ -304,12 +398,15 @@ func TestKubeAdmFirstCPAppendKubeletWriteError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
@@ -322,7 +419,6 @@ func TestKubeAdmFirstCPGetCoreDNSCMError(t *testing.T) {
 	kubeAdmConfigBackUp := fmt.Sprintf("%s/kubeadm-config.backup.yaml", upgCompBinDir)
 	newKubeAdmConfig := fmt.Sprintf("%s/kubeadm-config.yaml", upgCompBinDir)
 	clusterConfigBytes := []byte(clusterConfig)
-	appendedKubeletConfigBytes := []byte(fmt.Sprintf("%s%s%s", clusterConfig, "---\n", kubeletConfig))
 	ctx := context.TODO()
 	tt := newInPlaceUpgraderTest(t, upgrade.WithKubernetesVersion("v1.29.1-eks-1-29-6"), upgrade.WithEtcdVersion("v3.5.10-eks-1-29-6"))
 	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
@@ -331,14 +427,11 @@ func TestKubeAdmFirstCPGetCoreDNSCMError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
-	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, errors.New("")).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
 	tt.Expect(err).ToNot(BeNil())
@@ -351,7 +444,6 @@ func TestKubeAdmFirstCPCoreDNSConfWriteError(t *testing.T) {
 	newKubeAdmConfig := fmt.Sprintf("%s/kubeadm-config.yaml", upgCompBinDir)
 	coreDNSBackup := fmt.Sprintf("%s/coredns.yaml", upgCompBinDir)
 	clusterConfigBytes := []byte(clusterConfig)
-	appendedKubeletConfigBytes := []byte(fmt.Sprintf("%s%s%s", clusterConfig, "---\n", kubeletConfig))
 	ctx := context.TODO()
 	tt := newInPlaceUpgraderTest(t, upgrade.WithKubernetesVersion("v1.29.1-eks-1-29-6"), upgrade.WithEtcdVersion("v3.5.10-eks-1-29-6"))
 	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
@@ -360,14 +452,11 @@ func TestKubeAdmFirstCPCoreDNSConfWriteError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
-	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
@@ -381,7 +470,6 @@ func TestKubeAdmFirstCPCoreDNSCMDeleteError(t *testing.T) {
 	newKubeAdmConfig := fmt.Sprintf("%s/kubeadm-config.yaml", upgCompBinDir)
 	coreDNSBackup := fmt.Sprintf("%s/coredns.yaml", upgCompBinDir)
 	clusterConfigBytes := []byte(clusterConfig)
-	appendedKubeletConfigBytes := []byte(fmt.Sprintf("%s%s%s", clusterConfig, "---\n", kubeletConfig))
 	ctx := context.TODO()
 	tt := newInPlaceUpgraderTest(t, upgrade.WithKubernetesVersion("v1.29.1-eks-1-29-6"), upgrade.WithEtcdVersion("v3.5.10-eks-1-29-6"))
 	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
@@ -390,16 +478,13 @@ func TestKubeAdmFirstCPCoreDNSCMDeleteError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
-	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, errors.New("")).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
 	tt.Expect(err).ToNot(BeNil())
@@ -412,7 +497,6 @@ func TestKubeAdmFirstCPKubeAdmVersionCmdError(t *testing.T) {
 	newKubeAdmConfig := fmt.Sprintf("%s/kubeadm-config.yaml", upgCompBinDir)
 	coreDNSBackup := fmt.Sprintf("%s/coredns.yaml", upgCompBinDir)
 	clusterConfigBytes := []byte(clusterConfig)
-	appendedKubeletConfigBytes := []byte(fmt.Sprintf("%s%s%s", clusterConfig, "---\n", kubeletConfig))
 	ctx := context.TODO()
 	tt := newInPlaceUpgraderTest(t, upgrade.WithKubernetesVersion("v1.29.1-eks-1-29-6"), upgrade.WithEtcdVersion("v3.5.10-eks-1-29-6"))
 	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
@@ -421,17 +505,14 @@ func TestKubeAdmFirstCPKubeAdmVersionCmdError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
-	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, errors.New("")).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
 	tt.Expect(err).ToNot(BeNil())
@@ -453,17 +534,17 @@ func TestKubeAdmFirstCPKubeAdmUpgPlanError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
@@ -486,17 +567,17 @@ func TestKubeAdmFirstCPKubeAdmUpgApplyError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes").Return(nil, errors.New("")).Times(1)
 
@@ -520,17 +601,17 @@ func TestKubeAdmFirstCPKubeVipReadError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, errors.New("")).Times(1)
@@ -555,17 +636,17 @@ func TestKubeAdmFirstCPKubeVipBackupError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
@@ -591,17 +672,17 @@ func TestKubeAdmFirstCPNewKubeVipReadError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
@@ -628,17 +709,17 @@ func TestKubeAdmFirstCPNewKubeVipWriteError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
@@ -666,17 +747,17 @@ func TestKubeAdmFirstCPRestoreCoreDNSError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte{}, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
 	tt.s.EXPECT().WriteFile(coreDNSBackup, []byte("coredns-conf"), fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
@@ -694,9 +775,9 @@ func TestKubeAdmRestCPBackupExists(t *testing.T) {
 	tt := newInPlaceUpgraderTest(t)
 	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
 	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
@@ -720,9 +801,9 @@ func TestKubeAdmRestCPBackupNotExists(t *testing.T) {
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
 
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
@@ -761,8 +842,8 @@ func TestKubeAdmRestCPBackupCoreDNSError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, errors.New("")).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInRestCP(ctx)
 	tt.Expect(err).ToNot(BeNil())
@@ -779,9 +860,9 @@ func TestKubeAdmRestCPKubeadmVersionCmdError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, errors.New("")).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInRestCP(ctx)
 	tt.Expect(err).ToNot(BeNil())
@@ -798,9 +879,9 @@ func TestKubeAdmRestCPKubeadmUpgradeCmdError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration").Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInRestCP(ctx)
@@ -818,9 +899,9 @@ func TestKubeAdmRestCPKubeVipReadError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, errors.New("")).Times(1)
 
@@ -839,9 +920,9 @@ func TestKubeAdmRestCPKubeVipBackupError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(errors.New("")).Times(1)
@@ -861,9 +942,9 @@ func TestKubeAdmRestCPNewKubeVipReadError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
@@ -884,9 +965,9 @@ func TestKubeAdmRestCPNewKubeVipWriteError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
@@ -908,9 +989,9 @@ func TestKubeAdmRestCPRestoreCoreDNSError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", "kube-system", "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", "kube-system", "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
@@ -927,7 +1008,7 @@ func TestKubeAdmWorkerBackUpExist(t *testing.T) {
 	tt := newInPlaceUpgraderTest(t)
 	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
 	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, nil)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node").Return(nil, nil).Times(1)
 
 	err := tt.u.KubeAdmInWorker(ctx)
@@ -945,7 +1026,7 @@ func TestKubeAdmWorkerBackUpNotExist(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node").Return(nil, nil).Times(1)
 
 	err := tt.u.KubeAdmInWorker(ctx)
@@ -979,7 +1060,7 @@ func TestKubeAdmWorkerKubeadmVersionError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, errors.New("")).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInWorker(ctx)
 	tt.Expect(err).ToNot(BeNil())
@@ -996,9 +1077,43 @@ func TestKubeAdmWorkerKubeadmUpgradeError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "node").Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInWorker(ctx)
 	tt.Expect(err).ToNot(BeNil())
+}
+
+func generateObjectsFor130Test(clusterConfig, version string) (corev1.ConfigMap, upgrade.UpgradeConfiguration) {
+	preflightErrorsList := []string{"CoreDNSUnsupportedPlugins", "CoreDNSMigration"}
+	t := true
+	return corev1.ConfigMap{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ConfigMap",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "kubeadm-config",
+				Namespace: kubeSystemNS,
+			},
+			Data: map[string]string{"ClusterConfiguration": clusterConfig},
+		}, upgrade.UpgradeConfiguration{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "UpgradeConfiguration",
+				APIVersion: "kubeadm.k8s.io/v1beta4",
+			},
+			Apply: upgrade.UpgradeApplyConfiguration{
+				KubernetesVersion:         version,
+				AllowExperimentalUpgrades: &t,
+				ForceUpgrade:              &t,
+				EtcdUpgrade:               &t,
+				IgnorePreflightErrors:     preflightErrorsList,
+			},
+			Plan: upgrade.UpgradePlanConfiguration{
+				KubernetesVersion:         version,
+				AllowExperimentalUpgrades: &t,
+				IgnorePreflightErrors:     preflightErrorsList,
+				PrintConfig:               &t,
+			},
+		}
 }

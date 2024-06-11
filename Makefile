@@ -254,3 +254,7 @@ ensure-locale:
 				exporting LANG=C.UTF-8 to generate files instead.; \
 		fi; \
 	fi
+
+.PHONY: get-default-release-branch
+get-default-release-branch:
+	@echo $(LATEST_EKSD_RELEASE)

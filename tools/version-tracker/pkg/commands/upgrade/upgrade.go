@@ -136,18 +136,24 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 		// Validate whether the given project is release-branched.
 		var isReleaseBranched bool
-		var releaseBranch string
 		var currentVersion types.Version
 		var versionIndex int
 		if len(targetRepo.Versions) > 1 {
 			isReleaseBranched = true
+		}
+		releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
+		if releaseBranch == "" {
+			releaseBranch, err = getDefaultReleaseBranch(buildToolingRepoPath)
+			if err != nil {
+				return fmt.Errorf("getting default EKS Distro release branch: %v", err)
+			}
 		}
 		if isReleaseBranched {
 			supportedReleaseBranches, err := getSupportedReleaseBranches(buildToolingRepoPath)
 			if err != nil {
 				return fmt.Errorf("getting supported EKS Distro release branches: %v", err)
 			}
-			releaseBranch = os.Getenv(constants.ReleaseBranchEnvvar)
+
 			versionIndex = slices.Index(supportedReleaseBranches, releaseBranch)
 		} else {
 			versionIndex = 0
@@ -296,7 +302,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 				// If project has patches, attempt to apply them. Track failed patches and files that failed to apply, if any.
 				if projectHasPatches {
-					appliedPatchesCount, failedPatch, applyFailedFiles, err := applyPatchesToRepo(projectRootFilepath, projectRepo, latestRevision, totalPatchCount)
+					appliedPatchesCount, failedPatch, applyFailedFiles, err := applyPatchesToRepo(projectRootFilepath, projectRepo, releaseBranch, totalPatchCount)
 					if appliedPatchesCount == totalPatchCount {
 						patchApplySucceeded = true
 					}
@@ -601,12 +607,12 @@ func updateUpstreamProjectsTrackerFile(projectsList *types.ProjectsList, targetR
 
 // applyPatchesToRepo runs a Make command to apply patches to the cloned repository of the project
 // being upgraded.
-func applyPatchesToRepo(projectRootFilepath, projectRepo, latestVersion string, totalPatchCount int) (int, string, string, error) {
+func applyPatchesToRepo(projectRootFilepath, projectRepo, releaseBranch string, totalPatchCount int) (int, string, string, error) {
 	var patchesApplied int
 	var failedPatch, failedFilesInPatch string
 	patchApplySucceeded := true
 
-	applyPatchesCommandSequence := fmt.Sprintf("make -C %s patch-repo", projectRootFilepath)
+	applyPatchesCommandSequence := fmt.Sprintf("RELEASE_BRANCH=%s make -C %s patch-repo", releaseBranch, projectRootFilepath)
 	applyPatchesCmd := exec.Command("bash", "-c", applyPatchesCommandSequence)
 	applyPatchesOutput, err := command.ExecCommand(applyPatchesCmd)
 	if err != nil {
@@ -883,4 +889,15 @@ func updateBottlerocketHostContainerMetadata(client *gogithub.Client, projectRoo
 
 func isEKSDistroUpgrade(projectName string) bool {
 	return projectName == "aws/eks-distro"
+}
+
+func getDefaultReleaseBranch(buildToolingRepoPath string) (string, error) {
+	defaultReleaseBranchCommandSequence := fmt.Sprintf("make --no-print-directory -C %s get-default-release-branch", buildToolingRepoPath)
+	defaultReleaseBranchCmd := exec.Command("bash", "-c", defaultReleaseBranchCommandSequence)
+	defaultReleaseBranch, err := command.ExecCommand(defaultReleaseBranchCmd)
+	if err != nil {
+		return "", fmt.Errorf("running get-default-release-branch Make command: %v", err)
+	}
+
+	return defaultReleaseBranch, nil
 }

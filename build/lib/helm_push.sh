@@ -24,10 +24,11 @@ SED=$(build::find::gnu_variant_on_mac sed)
 
 IMAGE_REGISTRY="${1?First argument is image registry}"
 HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
-HELM_TAG="${3?Third argument is helm tag}"
-GIT_TAG="${4?Fourth arguement is the Git Tag}"
-OUTPUT_DIR="${5?Fifth arguement is output directory}"
-LATEST_TAG="${6?Sixth arguement is latest tag}"
+HELM_CHART_FOLDER="${3?Third arguemet is helm chart folder}"
+HELM_TAG="${4?Fourth argument is helm tag}"
+GIT_TAG="${5?Fifth arguement is the Git Tag}"
+OUTPUT_DIR="${6?Sixth arguement is output directory}"
+LATEST_TAG="${7?Seventh arguement is latest tag}"
 SEMVER_GIT_TAG="${GIT_TAG#[^0-9:main]}"
 
 SEMVER="${HELM_TAG#[^0-9]}" # remove any leading non-digits
@@ -38,7 +39,7 @@ if [[ ! $SEMVER_GIT_TAG =~ $SEMVER_REGEX ]]; then
 fi
 
 HELM_DESTINATION_OWNER=$(dirname ${HELM_DESTINATION_REPOSITORY})
-CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
+CHART_NAME=$(basename ${HELM_CHART_FOLDER})
 CHART_FILE="${OUTPUT_DIR}/helm/${CHART_NAME}-${SEMVER}.tgz"
 
 DOCKER_CONFIG=${DOCKER_CONFIG:-~/.docker}
@@ -69,11 +70,11 @@ helm push ${CHART_FILE} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER} 2>&1 |
 DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 
 # Adds a 2nd tag to the helm chart for the bundle-release jobs.
-build::common::echo_and_run skopeo copy docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}@${DIGEST} docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}:${SEMVER_GIT_TAG}-${LATEST_TAG}-helm
+build::common::echo_and_run skopeo copy docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER}/${CHART_NAME}@${DIGEST} docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER}/${CHART_NAME}:${SEMVER_GIT_TAG}-${LATEST_TAG}-helm
 
 {
     set +x
     echo
     echo
-    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY} --version ${SEMVER} --set sourceRegistry=${IMAGE_REGISTRY}"
+    echo "helm install ${CHART_NAME} oci://${IMAGE_REGISTRY}/${HELM_DESTINATION_OWNER}/${CHART_NAME} --version ${SEMVER} --set sourceRegistry=${IMAGE_REGISTRY}"
 }

@@ -21,11 +21,11 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
 OUTPUT_DIR="${1?First arguement is output directory}"
-HELM_DESTINATION_REPOSITORY="${2?Second argument is helm destination repository}"
-CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
+HELM_CHART_FOLDER="${2?Second argument is helm chart folder}"
 
 #
 # Build
 #
 cd ${OUTPUT_DIR}/helm
-build::common::echo_and_run helm package "${CHART_NAME}"
+build::common::echo_and_run helm dependency build "${HELM_CHART_FOLDER}"
+build::common::echo_and_run helm package "${HELM_CHART_FOLDER}"

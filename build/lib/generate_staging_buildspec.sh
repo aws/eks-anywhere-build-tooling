@@ -165,6 +165,10 @@ for project in "${PROJECTS[@]}"; do
             BUILDSPEC_VARS_KEYS=""
         fi
 
+        if [[ "$BUILDSPECS_VAR" == "UPGRADE_BUILDSPECS" ]] && [[ "${IDENTIFIER}" = "kubernetes_sigs_image_builder" ]]; then
+            BUILDSPEC_VARS_KEYS=""
+        fi
+
         if [[ -n "$BUILDSPEC_VARS_KEYS" ]]; then
             KEYS=(${BUILDSPEC_VARS_KEYS// / })
 
