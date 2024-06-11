@@ -6,6 +6,7 @@ import (
 
 // Constants used across the version-tracker source code.
 const (
+	BranchNameEnvVar                        = "BRANCH_NAME"
 	BaseRepoOwnerEnvvar                     = "BASE_REPO_OWNER"
 	HeadRepoOwnerEnvvar                     = "HEAD_REPO_OWNER"
 	GitHubTokenEnvvar                       = "GITHUB_TOKEN"
@@ -42,7 +43,7 @@ const (
 	GithubPerPage                           = 100
 	datetimeFormat                          = "%Y-%m-%dT%H:%M:%SZ"
 	MainBranchName                          = "main"
-	BaseRepoHeadRevision                    = "refs/remotes/origin/main"
+	BaseRepoHeadRevisionPattern             = "refs/remotes/origin/%s"
 	EKSDistroUpgradePullRequestBody         = `This PR bumps EKS Distro releases to the latest available release versions.
 
 /hold
