@@ -22,10 +22,15 @@ source "${SCRIPT_ROOT}/common.sh"
 
 OUTPUT_DIR="${1?First arguement is output directory}"
 HELM_CHART_FOLDER="${2?Second argument is helm chart folder}"
+BUILD_HELM_DEPENDENCIES="${3?Third argument is whether or not to build helm dependencies}"
+
 
 #
 # Build
 #
 cd ${OUTPUT_DIR}/helm
-build::common::echo_and_run helm dependency build "${HELM_CHART_FOLDER}"
+if [ "${BUILD_HELM_DEPENDENCIES}" = "true" ]; then
+    build::common::echo_and_run helm dependency update "${HELM_CHART_FOLDER}"
+    build::common::echo_and_run helm dependency build "${HELM_CHART_FOLDER}"
+fi
 build::common::echo_and_run helm package "${HELM_CHART_FOLDER}"
