@@ -95,7 +95,8 @@ func TestNot125KubeletKubectlUpgradeBackupDoesNotExist(t *testing.T) {
 	tt.s.EXPECT().Stat(kubeletConf).Return(nil, os.ErrNotExist)
 	tt.s.EXPECT().ExecCommand(ctx, "systemctl", "daemon-reload").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "systemctl", "restart", "kubelet").Return(nil, nil).Times(1)
-	tt.u.KubeletKubectlUpgrade(ctx)
+	err := tt.u.KubeletKubectlUpgrade(ctx)
+	tt.Expect(err).To(BeNil())
 }
 
 func TestNot125KubeletKubectlUpgradeKubeletConfExist(t *testing.T) {
@@ -127,7 +128,8 @@ func TestNot125KubeletKubectlUpgradeKubeletConfExist(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeletConf, newKubeletConf, fileMode640)
 	tt.s.EXPECT().ExecCommand(ctx, "systemctl", "daemon-reload").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "systemctl", "restart", "kubelet").Return(nil, nil).Times(1)
-	tt.u.KubeletKubectlUpgrade(ctx)
+	err := tt.u.KubeletKubectlUpgrade(ctx)
+	tt.Expect(err).To(BeNil())
 }
 
 func TestKubeletKubectlUpgradeKubectlBackupError(t *testing.T) {
