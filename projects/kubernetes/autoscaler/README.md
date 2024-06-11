@@ -3,7 +3,7 @@
 ![1.26 Version](https://img.shields.io/badge/1--26%20version-cluster--autoscaler--1.26.8-blue)
 ![1.27 Version](https://img.shields.io/badge/1--27%20version-cluster--autoscaler--1.27.7-blue)
 ![1.28 Version](https://img.shields.io/badge/1--28%20version-cluster--autoscaler--1.28.4-blue)
-![1.29 Version](https://img.shields.io/badge/1--29%20version-cluster--autoscaler--1.29.2-blue)
+![1.29 Version](https://img.shields.io/badge/1--29%20version-cluster--autoscaler--1.29.3-blue)
 ![1.30 Version](https://img.shields.io/badge/1--30%20version-cluster--autoscaler--1.30.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiL0tWckptdkxsZEd1cXNiNTBncjRNVU5oekpZRlBkTDNBcFVvZkFOVHZwbTBKUm91QkR6RVN4QlhJWk42cXF3L29FMmdnTXUrVndiay8zVUQ0YjJsc21vPSIsIml2UGFyYW1ldGVyU3BlYyI6Ik1Gd2UwbmRXVWxSRTMvUHQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
