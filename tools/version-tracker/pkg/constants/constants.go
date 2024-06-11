@@ -117,11 +117,6 @@ var (
 			Extract:                  false,
 			TrimLeadingVersionPrefix: true,
 		},
-		"cert-manager/cert-manager": {
-			AssetName:  "cert-manager-cmctl-linux-amd64.tar.gz",
-			BinaryName: "cmctl",
-			Extract:    true,
-		},
 		"containerd/containerd": {
 			AssetName:                "containerd-%s-linux-amd64.tar.gz",
 			BinaryName:               "bin/containerd",
@@ -208,6 +203,10 @@ var (
 		"brancz/kube-rbac-proxy": {
 			SourceOfTruthFile:     ".github/workflows/build.yml",
 			GoVersionSearchString: `go-version: '(1\.\d\d)\.\d+'`,
+		},
+		"cert-manager/cert-manager": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
 		},
 		"emissary-ingress/emissary": {
 			SourceOfTruthFile:     "go.mod",
