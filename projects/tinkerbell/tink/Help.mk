@@ -21,14 +21,16 @@ _output/bin/tink/linux-arm64/tink-server: ## Build `_output/bin/tink/linux-arm64
 _output/bin/tink/linux-arm64/tink-worker: ## Build `_output/bin/tink/linux-arm64/tink-worker`
 
 ##@ Image Targets
-local-images: ## Builds `tink-controller/images/amd64 tink-server/images/amd64 tink-worker/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `tink-controller/images/push tink-server/images/push tink-worker/images/push` to IMAGE_REPO
+local-images: ## Builds `tink-controller/images/amd64 tink-server/images/amd64 tink-worker/images/amd64 nginx/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `tink-controller/images/push tink-server/images/push tink-worker/images/push nginx/images/push` to IMAGE_REPO
 tink-controller/images/amd64: ## Builds/pushes `tink-controller/images/amd64`
 tink-server/images/amd64: ## Builds/pushes `tink-server/images/amd64`
 tink-worker/images/amd64: ## Builds/pushes `tink-worker/images/amd64`
+nginx/images/amd64: ## Builds/pushes `nginx/images/amd64`
 tink-controller/images/push: ## Builds/pushes `tink-controller/images/push`
 tink-server/images/push: ## Builds/pushes `tink-server/images/push`
 tink-worker/images/push: ## Builds/pushes `tink-worker/images/push`
+nginx/images/push: ## Builds/pushes `nginx/images/push`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.

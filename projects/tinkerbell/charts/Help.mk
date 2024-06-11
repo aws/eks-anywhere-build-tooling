@@ -11,9 +11,9 @@ clone-repo:  ## Clone upstream `charts`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Image Targets
-local-images: ## Builds `charts/images/arm64` as oci tars for presumbit validation
+local-images: ## Builds `charts/images/amd64` as oci tars for presumbit validation
 images: ## Pushes `charts/images/push` to IMAGE_REPO
-charts/images/arm64: ## Builds/pushes `charts/images/arm64`
+charts/images/amd64: ## Builds/pushes `charts/images/amd64`
 charts/images/push: ## Builds/pushes `charts/images/push`
 
 ##@ Helm Targets
