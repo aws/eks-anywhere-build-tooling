@@ -19,10 +19,10 @@ ARG TARGETOS
 
 COPY --from=ipmitool-builder /newroot /
 
-COPY _output/bin/rufio/$TARGETOS-$TARGETARCH/manager /usr/bin/manager
+COPY _output/bin/rufio/$TARGETOS-$TARGETARCH/manager /manager
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 USER 65532:65532
 
-ENTRYPOINT ["/usr/bin/manager"]
+ENTRYPOINT ["/manager"]
