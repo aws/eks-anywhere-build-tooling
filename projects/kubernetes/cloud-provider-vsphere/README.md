@@ -1,7 +1,7 @@
 ## **Kubernetes vSphere Cloud Provider**
 ![1.25 Version](https://img.shields.io/badge/1--25%20version-v1.25.3-blue)
 ![1.26 Version](https://img.shields.io/badge/1--26%20version-v1.26.2-blue)
-![1.27 Version](https://img.shields.io/badge/1--27%20version-v1.27.0-blue)
+![1.27 Version](https://img.shields.io/badge/1--27%20version-vsphere--cpi--chart--1.27.0-blue)
 ![1.28 Version](https://img.shields.io/badge/1--28%20version-v1.28.0-blue)
 ![1.29 Version](https://img.shields.io/badge/1--29%20version-v1.29.0-blue)
 ![1.30 Version](https://img.shields.io/badge/1--30%20version-v1.30.0--rc.0-blue)
