@@ -142,6 +142,9 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 
 		for _, tag := range allTags {
 			tagName := *tag.Name
+			if strings.Contains(tagName, "chart") || strings.Contains(tagName, "helm") {
+				continue
+			}
 			if org == "kubernetes" && repo == "autoscaler" {
 				if !strings.HasPrefix(tagName, "cluster-autoscaler-") {
 					continue
