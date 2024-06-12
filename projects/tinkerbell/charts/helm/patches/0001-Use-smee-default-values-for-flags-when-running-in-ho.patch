@@ -1,0 +1,47 @@
+From 5198bcda3023b34381b0c0b9eb33de4a5604184c Mon Sep 17 00:00:00 2001
+From: Ahree Hong <ahreeh@amazon.com>
+Date: Wed, 12 Jun 2024 15:01:44 -0700
+Subject: [PATCH 1/1] Use smee default values for flags when running in
+ hostNetwork=true mode
+
+Signed-off-by: Ahree Hong <ahreeh@amazon.com>
+---
+ tinkerbell/smee/templates/deployment.yaml | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/tinkerbell/smee/templates/deployment.yaml b/tinkerbell/smee/templates/deployment.yaml
+index e0db874..c35e92f 100644
+--- a/tinkerbell/smee/templates/deployment.yaml
++++ b/tinkerbell/smee/templates/deployment.yaml
+@@ -45,13 +45,7 @@ spec:
+             - -backend-kube-namespace={{ .Release.Namespace }}
+             - -dhcp-addr={{ printf "%v:%v" .Values.dhcp.ip .Values.dhcp.port }}
+             - -dhcp-enabled={{ .Values.dhcp.enabled }}
+-            - -dhcp-http-ipxe-binary-url={{include "urlJoiner" (dict "urlDict" .Values.dhcp.httpIPXE.binaryUrl)}}
+-            - -dhcp-http-ipxe-script-url={{include "urlJoiner" (dict "urlDict" .Values.dhcp.httpIPXE.scriptUrl)}}
+-            - -dhcp-ip-for-packet={{ .Values.dhcp.ipForPacket }}
+-            - -dhcp-syslog-ip={{ .Values.dhcp.syslogIp }}
+-            - -dhcp-tftp-ip={{ .Values.dhcp.tftpIp }}:69
+             - -extra-kernel-args={{ join " " ( append .Values.http.additionalKernelArgs ( printf "tink_worker_image=%s" ( required "missing tinkWorkerImage" .Values.tinkWorkerImage ) ) ) }}
+-            - -http-addr={{ printf "%v:%v" .Values.http.ip .Values.http.port }}
+             - -http-ipxe-binary-enabled={{ .Values.http.ipxeBinaryEnabled }}
+             - -http-ipxe-script-enabled={{ .Values.http.ipxeScriptEnabled }}
+             - -osie-url={{include "urlJoiner" (dict "urlDict" .Values.http.osieUrl)}}
+@@ -64,6 +58,14 @@ spec:
+             - -tftp-addr={{ printf "%v:%v" .Values.tftp.ip .Values.tftp.port }}
+             - -tftp-enabled={{ .Values.tftp.enabled }}
+             - -tftp-timeout={{ .Values.tftp.timeout }}
++            {{- if not .Values.hostNetwork }}
++            - -dhcp-http-ipxe-binary-url={{include "urlJoiner" (dict "urlDict" .Values.dhcp.httpIPXE.binaryUrl)}}
++            - -dhcp-http-ipxe-script-url={{include "urlJoiner" (dict "urlDict" .Values.dhcp.httpIPXE.scriptUrl)}}
++            - -dhcp-ip-for-packet={{ .Values.dhcp.ipForPacket }}
++            - -dhcp-syslog-ip={{ .Values.dhcp.syslogIp }}
++            - -dhcp-tftp-ip={{ .Values.dhcp.tftpIp }}:69
++            - -http-addr={{ printf "%v:%v" .Values.http.ip .Values.http.port }}
++            {{- end}}
+           {{- range .Values.additionalArgs }}
+             - {{ . }}
+           {{- end }}
+-- 
+2.45.0
+

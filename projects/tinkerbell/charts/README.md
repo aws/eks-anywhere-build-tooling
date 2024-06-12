@@ -1,5 +1,5 @@
 # **Tinkerbell Stack Helm Chart**
-![Version](https://img.shields.io/badge/version-v0.4.4-blue)
+![Version](https://img.shields.io/badge/version-v0.4.5-blue)
 ![Build Status]()
 
 ## Updating
