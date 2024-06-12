@@ -1,0 +1,45 @@
+From 894832c6daa14105940f08f7ce71b548ee32cf2b Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin215@gmail.com>
+Date: Mon, 28 Nov 2022 10:40:17 -0600
+Subject: [PATCH 4/6] Add namespace to charts
+
+---
+ charts/prometheus/templates/_helpers.tpl | 8 ++++++--
+ charts/prometheus/values.yaml            | 2 ++
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/charts/prometheus/templates/_helpers.tpl b/charts/prometheus/templates/_helpers.tpl
+index 06850b65..01a659e4 100644
+--- a/charts/prometheus/templates/_helpers.tpl
++++ b/charts/prometheus/templates/_helpers.tpl
+@@ -227,8 +227,12 @@ Create the name of the service account to use for the server component
+ Define the prometheus.namespace template if set with forceNamespace or .Release.Namespace is set
+ */}}
+ {{- define "prometheus.namespace" -}}
+-  {{- default .Release.Namespace .Values.forceNamespace -}}
+-{{- end }}
++  {{- if .Values.forceNamespace -}}
++    {{- default .Values.forceNamespace .Values.defaultNamespace -}}
++  {{- else -}}
++    {{- default .Release.Namespace .Values.defaultNamespace -}}
++  {{- end -}}
++{{- end -}}
+ 
+ {{/*
+ Define template prometheus.namespaces producing a list of namespaces to monitor
+diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
+index 1eccfe9d..cb6bb3b6 100644
+--- a/charts/prometheus/values.yaml
++++ b/charts/prometheus/values.yaml
+@@ -9,6 +9,8 @@ rbac:
+ podSecurityPolicy:
+   enabled: false
+ 
++defaultNamespace: "observability"
++
+ sourceRegistry: "783794618700.dkr.ecr.us-west-2.amazonaws.com"
+ imagePullSecrets: []
+ # - name: "image-pull-secret"
+-- 
+2.44.0
+

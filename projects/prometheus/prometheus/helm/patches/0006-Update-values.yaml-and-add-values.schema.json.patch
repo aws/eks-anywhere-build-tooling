@@ -1,0 +1,643 @@
+From 99091dc59b7cd65cf03007ad40b47cb5666b0dcb Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin215@gmail.com>
+Date: Fri, 16 Dec 2022 16:31:33 -0600
+Subject: [PATCH 6/6] Update values.yaml and add values.schema.json
+
+---
+ charts/prometheus/values.schema.json | 351 ++++++++++++++-------------
+ charts/prometheus/values.yaml        |  31 ++-
+ 2 files changed, 195 insertions(+), 187 deletions(-)
+
+diff --git a/charts/prometheus/values.schema.json b/charts/prometheus/values.schema.json
+index 8a5cd3bb..1e6a67de 100644
+--- a/charts/prometheus/values.schema.json
++++ b/charts/prometheus/values.schema.json
+@@ -1,25 +1,134 @@
+ {
+     "$schema": "http://json-schema.org/schema#",
+     "type": "object",
++    "additionalProperties": false,
+     "properties": {
+         "alertRelabelConfigs": {
+             "type": "object"
+         },
+-        "alertmanager": {
++        "defaultNamespace": {
++            "type": "string"
++        },
++        "extraManifests": {
++            "type": "array"
++        },
++        "extraScrapeConfigs": {
++            "type": "string"
++        },
++        "forceNamespace": {
++            "type": "string"
++        },
++        "imagePullSecrets": {
++            "type": "array"
++        },
++        "networkPolicy": {
+             "type": "object",
+             "properties": {
++                "enabled": {
++                    "type": "boolean"
++                }
++            }
++        },
++        "nodeExporter": {
++            "type": "object",
++            "properties": {
++                "container": {
++                    "type": "object",
++                    "properties": {
++                        "securityContext": {
++                            "type": "object",
++                            "properties": {
++                                "allowPrivilegeEscalation": {
++                                    "type": "boolean"
++                                }
++                            }
++                        }
++                    }
++                },
++                "dnsConfig": {
++                    "type": "object"
++                },
+                 "enabled": {
+                     "type": "boolean"
+                 },
+-                "persistence": {
++                "extraArgs": {
++                    "type": "object"
++                },
++                "extraConfigmapMounts": {
++                    "type": "array"
++                },
++                "extraHostPathMounts": {
++                    "type": "array"
++                },
++                "extraInitContainers": {
++                    "type": "array"
++                },
++                "hostNetwork": {
++                    "type": "boolean"
++                },
++                "hostPID": {
++                    "type": "boolean"
++                },
++                "hostRootfs": {
++                    "type": "boolean"
++                },
++                "image": {
+                     "type": "object",
+                     "properties": {
+-                        "size": {
++                        "digest": {
+                             "type": "string"
++                        },
++                        "pullPolicy": {
++                            "type": "string"
++                        },
++                        "repository": {
++                            "type": "string"
++                        }
++                    }
++                },
++                "name": {
++                    "type": "string"
++                },
++                "nodeSelector": {
++                    "type": "object"
++                },
++                "pod": {
++                    "type": "object",
++                    "properties": {
++                        "labels": {
++                            "type": "object"
+                         }
+                     }
+                 },
+-                "podSecurityContext": {
++                "podAnnotations": {
++                    "type": "object"
++                },
++                "podDisruptionBudget": {
++                    "type": "object",
++                    "properties": {
++                        "enabled": {
++                            "type": "boolean"
++                        },
++                        "maxUnavailable": {
++                            "type": "integer"
++                        }
++                    }
++                },
++                "podSecurityPolicy": {
++                    "type": "object",
++                    "properties": {
++                        "annotations": {
++                            "type": "object"
++                        }
++                    }
++                },
++                "priorityClassName": {
++                    "type": "string"
++                },
++                "resources": {
++                    "type": "object"
++                },
++                "securityContext": {
+                     "type": "object",
+                     "properties": {
+                         "fsGroup": {
+@@ -35,139 +144,76 @@
+                             "type": "integer"
+                         }
+                     }
+-                }
+-            }
+-        },
+-        "configmapReload": {
+-            "type": "object",
+-            "properties": {
+-                "env": {
+-                    "type": "array"
+                 },
+-                "prometheus": {
++                "service": {
+                     "type": "object",
+                     "properties": {
+-                        "containerSecurityContext": {
+-                            "type": "object"
+-                        },
+-                        "enabled": {
+-                            "type": "boolean"
+-                        },
+-                        "extraArgs": {
+-                            "type": "object"
+-                        },
+-                        "extraConfigmapMounts": {
+-                            "type": "array"
+-                        },
+-                        "extraVolumeDirs": {
+-                            "type": "array"
+-                        },
+-                        "extraVolumeMounts": {
+-                            "type": "array"
+-                        },
+-                        "image": {
++                        "annotations": {
+                             "type": "object",
+                             "properties": {
+-                                "digest": {
+-                                    "type": "string"
+-                                },
+-                                "pullPolicy": {
+-                                    "type": "string"
+-                                },
+-                                "repository": {
+-                                    "type": "string"
+-                                },
+-                                "tag": {
++                                "prometheus.io/scrape": {
+                                     "type": "string"
+                                 }
+                             }
+                         },
+-                        "name": {
++                        "clusterIP": {
+                             "type": "string"
+                         },
+-                        "resources": {
++                        "externalIPs": {
++                            "type": "array"
++                        },
++                        "hostPort": {
++                            "type": "integer"
++                        },
++                        "labels": {
+                             "type": "object"
++                        },
++                        "loadBalancerIP": {
++                            "type": "string"
++                        },
++                        "loadBalancerSourceRanges": {
++                            "type": "array"
++                        },
++                        "servicePort": {
++                            "type": "integer"
++                        },
++                        "type": {
++                            "type": "string"
+                         }
+                     }
+                 },
+-                "reloadUrl": {
+-                    "type": "string"
+-                }
+-            }
+-        },
+-        "extraManifests": {
+-            "type": "array"
+-        },
+-        "extraScrapeConfigs": {
+-            "type": "string"
+-        },
+-        "forceNamespace": {
+-            "type": "string"
+-        },
+-        "imagePullSecrets": {
+-            "type": "array"
+-        },
+-        "kube-state-metrics": {
+-            "type": "object",
+-            "properties": {
+-                "enabled": {
+-                    "type": "boolean"
+-                }
+-            }
+-        },
+-        "networkPolicy": {
+-            "type": "object",
+-            "properties": {
+-                "enabled": {
+-                    "type": "boolean"
+-                }
+-            }
+-        },
+-        "podSecurityPolicy": {
+-            "type": "object",
+-            "properties": {
+-                "enabled": {
+-                    "type": "boolean"
+-                }
+-            }
+-        },
+-        "prometheus-node-exporter": {
+-            "type": "object",
+-            "properties": {
+-                "containerSecurityContext": {
+-                    "type": "object",
+-                    "properties": {
+-                        "allowPrivilegeEscalation": {
+-                            "type": "boolean"
++                "tolerations": {
++                    "type": "array",
++                    "items": {
++                        "type": "object",
++                        "properties": {
++                            "effect": {
++                                "type": "string"
++                            },
++                            "key": {
++                                "type": "string"
++                            },
++                            "operator": {
++                                "type": "string"
++                            }
+                         }
+                     }
+                 },
+-                "enabled": {
+-                    "type": "boolean"
+-                },
+-                "rbac": {
++                "updateStrategy": {
+                     "type": "object",
+                     "properties": {
+-                        "pspEnabled": {
+-                            "type": "boolean"
++                        "type": {
++                            "type": "string"
+                         }
+                     }
+                 }
+             }
+         },
+-        "prometheus-pushgateway": {
++        "podSecurityPolicy": {
+             "type": "object",
+             "properties": {
+                 "enabled": {
+                     "type": "boolean"
+-                },
+-                "serviceAnnotations": {
+-                    "type": "object",
+-                    "properties": {
+-                        "prometheus.io/probe": {
+-                            "type": "string"
+-                        }
+-                    }
+                 }
+             }
+         },
+@@ -194,15 +240,6 @@
+                 "baseURL": {
+                     "type": "string"
+                 },
+-                "clusterRoleNameOverride": {
+-                    "type": "string"
+-                },
+-                "command": {
+-                    "type": "array"
+-                },
+-                "configMapAnnotations": {
+-                    "type": "object"
+-                },
+                 "configMapOverrideName": {
+                     "type": "string"
+                 },
+@@ -235,12 +272,12 @@
+                 "enableServiceLinks": {
+                     "type": "boolean"
+                 },
++                "enabled": {
++                    "type": "boolean"
++                },
+                 "env": {
+                     "type": "array"
+                 },
+-                "exemplars": {
+-                    "type": "object"
+-                },
+                 "extraArgs": {
+                     "type": "object"
+                 },
+@@ -262,9 +299,15 @@
+                 "extraInitContainers": {
+                     "type": "array"
+                 },
++                "extraObjects": {
++                    "type": "array"
++                },
+                 "extraSecretMounts": {
+                     "type": "array"
+                 },
++                "extraTemplates": {
++                    "type": "array"
++                },
+                 "extraVolumeMounts": {
+                     "type": "array"
+                 },
+@@ -302,9 +345,6 @@
+                         },
+                         "repository": {
+                             "type": "string"
+-                        },
+-                        "tag": {
+-                            "type": "string"
+                         }
+                     }
+                 },
+@@ -385,9 +425,6 @@
+                         "size": {
+                             "type": "string"
+                         },
+-                        "statefulSetNameOverride": {
+-                            "type": "string"
+-                        },
+                         "subPath": {
+                             "type": "string"
+                         }
+@@ -396,14 +433,6 @@
+                 "podAnnotations": {
+                     "type": "object"
+                 },
+-                "podAntiAffinity": {
+-                    "type": "string",
+-                    "enum": ["", "soft", "hard"],
+-                    "default": ""
+-                },
+-                "podAntiAffinityTopologyKey": {
+-                    "type": "string"
+-                },
+                 "podDisruptionBudget": {
+                     "type": "object",
+                     "properties": {
+@@ -411,10 +440,7 @@
+                             "type": "boolean"
+                         },
+                         "maxUnavailable": {
+-                            "type": [
+-                                "string",
+-                                "integer"
+-                            ]
++                            "type": "integer"
+                         }
+                     }
+                 },
+@@ -429,9 +455,6 @@
+                         }
+                     }
+                 },
+-                "portName": {
+-                    "type": "string"
+-                },
+                 "prefixURL": {
+                     "type": "string"
+                 },
+@@ -459,9 +482,6 @@
+                 "readinessProbeTimeout": {
+                     "type": "integer"
+                 },
+-                "releaseNamespace": {
+-                    "type": "boolean"
+-                },
+                 "remoteRead": {
+                     "type": "array"
+                 },
+@@ -477,12 +497,6 @@
+                 "retention": {
+                     "type": "string"
+                 },
+-                "retentionSize": {
+-                    "type": "string"
+-                },
+-                "revisionHistoryLimit": {
+-                    "type": "integer"
+-                },
+                 "securityContext": {
+                     "type": "object",
+                     "properties": {
+@@ -503,9 +517,6 @@
+                 "service": {
+                     "type": "object",
+                     "properties": {
+-                        "additionalPorts": {
+-                            "type": "array"
+-                        },
+                         "annotations": {
+                             "type": "object"
+                         },
+@@ -622,12 +633,6 @@
+                         },
+                         "podManagementPolicy": {
+                             "type": "string"
+-                        },
+-                        "pvcDeleteOnStsDelete": {
+-                            "type": "boolean"
+-                        },
+-                        "pvcDeleteOnStsScale": {
+-                            "type": "boolean"
+                         }
+                     }
+                 },
+@@ -651,12 +656,6 @@
+                 "tolerations": {
+                     "type": "array"
+                 },
+-                "topologySpreadConstraints": {
+-                    "type": "array"
+-                },
+-                "tsdb": {
+-                    "type": "object"
+-                },
+                 "verticalAutoscaler": {
+                     "type": "object",
+                     "properties": {
+@@ -667,11 +666,9 @@
+                 }
+             }
+         },
+-        "scrapeConfigFiles": {
+-            "type": "array"
+-        },
+         "serverFiles": {
+             "type": "object",
++            "additionalProperties": false,
+             "properties": {
+                 "alerting_rules.yml": {
+                     "type": "object"
+@@ -726,7 +723,7 @@
+         "serviceAccounts": {
+             "type": "object",
+             "properties": {
+-                "server": {
++                "nodeExporter": {
+                     "type": "object",
+                     "properties": {
+                         "annotations": {
+@@ -737,13 +734,27 @@
+                         },
+                         "name": {
+                             "type": "string"
++                        }
++                    }
++                },
++                "server": {
++                    "type": "object",
++                    "properties": {
++                        "annotations": {
++                            "type": "object"
+                         },
+-                        "automountServiceAccountToken": {
++                        "create": {
+                             "type": "boolean"
++                        },
++                        "name": {
++                            "type": "string"
+                         }
+                     }
+                 }
+             }
++        },
++        "sourceRegistry": {
++            "type": "string"
+         }
+     }
+ }
+diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
+index cb6bb3b6..4240b98f 100644
+--- a/charts/prometheus/values.yaml
++++ b/charts/prometheus/values.yaml
+@@ -20,7 +20,7 @@ imagePullSecrets: []
+ serviceAccounts:
+   nodeExporter:
+     create: true
+-    name:
++    name: ""
+     annotations: {}
+   server:
+     create: true
+@@ -31,9 +31,6 @@ serviceAccounts:
+     ## It will be overriden by server.automountServiceAccountToken value, if set.
+     # automountServiceAccountToken: false
+ 
+-## Additional labels to attach to all resources
+-commonMetaLabels: {}
+-
+ 
+ nodeExporter:
+   ## If false, node-exporter will not be installed
+@@ -112,11 +109,15 @@ nodeExporter:
+   ## Node tolerations for node-exporter scheduling to nodes with taints
+   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+   ##
+-  tolerations: []
+-    # - key: "key"
+-    #   operator: "Equal|Exists"
+-    #   value: "value"
+-    #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
++  tolerations:
++    # For K8 version prior to 1.24
++    - key: "node-role.kubernetes.io/master"
++      operator: "Exists"
++      effect: "NoSchedule"
++    # For K8 version 1.24+
++    - key: "node-role.kubernetes.io/control-plane"
++      operator: "Exists"
++      effect: "NoSchedule"
+ 
+   ## Node labels for node-exporter pod assignment
+   ## Ref: https://kubernetes.io/docs/user-guide/node-selection/
+@@ -774,7 +775,7 @@ server:
+ 
+     loadBalancerIP: ""
+     loadBalancerSourceRanges: []
+-    servicePort: 80
++    servicePort: 9090
+     sessionAffinity: None
+     type: ClusterIP
+ 
+@@ -813,10 +814,6 @@ server:
+ ## Prometheus server ConfigMap entries for rule files (allow prometheus labels interpolation)
+ ruleFiles: {}
+ 
+-## Prometheus server ConfigMap entries for scrape_config_files
+-## (allows scrape configs defined in additional files)
+-##
+-scrapeConfigFiles: []
+ 
+ ## Prometheus server ConfigMap entries
+ ##
+@@ -895,7 +892,7 @@ serverFiles:
+           # so this should only be disabled in a controlled environment. You can
+           # disable certificate verification by uncommenting the line below.
+           #
+-          insecure_skip_verify: true
++          insecure_skip_verify: false
+         bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+ 
+         # Keep only the default/kubernetes service endpoints for the https port. This
+@@ -926,7 +923,7 @@ serverFiles:
+           # so this should only be disabled in a controlled environment. You can
+           # disable certificate verification by uncommenting the line below.
+           #
+-          insecure_skip_verify: true
++          insecure_skip_verify: false
+         bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+ 
+         kubernetes_sd_configs:
+@@ -963,7 +960,7 @@ serverFiles:
+           # so this should only be disabled in a controlled environment. You can
+           # disable certificate verification by uncommenting the line below.
+           #
+-          insecure_skip_verify: true
++          insecure_skip_verify: false
+         bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+ 
+         kubernetes_sd_configs:
+-- 
+2.44.0
+

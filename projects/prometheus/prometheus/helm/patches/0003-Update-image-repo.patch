@@ -1,0 +1,99 @@
+From 241571f7b392363405de5f1be950fa165b23624b Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin215@gmail.com>
+Date: Mon, 28 Nov 2022 10:38:19 -0600
+Subject: [PATCH 3/6] Update image repo
+
+---
+ charts/prometheus/templates/deploy.yaml              |  6 +-----
+ .../templates/node-exporter/daemonset.yaml           |  2 +-
+ charts/prometheus/templates/sts.yaml                 |  6 +-----
+ charts/prometheus/values.yaml                        | 12 +++++-------
+ 4 files changed, 8 insertions(+), 18 deletions(-)
+
+diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
+index 7f005fc7..c0076871 100644
+--- a/charts/prometheus/templates/deploy.yaml
++++ b/charts/prometheus/templates/deploy.yaml
+@@ -56,11 +56,7 @@ spec:
+       {{- end }}
+       containers:
+         - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
+-          {{- if .Values.server.image.digest }}
+-          image: "{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
+-          {{- else }}
+-          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion}}"
+-          {{- end }}
++          image: "{{ .Values.sourceRegistry }}/{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
+           imagePullPolicy: "{{ .Values.server.image.pullPolicy }}"
+           {{- with .Values.server.command }}
+           command:
+diff --git a/charts/prometheus/templates/node-exporter/daemonset.yaml b/charts/prometheus/templates/node-exporter/daemonset.yaml
+index f7568f75..0c4714d7 100644
+--- a/charts/prometheus/templates/node-exporter/daemonset.yaml
++++ b/charts/prometheus/templates/node-exporter/daemonset.yaml
+@@ -40,7 +40,7 @@ spec:
+ {{- end }}
+       containers:
+         - name: {{ template "prometheus.name" . }}-{{ .Values.nodeExporter.name }}
+-          image: "{{ .Values.nodeExporter.image.repository }}:{{ .Values.nodeExporter.image.tag }}"
++          image: "{{ .Values.sourceRegistry }}/{{ .Values.nodeExporter.image.repository }}@{{ .Values.nodeExporter.image.digest }}"
+           imagePullPolicy: "{{ .Values.nodeExporter.image.pullPolicy }}"
+           args:
+             - --path.procfs=/host/proc
+diff --git a/charts/prometheus/templates/sts.yaml b/charts/prometheus/templates/sts.yaml
+index a800f695..66023293 100644
+--- a/charts/prometheus/templates/sts.yaml
++++ b/charts/prometheus/templates/sts.yaml
+@@ -61,11 +61,7 @@ spec:
+       {{- end }}
+       containers:
+         - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
+-          {{- if .Values.server.image.digest }}
+-          image: "{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
+-          {{- else }}
+-          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion }}"
+-          {{- end }}
++          image: "{{ .Values.sourceRegistry }}/{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
+           imagePullPolicy: "{{ .Values.server.image.pullPolicy }}"
+           {{- with .Values.server.command }}
+           command:
+diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
+index 701996da..1eccfe9d 100644
+--- a/charts/prometheus/values.yaml
++++ b/charts/prometheus/values.yaml
+@@ -9,6 +9,7 @@ rbac:
+ podSecurityPolicy:
+   enabled: false
+ 
++sourceRegistry: "783794618700.dkr.ecr.us-west-2.amazonaws.com"
+ imagePullSecrets: []
+ # - name: "image-pull-secret"
+ 
+@@ -56,8 +57,8 @@ nodeExporter:
+   ## node-exporter container image
+   ##
+   image:
+-    repository: quay.io/prometheus/node-exporter
+-    tag: v1.3.1
++    repository: prometheus/node-exporter
++    digest: {{prometheus/node-exporter}}
+     pullPolicy: IfNotPresent
+ 
+   ## Specify if a Pod Security Policy for node-exporter must be created
+@@ -256,11 +257,8 @@ server:
+   ## Prometheus server container image
+   ##
+   image:
+-    repository: quay.io/prometheus/prometheus
+-    # if not set appVersion field from Chart.yaml is used
+-    tag: ""
+-    # When digest is set to a non-empty value, images will be pulled by digest (regardless of tag value).
+-    digest: ""
++    repository: prometheus/prometheus
++    digest: {{prometheus/prometheus}}
+     pullPolicy: IfNotPresent
+ 
+   ## Prometheus server command
+-- 
+2.44.0
+

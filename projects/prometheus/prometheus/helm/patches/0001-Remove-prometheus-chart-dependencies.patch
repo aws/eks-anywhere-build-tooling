@@ -1,0 +1,450 @@
+From 4e9ee0db2ef6e36143918fbf5b29f8ac78dc7f89 Mon Sep 17 00:00:00 2001
+From: "Ostosh, Ivy" <ivyjin215@gmail.com>
+Date: Mon, 28 Nov 2022 09:43:58 -0600
+Subject: [PATCH 1/6] Remove prometheus chart dependencies
+
+---
+ charts/prometheus/Chart.yaml             | 17 ------
+ charts/prometheus/templates/NOTES.txt    | 76 ------------------------
+ charts/prometheus/templates/_helpers.tpl |  7 ---
+ charts/prometheus/templates/cm.yaml      | 25 +-------
+ charts/prometheus/templates/deploy.yaml  | 75 +----------------------
+ charts/prometheus/templates/sts.yaml     | 69 ---------------------
+ charts/prometheus/values.yaml            | 55 +----------------
+ 7 files changed, 3 insertions(+), 321 deletions(-)
+
+diff --git a/charts/prometheus/Chart.yaml b/charts/prometheus/Chart.yaml
+index 2fba6d39..d6d6d297 100644
+--- a/charts/prometheus/Chart.yaml
++++ b/charts/prometheus/Chart.yaml
+@@ -24,23 +24,6 @@ maintainers:
+   - name: zeritti
+     email: rootsandtrees@posteo.de
+ type: application
+-dependencies:
+-  - name: alertmanager
+-    version: "1.11.*"
+-    repository: https://prometheus-community.github.io/helm-charts
+-    condition: alertmanager.enabled
+-  - name: kube-state-metrics
+-    version: "5.19.*"
+-    repository: https://prometheus-community.github.io/helm-charts
+-    condition: kube-state-metrics.enabled
+-  - name: prometheus-node-exporter
+-    version: "4.34.*"
+-    repository: https://prometheus-community.github.io/helm-charts
+-    condition: prometheus-node-exporter.enabled
+-  - name: prometheus-pushgateway
+-    version: "2.12.*"
+-    repository: https://prometheus-community.github.io/helm-charts
+-    condition: prometheus-pushgateway.enabled
+ keywords:
+   - monitoring
+   - prometheus
+diff --git a/charts/prometheus/templates/NOTES.txt b/charts/prometheus/templates/NOTES.txt
+index fc03c2a5..d9474bc2 100644
+--- a/charts/prometheus/templates/NOTES.txt
++++ b/charts/prometheus/templates/NOTES.txt
+@@ -33,81 +33,5 @@ Get the Prometheus server URL by running these commands in the same shell:
+ {{- end }}
+ {{- end }}
+ 
+-{{ if .Values.alertmanager.enabled }}
+-The Prometheus alertmanager can be accessed via port {{ .Values.alertmanager.service.port }} on the following DNS name from within your cluster:
+-{{ template "prometheus.alertmanager.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+-
+-{{ if .Values.alertmanager.ingress.enabled -}}
+-From outside the cluster, the alertmanager URL(s) are:
+-{{- range .Values.alertmanager.ingress.hosts }}
+-http://{{ . }}
+-{{- end }}
+-{{- else }}
+-Get the Alertmanager URL by running these commands in the same shell:
+-{{- if contains "NodePort" .Values.alertmanager.service.type }}
+-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "prometheus.alertmanager.fullname" . }})
+-  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+-  echo http://$NODE_IP:$NODE_PORT
+-{{- else if contains "LoadBalancer" .Values.alertmanager.service.type }}
+-  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+-        You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ template "prometheus.alertmanager.fullname" . }}'
+-
+-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "prometheus.alertmanager.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+-  echo http://$SERVICE_IP:{{ .Values.alertmanager.service.servicePort }}
+-{{- else if contains "ClusterIP"  .Values.alertmanager.service.type }}
+-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "alertmanager.name" .Subcharts.alertmanager }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+-  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 9093
+-{{- end }}
+-{{- end }}
+-
+-{{- if .Values.alertmanager.persistence.enabled }}
+-{{- else }}
+-#################################################################################
+-######   WARNING: Persistence is disabled!!! You will lose your data when   #####
+-######            the AlertManager pod is terminated.                       #####
+-#################################################################################
+-{{- end }}
+-{{- end }}
+-
+-{{- if (index .Values "prometheus-node-exporter" "enabled") }}
+-#################################################################################
+-######   WARNING: Pod Security Policy has been disabled by default since    #####
+-######            it deprecated after k8s 1.25+. use                        #####
+-######            (index .Values "prometheus-node-exporter" "rbac"          #####
+-###### .          "pspEnabled") with (index .Values                         #####
+-######            "prometheus-node-exporter" "rbac" "pspAnnotations")       #####
+-######            in case you still need it.                                #####
+-#################################################################################
+-{{- end }}
+-
+-{{ if (index .Values "prometheus-pushgateway" "enabled") }}
+-The Prometheus PushGateway can be accessed via port {{ index .Values "prometheus-pushgateway" "service" "port" }} on the following DNS name from within your cluster:
+-{{ include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") }}.{{ .Release.Namespace }}.svc.cluster.local
+-
+-{{ if (index .Values "prometheus-pushgateway" "ingress" "enabled") -}}
+-From outside the cluster, the pushgateway URL(s) are:
+-{{- range (index .Values "prometheus-pushgateway" "ingress" "hosts") }}
+-http://{{ . }}
+-{{- end }}
+-{{- else }}
+-Get the PushGateway URL by running these commands in the same shell:
+-{{- $pushgateway_svc_type := index .Values "prometheus-pushgateway" "service" "type" -}}
+-{{- if contains "NodePort" $pushgateway_svc_type }}
+-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") }})
+-  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+-  echo http://$NODE_IP:$NODE_PORT
+-{{- else if contains "LoadBalancer" $pushgateway_svc_type }}
+-  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+-        You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") }}'
+-
+-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+-  echo http://$SERVICE_IP:{{ index .Values "prometheus-pushgateway" "service" "port" }}
+-{{- else if contains "ClusterIP" $pushgateway_svc_type }}
+-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app={{ include "prometheus.name" (index .Subcharts "prometheus-pushgateway") }},component=pushgateway" -o jsonpath="{.items[0].metadata.name}")
+-  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 9091
+-{{- end }}
+-{{- end }}
+-{{- end }}
+-
+ For more information on running Prometheus, visit:
+ https://prometheus.io/
+diff --git a/charts/prometheus/templates/_helpers.tpl b/charts/prometheus/templates/_helpers.tpl
+index 0810e3c0..b7202480 100644
+--- a/charts/prometheus/templates/_helpers.tpl
++++ b/charts/prometheus/templates/_helpers.tpl
+@@ -73,13 +73,6 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this
+ {{- end -}}
+ {{- end -}}
+ 
+-{{/*
+-Create a fully qualified alertmanager name for communicating with the user via NOTES.txt
+-*/}}
+-{{- define "prometheus.alertmanager.fullname" -}}
+-{{- template "alertmanager.fullname" .Subcharts.alertmanager -}}
+-{{- end -}}
+-
+ {{/*
+ Create a fully qualified Prometheus server name.
+ We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+diff --git a/charts/prometheus/templates/cm.yaml b/charts/prometheus/templates/cm.yaml
+index 8713bd1e..6ad50cfc 100644
+--- a/charts/prometheus/templates/cm.yaml
++++ b/charts/prometheus/templates/cm.yaml
+@@ -66,36 +66,13 @@ data:
+ {{- if $root.Values.extraScrapeConfigs }}
+ {{ tpl $root.Values.extraScrapeConfigs $root | indent 4 }}
+ {{- end -}}
+-{{- if or ($root.Values.alertmanager.enabled) ($root.Values.server.alertmanagers) }}
++{{- if $root.Values.server.alertmanagers }}
+     alerting:
+ {{- if $root.Values.alertRelabelConfigs }}
+ {{ $root.Values.alertRelabelConfigs | toYaml  | trimSuffix "\n" | indent 6 }}
+ {{- end }}
+       alertmanagers:
+-{{- if $root.Values.server.alertmanagers }}
+ {{ toYaml $root.Values.server.alertmanagers | indent 8 }}
+-{{- else }}
+-      - kubernetes_sd_configs:
+-          - role: pod
+-        tls_config:
+-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+-        {{- if $root.Values.alertmanager.prefixURL }}
+-        path_prefix: {{ $root.Values.alertmanager.prefixURL }}
+-        {{- end }}
+-        relabel_configs:
+-        - source_labels: [__meta_kubernetes_namespace]
+-          regex: {{ $root.Release.Namespace }}
+-          action: keep
+-        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+-          regex: {{ $root.Release.Name }}
+-          action: keep
+-        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+-          regex: {{ default "alertmanager" $root.Values.alertmanager.nameOverride | trunc 63 | trimSuffix "-" }}
+-          action: keep
+-        - source_labels: [__meta_kubernetes_pod_container_port_number]
+-          regex: "9093"
+-          action: keep
+ {{- end -}}
+ {{- end -}}
+ {{- end -}}
+diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
+index fcf3d968..7f005fc7 100644
+--- a/charts/prometheus/templates/deploy.yaml
++++ b/charts/prometheus/templates/deploy.yaml
+@@ -55,62 +55,6 @@ spec:
+ {{ toYaml .Values.server.extraInitContainers | indent 8 }}
+       {{- end }}
+       containers:
+-        {{- if .Values.configmapReload.prometheus.enabled }}
+-        - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}-{{ .Values.configmapReload.prometheus.name }}
+-          {{- if .Values.configmapReload.prometheus.image.digest }}
+-          image: "{{ .Values.configmapReload.prometheus.image.repository }}@{{ .Values.configmapReload.prometheus.image.digest }}"
+-          {{- else }}
+-          image: "{{ .Values.configmapReload.prometheus.image.repository }}:{{ .Values.configmapReload.prometheus.image.tag }}"
+-          {{- end }}
+-          imagePullPolicy: "{{ .Values.configmapReload.prometheus.image.pullPolicy }}"
+-          {{- with .Values.configmapReload.prometheus.containerSecurityContext }}
+-          securityContext:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          args:
+-            - --watched-dir=/etc/config
+-          {{- $default_url := "http://127.0.0.1:9090/-/reload" }}
+-          {{- with .Values.server.prefixURL }}
+-          {{- $default_url = printf "http://127.0.0.1:9090%s/-/reload" . }}
+-          {{- end }}
+-            - --reload-url={{ default $default_url .Values.configmapReload.reloadUrl }}
+-          {{- range $key, $value := .Values.configmapReload.prometheus.extraArgs }}
+-            {{- if $value }}
+-            - --{{ $key }}={{ $value }}
+-            {{- else }}
+-            - --{{ $key }}
+-            {{- end }}
+-          {{- end }}
+-          {{- range .Values.configmapReload.prometheus.extraVolumeDirs }}
+-            - --watched-dir={{ . }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.env }}
+-          env:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          {{- if .Values.configmapReload.prometheus.containerPort }}
+-          ports:
+-            - containerPort: {{ .Values.configmapReload.prometheus.containerPort }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.prometheus.resources }}
+-          resources:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          volumeMounts:
+-            - name: config-volume
+-              mountPath: /etc/config
+-              readOnly: true
+-          {{- range .Values.configmapReload.prometheus.extraConfigmapMounts }}
+-            - name: {{ $.Values.configmapReload.prometheus.name }}-{{ .name }}
+-              mountPath: {{ .mountPath }}
+-              subPath: {{ .subPath }}
+-              readOnly: {{ .readOnly }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.prometheus.extraVolumeMounts }}
+-            {{ toYaml . | nindent 12 }}
+-          {{- end }}
+-        {{- end }}
+-
+         - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
+           {{- if .Values.server.image.digest }}
+           image: "{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
+@@ -346,16 +290,7 @@ spec:
+           hostPath:
+             path: {{ .hostPath }}
+       {{- end }}
+-      {{- range .Values.configmapReload.prometheus.extraConfigmapMounts }}
+-        - name: {{ $.Values.configmapReload.prometheus.name }}-{{ .name }}
+-          configMap:
+-            name: {{ .configMap }}
+-      {{- end }}
+-      {{- range .Values.server.extraConfigmapMounts }}
+-        - name: {{ $.Values.server.name }}-{{ .name }}
+-          configMap:
+-            name: {{ .configMap }}
+-      {{- end }}
++
+       {{- range .Values.server.extraSecretMounts }}
+         - name: {{ .name }}
+           secret:
+@@ -364,14 +299,6 @@ spec:
+             optional: {{ . }}
+             {{- end }}
+       {{- end }}
+-      {{- range .Values.configmapReload.prometheus.extraConfigmapMounts }}
+-        - name: {{ .name }}
+-          configMap:
+-            name: {{ .configMap }}
+-            {{- with .optional }}
+-            optional: {{ . }}
+-            {{- end }}
+-      {{- end }}
+ {{- if .Values.server.extraVolumes }}
+ {{ toYaml .Values.server.extraVolumes | indent 8}}
+ {{- end }}
+diff --git a/charts/prometheus/templates/sts.yaml b/charts/prometheus/templates/sts.yaml
+index 6a7b8986..a800f695 100644
+--- a/charts/prometheus/templates/sts.yaml
++++ b/charts/prometheus/templates/sts.yaml
+@@ -60,62 +60,6 @@ spec:
+ {{ toYaml .Values.server.extraInitContainers | indent 8 }}
+       {{- end }}
+       containers:
+-        {{- if .Values.configmapReload.prometheus.enabled }}
+-        - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}-{{ .Values.configmapReload.prometheus.name }}
+-          {{- if .Values.configmapReload.prometheus.image.digest }}
+-          image: "{{ .Values.configmapReload.prometheus.image.repository }}@{{ .Values.configmapReload.prometheus.image.digest }}"
+-          {{- else }}
+-          image: "{{ .Values.configmapReload.prometheus.image.repository }}:{{ .Values.configmapReload.prometheus.image.tag }}"
+-          {{- end }}
+-          imagePullPolicy: "{{ .Values.configmapReload.prometheus.image.pullPolicy }}"
+-          {{- with .Values.configmapReload.prometheus.containerSecurityContext }}
+-          securityContext:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          args:
+-            - --watched-dir=/etc/config
+-          {{- $default_url := "http://127.0.0.1:9090/-/reload" }}
+-          {{- with .Values.server.prefixURL }}
+-          {{- $default_url = printf "http://127.0.0.1:9090%s/-/reload" . }}
+-          {{- end }}
+-            - --reload-url={{ default $default_url .Values.configmapReload.reloadUrl }}
+-          {{- range $key, $value := .Values.configmapReload.prometheus.extraArgs }}
+-            {{- if $value }}
+-            - --{{ $key }}={{ $value }}
+-            {{- else }}
+-            - --{{ $key }}
+-            {{- end }}
+-          {{- end }}
+-          {{- range .Values.configmapReload.prometheus.extraVolumeDirs }}
+-            - --watched-dir={{ . }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.env }}
+-          env:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          {{- if .Values.configmapReload.prometheus.containerPort }}
+-          ports:
+-            - containerPort: {{ .Values.configmapReload.prometheus.containerPort }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.prometheus.resources }}
+-          resources:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          volumeMounts:
+-            - name: config-volume
+-              mountPath: /etc/config
+-              readOnly: true
+-          {{- with .Values.configmapReload.prometheus.extraVolumeMounts }}
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          {{- range .Values.configmapReload.prometheus.extraConfigmapMounts }}
+-            - name: {{ $.Values.configmapReload.prometheus.name }}-{{ .name }}
+-              mountPath: {{ .mountPath }}
+-              subPath: {{ .subPath }}
+-              readOnly: {{ .readOnly }}
+-          {{- end }}
+-        {{- end }}
+-
+         - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
+           {{- if .Values.server.image.digest }}
+           image: "{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
+@@ -349,11 +293,6 @@ spec:
+           hostPath:
+             path: {{ .hostPath }}
+       {{- end }}
+-      {{- range .Values.configmapReload.prometheus.extraConfigmapMounts }}
+-        - name: {{ $.Values.configmapReload.prometheus.name }}-{{ .name }}
+-          configMap:
+-            name: {{ .configMap }}
+-      {{- end }}
+       {{- range .Values.server.extraConfigmapMounts }}
+         - name: {{ $.Values.server.name }}-{{ .name }}
+           configMap:
+@@ -367,14 +306,6 @@ spec:
+             optional: {{ . }}
+             {{- end }}
+       {{- end }}
+-      {{- range .Values.configmapReload.prometheus.extraConfigmapMounts }}
+-        - name: {{ .name }}
+-          configMap:
+-            name: {{ .configMap }}
+-            {{- with .optional }}
+-            optional: {{ . }}
+-            {{- end }}
+-      {{- end }}
+ {{- if .Values.server.extraVolumes }}
+ {{ toYaml .Values.server.extraVolumes | indent 8}}
+ {{- end }}
+diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
+index ea21e453..27dc52e8 100644
+--- a/charts/prometheus/values.yaml
++++ b/charts/prometheus/values.yaml
+@@ -1216,57 +1216,4 @@ extraManifests: []
+   #   labels:
+   #     name: prometheus-extra
+   #   data:
+-  #     extra-data: "value"
+-
+-# Configuration of subcharts defined in Chart.yaml
+-
+-## alertmanager sub-chart configurable values
+-## Please see https://github.com/prometheus-community/helm-charts/tree/main/charts/alertmanager
+-##
+-alertmanager:
+-  ## If false, alertmanager will not be installed
+-  ##
+-  enabled: true
+-
+-  persistence:
+-    size: 2Gi
+-
+-  podSecurityContext:
+-    runAsUser: 65534
+-    runAsNonRoot: true
+-    runAsGroup: 65534
+-    fsGroup: 65534
+-
+-## kube-state-metrics sub-chart configurable values
+-## Please see https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-state-metrics
+-##
+-kube-state-metrics:
+-  ## If false, kube-state-metrics sub-chart will not be installed
+-  ##
+-  enabled: true
+-
+-## prometheus-node-exporter sub-chart configurable values
+-## Please see https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-node-exporter
+-##
+-prometheus-node-exporter:
+-  ## If false, node-exporter will not be installed
+-  ##
+-  enabled: true
+-
+-  rbac:
+-    pspEnabled: false
+-
+-  containerSecurityContext:
+-    allowPrivilegeEscalation: false
+-
+-## prometheus-pushgateway sub-chart configurable values
+-## Please see https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-pushgateway
+-##
+-prometheus-pushgateway:
+-  ## If false, pushgateway will not be installed
+-  ##
+-  enabled: true
+-
+-  # Optional service annotations
+-  serviceAnnotations:
+-    prometheus.io/probe: pushgateway
++  #     extra-data: "value"
+\ No newline at end of file
+-- 
+2.44.0
+
