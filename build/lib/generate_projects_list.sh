@@ -18,7 +18,7 @@ set -o pipefail
 
 BASE_DIRECTORY="${1?Specify first argument - Base directory of build-tooling repo}"
 UPSTREAM_PROJECTS_FILE="$BASE_DIRECTORY/UPSTREAM_PROJECTS.yaml"
-
+SUPPORTED_RELEASE_BRANCHES_FILE="$BASE_DIRECTORY/release/SUPPORTED_RELEASE_BRANCHES"
 YQ_LATEST_RELEASE_URL="https://github.com/mikefarah/yq/releases/latest"
 CURRENT_YQ_VERSION=$(yq -V | awk '{print $NF}')
 CURRENT_YQ_MAJOR_VERSION=${CURRENT_YQ_VERSION:1:1}
@@ -59,7 +59,16 @@ for org_path in projects/*; do
         yq eval -i -P ".projects += [{\"org\": \"$org\", \"repos\": []}]" $UPSTREAM_PROJECTS_FILE # Add an entry for this org in the projects array
         for repo in "${repos[@]}"; do
             yq eval -i -P ".projects[$org_count].repos += [{\"name\": \"$repo\", \"versions\": []}]" $UPSTREAM_PROJECTS_FILE # Add each repo to the repos array
-            git_tags=$(find projects/$org/$repo -type f -name "GIT_TAG" | sort)
+            git_tags=""
+            if [ -f projects/$org/$repo/GIT_TAG ]; then
+                git_tags="projects/$org/$repo/GIT_TAG"
+            fi
+            for release_branch in $(cat $SUPPORTED_RELEASE_BRANCHES_FILE); do
+                file="projects/$org/$repo/$release_branch/GIT_TAG"
+                if [ -f $file ]; then
+                    git_tags+=" $file"
+                fi
+            done
             for file in $git_tags; do
                 tag=$(cat $file)
                 golang_version="N/A"
