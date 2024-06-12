@@ -1034,7 +1034,8 @@ check-for-supported-release-branch:
 	elif [ -d $(MAKE_ROOT)/$(RELEASE_BRANCH) ]; then \
 		echo "Supported version to build"; \
 		exit 0; \
-	elif { [ "false" == "$(BINARIES_ARE_RELEASE_BRANCHED)" ] || [ -z "$(BINARY_TARGET_FILES)" ]; } && [ "true" == "$$(yq e ".releases[] | select(.branch==\"$(RELEASE_BRANCH)\") | has(\"branch\")" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)" ]; then \
+	elif { [ "false" == "$(BINARIES_ARE_RELEASE_BRANCHED)" ] || [ -z "$(BINARY_TARGET_FILES)" ]; } && \
+		{ [ "true" == "$$(yq e ".releases[] | select(.branch==\"$(RELEASE_BRANCH)\") | has(\"branch\")" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)" ] && grep $(RELEASE_BRANCH) $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_BRANCHES &> /dev/null; }; then \
 		echo "Supported version to build"; \
 		exit 0; \
 	else \
