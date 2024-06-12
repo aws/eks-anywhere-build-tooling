@@ -6,8 +6,8 @@ REPO_OWNER=tinkerbell
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
-BINARY_TARGET_FILES=boots
-SOURCE_PATTERNS=./cmd/boots
+BINARY_TARGET_FILES=smee
+SOURCE_PATTERNS=./cmd/smee
 
 GITREV?=$(shell git -C $(REPO) rev-parse --short HEAD)
 
