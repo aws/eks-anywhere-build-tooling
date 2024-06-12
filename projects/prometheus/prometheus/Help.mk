@@ -18,9 +18,9 @@ _output/bin/prometheus/linux-arm64/prometheus: ## Build `_output/bin/prometheus/
 _output/bin/prometheus/linux-arm64/promtool: ## Build `_output/bin/prometheus/linux-arm64/promtool`
 
 ##@ Image Targets
-local-images: ## Builds `prometheus/images/amd64` as oci tars for presumbit validation
+local-images: ## Builds `prometheus/images/arm64` as oci tars for presumbit validation
 images: ## Pushes `prometheus/images/push` to IMAGE_REPO
-prometheus/images/amd64: ## Builds/pushes `prometheus/images/amd64`
+prometheus/images/arm64: ## Builds/pushes `prometheus/images/arm64`
 prometheus/images/push: ## Builds/pushes `prometheus/images/push`
 
 ##@ Helm Targets
