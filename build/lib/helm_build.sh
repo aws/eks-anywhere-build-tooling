@@ -21,8 +21,15 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
 OUTPUT_DIR="${1?First arguement is output directory}"
-HELM_CHART_FOLDER="${2?Second argument is helm chart folder}"
-BUILD_HELM_DEPENDENCIES="${3?Third argument is whether or not to build helm dependencies}"
+HELM_DESTINATION_REPOSITORY="${2?Second argument is helm repository}"
+HELM_CHART_FOLDER="${3?Third argument is helm chart folder}"
+BUILD_HELM_DEPENDENCIES="${4?Fourth argument is whether or not to build helm dependencies}"
+
+CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
+
+if [ "${HELM_CHART_FOLDER}" != "." ]; then
+    CHART_NAME=${CHART_NAME}/${HELM_CHART_FOLDER}
+fi
 
 
 #
@@ -30,7 +37,7 @@ BUILD_HELM_DEPENDENCIES="${3?Third argument is whether or not to build helm depe
 #
 cd ${OUTPUT_DIR}/helm
 if [ "${BUILD_HELM_DEPENDENCIES}" = "true" ]; then
-    build::common::echo_and_run helm dependency update "${HELM_CHART_FOLDER}"
-    build::common::echo_and_run helm dependency build "${HELM_CHART_FOLDER}"
+    build::common::echo_and_run helm dependency update "${CHART_NAME}"
+    build::common::echo_and_run helm dependency build "${CHART_NAME}"
 fi
-build::common::echo_and_run helm package "${HELM_CHART_FOLDER}"
+build::common::echo_and_run helm package "${CHART_NAME}"
