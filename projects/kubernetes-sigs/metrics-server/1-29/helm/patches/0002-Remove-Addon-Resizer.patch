@@ -1,18 +1,18 @@
-From 9bb179b50087d0b0f7ed267e71b9106ad50c148e Mon Sep 17 00:00:00 2001
+From c0e41c2dd014793543a20439104d94c1b5c2510a Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
-Date: Thu, 30 Nov 2023 11:54:54 -0500
+Date: Sun, 2 Jun 2024 17:37:38 -0700
 Subject: [PATCH 2/2] Remove Addon Resizer
 
 ---
- charts/metrics-server/templates/_helpers.tpl  | 21 -----------
+ charts/metrics-server/templates/_helpers.tpl  | 21 ----------
  .../templates/clusterrole-nanny.yaml          | 13 -------
- .../templates/clusterrolebinding-nanny.yaml   | 18 ----------
- .../templates/configmaps-nanny.yaml           | 17 ---------
- .../metrics-server/templates/deployment.yaml  | 35 -------------------
- .../metrics-server/templates/role-nanny.yaml  | 27 --------------
- .../templates/rolebinding-nanny.yaml          | 19 ----------
- charts/metrics-server/values.yaml             | 24 -------------
- 8 files changed, 174 deletions(-)
+ .../templates/clusterrolebinding-nanny.yaml   | 18 ---------
+ .../templates/configmaps-nanny.yaml           | 17 --------
+ .../metrics-server/templates/deployment.yaml  | 39 -------------------
+ .../metrics-server/templates/role-nanny.yaml  | 27 -------------
+ .../templates/rolebinding-nanny.yaml          | 19 ---------
+ charts/metrics-server/values.yaml             | 34 ----------------
+ 8 files changed, 188 deletions(-)
  delete mode 100644 charts/metrics-server/templates/clusterrole-nanny.yaml
  delete mode 100644 charts/metrics-server/templates/clusterrolebinding-nanny.yaml
  delete mode 100644 charts/metrics-server/templates/configmaps-nanny.yaml
@@ -20,7 +20,7 @@ Subject: [PATCH 2/2] Remove Addon Resizer
  delete mode 100644 charts/metrics-server/templates/rolebinding-nanny.yaml
 
 diff --git a/charts/metrics-server/templates/_helpers.tpl b/charts/metrics-server/templates/_helpers.tpl
-index 492e462..e9b4728 100644
+index 492e4623..e9b47284 100644
 --- a/charts/metrics-server/templates/_helpers.tpl
 +++ b/charts/metrics-server/templates/_helpers.tpl
 @@ -71,27 +71,6 @@ The image to use
@@ -53,7 +53,7 @@ index 492e462..e9b4728 100644
    {{- if and (.Capabilities.APIVersions.Has "policy/v1") (semverCompare ">= 1.21-0" .Capabilities.KubeVersion.Version) -}}
 diff --git a/charts/metrics-server/templates/clusterrole-nanny.yaml b/charts/metrics-server/templates/clusterrole-nanny.yaml
 deleted file mode 100644
-index 24edd81..0000000
+index 24edd81c..00000000
 --- a/charts/metrics-server/templates/clusterrole-nanny.yaml
 +++ /dev/null
 @@ -1,13 +0,0 @@
@@ -72,7 +72,7 @@ index 24edd81..0000000
 -{{- end -}}
 diff --git a/charts/metrics-server/templates/clusterrolebinding-nanny.yaml b/charts/metrics-server/templates/clusterrolebinding-nanny.yaml
 deleted file mode 100644
-index 43738cc..0000000
+index 43738ccb..00000000
 --- a/charts/metrics-server/templates/clusterrolebinding-nanny.yaml
 +++ /dev/null
 @@ -1,18 +0,0 @@
@@ -96,7 +96,7 @@ index 43738cc..0000000
 -{{- end -}}
 diff --git a/charts/metrics-server/templates/configmaps-nanny.yaml b/charts/metrics-server/templates/configmaps-nanny.yaml
 deleted file mode 100644
-index c25005e..0000000
+index c25005ec..00000000
 --- a/charts/metrics-server/templates/configmaps-nanny.yaml
 +++ /dev/null
 @@ -1,17 +0,0 @@
@@ -118,15 +118,19 @@ index c25005e..0000000
 -    memoryPerNode: {{ .Values.addonResizer.nanny.extraMemory }}
 -{{- end -}}
 diff --git a/charts/metrics-server/templates/deployment.yaml b/charts/metrics-server/templates/deployment.yaml
-index e80dc0f..0128e28 100644
+index d12b5d2e..209ac328 100644
 --- a/charts/metrics-server/templates/deployment.yaml
 +++ b/charts/metrics-server/templates/deployment.yaml
-@@ -87,44 +87,9 @@ spec:
+@@ -94,48 +94,9 @@ spec:
            resources:
              {{- toYaml . | nindent 12 }}
            {{- end }}
 -        {{- if .Values.addonResizer.enabled }}
 -        - name: metrics-server-nanny
+-          {{- with .Values.addonResizer.securityContext }}
+-          securityContext:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
 -          image: {{ include "metrics-server.addonResizer.image" . }}
 -          env:
 -            - name: MY_POD_NAME
@@ -157,7 +161,7 @@ index e80dc0f..0128e28 100644
 -        {{- end }}
        volumes:
          - name: tmp
-           emptyDir: {}
+           {{- toYaml .Values.tmpVolume | nindent 10 }}
 -      {{- if .Values.addonResizer.enabled }}
 -        - name: nanny-config-volume
 -          configMap:
@@ -168,7 +172,7 @@ index e80dc0f..0128e28 100644
        {{- end }}
 diff --git a/charts/metrics-server/templates/role-nanny.yaml b/charts/metrics-server/templates/role-nanny.yaml
 deleted file mode 100644
-index f0bf8fc..0000000
+index f0bf8fce..00000000
 --- a/charts/metrics-server/templates/role-nanny.yaml
 +++ /dev/null
 @@ -1,27 +0,0 @@
@@ -201,7 +205,7 @@ index f0bf8fc..0000000
 -{{- end -}}
 diff --git a/charts/metrics-server/templates/rolebinding-nanny.yaml b/charts/metrics-server/templates/rolebinding-nanny.yaml
 deleted file mode 100644
-index 73bfaaf..0000000
+index 73bfaaff..00000000
 --- a/charts/metrics-server/templates/rolebinding-nanny.yaml
 +++ /dev/null
 @@ -1,19 +0,0 @@
@@ -225,10 +229,10 @@ index 73bfaaf..0000000
 -{{- end -}}
 -{{- end -}}
 diff --git a/charts/metrics-server/values.yaml b/charts/metrics-server/values.yaml
-index 38bea8c..5f12132 100644
+index 53324671..42270159 100644
 --- a/charts/metrics-server/values.yaml
 +++ b/charts/metrics-server/values.yaml
-@@ -123,27 +123,6 @@ service:
+@@ -125,37 +125,6 @@ service:
    #  kubernetes.io/cluster-service: "true"
    #  kubernetes.io/name: "Metrics-server"
  
@@ -236,7 +240,17 @@ index 38bea8c..5f12132 100644
 -  enabled: false
 -  image:
 -    repository: registry.k8s.io/autoscaling/addon-resizer
--    tag: 1.8.19
+-    tag: 1.8.20
+-  securityContext:
+-    allowPrivilegeEscalation: false
+-    readOnlyRootFilesystem: true
+-    runAsNonRoot: true
+-    runAsUser: 1000
+-    seccompProfile:
+-      type: RuntimeDefault
+-    capabilities:
+-      drop:
+-        - ALL
 -  resources:
 -    requests:
 -      cpu: 40m
@@ -256,7 +270,7 @@ index 38bea8c..5f12132 100644
  metrics:
    enabled: false
  
-@@ -160,9 +139,6 @@ resources:
+@@ -172,9 +141,6 @@ resources:
    requests:
      cpu: 100m
      memory: 200Mi
@@ -267,5 +281,5 @@ index 38bea8c..5f12132 100644
  extraVolumeMounts: []
  
 -- 
-2.39.3 (Apple Git-145)
+2.44.0
 
