@@ -1,0 +1,35 @@
+From bb2527578cca77908f80981c3f871a1faec3b193 Mon Sep 17 00:00:00 2001
+From: Ahree Hong <ahreeh@amazon.com>
+Date: Thu, 13 Jun 2024 11:20:37 -0700
+Subject: [PATCH 1/2] Load stream model for nginx and update http2 command
+
+Signed-off-by: Ahree Hong <ahreeh@amazon.com>
+---
+ tinkerbell/stack/templates/nginx-configmap.yaml | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/tinkerbell/stack/templates/nginx-configmap.yaml b/tinkerbell/stack/templates/nginx-configmap.yaml
+index 37f5be0..4b65e86 100644
+--- a/tinkerbell/stack/templates/nginx-configmap.yaml
++++ b/tinkerbell/stack/templates/nginx-configmap.yaml
+@@ -8,6 +8,7 @@ metadata:
+   namespace: {{ .Release.Namespace | quote }}
+ data:
+   nginx.conf: |
++    load_module /usr/lib64/nginx/modules/ngx_stream_module.so;
+     worker_processes 1;
+     events {
+         worker_connections  1024;
+@@ -42,8 +43,7 @@ data:
+       }
+ 
+       server {
+-        listen {{ .Values.tink.server.service.port }};
+-        http2 on;
++        listen {{ .Values.tink.server.service.port }} http2;
+         location / {
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+-- 
+2.45.0
+

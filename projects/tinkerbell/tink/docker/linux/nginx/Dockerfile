@@ -4,7 +4,7 @@ ARG BUILDER_IMAGE
 FROM $BUILDER_IMAGE as builder
 
 RUN set -x && \
-    install_binary /usr/bin/awk && \
+    install_binary /usr/sbin/awk && \
     install_rpm nginx-mod-stream && \
     cleanup "deps"
 
