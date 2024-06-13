@@ -1,4 +1,4 @@
-From 7f9ac0372627995e5691fae386f379b5ea88f479 Mon Sep 17 00:00:00 2001
+From 860c4b5f83e9c4904c3810eada86937f0750a1b3 Mon Sep 17 00:00:00 2001
 From: "Ostosh, Ivy" <ivyjin215@gmail.com>
 Date: Mon, 28 Nov 2022 10:20:17 -0600
 Subject: [PATCH 2/6] Add node-exporter component
@@ -130,7 +130,7 @@ index 6ad50cfc..acd5ad21 100644
 -{{- end -}}
 diff --git a/charts/prometheus/templates/node-exporter/daemonset.yaml b/charts/prometheus/templates/node-exporter/daemonset.yaml
 new file mode 100644
-index 00000000..f7568f75
+index 00000000..d75f8a1c
 --- /dev/null
 +++ b/charts/prometheus/templates/node-exporter/daemonset.yaml
 @@ -0,0 +1,150 @@
@@ -145,7 +145,7 @@ index 00000000..f7568f75
 +  labels:
 +    {{- include "prometheus.nodeExporter.labels" . | nindent 4 }}
 +  name: {{ template "prometheus.nodeExporter.fullname" . }}
-+namespace: {{ include "prometheus.namespace" . }}
++  namespace: {{ include "prometheus.namespace" . }}
 +spec:
 +  selector:
 +    matchLabels:
@@ -397,24 +397,24 @@ index 00000000..06914b70
 +{{- end }}
 diff --git a/charts/prometheus/templates/node-exporter/serviceaccount.yaml b/charts/prometheus/templates/node-exporter/serviceaccount.yaml
 new file mode 100644
-index 00000000..f59d4236
+index 00000000..352de6ff
 --- /dev/null
 +++ b/charts/prometheus/templates/node-exporter/serviceaccount.yaml
 @@ -0,0 +1,11 @@
 +{{- if and .Values.nodeExporter.enabled .Values.serviceAccounts.nodeExporter.create -}}
 +apiVersion: v1
 +kind: ServiceAccount
-+namespace: {{ include "prometheus.namespace" . | indent 2 }}
 +metadata:
 +  labels:
 +    {{- include "prometheus.nodeExporter.labels" . | nindent 4 }}
 +  name: {{ template "prometheus.serviceAccountName.nodeExporter" . }}
++  namespace: {{ include "prometheus.namespace" .}}
 +  annotations:
 +{{ toYaml .Values.serviceAccounts.nodeExporter.annotations | indent 4 }}
 +{{- end -}}
 diff --git a/charts/prometheus/templates/node-exporter/svc.yaml b/charts/prometheus/templates/node-exporter/svc.yaml
 new file mode 100644
-index 00000000..6bf214ee
+index 00000000..dad0130a
 --- /dev/null
 +++ b/charts/prometheus/templates/node-exporter/svc.yaml
 @@ -0,0 +1,47 @@
@@ -432,7 +432,7 @@ index 00000000..6bf214ee
 +{{ toYaml .Values.nodeExporter.service.labels | indent 4 }}
 +{{- end }}
 +  name: {{ template "prometheus.nodeExporter.fullname" . }}
-+namespace: {{ include "prometheus.namespace" . }}
++  namespace: {{ include "prometheus.namespace" . }}
 +spec:
 +{{- if .Values.nodeExporter.service.clusterIP }}
 +  clusterIP: {{ .Values.nodeExporter.service.clusterIP }}
