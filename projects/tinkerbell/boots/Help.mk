@@ -11,9 +11,9 @@ clone-repo:  ## Clone upstream `boots`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `boots` for `linux/amd64 linux/arm64`
-_output/bin/boots/linux-amd64/boots: ## Build `_output/bin/boots/linux-amd64/boots`
-_output/bin/boots/linux-arm64/boots: ## Build `_output/bin/boots/linux-arm64/boots`
+binaries: ## Build all binaries: `smee` for `linux/amd64 linux/arm64`
+_output/bin/boots/linux-amd64/smee: ## Build `_output/bin/boots/linux-amd64/smee`
+_output/bin/boots/linux-arm64/smee: ## Build `_output/bin/boots/linux-arm64/smee`
 
 ##@ Image Targets
 local-images: ## Builds `boots/images/amd64` as oci tars for presumbit validation
@@ -38,8 +38,8 @@ run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
 run-in-docker/boots/eks-anywhere-go-mod-download: ## Run `boots/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/_output/bin/boots/linux-amd64/boots: ## Run `_output/bin/boots/linux-amd64/boots` in docker builder container
-run-in-docker/_output/bin/boots/linux-arm64/boots: ## Run `_output/bin/boots/linux-arm64/boots` in docker builder container
+run-in-docker/_output/bin/boots/linux-amd64/smee: ## Run `_output/bin/boots/linux-amd64/smee` in docker builder container
+run-in-docker/_output/bin/boots/linux-arm64/smee: ## Run `_output/bin/boots/linux-arm64/smee` in docker builder container
 run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
 
 ##@ License Targets
