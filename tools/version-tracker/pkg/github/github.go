@@ -97,7 +97,7 @@ func GetFileContents(client *github.Client, org, repo, filePath, ref string) ([]
 }
 
 // GetLatestRevision returns the latest revision (GitHub release or tag) for a given GitHub repository.
-func GetLatestRevision(client *github.Client, org, repo, currentRevision string, isTrackedUsingCommitHash, releaseBranched bool) (string, bool, error) {
+func GetLatestRevision(client *github.Client, org, repo, currentRevision, branchName string, isTrackedUsingCommitHash, releaseBranched bool) (string, bool, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository", org, repo))
 	var currentRevisionCommit, latestRevision string
 	needsUpgrade := false
@@ -158,7 +158,13 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string,
 			if releaseBranched {
 				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
 				releaseNumber := strings.Split(releaseBranch, "-")[1]
-				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v?1.%s.\d$`, releaseNumber))
+				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v?1.%s.\d+$`, releaseNumber))
+				if !tagRegex.MatchString(tagNameForSemver) {
+					continue
+				}
+			}
+			if branchName != constants.MainBranchName {
+				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v%d.%d.\d+`, currentRevisionSemver.Major, currentRevisionSemver.Minor))
 				if !tagRegex.MatchString(tagNameForSemver) {
 					continue
 				}

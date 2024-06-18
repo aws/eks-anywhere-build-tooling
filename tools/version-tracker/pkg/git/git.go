@@ -18,7 +18,7 @@ import (
 )
 
 // CloneRepo clones the remote repository to a destination folder and creates a Git remote.
-func CloneRepo(cloneURL, destination, headRepoOwner string) (*git.Repository, string, error) {
+func CloneRepo(cloneURL, destination, headRepoOwner, branch string) (*git.Repository, string, error) {
 	logger.V(6).Info(fmt.Sprintf("Cloning repository [%s] to %s directory", cloneURL, destination))
 	progress := io.Discard
 	if logger.Verbosity >= 6 {
@@ -40,9 +40,9 @@ func CloneRepo(cloneURL, destination, headRepoOwner string) (*git.Repository, st
 		}
 	}
 
-	repoHeadCommit, err := repo.ResolveRevision(plumbing.Revision(constants.BaseRepoHeadRevision))
+	repoHeadCommit, err := repo.ResolveRevision(plumbing.Revision(fmt.Sprintf(constants.BaseRepoHeadRevisionPattern, branch)))
 	if err != nil {
-		return nil, "", fmt.Errorf("resolving revision [%s] to commit hash: %v", constants.BaseRepoHeadRevision, err)
+		return nil, "", fmt.Errorf("resolving revision [%s] to commit hash: %v", fmt.Sprintf(constants.BaseRepoHeadRevisionPattern, branch), err)
 	}
 	repoHeadCommitHash := strings.Split(repoHeadCommit.String(), " ")[0]
 
@@ -63,8 +63,8 @@ func CloneRepo(cloneURL, destination, headRepoOwner string) (*git.Repository, st
 	return repo, repoHeadCommitHash, nil
 }
 
-// ResetToMain hard-resets the current working tree to point to the HEAD commit of the base repository.
-func ResetToMain(worktree *git.Worktree, baseRepoHeadCommit string) error {
+// ResetToHEAD hard-resets the current working tree to point to the HEAD commit of the base repository.
+func ResetToHEAD(worktree *git.Worktree, baseRepoHeadCommit string) error {
 	err := worktree.Reset(&git.ResetOptions{
 		Commit: plumbing.NewHash(baseRepoHeadCommit),
 		Mode:   git.HardReset,
@@ -77,13 +77,13 @@ func ResetToMain(worktree *git.Worktree, baseRepoHeadCommit string) error {
 }
 
 // Checkout checks out the working tree at the given branch, creating a new branch if necessary.
-func Checkout(worktree *git.Worktree, branch string) error {
+func Checkout(worktree *git.Worktree, branch string, create bool) error {
 	logger.V(6).Info(fmt.Sprintf("Checking out branch [%s] in local worktree", branch))
 
 	err := worktree.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(branch),
 		Keep:   true,
-		Create: true,
+		Create: create,
 	})
 	if err != nil {
 		return fmt.Errorf("checking out branch [%s]: %v", branch, err)
