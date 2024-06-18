@@ -10,7 +10,7 @@ IMAGE_NAMES=
 
 IMAGE_BUILDER_DIR=$(REPO)/images/capi
 RAW_IMAGE_BUILD_AMI?=ami-095413544ce52437d
-RAW_IMAGE_BUILD_INSTANCE_TYPE?=t2.micro
+RAW_IMAGE_BUILD_INSTANCE_TYPE?=t3.micro
 RAW_IMAGE_BUILD_KEY_NAME?=raw-image-build
 
 # in the case of ubuntu ova builds we support either default bios or efi mode, for efi we put in a different output folder: $(ARTIFACTS_PATH)/ubuntu/2004/ova/efi/ubuntu.ova
