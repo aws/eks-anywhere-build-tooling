@@ -20,6 +20,12 @@ import (
 
 // Run contains the business logic to execute the `display` subcommand.
 func Run(displayOptions *types.DisplayOptions) error {
+	// Check if branch name environment variable has been set.
+	branchName, ok := os.LookupEnv(constants.BranchNameEnvVar)
+	if !ok {
+		branchName = constants.MainBranchName
+	}
+
 	// Check if GitHub token environment variable has been set.
 	githubToken, ok := os.LookupEnv("GITHUB_TOKEN")
 	if !ok {
@@ -40,9 +46,28 @@ func Run(displayOptions *types.DisplayOptions) error {
 
 	// Clone the eks-anywhere-build-tooling repository.
 	buildToolingRepoPath := filepath.Join(cwd, constants.BuildToolingRepoName)
-	_, _, err = git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, baseRepoOwner), buildToolingRepoPath, "")
+	repo, headCommit, err := git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, baseRepoOwner), buildToolingRepoPath, "", branchName)
 	if err != nil {
 		return fmt.Errorf("cloning build-tooling repo: %v", err)
+	}
+
+	// Get the worktree corresponding to the cloned repository.
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("getting repo's current worktree: %v", err)
+	}
+
+	// Checkout the eks-anywhere-build-tooling repo at the provided branch name.
+	createBranch := (branchName != constants.MainBranchName)
+	err = git.Checkout(worktree, branchName, createBranch)
+	if err != nil {
+		return fmt.Errorf("checking out worktree at branch %s: %v", branchName, err)
+	}
+
+	// Reset current worktree to get a clean index.
+	err = git.ResetToHEAD(worktree, headCommit)
+	if err != nil {
+		return fmt.Errorf("resetting new branch to [origin/%s] HEAD: %v", branchName, err)
 	}
 
 	if displayOptions.ProjectName != "" {
@@ -102,7 +127,7 @@ func Run(displayOptions *types.DisplayOptions) error {
 			}
 
 			// Get latest revision for the project from GitHub.
-			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision, isTrackedByCommitHash, releaseBranched)
+			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision, branchName, isTrackedByCommitHash, releaseBranched)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from GitHub: %v", err)
 			}
