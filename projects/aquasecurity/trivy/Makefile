@@ -30,6 +30,18 @@ SKIP_ON_RELEASE_BRANCH=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+FIX_LICENSES_CSAF_TARGET=$(REPO)/vendor/github.com/csaf-poc/csaf_distribution/v3/LICENSE.txt
+
+$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_CSAF_TARGET)
+
+$(FIX_LICENSES_CSAF_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+# The csaf-poc dependency github repos all have licenses however they all do not have go.mod files
+# checked in to the repo. Hence we need to manually download licenses from Github for each of them 
+# and place them in the respective folders under vendor directory so that they is available for 
+# go-licenses to pick up	
+	wget -q --retry-connrefused https://raw.githubusercontent.com/csaf-poc/csaf_distribution/main/LICENSES/Apache-2.0.txt -O \
+		$(REPO)/vendor/github.com/csaf-poc/csaf_distribution/v3/LICENSE.txt; \
+
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
