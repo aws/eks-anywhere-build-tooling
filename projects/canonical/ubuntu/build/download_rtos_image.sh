@@ -18,13 +18,15 @@ set -x
 set -o errexit
 set -o pipefail
 
-RTOS_SOURCE_URL="${1?Specify first argument - source URL for the Ubuntu RTOS image}"
-ARTIFACTS_PATH="${2?Specify second argument - artifacts path}"
+RTOS_BUCKET_NAME="${1?Specify first argument - Ubuntu RTOS image bucket name}"
+RTOS_IMAGE_DATE="${2?Specify second argument - Ubuntu RTOS image build date}"
+ARTIFACTS_PATH="${3?Specify third argument - artifacts path}"
+RELEASE_BRANCH="${4?Specify fourth argument - release branch}"
 
 function build::download::ubuntu::rtos::image(){
     mkdir -p $ARTIFACTS_PATH
-    filename=$(basename $RTOS_SOURCE_URL)
-    curl -s $RTOS_SOURCE_URL -o $ARTIFACTS_PATH/ubuntu.gz
+    download_path=s3://$RTOS_BUCKET_NAME/ubuntu/jammy/$RTOS_IMAGE_DATE/ubuntu-jammy-eks-anywhere-pro-realtime-minimal-amd64-eks-anywhere-$RELEASE_BRANCH-pro-realtime.raw.gz
+    aws s3 cp $download_path $ARTIFACTS_PATH/ubuntu.gz
 }
 
 build::download::ubuntu::rtos::image

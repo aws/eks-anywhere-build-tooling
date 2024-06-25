@@ -7,7 +7,6 @@ REPO_OWNER=canonical
 RTOS_BUCKET_NAME?=
 RTOS_IMAGE_DATE=$(shell cat RTOS_IMAGE_DATE)
 RELEASE_BRANCH=1-29
-RTOS_SOURCE_URL=https://$(RTOS_BUCKET_NAME).s3.us-west-2.amazonaws.com/ubuntu/jammy/$(RTOS_IMAGE_DATE)/ubuntu-jammy-eks-anywhere-pro-realtime-minimal-amd64-eks-anywhere-$(RELEASE_BRANCH)-pro-realtime.raw.gz
 
 HAS_S3_ARTIFACTS=true
 SIMPLE_CREATE_BINARIES=false
@@ -35,7 +34,7 @@ s3-artifacts: download-rtos-image
 
 .PHONY: download-rtos-image
 download-rtos-image:
-	build/download_rtos_image.sh $(RTOS_SOURCE_URL) $(ARTIFACTS_PATH)
+	build/download_rtos_image.sh $(RTOS_BUCKET_NAME) $(RTOS_IMAGE_DATE) $(ARTIFACTS_PATH) $(RELEASE_BRANCH)
 
 
 ########### DO NOT EDIT #############################
