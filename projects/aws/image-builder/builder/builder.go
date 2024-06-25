@@ -80,7 +80,7 @@ func (b *BuildOptions) BuildImage() {
 		b.FilesConfig.FilesAnsibleConfig.CustomRoleNames = additionalFilesCustomRole
 		b.FilesConfig.FilesAnsibleConfig.AnsibleExtraVars = fmt.Sprintf("@%s", additionalFilesList)
 
-		log.Println("Marshaling files ansible config to JSON")
+		log.Println("Marshalling files ansible config to JSON")
 		filesAnsibleConfig, err := json.Marshal(b.FilesConfig.FilesAnsibleConfig)
 		if err != nil {
 			log.Fatalf("Error marshalling files ansible config data: %v", err)
@@ -93,7 +93,7 @@ func (b *BuildOptions) BuildImage() {
 			log.Fatalf("Error writing additional files config file to Packer config directory: %v", err)
 		}
 
-		log.Println("Marshaling additional files list to YAML")
+		log.Println("Marshalling additional files list to YAML")
 		if b.AMIConfig != nil {
 			for index, file := range b.FilesConfig.AdditionalFilesList {
 				for _, defaultFile := range DefaultAMIAdditionalFiles {

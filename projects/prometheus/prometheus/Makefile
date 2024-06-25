@@ -2,6 +2,8 @@ BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG=$(shell cat GIT_TAG)
 HELM_GIT_TAG=$(shell cat HELM_GIT_TAG)
 GOLANG_VERSION=$(shell cat GOLANG_VERSION)
+PROMETHEUS_NODE_EXPORTER_GIT_TAG=$(shell cat ../node_exporter/GIT_TAG)
+PROMETHEUS_NODE_EXPORTER_IMAGE_TAG=$(PROMETHEUS_NODE_EXPORTER_GIT_TAG)-$(GIT_HASH)
 REPO=prometheus
 REPO_OWNER=prometheus
 
@@ -34,6 +36,7 @@ HELM_SOURCE_OWNER=prometheus-community
 HELM_SOURCE_REPOSITORY=helm-charts
 HELM_DIRECTORY=charts/prometheus
 HELM_IMAGE_LIST=prometheus/prometheus prometheus/node-exporter
+HELM_IMAGE_TAG_LIST=$(IMAGE_TAG) $(PROMETHEUS_NODE_EXPORTER_IMAGE_TAG)
 
 HELM_CHART_NAMES=prometheus/charts/prometheus
 

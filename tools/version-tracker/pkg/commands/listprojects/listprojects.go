@@ -21,9 +21,21 @@ func Run() error {
 		return fmt.Errorf("retrieving current working directory: %v", err)
 	}
 
+	// Check if branch name environment variable has been set.
+	branchName, ok := os.LookupEnv(constants.BranchNameEnvVar)
+	if !ok {
+		branchName = constants.MainBranchName
+	}
+
+	// Get base repository owner environment variable if set.
+	baseRepoOwner := os.Getenv(constants.BaseRepoOwnerEnvvar)
+	if baseRepoOwner == "" {
+		baseRepoOwner = constants.DefaultBaseRepoOwner
+	}
+
 	// Clone the eks-anywhere-build-tooling repository.
 	buildToolingRepoPath := filepath.Join(cwd, constants.BuildToolingRepoName)
-	_, _, err = git.CloneRepo(constants.BuildToolingRepoURL, buildToolingRepoPath, "")
+	_, _, err = git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, baseRepoOwner), buildToolingRepoPath, "", branchName)
 	if err != nil {
 		return fmt.Errorf("cloning build-tooling repo: %v", err)
 	}
@@ -39,7 +51,7 @@ func Run() error {
 	var projectsList types.ProjectsList
 	err = yaml.Unmarshal(contents, &projectsList)
 	if err != nil {
-		return fmt.Errorf("unmarshaling upstream projects tracker file to YAML: %v", err)
+		return fmt.Errorf("unmarshalling upstream projects tracker file: %v", err)
 	}
 
 	var projectVersionInfoList []types.ProjectVersionInfo

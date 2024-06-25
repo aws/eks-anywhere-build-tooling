@@ -6,30 +6,51 @@ import (
 
 // Constants used across the version-tracker source code.
 const (
-	BaseRepoOwnerEnvvar         = "BASE_REPO_OWNER"
-	HeadRepoOwnerEnvvar         = "HEAD_REPO_OWNER"
-	GitHubTokenEnvvar           = "GITHUB_TOKEN"
-	CommitAuthorNameEnvvar      = "COMMIT_AUTHOR_NAME"
-	CommitAuthorEmailEnvvar     = "COMMIT_AUTHOR_EMAIL"
-	DefaultCommitAuthorName     = "EKS Distro PR Bot"
-	DefaultCommitAuthorEmail    = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
-	BuildToolingRepoName        = "eks-anywhere-build-tooling"
-	BuildToolingRepoURL         = "https://github.com/aws/eks-anywhere-build-tooling"
-	ReadmeFile                  = "README.md"
-	ReadmeUpdateScriptFile      = "build/lib/readme_check.sh"
-	LicenseBoilerplateFile      = "hack/boilerplate.yq.txt"
-	SkippedProjectsFile         = "SKIPPED_PROJECTS"
-	UpstreamProjectsTrackerFile = "UPSTREAM_PROJECTS.yaml"
-	GitTagFile                  = "GIT_TAG"
-	GoVersionFile               = "GOLANG_VERSION"
-	ChecksumsFile               = "CHECKSUMS"
-	AttributionsFilePattern     = "*ATTRIBUTION.txt"
-	PatchesDirectory            = "patches"
-	GithubPerPage               = 100
-	datetimeFormat              = "%Y-%m-%dT%H:%M:%SZ"
-	MainBranchName              = "main"
-	BaseRepoHeadRevision        = "refs/remotes/origin/main"
-	PullRequestBody             = `This PR bumps %[1]s/%[2]s to the latest Git revision, along with other updates such as Go version, checksums and attribution files.
+	BranchNameEnvVar                        = "BRANCH_NAME"
+	BaseRepoOwnerEnvvar                     = "BASE_REPO_OWNER"
+	HeadRepoOwnerEnvvar                     = "HEAD_REPO_OWNER"
+	GitHubTokenEnvvar                       = "GITHUB_TOKEN"
+	CommitAuthorNameEnvvar                  = "COMMIT_AUTHOR_NAME"
+	CommitAuthorEmailEnvvar                 = "COMMIT_AUTHOR_EMAIL"
+	ReleaseBranchEnvvar                     = "RELEASE_BRANCH"
+	DefaultCommitAuthorName                 = "EKS Distro PR Bot"
+	DefaultCommitAuthorEmail                = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
+	BuildToolingRepoName                    = "eks-anywhere-build-tooling"
+	DefaultBaseRepoOwner                    = "aws"
+	BuildToolingRepoURL                     = "https://github.com/%s/eks-anywhere-build-tooling"
+	ReadmeFile                              = "README.md"
+	ReadmeUpdateScriptFile                  = "build/lib/readme_check.sh"
+	LicenseBoilerplateFile                  = "hack/boilerplate.yq.txt"
+	EKSDistroLatestReleasesFile             = "EKSD_LATEST_RELEASES"
+	EKSDistroReleaseChannelsFileURLFormat   = "https://distro.eks.amazonaws.com/releasechannels/%s.yaml"
+	EKSDistroReleaseManifestURLFormat       = "https://distro.eks.amazonaws.com/kubernetes-%[1]s/kubernetes-%[1]s-eks-%d.yaml"
+	SkippedProjectsFile                     = "SKIPPED_PROJECTS"
+	UpstreamProjectsTrackerFile             = "UPSTREAM_PROJECTS.yaml"
+	SupportedReleaseBranchesFile            = "release/SUPPORTED_RELEASE_BRANCHES"
+	GitTagFile                              = "GIT_TAG"
+	GoVersionFile                           = "GOLANG_VERSION"
+	ChecksumsFile                           = "CHECKSUMS"
+	AttributionsFilePattern                 = "*ATTRIBUTION.txt"
+	PatchesDirectory                        = "patches"
+	FailedPatchApplyMarker                  = "patch does not apply"
+	SemverRegex                             = `v?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
+	FailedPatchApplyRegex                   = "Patch failed at .*"
+	FailedPatchFilesRegex                   = "error: (.*): patch does not apply"
+	BottlerocketReleasesFile                = "BOTTLEROCKET_RELEASES"
+	BottlerocketContainerMetadataFileFormat = "BOTTLEROCKET_%s_CONTAINER_METADATA"
+	BottlerocketHostContainersTOMLFile      = "sources/models/shared-defaults/public-host-containers.toml"
+	CiliumImageRepository                   = "public.ecr.aws/isovalent/cilium"
+	GithubPerPage                           = 100
+	datetimeFormat                          = "%Y-%m-%dT%H:%M:%SZ"
+	MainBranchName                          = "main"
+	BaseRepoHeadRevisionPattern             = "refs/remotes/origin/%s"
+	EKSDistroUpgradePullRequestBody         = `This PR bumps EKS Distro releases to the latest available release versions.
+
+/hold
+/area dependencies
+
+By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
+	DefaultUpgradePullRequestBody = `This PR bumps %[1]s/%[2]s to the latest Git revision.
 
 [Compare changes](https://github.com/%[1]s/%[2]s/compare/%[3]s...%[4]s)
 [Release notes](https://github.com/%[1]s/%[2]s/releases/%[4]s)
@@ -38,7 +59,35 @@ const (
 /area dependencies
 
 By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
+	BottlerocketUpgradePullRequestBody = `This PR bumps Bottlerocket releases to the latest Git revision.
+
+[Compare changes](https://github.com/bottlerocket-os/bottlerocket/compare/%[1]s...%[2]s)
+[Release notes](https://github.com/bottlerocket-os/bottlerocket/releases/%[2]s)
+
+/hold
+/area dependencies
+
+By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
+
+	CombinedImageBuilderBottlerocketUpgradePullRequestBody = `This PR bumps kubernetes-sigs/image-builder and Bottlerocket releases to the latest Git revision.
+
+[Compare changes for image-builder](https://github.com/kubernetes-sigs/image-builder/compare/%[1]s...%[2]s)
+[Release notes for image-builder](https://github.com/kubernetes-sigs/image-builder/releases/%[2]s)
+
+[Compare changes for Bottlerocket](https://github.com/bottlerocket-os/bottlerocket/compare/%[3]s...%[4]s)
+[Release notes for Bottlerocket](https://github.com/bottlerocket-os/bottlerocket/releases/%[4]s)
+
+/hold
+/area dependencies
+
+By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
 	PatchesCommentBody = `# This pull request is incomplete!
+## Failed patch details
+**Only %d/%d patches were applied!**
+%s
+The following files in the above patch did not apply successfully:
+%s
+
 The project being upgraded in this pull request needs changes to patches that cannot be handled automatically. A developer will need to regenerate the patches locally and update the pull request. In addition to patches, the checksums and attribution file(s) corresponding to the project will need to be updated.`
 )
 
@@ -68,11 +117,6 @@ var (
 			BinaryName:               "aws_signing_helper",
 			Extract:                  false,
 			TrimLeadingVersionPrefix: true,
-		},
-		"cert-manager/cert-manager": {
-			AssetName:  "cmctl-linux-amd64.tar.gz",
-			BinaryName: "cmctl",
-			Extract:    true,
 		},
 		"containerd/containerd": {
 			AssetName:                "containerd-%s-linux-amd64.tar.gz",
@@ -149,9 +193,21 @@ var (
 
 	// ProjectGoVersionSourceOfTruth is the mapping of project name to Go version source of truth files configuration.
 	ProjectGoVersionSourceOfTruth = map[string]types.GoVersionSourceOfTruth{
+		"aws/etcdadm-bootstrap-provider": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"aws/etcdadm-controller": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
 		"brancz/kube-rbac-proxy": {
 			SourceOfTruthFile:     ".github/workflows/build.yml",
 			GoVersionSearchString: `go-version: '(1\.\d\d)\.\d+'`,
+		},
+		"cert-manager/cert-manager": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
 		},
 		"emissary-ingress/emissary": {
 			SourceOfTruthFile:     "go.mod",
@@ -181,6 +237,18 @@ var (
 			SourceOfTruthFile:     "Dockerfile",
 			GoVersionSearchString: `golang:(1\.\d\d)`,
 		},
+		"kubernetes/autoscaler": {
+			SourceOfTruthFile:     "cluster-autoscaler/go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"kubernetes/cloud-provider-aws": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"kubernetes/cloud-provider-vsphere": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
 		"kubernetes-sigs/cluster-api-provider-cloudstack": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
@@ -201,6 +269,10 @@ var (
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
+		"prometheus/prometheus": {
+			SourceOfTruthFile:     ".promu.yml",
+			GoVersionSearchString: `version: (1\.\d\d)`,
+		},
 		"tinkerbell/boots": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
@@ -218,4 +290,17 @@ var (
 			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)"`,
 		},
 	}
+
+	ProjectsWithUnconventionalUpgradeFlows = []string{
+		"cilium/cilium",
+		"kubernetes-sigs/image-builder",
+	}
+
+	BottlerocketImageFormats = []string{"ami", "ova", "raw"}
+
+	BottlerocketHostContainers = []string{"admin", "control"}
+
+	CiliumImageDirectories = []string{"cilium", "operator-generic", "cilium-chart"}
+
+	ProjectsSupportingPrereleaseTags = []string{"kubernetes-sigs/cluster-api-provider-cloudstack"}
 )

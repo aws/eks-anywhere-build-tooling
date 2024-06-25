@@ -26,6 +26,7 @@ EXCLUDE_VAR="${6:-EXCLUDE_FROM_STAGING_BUILDSPEC}"
 BUILDSPECS_VAR="${7:-BUILDSPECS}"
 FAST_FAIL="${8:-true}"
 ADD_FINAL_STAGE="${9:-}"
+NO_DEPS_FOR_FINAL_STAGE="${10:-false}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
@@ -164,6 +165,10 @@ for project in "${PROJECTS[@]}"; do
             BUILDSPEC_VARS_KEYS=""
         fi
 
+        if [[ "$BUILDSPECS_VAR" == "UPGRADE_BUILDSPECS" ]] && [[ "${IDENTIFIER}" = "kubernetes_sigs_image_builder" ]]; then
+            BUILDSPEC_VARS_KEYS=""
+        fi
+
         if [[ -n "$BUILDSPEC_VARS_KEYS" ]]; then
             KEYS=(${BUILDSPEC_VARS_KEYS// / })
 
@@ -241,8 +246,12 @@ done
 
 if [ -n "${ADD_FINAL_STAGE}" ]; then
     ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"BUILD_GENERAL1_SMALL\""
+    DEPEND_ON=",\"depend-on\":[${ALL_PROJECT_IDS%?}]"
+    if [ "$NO_DEPS_FOR_FINAL_STAGE" = "true" ]; then
+        DEPEND_ON=""
+    fi
     yq eval -i -P \
-        ".batch.build-graph += [{\"identifier\":\"final_stage\",\"buildspec\":\"$ADD_FINAL_STAGE\",\"env\":{$ARCH_TYPE},\"depend-on\":[${ALL_PROJECT_IDS%?}]}]" \
+        ".batch.build-graph += [{\"identifier\":\"final_stage\",\"buildspec\":\"$ADD_FINAL_STAGE\",\"env\":{$ARCH_TYPE}$DEPEND_ON}]" \
         $STAGING_BUILDSPEC_FILE 
 fi
 

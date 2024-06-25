@@ -28,7 +28,8 @@ LATEST="${7?Seventh argument is latest tag}"
 HELM_USE_UPSTREAM_IMAGE="${8?Eigth argument is bool determining whether to use cached upstream images}"
 PACKAGE_DEPENDENCIES="${9?Ninth argument is optional project dependencies}"
 FORCE_JSON_SCHEMA_FILE="${10?Tenth argument is optional schema file}"
-HELM_IMAGE_LIST="${@:11}"
+HELM_IMAGE_LIST="${11}"
+HELM_IMAGE_TAG_LIST="${12}"
 
 CHART_NAME=$(basename ${HELM_DESTINATION_REPOSITORY})
 DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
@@ -78,7 +79,7 @@ function get_image_tag_not_latest() {
     # to find another tag associated with this image we have to use the aws cli
     # the following only works for ecr repos
     if [ "${JOB_TYPE:-}" = "presubmit" ] ||  [[ "${IMAGE_REGISTRY}" != *"ecr"* ]]; then
-      echo ${tag}      
+      echo ${tag}
     else
       if ! aws sts get-caller-identity &> /dev/null; then
         echo "The AWS cli is used to find the ECR registries and repos for the current AWS account please login!"
@@ -87,63 +88,70 @@ function get_image_tag_not_latest() {
 
       local service="ecr"
       if [[ "${IMAGE_REGISTRY}" = *"public.ecr"* ]]; then
-        service="--region us-east-1 ecr-public"      
+        service="--region us-east-1 ecr-public"
       fi
-      build::common::echo_and_run aws ${service} describe-images --repository-name ${image} --image-id imageDigest=${shasum} --query 'imageDetails[0].imageTags' --output yaml | grep -v ${LATEST} | head -1| sed -e 's/- //'      
+      build::common::echo_and_run aws ${service} describe-images --repository-name ${image} --image-id imageDigest=${shasum} --query 'imageDetails[0].imageTags' --output yaml | grep -v ${LATEST} | head -1| sed -e 's/- //'
     fi
 }
 
-for IMAGE in ${HELM_IMAGE_LIST:-}; do
-  # the image_list will include images built by the current project and potentially images built from
-  # other projects, ex: prometheus chart includes the node_exporter which is built seperately
-  # since each project is built independently and is tagged with the current HEAD commit hash
-  # images built via this current build may not be tagged exactly the same as images from other builds
-  # this code will first try to pull the image by the IMAGE_TAG and if that is not available
-  # it will fallback to the LATEST tag which follows the same pattern we use for artifacts on s3
-  # in the event that the LATEST tag is used, the ecr api will be used to get a different tag, which
-  # should be the tag in the format <version>-<commit-hash>, this tag will be used in the requires.yaml 
-  IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${IMAGE_TAG})
 
-  if [[ -z ${IMAGE_SHASUM} ]]; then
-    IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${LATEST})
-  fi
+if [ -n "$HELM_IMAGE_LIST" ]; then
+  HELM_IMAGE_ARR=($HELM_IMAGE_LIST)
+  HELM_IMAGE_TAG_ARR=($HELM_IMAGE_TAG_LIST)
+  for i in "${!HELM_IMAGE_ARR[@]}"; do
+    IMAGE="${HELM_IMAGE_ARR[$i]}"
+    TAG="${HELM_IMAGE_TAG_ARR[$i]}"
+    # the image_list will include images built by the current project and potentially images built from
+    # other projects, ex: prometheus chart includes the node_exporter which is built seperately
+    # since each project is built independently and is tagged with the current HEAD commit hash
+    # images built via this current build may not be tagged exactly the same as images from other builds
+    # this code will first try to pull the image by the IMAGE_TAG and if that is not available
+    # it will fallback to the LATEST tag which follows the same pattern we use for artifacts on s3
+    # in the event that the LATEST tag is used, the ecr api will be used to get a different tag, which
+    # should be the tag in the format <version>-<commit-hash>, this tag will be used in the requires.yaml
+    IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${TAG})
 
-  if [[ -z ${IMAGE_SHASUM} ]]; then
-    echo "Neither ${IMAGE}@${IMAGE_TAG} nor ${IMAGE}@${LATEST} exists!"
-    exit 1
-  fi 
+    if [[ -z ${IMAGE_SHASUM} ]]; then
+      IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${LATEST})
+    fi
 
-  echo "s,{{${IMAGE}}},${IMAGE_SHASUM},g" >>${SEDFILE}
-  if [ "${IMAGE_TAG}" = "${LATEST}" ]; then
-    # if finding an image from another project using the `latest` tag, find the image and a different tag associated with that image
-    USE_TAG=$(get_image_tag_not_latest ${IMAGE} ${IMAGE_SHASUM})
-    if [[ -z ${USE_TAG} ]]; then
-      echo "non-${LATEST} tag does not exist for ${IMAGE}@${IMAGE_SHASUM}!"
+    if [[ -z ${IMAGE_SHASUM} ]]; then
+      echo "Neither ${IMAGE}@${TAG} nor ${IMAGE}@${LATEST} exists!"
       exit 1
-    fi 
-  else
-    USE_TAG=$IMAGE_TAG
-  fi
-  
-  # If HELM_USE_UPSTREAM_IMAGE is true, we are using images from upstream.
-  # Though we pull images directly from upstream for build tooling checks (i.e.
-  # get images shasums), we will use cached images in the helm charts. Cached
-  # images follow the convention of ${PROJECT_NAME}/${UPSTREAM_IMAGE_NAME}.
-  if [ "${HELM_USE_UPSTREAM_IMAGE}" == true ]; then
-    PROJECT_NAME=$(echo "$HELM_DESTINATION_REPOSITORY" | awk -F "/" '{print $1}')
-    IMAGE_REPO="${PROJECT_NAME}/${IMAGE}"
-  else
-    IMAGE_REPO="${IMAGE}"
-  fi
+    fi
 
-  cat >>${REQUIRES_FILE} <<!
-  - repository: ${IMAGE_REPO}
-    tag: ${USE_TAG}
-    digest: ${IMAGE_SHASUM}
+    echo "s,{{${IMAGE}}},${IMAGE_SHASUM},g" >>${SEDFILE}
+    if [ "${TAG}" = "${LATEST}" ]; then
+      # if finding an image from another project using the `latest` tag, find the image and a different tag associated with that image
+      USE_TAG=$(get_image_tag_not_latest ${IMAGE} ${IMAGE_SHASUM})
+      if [[ -z ${USE_TAG} ]]; then
+        echo "non-${LATEST} tag does not exist for ${IMAGE}@${IMAGE_SHASUM}!"
+        exit 1
+      fi
+    else
+      USE_TAG=$TAG
+    fi
+
+    # If HELM_USE_UPSTREAM_IMAGE is true, we are using images from upstream.
+    # Though we pull images directly from upstream for build tooling checks (i.e.
+    # get images shasums), we will use cached images in the helm charts. Cached
+    # images follow the convention of ${PROJECT_NAME}/${UPSTREAM_IMAGE_NAME}.
+    if [ "${HELM_USE_UPSTREAM_IMAGE}" == true ]; then
+      PROJECT_NAME=$(echo "$HELM_DESTINATION_REPOSITORY" | awk -F "/" '{print $1}')
+      IMAGE_REPO="${PROJECT_NAME}/${IMAGE}"
+    else
+      IMAGE_REPO="${IMAGE}"
+    fi
+
+    cat >>${REQUIRES_FILE} <<!
+    - repository: ${IMAGE_REPO}
+      tag: ${USE_TAG}
+      digest: ${IMAGE_SHASUM}
 !
-done
+  done
+fi
 
-if [ -n "${FORCE_JSON_SCHEMA_FILE}" ]; then 
+if [ -n "${FORCE_JSON_SCHEMA_FILE}" ]; then
   JSON_SCHEMA_FILE=${FORCE_JSON_SCHEMA_FILE}
 fi
 

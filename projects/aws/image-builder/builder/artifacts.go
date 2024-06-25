@@ -6,8 +6,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	k8syaml "sigs.k8s.io/yaml"
 	"strings"
+
+	k8syaml "sigs.k8s.io/yaml"
 
 	releasev1 "github.com/aws/eks-anywhere/release/api/v1alpha1"
 	eksDreleasev1 "github.com/aws/eks-distro-build-tooling/release/api/v1alpha1"

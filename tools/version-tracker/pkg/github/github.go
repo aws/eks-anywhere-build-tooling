@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aws/eks-anywhere/pkg/semver"
@@ -19,36 +21,9 @@ import (
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/version"
 )
 
-// getReleasesForRepo retrieves the list of releases for the given GitHub repository.
-func getReleasesForRepo(client *github.Client, org, repo string) ([]*github.RepositoryRelease, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting releases for [%s/%s] repository\n", org, repo))
-	var allReleases []*github.RepositoryRelease
-	listReleasesOptions := &github.ListOptions{
-		PerPage: constants.GithubPerPage,
-	}
-
-	for {
-		releases, resp, err := client.Repositories.ListReleases(context.Background(), org, repo, listReleasesOptions)
-		if err != nil {
-			return nil, fmt.Errorf("calling ListReleases API for [%s/%s] repository: %v", org, repo, err)
-		}
-		for _, release := range releases {
-			if !*release.Prerelease {
-				allReleases = append(allReleases, release)
-			}
-		}
-		if resp.NextPage == 0 {
-			break
-		}
-		listReleasesOptions.Page = resp.NextPage
-	}
-
-	return allReleases, nil
-}
-
 // getTagsForRepo retrieves the list of tags for the given GitHub repository.
 func getTagsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryTag, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting tags for [%s/%s] repository\n", org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting tags for [%s/%s] repository", org, repo))
 	var allTags []*github.RepositoryTag
 	listTagOptions := &github.ListOptions{
 		PerPage: constants.GithubPerPage,
@@ -72,7 +47,7 @@ func getTagsForRepo(client *github.Client, org, repo string) ([]*github.Reposito
 
 // getCommitsForRepo retrieves the list of commits for the given GitHub repository.
 func getCommitsForRepo(client *github.Client, org, repo string) ([]*github.RepositoryCommit, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting commits for [%s/%s] repository\n", org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting commits for [%s/%s] repository", org, repo))
 	var allCommits []*github.RepositoryCommit
 	listCommitOptions := &github.CommitsListOptions{
 		ListOptions: github.ListOptions{
@@ -83,7 +58,7 @@ func getCommitsForRepo(client *github.Client, org, repo string) ([]*github.Repos
 	for {
 		commits, resp, err := client.Repositories.ListCommits(context.Background(), org, repo, listCommitOptions)
 		if err != nil {
-			return nil, fmt.Errorf("calling ListCommits for [%s/%s] repository: %v", org, repo, err)
+			return nil, fmt.Errorf("calling ListCommits API for [%s/%s] repository: %v", org, repo, err)
 		}
 		allCommits = append(allCommits, commits...)
 
@@ -98,7 +73,7 @@ func getCommitsForRepo(client *github.Client, org, repo string) ([]*github.Repos
 
 // getCommitDateEpoch gets the Unix epoch time equivalent of a given Github commit's date.
 func getCommitDateEpoch(client *github.Client, org, repo, commitSHA string) (int64, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting date for commit %s in [%s/%s] repository\n", commitSHA, org, repo))
+	logger.V(6).Info(fmt.Sprintf("Getting date for commit %s in [%s/%s] repository", commitSHA, org, repo))
 
 	commit, _, err := client.Repositories.GetCommit(context.Background(), org, repo, commitSHA, nil)
 	if err != nil {
@@ -108,17 +83,24 @@ func getCommitDateEpoch(client *github.Client, org, repo, commitSHA string) (int
 	return (*commit.Commit.Author.Date).Unix(), nil
 }
 
-// GetLatestRevision returns the latest revision (GitHub release or tag) for a given GitHub repository.
-func GetLatestRevision(client *github.Client, org, repo, currentRevision string) (string, bool, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository\n", org, repo))
-	var latestRevision string
-	needsUpgrade := false
-
-	// Get all GitHub releases for this project.
-	allReleases, err := getReleasesForRepo(client, org, repo)
+func GetFileContents(client *github.Client, org, repo, filePath, ref string) ([]byte, error) {
+	contents, _, _, err := client.Repositories.GetContents(context.Background(), org, repo, filePath, &github.RepositoryContentGetOptions{Ref: ref})
 	if err != nil {
-		return "", false, fmt.Errorf("getting all releases for [%s/%s] repository: %v", org, repo, err)
+		return nil, fmt.Errorf("getting contents of file [%s]: %v", filePath, err)
 	}
+	contentsDecoded, err := base64.StdEncoding.DecodeString(*contents.Content)
+	if err != nil {
+		return nil, fmt.Errorf("decoding contents of file [%s]: %v", filePath, err)
+	}
+
+	return contentsDecoded, nil
+}
+
+// GetLatestRevision returns the latest revision (GitHub release or tag) for a given GitHub repository.
+func GetLatestRevision(client *github.Client, org, repo, currentRevision, branchName string, isTrackedUsingCommitHash, releaseBranched bool) (string, bool, error) {
+	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository", org, repo))
+	var currentRevisionCommit, latestRevision string
+	needsUpgrade := false
 
 	// Get all GitHub tags for this project.
 	allTags, err := getTagsForRepo(client, org, repo)
@@ -127,7 +109,11 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string)
 	}
 
 	// Get commit hash corresponding to current revision tag.
-	currentRevisionCommit := getCommitForTag(allTags, currentRevision)
+	if isTrackedUsingCommitHash {
+		currentRevisionCommit = currentRevision
+	} else {
+		currentRevisionCommit = getCommitForTag(allTags, currentRevision)
+	}
 
 	// Get Unix timestamp for current revision's commit.
 	currentRevisionCommitEpoch, err := getCommitDateEpoch(client, org, repo, currentRevisionCommit)
@@ -135,16 +121,64 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string)
 		return "", false, fmt.Errorf("getting epoch time corresponding to current revision commit: %v", err)
 	}
 
-	// Get SemVer construct corresponding to the current revision tag.
-	currentRevisionSemver, err := semver.New(currentRevision)
-	if err != nil {
-		return "", false, fmt.Errorf("getting semver for current version: %v", err)
-	}
+	// If the project is tracked using a commit hash, upgrade to the latest commit.
+	if isTrackedUsingCommitHash {
+		// If the project does not have Github tags, pick the latest commit.
+		allCommits, err := getCommitsForRepo(client, org, repo)
+		if err != nil {
+			return "", false, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
+		}
+		latestRevision = *allCommits[0].SHA
+		needsUpgrade = true
+	} else {
+		semverRegex := regexp.MustCompile(constants.SemverRegex)
+		currentRevisionForSemver := semverRegex.FindString(currentRevision)
 
-	// If the project has GitHub releases, determine the latest from among them.
-	if len(allReleases) > 0 {
-		for _, release := range allReleases {
-			latestRevision = *release.TagName
+		// Get SemVer construct corresponding to the current revision tag.
+		currentRevisionSemver, err := semver.New(currentRevisionForSemver)
+		if err != nil {
+			return "", false, fmt.Errorf("getting semver for current version: %v", err)
+		}
+
+		for _, tag := range allTags {
+			tagName := *tag.Name
+			if strings.Contains(tagName, "chart") || strings.Contains(tagName, "helm") {
+				continue
+			}
+			if org == "kubernetes" && repo == "autoscaler" {
+				if !strings.HasPrefix(tagName, "cluster-autoscaler-") {
+					continue
+				}
+			}
+			tagNameForSemver := semverRegex.FindString(tagName)
+			if tagNameForSemver == "" {
+				continue
+			}
+
+			if releaseBranched {
+				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
+				releaseNumber := strings.Split(releaseBranch, "-")[1]
+				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v?1.%s.\d+$`, releaseNumber))
+				if !tagRegex.MatchString(tagNameForSemver) {
+					continue
+				}
+			}
+			if branchName != constants.MainBranchName {
+				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v%d.%d.\d+`, currentRevisionSemver.Major, currentRevisionSemver.Minor))
+				if !tagRegex.MatchString(tagNameForSemver) {
+					continue
+				}
+			}
+
+			revisionSemver, err := semver.New(tagNameForSemver)
+			if err != nil {
+				return "", false, fmt.Errorf("getting semver for the version under consideration: %v", err)
+			}
+			if !slices.Contains(constants.ProjectsSupportingPrereleaseTags, fmt.Sprintf("%s/%s", org, repo)) && revisionSemver.Prerelease != "" {
+				continue
+			}
+
+			latestRevision = tagName
 
 			// Determine if upgrade is required based on current and latest revisions
 			upgradeRequired, shouldBreak, err := isUpgradeRequired(client, org, repo, latestRevision, currentRevisionCommitEpoch, currentRevisionSemver, allTags)
@@ -155,31 +189,6 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision string)
 				needsUpgrade = upgradeRequired
 				break
 			}
-		}
-	} else {
-		// If the project doesn't have GitHub releases but has tags on GitHub, determine the latest from among them.
-		if len(allTags) > 0 {
-			for _, tag := range allTags {
-				latestRevision = *tag.Name
-
-				// Determine if upgrade is required based on current and latest revisions
-				upgradeRequired, shouldBreak, err := isUpgradeRequired(client, org, repo, latestRevision, currentRevisionCommitEpoch, currentRevisionSemver, allTags)
-				if err != nil {
-					return "", false, fmt.Errorf("determining if upgrade is required for project: %v", err)
-				}
-				if shouldBreak {
-					needsUpgrade = upgradeRequired
-					break
-				}
-			}
-		} else {
-			// If the project has neither Github releases nor tags, pick the latest commit.
-			allCommits, err := getCommitsForRepo(client, org, repo)
-			if err != nil {
-				return "", false, fmt.Errorf("getting all commits for [%s/%s] repository: %v", org, repo, err)
-			}
-			latestRevision = *allCommits[0].SHA
-			needsUpgrade = true
 		}
 	}
 
@@ -203,15 +212,18 @@ func isUpgradeRequired(client *github.Client, org, repo, latestRevision string, 
 		return false, false, fmt.Errorf("getting epoch time corresponding to latest revision commit: %v", err)
 	}
 
+	semverRegex := regexp.MustCompile(constants.SemverRegex)
+	latestRevisionForSemver := semverRegex.FindString(latestRevision)
+
 	// Get SemVer construct corresponding to the latest revision tag.
-	latestRevisionSemver, err := semver.New(latestRevision)
+	latestRevisionSemver, err := semver.New(latestRevisionForSemver)
 	if err != nil {
 		return false, false, fmt.Errorf("getting semver for latest version: %v", err)
 	}
 
 	// If the latest revision comes after the current revision both chronologically and semantically, then declare that
 	// an upgrade is required
-	if latestRevisionCommitEpoch > currentRevisionCommitEpoch && latestRevisionSemver.GreaterThan(currentRevisionSemver) {
+	if latestRevisionSemver.GreaterThan(currentRevisionSemver) || latestRevisionCommitEpoch > currentRevisionCommitEpoch {
 		needsUpgrade = true
 		shouldBreak = true
 	} else if latestRevisionSemver.Equal(currentRevisionSemver) {
@@ -234,140 +246,194 @@ func getCommitForTag(allTags []*github.RepositoryTag, searchTag string) string {
 
 // GetGoVersionForLatestRevision gets the Go version used to build the latest revision of the project.
 func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevision string) (string, error) {
-	logger.V(6).Info(fmt.Sprintf("Getting Go version corresponding to latest revision %s for [%s/%s] repository\n", latestRevision, org, repo))
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("retrieving current working directory: %v", err)
-	}
+	logger.V(6).Info(fmt.Sprintf("Getting Go version corresponding to latest revision %s for [%s/%s] repository", latestRevision, org, repo))
 
 	var goVersion string
+	var err error
 	projectFullName := fmt.Sprintf("%s/%s", org, repo)
 	if _, ok := constants.ProjectReleaseAssets[projectFullName]; ok {
-		release, _, err := client.Repositories.GetReleaseByTag(context.Background(), org, repo, latestRevision)
+		release, response, err := client.Repositories.GetReleaseByTag(context.Background(), org, repo, latestRevision)
 		if err != nil {
-			return "", fmt.Errorf("calling GetReleaseByTag for tag %s in [%s/%s] repository: %v", latestRevision, org, repo, err)
-		}
-		var tarballName, tarballUrl string
-		projectReleaseAsset := constants.ProjectReleaseAssets[projectFullName]
-		searchAssetName := projectReleaseAsset.AssetName
-		assetVersionReplacement := latestRevision
-		if constants.ProjectReleaseAssets[projectFullName].TrimLeadingVersionPrefix {
-			assetVersionReplacement = latestRevision[1:]
-		}
-		if strings.Count(searchAssetName, "%s") > 0 {
-			searchAssetName = fmt.Sprintf(searchAssetName, assetVersionReplacement)
-		}
-		if projectReleaseAsset.OverrideAssetURL != "" {
-			tarballName = searchAssetName
-			tarballUrl = projectReleaseAsset.OverrideAssetURL
-			if strings.Count(tarballUrl, "%s") > 0 {
-				tarballUrl = fmt.Sprintf(tarballUrl, assetVersionReplacement)
+			if response.StatusCode == http.StatusNotFound {
+				logger.V(6).Info(fmt.Sprintf("GitHub release for tag %s not found. Falling back to GitHub source of truth file for Go version", latestRevision))
+				goVersion, err = getGoVersionFromGitHubFile(client, org, repo, projectFullName, latestRevision)
+				if err != nil {
+					return "", fmt.Errorf("getting Go version from GitHub source of truth file: %v", err)
+				}
+			} else {
+				return "", fmt.Errorf("calling GetReleaseByTag API for tag %s in [%s/%s] repository: %v", latestRevision, org, repo, err)
 			}
 		} else {
-			for _, asset := range release.Assets {
-				if *asset.Name == searchAssetName {
-					tarballName = *asset.Name
-					tarballUrl = *asset.BrowserDownloadURL
-					break
-				}
-			}
-		}
-
-		tarballDownloadPath := filepath.Join(cwd, "github-release-downloads")
-		err = os.MkdirAll(tarballDownloadPath, 0o755)
-		if err != nil {
-			return "", fmt.Errorf("failed to create GitHub release downloads folder: %v", err)
-		}
-		tarballFilePath := filepath.Join(tarballDownloadPath, tarballName)
-
-		err = file.Download(tarballUrl, tarballFilePath)
-		if err != nil {
-			return "", fmt.Errorf("downloading release tarball from URL [%s]: %v", tarballUrl, err)
-		}
-
-		if projectReleaseAsset.Extract {
-			tarballFile, err := os.Open(tarballFilePath)
+			goVersion, err = getGoVersionFromGitHubRelease(release, projectFullName, latestRevision)
 			if err != nil {
-				return "", fmt.Errorf("opening tarball filepath: %v", err)
+				return "", fmt.Errorf("getting Go version from GitHub release assets: %v", err)
 			}
-
-			err = tar.ExtractTarGz(tarballDownloadPath, tarballFile)
-			if err != nil {
-				return "", fmt.Errorf("extracting tarball file: %v", err)
-			}
-		}
-
-		binaryName := projectReleaseAsset.BinaryName
-		if strings.Count(binaryName, "%s") > 0 {
-			binaryName = fmt.Sprintf(binaryName, assetVersionReplacement)
-		}
-		binaryFilePath := filepath.Join(tarballDownloadPath, binaryName)
-		goVersion, err = version.GetGoVersion(binaryFilePath)
-		if err != nil {
-			return "", fmt.Errorf("getting Go version embedded in binary [%s]: %v", binaryFilePath, err)
-		}
-
-		err = os.RemoveAll(tarballDownloadPath)
-		if err != nil {
-			return "", fmt.Errorf("removing tarball download path: %v", err)
 		}
 	} else if _, ok := constants.ProjectGoVersionSourceOfTruth[projectFullName]; ok {
-		projectGoVersionSourceOfTruthFile := constants.ProjectGoVersionSourceOfTruth[projectFullName].SourceOfTruthFile
-		workflowContents, _, _, err := client.Repositories.GetContents(context.Background(), org, repo, projectGoVersionSourceOfTruthFile, &github.RepositoryContentGetOptions{Ref: latestRevision})
+		goVersion, err = getGoVersionFromGitHubFile(client, org, repo, projectFullName, latestRevision)
 		if err != nil {
-			return "", fmt.Errorf("getting contents of file [%s]: %v", projectGoVersionSourceOfTruthFile, err)
+			return "", fmt.Errorf("getting Go version from GitHub source of truth file: %v", err)
 		}
-		workflowContentsDecoded, err := base64.StdEncoding.DecodeString(*workflowContents.Content)
-		if err != nil {
-			return "", fmt.Errorf("decoding contents of file [%s]: %v", projectGoVersionSourceOfTruthFile, err)
-		}
-		pattern := regexp.MustCompile(constants.ProjectGoVersionSourceOfTruth[projectFullName].GoVersionSearchString)
-		matches := pattern.FindStringSubmatch(string(workflowContentsDecoded))
-
-		goVersion = matches[1]
 	}
 
 	return goVersion, nil
 }
 
 // CreatePullRequest creates a pull request from the head branch to the base branch on the base repository.
-func CreatePullRequest(client *github.Client, org, repo, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, projectHasPatches bool) error {
-	logger.V(6).Info(fmt.Sprintf("Creating pull request with updated versions for [%s/%s] repository\n", org, repo))
+func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, addPatchWarningComment bool, patchesWarningComment string) error {
+	var pullRequest *github.PullRequest
+	var patchWarningCommentExists bool
 
+	// Check if there is already a pull request from the head branch to the base branch.
 	pullRequests, _, err := client.PullRequests.List(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, &github.PullRequestListOptions{
+		Base: baseBranch,
 		Head: fmt.Sprintf("%s:%s", headRepoOwner, headBranch),
 	})
 	if err != nil {
-		return fmt.Errorf("listing pull requests with %s:%s as head branch: %v", headRepoOwner, headBranch, err)
+		return fmt.Errorf("listing pull requests from %s:%s -> %s:%s: %v", headRepoOwner, headBranch, baseRepoOwner, baseBranch, err)
 	}
+
 	if len(pullRequests) > 0 {
-		logger.Info(fmt.Sprintf("A pull request already exists for %s:%s\n", headRepoOwner, headBranch), "Pull request", *pullRequests[0].HTMLURL)
-		return nil
-	}
+		pullRequest = pullRequests[0]
+		logger.Info(fmt.Sprintf("A pull request already exists for %s:%s", headRepoOwner, headBranch), "Pull request", *pullRequest.HTMLURL)
 
-	newPR := &github.NewPullRequest{
-		Title:               github.String(fmt.Sprintf("Bump %s/%s to latest release", org, repo)),
-		Head:                github.String(fmt.Sprintf("%s:%s", headRepoOwner, headBranch)),
-		Base:                github.String(baseBranch),
-		Body:                github.String(fmt.Sprintf(constants.PullRequestBody, org, repo, currentRevision, latestRevision)),
-		MaintainerCanModify: github.Bool(true),
-	}
-
-	pullRequest, _, err := client.PullRequests.Create(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, newPR)
-	if err != nil {
-		return fmt.Errorf("creating pull request with updated versions from %s to %s: %v", headBranch, baseBranch, err)
-	}
-
-	if projectHasPatches {
-		newComment := &github.IssueComment{
-			Body: github.String(constants.PatchesCommentBody),
+		pullRequest.Body = github.String(body)
+		pullRequest, _, err = client.PullRequests.Edit(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, pullRequest)
+		if err != nil {
+			return fmt.Errorf("editing existing pull request [%s]: %v", *pullRequest.HTMLURL, err)
 		}
 
-		_, _, err = client.Issues.CreateComment(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, newComment)
+		// If patches to the project failed to apply, check if the PR already has a comment warning about
+		// the incomplete PR and patches needing to be regenerated.
+		if addPatchWarningComment {
+			pullRequestComments, _, err := client.Issues.ListComments(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, nil)
+			if err != nil {
+				return fmt.Errorf("listing comments on pull request [%s]: %v", *pullRequest.HTMLURL, err)
+			}
+
+			for _, comment := range pullRequestComments {
+				if comment.Body == github.String(patchesWarningComment) {
+					patchWarningCommentExists = true
+				}
+			}
+		}
+	} else {
+		logger.V(6).Info(fmt.Sprintf("Creating pull request with updated versions for [%s/%s] repository", org, repo))
+
+		newPR := &github.NewPullRequest{
+			Title:               github.String(title),
+			Head:                github.String(fmt.Sprintf("%s:%s", headRepoOwner, headBranch)),
+			Base:                github.String(baseBranch),
+			Body:                github.String(body),
+			MaintainerCanModify: github.Bool(true),
+		}
+		pullRequest, _, err = client.PullRequests.Create(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, newPR)
 		if err != nil {
-			return fmt.Errorf("commenting patch warning on pull request [%s]: %v", *pullRequest.HTMLURL, err)
+			return fmt.Errorf("creating pull request with updated versions from %s to %s: %v", headBranch, baseBranch, err)
+		}
+
+		logger.Info(fmt.Sprintf("Created pull request: %s", *pullRequest.HTMLURL))
+	}
+
+	// If patches failed to apply and no patch warning comment exists (always the case for a new PR), then add a comment with the
+	// warning.
+	if addPatchWarningComment && !patchWarningCommentExists {
+		patchWarningComment := &github.IssueComment{
+			Body: github.String(patchesWarningComment),
+		}
+
+		_, _, err = client.Issues.CreateComment(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, patchWarningComment)
+		if err != nil {
+			return fmt.Errorf("commenting failed patch apply warning on pull request [%s]: %v", *pullRequest.HTMLURL, err)
 		}
 	}
 
 	return nil
+}
+
+func getGoVersionFromGitHubRelease(release *github.RepositoryRelease, projectFullName, latestRevision string) (string, error) {
+	var tarballName, tarballUrl string
+	projectReleaseAsset := constants.ProjectReleaseAssets[projectFullName]
+	searchAssetName := projectReleaseAsset.AssetName
+	assetVersionReplacement := latestRevision
+	if constants.ProjectReleaseAssets[projectFullName].TrimLeadingVersionPrefix {
+		assetVersionReplacement = latestRevision[1:]
+	}
+	if strings.Count(searchAssetName, "%s") > 0 {
+		searchAssetName = fmt.Sprintf(searchAssetName, assetVersionReplacement)
+	}
+	if projectReleaseAsset.OverrideAssetURL != "" {
+		tarballName = searchAssetName
+		tarballUrl = projectReleaseAsset.OverrideAssetURL
+		if strings.Count(tarballUrl, "%s") > 0 {
+			tarballUrl = fmt.Sprintf(tarballUrl, assetVersionReplacement)
+		}
+	} else {
+		for _, asset := range release.Assets {
+			if *asset.Name == searchAssetName {
+				tarballName = *asset.Name
+				tarballUrl = *asset.BrowserDownloadURL
+				break
+			}
+		}
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("retrieving current working directory: %v", err)
+	}
+
+	tarballDownloadPath := filepath.Join(cwd, "github-release-downloads")
+	err = os.MkdirAll(tarballDownloadPath, 0o755)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GitHub release downloads folder: %v", err)
+	}
+	tarballFilePath := filepath.Join(tarballDownloadPath, tarballName)
+
+	err = file.Download(tarballUrl, tarballFilePath)
+	if err != nil {
+		return "", fmt.Errorf("downloading release tarball from URL [%s]: %v", tarballUrl, err)
+	}
+
+	binaryName := projectReleaseAsset.BinaryName
+	if strings.Count(binaryName, "%s") > 0 {
+		binaryName = fmt.Sprintf(binaryName, assetVersionReplacement)
+	}
+	if projectReleaseAsset.Extract {
+		tarballFile, err := os.Open(tarballFilePath)
+		if err != nil {
+			return "", fmt.Errorf("opening tarball filepath: %v", err)
+		}
+
+		err = tar.ExtractFileFromTarball(tarballDownloadPath, tarballFile, binaryName)
+		if err != nil {
+			return "", fmt.Errorf("extracting tarball file: %v", err)
+		}
+	}
+
+	binaryFilePath := filepath.Join(tarballDownloadPath, binaryName)
+	goVersion, err := version.GetGoVersion(binaryFilePath)
+	if err != nil {
+		return "", fmt.Errorf("getting Go version embedded in binary [%s]: %v", binaryFilePath, err)
+	}
+
+	err = os.RemoveAll(tarballDownloadPath)
+	if err != nil {
+		return "", fmt.Errorf("removing tarball download path: %v", err)
+	}
+
+	return goVersion, nil
+}
+
+func getGoVersionFromGitHubFile(client *github.Client, org, repo, projectFullName, latestRevision string) (string, error) {
+	projectGoVersionSourceOfTruthFile := constants.ProjectGoVersionSourceOfTruth[projectFullName].SourceOfTruthFile
+	workflowContents, err := GetFileContents(client, org, repo, projectGoVersionSourceOfTruthFile, latestRevision)
+	if err != nil {
+		return "", fmt.Errorf("getting contents of file [%s]: %v", projectGoVersionSourceOfTruthFile, err)
+	}
+
+	pattern := regexp.MustCompile(constants.ProjectGoVersionSourceOfTruth[projectFullName].GoVersionSearchString)
+	matches := pattern.FindStringSubmatch(string(workflowContents))
+
+	return matches[1], nil
 }

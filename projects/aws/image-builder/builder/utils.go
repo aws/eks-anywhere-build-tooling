@@ -168,7 +168,7 @@ func downloadFile(path, url string) error {
 	// Create the leading directories if it doesnt exists
 	dirs := filepath.Dir(path)
 	if _, err := os.Stat(dirs); os.IsNotExist(err) {
-		os.MkdirAll(dirs, 0755)
+		os.MkdirAll(dirs, 0o755)
 	}
 
 	// Create the file

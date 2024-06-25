@@ -103,7 +103,7 @@ SUPPORTED_K8S_VERSIONS=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_B
 SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
-UNRELEASE_BRANCH_BINARY_TARGETS=binaries attribution checksums
+UNRELEASE_BRANCH_BINARY_TARGETS=patch-repo binaries attribution checksums
 IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter $(UNRELEASE_BRANCH_BINARY_TARGETS) $(foreach target,$(UNRELEASE_BRANCH_BINARY_TARGETS),run-$(target)-in-docker run-in-docker/$(target)),$(MAKECMDGOALS)))
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help start-docker-builder stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums update-patch-numbers check-for-release-branch-skip run-buildkit-and-registry $(if $(filter false, $(HAS_LICENSES)),attribution,) $(if $(filter true, $(HAS_HELM_CHART)),,helm/push)
@@ -213,6 +213,7 @@ HELM_USE_UPSTREAM_IMAGE?=false
 HELM_DIRECTORY?=.
 HELM_DESTINATION_REPOSITORY?=$(HELM_CHART_NAME)
 HELM_IMAGE_LIST?=$(IMAGE_COMPONENT)
+HELM_IMAGE_TAG_LIST?=$(foreach _,$(HELM_IMAGE_LIST),$(IMAGE_TAG))
 HELM_GIT_CHECKOUT_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
 HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
 PACKAGE_DEPENDENCIES?=
@@ -856,7 +857,7 @@ $(call FULL_CHART_TARGETS,copy) : %/helm/copy: checkout-repo checkout-helm-repo 
 	@$(BUILD_LIB)/helm_copy.sh $(HELM_SOURCE_REPOSITORY) $(HELM_DESTINATION_REPOSITORY) $(HELM_DIRECTORY) $(OUTPUT_DIR)
 
 $(call FULL_CHART_TARGETS,require) : %/helm/require: %/helm/copy | $$(ENABLE_LOGGING)
-	@$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) "$(PACKAGE_DEPENDENCIES)" "$(FORCE_JSON_SCHEMA_FILE)" $(HELM_IMAGE_LIST)
+	@$(BUILD_LIB)/helm_require.sh $(HELM_SOURCE_IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR) $(IMAGE_TAG) $(HELM_TAG) $(PROJECT_ROOT) $(LATEST) $(HELM_USE_UPSTREAM_IMAGE) "$(PACKAGE_DEPENDENCIES)" "$(FORCE_JSON_SCHEMA_FILE)" "$(HELM_IMAGE_LIST)" "$(HELM_IMAGE_TAG_LIST)"
 
 $(call FULL_CHART_TARGETS,replace) : %/helm/replace: %/helm/require | $$(ENABLE_LOGGING)
 	@$(BUILD_LIB)/helm_replace.sh $(HELM_DESTINATION_REPOSITORY) $(OUTPUT_DIR)

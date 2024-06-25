@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	gogithub "github.com/google/go-github/v53/github"
@@ -19,6 +20,12 @@ import (
 
 // Run contains the business logic to execute the `display` subcommand.
 func Run(displayOptions *types.DisplayOptions) error {
+	// Check if branch name environment variable has been set.
+	branchName, ok := os.LookupEnv(constants.BranchNameEnvVar)
+	if !ok {
+		branchName = constants.MainBranchName
+	}
+
 	// Check if GitHub token environment variable has been set.
 	githubToken, ok := os.LookupEnv("GITHUB_TOKEN")
 	if !ok {
@@ -31,11 +38,36 @@ func Run(displayOptions *types.DisplayOptions) error {
 		return fmt.Errorf("retrieving current working directory: %v", err)
 	}
 
+	// Get base repository owner environment variable if set.
+	baseRepoOwner := os.Getenv(constants.BaseRepoOwnerEnvvar)
+	if baseRepoOwner == "" {
+		baseRepoOwner = constants.DefaultBaseRepoOwner
+	}
+
 	// Clone the eks-anywhere-build-tooling repository.
 	buildToolingRepoPath := filepath.Join(cwd, constants.BuildToolingRepoName)
-	_, _, err = git.CloneRepo(constants.BuildToolingRepoURL, buildToolingRepoPath, "")
+	repo, headCommit, err := git.CloneRepo(fmt.Sprintf(constants.BuildToolingRepoURL, baseRepoOwner), buildToolingRepoPath, "", branchName)
 	if err != nil {
 		return fmt.Errorf("cloning build-tooling repo: %v", err)
+	}
+
+	// Get the worktree corresponding to the cloned repository.
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("getting repo's current worktree: %v", err)
+	}
+
+	// Checkout the eks-anywhere-build-tooling repo at the provided branch name.
+	createBranch := (branchName != constants.MainBranchName)
+	err = git.Checkout(worktree, branchName, createBranch)
+	if err != nil {
+		return fmt.Errorf("checking out worktree at branch %s: %v", branchName, err)
+	}
+
+	// Reset current worktree to get a clean index.
+	err = git.ResetToHEAD(worktree, headCommit)
+	if err != nil {
+		return fmt.Errorf("resetting new branch to [origin/%s] HEAD: %v", branchName, err)
 	}
 
 	if displayOptions.ProjectName != "" {
@@ -56,7 +88,7 @@ func Run(displayOptions *types.DisplayOptions) error {
 	var projectsList types.ProjectsList
 	err = yaml.Unmarshal(contents, &projectsList)
 	if err != nil {
-		return fmt.Errorf("unmarshaling upstream projects tracker file to YAML: %v", err)
+		return fmt.Errorf("unmarshalling upstream projects tracker file: %v", err)
 	}
 
 	var projectVersionInfoList []types.ProjectVersionInfo
@@ -64,20 +96,38 @@ func Run(displayOptions *types.DisplayOptions) error {
 		org := project.Org
 		for _, repo := range project.Repos {
 			repoName := repo.Name
-			currentVersion := repo.Versions[len(repo.Versions)-1]
-			var currentRevision string
-			if currentVersion.Tag != "" {
-				currentRevision = currentVersion.Tag
-			} else if currentVersion.Commit != "" {
-				currentRevision = currentVersion.Commit
-			}
 			fullRepoName := fmt.Sprintf("%s/%s", org, repoName)
 			if displayOptions.ProjectName != "" && displayOptions.ProjectName != fullRepoName {
 				continue
 			}
+			var releaseBranched bool
+			var currentVersion types.Version
+			if len(repo.Versions) > 1 {
+				releaseBranched = true
+			}
+			if releaseBranched {
+				supportedReleaseBranches, err := getSupportedReleaseBranches(buildToolingRepoPath)
+				if err != nil {
+					return fmt.Errorf("getting supported EKS Distro release branches: %v", err)
+				}
+				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
+				releaseBranchIndex := slices.Index(supportedReleaseBranches, releaseBranch)
+				currentVersion = repo.Versions[releaseBranchIndex]
+			} else {
+				currentVersion = repo.Versions[0]
+			}
+
+			var currentRevision string
+			var isTrackedByCommitHash bool
+			if currentVersion.Tag != "" {
+				currentRevision = currentVersion.Tag
+			} else if currentVersion.Commit != "" {
+				currentRevision = currentVersion.Commit
+				isTrackedByCommitHash = true
+			}
 
 			// Get latest revision for the project from GitHub.
-			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision)
+			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision, branchName, isTrackedByCommitHash, releaseBranched)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from GitHub: %v", err)
 			}
@@ -106,4 +156,16 @@ func Run(displayOptions *types.DisplayOptions) error {
 	tbl.Print()
 
 	return nil
+}
+
+func getSupportedReleaseBranches(buildToolingRepoPath string) ([]string, error) {
+	supportedReleaseBranchesFilepath := filepath.Join(buildToolingRepoPath, constants.SupportedReleaseBranchesFile)
+
+	supportedReleaseBranchesFileContents, err := os.ReadFile(supportedReleaseBranchesFilepath)
+	if err != nil {
+		return nil, fmt.Errorf("reading supported release branches file: %v", err)
+	}
+	supportedK8sVersions := strings.Split(strings.TrimRight(string(supportedReleaseBranchesFileContents), "\n"), "\n")
+
+	return supportedK8sVersions, nil
 }
