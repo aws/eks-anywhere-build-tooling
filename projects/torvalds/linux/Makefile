@@ -3,7 +3,7 @@ GIT_TAG=$(shell cat GIT_TAG)
 
 REPO=linux
 REPO_OWNER=torvalds
-REPO_SPARSE_CHECKOUT=tools lib/bootconfig.c include/linux/bootconfig.h
+REPO_SPARSE_CHECKOUT=COPYING tools lib/bootconfig.c include/linux/bootconfig.h
 
 SIMPLE_CREATE_BINARIES=false
 
