@@ -31,6 +31,8 @@ kind-base/images/push: ## Builds/pushes `kind-base/images/push`
 ##@ Fetch Binary Targets
 _output/1-26/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client`
 _output/1-26/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/1-26/dependencies/linux-amd64/eksd/kubernetes/server.tar.gz: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/server.tar.gz`
+_output/1-26/dependencies/linux-arm64/eksd/kubernetes/server.tar.gz: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/server.tar.gz`
 _output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
 _output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
 _output/1-26/dependencies/linux-amd64/eksd/cni-plugins: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/cni-plugins`
