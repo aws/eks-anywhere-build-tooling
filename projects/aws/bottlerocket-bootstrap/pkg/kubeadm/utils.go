@@ -319,6 +319,13 @@ func isEmpty(str string) bool {
 func patchKubeVipManifest() error {
 	fmt.Println("Patching kube-vip static pod manifest")
 	kubeVipManifest := filepath.Join(staticPodManifestsPath, "kube-vip.yaml")
+
+	// skip patching KubeVip manifest if its not present
+	_, error := os.Stat(kubeVipManifest)
+	if errors.Is(error, os.ErrNotExist) {
+		return nil
+	}
+
 	contents, err := ioutil.ReadFile(kubeVipManifest)
 	if err != nil {
 		return errors.Wrapf(err, "Error reading file %s", kubeVipManifest)
