@@ -2,7 +2,9 @@ package kubeadm
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -38,9 +40,14 @@ func controlPlaneInit() error {
 
 	if k8s129Compare != -1 {
 		fmt.Println("Kubernetes version is v1.29 or above")
-		err = patchKubeVipManifest()
-		if err != nil {
-			return errors.Wrapf(err, "Error patching kube-vip manifest")
+
+		// skip patching KubeVip manifest if its not present
+		kubeVipManifest := filepath.Join(staticPodManifestsPath, "kube-vip.yaml")
+		if _, err := os.Stat(kubeVipManifest); err == nil {
+			err = patchKubeVipManifest()
+			if err != nil {
+				return errors.Wrapf(err, "Error patching kube-vip manifest")
+			}
 		}
 	}
 
