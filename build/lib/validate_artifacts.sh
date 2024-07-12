@@ -55,11 +55,13 @@ envsubst "\$GIT_TAG:\$IMAGE_OS" \
 if $FAKE_ARM_ARTIFACTS_FOR_VALIDATION; then
     echo "Faking arm64 artifacts"
     sed -i '/arm64/d' "$EXPECTED_FILES"
+    sed -i '/aarch64/d' "$EXPECTED_FILES"
 fi
 
 if $FAKE_AMD_BINARIES_FOR_VALIDATION; then
     echo "Faking amd64 artifacts"
     sed -i '/amd64/d' "$EXPECTED_FILES"
+    sed -i '/x86_64/d' "$EXPECTED_FILES"
 fi
 
 # The versions of sort found on macOS and Linux can behave

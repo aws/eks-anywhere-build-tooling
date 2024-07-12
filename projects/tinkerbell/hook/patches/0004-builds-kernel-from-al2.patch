@@ -1,0 +1,62 @@
+From df5efceb73cf7edad32e14660710e42463e816ce Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Mon, 15 Jul 2024 20:41:42 +0000
+Subject: [PATCH 4/4] builds kernel from al2
+
+---
+ kernel/Dockerfile | 34 +++++++++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 7 deletions(-)
+
+diff --git a/kernel/Dockerfile b/kernel/Dockerfile
+index 8b5277d..3803d4e 100644
+--- a/kernel/Dockerfile
++++ b/kernel/Dockerfile
+@@ -1,11 +1,27 @@
+-FROM debian:stable as kernel-source-unpacked
+-ENV DEBIAN_FRONTEND=noninteractive
++ARG BASE_IMAGE
++FROM ${BASE_IMAGE} as kernel-source-unpacked-amd64
+ 
+-# crossbuild-essentials are pretty heavy; here we install for both architecures to maximize Docker layer hit cache rate during development, but only one will be used
+-RUN set -x && apt -o "Dpkg::Use-Pty=0" -y update && \
+-      apt -o "Dpkg::Use-Pty=0" -y install curl xz-utils gnupg2 flex bison libssl-dev libelf-dev bc libncurses-dev kmod \
+-                     crossbuild-essential-amd64 crossbuild-essential-arm64 && \
+-      apt -o "Dpkg::Use-Pty=0" -y clean
++ARG DEFCONFIG
++ENV KERNEL_ARCH=x86
++ENV INPUT_DEFCONFIG=${DEFCONFIG}-x86_64
++ENV KERNEL_OUTPUT_IMAGE=arch/${KERNEL_ARCH}/boot/bzImage
++
++ARG BASE_IMAGE
++FROM ${BASE_IMAGE} as kernel-source-unpacked-arm64
++
++ARG DEFCONFIG
++ENV KERNEL_ARCH=arm64
++ENV INPUT_DEFCONFIG=${DEFCONFIG}-aarch64
++ENV KERNEL_OUTPUT_IMAGE=arch/${KERNEL_ARCH}/boot/Image
++
++ARG TARGETARCH
++FROM kernel-source-unpacked-${TARGETARCH} as kernel-source-unpacked
++
++RUN set -x && yum -y update && \
++        yum -y groupinstall "Development Tools" && \
++        yum -y install --allowerasing bc ncurses-devel openssl-devel gnupg2-full && \
++        yum clean all && \
++        rm -rf /var/cache/yum
+ 
+ ARG KERNEL_MAJOR_V
+ ARG KERNEL_VERSION
+@@ -47,6 +63,10 @@ ENV KBUILD_BUILD_HOST="tinkerbell"
+ WORKDIR /linux
+ COPY /configs/${INPUT_DEFCONFIG} /linux/.config
+ 
++COPY /config-patches /linux/config-patches
++RUN set -x && \
++    /linux/scripts/kconfig/merge_config.sh -m .config $(find config-patches -type f | sort)
++
+ # Kernel config; copy the correct defconfig as .config, and run olddefconfig
+ RUN set -x && make "ARCH=${KERNEL_ARCH}" olddefconfig
+ 
+-- 
+2.34.1
+
