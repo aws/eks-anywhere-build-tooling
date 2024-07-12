@@ -715,7 +715,31 @@ batch:
         variables:
           PROJECT_PATH: projects/tinkerbell/hegel
           CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/tinkerbell.hegel
+    - identifier: tinkerbell_hook_linux_amd64
+      env:
+        type: LINUX_CONTAINER
+        compute-type: BUILD_GENERAL1_LARGE
+        variables:
+          PROJECT_PATH: projects/tinkerbell/hook
+          CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/tinkerbell.hook
+          IMAGE_PLATFORMS: linux/amd64
+          BINARY_PLATFORMS: linux/amd64
+          IMAGE_TAG_SUFFIX: -amd64
+    - identifier: tinkerbell_hook_linux_arm64
+      env:
+        type: ARM_CONTAINER
+        compute-type: BUILD_GENERAL1_LARGE
+        variables:
+          PROJECT_PATH: projects/tinkerbell/hook
+          CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/tinkerbell.hook
+          IMAGE_PLATFORMS: linux/arm64
+          BINARY_PLATFORMS: linux/arm64
+          IMAGE_TAG_SUFFIX: -arm64
     - identifier: tinkerbell_hook
+      buildspec: buildspecs/combine-images.yml
+      depend-on:
+        - tinkerbell_hook_linux_amd64
+        - tinkerbell_hook_linux_arm64
       env:
         type: ARM_CONTAINER
         compute-type: BUILD_GENERAL1_SMALL

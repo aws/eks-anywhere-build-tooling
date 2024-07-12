@@ -1,0 +1,30 @@
+From 3de7f342367c9fb89e8a97bad8d750d1b36995ea Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Mon, 15 Jul 2024 16:46:54 +0000
+Subject: [PATCH 2/4] adds support for building single arch vmlinuz and
+ initramfs
+
+---
+ rules.mk | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/rules.mk b/rules.mk
+index 006dd48..7c619bd 100644
+--- a/rules.mk
++++ b/rules.mk
+@@ -82,9 +82,10 @@ push-hook-bootkit push-hook-docker:
+ 	docker buildx build --platform $$platforms --push -t $(ORG)/$(container):$T $(container)
+ 
+ .PHONY: dist
+-dist: out/$T/rel/amd64/hook.tar out/$T/rel/arm64/hook.tar ## Build tarballs for distribution
++dist-aarch64: out/$T/rel/arm64/hook.tar ## Build tarballs for distribution
++dist-x86_64: out/$T/rel/amd64/hook.tar ## Build tarballs for distribution
+ dbg-dist: out/$T/dbg/$(ARCH)/hook.tar ## Build debug enabled tarball
+-dist dbg-dist:
++dist-aarch64 dist-x86_64 dbg-dist:
+ 	for f in $^; do \
+ 	case $$f in \
+ 	*amd64*) arch=x86_64 ;; \
+-- 
+2.34.1
+
