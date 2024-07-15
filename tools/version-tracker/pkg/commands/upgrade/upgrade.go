@@ -429,10 +429,16 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		if err != nil {
 			return fmt.Errorf("pushing updated project version files for [%s] project: %v", projectName, err)
 		}
+		
+		// Update the title of the pull request depending on the base branch name.
+		title := commitMessage
+		if baseBranchName != constants.MainBranchName {
+			title = fmt.Sprintf("[%s] %s", baseBranchName, title)
+		}
 
-		// Create a pull request from the bramch in the head repository to the target branch in the aws/eks-anywhere-build-tooling repository.
+		// Create a pull request from the branch in the head repository to the target branch in the aws/eks-anywhere-build-tooling repository.
 		logger.Info("Creating pull request with updated files")
-		err = github.CreatePullRequest(client, projectOrg, projectRepo, commitMessage, pullRequestBody, baseRepoOwner, baseBranchName, headRepoOwner, headBranchName, currentRevision, latestRevision, addPatchWarningComment, patchesWarningComment)
+		err = github.CreatePullRequest(client, projectOrg, projectRepo, title, pullRequestBody, baseRepoOwner, baseBranchName, headRepoOwner, headBranchName, currentRevision, latestRevision, addPatchWarningComment, patchesWarningComment)
 		if err != nil {
 			return fmt.Errorf("creating pull request to %s repository: %v", constants.BuildToolingRepoName, err)
 		}
