@@ -5,6 +5,7 @@ GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 REPO=hook
 REPO_OWNER=tinkerbell
 
+
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
