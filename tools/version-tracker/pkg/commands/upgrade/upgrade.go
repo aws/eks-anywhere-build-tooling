@@ -390,7 +390,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 						commitMessage = "Bump Bottlerocket versions to latest release"
 						pullRequestBody = fmt.Sprintf(constants.BottlerocketUpgradePullRequestBody, currentBottlerocketVersion, latestBottlerocketVersion)
 					} else {
-						headBranchName = fmt.Sprintf("update-%s-%s-and-bottlerocket", projectOrg, projectRepo)
+						headBranchName = fmt.Sprintf("update-%s-%s-and-bottlerocket-%s", projectOrg, projectRepo, branchName)
 						commitMessage = fmt.Sprintf("Bump %s and Bottlerocket versions to latest release", projectName)
 						pullRequestBody = fmt.Sprintf(constants.CombinedImageBuilderBottlerocketUpgradePullRequestBody, currentRevision, latestRevision, currentBottlerocketVersion, latestBottlerocketVersion)
 					}
@@ -429,7 +429,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		if err != nil {
 			return fmt.Errorf("pushing updated project version files for [%s] project: %v", projectName, err)
 		}
-		
+
 		// Update the title of the pull request depending on the base branch name.
 		title := commitMessage
 		if baseBranchName != constants.MainBranchName {
