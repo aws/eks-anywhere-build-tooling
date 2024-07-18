@@ -1,4 +1,4 @@
-From 88992bddd0c44220d55534e33d06caf7664fadfb Mon Sep 17 00:00:00 2001
+From 746d2c799760508d11c991bceab1b3f593830889 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Mon, 21 Aug 2023 18:40:07 -0500
 Subject: [PATCH 7/8] adds retries and timeout to packer image-builder
@@ -13,7 +13,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  5 files changed, 32 insertions(+), 9 deletions(-)
 
 diff --git a/images/capi/packer/ami/packer.json b/images/capi/packer/ami/packer.json
-index f5856f4c3..94bb7c732 100644
+index 33fcfd43a..a302529c7 100644
 --- a/images/capi/packer/ami/packer.json
 +++ b/images/capi/packer/ami/packer.json
 @@ -107,7 +107,9 @@
@@ -44,10 +44,10 @@ index bab9c2bde..7b3298826 100644
    "vmx_version": "15",
    "vnc_bind_address": "127.0.0.1",
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 5132b5e21..9b421e968 100644
+index ab50f6e22..debb04643 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
-@@ -18,8 +18,9 @@
+@@ -19,8 +19,9 @@
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
        "skip_compaction": "{{user `skip_compaction`}}",
        "source_path": "{{ user `source_path`}}",
@@ -58,7 +58,7 @@ index 5132b5e21..9b421e968 100644
        "ssh_username": "{{user `ssh_username`}}",
        "type": "vmware-vmx",
        "vm_name": "{{user `build_version`}}",
-@@ -67,8 +68,9 @@
+@@ -68,8 +69,9 @@
        "remote_username": "{{user `remote_username`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c '{{user `shutdown_command`}}'",
        "skip_compaction": "{{user `skip_compaction`}}",
@@ -69,7 +69,7 @@ index 5132b5e21..9b421e968 100644
        "ssh_username": "{{user `ssh_username`}}",
        "type": "vmware-iso",
        "version": "{{user `vmx_version`}}",
-@@ -115,8 +117,9 @@
+@@ -116,8 +118,9 @@
        "remote_username": "{{user `remote_username`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
        "skip_compaction": "{{user `skip_compaction`}}",
@@ -80,7 +80,7 @@ index 5132b5e21..9b421e968 100644
        "ssh_username": "{{user `ssh_username`}}",
        "type": "vmware-iso",
        "version": "{{user `vmx_version`}}",
-@@ -174,8 +177,9 @@
+@@ -175,8 +178,9 @@
        "resource_pool": "{{user `resource_pool`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c '{{user `shutdown_command`}}'",
        "ssh_clear_authorized_keys": "false",
@@ -91,7 +91,7 @@ index 5132b5e21..9b421e968 100644
        "ssh_username": "{{user `ssh_username`}}",
        "storage": [
          {
-@@ -239,7 +243,8 @@
+@@ -240,7 +244,8 @@
        "ssh_password": "{{user `ssh_password`}}",
        "ssh_proxy_host": "{{user `ssh_proxy_host`}}",
        "ssh_proxy_port": "{{user `ssh_proxy_port`}}",
@@ -101,7 +101,7 @@ index 5132b5e21..9b421e968 100644
        "ssh_username": "{{user `ssh_username`}}",
        "storage": [
          {
-@@ -280,7 +285,8 @@
+@@ -281,7 +286,8 @@
        "resource_pool": "{{user `resource_pool`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
        "ssh_password": "{{user `ssh_password`}}",
@@ -111,7 +111,7 @@ index 5132b5e21..9b421e968 100644
        "ssh_username": "{{user `ssh_username`}}",
        "template": "{{user `template`}}",
        "type": "vsphere-clone",
-@@ -380,7 +386,9 @@
+@@ -381,7 +387,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -121,7 +121,7 @@ index 5132b5e21..9b421e968 100644
        "type": "ansible",
        "user": "{{user `ssh_username`}}"
      },
-@@ -413,7 +421,9 @@
+@@ -414,7 +422,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -202,5 +202,5 @@ index 3b61117df..29d18badd 100644
        "user": "builder"
      },
 -- 
-2.39.3 (Apple Git-146)
+2.45.2
 
