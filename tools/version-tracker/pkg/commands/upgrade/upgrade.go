@@ -386,7 +386,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 				if len(updatedBRFiles) > 0 {
 					updatedFiles = append(updatedFiles, updatedBRFiles...)
 					if len(updatedFiles) == len(updatedBRFiles) {
-						headBranchName = "update-bottlerocket-releases"
+						headBranchName = fmt.Sprintf("update-bottlerocket-releases-%s", branchName)
 						commitMessage = "Bump Bottlerocket versions to latest release"
 						pullRequestBody = fmt.Sprintf(constants.BottlerocketUpgradePullRequestBody, currentBottlerocketVersion, latestBottlerocketVersion)
 					} else {
