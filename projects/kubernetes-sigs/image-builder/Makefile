@@ -248,28 +248,28 @@ setup-ami-share: | $$(ENABLE_LOGGING)
 setup-packer-configs-%: $(GIT_PATCH_TARGET) | ensure-jq ensure-yq $$(ENABLE_LOGGING)
 	@build/setup_packer_configs.sh $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(IMAGE_OS) $(ARTIFACTS_BUCKET) $(FINAL_IMAGE_DIR) $(ADDITIONAL_PAUSE_$(RELEASE_BRANCH)_FROM) $(LATEST) $(IMAGE_BUILDER_DIR) $(IMAGE_OS_DIR) $(IMAGE_OS_VERSION)
 
-REDHAT_8_VERSION=8.4
-REDHAT_9_VERSION=9.3
-REDHAT_8_ISO_CHECKSUM=ea5f349d492fed819e5086d351de47261c470fc794f7124805d176d69ddf1fcd
-REDHAT_9_ISO_CHECKSUM=5c802147aa58429b21e223ee60e347e850d6b0d8680930c4ffb27340ffb687a8
-NUTANIX_REDHAT_8_VERSION=8.8
-NUTANIX_REDHAT_9_VERSION=9.3
+REDHAT_8_SEMVER=8.10
+REDHAT_9_SEMVER=9.4
+REDHAT_8_ISO_CHECKSUM=9b3c8e31bc2cdd2de9cf96abb3726347f5840ff3b176270647b3e66639af291b
+REDHAT_9_ISO_CHECKSUM=398561d7b66f1a4bf23664f4aa8f2cfbb3641aa2f01a320068e86bd1fc0e9076
+REDHAT_8_KMOD_RPM=kmod-megaraid_sas-07.727.03.00-1.el8_10.elrepo.x86_64.rpm
+REDHAT_9_KMOD_RPM=kmod-megaraid_sas-07.727.03.00-1.el9_4.elrepo.x86_64.rpm
 
 $(REDHAT_CONFIG_TARGET):
 	@if [[ "$(IMAGE_FORMAT)" == "nutanix" ]]; then \
 		jq --null-input \
 			--arg rhel_username "$(RHSM_USERNAME)" \
 			--arg rhel_password "$(RHSM_PASSWORD)" \
-			--arg image_url "$(if $(filter 9,$(IMAGE_OS_VERSION)),https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/$(NUTANIX_REDHAT_9_VERSION)/rhel-$(NUTANIX_REDHAT_9_VERSION).qcow2,https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/$(NUTANIX_REDHAT_8_VERSION)/rhel-$(NUTANIX_REDHAT_8_VERSION).qcow2)" \
+			--arg image_url "$$(aws s3 presign redhat-iso-pdx/$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)/rhel-$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)-x86_64-kvm.qcow2)" \
 			'{"rhel_username": $$rhel_username, "rhel_password": $$rhel_password, "image_url": $$image_url}' > $@; \
 	else \
 		jq --null-input \
 			--arg rhel_username "$(RHSM_USERNAME)" \
 			--arg rhel_password "$(RHSM_PASSWORD)" \
-			--arg iso_url "$(if $(filter 9,$(IMAGE_OS_VERSION)),$$(aws s3 presign redhat-iso-pdx/$(REDHAT_9_VERSION)/rhel-$(REDHAT_9_VERSION)-x86_64-dvd.iso),$$(aws s3 presign redhat-iso-pdx/$(REDHAT_8_VERSION)/rhel-$(REDHAT_8_VERSION)-x86_64-dvd.iso))" \
-			--arg extra_rpms "$(if $(filter raw,$(IMAGE_FORMAT)),$$(aws s3 presign redhat-iso-pdx/8.4/rpms/kmod-megaraid_sas-07.719.06.00_el8.4-1.x86_64.rpm),)" \
+			--arg iso_url "$$(aws s3 presign redhat-iso-pdx/$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)/rhel-$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)-x86_64-dvd.iso)" \
+			--arg extra_rpms "$(if $(filter raw,$(IMAGE_FORMAT)),$$(aws s3 presign redhat-iso-pdx/$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)/rpms/$(REDHAT_$(IMAGE_OS_VERSION)_KMOD_RPM)),)" \
 			--arg iso_checksum_type "sha256" \
-			--arg iso_checksum "$(if $(filter 9,$(IMAGE_OS_VERSION)),$(REDHAT_9_ISO_CHECKSUM),$(REDHAT_8_ISO_CHECKSUM))" \
+			--arg iso_checksum "$(REDHAT_$(IMAGE_OS_VERSION)_ISO_CHECKSUM)" \
 			'{"rhel_username": $$rhel_username, "rhel_password": $$rhel_password, "iso_url": $$iso_url, "iso_checksum_type": $$iso_checksum_type, "iso_checksum": $$iso_checksum, "extra_rpms": $$extra_rpms}' > $@; \
 	fi
 ##############################################################
