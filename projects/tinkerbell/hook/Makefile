@@ -35,6 +35,11 @@ FIX_LICENSES_HOOK_DOCKER_TARGET=$(REPO)/hook-docker/LICENSE
 KERNEL_MAJOR_V=v$(firstword $(subst ., ,$(KERNEL_VERSION))).x
 DEFCONFIG=config-$(basename $(KERNEL_VERSION)).x
 
+KERNEL_ARCH=$(if $(findstring amd64,$(BUILDER_PLATFORM_ARCH)),x86_64,aarch64)
+EKSA_DEFCONFIG=$(DEFCONFIG)-$(KERNEL_ARCH)-eksa
+USER_DEFCONFIG=$(DEFCONFIG)-$(KERNEL_ARCH)
+KERNEL_CONFIG_HOST_PATH=$(MAKE_ROOT)/$(OUTPUT_DIR)/kernel-config
+
 BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
@@ -71,7 +76,7 @@ $(call IMAGE_TARGETS_FOR_NAME, kernel-config): $(HOOK_IMAGE_FILES)
 kernel-config/images/%: IMAGE_TARGET=kernel-configurator
 kernel-config/images/%: IMAGE_OUTPUT_TYPE=docker
 kernel-config/images/%: IMAGE_IMPORT_CACHE=
-kernel-config/images/%: LATEST_IMAGE=hook-kernel:builder
+kernel-config/images/%: LATEST_IMAGE=hook-kernel-builder:$(KERNEL_VERSION)
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
@@ -98,15 +103,15 @@ $(REPO)/%/LICENSE: | $(GO_MOD_DOWNLOAD_TARGETS)
 #go-licenses requires a LICENSE file in each folder with the go.mod
 	cp $(REPO)/LICENSE $@
 
-kernel-config: KERNEL_ARCH=$(if $(findstring amd64,$(BUILDER_PLATFORM_ARCH)),x86_64,aarch64)
-kernel-config: EKSA_DEFCONFIG=$(DEFCONFIG)-$(KERNEL_ARCH)-eksa
-kernel-config: USER_DEFCONFIG=$(DEFCONFIG)-$(KERNEL_ARCH)
-kernel-config: HOST_PATH=$(MAKE_ROOT)/$(OUTPUT_DIR)/kernel-config
-kernel-config: | ensure-docker
+kernel-config-%: | ensure-docker
 	@$(MAKE) kernel-config/images/$(BUILDER_PLATFORM_ARCH) IMAGE_NAMES=kernel-config
-	@mkdir -p $(HOST_PATH)
-	docker run -it -v $(HOST_PATH):/host hook-kernel:builder bash -c "cp .config /host/$(EKSA_DEFCONFIG) && make menuconfig && cp -v .config /host/$(USER_DEFCONFIG)"
-	diff $(HOST_PATH)/$(EKSA_DEFCONFIG) $(HOST_PATH)/$(USER_DEFCONFIG)
+	@mkdir -p $(KERNEL_CONFIG_HOST_PATH)
+	docker run -it -v $(KERNEL_CONFIG_HOST_PATH):/host hook-kernel-builder:$(KERNEL_VERSION) bash -c "cp .config /host/$(EKSA_DEFCONFIG) && make $* && cp -v .config /host/$(USER_DEFCONFIG)"
+
+menuconfig: kernel-config-menuconfig
+
+create-new-config-patch: kernel-config-menuconfig
+	@diff $(KERNEL_CONFIG_HOST_PATH)/$(EKSA_DEFCONFIG) $(KERNEL_CONFIG_HOST_PATH)/$(USER_DEFCONFIG) || true
 
 
 ########### DO NOT EDIT #############################
