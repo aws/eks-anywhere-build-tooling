@@ -307,4 +307,22 @@ var (
 	CiliumImageDirectories = []string{"cilium", "operator-generic", "cilium-chart"}
 
 	ProjectsSupportingPrereleaseTags = []string{"kubernetes-sigs/cluster-api-provider-cloudstack"}
+
+	// These projects will be upgraded only on main and won't be triggered on release branches.
+	UpstreamPackagesProjects = []string{
+		"aquasecurity/harbor-scanner-trivy",
+		"aquasecurity/trivy",
+		"aws-containers/hello-eks-anywhere",
+		"aws-observability/aws-otel-collector",
+		"distribution/distribution",
+		"emissary-ingress/emissary",
+		"goharbor/harbor",
+		"kubernetes/autoscaler",
+		"kubernetes/cloud-provider-aws",
+		"kubernetes-sigs/metrics-server",
+		"metallb/metallb",
+		"prometheus/node_exporter",
+		"prometheus/prometheus",
+		"redis/redis",
+	}
 )
