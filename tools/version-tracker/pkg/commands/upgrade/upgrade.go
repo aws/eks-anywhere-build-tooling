@@ -70,6 +70,12 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 	}
 	client := gogithub.NewTokenClient(context.Background(), githubToken)
 
+	// Skip project upgrade if it is in the packages list and branch is not main
+	if branchName != constants.MainBranchName && slices.Contains(constants.UpstreamPackagesProjects, projectName) {
+		logger.Info(fmt.Sprintf("Skipping upgrade for project %s on %s branch", projectName, branchName))
+		return nil
+	}
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("retrieving current working directory: %v", err)
