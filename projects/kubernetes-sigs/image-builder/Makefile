@@ -260,7 +260,7 @@ $(REDHAT_CONFIG_TARGET):
 		jq --null-input \
 			--arg rhel_username "$(RHSM_USERNAME)" \
 			--arg rhel_password "$(RHSM_PASSWORD)" \
-			--arg image_url "$$(aws s3 presign redhat-iso-pdx/$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)/rhel-$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)-x86_64-kvm.qcow2)" \
+			--arg image_url "https://redhat-iso-pdx.s3.us-west-2.amazonaws.com/$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)/rhel-$(REDHAT_$(IMAGE_OS_VERSION)_SEMVER)-x86_64-kvm.qcow2" \
 			'{"rhel_username": $$rhel_username, "rhel_password": $$rhel_password, "image_url": $$image_url}' > $@; \
 	else \
 		jq --null-input \
