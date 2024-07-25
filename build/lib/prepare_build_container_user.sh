@@ -31,3 +31,4 @@ groupadd --gid "$GROUP_ID" matchinguser
 useradd  --no-create-home --uid "$USER_ID" --gid "$GROUP_ID" matchinguser
 mkdir -p /home/matchinguser
 chown -R matchinguser:matchinguser /home/matchinguser
+echo "matchinguser ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
