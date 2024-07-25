@@ -7,23 +7,16 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `boots`
+clone-repo:  ## Clone upstream `ipxedust`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `smee` for `linux/amd64 linux/arm64`
-_output/bin/boots/linux-amd64/smee: ## Build `_output/bin/boots/linux-amd64/smee`
-_output/bin/boots/linux-arm64/smee: ## Build `_output/bin/boots/linux-arm64/smee`
-
-##@ Image Targets
-local-images: ## Builds `boots/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `boots/images/push` to IMAGE_REPO
-boots/images/amd64: ## Builds/pushes `boots/images/amd64`
-boots/images/push: ## Builds/pushes `boots/images/push`
-
-##@ Fetch Binary Targets
-_output/dependencies/linux-amd64/eksa/tinkerbell/ipxedust: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/ipxedust`
-_output/dependencies/linux-arm64/eksa/tinkerbell/ipxedust: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/ipxedust`
+binaries: ## Build all binaries: `` for `linux/amd64`
+_output/bin/ipxedust/linux-amd64/ipxe.efi: ## Build `_output/bin/ipxedust/linux-amd64/ipxe.efi`
+_output/bin/ipxedust/linux-amd64/undionly.kpxe: ## Build `_output/bin/ipxedust/linux-amd64/undionly.kpxe`
+_output/bin/ipxedust/linux-amd64/ipxe.iso: ## Build `_output/bin/ipxedust/linux-amd64/ipxe.iso`
+_output/bin/ipxedust/linux-amd64/ipxe-efi.img: ## Build `_output/bin/ipxedust/linux-amd64/ipxe-efi.img`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
@@ -41,18 +34,15 @@ run-in-docker/checksums: ## Run `checksums` in docker builder container
 run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
-run-in-docker/boots/eks-anywhere-go-mod-download: ## Run `boots/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/_output/bin/boots/linux-amd64/smee: ## Run `_output/bin/boots/linux-amd64/smee` in docker builder container
-run-in-docker/_output/bin/boots/linux-arm64/smee: ## Run `_output/bin/boots/linux-arm64/smee` in docker builder container
-run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/bin/ipxedust/linux-amd64/ipxe.efi: ## Run `_output/bin/ipxedust/linux-amd64/ipxe.efi` in docker builder container
+run-in-docker/_output/bin/ipxedust/linux-amd64/undionly.kpxe: ## Run `_output/bin/ipxedust/linux-amd64/undionly.kpxe` in docker builder container
+run-in-docker/_output/bin/ipxedust/linux-amd64/ipxe.iso: ## Run `_output/bin/ipxedust/linux-amd64/ipxe.iso` in docker builder container
+run-in-docker/_output/bin/ipxedust/linux-amd64/ipxe-efi.img: ## Run `_output/bin/ipxedust/linux-amd64/ipxe-efi.img` in docker builder container
 
-##@ License Targets
-gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
-attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
-attribution-pr: ## Generates PR to update attribution files for projects
-attribution-checksums: ## Update attribution and checksums files.
-all-attributions: ## Update attribution files for all RELEASE_BRANCHes.
-all-attributions-checksums: ## Update attribution and checksums files for all RELEASE_BRANCHes.
+##@ Artifact Targets
+tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
+s3-artifacts: # Prepare ARTIFACTS_PATH folder structure with tarballs/manifests/other items to be uploaded to s3
+upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S3
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
@@ -78,6 +68,6 @@ patch-for-dep-update: ## After bumping dep in go.mod file and updating vendor, g
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `github-rate-limit-pre validate-checksums attribution local-images   attribution-pr github-rate-limit-post`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images  `
+build: ## Called via prow presubmit, calls `github-rate-limit-pre validate-checksums attribution   upload-artifacts attribution-pr github-rate-limit-post`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums   upload-artifacts`
 ########### END GENERATED ###########################

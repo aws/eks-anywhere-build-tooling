@@ -79,6 +79,8 @@ projects/kubernetes-sigs/image-builder/eks-anywhere-full-build-complete: export 
 projects/aws/eks-a-admin-image/eks-anywhere-full-build-complete: MAIN_TARGET=build
 
 projects/torvalds/linux/eks-anywhere-full-build-complete: export BINARY_PLATFORMS=linux/amd64 linux/arm64
+projects/tinkerbell/ipxedust/eks-anywhere-full-build-complete: export BINARY_PLATFORMS=linux/amd64 linux/arm64
+
 # Skips
 projects/aws/cluster-api-provider-aws-snow/eks-anywhere-full-build-complete:
 	@echo "Skipping aws/cluster-api-provider-aws-snow: container images are pulled cross account"
@@ -207,6 +209,7 @@ generate-staging-buildspec: | ensure-locale
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "emissary-ingress_emissary" "$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "goharbor_harbor" "$(BASE_DIRECTORY)/projects/goharbor/harbor/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_upgrader" "$(BASE_DIRECTORY)/projects/aws/upgrader/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_ipxedust" "$(BASE_DIRECTORY)/projects/tinkerbell/ipxedust/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/tools/version-tracker/buildspecs/upgrade.yml" "$(BASE_DIRECTORY)/buildspecs/upgrade-buildspec.yml" true EXCLUDE_FROM_UPGRADE_BUILDSPEC UPGRADE_BUILDSPECS false buildspecs/upgrade-eks-distro-buildspec.yml true
 
 .PHONY: generate
