@@ -11,8 +11,8 @@ clone-repo:  ## Clone upstream `dhcp`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `` for `linux/arm64`
-_output/bin/dhcp/linux-arm64: ## Build `_output/bin/dhcp/linux-arm64`
+binaries: ## Build all binaries: `` for `linux/amd64`
+_output/bin/dhcp/linux-amd64/dhcp: ## Build `_output/bin/dhcp/linux-amd64/dhcp`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
@@ -30,7 +30,7 @@ run-in-docker/checksums: ## Run `checksums` in docker builder container
 run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
-run-in-docker/_output/bin/dhcp/linux-arm64: ## Run `_output/bin/dhcp/linux-arm64` in docker builder container
+run-in-docker/_output/bin/dhcp/linux-amd64/dhcp: ## Run `_output/bin/dhcp/linux-amd64/dhcp` in docker builder container
 
 ##@ Artifact Targets
 tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
