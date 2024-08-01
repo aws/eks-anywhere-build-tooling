@@ -27,10 +27,18 @@ tink-controller/images/amd64: ## Builds/pushes `tink-controller/images/amd64`
 tink-server/images/amd64: ## Builds/pushes `tink-server/images/amd64`
 tink-worker/images/amd64: ## Builds/pushes `tink-worker/images/amd64`
 nginx/images/amd64: ## Builds/pushes `nginx/images/amd64`
+tink-relay/images/amd64: ## Builds/pushes `tink-relay/images/amd64`
+tink-relay-init/images/amd64: ## Builds/pushes `tink-relay-init/images/amd64`
 tink-controller/images/push: ## Builds/pushes `tink-controller/images/push`
 tink-server/images/push: ## Builds/pushes `tink-server/images/push`
 tink-worker/images/push: ## Builds/pushes `tink-worker/images/push`
 nginx/images/push: ## Builds/pushes `nginx/images/push`
+tink-relay/images/push: ## Builds/pushes `tink-relay/images/push`
+tink-relay-init/images/push: ## Builds/pushes `tink-relay-init/images/push`
+
+##@ Fetch Binary Targets
+_output/dependencies/linux-amd64/eksa/isc-projects/dhcp: ## Fetch `_output/dependencies/linux-amd64/eksa/isc-projects/dhcp`
+_output/dependencies/linux-arm64/eksa/isc-projects/dhcp: ## Fetch `_output/dependencies/linux-arm64/eksa/isc-projects/dhcp`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
