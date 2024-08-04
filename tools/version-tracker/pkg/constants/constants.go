@@ -174,11 +174,6 @@ var (
 			Extract:                  true,
 			TrimLeadingVersionPrefix: true,
 		},
-		"rancher/local-path-provisioner": {
-			AssetName:  "local-path-provisioner-amd64",
-			BinaryName: "local-path-provisioner-amd64",
-			Extract:    false,
-		},
 		"replicatedhq/troubleshoot": {
 			AssetName:  "support-bundle_linux_amd64.tar.gz",
 			BinaryName: "support-bundle",
@@ -272,6 +267,10 @@ var (
 		"prometheus/prometheus": {
 			SourceOfTruthFile:     ".promu.yml",
 			GoVersionSearchString: `version: (1\.\d\d)`,
+		},
+		"rancher/local-path-provisioner": {
+			SourceOfTruthFile:     "Dockerfile.dapper",
+			GoVersionSearchString: `golang:(1\.\d\d)`,
 		},
 		"tinkerbell/boots": {
 			SourceOfTruthFile:     "go.mod",
