@@ -260,6 +260,10 @@ var (
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
+		"nutanix-cloud-native/cloud-provider-nutanix": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
 		"metallb/metallb": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
