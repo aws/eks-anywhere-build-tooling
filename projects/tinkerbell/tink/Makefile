@@ -8,7 +8,19 @@ BASE_IMAGE_NAME?=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 PROJECT_DEPENDENCIES=eksa/isc-projects/dhcp
-BUILDSPEC_DEPENDS_ON_OVERRIDE=isc_projects_dhcp_linux_amd64 isc_projects_dhcp_linux_arm64
+
+BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
+BUILDSPEC_1_DEPENDS_ON_OVERRIDE=none
+BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
+BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
+BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
+BUILDSPEC_2_DEPENDS_ON_OVERRIDE=tinkerbell_tink_linux_amd64 tinkerbell_tink_linux_arm64
+
+# Since we build the arm and amd binaries on difference instances in codebuild
+# we do not want to delete missing files when s3 sync-ing from local to the bucket
+# since this would clobber the other build's artifacts
+UPLOAD_DO_NOT_DELETE=true
 
 TINK_CONTROLLER_IMAGE_COMPONENT=tinkerbell/tink/tink-controller
 TINK_SERVER_IMAGE_COMPONENT=tinkerbell/tink/tink-server
