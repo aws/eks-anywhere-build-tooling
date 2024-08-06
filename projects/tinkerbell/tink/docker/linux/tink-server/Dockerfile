@@ -6,9 +6,8 @@ FROM $BUILDER_IMAGE as wget-builder
 WORKDIR /newroot
 
 RUN set -x && \
-    clean_install "wget" && \
-    remove_package "bash coreutils gawk info sed grep" && \
-    cleanup "wget"
+    install_binary /usr/bin/wget && \
+    cleanup "deps"
 
 FROM $BASE_IMAGE
 
