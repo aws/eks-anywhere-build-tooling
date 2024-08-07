@@ -4,11 +4,9 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-ARG ATTRIBUTION_FILE
-
 COPY _output/bin/hub/$TARGETOS-$TARGETARCH/writefile /usr/bin/writefile
 COPY _output/LICENSES /LICENSES
-COPY $ATTRIBUTION_FILE /ATTRIBUTION.txt
+COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
 COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/torvalds/linux/tools/bootconfig /usr/bin/bootconfig
 COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/torvalds/linux/ATTRIBUTION.txt /BOOTCONFIG_ATTRIBUTION.txt
