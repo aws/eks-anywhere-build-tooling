@@ -7,6 +7,8 @@ REPO_OWNER=tinkerbell
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
+BUILDSPECS=buildspec.yml
+
 TINK_CONTROLLER_IMAGE_COMPONENT=tinkerbell/tink/tink-controller
 TINK_SERVER_IMAGE_COMPONENT=tinkerbell/tink/tink-server
 TINK_WORKER_IMAGE_COMPONENT=tinkerbell/tink/tink-worker
