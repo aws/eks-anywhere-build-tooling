@@ -106,7 +106,7 @@ func (u *InPlaceUpgrader) KubeAdmInFirstCP(ctx context.Context) error {
 		}
 		logger.Info("components to be upgraded with kubeadm", "output", string(kubeAdmUpgPlan))
 
-		kubeAdmUpgCmd := []string{"kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes"}
+		kubeAdmUpgCmd := []string{"kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes", "--force"}
 		kubeAdmUpg, err := u.ExecCommand(ctx, kubeAdmUpgCmd[0], kubeAdmUpgCmd[1:]...)
 		if err != nil {
 			return execError(kubeAdmUpgCmd, string(kubeAdmUpg))
