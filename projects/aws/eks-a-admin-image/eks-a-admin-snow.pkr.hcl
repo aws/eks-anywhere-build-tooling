@@ -9,8 +9,9 @@ packer {
 }
 
 source "amazon-ebs" "amazonlinux2" {
-  ami_name      = "${local.image_name}"
-  instance_type = "t3.xlarge"
+  ami_name             = "${local.image_name}"
+  instance_type        = "t3.xlarge"
+  iam_instance_profile = "eksa-imagebuilder-instance-profile"
   // with t3.micro 48 min
   // with t3.large 45 min
   // with t3.xlarge 40 min
