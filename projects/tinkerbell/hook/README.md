@@ -16,6 +16,9 @@
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
 
+
+create-new-config-patch
+menuconfig
 ### Development
 1. The project consists of 3 images. `hook-bootkit`, `hook-docker` and `kernel`.
 1. For `kernel`, the image builds off upstream. The `hook` project uses the kernel.org [linux 5.10.85 kernel](https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.10.85.tar.xz) to build an image.
