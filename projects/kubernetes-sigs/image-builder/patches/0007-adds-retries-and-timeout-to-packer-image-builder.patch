@@ -1,4 +1,4 @@
-From c225b8694c0c56ee5fef788b19c711aab5d0e5d8 Mon Sep 17 00:00:00 2001
+From 746d2c799760508d11c991bceab1b3f593830889 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Mon, 21 Aug 2023 18:40:07 -0500
 Subject: [PATCH 7/8] adds retries and timeout to packer image-builder
@@ -44,7 +44,7 @@ index bab9c2bde..7b3298826 100644
    "vmx_version": "15",
    "vnc_bind_address": "127.0.0.1",
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 833b1cfae..3d0c3ed11 100644
+index ab50f6e22..debb04643 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
 @@ -19,8 +19,9 @@
@@ -91,7 +91,7 @@ index 833b1cfae..3d0c3ed11 100644
        "ssh_username": "{{user `ssh_username`}}",
        "storage": [
          {
-@@ -242,7 +246,8 @@
+@@ -240,7 +244,8 @@
        "ssh_password": "{{user `ssh_password`}}",
        "ssh_proxy_host": "{{user `ssh_proxy_host`}}",
        "ssh_proxy_port": "{{user `ssh_proxy_port`}}",
@@ -101,7 +101,7 @@ index 833b1cfae..3d0c3ed11 100644
        "ssh_username": "{{user `ssh_username`}}",
        "storage": [
          {
-@@ -283,7 +288,8 @@
+@@ -281,7 +286,8 @@
        "resource_pool": "{{user `resource_pool`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
        "ssh_password": "{{user `ssh_password`}}",
@@ -111,7 +111,7 @@ index 833b1cfae..3d0c3ed11 100644
        "ssh_username": "{{user `ssh_username`}}",
        "template": "{{user `template`}}",
        "type": "vsphere-clone",
-@@ -383,7 +389,9 @@
+@@ -381,7 +387,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -121,7 +121,7 @@ index 833b1cfae..3d0c3ed11 100644
        "type": "ansible",
        "user": "{{user `ssh_username`}}"
      },
-@@ -416,7 +424,9 @@
+@@ -414,7 +422,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -132,10 +132,10 @@ index 833b1cfae..3d0c3ed11 100644
        "user": "{{user `ssh_username`}}"
      },
 diff --git a/images/capi/packer/qemu/packer.json b/images/capi/packer/qemu/packer.json
-index c6e9e6329..aa804a10f 100644
+index e17436a9d..e2fecf369 100644
 --- a/images/capi/packer/qemu/packer.json
 +++ b/images/capi/packer/qemu/packer.json
-@@ -30,8 +30,9 @@
+@@ -25,8 +25,9 @@
        "output_directory": "{{user `output_directory`}}",
        "qemu_binary": "{{user `qemu_binary`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'usermod -L {{user `ssh_username`}} && {{user `shutdown_command`}}'",
@@ -146,7 +146,7 @@ index c6e9e6329..aa804a10f 100644
        "ssh_username": "{{user `ssh_username`}}",
        "type": "qemu",
        "vm_name": "{{user `vm_name`}}"
-@@ -90,7 +91,9 @@
+@@ -85,7 +86,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -156,7 +156,7 @@ index c6e9e6329..aa804a10f 100644
        "type": "ansible",
        "user": "builder"
      },
-@@ -117,7 +120,9 @@
+@@ -112,7 +115,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
