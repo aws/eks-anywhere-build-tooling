@@ -74,7 +74,7 @@ kubeadm_in_first_cp(){
 
   kubeadm version
   kubeadm upgrade plan --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --config "$new_kubeadm_config"
-  kubeadm upgrade apply "$kube_version" --config "$new_kubeadm_config" --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --allow-experimental-upgrades --yes
+  kubeadm upgrade apply "$kube_version" --config "$new_kubeadm_config" --ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration --allow-experimental-upgrades --yes --force
   
   new_kubevip_config_path="$(upgrade_components_dir)/kube-vip.yaml"
   static_kubevip_path="/etc/kubernetes/manifests/kube-vip.yaml"
