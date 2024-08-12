@@ -32,14 +32,14 @@ MINIMUM_PYTHON_VERSION="$($SED -n "s/^minimum_python_version=\(\S*\)/\1/p" $IMAG
 ANSIBLE_VERSION="$($SED -n "s/^_version=\"\(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/hack/ensure-ansible.sh)"
 
 PACKER_VERSION="$($SED -n "s/^_version=\"\(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/hack/ensure-packer.sh)"
+GOSS_VERSION="$($SED -n "s/^_version=\"\(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/hack/ensure-goss.sh)"
 
 PACKER_PLUGIN_ANSIBLE="$($SED -n "s/^\s*version = \">= \(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/packer/config.pkr.hcl)"
-PACKER_PLUGIN_GOSS="$($SED -n "s/^\s*version = \"~> \(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/packer/config.pkr.hcl)"
 PACKER_PLUGIN_NUTANIX="$($SED -n "s/^\s*version = \">= \(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/packer/nutanix/config.pkr.hcl)"
 
 rm $DEPENDENCY_YAML
 
-yq e ".packer={\"version\":\"$PACKER_VERSION\",\"plugins\":{\"ansible\":\"$PACKER_PLUGIN_ANSIBLE\",\"goss\":\"$PACKER_PLUGIN_GOSS\",\"nutanix\":\"$PACKER_PLUGIN_NUTANIX\"}}" $DEPENDENCY_YAML > $DEPENDENCY_YAML
+yq e ".packer={\"version\":\"$PACKER_VERSION\",\"plugins\":{\"ansible\":\"$PACKER_PLUGIN_ANSIBLE\",\"goss\":\"$GOSS_VERSION\",\"nutanix\":\"$PACKER_PLUGIN_NUTANIX\"}}" $DEPENDENCY_YAML > $DEPENDENCY_YAML
 echo "ansible: $ANSIBLE_VERSION" >> $DEPENDENCY_YAML
 echo "python: $MINIMUM_PYTHON_VERSION" >> $DEPENDENCY_YAML
 
