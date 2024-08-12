@@ -21,7 +21,6 @@ COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/
 COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/server/bin/kubelet \
     _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksd/kubernetes/server/bin/kubeadm \
     /eksa-upgrades/binaries/kubernetes/usr/bin/
-COPY ../../upgrade.sh /eksa-upgrades/scripts/
 COPY _output/bin/upgrader/$TARGETOS-$TARGETARCH/upgrader /eksa-upgrades/tools/
 
 COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/usr/local/bin/CONTAINERD_ATTRIBUTION.txt /THIRD_PARTY_LICENSES/CONTAINERD_ATTRIBUTION.txt
