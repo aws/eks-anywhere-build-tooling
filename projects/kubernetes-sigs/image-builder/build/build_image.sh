@@ -164,7 +164,23 @@ elif [[ $image_format == "nutanix" ]]; then
 
   echo "Creating Nutanix image-builder config"
   if [[ $image_os == "redhat" ]]; then
+    # Add Red Hat image fields to config file
     jq -s add $nutanix_config_file $redhat_config_file > $image_builder_config_file
+
+    image_url=$(jq -r '.image_url' $image_builder_config_file)
+    image_filename_query=${image_url##*/}
+    image_filename=${image_filename_query%%[?#]*}
+
+    # Download Nutanix source image locally
+    $MAKE_ROOT/build/download_iso.sh $image_filename $image_url
+
+    # Create file server to host Nutanix image directory
+    default_interface=$(cat /proc/net/route | awk '$2 == "00000000" && $8 == "00000000" { print $1 }' | head -1)
+    host_ip=$(ip addr show dev $default_interface | awk '/inet / {print $2}' | cut -d/ -f1)
+    python3 -m http.server -d /tmp &
+
+    # Point image URL in config file to the file server endpoint
+    build::jq::update_in_place $image_builder_config_file '.image_url = '"\"http://$host_ip:8000/$image_filename\""''
   else
     image_builder_config_file=$nutanix_config_file
   fi

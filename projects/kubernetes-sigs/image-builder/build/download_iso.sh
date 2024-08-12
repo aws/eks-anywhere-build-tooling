@@ -21,17 +21,21 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
 source "${SCRIPT_ROOT}/build/lib/common.sh"
 
 ISO_FILENAME="$1"
-ISO_CHECKSUM="$2"
-ISO_URL="$3"
+ISO_URL="$2"
+ISO_CHECKSUM="${3:-}"
 
-echo "$ISO_CHECKSUM  /tmp/$ISO_FILENAME" > /tmp/$ISO_FILENAME.sha256
+if [[ -n "$ISO_CHECKSUM" ]]; then
+    echo "$ISO_CHECKSUM  /tmp/$ISO_FILENAME" > /tmp/$ISO_FILENAME.sha256
+fi
 
 function download_and_validate(){    
     if ! build::common::echo_and_run curl -sSL --retry 5 $ISO_URL -o /tmp/$ISO_FILENAME; then
         return 1
     fi
     
-    build::common::echo_and_run sha256sum -c /tmp/$ISO_FILENAME.sha256
+    if [[ -n "$ISO_CHECKSUM" ]]; then
+        build::common::echo_and_run sha256sum -c /tmp/$ISO_FILENAME.sha256
+    fi
 }
 
 retry download_and_validate
