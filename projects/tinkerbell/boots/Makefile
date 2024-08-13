@@ -15,22 +15,7 @@ EXTRA_GO_LDFLAGS=-X main.GitRev=${GITREV}
 
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
-PROJECT_DEPENDENCIES=eksa/tinkerbell/ipxedust
-BUILDSPEC_DEPENDS_ON_OVERRIDE=tinkerbell_ipxedust_linux_amd64 tinkerbell_ipxedust_linux_arm64
-
-OVERRIDE_VENDOR_BINARIES_TARGET=$(REPO)/vendor/github.com/tinkerbell/ipxedust/binary/eks-a-overridden
-
 include $(BASE_DIRECTORY)/Common.mk
-
-
-# smee embeds the ipxe binarys into the final go bin
-# overriding them with the ones built via eks-a build tooling
-$(OVERRIDE_VENDOR_BINARIES_TARGET): $(PROJECT_DEPENDENCIES_TARGETS) | $(GO_MOD_DOWNLOAD_TARGETS)
-	for bin in "ipxe-efi.img" "ipxe.efi" "ipxe.iso" "undionly.kpxe"; do cp $(OUTPUT_DIR)/dependencies/linux-amd64/eksa/tinkerbell/ipxedust/$$bin $(@D); done
-	for bin in "snp.efi"; do cp $(OUTPUT_DIR)/dependencies/linux-arm64/eksa/tinkerbell/ipxedust/$$bin $(@D); done
-	touch $(@)
-
-$(BINARY_TARGETS): $(OVERRIDE_VENDOR_BINARIES_TARGET)
 
 
 ########### DO NOT EDIT #############################

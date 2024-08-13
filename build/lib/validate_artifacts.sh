@@ -25,17 +25,9 @@ ARTIFACTS_FOLDER="$2"
 GIT_TAG="$3"
 FAKE_ARM_ARTIFACTS_FOR_VALIDATION="$4"
 FAKE_AMD_BINARIES_FOR_VALIDATION="$5"
-IMAGE_FORMAT="${6:-}"
+EXPECTED_FILES_PATH="$6"
 IMAGE_OS="${7:-}"
 
-EXPECTED_FILES_PATH=$PROJECT_ROOT/expected_artifacts
-if [ -n "$IMAGE_FORMAT" ]; then
-  if [ "$IMAGE_OS" = "bottlerocket" ]; then
-    EXPECTED_FILES_PATH=${PROJECT_ROOT}/expected-artifacts/expected_artifacts_${IMAGE_FORMAT}_bottlerocket
-  else
-    EXPECTED_FILES_PATH=${PROJECT_ROOT}/expected-artifacts/expected_artifacts_${IMAGE_FORMAT}
-  fi
-fi
 
 REALPATH=$(build::find::gnu_variant_on_mac realpath)
 

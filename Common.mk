@@ -460,6 +460,7 @@ IMAGE_FORMAT?=
 IMAGE_OS?=
 UPLOAD_DO_NOT_DELETE?=false
 UPLOAD_CREATE_PUBLIC_ACL?=true
+EXPECTED_FILES_PATH?=expected_artifacts
 ####################################################
 
 #################### OTHER #########################
@@ -748,7 +749,7 @@ upload-artifacts: s3-artifacts upload-output-to-prow-artifacts-s3-artifacts | $$
 s3-artifacts: tarballs
 	@echo -e $(call TARGET_START_LOG)
 	$(BUILD_LIB)/create_release_checksums.sh $(ARTIFACTS_PATH)
-	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION) $(IMAGE_FORMAT) $(IMAGE_OS)
+	$(BUILD_LIB)/validate_artifacts.sh $(MAKE_ROOT) $(ARTIFACTS_PATH) $(GIT_TAG) $(FAKE_ARM_BINARIES_FOR_VALIDATION) $(FAKE_AMD_BINARIES_FOR_VALIDATION) $(MAKE_ROOT)/$(EXPECTED_FILES_PATH) $(IMAGE_OS)
 	@echo -e $(call TARGET_END_LOG)
 
 .PHONY: upload-output-to-prow-artifacts-%
