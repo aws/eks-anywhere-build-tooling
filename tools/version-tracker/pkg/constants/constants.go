@@ -38,7 +38,7 @@ const (
 	FailedPatchFilesRegex                   = "error: (.*): patch does not apply"
 	BottlerocketReleasesFile                = "BOTTLEROCKET_RELEASES"
 	BottlerocketContainerMetadataFileFormat = "BOTTLEROCKET_%s_CONTAINER_METADATA"
-	BottlerocketHostContainersTOMLFile      = "sources/models/shared-defaults/public-host-containers.toml"
+	BottlerocketHostContainersTOMLFile      = "sources/shared-defaults/public-host-containers.toml"
 	CiliumImageRepository                   = "public.ecr.aws/isovalent/cilium"
 	GithubPerPage                           = 100
 	datetimeFormat                          = "%Y-%m-%dT%H:%M:%SZ"
