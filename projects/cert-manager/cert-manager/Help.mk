@@ -11,31 +11,27 @@ clone-repo:  ## Clone upstream `cert-manager`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook cert-manager-ctl` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook` for `linux/amd64 linux/arm64`
 _output/bin/cert-manager/linux-amd64/cert-manager-acmesolver: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-acmesolver`
 _output/bin/cert-manager/linux-amd64/cert-manager-cainjector: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-cainjector`
 _output/bin/cert-manager/linux-amd64/cert-manager-controller: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-controller`
 _output/bin/cert-manager/linux-amd64/cert-manager-webhook: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-webhook`
-_output/bin/cert-manager/linux-amd64/cert-manager-ctl: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-ctl`
 _output/bin/cert-manager/linux-arm64/cert-manager-acmesolver: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-acmesolver`
 _output/bin/cert-manager/linux-arm64/cert-manager-cainjector: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-cainjector`
 _output/bin/cert-manager/linux-arm64/cert-manager-controller: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-controller`
 _output/bin/cert-manager/linux-arm64/cert-manager-webhook: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-webhook`
-_output/bin/cert-manager/linux-arm64/cert-manager-ctl: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-ctl`
 
 ##@ Image Targets
-local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64 cert-manager-ctl/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push cert-manager-ctl/images/push` to IMAGE_REPO
-cert-manager-acmesolver/images/amd64: ## Builds/pushes `cert-manager-acmesolver/images/amd64`
-cert-manager-cainjector/images/amd64: ## Builds/pushes `cert-manager-cainjector/images/amd64`
-cert-manager-controller/images/amd64: ## Builds/pushes `cert-manager-controller/images/amd64`
-cert-manager-webhook/images/amd64: ## Builds/pushes `cert-manager-webhook/images/amd64`
-cert-manager-ctl/images/amd64: ## Builds/pushes `cert-manager-ctl/images/amd64`
+local-images: ## Builds `cert-manager-acmesolver/images/arm64 cert-manager-cainjector/images/arm64 cert-manager-controller/images/arm64 cert-manager-webhook/images/arm64` as oci tars for presumbit validation
+images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push` to IMAGE_REPO
+cert-manager-acmesolver/images/arm64: ## Builds/pushes `cert-manager-acmesolver/images/arm64`
+cert-manager-cainjector/images/arm64: ## Builds/pushes `cert-manager-cainjector/images/arm64`
+cert-manager-controller/images/arm64: ## Builds/pushes `cert-manager-controller/images/arm64`
+cert-manager-webhook/images/arm64: ## Builds/pushes `cert-manager-webhook/images/arm64`
 cert-manager-acmesolver/images/push: ## Builds/pushes `cert-manager-acmesolver/images/push`
 cert-manager-cainjector/images/push: ## Builds/pushes `cert-manager-cainjector/images/push`
 cert-manager-controller/images/push: ## Builds/pushes `cert-manager-controller/images/push`
 cert-manager-webhook/images/push: ## Builds/pushes `cert-manager-webhook/images/push`
-cert-manager-ctl/images/push: ## Builds/pushes `cert-manager-ctl/images/push`
 
 ##@ Helm Targets
 helm/build: ## Build helm chart
@@ -61,22 +57,18 @@ run-in-docker/cert-manager/cmd/acmesolver/eks-anywhere-go-mod-download: ## Run `
 run-in-docker/cert-manager/cmd/cainjector/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/cainjector/eks-anywhere-go-mod-download` in docker builder container
 run-in-docker/cert-manager/cmd/controller/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/controller/eks-anywhere-go-mod-download` in docker builder container
 run-in-docker/cert-manager/cmd/webhook/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/webhook/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/cert-manager/cmd/ctl/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/ctl/eks-anywhere-go-mod-download` in docker builder container
 run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-acmesolver: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-acmesolver` in docker builder container
 run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-cainjector: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-cainjector` in docker builder container
 run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-controller: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-controller` in docker builder container
 run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-webhook: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-webhook` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-ctl: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-ctl` in docker builder container
 run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-acmesolver: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-acmesolver` in docker builder container
 run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-cainjector: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-cainjector` in docker builder container
 run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-controller: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-controller` in docker builder container
 run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-webhook: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-webhook` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-ctl: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-ctl` in docker builder container
 run-in-docker/_output/cert-manager-acmesolver/attribution/go-license.csv: ## Run `_output/cert-manager-acmesolver/attribution/go-license.csv` in docker builder container
 run-in-docker/_output/cert-manager-cainjector/attribution/go-license.csv: ## Run `_output/cert-manager-cainjector/attribution/go-license.csv` in docker builder container
 run-in-docker/_output/cert-manager-controller/attribution/go-license.csv: ## Run `_output/cert-manager-controller/attribution/go-license.csv` in docker builder container
 run-in-docker/_output/cert-manager-webhook/attribution/go-license.csv: ## Run `_output/cert-manager-webhook/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/cert-manager-ctl/attribution/go-license.csv: ## Run `_output/cert-manager-ctl/attribution/go-license.csv` in docker builder container
 
 ##@ Artifact Targets
 tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile

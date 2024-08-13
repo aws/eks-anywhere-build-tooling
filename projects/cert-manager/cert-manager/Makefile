@@ -11,13 +11,12 @@ CERT_MANAGER_ACMESOLVER_IMAGE_COMPONENT=cert-manager/cert-manager-acmesolver
 CERT_MANAGER_CAINJECTOR_IMAGE_COMPONENT=cert-manager/cert-manager-cainjector
 CERT_MANAGER_CONTROLLER_IMAGE_COMPONENT=cert-manager/cert-manager-controller
 CERT_MANAGER_WEBHOOK_IMAGE_COMPONENT=cert-manager/cert-manager-webhook
-CERT_MANAGER_CTL_IMAGE_COMPONENT=cert-manager/cert-manager-ctl
 
-IMAGE_NAMES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook cert-manager-ctl
+IMAGE_NAMES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook
 
-BINARY_TARGET_FILES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook cert-manager-ctl
+BINARY_TARGET_FILES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook
 SOURCE_PATTERNS=. . . . .
-GO_MOD_PATHS=cmd/acmesolver cmd/cainjector cmd/controller cmd/webhook cmd/ctl
+GO_MOD_PATHS=cmd/acmesolver cmd/cainjector cmd/controller cmd/webhook
 
 # by default the first target is assumed to be the primary and will produce a attribution with no prefix
 # for this build we want to prefix all the files
@@ -25,7 +24,7 @@ CERT_MANAGER_ACMESOLVER_ATTRIBUTION_OVERRIDE=cert-manager-acmesolver
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=deploy/charts/cert-manager
-HELM_IMAGE_LIST=cert-manager/cert-manager-cainjector cert-manager/cert-manager-controller cert-manager/cert-manager-webhook cert-manager/cert-manager-ctl cert-manager/cert-manager-acmesolver
+HELM_IMAGE_LIST=cert-manager/cert-manager-cainjector cert-manager/cert-manager-controller cert-manager/cert-manager-webhook cert-manager/cert-manager-acmesolver
 
 HAS_S3_ARTIFACTS=true
 
@@ -37,13 +36,11 @@ $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-cainjector): cert-manager-cainjector-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-controller-useradd/images/export
 $(call IMAGE_TARGETS_FOR_NAME, cert-manager-webhook): cert-manager-webhook-useradd/images/export
-$(call IMAGE_TARGETS_FOR_NAME, cert-manager-ctl): cert-manager-ctl-useradd/images/export
 
 cert-manager-acmesolver-useradd/images/export: IMAGE_USERADD_USER_NAME=acmesolver
 cert-manager-cainjector-useradd/images/export: IMAGE_USERADD_USER_NAME=cainjector
 cert-manager-controller-useradd/images/export: IMAGE_USERADD_USER_NAME=cert-manager
 cert-manager-webhook-useradd/images/export: IMAGE_USERADD_USER_NAME=webhook
-cert-manager-ctl-useradd/images/export: IMAGE_USERADD_USER_NAME=ctl
 
 s3-artifacts: create-manifests
 
