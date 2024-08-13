@@ -296,6 +296,10 @@ var (
 			SourceOfTruthFile:     ".github/workflows/ci.yaml",
 			GoVersionSearchString: `GO_VERSION: '(1\.\d\d)'`,
 		},
+		"tinkerbell/hook": {
+			SourceOfTruthFile:     "images/hook-bootkit/Dockerfile",
+			GoVersionSearchString: `golang:'(1\.\d\d)'`,
+		},
 	}
 
 	ProjectsWithUnconventionalUpgradeFlows = []string{
