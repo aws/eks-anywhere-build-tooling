@@ -298,7 +298,7 @@ var (
 		},
 		"tinkerbell/hook": {
 			SourceOfTruthFile:     "images/hook-bootkit/Dockerfile",
-			GoVersionSearchString: `golang:'(1\.\d\d)'`,
+			GoVersionSearchString: `golang:(1\.\d\d)`,
 		},
 	}
 
