@@ -1,4 +1,4 @@
-From cf521735550ac50e7b78d7d3b8dc279642b77f9d Mon Sep 17 00:00:00 2001
+From d7d56fce16c1acc5810ffa7fa65e34a52003a7f8 Mon Sep 17 00:00:00 2001
 From: Jhaanvi Golani <jhaanvi4.golani@gmail.com>
 Date: Fri, 24 May 2024 16:25:03 -0700
 Subject: [PATCH] packages patches
@@ -22,11 +22,11 @@ Subject: [PATCH] packages patches
  charts/metallb/templates/secret.yaml          |  16 +
  .../metallb/templates/service-accounts.yaml   |   4 +-
  charts/metallb/templates/servicemonitor.yaml  |  34 +-
- charts/metallb/templates/speaker.yaml         | 355 +-----------------
+ charts/metallb/templates/speaker.yaml         | 358 +-----------------
  charts/metallb/templates/webhooks.yaml        |  16 +-
  charts/metallb/values.schema.json             |  46 +--
  charts/metallb/values.yaml                    |  54 +--
- 22 files changed, 135 insertions(+), 504 deletions(-)
+ 22 files changed, 135 insertions(+), 507 deletions(-)
  rename charts/{metallb/charts => }/crds/.helmignore (100%)
  rename charts/{metallb/charts => }/crds/Chart.yaml (100%)
  rename charts/{metallb/charts => }/crds/README.md (100%)
@@ -512,7 +512,7 @@ index 8be88dd3..cad6823d 100644
    apiGroup: rbac.authorization.k8s.io
    kind: Role
 diff --git a/charts/metallb/templates/speaker.yaml b/charts/metallb/templates/speaker.yaml
-index e70743ce..bfed6185 100644
+index e70743ce..b82b2a68 100644
 --- a/charts/metallb/templates/speaker.yaml
 +++ b/charts/metallb/templates/speaker.yaml
 @@ -1,125 +1,9 @@
@@ -704,7 +704,17 @@ index e70743ce..bfed6185 100644
          {{- if .Values.speaker.image.pullPolicy }}
          imagePullPolicy: {{ .Values.speaker.image.pullPolicy }}
          {{- end }}
-@@ -284,18 +124,6 @@ spec:
+@@ -255,9 +95,6 @@ spec:
+         {{- if .Values.prometheus.secureMetricsPort }}
+         - --host=localhost
+         {{- end }}
+-        {{- if .Values.frrk8s.external }}
+-        - --frrk8s-namespace={{ required "namespace is required when frrk8s is external" .Values.frrk8s.namespace }}
+-        {{- end }}
+         env:
+         - name: METALLB_NODE_NAME
+           valueFrom:
+@@ -284,18 +121,6 @@ spec:
          - name: METALLB_ML_SECRET_KEY_PATH
            value: "{{ .Values.speaker.memberlist.mlSecretKeyPath }}"
          {{- end }}
@@ -723,7 +733,7 @@ index e70743ce..bfed6185 100644
          - name: METALLB_POD_NAME
            valueFrom:
              fieldRef:
-@@ -351,194 +179,17 @@ spec:
+@@ -351,194 +176,17 @@ spec:
              - ALL
              add:
              - NET_RAW
@@ -1168,5 +1178,5 @@ index bc96d355..fbde67b9 100644
 -  external: false
 -  namespace: ""
 -- 
-2.46.0
+2.44.0
 
