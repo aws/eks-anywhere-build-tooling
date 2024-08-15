@@ -7,21 +7,25 @@ ARG TARGETARCH
 WORKDIR /newroot
 
 RUN set -x && \
-    amazon-linux-extras enable docker && \
-    cp /etc/yum.repos.d/amzn2-extras.repo /newroot/etc/yum.repos.d/amzn2-extras.repo && \
-    clean_install "systemd" true true && \
-    clean_install "docker procps e2fsprogs" && \
-    remove_package "bash coreutils gawk info sed shadow-utils grep" && \
-    remove_package "systemd" true && \
-    cleanup "tink-docker" && \
+    enable_extra docker && \
+    install_rpm containerd docker e2fsprogs runc pigz procps-ng  && \
     if [ $TARGETARCH = "amd64" ]; then BUSYBOX_ARCH="x86_64"; else BUSYBOX_ARCH="armv81"; fi && \
     curl https://busybox.net/downloads/binaries/1.31.0-defconfig-multiarch-musl/busybox-$BUSYBOX_ARCH -o /newroot/usr/bin/busybox && \
     chmod +x /newroot/usr/bin/busybox && \
     ln -sf /usr/bin/busybox /newroot/usr/sbin/reboot && \
     ln -sf /usr/bin/docker-init /newroot/usr/local/bin/docker-init && \
-    ln -sf /usr/bin/dockerd /newroot/usr/local/bin/dockerd
+    ln -sf /usr/bin/dockerd /newroot/usr/local/bin/dockerd && \
+    cleanup "tink-docker"
 
-FROM $BASE_IMAGE
+
+FROM docker-builder as dind-builder
+
+RUN set -x && \
+    install_rpm bash && \
+    install_binary /usr/bin/cp /usr/bin/rm
+
+
+FROM $BASE_IMAGE as hook-docker
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -35,3 +39,9 @@ COPY _output/hook-docker/LICENSES /LICENSES
 COPY HOOK_DOCKER_ATTRIBUTION.txt /ATTRIBUTION.txt
 
 ENTRYPOINT [ "/usr/bin/tink-docker" ]
+
+FROM hook-docker as hook-dind
+
+COPY --from=dind-builder /newroot /
+
+VOLUME /var/lib/docker

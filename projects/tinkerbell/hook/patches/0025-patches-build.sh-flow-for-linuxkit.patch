@@ -1,0 +1,263 @@
+From 075903d2f8c06480458d62cfed380a2ca7502a50 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Tue, 13 Aug 2024 19:42:41 +0000
+Subject: [PATCH 25/26] patches build.sh flow for linuxkit
+
+- do not require docker
+- allow tag overriddes for kernel and other images
+- replace shell script usage in hook-docker
+- remove unused features, nerdctl, kernel dtbs, mdev
+---
+ bash/common.sh                        |  6 ++-
+ bash/hook-lk-containers.sh            |  7 +++
+ bash/kernel/kernel_default.sh         | 33 +++++++------
+ bash/linuxkit.sh                      | 70 ++++++++++++++-------------
+ build.sh                              |  6 ++-
+ images/hook-docker/main.go            |  6 ++-
+ linuxkit-templates/hook.template.yaml |  5 +-
+ 7 files changed, 76 insertions(+), 57 deletions(-)
+
+diff --git a/bash/common.sh b/bash/common.sh
+index 7040554..250ed21 100644
+--- a/bash/common.sh
++++ b/bash/common.sh
+@@ -68,8 +68,10 @@ function define_id() {
+ 
+ 	declare str_dict
+ 	str_dict="$(declare -p dict)"                  # bash high sorcery; get a string representation of the dict
+-	str_dict="${str_dict#*"dict=("}"               # remove 'declare -A dict=(' from the string
+-	str_dict="${str_dict%?}"                       # remove the last character, which is a ")"
++	# eks-a - the version of bash in the builder base uses single quote instead double
++	# this change removes all before the first ( and everything after the last )
++	str_dict="${str_dict#*(}"               # remove 'declare -A dict=(' from the string
++	str_dict="${str_dict%)*}"                       # remove the last character, which is a ")"
+ 	log debug "str dict for id=${id}: ${str_dict}" # this _will_ go wrong, so add a debug
+ 
+ 	# eval it into the inventory_dict dict
+diff --git a/bash/hook-lk-containers.sh b/bash/hook-lk-containers.sh
+index 9c5c8b1..a005b52 100644
+--- a/bash/hook-lk-containers.sh
++++ b/bash/hook-lk-containers.sh
+@@ -28,10 +28,17 @@ function build_hook_linuxkit_container() {
+ 	declare container_files_hash_short="${container_files_hash:0:8}"
+ 
+ 	declare container_oci_ref="${HOOK_LK_CONTAINERS_OCI_BASE}${container_dir}:${container_files_hash_short}-${DOCKER_ARCH}"
++	# eks-a - allow tag to be overridden via var
++	if [ -n "${HOOK_LK_CONTAINERS_OCI_VERSION}" ]; then
++		container_oci_ref="${HOOK_LK_CONTAINERS_OCI_BASE}${container_dir}:${HOOK_LK_CONTAINERS_OCI_VERSION}"
++	fi
+ 	log info "Consider building LK container ${container_oci_ref} from ${container_base_dir}/${container_dir} for platform ${DOCKER_ARCH}"
+ 	output_var="${container_oci_ref}" # the the name reference
+ 	echo "${output_var}" > /dev/null  # no-op; just to avoid shellcheck SC2034 (unused var; but it is actually a bash nameref)
+ 
++	# eks-a - skip pre pulling images
++	return 0
++
+ 	# If the image is in the local docker cache, skip building
+ 	log debug "Checking if image ${container_oci_ref} exists in local registry"
+ 	if [[ -n "$(docker images -q "${container_oci_ref}")" ]]; then
+diff --git a/bash/kernel/kernel_default.sh b/bash/kernel/kernel_default.sh
+index 9b53d0d..16af383 100644
+--- a/bash/kernel/kernel_default.sh
++++ b/bash/kernel/kernel_default.sh
+@@ -46,20 +46,25 @@ function calculate_kernel_version_default() {
+ 	esac
+ 
+ 	# Grab the latest version from kernel.org
+-	declare -g KERNEL_POINT_RELEASE="${KERNEL_POINT_RELEASE:-""}"
+-	resolve_latest_kernel_version_lts
+-
+-	# Calculate a version and hash for the OCI image
+-	# Hash the Dockerfile and the input defconfig together
+-	declare input_hash="" short_input_hash=""
+-	input_hash="$(cat "kernel/configs/${INPUT_DEFCONFIG}" "kernel/Dockerfile" | sha256sum - | cut -d ' ' -f 1)"
+-	short_input_hash="${input_hash:0:8}"
+-	kernel_oci_version="${KERNEL_MAJOR}.${KERNEL_MINOR}.${KERNEL_POINT_RELEASE}-${short_input_hash}"
+-
+-	kernel_id_to_use="${inventory_id}"
+-	if [[ -n "${USE_KERNEL_ID}" ]]; then
+-		log warn "USE_KERNEL_ID is set to '${USE_KERNEL_ID}'; using it instead of the default inventory_id '${inventory_id}'."
+-		kernel_id_to_use="${USE_KERNEL_ID}"
++	declare -g KERNEL_POINT_RELEASE="${HOOK_KERNEL_POINT_RELEASE:-""}"
++
++	# eks-a - allow kernel tag to be overridden
++	kernel_oci_version="${HOOK_KERNEL_OCI_VERSION:-""}"
++	if [ -z "${kernel_oci_version}" ]; then
++		resolve_latest_kernel_version_lts
++
++		# Calculate a version and hash for the OCI image
++		# Hash the Dockerfile and the input defconfig together
++		declare input_hash="" short_input_hash=""
++		input_hash="$(cat "kernel/configs/${INPUT_DEFCONFIG}" "kernel/Dockerfile" | sha256sum - | cut -d ' ' -f 1)"
++		short_input_hash="${input_hash:0:8}"
++		kernel_oci_version="${KERNEL_MAJOR}.${KERNEL_MINOR}.${KERNEL_POINT_RELEASE}-${short_input_hash}"
++
++		kernel_id_to_use="${inventory_id}"
++		if [[ -n "${USE_KERNEL_ID}" ]]; then
++			log warn "USE_KERNEL_ID is set to '${USE_KERNEL_ID}'; using it instead of the default inventory_id '${inventory_id}'."
++			kernel_id_to_use="${USE_KERNEL_ID}"
++		fi
+ 	fi
+ 
+ 	kernel_oci_image="${HOOK_KERNEL_OCI_BASE}:${kernel_oci_version}"
+diff --git a/bash/linuxkit.sh b/bash/linuxkit.sh
+index 5f05325..3da85a0 100644
+--- a/bash/linuxkit.sh
++++ b/bash/linuxkit.sh
+@@ -33,21 +33,22 @@ function linuxkit_build() {
+ 		exit 1
+ 	fi
+ 
++	# eks-a - skip pre-pulling images
+ 	# If the image is in the local docker cache, skip building
+-	if [[ -n "$(docker images -q "${kernel_oci_image}")" ]]; then
+-		log info "Kernel image ${kernel_oci_image} already in local cache; trying a pull to update, but tolerate failures..."
+-		docker pull "${kernel_oci_image}" || log warn "Pull failed, fallback to local image ${kernel_oci_image} - results might be inconsistent."
+-	else
+-		# Pull the kernel from the OCI registry
+-		log info "Pulling kernel from ${kernel_oci_image}"
+-		if docker pull "${kernel_oci_image}"; then
+-			log info "Successfully pulled kernel ${kernel_oci_image} from registry."
+-		else
+-			log error "Failed to pull kernel ${kernel_oci_image} from registry."
+-			log error "You might want to build the kernel locally, by running './build.sh kernel ${inventory_id}'"
+-			exit 7
+-		fi
+-	fi
++	# if [[ -n "$(docker images -q "${kernel_oci_image}")" ]]; then
++	# 	log info "Kernel image ${kernel_oci_image} already in local cache; trying a pull to update, but tolerate failures..."
++	# 	docker pull "${kernel_oci_image}" || log warn "Pull failed, fallback to local image ${kernel_oci_image} - results might be inconsistent."
++	# else
++	# 	# Pull the kernel from the OCI registry
++	# 	log info "Pulling kernel from ${kernel_oci_image}"
++	# 	if docker pull "${kernel_oci_image}"; then
++	# 		log info "Successfully pulled kernel ${kernel_oci_image} from registry."
++	# 	else
++	# 		log error "Failed to pull kernel ${kernel_oci_image} from registry."
++	# 		log error "You might want to build the kernel locally, by running './build.sh kernel ${inventory_id}'"
++	# 		exit 7
++	# 	fi
++	# fi
+ 
+ 	# Build the containers in this repo used in the LinuxKit YAML;
+ 	build_all_hook_linuxkit_containers # sets HOOK_CONTAINER_IP_IMAGE, HOOK_CONTAINER_BOOTKIT_IMAGE, HOOK_CONTAINER_DOCKER_IMAGE, HOOK_CONTAINER_MDEV_IMAGE, HOOK_CONTAINER_CONTAINERD_IMAGE
+@@ -129,31 +130,32 @@ function linuxkit_build() {
+ 
+ 	declare -a output_files=("vmlinuz-${OUTPUT_ID}" "initramfs-${OUTPUT_ID}")
+ 
++	# eks-a - we do not need nor build dtbs with the kernel
+ 	# We need to extract /dtbs.tar.gz from the kernel image; linuxkit itself knows nothing about dtbs.
+ 	# Export a .tar of the image using docker to stdout, read a single file from stdin and output it
+-	log debug "Docker might emit a warning about mismatched platforms below. It's safe to ignore; the image in question only contains kernel binaries, for the correct arch, even though the image might have been built & tagged on a different arch."
+-	docker create --name "export-dtb-${OUTPUT_ID}" "${kernel_oci_image}" "command_is_irrelevant_here_container_is_never_started"
+-	(docker export "export-dtb-${OUTPUT_ID}" | tar -xO "dtbs.tar.gz" > "${lk_output_dir}/dtbs-${OUTPUT_ID}.tar.gz") || true # don't fail -- otherwise container is left behind forever
+-	docker rm "export-dtb-${OUTPUT_ID}"
++	# log debug "Docker might emit a warning about mismatched platforms below. It's safe to ignore; the image in question only contains kernel binaries, for the correct arch, even though the image might have been built & tagged on a different arch."
++	# docker create --name "export-dtb-${OUTPUT_ID}" "${kernel_oci_image}" "command_is_irrelevant_here_container_is_never_started"
++	# (docker export "export-dtb-${OUTPUT_ID}" | tar -xO "dtbs.tar.gz" > "${lk_output_dir}/dtbs-${OUTPUT_ID}.tar.gz") || true # don't fail -- otherwise container is left behind forever
++	# docker rm "export-dtb-${OUTPUT_ID}"
+ 
+ 	# Now process "${lk_output_dir}/dtbs-${OUTPUT_ID}.tar.gz so every file in it is prefixed with the path dtbs-${OUTPUT_ID}/
+ 	# This is so that the tarball can be extracted in /boot/dtbs-${OUTPUT_ID} and not pollute /boot with a ton of dtbs
+-	declare dtbs_tmp_dir="${lk_output_dir}/extract-dtbs-${OUTPUT_ID}"
+-	mkdir -p "${dtbs_tmp_dir}"
+-	tar -xzf "${lk_output_dir}/dtbs-${OUTPUT_ID}.tar.gz" -C "${dtbs_tmp_dir}"
+-	# Get a count of .dtb files in the extracted dir
+-	declare -i dtb_count
+-	dtb_count=$(find "${dtbs_tmp_dir}" -type f -name "*.dtb" | wc -l)
+-	log info "Kernel includes ${dtb_count} DTB files..."
+-	# If more than zero, let's tar them up adding a prefix
+-	if [[ $dtb_count -gt 0 ]]; then
+-		tar -czf "out/hook/dtbs-${OUTPUT_ID}.tar.gz" -C "${dtbs_tmp_dir}" --transform "s,^,dtbs-${OUTPUT_ID}/," .
+-		output_files+=("dtbs-${OUTPUT_ID}.tar.gz")
+-	else
+-		log info "No DTB files found in kernel image."
+-	fi
+-	rm -rf "${dtbs_tmp_dir}"
+-	rm "${lk_output_dir}/dtbs-${OUTPUT_ID}.tar.gz"
++	# declare dtbs_tmp_dir="${lk_output_dir}/extract-dtbs-${OUTPUT_ID}"
++	# mkdir -p "${dtbs_tmp_dir}"
++	# tar -xzf "${lk_output_dir}/dtbs-${OUTPUT_ID}.tar.gz" -C "${dtbs_tmp_dir}"
++	# # Get a count of .dtb files in the extracted dir
++	# declare -i dtb_count
++	# dtb_count=$(find "${dtbs_tmp_dir}" -type f -name "*.dtb" | wc -l)
++	# log info "Kernel includes ${dtb_count} DTB files..."
++	# # If more than zero, let's tar them up adding a prefix
++	# if [[ $dtb_count -gt 0 ]]; then
++	# 	tar -czf "out/hook/dtbs-${OUTPUT_ID}.tar.gz" -C "${dtbs_tmp_dir}" --transform "s,^,dtbs-${OUTPUT_ID}/," .
++	# 	output_files+=("dtbs-${OUTPUT_ID}.tar.gz")
++	# else
++	# 	log info "No DTB files found in kernel image."
++	# fi
++	# rm -rf "${dtbs_tmp_dir}"
++	# rm "${lk_output_dir}/dtbs-${OUTPUT_ID}.tar.gz"
+ 
+ 	if [[ "${OUTPUT_TARBALL_FILELIST:-"no"}" == "yes" ]]; then
+ 		log info "OUTPUT_TARBALL_FILELIST=yes; including tar and filelist in output."
+diff --git a/build.sh b/build.sh
+index 985bea8..b7cc83b 100755
+--- a/build.sh
++++ b/build.sh
+@@ -63,7 +63,8 @@ mkdir -p "${CACHE_DIR}" # ensure the directory exists
+ install_dependencies
+ 
+ # check the host's docker daemon
+-check_docker_daemon_for_sanity
++# eks-a - avoid requiring docker
++# check_docker_daemon_for_sanity
+ 
+ # These commands take no paramters and are handled first, and exit early.
+ declare first_param="${CLI_NON_PARAM_ARGS[0]}"
+@@ -126,7 +127,8 @@ case "${first_param}" in
+ 		;;
+ 
+ 	build-run-qemu | run-qemu | qemu-run | run | qemu)
+-		LK_RUN="qemu" linuxkit_build
++		# eks-a - do not build before running, allow build tooling makefile to orchestrate this
++		linuxkit_run_qemu
+ 		;;
+ 
+ 	*)
+diff --git a/images/hook-docker/main.go b/images/hook-docker/main.go
+index 9257f42..403c2dc 100644
+--- a/images/hook-docker/main.go
++++ b/images/hook-docker/main.go
+@@ -54,8 +54,10 @@ func run() error {
+ 		return fmt.Errorf("failed to write docker config: %w", err)
+ 	}
+ 	// Build the command, and execute
+-	// cmd := exec.Command("/usr/local/bin/docker-init", "/usr/local/bin/dockerd")
+-	cmd := exec.Command("sh", "-c", "/usr/local/bin/dockerd-entrypoint.sh")
++	// eks-a - docker image does not have a shell and for this usage the entrypoint.sh
++	// is not neccessary
++	cmd := exec.Command("/usr/local/bin/docker-init", "/usr/local/bin/dockerd")
++	// cmd := exec.Command("sh", "-c", "/usr/local/bin/dockerd-entrypoint.sh")
+ 	cmd.Stdout = os.Stdout
+ 	cmd.Stderr = os.Stderr
+ 
+diff --git a/linuxkit-templates/hook.template.yaml b/linuxkit-templates/hook.template.yaml
+index 56187f0..41c01f7 100644
+--- a/linuxkit-templates/hook.template.yaml
++++ b/linuxkit-templates/hook.template.yaml
+@@ -96,7 +96,6 @@ services:
+       - /:/host_root
+       - /dev:/dev
+       - /dev/console:/dev/console
+-      - /usr/bin/nerdctl:/usr/bin/nerdctl
+     env:
+       - INSECURE=true
+     devices:
+@@ -238,8 +237,8 @@ services:
+ files:
+   - path: etc/profile.d/local.sh
+     contents: |
+-      alias       docker='nerdctl -n services.linuxkit exec -it hook-docker docker'
+-      alias docker-shell='nerdctl -n services.linuxkit exec -it hook-docker sh'
++      alias       docker='ctr -n services.linuxkit tasks exec --tty --exec-id cmd hook-docker docker'
++      alias docker-shell='ctr -n services.linuxkit tasks exec --tty --exec-id shell hook-docker sh'
+       export PS1='HookOS ${HOOK_VERSION}:\w\$ '
+       # only print WARNING or higher kernel messages to console
+       echo 4 > /proc/sys/kernel/printk
+-- 
+2.34.1
+
