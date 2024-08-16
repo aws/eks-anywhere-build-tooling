@@ -205,10 +205,14 @@ EOF
 }
 
 function pr::create::attribution() {
-    local -r pr_title="Update ATTRIBUTION.txt files"
+    local pr_title="Update ATTRIBUTION.txt files"
     local commit_message="[PR BOT] Update ATTRIBUTION.txt files"
     local pr_branch="attribution-files-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "attribution")
+
+    if [ "$MAIN_BRANCH" != "main" ]; then
+        pr_title="[$MAIN_BRANCH] $pr_title"
+    fi
     
     local force_push="true"
     if [ -n "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}" ]; then
@@ -226,9 +230,13 @@ function pr::create::attribution() {
 }
 
 function pr::create::checksums() {
-    local -r pr_title="Update CHECKSUMS files"
+    local pr_title="Update CHECKSUMS files"
     local pr_branch="checksums-files-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "checksums")
+
+    if [ "$MAIN_BRANCH" != "main" ]; then
+        pr_title="[$MAIN_BRANCH] $pr_title"
+    fi
 
     local force_push="true"
     if [ -n "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}" ]; then
