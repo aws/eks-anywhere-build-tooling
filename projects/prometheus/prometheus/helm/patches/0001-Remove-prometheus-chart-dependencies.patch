@@ -1,20 +1,20 @@
-From 8f8a91cbe306756bc56775dc53cdd9380ceee1f3 Mon Sep 17 00:00:00 2001
-From: "Ostosh, Ivy" <ivyjin215@gmail.com>
-Date: Mon, 28 Nov 2022 09:43:58 -0600
-Subject: [PATCH 1/6] Remove prometheus chart dependencies
+From 5cd8a1a6997a85b403b1ceccdf60371a745bd455 Mon Sep 17 00:00:00 2001
+From: Jhaanvi Golani <jhaanvi@amazon.com>
+Date: Fri, 23 Aug 2024 13:55:43 -0700
+Subject: [PATCH] Remove prometheus chart dependencies
 
 ---
- charts/prometheus/Chart.yaml             | 17 ------
- charts/prometheus/templates/NOTES.txt    | 76 ------------------------
- charts/prometheus/templates/_helpers.tpl |  7 ---
- charts/prometheus/templates/cm.yaml      | 25 +-------
- charts/prometheus/templates/deploy.yaml  | 75 +----------------------
- charts/prometheus/templates/sts.yaml     | 69 ---------------------
- charts/prometheus/values.yaml            | 55 +----------------
- 7 files changed, 3 insertions(+), 321 deletions(-)
+ charts/prometheus/Chart.yaml             | 17 -----
+ charts/prometheus/templates/NOTES.txt    | 76 -------------------
+ charts/prometheus/templates/_helpers.tpl | 11 ---
+ charts/prometheus/templates/cm.yaml      | 25 +------
+ charts/prometheus/templates/deploy.yaml  | 94 +-----------------------
+ charts/prometheus/templates/sts.yaml     | 88 ----------------------
+ charts/prometheus/values.yaml            | 55 +-------------
+ 7 files changed, 3 insertions(+), 363 deletions(-)
 
 diff --git a/charts/prometheus/Chart.yaml b/charts/prometheus/Chart.yaml
-index 2fba6d39..d6d6d297 100644
+index 8d475588..baa1de1c 100644
 --- a/charts/prometheus/Chart.yaml
 +++ b/charts/prometheus/Chart.yaml
 @@ -24,23 +24,6 @@ maintainers:
@@ -23,19 +23,19 @@ index 2fba6d39..d6d6d297 100644
  type: application
 -dependencies:
 -  - name: alertmanager
--    version: "1.11.*"
+-    version: "1.12.*"
 -    repository: https://prometheus-community.github.io/helm-charts
 -    condition: alertmanager.enabled
 -  - name: kube-state-metrics
--    version: "5.19.*"
+-    version: "5.25.*"
 -    repository: https://prometheus-community.github.io/helm-charts
 -    condition: kube-state-metrics.enabled
 -  - name: prometheus-node-exporter
--    version: "4.34.*"
+-    version: "4.37.*"
 -    repository: https://prometheus-community.github.io/helm-charts
 -    condition: prometheus-node-exporter.enabled
 -  - name: prometheus-pushgateway
--    version: "2.12.*"
+-    version: "2.14.*"
 -    repository: https://prometheus-community.github.io/helm-charts
 -    condition: prometheus-pushgateway.enabled
  keywords:
@@ -128,18 +128,22 @@ index fc03c2a5..d9474bc2 100644
  For more information on running Prometheus, visit:
  https://prometheus.io/
 diff --git a/charts/prometheus/templates/_helpers.tpl b/charts/prometheus/templates/_helpers.tpl
-index 0810e3c0..b7202480 100644
+index 3d8078f0..b7202480 100644
 --- a/charts/prometheus/templates/_helpers.tpl
 +++ b/charts/prometheus/templates/_helpers.tpl
-@@ -73,13 +73,6 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this
+@@ -73,17 +73,6 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this
  {{- end -}}
  {{- end -}}
  
 -{{/*
--Create a fully qualified alertmanager name for communicating with the user via NOTES.txt
+-Create a fully qualified alertmanager name for communicating and check to ensure that `alertmanager` exists before trying to use it with the user via NOTES.txt
 -*/}}
 -{{- define "prometheus.alertmanager.fullname" -}}
+-{{- if .Subcharts.alertmanager -}}
 -{{- template "alertmanager.fullname" .Subcharts.alertmanager -}}
+-{{- else -}}
+-{{- "alertmanager not found" -}}
+-{{- end -}}
 -{{- end -}}
 -
  {{/*
@@ -188,10 +192,10 @@ index 8713bd1e..6ad50cfc 100644
  {{- end -}}
  {{- end -}}
 diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
-index fcf3d968..7f005fc7 100644
+index fa0d13bf..7f005fc7 100644
 --- a/charts/prometheus/templates/deploy.yaml
 +++ b/charts/prometheus/templates/deploy.yaml
-@@ -55,62 +55,6 @@ spec:
+@@ -55,81 +55,6 @@ spec:
  {{ toYaml .Values.server.extraInitContainers | indent 8 }}
        {{- end }}
        containers:
@@ -213,6 +217,9 @@ index fcf3d968..7f005fc7 100644
 -          {{- with .Values.server.prefixURL }}
 -          {{- $default_url = printf "http://127.0.0.1:9090%s/-/reload" . }}
 -          {{- end }}
+-          {{- if .Values.configmapReload.prometheus.containerPort }}
+-            - --listen-address=0.0.0.0:{{ .Values.configmapReload.prometheus.containerPort }}
+-          {{- end }}
 -            - --reload-url={{ default $default_url .Values.configmapReload.reloadUrl }}
 -          {{- range $key, $value := .Values.configmapReload.prometheus.extraArgs }}
 -            {{- if $value }}
@@ -231,6 +238,22 @@ index fcf3d968..7f005fc7 100644
 -          {{- if .Values.configmapReload.prometheus.containerPort }}
 -          ports:
 -            - containerPort: {{ .Values.configmapReload.prometheus.containerPort }}
+-              {{- if .Values.configmapReload.prometheus.containerPortName }}
+-              name: {{ .Values.configmapReload.prometheus.containerPortName }}
+-              {{- end }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.prometheus.livenessProbe }}
+-          livenessProbe:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.prometheus.readinessProbe }}
+-          readinessProbe:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          {{- if .Values.configmapReload.prometheus.startupProbe.enabled }}
+-          {{- $startupProbe := omit .Values.configmapReload.prometheus.startupProbe "enabled" }}
+-          startupProbe:
+-            {{- toYaml $startupProbe | nindent 12 }}
 -          {{- end }}
 -          {{- with .Values.configmapReload.prometheus.resources }}
 -          resources:
@@ -254,7 +277,7 @@ index fcf3d968..7f005fc7 100644
          - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
            {{- if .Values.server.image.digest }}
            image: "{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
-@@ -346,16 +290,7 @@ spec:
+@@ -365,16 +290,7 @@ spec:
            hostPath:
              path: {{ .hostPath }}
        {{- end }}
@@ -272,7 +295,7 @@ index fcf3d968..7f005fc7 100644
        {{- range .Values.server.extraSecretMounts }}
          - name: {{ .name }}
            secret:
-@@ -364,14 +299,6 @@ spec:
+@@ -383,14 +299,6 @@ spec:
              optional: {{ . }}
              {{- end }}
        {{- end }}
@@ -288,10 +311,10 @@ index fcf3d968..7f005fc7 100644
  {{ toYaml .Values.server.extraVolumes | indent 8}}
  {{- end }}
 diff --git a/charts/prometheus/templates/sts.yaml b/charts/prometheus/templates/sts.yaml
-index 6a7b8986..a800f695 100644
+index 6200555d..1a5d85d2 100644
 --- a/charts/prometheus/templates/sts.yaml
 +++ b/charts/prometheus/templates/sts.yaml
-@@ -60,62 +60,6 @@ spec:
+@@ -60,81 +60,6 @@ spec:
  {{ toYaml .Values.server.extraInitContainers | indent 8 }}
        {{- end }}
        containers:
@@ -313,6 +336,9 @@ index 6a7b8986..a800f695 100644
 -          {{- with .Values.server.prefixURL }}
 -          {{- $default_url = printf "http://127.0.0.1:9090%s/-/reload" . }}
 -          {{- end }}
+-          {{- if .Values.configmapReload.prometheus.containerPort }}
+-            - --listen-address=0.0.0.0:{{ .Values.configmapReload.prometheus.containerPort }}
+-          {{- end }}
 -            - --reload-url={{ default $default_url .Values.configmapReload.reloadUrl }}
 -          {{- range $key, $value := .Values.configmapReload.prometheus.extraArgs }}
 -            {{- if $value }}
@@ -331,6 +357,22 @@ index 6a7b8986..a800f695 100644
 -          {{- if .Values.configmapReload.prometheus.containerPort }}
 -          ports:
 -            - containerPort: {{ .Values.configmapReload.prometheus.containerPort }}
+-              {{- if .Values.configmapReload.prometheus.containerPortName }}
+-              name: {{ .Values.configmapReload.prometheus.containerPortName }}
+-              {{- end }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.prometheus.livenessProbe }}
+-          livenessProbe:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          {{- with .Values.configmapReload.prometheus.readinessProbe }}
+-          readinessProbe:
+-            {{- toYaml . | nindent 12 }}
+-          {{- end }}
+-          {{- if .Values.configmapReload.prometheus.startupProbe }}
+-          {{- $startupProbe := omit .Values.configmapReload.prometheus.startupProbe "enabled" }}
+-          startupProbe:
+-            {{- toYaml $startupProbe | nindent 12 }}
 -          {{- end }}
 -          {{- with .Values.configmapReload.prometheus.resources }}
 -          resources:
@@ -354,7 +396,7 @@ index 6a7b8986..a800f695 100644
          - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
            {{- if .Values.server.image.digest }}
            image: "{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
-@@ -349,11 +293,6 @@ spec:
+@@ -368,11 +293,6 @@ spec:
            hostPath:
              path: {{ .hostPath }}
        {{- end }}
@@ -366,7 +408,7 @@ index 6a7b8986..a800f695 100644
        {{- range .Values.server.extraConfigmapMounts }}
          - name: {{ $.Values.server.name }}-{{ .name }}
            configMap:
-@@ -367,14 +306,6 @@ spec:
+@@ -386,14 +306,6 @@ spec:
              optional: {{ . }}
              {{- end }}
        {{- end }}
@@ -382,10 +424,10 @@ index 6a7b8986..a800f695 100644
  {{ toYaml .Values.server.extraVolumes | indent 8}}
  {{- end }}
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index ea21e453..27dc52e8 100644
+index 6e65b09c..ccfcb14d 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
-@@ -1216,57 +1216,4 @@ extraManifests: []
+@@ -1248,57 +1248,4 @@ extraManifests: []
    #   labels:
    #     name: prometheus-extra
    #   data:
