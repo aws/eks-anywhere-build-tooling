@@ -3,6 +3,7 @@ GIT_TAG=$(shell cat GIT_TAG)
 GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 REPO=metallb
 REPO_OWNER=metallb
+BASE_IMAGE_NAME?=eks-distro-minimal-base
 
 BINARY_TARGET_FILES=controller speaker
 SOURCE_PATTERNS=go.universe.tf/metallb/controller go.universe.tf/metallb/speaker
