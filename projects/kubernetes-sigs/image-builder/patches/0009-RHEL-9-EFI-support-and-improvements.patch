@@ -1,0 +1,54 @@
+From 207895d2917519a11169a7a50da296e89bd21d77 Mon Sep 17 00:00:00 2001
+From: Shizhao Liu <lshizhao@amazon.com>
+Date: Mon, 19 Aug 2024 10:14:26 -0700
+Subject: [PATCH 9/9] Support and improvements for RHEL 9 EFI
+
+1. Remove 2 unwanted partitions (the swap partition and /boot
+partition).
+2. Manually create partition sda1 and sda2 and assign root
+partition to sda1, EFI partition to sda2.
+
+Signed-off-by: Shizhao Liu <lshizhao@amazon.com>
+---
+ .../packer/raw/linux/rhel/http/9/ks-efi.cfg   | 20 +++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
+
+diff --git a/images/capi/packer/raw/linux/rhel/http/9/ks-efi.cfg b/images/capi/packer/raw/linux/rhel/http/9/ks-efi.cfg
+index c2f7daa1f..c0d43792d 100644
+--- a/images/capi/packer/raw/linux/rhel/http/9/ks-efi.cfg
++++ b/images/capi/packer/raw/linux/rhel/http/9/ks-efi.cfg
+@@ -29,13 +29,9 @@ user --groups=wheel --name=builder --password=builder --plaintext --gecos="build
+ 
+ # System bootloader configuration
+ bootloader --location=mbr --boot-drive=sda
+-# Clear the Master Boot Record
+-zerombr
+-clearpart --all --initlabel --drives=sda
+-part / --fstype="ext4" --grow --asprimary --label=slash --ondisk=sda
+-part /boot/efi --fstype="efi" --ondisk=sda --size=200 --fsoptions="umask=0077,shortname=winnt"
+-part swap --fstype="swap" --ondisk=sda --size=100
+-part /boot --fstype="ext4" --ondisk=sda --size=1024
++clearpart --none --initlabel
++part / --fstype="ext4" --label=slash --onpart=sda1
++part /boot/efi --fstype="efi" --onpart=sda2 --fsoptions="umask=0077,shortname=winnt"
+ 
+ # Reboot after successful installation
+ reboot
+@@ -73,4 +69,12 @@ sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
+ 
+ sed -i '/^\(HWADDR\|UUID\)=/d' /etc/sysconfig/network-scripts/ifcfg-*
+ 
+-%end
+\ No newline at end of file
++%end
++
++%pre --interpreter=/usr/bin/bash
++wipefs -a /dev/sda
++parted -s /dev/sda mklabel gpt
++parted -s /dev/sda mkpart primary ext4 261MiB 100%
++parted -s /dev/sda mkpart ESP fat32 1MiB 261MiB
++parted -s /dev/sda set 2 esp on
++%end
+-- 
+2.46.0
+
