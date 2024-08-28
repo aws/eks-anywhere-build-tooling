@@ -1,5 +1,5 @@
 ## **Hook**
-![Version](https://img.shields.io/badge/version-v0.8.1-blue)
+![Version](https://img.shields.io/badge/version-v0.9.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoicVVYYXpIMzRpazNGUTBWdnY1dittK09zNDJvRmtlUlpTZUtZRFoyMkZ0YzlZT3NBMTRSSUFacFg3ZzdVNjg3SlhOZ2dZNmExOVkwaDE5U2RNQldWSTBzPSIsIml2UGFyYW1ldGVyU3BlYyI6ImdYN1lEaGZuSVpQMjhLM2EiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Hook](https://github.com/tinkerbell/hook) is the Tinkerbell Installation Environment for bare-metal. It runs in-memory, installs operating system, and handles deprovisioning.
@@ -8,16 +8,47 @@
 
 1. Review commits upstream [repo](https://github.com/tinkerbell/hook) and decide on new release tag or commit to track.
 1. Update the `GIT_TAG` file to have the new desired tag or commit based on upstream.
-1. Update the 'LINUX_KERNEL_VERSION' file to the kernel version tracked in [hook.yaml](https://github.com/tinkerbell/hook/blob/029ef8f0711579717bfd14ac5eb63cdc3e658b1d/hook.yaml#L2)
-1. Verify the golang version has not changed. Currently for `hook-bootkit` and `hook-docker` the version mentioned in a [dockerfile](https://github.com/tinkerbell/hook/blob/6d43b8b331c7a389f3ffeaa388fa9aa98248d7a2/hook-docker/Dockerfile#L3) of the respective projects is being used to build.
+1. Update the `LINUX_KERNEL_VERSION` file to the latest patch version of the current minor kernel version tracked in [hook](https://github.com/tinkerbell/hook/tree/main/kernel/configs). Upstream supports multiple versions, consider bumping to a new supported minor.
+If the config file names change upstream be sure to change `HOOK_IMAGE_FILES` in the Makefile.
+1. Verify the golang version has not changed. Currently for `hook-bootkit` and `hook-docker` the version mentioned in a [dockerfile](https://github.com/tinkerbell/hook/blob/main/images/hook-bootkit/Dockerfile) of the respective projects is being used to build.
+We only support building with one golang version per project, pick the latest from these two dockerfiles if they do not match.
 1. Verify no changes have been made to the dockerfile for each image. Looking specifically for added runtime deps.
 1. `hook-docker` image has docker runtime. Hence, verify no new changes have been made with docker version updates.
 1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
 
+
+create-new-config-patch
+menuconfig
 ### Development
-1. The project consists of 3 images. `hook-bootkit`, `hook-docker` and `kernel`.
-1. For `kernel`, the image builds off upstream. The `hook` project uses the kernel.org [linux 5.10.85 kernel](https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.10.85.tar.xz) to build an image.
-1. For building the in-memory OSIE files, `hook` uses [linuxkit](https://github.com/linuxkit/linuxkit). `Linuxkit build` expects the project images to be present in the repository represented by `IMAGE_REPO` variable.
-1. To build locally, we suggest using a local registry and setting `IMAGE_REPO` variable.
+
+1. The project consists of 3 images. `hook-bootkit`, `hoot-containerd`, `hook-docker`, `hook-embedded`, `hook-runc` and `kernel`.
+1. For building the in-memory OS files (vmlinuz and initramfs), `hook` uses [linuxkit](https://github.com/linuxkit/linuxkit). `linuxkit build` expects the project images to be present in the repository represented by `IMAGE_REPO` variable.
+1. For `kernel`, the image builds from the kernel source version defined in the `LINUX_KERNEL_VERSION` file. The upstream's [Dockerfile](https://github.com/tinkerbell/hook/blob/main/kernel/Dockerfile) is patched to use AL23 instead of alpine.
+This image is used by linuxkit build and ends up on the "host" via the built vmlinuz. This should be kept to the latest patch for the choosen minor.
+1. The `hook-bootkit`, `hoot-containerd` and `hook-runc` images are used during the linuxkit build process and ends up on the "host" via the built initramfs.
+    - `hook-containerd` and `hook-runc` use the build of containerd and runc from eks-anywhere-build-tooling
+    - `hook-bootkit` is a go bin used to start the `tink-worker` (built via [tinkerbell/tink](../tink/Makefile)) image
+1. The `hook-embedded` image is built using the upstream pull-images script and used by linuxkit build to "embedded" the [action](../hub/Makefile) and [tink-worker](../tink/Makefile) images in the docker-in-docker image cache.
+These embedded images allow customers to point our "latest" action images without neededing to update their cluster specs and avoids pulling these images at runtime.
+1. To build locally, we suggest using a local registry, or your personal public ecr repos, and setting `IMAGE_REPO` variable.
+    - To assist in creating the ecr repos, you can run `make create-ecr-repos`. If using public ecr, be sure to set `IMAGE_REPO`
+
+#### Kernel
+
+The kernel included in the vmlinuz file built by linuxkit is built from source, using upstream hook's [Dockerfile](https://github.com/tinkerbell/hook/blob/main/kernel/Dockerfile) and kernel [config](https://github.com/tinkerbell/hook/tree/main/kernel/configs) files.
+Additional config options are applied based on EKS-A customer feedback and exists as files in the [config-patches](./config-patches/) folder.  These files are merged with upstream's config during the 
+docker build process using [merge-config.sh](https://github.com/torvalds/linux/blob/master/scripts/kconfig/merge_config.sh) provided in the linux source.
+
+To create a new config patch:
+1. run `make create-new-config-patch` to launch the linux `menuconfig` process.
+1. using the menu, enable the new options.
+1. click `save` and save the changes to `.config`.
+1. click `exit`.
+1. after the menuconfig is exited, `_output/kernel-config/generic-5.10.y-x86_64-eksa` will be created and `diff` will be ran to give you the config options to set in your new `config-patches` file.
+
+Running the built kernel image locally with qemu:
+1. run `make run-kernel-in-qemu`
+1. this will launch a qemu vm using the built vmlinuz/initramfs files
+1. `ctrl + a + z` may work to kill the qemu terminal, if not, use `kill -9` to stop the process when you are done

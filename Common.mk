@@ -334,6 +334,10 @@ ADD_TRAILING_CHAR=$(if $(1),$(1)$(2),)
 IS_ONE_WORD=$(if $(filter 1,$(words $(1))),true,false)
 
 SED_CMD=$(shell source $(BUILD_LIB)/common.sh && build::find::gnu_variant_on_mac sed)
+
+# creating a space character by using a empty var seperated by space
+_EMPTY_VAR=
+SPACE=$(_EMPTY_VAR) $(_EMPTY_VAR)
 ####################################################
 
 #################### BINARIES ######################
