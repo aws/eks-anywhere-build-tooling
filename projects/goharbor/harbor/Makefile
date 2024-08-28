@@ -54,6 +54,7 @@ IMAGE_BUILD_ARGS=TRIVY_VERSION
 PROJECT_DEPENDENCIES=eksa/distribution/distribution eksa/aquasecurity/trivy eksa/aquasecurity/harbor-scanner-trivy
 
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
+FIX_LICENSES_VOLC_SDK_GOLANG_TARGET=$(REPO)/src/vendor/github.com/volcengine/volc-sdk-golang/service/sts/LICENSE
 
 HAS_HELM_CHART?=true
 
@@ -136,7 +137,11 @@ ifeq ($(JOB_TYPE),presubmit)
 $(call IMAGE_TARGETS_FOR_NAME, harbor-portal): clean-repo
 endif
 
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_XEIPUUV_TARGET)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_XEIPUUV_TARGET) $(FIX_LICENSES_VOLC_SDK_GOLANG_TARGET)
+
+$(FIX_LICENSES_VOLC_SDK_GOLANG_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+	wget -q --retry-connrefused https://raw.githubusercontent.com/volcengine/volc-sdk-golang/main/LICENSE -O $(REPO)/src/vendor/github.com/volcengine/volc-sdk-golang/service/sts/LICENSE;
+	wget -q --retry-connrefused https://raw.githubusercontent.com/volcengine/volc-sdk-golang/main/LICENSE -O $(REPO)/src/vendor/github.com/volcengine/volc-sdk-golang/base/LICENSE;
 
 $(FIX_LICENSES_XEIPUUV_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # The xeipuuv dependency github repos all have licenses however they all do not have go.mod files
