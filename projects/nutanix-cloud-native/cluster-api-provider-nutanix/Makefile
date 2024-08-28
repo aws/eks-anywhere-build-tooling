@@ -12,12 +12,24 @@ EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api
 
 HAS_S3_ARTIFACTS=true
 
+TOOLS_BIN_DIR := $(shell pwd)/hack/tools/bin
+CONTROLLER_GEN := $(TOOLS_BIN_DIR)/controller-gen
+GO_BIN_PATH=$(shell source $(BUILD_LIB)/common.sh && build::common::get_go_path $(GOLANG_VERSION))
+GO=$(GO_BIN_PATH)/go
+
 include $(BASE_DIRECTORY)/Common.mk
 
 s3-artifacts: create-manifests
 
+$(TOOLS_BIN_DIR):
+	@mkdir -p $(TOOLS_BIN_DIR)
+
+$(CONTROLLER_GEN): $(TOOLS_BIN_DIR)
+	GOBIN=$(TOOLS_BIN_DIR) $(GO) install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0
+
 .PHONY: create-manifests
-create-manifests: tarballs | ensure-yq $$(ENABLE_DOCKER)
+create-manifests: export PATH:=$(TOOLS_BIN_DIR):$(MAKE_ROOT)/$(OUTPUT_DIR):$(PATH)
+create-manifests: $(CONTROLLER_GEN) $(KUSTOMIZE_TARGET) tarballs | ensure-yq $$(ENABLE_DOCKER)
 	@build/create_manifests.sh $(REPO) $(OUTPUT_DIR) $(ARTIFACTS_PATH) $(GIT_TAG) $(IMAGE_REPO) $(IMAGE_TAG) $(GOLANG_VERSION)
 
 
