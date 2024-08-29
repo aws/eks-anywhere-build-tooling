@@ -463,7 +463,7 @@ UPLOAD_CREATE_PUBLIC_ACL?=true
 ####################################################
 
 #################### OTHER #########################
-KUSTOMIZE_VERSION=4.5.7
+KUSTOMIZE_VERSION=5.4.3
 KUSTOMIZE_TARGET=$(OUTPUT_DIR)/kustomize
 GIT_DEPS_DIR?=$(OUTPUT_DIR)/gitdependencies
 SPECIAL_TARGET_SECONDARY+=$(strip $(PROJECT_DEPENDENCIES_TARGETS) $(GO_MOD_DOWNLOAD_TARGETS))
