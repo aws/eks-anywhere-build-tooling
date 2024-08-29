@@ -44,4 +44,5 @@ FROM hook-docker as hook-dind
 
 COPY --from=dind-builder /newroot /
 
-VOLUME /var/lib/docker
+# last stage not named to avoid needing to pass a target which messes up the combine phase
+FROM hook-docker

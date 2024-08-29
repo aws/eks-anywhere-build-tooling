@@ -19,6 +19,14 @@ HOOK_IP_IMAGE_COMPONENT=tinkerbell/hook-ip
 HOOK_MDEV_IMAGE_COMPONENT=tinkerbell/hook-mdev
 
 IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-ip hook-mdev hook-dind hook-embedded
+# historically we have included these two images in our bundle even tho we really do not
+# need them at runtime since they are built into the final vmlinuz/initramfs files
+# when in codebuild we run the combine-images build, only bother merging these two
+# merging the others is actually a bit more complicated since we override the dockerfile location
+# the combine-images target does not easily support this case since we have not needed it before
+ifneq ($(findstring combine-images,$(RELEASE_TARGETS)),)
+IMAGE_NAMES=hook-bootkit hook-docker
+endif
 
 BINARY_TARGET_FILES=hook-bootkit hook-docker
 SOURCE_PATTERNS=./ ./
@@ -50,6 +58,14 @@ KERNEL_CONFIG_HOST_PATH=$(MAKE_ROOT)/$(OUTPUT_DIR)/kernel-config
 HOOK_EMBEDDED_FOLDER=$(REPO)/images/hook-embedded
 EMBEDDED_IMAGES=$(foreach platform,$(HOOK_PLATFORMS),$(OUTPUT_DIR)/hook-embedded/$(subst /,-,$(platform))/images)
 
+# we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
+# it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
+# and the combine-images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L846)
+# since combine-images has images as prereq target, the ?= does not really behavior as one might expect.
+# the images target being the actual action, its version of the set takes prioirty and resets to empty
+# setting it explicitly to empty here takes allows the combine-images override to take proirty
+IMAGE_BUILD_ARGS=
+
 BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
@@ -77,8 +93,6 @@ $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_HOOK_BOOTKIT_TARGET) $(FIX_LICENSES
 # hook-docker image required docker runtime.
 # We are using eks-distro-minimal-base-glibc as the base and builder to install docker.
 hook-docker/images/% hook-dind/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-iptables
-
-hook-docker/images/%: IMAGE_TARGET=hook-docker
 
 hook-dind/images/%: DOCKERFILE_FOLDER=./docker/linux/hook-docker
 hook-dind/images/%: IMAGE_TARGET=hook-dind
@@ -123,8 +137,8 @@ $(CREATE_HOOK_FILES_PATTERN)-%: | $$(ENABLE_DOCKER)
 	DEBUG=yes HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
 		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
 		HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
-		HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG) \
-		HOOK_LK_CONTAINERS_OCI_VERSION=$(LATEST_TAG) \
+		HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
+		HOOK_LK_CONTAINERS_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
 		./build.sh build hook-default-$(BUILD_ARCH); \
 	cd ..; \
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG); \
