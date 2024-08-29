@@ -138,6 +138,9 @@ $(REPO)/%/LICENSE: | $(GO_MOD_DOWNLOAD_TARGETS)
 	cp $(REPO)/LICENSE $@
 
 $(OUTPUT_DIR)/hook-embedded/linux-%/images: MAKEFLAGS=--no-print-directory
+# in codebuild this is set to arm64/amd64, for the images pulled during this target
+# we never want to use the -<arch>
+$(OUTPUT_DIR)/hook-embedded/linux-%/images: IMAGE_TAG_SUFFIX=
 $(OUTPUT_DIR)/hook-embedded/linux-%/images: DIND_IMAGE=$(shell $(MAKE) var-value-LATEST_IMAGE IMAGE_NAME=hook-dind)
 $(OUTPUT_DIR)/hook-embedded/linux-%/images: $(GIT_PATCH_TARGET)
 	mkdir -p $(@D)
