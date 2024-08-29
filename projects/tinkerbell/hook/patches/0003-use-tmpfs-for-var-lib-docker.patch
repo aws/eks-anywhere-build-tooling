@@ -1,0 +1,25 @@
+From 067eff9d94403b33816a5cb6155387fc6b88569d Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Thu, 29 Aug 2024 01:08:55 +0000
+Subject: [PATCH 3/3] use tmpfs for var/lib/docker
+
+---
+ images/hook-embedded/pull-images.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/images/hook-embedded/pull-images.sh b/images/hook-embedded/pull-images.sh
+index 45bf18d..6689946 100755
+--- a/images/hook-embedded/pull-images.sh
++++ b/images/hook-embedded/pull-images.sh
+@@ -69,7 +69,7 @@ function main() {
+     # will change the permissions of the bind mount directory (images/) to root.
+     echo -e "Starting DinD container"
+     echo -e "-----------------------"
+-    docker run -d --privileged --name "${dind_container}" -v "${PWD}/images_tar":/images_tar -v "${PWD}"/images/:/var/lib/docker-embedded/ -d "${dind_container_image}"
++    docker run -d --privileged --mount type=tmpfs,destination=/var/lib/docker --name "${dind_container}" -v "${PWD}/images_tar":/images_tar -v "${PWD}"/images/:/var/lib/docker-embedded/ -d "${dind_container_image}"
+ 
+     # wait until the docker daemon is ready
+     until docker exec "${dind_container}" docker info &> /dev/null; do
+-- 
+2.34.1
+
