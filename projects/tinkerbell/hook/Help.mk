@@ -19,14 +19,32 @@ _output/bin/hook/linux-arm64/hook-bootkit: ## Build `_output/bin/hook/linux-arm6
 _output/bin/hook/linux-arm64/hook-docker: ## Build `_output/bin/hook/linux-arm64/hook-docker`
 
 ##@ Image Targets
-local-images: ## Builds `hook-bootkit/images/amd64 hook-docker/images/amd64 kernel/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `hook-bootkit/images/push hook-docker/images/push kernel/images/push` to IMAGE_REPO
+local-images: ## Builds `hook-bootkit/images/amd64 hook-docker/images/amd64 hook-runc/images/amd64 hook-containerd/images/amd64 kernel/images/amd64 hook-ip/images/amd64 hook-mdev/images/amd64 hook-dind/images/amd64 hook-embedded/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `hook-bootkit/images/push hook-docker/images/push hook-runc/images/push hook-containerd/images/push kernel/images/push hook-ip/images/push hook-mdev/images/push hook-dind/images/push hook-embedded/images/push` to IMAGE_REPO
 hook-bootkit/images/amd64: ## Builds/pushes `hook-bootkit/images/amd64`
 hook-docker/images/amd64: ## Builds/pushes `hook-docker/images/amd64`
+hook-runc/images/amd64: ## Builds/pushes `hook-runc/images/amd64`
+hook-containerd/images/amd64: ## Builds/pushes `hook-containerd/images/amd64`
 kernel/images/amd64: ## Builds/pushes `kernel/images/amd64`
+hook-ip/images/amd64: ## Builds/pushes `hook-ip/images/amd64`
+hook-mdev/images/amd64: ## Builds/pushes `hook-mdev/images/amd64`
+hook-dind/images/amd64: ## Builds/pushes `hook-dind/images/amd64`
+hook-embedded/images/amd64: ## Builds/pushes `hook-embedded/images/amd64`
 hook-bootkit/images/push: ## Builds/pushes `hook-bootkit/images/push`
 hook-docker/images/push: ## Builds/pushes `hook-docker/images/push`
+hook-runc/images/push: ## Builds/pushes `hook-runc/images/push`
+hook-containerd/images/push: ## Builds/pushes `hook-containerd/images/push`
 kernel/images/push: ## Builds/pushes `kernel/images/push`
+hook-ip/images/push: ## Builds/pushes `hook-ip/images/push`
+hook-mdev/images/push: ## Builds/pushes `hook-mdev/images/push`
+hook-dind/images/push: ## Builds/pushes `hook-dind/images/push`
+hook-embedded/images/push: ## Builds/pushes `hook-embedded/images/push`
+
+##@ Fetch Binary Targets
+_output/dependencies/linux-amd64/eksa/containerd/containerd: ## Fetch `_output/dependencies/linux-amd64/eksa/containerd/containerd`
+_output/dependencies/linux-arm64/eksa/containerd/containerd: ## Fetch `_output/dependencies/linux-arm64/eksa/containerd/containerd`
+_output/dependencies/linux-amd64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/tink`
+_output/dependencies/linux-arm64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/tink`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
@@ -44,8 +62,8 @@ run-in-docker/checksums: ## Run `checksums` in docker builder container
 run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
-run-in-docker/hook/hook-bootkit/eks-anywhere-go-mod-download: ## Run `hook/hook-bootkit/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/hook/hook-docker/eks-anywhere-go-mod-download: ## Run `hook/hook-docker/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/hook/images/hook-bootkit/eks-anywhere-go-mod-download: ## Run `hook/images/hook-bootkit/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/hook/images/hook-docker/eks-anywhere-go-mod-download: ## Run `hook/images/hook-docker/eks-anywhere-go-mod-download` in docker builder container
 run-in-docker/_output/bin/hook/linux-amd64/hook-bootkit: ## Run `_output/bin/hook/linux-amd64/hook-bootkit` in docker builder container
 run-in-docker/_output/bin/hook/linux-amd64/hook-docker: ## Run `_output/bin/hook/linux-amd64/hook-docker` in docker builder container
 run-in-docker/_output/bin/hook/linux-arm64/hook-bootkit: ## Run `_output/bin/hook/linux-arm64/hook-bootkit` in docker builder container
