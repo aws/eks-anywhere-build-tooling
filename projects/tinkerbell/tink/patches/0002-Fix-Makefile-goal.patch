@@ -1,0 +1,40 @@
+From 447ab805b9a294ced8b3b1c72d7cdd961bf4569c Mon Sep 17 00:00:00 2001
+From: Jacob Weinstock <jakobweinstock@gmail.com>
+Date: Fri, 30 Aug 2024 09:54:13 -0600
+Subject: [PATCH 2/2] Fix Makefile goal:
+
+The `(` on its own line causes the goal to fail
+with:
+(
+bash: -c: line 2: syntax error: unexpected end of file
+make: *** [Makefile:154: out/release/tink.yaml] Error 2
+
+This is resolved by putting the parenthesis on the same
+line.
+
+Signed-off-by: Jacob Weinstock <jakobweinstock@gmail.com>
+---
+ Makefile | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 8f477351..cd7e5106 100644
+--- a/Makefile
++++ b/Makefile
+@@ -151,11 +151,9 @@ out/release/default/kustomization.yaml: config/default/kustomization.yaml
+ 	cp -a config/ out/release/
+ 
+ out/release/tink.yaml: generate-manifests out/release/default/kustomization.yaml $(KUSTOMIZE)
+-	(
+-		cd out/release/default && \
++	(cd out/release/default && \
+ 		$(KUSTOMIZE) edit set image server=$(TINK_SERVER_IMAGE):$(TINK_CONTROLLER_TAG) controller=$(TINK_CONTROLLER_IMAGE):$(TINK_CONTROLLER_TAG) && \
+-		$(KUSTOMIZE) edit set namespace $(NAMESPACE) \
+-	)
++		$(KUSTOMIZE) edit set namespace $(NAMESPACE))
+ 	$(KUSTOMIZE) build out/release/default -o $@
+ 	prettier --write $@
+ 
+-- 
+2.44.0
+
