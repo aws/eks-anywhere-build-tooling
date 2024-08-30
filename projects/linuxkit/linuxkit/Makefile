@@ -50,6 +50,11 @@ BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
 BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
 BUILDSPEC_2_DEPENDS_ON_OVERRIDE=linuxkit_linuxkit_linux_amd64 linuxkit_linuxkit_linux_arm64
 
+# Since we build the arm and amd binaries on difference instances in codebuild
+# we do not want to delete missing files when s3 sync-ing from local to the bucket
+# since this would clobber the other build's artifacts
+UPLOAD_DO_NOT_DELETE=true
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
