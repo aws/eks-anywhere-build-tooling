@@ -22,7 +22,7 @@ RNGD_IMAGE_COMPONENT=linuxkit/rngd
 SYSCTL_IMAGE_COMPONENT=linuxkit/sysctl
 SYSFS_IMAGE_COMPONENT=linuxkit/sysfs
 MODPROBE_IMAGE_COMPONENT=linuxkit/modprobe
-DHCPD_IMAGE_COMPONENT=linuxkit/dhcpcd
+DHCPCD_IMAGE_COMPONENT=linuxkit/dhcpcd
 OPENNTPD_IMAGE_COMPONENT=linuxkit/openntpd
 GETTY_IMAGE_COMPONENT=linuxkit/getty
 
