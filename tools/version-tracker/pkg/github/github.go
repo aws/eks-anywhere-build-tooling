@@ -280,9 +280,8 @@ func GetGoVersionForLatestRevision(client *github.Client, org, repo, latestRevis
 }
 
 // CreatePullRequest creates a pull request from the head branch to the base branch on the base repository.
-func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string, addPatchWarningComment bool, patchesWarningComment string) error {
+func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOwner, baseBranch, headRepoOwner, headBranch, currentRevision, latestRevision string) (*github.PullRequest, error) {
 	var pullRequest *github.PullRequest
-	var patchWarningCommentExists bool
 
 	// Check if there is already a pull request from the head branch to the base branch.
 	pullRequests, _, err := client.PullRequests.List(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, &github.PullRequestListOptions{
@@ -290,7 +289,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 		Head: fmt.Sprintf("%s:%s", headRepoOwner, headBranch),
 	})
 	if err != nil {
-		return fmt.Errorf("listing pull requests from %s:%s -> %s:%s: %v", headRepoOwner, headBranch, baseRepoOwner, baseBranch, err)
+		return nil, fmt.Errorf("listing pull requests from %s:%s -> %s:%s: %v", headRepoOwner, headBranch, baseRepoOwner, baseBranch, err)
 	}
 
 	if len(pullRequests) > 0 {
@@ -300,22 +299,7 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 		pullRequest.Body = github.String(body)
 		pullRequest, _, err = client.PullRequests.Edit(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, pullRequest)
 		if err != nil {
-			return fmt.Errorf("editing existing pull request [%s]: %v", *pullRequest.HTMLURL, err)
-		}
-
-		// If patches to the project failed to apply, check if the PR already has a comment warning about
-		// the incomplete PR and patches needing to be regenerated.
-		if addPatchWarningComment {
-			pullRequestComments, _, err := client.Issues.ListComments(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, nil)
-			if err != nil {
-				return fmt.Errorf("listing comments on pull request [%s]: %v", *pullRequest.HTMLURL, err)
-			}
-
-			for _, comment := range pullRequestComments {
-				if comment.Body == github.String(patchesWarningComment) {
-					patchWarningCommentExists = true
-				}
-			}
+			return nil, fmt.Errorf("editing existing pull request [%s]: %v", *pullRequest.HTMLURL, err)
 		}
 	} else {
 		logger.V(6).Info(fmt.Sprintf("Creating pull request with updated versions for [%s/%s] repository", org, repo))
@@ -329,23 +313,23 @@ func CreatePullRequest(client *github.Client, org, repo, title, body, baseRepoOw
 		}
 		pullRequest, _, err = client.PullRequests.Create(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, newPR)
 		if err != nil {
-			return fmt.Errorf("creating pull request with updated versions from %s to %s: %v", headBranch, baseBranch, err)
+			return nil, fmt.Errorf("creating pull request with updated versions from %s to %s: %v", headBranch, baseBranch, err)
 		}
 
 		logger.Info(fmt.Sprintf("Created pull request: %s", *pullRequest.HTMLURL))
 	}
 
-	// If patches failed to apply and no patch warning comment exists (always the case for a new PR), then add a comment with the
-	// warning.
-	if addPatchWarningComment && !patchWarningCommentExists {
-		patchWarningComment := &github.IssueComment{
-			Body: github.String(patchesWarningComment),
-		}
+	return pullRequest, nil
+}
 
-		_, _, err = client.Issues.CreateComment(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, patchWarningComment)
-		if err != nil {
-			return fmt.Errorf("commenting failed patch apply warning on pull request [%s]: %v", *pullRequest.HTMLURL, err)
-		}
+func AddCommentOnPR(client *github.Client, baseRepoOwner, comment string, pullRequest *github.PullRequest) error {
+	prComment := &github.IssueComment{
+		Body: github.String(comment),
+	}
+
+	_, _, err := client.Issues.CreateComment(context.Background(), baseRepoOwner, constants.BuildToolingRepoName, *pullRequest.Number, prComment)
+	if err != nil {
+		return fmt.Errorf("commenting on pull request [%s]: %v", *pullRequest.HTMLURL, err)
 	}
 
 	return nil
