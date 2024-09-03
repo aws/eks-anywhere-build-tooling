@@ -281,10 +281,14 @@ function pr::create::checksums() {
 }
 
 function pr::create::help() {
-    local -r pr_title="Update Makefile generated help"
+    local pr_title="Update Makefile generated help"
     local -r commit_message="[PR BOT] Update Help.mk files"
     local -r pr_branch="help-makefiles-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "makehelp")
+
+    if [ "$MAIN_BRANCH" != "main" ]; then
+        pr_title="[$MAIN_BRANCH] $pr_title"
+    fi
 
     if pr::commit::push "$commit_message" "$pr_branch"; then
         pr::create "$pr_title" "$pr_branch" "$pr_body"
@@ -292,10 +296,14 @@ function pr::create::help() {
 }
 
 function pr::create::go-mod() {
-    local -r pr_title="Update go.mod files"
+    local pr_title="Update go.mod files"
     local -r commit_message="[PR BOT] Update go.mod files"
     local -r pr_branch="go-mod-update-$MAIN_BRANCH"
     local -r pr_body=$(pr::create::pr_body "go-mod")
+
+    if [ "$MAIN_BRANCH" != "main" ]; then
+        pr_title="[$MAIN_BRANCH] $pr_title"
+    fi
 
     if pr::commit::push "$commit_message" "$pr_branch"; then
         pr::create "$pr_title" "$pr_branch" "$pr_body"
