@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
+	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/ecrpublic"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/git"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/github"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/types"
@@ -20,6 +21,8 @@ import (
 
 // Run contains the business logic to execute the `display` subcommand.
 func Run(displayOptions *types.DisplayOptions) error {
+	projectName := displayOptions.ProjectName
+
 	// Check if branch name environment variable has been set.
 	branchName, ok := os.LookupEnv(constants.BranchNameEnvVar)
 	if !ok {
@@ -126,10 +129,18 @@ func Run(displayOptions *types.DisplayOptions) error {
 				isTrackedByCommitHash = true
 			}
 
-			// Get latest revision for the project from GitHub.
-			latestRevision, _, err := github.GetLatestRevision(client, org, repoName, currentRevision, branchName, isTrackedByCommitHash, releaseBranched)
-			if err != nil {
-				return fmt.Errorf("getting latest revision from GitHub: %v", err)
+			var latestRevision string
+			if projectName == "cilium/cilium" {
+				latestRevision, _, err = ecrpublic.GetLatestRevision(constants.CiliumImageRepository, currentRevision, branchName)
+				if err != nil {
+					return fmt.Errorf("getting latest revision from ECR Public: %v", err)
+				}
+			} else {
+				// Get latest revision for the project from GitHub.
+				latestRevision, _, err = github.GetLatestRevision(client, org, repoName, currentRevision, branchName, isTrackedByCommitHash, releaseBranched)
+				if err != nil {
+					return fmt.Errorf("getting latest revision from GitHub: %v", err)
+				}
 			}
 
 			// Check if we should print only the latest version of the project.
