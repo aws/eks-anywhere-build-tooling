@@ -1,7 +1,7 @@
-From d4e16765d43a8567b2d9a7bfa54738a2bf5ec3a0 Mon Sep 17 00:00:00 2001
+From bdd63a6800d77ca969434d221e942587d00cff9f Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Wed, 23 Nov 2022 09:26:28 -0500
-Subject: [PATCH 18/37] Support configuring bottlerocket admin container image
+Subject: [PATCH 18/38] Support configuring bottlerocket admin container image
 
 ---
  .../kubeadm/api/v1beta1/kubeadm_types.go      | 17 ++++
@@ -23,7 +23,7 @@ Subject: [PATCH 18/37] Support configuring bottlerocket admin container image
  16 files changed, 592 insertions(+), 2 deletions(-)
 
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 5e6f200e0..2d5fb7e6d 100644
+index 94726328e..455a9c55c 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -83,6 +83,11 @@ type ClusterConfiguration struct {
@@ -52,7 +52,7 @@ index 5e6f200e0..2d5fb7e6d 100644
  // BottlerocketControl holds the settings of control container for bottlerocket nodes
  // This setting is ONLY for bottlerocket nodes.
  type BottlerocketControl struct {
-@@ -498,6 +510,11 @@ type JoinConfiguration struct {
+@@ -520,6 +532,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -65,7 +65,7 @@ index 5e6f200e0..2d5fb7e6d 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
-index 64e4eeff7..ca5525885 100644
+index bdab73f22..999ce4e33 100644
 --- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 @@ -142,6 +142,22 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -99,7 +99,7 @@ index 64e4eeff7..ca5525885 100644
  	out.BottlerocketControl = in.BottlerocketControl
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
-@@ -636,6 +653,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+@@ -685,6 +702,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  	out.TypeMeta = in.TypeMeta
  	out.Pause = in.Pause
  	out.BottlerocketBootstrap = in.BottlerocketBootstrap
@@ -108,7 +108,7 @@ index 64e4eeff7..ca5525885 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index e1d3687cf..d256ac98c 100644
+index 2f76b8d55..238f5f065 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -114,6 +114,22 @@ spec:
@@ -203,7 +203,7 @@ index e1d3687cf..d256ac98c 100644
                    bottlerocketBootstrap:
                      description: |-
                        BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -2774,6 +2838,22 @@ spec:
+@@ -2901,6 +2965,22 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -226,7 +226,7 @@ index e1d3687cf..d256ac98c 100644
                    bottlerocketBootstrap:
                      description: |-
                        BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -3563,6 +3643,22 @@ spec:
+@@ -4121,6 +4201,22 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -250,7 +250,7 @@ index e1d3687cf..d256ac98c 100644
                      description: |-
                        BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 5046e9f62..b99285258 100644
+index ea9ddf963..f2993a4da 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -122,6 +122,22 @@ spec:
@@ -345,7 +345,7 @@ index 5046e9f62..b99285258 100644
                            bottlerocketBootstrap:
                              description: |-
                                BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -2734,6 +2798,22 @@ spec:
+@@ -2865,6 +2929,22 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -368,7 +368,7 @@ index 5046e9f62..b99285258 100644
                            bottlerocketBootstrap:
                              description: |-
                                BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -3541,6 +3621,22 @@ spec:
+@@ -4118,6 +4198,22 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -519,10 +519,10 @@ index e504684a0..9848f47e8 100644
  		},
  		{
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index f1be0a695..3e3ee9d21 100644
+index 2cb97bc37..a9036689b 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -507,6 +507,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -495,6 +495,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
  			Pause:                                 scope.Config.Spec.ClusterConfiguration.Pause,
  			BottlerocketBootstrap:                 scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
@@ -530,7 +530,7 @@ index f1be0a695..3e3ee9d21 100644
  			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
  			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
  			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
-@@ -714,6 +715,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -732,6 +733,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
  			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
  			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
@@ -538,7 +538,7 @@ index f1be0a695..3e3ee9d21 100644
  			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
  			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
  			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
-@@ -845,6 +847,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -875,6 +877,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
  			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
  			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
@@ -589,7 +589,7 @@ index f35b90a43..43b0bf856 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
-index 531086227..ecbb70ea6 100644
+index 8b2d77601..1e89c7c78 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
 @@ -141,6 +141,22 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -632,7 +632,7 @@ index 531086227..ecbb70ea6 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-index 2e3bc99ea..8b6475592 100644
+index 54f239f44..b23a2cabe 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 @@ -528,6 +528,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfigur
@@ -643,7 +643,7 @@ index 2e3bc99ea..8b6475592 100644
  	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
  		return err
  	}
-@@ -844,6 +845,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
+@@ -868,6 +869,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -652,7 +652,7 @@ index 2e3bc99ea..8b6475592 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index 1b2d94a1d..4584e6266 100644
+index cb38c23f7..0ce57fa5b 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -532,6 +532,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
@@ -663,7 +663,7 @@ index 1b2d94a1d..4584e6266 100644
  	if err := Convert_v1beta1_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
  		return err
  	}
-@@ -836,6 +837,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+@@ -865,6 +866,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -672,7 +672,7 @@ index 1b2d94a1d..4584e6266 100644
  		return err
  	}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index a36dc6ffb..842b5df46 100644
+index baadba595..d0b464038 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -198,6 +198,22 @@ spec:
@@ -767,7 +767,7 @@ index a36dc6ffb..842b5df46 100644
                        bottlerocketBootstrap:
                          description: |-
                            BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -3253,6 +3317,22 @@ spec:
+@@ -3381,6 +3445,22 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -790,7 +790,7 @@ index a36dc6ffb..842b5df46 100644
                        bottlerocketBootstrap:
                          description: |-
                            BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -4053,6 +4133,22 @@ spec:
+@@ -4619,6 +4699,22 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -814,7 +814,7 @@ index a36dc6ffb..842b5df46 100644
                          description: |-
                            BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 4e81dac1c..a83251f01 100644
+index 8cb46ece3..c9675d42e 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -134,6 +134,22 @@ spec:
@@ -863,7 +863,7 @@ index 4e81dac1c..a83251f01 100644
                                bottlerocketBootstrap:
                                  description: |-
                                    BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -1618,6 +1650,22 @@ spec:
+@@ -1751,6 +1783,22 @@ spec:
                                    may reject unrecognized values.
                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                                  type: string
@@ -886,7 +886,7 @@ index 4e81dac1c..a83251f01 100644
                                bottlerocketBootstrap:
                                  description: |-
                                    BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -2434,6 +2482,22 @@ spec:
+@@ -3021,6 +3069,22 @@ spec:
                                    may reject unrecognized values.
                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                                  type: string
@@ -952,7 +952,7 @@ index 592c257b8..f1e5eee19 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-index 2426450f0..e64081071 100644
+index 168b9f816..4700180ce 100644
 --- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 +++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 @@ -90,6 +90,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -1023,7 +1023,7 @@ index 2426450f0..e64081071 100644
  	if err := Convert_v1beta1_BottlerocketControl_To_v1alpha4_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
  		return err
  	}
-@@ -1166,6 +1206,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
+@@ -1190,6 +1230,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *Joi
  	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1033,7 +1033,7 @@ index 2426450f0..e64081071 100644
  	if err := Convert_v1alpha4_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
  		return err
  	}
-@@ -1200,6 +1243,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+@@ -1224,6 +1267,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -1087,5 +1087,5 @@ index 4e60b7369..082b6114c 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
 -- 
-2.42.0
+2.46.0
 

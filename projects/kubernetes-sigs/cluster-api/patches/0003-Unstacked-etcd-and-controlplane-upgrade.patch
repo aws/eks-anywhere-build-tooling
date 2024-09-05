@@ -1,7 +1,7 @@
-From e348b690525d2d7d9da803525d8cae30082aa817 Mon Sep 17 00:00:00 2001
+From f7e38f5157b27cd28b3703b825c659146e4ce45a Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
-Subject: [PATCH 03/37] Unstacked etcd and controlplane upgrade
+Subject: [PATCH 03/38] Unstacked etcd and controlplane upgrade
 
 Rename controlplane upgrade annotation variable
 
@@ -46,7 +46,7 @@ previous clients that expect this orchestration by default.
  api/v1beta1/common_types.go                   |   7 +
  controllers/external/util.go                  |  29 ++
  .../kubeadm/api/v1beta1/condition_consts.go   |   8 +
- .../internal/controllers/controller.go        | 116 ++++++--
+ .../internal/controllers/controller.go        | 108 ++++++--
  .../internal/controllers/controller_test.go   | 209 +++++++++++++-
  .../kubeadm/internal/workload_cluster.go      |   1 +
  .../kubeadm/internal/workload_cluster_etcd.go |   8 +
@@ -56,11 +56,11 @@ previous clients that expect this orchestration by default.
  internal/test/builder/builders.go             |  10 +
  internal/test/builder/etcd.go                 |  80 ++++++
  util/annotations/helpers.go                   |   5 +
- 13 files changed, 768 insertions(+), 69 deletions(-)
+ 13 files changed, 760 insertions(+), 69 deletions(-)
  create mode 100644 internal/test/builder/etcd.go
 
 diff --git a/api/v1beta1/common_types.go b/api/v1beta1/common_types.go
-index 28fd03296..f0e2c140b 100644
+index 860b8d287..092e16182 100644
 --- a/api/v1beta1/common_types.go
 +++ b/api/v1beta1/common_types.go
 @@ -168,6 +168,9 @@ const (
@@ -141,7 +141,7 @@ index e9870d34c..adc1b2a0a 100644
  
  const (
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index a3a67dadd..45da8201c 100644
+index 343c59afb..8bf8aac0e 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -25,6 +25,7 @@ import (
@@ -152,7 +152,7 @@ index a3a67dadd..45da8201c 100644
  	"github.com/pkg/errors"
  	corev1 "k8s.io/api/core/v1"
  	apierrors "k8s.io/apimachinery/pkg/api/errors"
-@@ -175,28 +176,12 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -178,28 +179,12 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  	}
  
  	if cluster.Spec.ManagedExternalEtcdRef != nil {
@@ -184,7 +184,7 @@ index a3a67dadd..45da8201c 100644
  		}
  	}
  
-@@ -334,6 +319,80 @@ func (r *KubeadmControlPlaneReconciler) initControlPlaneScope(ctx context.Contex
+@@ -341,6 +326,72 @@ func (r *KubeadmControlPlaneReconciler) initControlPlaneScope(ctx context.Contex
  	return controlPlane, false, nil
  }
  
@@ -194,34 +194,28 @@ index a3a67dadd..45da8201c 100644
 +	if kcp.Spec.KubeadmConfigSpec.ClusterConfiguration == nil || kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External == nil {
 +		return ctrl.Result{}, errors.New("invalid kcp, external etcd not configured for cluster with managed external etcd")
 +	}
-+
 +	etcdRef := cluster.Spec.ManagedExternalEtcdRef
 +	externalEtcd, err := external.Get(ctx, r.Client, etcdRef, cluster.Namespace)
 +	if err != nil {
 +		return ctrl.Result{}, err
 +	}
-+
 +	externalEtcdReady, err := external.IsReady(externalEtcd)
 +	if err != nil {
 +		return ctrl.Result{}, err
 +	}
-+
 +	if !externalEtcdReady {
 +		log.Info("Managed external etcd is not ready yet, requeueing")
 +		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 +	}
-+
 +	endpoints, found, err := external.GetExternalEtcdEndpoints(externalEtcd)
 +	if err != nil {
 +		return ctrl.Result{}, errors.Wrapf(err, "failed to get endpoint field from %v", externalEtcd.GetName())
 +	}
 +	currentEtcdEndpoints := strings.Split(endpoints, ",")
-+
 +	if !found || areEndpointsEmpty(currentEtcdEndpoints) {
 +		log.Info("Managed external etcd endpoints not available, requeueing")
 +		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 +	}
-+
 +	sort.Strings(currentEtcdEndpoints)
 +	currentKCPEndpoints := kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints
 +	if !reflect.DeepEqual(currentEtcdEndpoints, currentKCPEndpoints) {
@@ -254,18 +248,16 @@ index a3a67dadd..45da8201c 100644
 +	if conditions.IsFalse(kcp, controlplanev1.ExternalEtcdEndpointsAvailable) {
 +		conditions.MarkTrue(kcp, controlplanev1.ExternalEtcdEndpointsAvailable)
 +	}
-+
 +	return ctrl.Result{}, nil
 +}
-+
 +func areEndpointsEmpty(endpoints []string) bool {
 +	return len(endpoints) == 0 || len(endpoints) == 1 && endpoints[0] == ""
 +}
 +
- func patchKubeadmControlPlane(ctx context.Context, patchHelper *patch.Helper, kcp *controlplanev1.KubeadmControlPlane) error {
+ func patchKubeadmControlPlane(ctx context.Context, patchHelper *patch.Helper, kcp *controlplanev1.KubeadmControlPlane, options ...patch.Option) error {
  	// Always update the readyCondition by summarizing the state of other conditions.
  	conditions.SetSummary(kcp,
-@@ -441,6 +500,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+@@ -450,6 +501,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
  		// NOTE: we are checking the condition already exists in order to avoid to set this condition at the first
  		// reconciliation/before a rolling upgrade actually starts.
  		if conditions.Has(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition) {
@@ -292,7 +284,7 @@ index a3a67dadd..45da8201c 100644
  		}
  	}
 diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
-index 6459174a9..3c49022ae 100644
+index da71a74ff..da71ae088 100644
 --- a/controlplane/kubeadm/internal/controllers/controller_test.go
 +++ b/controlplane/kubeadm/internal/controllers/controller_test.go
 @@ -24,6 +24,7 @@ import (
@@ -533,12 +525,12 @@ index 6459174a9..3c49022ae 100644
  
  func newFakeClient(initObjs ...client.Object) client.Client {
 diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
-index 9034dd1e0..9d7cb609f 100644
+index 0d35ae2d5..2f1afafbf 100644
 --- a/controlplane/kubeadm/internal/workload_cluster.go
 +++ b/controlplane/kubeadm/internal/workload_cluster.go
-@@ -109,6 +109,7 @@ type WorkloadCluster interface {
+@@ -116,6 +116,7 @@ type WorkloadCluster interface {
  	UpdateImageRepositoryInKubeadmConfigMap(imageRepository string) func(*bootstrapv1.ClusterConfiguration)
- 	UpdateFeatureGatesInKubeadmConfigMap(featureGates map[string]bool) func(*bootstrapv1.ClusterConfiguration)
+ 	UpdateFeatureGatesInKubeadmConfigMap(kubeadmConfigSpec bootstrapv1.KubeadmConfigSpec, kubernetesVersion semver.Version) func(*bootstrapv1.ClusterConfiguration)
  	UpdateEtcdLocalInKubeadmConfigMap(localEtcd *bootstrapv1.LocalEtcd) func(*bootstrapv1.ClusterConfiguration)
 +	UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx context.Context, endpoints []string, version semver.Version) error
  	UpdateEtcdExternalInKubeadmConfigMap(externalEtcd *bootstrapv1.ExternalEtcd) func(*bootstrapv1.ClusterConfiguration)
@@ -564,7 +556,7 @@ index 48c06bc3f..fcf4beb69 100644
  // Removing the last remaining member of the cluster is not supported.
  func (w *Workload) RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error {
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index 269007490..b41895e51 100644
+index f08e3306f..300a30bc3 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
 @@ -206,10 +206,10 @@ func (r *Reconciler) reconcile(ctx context.Context, cluster *clusterv1.Cluster)
@@ -580,7 +572,7 @@ index 269007490..b41895e51 100644
  
  	res := ctrl.Result{}
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 73ff4f789..0482afb3f 100644
+index 2eeeb1bdf..900bd1d7d 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -19,10 +19,11 @@ package cluster
@@ -597,7 +589,7 @@ index 73ff4f789..0482afb3f 100644
  	"github.com/pkg/errors"
  	corev1 "k8s.io/api/core/v1"
  	apierrors "k8s.io/apimachinery/pkg/api/errors"
-@@ -223,37 +224,13 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, cluster *cluster
+@@ -228,37 +229,13 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, cluster *cluster
  	if cluster.Spec.ControlPlaneRef == nil {
  		return ctrl.Result{}, nil
  	}
@@ -640,7 +632,7 @@ index 73ff4f789..0482afb3f 100644
  		}
  	}
  
-@@ -312,6 +289,55 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, cluster *cluster
+@@ -330,6 +307,55 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, cluster *cluster
  	return ctrl.Result{}, nil
  }
  
@@ -696,7 +688,7 @@ index 73ff4f789..0482afb3f 100644
  func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv1.Cluster) (ctrl.Result, error) {
  	log := ctrl.LoggerFrom(ctx)
  
-@@ -345,23 +371,6 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv
+@@ -363,23 +389,6 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv
  	}
  	cluster.Status.ManagedExternalEtcdReady = ready
  
@@ -721,7 +713,7 @@ index 73ff4f789..0482afb3f 100644
  	conditions.SetMirror(cluster, clusterv1.ManagedExternalEtcdClusterReadyCondition,
  		conditions.UnstructuredGetter(etcdPlaneConfig),
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 0439ca397..4708101ab 100644
+index 55f117f75..6e7835e80 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
 @@ -18,16 +18,21 @@ package cluster
@@ -754,7 +746,7 @@ index 0439ca397..4708101ab 100644
  	"sigs.k8s.io/cluster-api/util/conditions"
  	"sigs.k8s.io/cluster-api/util/patch"
  )
-@@ -944,3 +950,254 @@ func TestReconcileControlPlaneInitializedControlPlaneRef(t *testing.T) {
+@@ -986,3 +992,254 @@ func TestReconcileControlPlaneInitializedControlPlaneRef(t *testing.T) {
  	g.Expect(err).ToNot(HaveOccurred())
  	g.Expect(conditions.Has(c, clusterv1.ControlPlaneInitializedCondition)).To(BeFalse())
  }
@@ -1010,7 +1002,7 @@ index 0439ca397..4708101ab 100644
 +	})
 +}
 diff --git a/internal/test/builder/builders.go b/internal/test/builder/builders.go
-index 1d7a2bb6d..7bca0d085 100644
+index dd2ae1dc8..6c155a191 100644
 --- a/internal/test/builder/builders.go
 +++ b/internal/test/builder/builders.go
 @@ -38,6 +38,7 @@ type ClusterBuilder struct {
@@ -1147,5 +1139,5 @@ index e4990032b..a68d61ae8 100644
  func hasAnnotation(o metav1.Object, annotation string) bool {
  	annotations := o.GetAnnotations()
 -- 
-2.42.0
+2.46.0
 

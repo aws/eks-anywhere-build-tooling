@@ -1,7 +1,7 @@
-From 2f7df1f4a09760823557a751829ff8c074b44a96 Mon Sep 17 00:00:00 2001
+From e4e650969bfce788b0bc8b1fdeca4f05d2faf610 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Fri, 11 Jun 2021 10:43:09 -0700
-Subject: [PATCH 01/37] Adding capi support for Bottlerocket
+Subject: [PATCH 01/38] Adding capi support for Bottlerocket
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 
@@ -51,8 +51,8 @@ Remove userdata logging for bottlerocket
  .../zz_generated.conversion.go                |   6 +
  ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 189 ++++++++++++++++++
  ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  95 +++++++++
- .../v1alpha4/zz_generated.conversion.go       |  26 ++-
- 23 files changed, 1513 insertions(+), 4 deletions(-)
+ .../v1alpha4/zz_generated.conversion.go       |   6 +
+ 23 files changed, 1495 insertions(+), 2 deletions(-)
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bottlerocket_test.go
@@ -64,7 +64,7 @@ Remove userdata logging for bottlerocket
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/utils.go
 
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
-index 67b4f51cd..f49a64302 100644
+index 8bed14f6a..a3909136d 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadm_types.go
 @@ -73,6 +73,21 @@ type InitConfiguration struct {
@@ -119,7 +119,7 @@ index 67b4f51cd..f49a64302 100644
  // ControlPlaneComponent holds settings common to control plane component of the cluster.
  type ControlPlaneComponent struct {
  	// ExtraArgs is an extra set of flags to pass to the control plane component.
-@@ -415,6 +453,21 @@ type ExternalEtcd struct {
+@@ -437,6 +475,21 @@ type ExternalEtcd struct {
  type JoinConfiguration struct {
  	metav1.TypeMeta `json:",inline"`
  
@@ -142,7 +142,7 @@ index 67b4f51cd..f49a64302 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
-index 70b9c133b..d68d247c7 100644
+index 90689364d..a78d16395 100644
 --- a/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
 +++ b/bootstrap/kubeadm/api/v1beta1/kubeadmconfig_types.go
 @@ -27,7 +27,7 @@ import (
@@ -165,7 +165,7 @@ index 70b9c133b..d68d247c7 100644
  
  var (
 diff --git a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
-index 425b90eda..1c034ec0d 100644
+index 0c4becdd2..b5b3c4b0b 100644
 --- a/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/api/v1beta1/zz_generated.deepcopy.go
 @@ -142,10 +142,29 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -198,7 +198,7 @@ index 425b90eda..1c034ec0d 100644
  	in.Etcd.DeepCopyInto(&out.Etcd)
  	out.Networking = in.Networking
  	in.APIServer.DeepCopyInto(&out.APIServer)
-@@ -555,6 +574,9 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+@@ -604,6 +623,9 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
  func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
  	*out = *in
  	out.TypeMeta = in.TypeMeta
@@ -208,7 +208,7 @@ index 425b90eda..1c034ec0d 100644
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
  	in.Discovery.DeepCopyInto(&out.Discovery)
  	if in.ControlPlane != nil {
-@@ -1052,6 +1074,42 @@ func (in *Patches) DeepCopy() *Patches {
+@@ -1220,6 +1242,42 @@ func (in *Patches) DeepCopy() *Patches {
  	return out
  }
  
@@ -252,7 +252,7 @@ index 425b90eda..1c034ec0d 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index ea2733dc9..ec42c300e 100644
+index 2208256ad..f7f90fd07 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -114,6 +114,22 @@ spec:
@@ -375,7 +375,7 @@ index ea2733dc9..ec42c300e 100644
                  type: object
                mounts:
                  description: Mounts specifies a list of mount points to be setup.
-@@ -2137,6 +2229,22 @@ spec:
+@@ -2264,6 +2356,22 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -398,7 +398,7 @@ index ea2733dc9..ec42c300e 100644
                    certificatesDir:
                      description: |-
                        CertificatesDir specifies where to store or look for all required certificates.
-@@ -2351,6 +2459,36 @@ spec:
+@@ -2733,6 +2841,36 @@ spec:
                            to "10.96.0.0/12" if that's unset.
                          type: string
                      type: object
@@ -435,7 +435,7 @@ index ea2733dc9..ec42c300e 100644
                    scheduler:
                      description: Scheduler contains extra settings for the scheduler
                        control plane component
-@@ -2541,6 +2679,7 @@ spec:
+@@ -3050,6 +3188,7 @@ spec:
                  enum:
                  - cloud-config
                  - ignition
@@ -443,30 +443,7 @@ index ea2733dc9..ec42c300e 100644
                  type: string
                ignition:
                  description: Ignition contains Ignition specific configuration.
-@@ -2766,6 +2905,22 @@ spec:
-                       may reject unrecognized values.
-                       More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-                     type: string
-+                  bottlerocketBootstrap:
-+                    description: |-
-+                      BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-+                      This is only for bottlerocket
-+                    properties:
-+                      imageRepository:
-+                        description: |-
-+                          ImageRepository sets the container registry to pull images from.
-+                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                        type: string
-+                      imageTag:
-+                        description: |-
-+                          ImageTag allows to specify a tag for the image.
-+                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                        type: string
-+                    type: object
-                   caCertPath:
-                     description: |-
-                       CACertPath is the path to the SSL certificate authority used to
-@@ -2964,6 +3119,36 @@ spec:
+@@ -3261,6 +3400,36 @@ spec:
                            by referencing a secret.
                          type: string
                      type: object
@@ -503,8 +480,31 @@ index ea2733dc9..ec42c300e 100644
                    skipPhases:
                      description: |-
                        SkipPhases is a list of phases to skip during command execution.
+@@ -3281,6 +3450,22 @@ spec:
+                       may reject unrecognized values.
+                       More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                     type: string
++                  bottlerocketBootstrap:
++                    description: |-
++                      BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          ImageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        type: string
++                      imageTag:
++                        description: |-
++                          ImageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: |-
+                       CACertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 30baffe56..478c8baf6 100644
+index 9b6b709cc..364e28418 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -122,6 +122,22 @@ spec:
@@ -629,7 +629,7 @@ index 30baffe56..478c8baf6 100644
                          type: object
                        mounts:
                          description: Mounts specifies a list of mount points to be
-@@ -2085,6 +2179,22 @@ spec:
+@@ -2216,6 +2310,22 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -652,7 +652,7 @@ index 30baffe56..478c8baf6 100644
                            certificatesDir:
                              description: |-
                                CertificatesDir specifies where to store or look for all required certificates.
-@@ -2303,6 +2413,37 @@ spec:
+@@ -2698,6 +2808,37 @@ spec:
                                    to "10.96.0.0/12" if that's unset.
                                  type: string
                              type: object
@@ -690,7 +690,7 @@ index 30baffe56..478c8baf6 100644
                            scheduler:
                              description: Scheduler contains extra settings for the
                                scheduler control plane component
-@@ -2501,6 +2642,7 @@ spec:
+@@ -3027,6 +3168,7 @@ spec:
                          enum:
                          - cloud-config
                          - ignition
@@ -698,30 +698,7 @@ index 30baffe56..478c8baf6 100644
                          type: string
                        ignition:
                          description: Ignition contains Ignition specific configuration.
-@@ -2729,6 +2871,22 @@ spec:
-                               may reject unrecognized values.
-                               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-                             type: string
-+                          bottlerocketBootstrap:
-+                            description: |-
-+                              BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-+                              This is only for bottlerocket
-+                            properties:
-+                              imageRepository:
-+                                description: |-
-+                                  ImageRepository sets the container registry to pull images from.
-+                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                type: string
-+                              imageTag:
-+                                description: |-
-+                                  ImageTag allows to specify a tag for the image.
-+                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                type: string
-+                            type: object
-                           caCertPath:
-                             description: |-
-                               CACertPath is the path to the SSL certificate authority used to
-@@ -2930,6 +3088,37 @@ spec:
+@@ -3241,6 +3383,37 @@ spec:
                                    by referencing a secret.
                                  type: string
                              type: object
@@ -759,6 +736,29 @@ index 30baffe56..478c8baf6 100644
                            skipPhases:
                              description: |-
                                SkipPhases is a list of phases to skip during command execution.
+@@ -3261,6 +3434,22 @@ spec:
+                               may reject unrecognized values.
+                               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                             type: string
++                          bottlerocketBootstrap:
++                            description: |-
++                              BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  ImageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                type: string
++                              imageTag:
++                                description: |-
++                                  ImageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: |-
+                               CACertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 new file mode 100644
 index 000000000..e4be8d945
@@ -1333,10 +1333,10 @@ index 000000000..9118e28c4
 +	return strings.Repeat(" ", i) + strings.Join(split, ident)
 +}
 diff --git a/bootstrap/kubeadm/internal/cloudinit/cloudinit.go b/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
-index c2f158f7c..aaf8c5dc0 100644
+index 048ad0857..017b5433e 100644
 --- a/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
 +++ b/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
-@@ -59,8 +59,8 @@ type BaseUserData struct {
+@@ -62,8 +62,8 @@ type BaseUserData struct {
  }
  
  func (input *BaseUserData) prepare() error {
@@ -1347,10 +1347,10 @@ index c2f158f7c..aaf8c5dc0 100644
  	if input.UseExperimentalRetry {
  		input.KubeadmCommand = retriableJoinScriptName
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 183f99c1e..000a4c5bd 100644
+index af698cad8..7b501cdfe 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -43,6 +43,7 @@ import (
+@@ -45,6 +45,7 @@ import (
  
  	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
  	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
@@ -1358,7 +1358,7 @@ index 183f99c1e..000a4c5bd 100644
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/ignition"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/locking"
-@@ -472,6 +473,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -460,6 +461,46 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  	// injects into config.ClusterConfiguration values from top level object
  	r.reconcileTopLevelObjectSettings(ctx, scope.Cluster, machine, scope.Config)
  
@@ -1405,7 +1405,7 @@ index 183f99c1e..000a4c5bd 100644
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(scope.Config.Spec.ClusterConfiguration, parsedVersion)
  	if err != nil {
  		scope.Error(err, "Failed to marshal cluster configuration")
-@@ -543,6 +584,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -549,6 +590,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  			ControlPlaneInput: controlPlaneInput,
  			Ignition:          scope.Config.Spec.Ignition,
  		})
@@ -1418,7 +1418,7 @@ index 183f99c1e..000a4c5bd 100644
  	default:
  		bootstrapInitData, err = cloudinit.NewInitControlPlane(controlPlaneInput)
  	}
-@@ -651,6 +698,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -669,6 +716,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  			NodeInput: nodeInput,
  			Ignition:  scope.Config.Spec.Ignition,
  		})
@@ -1438,7 +1438,7 @@ index 183f99c1e..000a4c5bd 100644
  	default:
  		bootstrapJoinData, err = cloudinit.NewNode(nodeInput)
  	}
-@@ -757,6 +817,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -787,6 +847,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  			ControlPlaneJoinInput: controlPlaneJoinInput,
  			Ignition:              scope.Config.Spec.Ignition,
  		})
@@ -1537,7 +1537,7 @@ index 3f90b4611..2570daa4f 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
-index aeaaa3aff..17a1e2aec 100644
+index 00364f438..8d35388dd 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta1/zz_generated.deepcopy.go
 @@ -141,10 +141,29 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -1621,7 +1621,7 @@ index aeaaa3aff..17a1e2aec 100644
 +	return out
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-index 9a40da3b2..b39352d39 100644
+index 8730f2b34..454638c16 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 @@ -409,6 +409,9 @@ func autoConvert_upstreamv1beta2_ClusterConfiguration_To_v1beta1_ClusterConfigur
@@ -1634,7 +1634,7 @@ index 9a40da3b2..b39352d39 100644
  	if err := Convert_v1beta1_Etcd_To_upstreamv1beta2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -698,6 +701,9 @@ func Convert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *
+@@ -722,6 +725,9 @@ func Convert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *
  }
  
  func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -1645,7 +1645,7 @@ index 9a40da3b2..b39352d39 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index d849616cb..b487d3ba8 100644
+index 997be63a2..f94a9cb0f 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -413,6 +413,9 @@ func Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguratio
@@ -1658,7 +1658,7 @@ index d849616cb..b487d3ba8 100644
  	if err := Convert_v1beta1_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -690,6 +693,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
+@@ -719,6 +722,9 @@ func Convert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(in *
  }
  
  func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -1669,7 +1669,7 @@ index d849616cb..b487d3ba8 100644
  		return err
  	}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 1e87f3761..2fb57cc98 100644
+index 27ad7e0d8..a7853369c 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -198,6 +198,22 @@ spec:
@@ -1794,7 +1794,7 @@ index 1e87f3761..2fb57cc98 100644
                      type: object
                    mounts:
                      description: Mounts specifies a list of mount points to be setup.
-@@ -2604,6 +2698,22 @@ spec:
+@@ -2732,6 +2826,22 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -1817,7 +1817,7 @@ index 1e87f3761..2fb57cc98 100644
                        certificatesDir:
                          description: |-
                            CertificatesDir specifies where to store or look for all required certificates.
-@@ -2820,6 +2930,37 @@ spec:
+@@ -3207,6 +3317,37 @@ spec:
                                to "10.96.0.0/12" if that's unset.
                              type: string
                          type: object
@@ -1855,7 +1855,7 @@ index 1e87f3761..2fb57cc98 100644
                        scheduler:
                          description: Scheduler contains extra settings for the scheduler
                            control plane component
-@@ -3015,6 +3156,7 @@ spec:
+@@ -3530,6 +3671,7 @@ spec:
                      enum:
                      - cloud-config
                      - ignition
@@ -1863,30 +1863,7 @@ index 1e87f3761..2fb57cc98 100644
                      type: string
                    ignition:
                      description: Ignition contains Ignition specific configuration.
-@@ -3241,6 +3383,22 @@ spec:
-                           may reject unrecognized values.
-                           More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-                         type: string
-+                      bottlerocketBootstrap:
-+                        description: |-
-+                          BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-+                          This is only for bottlerocket
-+                        properties:
-+                          imageRepository:
-+                            description: |-
-+                              ImageRepository sets the container registry to pull images from.
-+                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                            type: string
-+                          imageTag:
-+                            description: |-
-+                              ImageTag allows to specify a tag for the image.
-+                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                            type: string
-+                        type: object
-                       caCertPath:
-                         description: |-
-                           CACertPath is the path to the SSL certificate authority used to
-@@ -3440,6 +3598,37 @@ spec:
+@@ -3742,6 +3884,37 @@ spec:
                                by referencing a secret.
                              type: string
                          type: object
@@ -1924,11 +1901,34 @@ index 1e87f3761..2fb57cc98 100644
                        skipPhases:
                          description: |-
                            SkipPhases is a list of phases to skip during command execution.
+@@ -3762,6 +3935,22 @@ spec:
+                           may reject unrecognized values.
+                           More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                         type: string
++                      bottlerocketBootstrap:
++                        description: |-
++                          BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              ImageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            type: string
++                          imageTag:
++                            description: |-
++                              ImageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: |-
+                           CACertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 082217777..54f1f373d 100644
+index f8eca78b0..8c27a3f6b 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -1287,6 +1287,22 @@ spec:
+@@ -1420,6 +1420,22 @@ spec:
                                    may reject unrecognized values.
                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                                  type: string
@@ -1951,7 +1951,7 @@ index 082217777..54f1f373d 100644
                                certificatesDir:
                                  description: |-
                                    CertificatesDir specifies where to store or look for all required certificates.
-@@ -1507,6 +1523,37 @@ spec:
+@@ -1910,6 +1926,37 @@ spec:
                                        to "10.96.0.0/12" if that's unset.
                                      type: string
                                  type: object
@@ -1989,7 +1989,7 @@ index 082217777..54f1f373d 100644
                                scheduler:
                                  description: Scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -1709,6 +1756,7 @@ spec:
+@@ -2245,6 +2292,7 @@ spec:
                              enum:
                              - cloud-config
                              - ignition
@@ -1997,30 +1997,7 @@ index 082217777..54f1f373d 100644
                              type: string
                            ignition:
                              description: Ignition contains Ignition specific configuration.
-@@ -1937,6 +1985,22 @@ spec:
-                                   may reject unrecognized values.
-                                   More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-                                 type: string
-+                              bottlerocketBootstrap:
-+                                description: |-
-+                                  BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-+                                  This is only for bottlerocket
-+                                properties:
-+                                  imageRepository:
-+                                    description: |-
-+                                      ImageRepository sets the container registry to pull images from.
-+                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                    type: string
-+                                  imageTag:
-+                                    description: |-
-+                                      ImageTag allows to specify a tag for the image.
-+                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                    type: string
-+                                type: object
-                               caCertPath:
-                                 description: |-
-                                   CACertPath is the path to the SSL certificate authority used to
-@@ -2138,6 +2202,37 @@ spec:
+@@ -2459,6 +2507,37 @@ spec:
                                        by referencing a secret.
                                      type: string
                                  type: object
@@ -2058,8 +2035,31 @@ index 082217777..54f1f373d 100644
                                skipPhases:
                                  description: |-
                                    SkipPhases is a list of phases to skip during command execution.
+@@ -2479,6 +2558,22 @@ spec:
+                                   may reject unrecognized values.
+                                   More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                                 type: string
++                              bottlerocketBootstrap:
++                                description: |-
++                                  BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      ImageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      ImageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    type: string
++                                type: object
+                               caCertPath:
+                                 description: |-
+                                   CACertPath is the path to the SSL certificate authority used to
 diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-index 5a9c2f8bf..4d45e86af 100644
+index 1e79a5223..e7ea1b6dc 100644
 --- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 +++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 @@ -575,6 +575,9 @@ func Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *C
@@ -2072,7 +2072,7 @@ index 5a9c2f8bf..4d45e86af 100644
  	if err := Convert_v1beta1_Etcd_To_v1alpha4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -968,6 +971,9 @@ func Convert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinCon
+@@ -992,6 +995,9 @@ func Convert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinCon
  }
  
  func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -2082,40 +2082,6 @@ index 5a9c2f8bf..4d45e86af 100644
  	if err := Convert_v1beta1_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1080,7 +1086,15 @@ func Convert_v1beta1_KubeadmConfigList_To_v1alpha4_KubeadmConfigList(in *v1beta1
- }
- 
- func autoConvert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *KubeadmConfigSpec, out *v1beta1.KubeadmConfigSpec, s conversion.Scope) error {
--	out.ClusterConfiguration = (*v1beta1.ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
-+	if in.ClusterConfiguration != nil {
-+		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
-+		*out = new(v1beta1.ClusterConfiguration)
-+		if err := Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(*in, *out, s); err != nil {
-+			return err
-+		}
-+	} else {
-+		out.ClusterConfiguration = nil
-+	}
- 	if in.InitConfiguration != nil {
- 		in, out := &in.InitConfiguration, &out.InitConfiguration
- 		*out = new(v1beta1.InitConfiguration)
-@@ -1138,7 +1152,15 @@ func Convert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *Kubeadm
- }
- 
- func autoConvert_v1beta1_KubeadmConfigSpec_To_v1alpha4_KubeadmConfigSpec(in *v1beta1.KubeadmConfigSpec, out *KubeadmConfigSpec, s conversion.Scope) error {
--	out.ClusterConfiguration = (*ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
-+	if in.ClusterConfiguration != nil {
-+		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
-+		*out = new(ClusterConfiguration)
-+		if err := Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(*in, *out, s); err != nil {
-+			return err
-+		}
-+	} else {
-+		out.ClusterConfiguration = nil
-+	}
- 	if in.InitConfiguration != nil {
- 		in, out := &in.InitConfiguration, &out.InitConfiguration
- 		*out = new(InitConfiguration)
 -- 
-2.42.0
+2.46.0
 

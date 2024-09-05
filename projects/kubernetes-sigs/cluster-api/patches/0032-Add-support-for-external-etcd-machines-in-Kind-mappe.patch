@@ -1,7 +1,7 @@
-From 1620bce645113e9e7fcf8f01cda4084c8df245e3 Mon Sep 17 00:00:00 2001
+From 605a799a74f591c64a1a909dbb899b1614ca6d70 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 16 Aug 2023 19:58:01 -0700
-Subject: [PATCH 32/37] Add support for external etcd machines in Kind mapper
+Subject: [PATCH 32/38] Add support for external etcd machines in Kind mapper
 
 ---
  .../client/cluster/objectgraph_test.go        |  2 +-
@@ -24,20 +24,20 @@ index 2b92ba3bc..48b617339 100644
  					objs := []client.Object{}
  					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
 diff --git a/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go b/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
-index 7e4726246..2b79c351c 100644
+index e455b931b..24597fa78 100644
 --- a/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
 +++ b/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
 @@ -99,7 +99,7 @@ func createDockerContainer(ctx context.Context, name string, cluster *clusterv1.
  	}
  
- 	log.Info("Creating container for machinePool", "name", name, "machinePool", machinePool.Name)
+ 	log.Info("Creating container for machinePool", "name", name, "MachinePool", klog.KObj(machinePool))
 -	if err := externalMachine.Create(ctx, dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, machinePool.Spec.Template.Spec.Version, labels, dockerMachinePool.Spec.Template.ExtraMounts); err != nil {
 +	if err := externalMachine.Create(ctx, dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, machinePool.Spec.Template.Spec.Version, labels, dockerMachinePool.Spec.Template.ExtraMounts, false); err != nil {
  		return errors.Wrapf(err, "failed to create docker machine with name %s", name)
  	}
  	return nil
 diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-index 029c5614b..cc9162212 100644
+index 6572b3851..9794a35cb 100644
 --- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 +++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 @@ -295,7 +295,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
@@ -83,7 +83,7 @@ index 029c5614b..cc9162212 100644
 -	return ok
 -}
 diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
-index daa98e4be..2e5f306b8 100644
+index b354ed894..3f02a3508 100644
 --- a/test/infrastructure/docker/internal/docker/machine.go
 +++ b/test/infrastructure/docker/internal/docker/machine.go
 @@ -48,6 +48,7 @@ import (
@@ -190,5 +190,5 @@ index daa98e4be..2e5f306b8 100644
  
  	kindMapping := kind.GetMapping(semVer, image)
 -- 
-2.42.0
+2.46.0
 
