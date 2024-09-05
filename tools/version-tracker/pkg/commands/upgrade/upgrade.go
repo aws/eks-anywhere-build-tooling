@@ -218,7 +218,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		var latestRevision string
 		var needsUpgrade bool
 		if projectName == "cilium/cilium" {
-			latestRevision, needsUpgrade, err = ecrpublic.GetLatestRevision(constants.CiliumImageRepository, currentRevision)
+			latestRevision, needsUpgrade, err = ecrpublic.GetLatestRevision(constants.CiliumImageRepository, currentRevision, branchName)
 			if err != nil {
 				return fmt.Errorf("getting latest revision from ECR Public: %v", err)
 			}
