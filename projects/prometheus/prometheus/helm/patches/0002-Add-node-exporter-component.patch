@@ -1,20 +1,20 @@
-From 860c4b5f83e9c4904c3810eada86937f0750a1b3 Mon Sep 17 00:00:00 2001
-From: "Ostosh, Ivy" <ivyjin215@gmail.com>
-Date: Mon, 28 Nov 2022 10:20:17 -0600
-Subject: [PATCH 2/6] Add node-exporter component
+From 07b9cb50b5708d550f14b22f0d0e5f8d3e5fb34b Mon Sep 17 00:00:00 2001
+From: Jhaanvi Golani <jhaanvi@amazon.com>
+Date: Fri, 23 Aug 2024 14:07:54 -0700
+Subject: [PATCH] Add node-exporter component
 
 ---
  charts/prometheus/templates/NOTES.txt         |  10 +
  charts/prometheus/templates/_helpers.tpl      |  45 ++++
  charts/prometheus/templates/cm.yaml           |   1 -
- .../templates/node-exporter/daemonset.yaml    | 150 +++++++++++++
+ .../templates/node-exporter/daemonset.yaml    | 150 +++++++++++
  .../templates/node-exporter/psp.yaml          |  57 +++++
  .../templates/node-exporter/role.yaml         |  17 ++
  .../templates/node-exporter/rolebinding.yaml  |  19 ++
  .../node-exporter/serviceaccount.yaml         |  11 +
  .../templates/node-exporter/svc.yaml          |  47 ++++
- charts/prometheus/values.yaml                 | 210 +++++++++++++-----
- 10 files changed, 507 insertions(+), 60 deletions(-)
+ charts/prometheus/values.yaml                 | 241 +++++++++++-------
+ 10 files changed, 508 insertions(+), 90 deletions(-)
  create mode 100644 charts/prometheus/templates/node-exporter/daemonset.yaml
  create mode 100644 charts/prometheus/templates/node-exporter/psp.yaml
  create mode 100644 charts/prometheus/templates/node-exporter/role.yaml
@@ -466,7 +466,7 @@ index 00000000..dad0130a
 +  type: "{{ .Values.nodeExporter.service.type }}"
 +{{- end -}}
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index 27dc52e8..701996da 100644
+index ccfcb14d..3b6d495a 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
 @@ -15,6 +15,10 @@ imagePullSecrets: []
@@ -480,7 +480,7 @@ index 27dc52e8..701996da 100644
    server:
      create: true
      name: ""
-@@ -27,75 +31,163 @@ serviceAccounts:
+@@ -27,104 +31,163 @@ serviceAccounts:
  ## Additional labels to attach to all resources
  commonMetaLabels: {}
  
@@ -527,23 +527,33 @@ index 27dc52e8..701996da 100644
 -    ##
 -    image:
 -      repository: quay.io/prometheus-operator/prometheus-config-reloader
--      tag: v0.73.2
+-      tag: v0.75.2
 -      # When digest is set to a non-empty value, images will be pulled by digest (regardless of tag value).
 -      digest: ""
 -      pullPolicy: IfNotPresent
-+  ## If true, node-exporter pods mounts host / at /host/root
-+  ##
-+  hostRootfs: true
- 
--    # containerPort: 9533
-+  ## node-exporter container name
-+  ##
-+  name: node-exporter
- 
+-
+-    ## config-reloader's container port and port name for probes and metrics
+-    containerPort: 8080
+-    containerPortName: metrics
+-
 -    ## Additional configmap-reload container arguments
 -    ## Set to null for argumentless flags
 -    ##
 -    extraArgs: {}
++  ## If true, node-exporter pods mounts host / at /host/root
++  ##
++  hostRootfs: true
+ 
+-    ## Additional configmap-reload volume directories
+-    ##
+-    extraVolumeDirs: []
++  ## node-exporter container name
++  ##
++  name: node-exporter
+ 
+-    ## Additional configmap-reload volume mounts
+-    ##
+-    extraVolumeMounts: []
 +  ## node-exporter container image
 +  ##
 +  image:
@@ -551,9 +561,21 @@ index 27dc52e8..701996da 100644
 +    tag: v1.3.1
 +    pullPolicy: IfNotPresent
  
--    ## Additional configmap-reload volume directories
+-    ## Additional configmap-reload mounts
 -    ##
--    extraVolumeDirs: []
+-    extraConfigmapMounts: []
+-      # - name: prometheus-alerts
+-      #   mountPath: /etc/alerts.d
+-      #   subPath: ""
+-      #   configMap: prometheus-alerts
+-      #   readOnly: true
+-
+-    ## Security context to be added to configmap-reload container
+-    containerSecurityContext: {}
+-
+-    ## Settings for Prometheus reloader's readiness, liveness and startup probes
+-    ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+-    ##
 +  ## Specify if a Pod Security Policy for node-exporter must be created
 +  ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
 +  ##
@@ -568,27 +590,35 @@ index 27dc52e8..701996da 100644
 +      # seccomp.security.alpha.kubernetes.io/defaultProfileName: 'docker/default'
 +      # apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
  
--    ## Additional configmap-reload volume mounts
--    ##
--    extraVolumeMounts: []
-+  ## node-exporter priorityClassName
-+  ##
-+  priorityClassName: ""
- 
--    ## Additional configmap-reload mounts
--    ##
--    extraConfigmapMounts: []
--      # - name: prometheus-alerts
--      #   mountPath: /etc/alerts.d
--      #   subPath: ""
--      #   configMap: prometheus-alerts
--      #   readOnly: true
+-    livenessProbe:
+-      httpGet:
+-        path: /healthz
+-        port: metrics
+-        scheme: HTTP
+-      periodSeconds: 10
+-      initialDelaySeconds: 2
 -
--    ## Security context to be added to configmap-reload container
--    containerSecurityContext: {}
+-    readinessProbe:
+-      httpGet:
+-        path: /healthz
+-        port: metrics
+-        scheme: HTTP
+-      periodSeconds: 10
+-
+-    startupProbe:
+-      enabled: false
+-      httpGet:
+-        path: /healthz
+-        port: metrics
+-        scheme: HTTP
+-      periodSeconds: 10
 -
 -    ## configmap-reload resource requests and limits
 -    ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
++  ## node-exporter priorityClassName
++  ##
++  priorityClassName: ""
++
 +  ## Custom Update Strategy
 +  ##
 +  updateStrategy:
