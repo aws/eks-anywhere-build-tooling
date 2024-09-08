@@ -1,4 +1,4 @@
-From 56adab19686da6cb98b61d3286531d4e0b49bb7d Mon Sep 17 00:00:00 2001
+From b955446b9e03c0958c6e1e8a54e5021437689e66 Mon Sep 17 00:00:00 2001
 From: Jhaanvi Golani <jhaanvi@amazon.com>
 Date: Mon, 11 Mar 2024 17:32:24 -0700
 Subject: [PATCH] Support re-assignment of another failure domain when the
@@ -18,6 +18,7 @@ Signed-off-by: Jhaanvi Golani <jhaanvi@amazon.com>
  ...loudstackmachinestatechecker_controller.go |   2 +-
  controllers/controllers_suite_test.go         |  18 +-
  controllers/utils/failuredomains.go           |  44 +--
+ metadata.yaml                                 |   2 +-
  pkg/cloud/instance.go                         |  76 +++--
  pkg/cloud/network.go                          |  24 ++
  pkg/errors/cloudstack.go                      |  85 +++++
@@ -29,7 +30,7 @@ Signed-off-by: Jhaanvi Golani <jhaanvi@amazon.com>
  pkg/failuredomains/client_test.go             | 159 +++++++++
  .../failuredomains_suite_test.go              |  33 ++
  pkg/metrics/metrics.go                        |  22 +-
- 23 files changed, 1244 insertions(+), 109 deletions(-)
+ 24 files changed, 1245 insertions(+), 110 deletions(-)
  create mode 100644 pkg/errors/cloudstack.go
  create mode 100644 pkg/errors/cloudstack_test.go
  create mode 100644 pkg/errors/errors_suite_test.go
@@ -108,7 +109,7 @@ index 83ecdc6..187e51c 100644
  - apiGroups:
    - cluster.x-k8s.io
 diff --git a/controllers/cks_cluster_controller.go b/controllers/cks_cluster_controller.go
-index 2511651..b69a748 100644
+index 2511651..05d22ab 100644
 --- a/controllers/cks_cluster_controller.go
 +++ b/controllers/cks_cluster_controller.go
 @@ -75,7 +75,7 @@ func (r *CksClusterReconciliationRunner) Reconcile() (res ctrl.Result, reterr er
@@ -116,7 +117,7 @@ index 2511651..b69a748 100644
  	controllerutil.AddFinalizer(r.ReconciliationSubject, CksClusterFinalizer)
  
 -	res, err := r.AsFailureDomainUser(&r.FailureDomains.Items[0].Spec)()
-+	res, err := r.AsFailureDomainUser(context.Background(), &r.FailureDomains.Items[0].Spec)()
++	res, err := r.AsFailureDomainUser(r.RequestCtx, &r.FailureDomains.Items[0].Spec)()
  	if r.ShouldReturn(res, err) {
  		return res, err
  	}
@@ -125,12 +126,12 @@ index 2511651..b69a748 100644
  			return ctrl.Result{}, fmt.Errorf("no failure domains found")
  		}
 -		res, err := r.AsFailureDomainUser(&r.FailureDomains.Items[0].Spec)()
-+		res, err := r.AsFailureDomainUser(context.Background(), &r.FailureDomains.Items[0].Spec)()
++		res, err := r.AsFailureDomainUser(r.RequestCtx, &r.FailureDomains.Items[0].Spec)()
  		if r.ShouldReturn(res, err) {
  			return res, err
  		}
 diff --git a/controllers/cks_machine_controller.go b/controllers/cks_machine_controller.go
-index 574f932..f7f40d4 100644
+index 574f932..f8a8119 100644
 --- a/controllers/cks_machine_controller.go
 +++ b/controllers/cks_machine_controller.go
 @@ -63,7 +63,7 @@ func (reconciler *CksMachineReconciler) Reconcile(ctx context.Context, req ctrl.
@@ -138,7 +139,7 @@ index 574f932..f7f40d4 100644
  	r.WithAdditionalCommonStages(
  		r.GetFailureDomainByName(func() string { return r.ReconciliationSubject.Spec.FailureDomainName }, r.FailureDomain),
 -		r.AsFailureDomainUser(&r.FailureDomain.Spec))
-+		r.AsFailureDomainUser(ctx, &r.FailureDomain.Spec))
++		r.AsFailureDomainUser(r.RequestCtx, &r.FailureDomain.Spec))
  	return r.RunBaseReconciliationStages()
  }
  
@@ -147,7 +148,7 @@ index 574f932..f7f40d4 100644
  	controllerutil.AddFinalizer(r.ReconciliationSubject, CksMachineFinalizer)
  
 -	res, err := r.AsFailureDomainUser(&r.FailureDomain.Spec)()
-+	res, err := r.AsFailureDomainUser(context.Background(), &r.FailureDomain.Spec)()
++	res, err := r.AsFailureDomainUser(r.RequestCtx, &r.FailureDomain.Spec)()
  	if r.ShouldReturn(res, err) {
  		return res, err
  	}
@@ -556,6 +557,17 @@ index bf66c25..5ca3e97 100644
 +func (c *CloudClientImplementation) GetCloudClientAndUser(ctx context.Context, fdSpec *infrav1.CloudStackFailureDomainSpec) (csClient cloud.Client, csUser cloud.Client, err error) {
 +	return c.fdClientFactory.GetCloudClientAndUser(ctx, fdSpec)
 +}
+diff --git a/metadata.yaml b/metadata.yaml
+index bd61395..a030a70 100644
+--- a/metadata.yaml
++++ b/metadata.yaml
+@@ -7,5 +7,5 @@ apiVersion: clusterctl.cluster.x-k8s.io/v1alpha3
+ kind: Metadata
+ releaseSeries:
+   - major: 0
+-    minor: 4
++    minor: 5
+     contract: v1beta1
 diff --git a/pkg/cloud/instance.go b/pkg/cloud/instance.go
 index 6fb5857..e622920 100644
 --- a/pkg/cloud/instance.go
