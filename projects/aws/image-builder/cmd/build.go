@@ -49,7 +49,7 @@ func init() {
 	buildCmd.Flags().StringVar(&cloudstackConfigFile, "cloudstack-config", "", "Path to CloudStack Config file")
 	buildCmd.Flags().StringVar(&amiConfigFile, "ami-config", "", "Path to AMI Config file")
 	buildCmd.Flags().StringVar(&additionalFilesConfigFile, "files-config", "", "Path to Config file specifying additional files to be copied into EKS-A node image")
-	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-27", "EKS-D Release channel for node image. Can be 1-24, 1-25, 1-26, 1-27 or 1-28")
+	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-31", "EKS-D Release channel for node image. Can be 1-27, 1-28, 1-29, 1-30 or 1-31")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA & Raw, and Redhat 9 RAW builds.")
 	buildCmd.Flags().StringVar(&bo.EKSAReleaseVersion, "eksa-release", "", "The EKS-A CLI version to build images for")
