@@ -188,6 +188,18 @@ var (
 
 	// ProjectGoVersionSourceOfTruth is the mapping of project name to Go version source of truth files configuration.
 	ProjectGoVersionSourceOfTruth = map[string]types.GoVersionSourceOfTruth{
+		"apache/cloudstack-cloudmonkey": {
+			SourceOfTruthFile:     ".github/workflows/build.yml",
+			GoVersionSearchString: `go-version: (1\.\d\d)`,
+		},
+		"aquasecurity/harbor-scanner-trivy": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
+		"aquasecurity/trivy": {
+			SourceOfTruthFile:     "Dockerfile.protoc",
+			GoVersionSearchString: `golang:(1\.\d\d)`,
+		},
 		"aws/etcdadm-bootstrap-provider": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
@@ -196,21 +208,33 @@ var (
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
+		"aws/rolesanywhere-credential-helper": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
+		},
 		"brancz/kube-rbac-proxy": {
 			SourceOfTruthFile:     ".github/workflows/build.yml",
-			GoVersionSearchString: `go-version: '(1\.\d\d)\.\d+'`,
+			GoVersionSearchString: `go-version: '(1\.\d\d)'`,
 		},
 		"cert-manager/cert-manager": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
+		"containerd/containerd": {
+			SourceOfTruthFile:     ".github/workflows/release.yml",
+			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)"`,
+		},
+		"distribution/distribution": {
+			SourceOfTruthFile:     "Dockerfile",
+			GoVersionSearchString: `ARG GO_VERSION=(1\.\d\d)`,
+		},
 		"emissary-ingress/emissary": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
-		"goharbor/harbor": {
-			SourceOfTruthFile:     "Makefile",
-			GoVersionSearchString: `GOBUILDIMAGE=golang:(1\.\d\d)`,
+		"fluxcd/flux2": {
+			SourceOfTruthFile:     ".github/workflows/release.yaml",
+			GoVersionSearchString: `go-version: (1\.\d\d)`,
 		},
 		"fluxcd/helm-controller": {
 			SourceOfTruthFile:     "Dockerfile",
@@ -228,6 +252,14 @@ var (
 			SourceOfTruthFile:     "Dockerfile",
 			GoVersionSearchString: `ARG GO_VERSION=(1\.\d\d)`,
 		},
+		"goharbor/harbor": {
+			SourceOfTruthFile:     "Makefile",
+			GoVersionSearchString: `GOBUILDIMAGE=golang:(1\.\d\d)`,
+		},
+		"helm/helm": {
+			SourceOfTruthFile:     ".github/workflows/release.yaml",
+			GoVersionSearchString: `go-version: '(1\.\d\d)'`,
+		},
 		"kube-vip/kube-vip": {
 			SourceOfTruthFile:     "Dockerfile",
 			GoVersionSearchString: `golang:(1\.\d\d)`,
@@ -244,17 +276,33 @@ var (
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
+		"kubernetes-sigs/cluster-api": {
+			SourceOfTruthFile:     "Makefile",
+			GoVersionSearchString: `GO_VERSION \?= (1\.\d\d)`,
+		},
 		"kubernetes-sigs/cluster-api-provider-cloudstack": {
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
 		"kubernetes-sigs/cluster-api-provider-vsphere": {
 			SourceOfTruthFile:     "Makefile",
-			GoVersionSearchString: `GO_VERSION \?= (1\.\d\d)\.\d+`,
+			GoVersionSearchString: `GO_VERSION \?= (1\.\d\d)`,
+		},
+		"kubernetes-sigs/cri-tools": {
+			SourceOfTruthFile:     ".github/workflows/release.yml",
+			GoVersionSearchString: `go-version: '(1\.\d\d)'`,
 		},
 		"kubernetes-sigs/etcdadm": {
 			SourceOfTruthFile:     "Makefile",
 			GoVersionSearchString: `GO_IMAGE \?= golang:(1\.\d\d)`,
+		},
+		"kubernetes-sigs/kind": {
+			SourceOfTruthFile:     ".go-version",
+			GoVersionSearchString: `(1\.\d\d)`,
+		},
+		"metallb/metallb": {
+			SourceOfTruthFile:     "controller/Dockerfile",
+			GoVersionSearchString: `golang:(1\.\d\d)`,
 		},
 		"nutanix-cloud-native/cluster-api-provider-nutanix": {
 			SourceOfTruthFile:     "go.mod",
@@ -264,9 +312,13 @@ var (
 			SourceOfTruthFile:     "go.mod",
 			GoVersionSearchString: `go (1\.\d\d)`,
 		},
-		"metallb/metallb": {
-			SourceOfTruthFile:     "go.mod",
-			GoVersionSearchString: `go (1\.\d\d)`,
+		"opencontainers/runc": {
+			SourceOfTruthFile:     "Dockerfile",
+			GoVersionSearchString: `ARG GO_VERSION=(1\.\d\d)`,
+		},
+		"prometheus/node_exporter": {
+			SourceOfTruthFile:     ".promu.yml",
+			GoVersionSearchString: `version: (1\.\d\d)`,
 		},
 		"prometheus/prometheus": {
 			SourceOfTruthFile:     ".promu.yml",
@@ -275,6 +327,10 @@ var (
 		"rancher/local-path-provisioner": {
 			SourceOfTruthFile:     "Dockerfile.dapper",
 			GoVersionSearchString: `golang:(1\.\d\d)`,
+		},
+		"replicatedhq/troubleshoot": {
+			SourceOfTruthFile:     ".github/workflows/build-test-deploy.yaml",
+			GoVersionSearchString: `go-version: "(1\.\d\d)"`,
 		},
 		"tinkerbell/boots": {
 			SourceOfTruthFile:     "go.mod",
@@ -291,6 +347,10 @@ var (
 		"tinkerbell/tink": {
 			SourceOfTruthFile:     ".github/workflows/ci.yaml",
 			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)"`,
+		},
+		"vmware/govmomi": {
+			SourceOfTruthFile:     ".github/workflows/govmomi-release.yaml",
+			GoVersionSearchString: `go-version: '(1\.\d\d)'`,
 		},
 	}
 
@@ -311,6 +371,7 @@ var (
 	UpstreamPackagesProjects = []string{
 		"aquasecurity/harbor-scanner-trivy",
 		"aquasecurity/trivy",
+		"aws/rolesanywhere-credential-helper",
 		"aws-containers/hello-eks-anywhere",
 		"aws-observability/aws-otel-collector",
 		"distribution/distribution",
