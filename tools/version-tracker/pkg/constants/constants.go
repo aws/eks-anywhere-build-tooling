@@ -190,7 +190,7 @@ var (
 	ProjectGoVersionSourceOfTruth = map[string]types.GoVersionSourceOfTruth{
 		"apache/cloudstack-cloudmonkey": {
 			SourceOfTruthFile:     ".github/workflows/build.yml",
-			GoVersionSearchString: `go-version: (1\.\d\d)\.x`,
+			GoVersionSearchString: `go-version: (1\.\d\d)`,
 		},
 		"aquasecurity/harbor-scanner-trivy": {
 			SourceOfTruthFile:     "go.mod",
@@ -214,7 +214,7 @@ var (
 		},
 		"brancz/kube-rbac-proxy": {
 			SourceOfTruthFile:     ".github/workflows/build.yml",
-			GoVersionSearchString: `go-version: '(1\.\d\d)\.\d+'`,
+			GoVersionSearchString: `go-version: '(1\.\d\d)'`,
 		},
 		"cert-manager/cert-manager": {
 			SourceOfTruthFile:     "go.mod",
@@ -222,7 +222,7 @@ var (
 		},
 		"containerd/containerd": {
 			SourceOfTruthFile:     ".github/workflows/release.yml",
-			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)\.\d+"`,
+			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)"`,
 		},
 		"distribution/distribution": {
 			SourceOfTruthFile:     "Dockerfile",
@@ -234,7 +234,7 @@ var (
 		},
 		"fluxcd/flux2": {
 			SourceOfTruthFile:     ".github/workflows/release.yaml",
-			GoVersionSearchString: `go-version: (1\.\d\d)\.x`,
+			GoVersionSearchString: `go-version: (1\.\d\d)`,
 		},
 		"fluxcd/helm-controller": {
 			SourceOfTruthFile:     "Dockerfile",
@@ -278,7 +278,7 @@ var (
 		},
 		"kubernetes-sigs/cluster-api": {
 			SourceOfTruthFile:     "Makefile",
-			GoVersionSearchString: `GO_VERSION \?= (1\.\d\d)\.\d+`,
+			GoVersionSearchString: `GO_VERSION \?= (1\.\d\d)`,
 		},
 		"kubernetes-sigs/cluster-api-provider-cloudstack": {
 			SourceOfTruthFile:     "go.mod",
@@ -286,7 +286,7 @@ var (
 		},
 		"kubernetes-sigs/cluster-api-provider-vsphere": {
 			SourceOfTruthFile:     "Makefile",
-			GoVersionSearchString: `GO_VERSION \?= (1\.\d\d)\.\d+`,
+			GoVersionSearchString: `GO_VERSION \?= (1\.\d\d)`,
 		},
 		"kubernetes-sigs/cri-tools": {
 			SourceOfTruthFile:     ".github/workflows/release.yml",
@@ -298,7 +298,7 @@ var (
 		},
 		"kubernetes-sigs/kind": {
 			SourceOfTruthFile:     ".go-version",
-			GoVersionSearchString: `(1\.\d\d)\.\d+`,
+			GoVersionSearchString: `(1\.\d\d)`,
 		},
 		"metallb/metallb": {
 			SourceOfTruthFile:     "controller/Dockerfile",
