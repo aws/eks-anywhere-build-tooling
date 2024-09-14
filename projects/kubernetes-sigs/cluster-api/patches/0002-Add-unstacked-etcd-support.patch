@@ -1,7 +1,7 @@
-From dd9d69b37580189667bdaa1a538436fb8b36b02a Mon Sep 17 00:00:00 2001
+From 37cad853d2554664b634ee982d3cb3da34f76e9f Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 02/41] Add unstacked etcd support
+Subject: [PATCH 02/40] Add unstacked etcd support
 
 Unstacked etcd: API and config changes
 
@@ -209,10 +209,10 @@ index ea9c742ab..61270d3a7 100644
  		}
  	}
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index f052a5b8e..f480229a3 100644
+index f8bd0a426..ab514c177 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -169,6 +169,45 @@ spec:
+@@ -174,6 +174,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -258,7 +258,7 @@ index f052a5b8e..f480229a3 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -261,6 +300,15 @@ spec:
+@@ -391,6 +430,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -274,7 +274,7 @@ index f052a5b8e..f480229a3 100644
                observedGeneration:
                  description: ObservedGeneration is the latest generation observed
                    by the controller.
-@@ -432,6 +480,45 @@ spec:
+@@ -569,6 +617,45 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -320,7 +320,7 @@ index f052a5b8e..f480229a3 100644
                paused:
                  description: Paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -1627,6 +1714,15 @@ spec:
+@@ -1369,6 +1456,15 @@ spec:
                  description: InfrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -1062,7 +1062,7 @@ index 0bcaaa1d0..f3586efa5 100644
 +	}
 +}
 diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
-index 8c197b4c1..e22977cc0 100644
+index 5e34f8904..8eae496e0 100644
 --- a/internal/controllers/machine/machine_controller_phases.go
 +++ b/internal/controllers/machine/machine_controller_phases.go
 @@ -19,6 +19,7 @@ package machine
@@ -1073,7 +1073,7 @@ index 8c197b4c1..e22977cc0 100644
  	"time"
  
  	"github.com/pkg/errors"
-@@ -68,6 +69,13 @@ func (r *Reconciler) reconcilePhase(_ context.Context, m *clusterv1.Machine) {
+@@ -70,6 +71,13 @@ func (r *Reconciler) reconcilePhase(_ context.Context, m *clusterv1.Machine) {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
  	}
  
@@ -1087,7 +1087,7 @@ index 8c197b4c1..e22977cc0 100644
  	// Set the phase to "failed" if any of Status.FailureReason or Status.FailureMessage is not-nil.
  	if m.Status.FailureReason != nil || m.Status.FailureMessage != nil {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseFailed)
-@@ -321,6 +329,113 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+@@ -307,6 +315,113 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
  		return ctrl.Result{}, errors.Wrapf(err, "failed to retrieve addresses from infrastructure provider for Machine %q in namespace %q", m.Name, m.Namespace)
  	}
  
@@ -1256,7 +1256,7 @@ index 68b3553ff..30128dcc4 100644
 +	return ok
 +}
 diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
-index 735965451..2b2fb31bd 100644
+index 12c2e20f8..ec46466ec 100644
 --- a/util/collections/machine_filters.go
 +++ b/util/collections/machine_filters.go
 @@ -122,6 +122,18 @@ func ControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) b
@@ -1278,7 +1278,7 @@ index 735965451..2b2fb31bd 100644
  // AdoptableControlPlaneMachines returns a filter to find all un-controlled control plane machines.
  // Usage: GetFilteredMachinesForCluster(ctx, client, cluster, AdoptableControlPlaneMachines(cluster.Name, controlPlane)).
  func AdoptableControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) bool {
-@@ -261,6 +273,20 @@ func ControlPlaneSelectorForCluster(clusterName string) labels.Selector {
+@@ -225,6 +237,20 @@ func ControlPlaneSelectorForCluster(clusterName string) labels.Selector {
  	)
  }
  
@@ -1344,5 +1344,5 @@ index d72947ecf..e830011d9 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.46.0
+2.39.3 (Apple Git-145)
 
