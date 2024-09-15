@@ -1,4 +1,4 @@
-From a177aee3c9bcc91607d93d74eb9d9422f4e81a12 Mon Sep 17 00:00:00 2001
+From eba35ef79315a9b19e4eb8b6bc7d53bf91404456 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Fri, 23 Jun 2023 10:50:08 -0500
 Subject: [PATCH 4/9] Ubuntu 22.04 support and improvements
@@ -6,10 +6,16 @@ Subject: [PATCH 4/9] Ubuntu 22.04 support and improvements
 - adds support for raw ubuntu 22.04 builds
 - Ubuntu switch to offline-install when mirrors are unavailable
 - sets OS_VERSION for goss validation on raw image builds
+- bump Ubuntu 22.04 patch version to 22.04.5
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
  images/capi/Makefile                          |   6 +-
+ images/capi/packer/ova/ubuntu-2204-efi.json   |   4 +-
+ images/capi/packer/ova/ubuntu-2204.json       |   4 +-
+ images/capi/packer/proxmox/ubuntu-2204.json   |   4 +-
+ .../packer/qemu/qemu-ubuntu-2204-efi.json     |   4 +-
+ images/capi/packer/qemu/qemu-ubuntu-2204.json |   4 +-
  .../raw/linux/ubuntu/http/22.04.efi/meta-data |   0
  .../raw/linux/ubuntu/http/22.04.efi/user-data | 115 ++++++++++++++++++
  .../raw/linux/ubuntu/http/22.04/meta-data     |   0
@@ -19,7 +25,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  images/capi/packer/raw/raw-ubuntu-2004.json   |   1 +
  .../capi/packer/raw/raw-ubuntu-2204-efi.json  |  14 +++
  images/capi/packer/raw/raw-ubuntu-2204.json   |  13 ++
- 10 files changed, 244 insertions(+), 1 deletion(-)
+ 15 files changed, 254 insertions(+), 11 deletions(-)
  create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data
  create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
  create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04/meta-data
@@ -58,6 +64,86 @@ index 143c83999..152d33da6 100644
  validate-raw-rhel-8: ## Validates RHEL 8 RAW image packer config
  validate-raw-all: $(RAW_VALIDATE_TARGETS) ## Validates all RAW Packer config
  
+diff --git a/images/capi/packer/ova/ubuntu-2204-efi.json b/images/capi/packer/ova/ubuntu-2204-efi.json
+index ffd4bf6c8..67ec60e7f 100644
+--- a/images/capi/packer/ova/ubuntu-2204-efi.json
++++ b/images/capi/packer/ova/ubuntu-2204-efi.json
+@@ -9,9 +9,9 @@
+   "firmware": "efi",
+   "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
+   "guest_os_type": "ubuntu-64",
+-  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
++  "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+   "iso_checksum_type": "sha256",
+-  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
+   "os_display_name": "Ubuntu 22.04",
+   "shutdown_command": "shutdown -P now",
+   "vsphere_guest_os_type": "ubuntu64Guest"
+diff --git a/images/capi/packer/ova/ubuntu-2204.json b/images/capi/packer/ova/ubuntu-2204.json
+index e436d93b9..7cadf0227 100644
+--- a/images/capi/packer/ova/ubuntu-2204.json
++++ b/images/capi/packer/ova/ubuntu-2204.json
+@@ -8,9 +8,9 @@
+   "distro_version": "22.04",
+   "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
+   "guest_os_type": "ubuntu-64",
+-  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
++  "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+   "iso_checksum_type": "sha256",
+-  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
+   "os_display_name": "Ubuntu 22.04",
+   "shutdown_command": "shutdown -P now",
+   "vsphere_guest_os_type": "ubuntu64Guest"
+diff --git a/images/capi/packer/proxmox/ubuntu-2204.json b/images/capi/packer/proxmox/ubuntu-2204.json
+index 78aacbb94..b604107c9 100644
+--- a/images/capi/packer/proxmox/ubuntu-2204.json
++++ b/images/capi/packer/proxmox/ubuntu-2204.json
+@@ -3,9 +3,9 @@
+   "build_name": "ubuntu-2204",
+   "distribution_version": "2204",
+   "distro_name": "ubuntu",
+-  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
++  "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+   "iso_checksum_type": "sha256",
+-  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
+   "os_display_name": "Ubuntu 22.04",
+   "source_image": "ubuntu-20-04-x64",
+   "unmount_iso": "true",
+diff --git a/images/capi/packer/qemu/qemu-ubuntu-2204-efi.json b/images/capi/packer/qemu/qemu-ubuntu-2204-efi.json
+index cde3d1109..0ec98faaa 100644
+--- a/images/capi/packer/qemu/qemu-ubuntu-2204-efi.json
++++ b/images/capi/packer/qemu/qemu-ubuntu-2204-efi.json
+@@ -5,9 +5,9 @@
+   "firmware": "OVMF.fd",
+   "guest_os_type": "ubuntu-64",
+   "http_directory": "./packer/qemu/linux/ubuntu/http/22.04.efi.qemu",
+-  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
++  "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+   "iso_checksum_type": "sha256",
+-  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
+   "os_display_name": "Ubuntu 22.04",
+   "shutdown_command": "shutdown -P now",
+   "unmount_iso": "true"
+diff --git a/images/capi/packer/qemu/qemu-ubuntu-2204.json b/images/capi/packer/qemu/qemu-ubuntu-2204.json
+index 9a114d361..3d6f350ac 100644
+--- a/images/capi/packer/qemu/qemu-ubuntu-2204.json
++++ b/images/capi/packer/qemu/qemu-ubuntu-2204.json
+@@ -4,9 +4,9 @@
+   "distribution_version": "2204",
+   "distro_name": "ubuntu",
+   "guest_os_type": "ubuntu-64",
+-  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
++  "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+   "iso_checksum_type": "sha256",
+-  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
+   "os_display_name": "Ubuntu 22.04",
+   "shutdown_command": "shutdown -P now",
+   "unmount_iso": "true"
 diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data
 new file mode 100644
 index 000000000..e69de29bb
@@ -323,7 +409,7 @@ index 9e78e6384..cbcfbc6f3 100644
    "iso_checksum_type": "sha256",
 diff --git a/images/capi/packer/raw/raw-ubuntu-2204-efi.json b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
 new file mode 100644
-index 000000000..8c4217c26
+index 000000000..faaf51674
 --- /dev/null
 +++ b/images/capi/packer/raw/raw-ubuntu-2204-efi.json
 @@ -0,0 +1,14 @@
@@ -335,15 +421,15 @@ index 000000000..8c4217c26
 +  "distro_version": "22.04",
 +  "firmware": "OVMF.fd",
 +  "guest_os_type": "ubuntu-64",
-+  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
++  "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
 +  "iso_checksum_type": "sha256",
-+  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
 +  "os_display_name": "Ubuntu 22.04",
 +  "shutdown_command": "shutdown -P now"
 +  }
 diff --git a/images/capi/packer/raw/raw-ubuntu-2204.json b/images/capi/packer/raw/raw-ubuntu-2204.json
 new file mode 100644
-index 000000000..9317900f5
+index 000000000..a0cc5c22d
 --- /dev/null
 +++ b/images/capi/packer/raw/raw-ubuntu-2204.json
 @@ -0,0 +1,13 @@
@@ -354,9 +440,9 @@ index 000000000..9317900f5
 +  "distro_name": "ubuntu",
 +  "distro_version": "22.04",
 +  "guest_os_type": "ubuntu-64",
-+  "iso_checksum": "45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2",
++  "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
 +  "iso_checksum_type": "sha256",
-+  "iso_url": "https://releases.ubuntu.com/22.04.4/ubuntu-22.04.4-live-server-amd64.iso",
++  "iso_url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-live-server-amd64.iso",
 +  "os_display_name": "Ubuntu 22.04",
 +  "shutdown_command": "shutdown -P now"
 +  }
