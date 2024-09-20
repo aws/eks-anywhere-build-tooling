@@ -1,0 +1,177 @@
+From 44750ef8da75a7d55b901896e2bc10226598de80 Mon Sep 17 00:00:00 2001
+From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
+Date: Thu, 19 Sep 2024 18:52:00 -0700
+Subject: [PATCH 12/12] Revert updating preseed and cloud-init to use CD for
+ boot files
+
+We are reverting the upstream change that updated preseed and cloud-init scripts
+to be obtained from CD, with the help of xorriso for image builds. We will continue
+to use floppy drives to mount the boot files until we add xorriso to the builder image.
+ 
+Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
+---
+ images/capi/Dockerfile                      | 2 --
+ images/capi/packer/ova/packer-node.json     | 4 ----
+ images/capi/packer/ova/photon-5.json        | 6 ++----
+ images/capi/packer/ova/ubuntu-2204-efi.json | 6 ++----
+ images/capi/packer/ova/ubuntu-2204.json     | 7 +++----
+ images/capi/packer/ova/ubuntu-2404-efi.json | 7 +++----
+ images/capi/packer/ova/ubuntu-2404.json     | 7 +++----
+ images/capi/scripts/ci-ova.sh               | 3 ---
+ 8 files changed, 13 insertions(+), 29 deletions(-)
+
+diff --git a/images/capi/Dockerfile b/images/capi/Dockerfile
+index 18a4dd00e..62e767c7d 100644
+--- a/images/capi/Dockerfile
++++ b/images/capi/Dockerfile
+@@ -31,8 +31,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+ 	wget \
+ 	qemu-system-x86 \
+ 	qemu-kvm \
+-	# Adding xorriso to create iso for mounting cd_drives which then can be used for bootstrapping node image
+-	xorriso \
+ 	&& useradd -ms /bin/bash imagebuilder \
+ 	&& apt-get purge --auto-remove -y \
+ 	&& rm -rf /var/lib/apt/lists/*
+diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
+index 3d0c3ed11..54e518181 100644
+--- a/images/capi/packer/ova/packer-node.json
++++ b/images/capi/packer/ova/packer-node.json
+@@ -203,8 +203,6 @@
+         "{{user `boot_command_suffix`}}"
+       ],
+       "boot_wait": "{{user `boot_wait`}}",
+-      "cd_files": "{{user `cd_content_location`}}",
+-      "cd_label": "{{user `cd_label`}}",
+       "cdrom_type": "{{user `cdrom_type`}}",
+       "cluster": "{{user `cluster`}}",
+       "communicator": "ssh",
+@@ -486,8 +484,6 @@
+     "block_nouveau_loading": "true",
+     "build_timestamp": "{{timestamp}}",
+     "build_version": "{{user `build_name`}}-kube-{{user `kubernetes_semver`}}",
+-    "cd_files": "{{user `cd_content_location`}}",
+-    "cd_label": "{{user `cd_label`}}",
+     "cdrom_adapter_type": "ide",
+     "cdrom_type": "ide",
+     "cluster": "",
+diff --git a/images/capi/packer/ova/photon-5.json b/images/capi/packer/ova/photon-5.json
+index 612c552c0..82b5fa949 100644
+--- a/images/capi/packer/ova/photon-5.json
++++ b/images/capi/packer/ova/photon-5.json
+@@ -1,10 +1,8 @@
+ {
+   "boot_command_prefix": "<esc><wait> vmlinuz initrd=initrd.img root/dev/ram0 loglevel=3 photon.media=cdrom ks=",
+-  "boot_command_suffix": " insecure_installation=1<enter><wait>",
+-  "boot_media_path": "/dev/sr1:/5/ks.json",
++  "boot_command_suffix": "/5/ks.json insecure_installation=1<enter><wait>",
++  "boot_media_path": "http://{{ .HTTPIP }}:{{ .HTTPPort }}",
+   "build_name": "photon-5",
+-  "cd_content_location": "./packer/ova/linux/{{user `distro_name`}}/http/*",
+-  "cd_label": "cidata",
+   "cdrom_type": "sata",
+   "distro_arch": "amd64",
+   "distro_name": "photon",
+diff --git a/images/capi/packer/ova/ubuntu-2204-efi.json b/images/capi/packer/ova/ubuntu-2204-efi.json
+index 85b548009..67ec60e7f 100644
+--- a/images/capi/packer/ova/ubuntu-2204-efi.json
++++ b/images/capi/packer/ova/ubuntu-2204-efi.json
+@@ -1,15 +1,13 @@
+ {
+-  "boot_command_prefix": "c<wait>linux /casper/vmlinuz ipv6.disable={{ user `boot_disable_ipv6` }} --- autoinstall ds='nocloud;'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
++  "boot_command_prefix": "c<wait>linux /casper/vmlinuz ipv6.disable={{ user `boot_disable_ipv6` }} --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/22.04.efi/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
+   "boot_disable_ipv6": "0",
+   "boot_media_path": "/media/HTTP",
+   "build_name": "ubuntu-2204-efi",
+-  "cd_content_location": "./packer/ova/linux/{{user `distro_name`}}/http/22.04.efi/*",
+-  "cd_label": "cidata",
+   "distro_arch": "amd64",
+   "distro_name": "ubuntu",
+   "distro_version": "22.04",
+   "firmware": "efi",
+-  "floppy_dirs": "",
++  "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
+   "guest_os_type": "ubuntu-64",
+   "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+   "iso_checksum_type": "sha256",
+diff --git a/images/capi/packer/ova/ubuntu-2204.json b/images/capi/packer/ova/ubuntu-2204.json
+index 85991d07c..7cadf0227 100644
+--- a/images/capi/packer/ova/ubuntu-2204.json
++++ b/images/capi/packer/ova/ubuntu-2204.json
+@@ -1,13 +1,12 @@
+ {
+-  "boot_command_prefix": "c<wait>linux /casper/vmlinuz ipv6.disable={{ user `boot_disable_ipv6` }} --- autoinstall ds='nocloud;'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
++  "boot_command_prefix": "c<wait>linux /casper/vmlinuz ipv6.disable={{ user `boot_disable_ipv6` }} --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/22.04/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
+   "boot_disable_ipv6": "0",
++  "boot_media_path": "/media/HTTP",
+   "build_name": "ubuntu-2204",
+-  "cd_content_location": "./packer/ova/linux/{{user `distro_name`}}/http/{{user `distro_version`}}/*",
+-  "cd_label": "cidata",
+   "distro_arch": "amd64",
+   "distro_name": "ubuntu",
+   "distro_version": "22.04",
+-  "floppy_dirs": "",
++  "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
+   "guest_os_type": "ubuntu-64",
+   "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+   "iso_checksum_type": "sha256",
+diff --git a/images/capi/packer/ova/ubuntu-2404-efi.json b/images/capi/packer/ova/ubuntu-2404-efi.json
+index bd97ca36e..6ec6e6176 100644
+--- a/images/capi/packer/ova/ubuntu-2404-efi.json
++++ b/images/capi/packer/ova/ubuntu-2404-efi.json
+@@ -1,14 +1,13 @@
+ {
+-  "boot_command_prefix": "c<wait>linux /casper/vmlinuz ipv6.disable={{ user `boot_disable_ipv6` }} --- autoinstall ds='nocloud;'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
++  "boot_command_prefix": "c<wait>linux /casper/vmlinuz ipv6.disable={{ user `boot_disable_ipv6` }} --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/24.04.efi/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
+   "boot_disable_ipv6": "0",
++  "boot_media_path": "/media/HTTP",
+   "build_name": "ubuntu-2404-efi",
+-  "cd_content_location": "./packer/ova/linux/{{user `distro_name`}}/http/24.04.efi/*",
+-  "cd_label": "cidata",
+   "distro_arch": "amd64",
+   "distro_name": "ubuntu",
+   "distro_version": "24.04",
+   "firmware": "efi",
+-  "floppy_dirs": "",
++  "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
+   "guest_os_type": "ubuntu-64",
+   "iso_checksum": "e240e4b801f7bb68c20d1356b60968ad0c33a41d00d828e74ceb3364a0317be9",
+   "iso_checksum_type": "sha256",
+diff --git a/images/capi/packer/ova/ubuntu-2404.json b/images/capi/packer/ova/ubuntu-2404.json
+index 200d18ea7..1289c31b0 100644
+--- a/images/capi/packer/ova/ubuntu-2404.json
++++ b/images/capi/packer/ova/ubuntu-2404.json
+@@ -1,13 +1,12 @@
+ {
+-  "boot_command_prefix": "c<wait>linux /casper/vmlinuz ipv6.disable={{ user `boot_disable_ipv6` }} --- autoinstall ds='nocloud;'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
++  "boot_command_prefix": "c<wait>linux /casper/vmlinuz ipv6.disable={{ user `boot_disable_ipv6` }} --- autoinstall ds='nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/24.04/'<enter><wait>initrd /casper/initrd<enter><wait>boot<enter>",
+   "boot_disable_ipv6": "0",
++  "boot_media_path": "/media/HTTP",
+   "build_name": "ubuntu-2404",
+-  "cd_content_location": "./packer/ova/linux/{{user `distro_name`}}/http/{{user `distro_version`}}/*",
+-  "cd_label": "cidata",
+   "distro_arch": "amd64",
+   "distro_name": "ubuntu",
+   "distro_version": "24.04",
+-  "floppy_dirs": "",
++  "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
+   "guest_os_type": "ubuntu-64",
+   "iso_checksum": "e240e4b801f7bb68c20d1356b60968ad0c33a41d00d828e74ceb3364a0317be9",
+   "iso_checksum_type": "sha256",
+diff --git a/images/capi/scripts/ci-ova.sh b/images/capi/scripts/ci-ova.sh
+index 683670a35..5794d876c 100755
+--- a/images/capi/scripts/ci-ova.sh
++++ b/images/capi/scripts/ci-ova.sh
+@@ -75,9 +75,6 @@ export GOVC_DATACENTER="SDDC-Datacenter"
+ export GOVC_CLUSTER="Cluster-1"
+ export GOVC_INSECURE=true
+ 
+-# Install xorriso which will be then used by packer to generate ISO for generating CD files
+-apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y xorriso
+-
+ # Run the vpn client in container
+ docker run --rm -d --name vpn -v "${HOME}/.openvpn/:${HOME}/.openvpn/" \
+   -w "${HOME}/.openvpn/" --cap-add=NET_ADMIN --net=host --device=/dev/net/tun \
+-- 
+2.46.1
+
