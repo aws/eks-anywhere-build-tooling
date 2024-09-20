@@ -27,8 +27,6 @@ IMAGE_FORMAT="$1"
 DEPENDENCY_YAML=$MAKE_ROOT/REQUIRED_DEPENDENCY_VERSIONS.yaml
 
 # python 3.9+ is already checked in upstream image-builder's ensure-python.sh
-# the goss binary's shasum is compared in upstream image-builder's ensure-goss.sh and if its 
-#  not the expected it is redownlaoded
 
 echo -e "\n\n************************************************"
 echo "The following are key dependencies and their current versions"
