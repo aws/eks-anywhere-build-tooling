@@ -1,7 +1,7 @@
-From 8d8f24162036f78f8a91a5f76b73ec23278a120e Mon Sep 17 00:00:00 2001
+From 9d44743a428515d1327df7e75d8a7fb34caf8bdc Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 18:36:56 -0800
-Subject: [PATCH 2/2] EKS-D support and changes
+Subject: [PATCH 02/11] EKS-D support and changes
 
 - Add goss validations for EKS-D artifacts
 - Add etcdadm and etcd.tar.gz to image for unstacked etcd support
@@ -140,13 +140,13 @@ index fd93b29d6..435797c65 100644
    "ansible_scp_extra_args": "{{env `ANSIBLE_SCP_EXTRA_ARGS`}}"
  }
 diff --git a/images/capi/packer/config/kubernetes.json b/images/capi/packer/config/kubernetes.json
-index b15ca8ab5..e6111f561 100644
+index e6ae7e3d9..ff84c58aa 100644
 --- a/images/capi/packer/config/kubernetes.json
 +++ b/images/capi/packer/config/kubernetes.json
 @@ -4,6 +4,9 @@
    "crictl_source_type": "pkg",
    "crictl_url": "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{user `crictl_version`}}/crictl-v{{user `crictl_version`}}-linux-{{user `crictl_arch`}}.tar.gz",
-   "crictl_version": "1.28.0",
+   "crictl_version": "1.29.0",
 +  "etcd_http_source":"",
 +  "etcd_version":"",
 +  "etcdadm_http_source":"",
@@ -156,10 +156,10 @@ index b15ca8ab5..e6111f561 100644
 @@ -18,6 +21,7 @@
    "kubernetes_rpm_repo": "https://pkgs.k8s.io/core:/stable:/{{ user `kubernetes_series` }}/rpm/",
    "kubernetes_rpm_repo_arch": "x86_64",
-   "kubernetes_rpm_version": "1.28.9",
-+  "kubernetes_full_version": "v1.28.9",
-   "kubernetes_semver": "v1.28.9",
-   "kubernetes_series": "v1.28",
+   "kubernetes_rpm_version": "1.29.7",
++  "kubernetes_full_version": "v1.29.7",
+   "kubernetes_semver": "v1.29.7",
+   "kubernetes_series": "v1.29",
    "kubernetes_source_type": "pkg",
 diff --git a/images/capi/packer/goss/goss-command.yaml b/images/capi/packer/goss/goss-command.yaml
 index aa2179c6d..36cebb4b3 100644
@@ -264,10 +264,10 @@ index 959005df8..2d88c2fb6 100644
        "version": "{{user `goss_version`}}"
      }
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index c9ede60bd..d95c44a3c 100644
+index 34e1f80b8..833b1cfae 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
-@@ -454,6 +454,11 @@
+@@ -456,6 +456,11 @@
          "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0  }}",
          "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
          "kubernetes_version": "{{user `kubernetes_semver` | replace \"v\" \"\" 1}}",
@@ -280,10 +280,10 @@ index c9ede60bd..d95c44a3c 100644
        },
        "version": "{{user `goss_version`}}"
 diff --git a/images/capi/packer/qemu/packer.json b/images/capi/packer/qemu/packer.json
-index 8c201c17d..e17436a9d 100644
+index e261a2a8a..f105863f8 100644
 --- a/images/capi/packer/qemu/packer.json
 +++ b/images/capi/packer/qemu/packer.json
-@@ -142,7 +142,12 @@
+@@ -148,7 +148,12 @@
          "kubernetes_deb_version": "{{ user `kubernetes_deb_version` }}",
          "kubernetes_rpm_version": "{{ split (user `kubernetes_rpm_version`) \"-\" 0  }}",
          "kubernetes_source_type": "{{user `kubernetes_source_type`}}",
@@ -316,5 +316,5 @@ index 1d52a5f98..29a3b34c2 100644
        "version": "{{user `goss_version`}}"
      }
 -- 
-2.45.2
+2.46.1
 

@@ -1,0 +1,48 @@
+From e0e456c1644f9f8eeef04ca95af8fd7046991077 Mon Sep 17 00:00:00 2001
+From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
+Date: Thu, 19 Sep 2024 16:04:19 -0700
+Subject: [PATCH 10/11] Remove containerd configuration for hosts.toml paths
+
+In EKS Anywhere, we're still using the older containerd config template (v2), so setting the
+config_path in the containerd config file causes errors like "invalid plugin config: `mirrors`
+cannot be set when `config_path` is provided" in registry mirror tests. Thus we're reverting the
+change that added the config path.
+
+Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
+---
+ images/capi/ansible/roles/containerd/tasks/main.yml          | 5 -----
+ .../roles/containerd/templates/etc/containerd/config.toml    | 2 --
+ 2 files changed, 7 deletions(-)
+
+diff --git a/images/capi/ansible/roles/containerd/tasks/main.yml b/images/capi/ansible/roles/containerd/tasks/main.yml
+index b3beb4b53..ffbd429d3 100644
+--- a/images/capi/ansible/roles/containerd/tasks/main.yml
++++ b/images/capi/ansible/roles/containerd/tasks/main.yml
+@@ -151,11 +151,6 @@
+     path: /etc/containerd
+     state: directory
+ 
+-- name: Creates containerd certificates directory
+-  ansible.builtin.file:
+-    path: /etc/containerd/certs.d
+-    state: directory
+-
+ - name: Copy in containerd config file {{ containerd_config_file }}
+   vars:
+     runtime_versions: "{{ containerd_wasm_shims_runtime_versions | from_json }}"
+diff --git a/images/capi/ansible/roles/containerd/templates/etc/containerd/config.toml b/images/capi/ansible/roles/containerd/templates/etc/containerd/config.toml
+index 0bae3b0d7..2066c4971 100644
+--- a/images/capi/ansible/roles/containerd/templates/etc/containerd/config.toml
++++ b/images/capi/ansible/roles/containerd/templates/etc/containerd/config.toml
+@@ -11,8 +11,6 @@ imports = ["/etc/containerd/conf.d/*.toml"]
+ [plugins]
+   [plugins."io.containerd.grpc.v1.cri"]
+     sandbox_image = "{{ pause_image }}"
+-  [plugins."io.containerd.grpc.v1.cri".registry]
+-    config_path = "/etc/containerd/certs.d"
+ {% if kubernetes_semver is version('v1.21.0', '>=') %}
+   [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+     runtime_type = "io.containerd.runc.v2"
+-- 
+2.46.1
+
