@@ -1,28 +1,25 @@
-From 4d04bfc5e05b2d4846b91e875935877a43a7b255 Mon Sep 17 00:00:00 2001
+From 038b8c5badb2654c3e146c0189cf0548f16de055 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Sun, 21 Nov 2021 20:59:58 -0800
-Subject: [PATCH 09/39] Add bottlerocket changes to capbk v1alpha4 api
+Subject: [PATCH 09/40] Add bottlerocket changes to capbk v1alpha4 api
 
 ---
- ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 119 ++++++++++
- ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 123 +++++++++++
- .../kubeadm/types/upstreamv1beta2/types.go    |  72 ++++++
- .../zz_generated.conversion.go                | 188 +++++++++++++++-
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 119 +++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 123 ++++++++++++
+ .../kubeadm/types/upstreamv1beta2/types.go    |  72 +++++++
+ .../zz_generated.conversion.go                | 188 +++++++++++++++++-
  .../upstreamv1beta2/zz_generated.deepcopy.go  |  75 +++++++
- .../kubeadm/types/upstreamv1beta3/types.go    |  72 ++++++
- .../zz_generated.conversion.go                | 188 +++++++++++++++-
+ .../kubeadm/types/upstreamv1beta3/types.go    |  72 +++++++
+ .../zz_generated.conversion.go                | 188 +++++++++++++++++-
  .../upstreamv1beta3/zz_generated.deepcopy.go  |  75 +++++++
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 123 +++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 123 +++++++++++
- .../kubeadm/v1alpha4/kubeadm_types.go         |  72 ++++++
- .../kubeadm/v1alpha4/kubeadmconfig_types.go   |   2 +-
- .../v1alpha4/zz_generated.conversion.go       | 208 +++++++++++++++---
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 123 ++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 123 ++++++++++++
  .../kubeadm/v1alpha4/zz_generated.deepcopy.go |  75 +++++++
  .../core/v1alpha4/zz_generated.deepcopy.go    |   5 +
- 15 files changed, 1477 insertions(+), 43 deletions(-)
+ 12 files changed, 1222 insertions(+), 16 deletions(-)
 
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index da0f86d84..f27cbc4a9 100644
+index ed2a24ead..a49a99666 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -1250,6 +1250,22 @@ spec:
@@ -180,7 +177,7 @@ index da0f86d84..f27cbc4a9 100644
                mounts:
                  description: Mounts specifies a list of mount points to be setup.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 8a1574b1d..19fed6b15 100644
+index 03dab318f..94ec55b20 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -1216,6 +1216,22 @@ spec:
@@ -439,7 +436,7 @@ index 413f6fe9b..ff9a01d04 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
-index 99cf9a8ff..ae1158152 100644
+index d6d86e67a..56db9e656 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.conversion.go
 @@ -88,6 +88,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -459,7 +456,7 @@ index 99cf9a8ff..ae1158152 100644
  	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
  		return Convert_v1beta1_ClusterConfiguration_To_upstreamv1beta2_ClusterConfiguration(a.(*v1beta1.ClusterConfiguration), b.(*ClusterConfiguration), scope)
  	}); err != nil {
-@@ -213,6 +223,36 @@ func RegisterConversions(s *runtime.Scheme) error {
+@@ -198,6 +208,36 @@ func RegisterConversions(s *runtime.Scheme) error {
  	}); err != nil {
  		return err
  	}
@@ -563,7 +560,7 @@ index 99cf9a8ff..ae1158152 100644
  	if err := Convert_v1beta1_Etcd_To_upstreamv1beta2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -677,6 +761,18 @@ func autoConvert_v1beta1_InitConfiguration_To_upstreamv1beta2_InitConfiguration(
+@@ -701,6 +785,18 @@ func autoConvert_v1beta1_InitConfiguration_To_upstreamv1beta2_InitConfiguration(
  }
  
  func autoConvert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinConfiguration, out *v1beta1.JoinConfiguration, s conversion.Scope) error {
@@ -582,7 +579,7 @@ index 99cf9a8ff..ae1158152 100644
  	if err := Convert_upstreamv1beta2_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -702,10 +798,18 @@ func Convert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *
+@@ -726,10 +822,18 @@ func Convert_upstreamv1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *
  }
  
  func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta2_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -605,8 +602,8 @@ index 99cf9a8ff..ae1158152 100644
  	if err := Convert_v1beta1_NodeRegistrationOptions_To_upstreamv1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -826,3 +930,71 @@ func autoConvert_v1beta1_NodeRegistrationOptions_To_upstreamv1beta2_NodeRegistra
- 	// WARNING: in.ImagePullPolicy requires manual conversion: does not exist in peer-type
+@@ -847,3 +951,71 @@ func autoConvert_v1beta1_NodeRegistrationOptions_To_upstreamv1beta2_NodeRegistra
+ 	// WARNING: in.ImagePullSerial requires manual conversion: does not exist in peer-type
  	return nil
  }
 +
@@ -678,7 +675,7 @@ index 99cf9a8ff..ae1158152 100644
 +	return autoConvert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta2_RegistryMirrorConfiguration(in, out, s)
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
-index c4cecbaad..1caece2f9 100644
+index 4ba216563..d6dc1e95c 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta2/zz_generated.deepcopy.go
 @@ -141,10 +141,30 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -876,7 +873,7 @@ index abc993a88..42bda5ca0 100644
  	// +optional
  	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index d9a815828..9b0c13356 100644
+index d9de44404..819d62b4b 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -88,6 +88,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -896,7 +893,7 @@ index d9a815828..9b0c13356 100644
  	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
  		return Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
  	}); err != nil {
-@@ -228,6 +238,36 @@ func RegisterConversions(s *runtime.Scheme) error {
+@@ -218,6 +228,36 @@ func RegisterConversions(s *runtime.Scheme) error {
  	}); err != nil {
  		return err
  	}
@@ -1000,7 +997,7 @@ index d9a815828..9b0c13356 100644
  	if err := Convert_v1beta1_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -672,6 +756,18 @@ func Convert_v1beta1_InitConfiguration_To_upstreamv1beta3_InitConfiguration(in *
+@@ -696,6 +780,18 @@ func Convert_v1beta1_InitConfiguration_To_upstreamv1beta3_InitConfiguration(in *
  }
  
  func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinConfiguration, out *v1beta1.JoinConfiguration, s conversion.Scope) error {
@@ -1019,7 +1016,7 @@ index d9a815828..9b0c13356 100644
  	if err := Convert_upstreamv1beta3_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -694,10 +790,18 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
+@@ -723,10 +819,18 @@ func Convert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(in *
  }
  
  func autoConvert_v1beta1_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -1042,7 +1039,7 @@ index d9a815828..9b0c13356 100644
  	if err := Convert_v1beta1_NodeRegistrationOptions_To_upstreamv1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -844,3 +948,71 @@ func autoConvert_v1beta1_Patches_To_upstreamv1beta3_Patches(in *v1beta1.Patches,
+@@ -870,3 +974,71 @@ func autoConvert_v1beta1_Patches_To_upstreamv1beta3_Patches(in *v1beta1.Patches,
  func Convert_v1beta1_Patches_To_upstreamv1beta3_Patches(in *v1beta1.Patches, out *Patches, s conversion.Scope) error {
  	return autoConvert_v1beta1_Patches_To_upstreamv1beta3_Patches(in, out, s)
  }
@@ -1115,7 +1112,7 @@ index d9a815828..9b0c13356 100644
 +	return autoConvert_v1beta1_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in, out, s)
 +}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
-index 77bc8ac51..b7b976a49 100644
+index ded9eea14..68734b74a 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
 @@ -141,10 +141,30 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -1216,7 +1213,7 @@ index 77bc8ac51..b7b976a49 100644
 +	return out
 +}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 07c5d6c85..0d23a71cc 100644
+index a798905c7..be69de523 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -1478,6 +1478,22 @@ spec:
@@ -1378,7 +1375,7 @@ index 07c5d6c85..0d23a71cc 100644
                    mounts:
                      description: Mounts specifies a list of mount points to be setup.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 883a32273..76ca445aa 100644
+index 6536ca18f..ab954d25f 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -134,6 +134,22 @@ spec:
@@ -1539,392 +1536,6 @@ index 883a32273..76ca445aa 100644
                              type: object
                            mounts:
                              description: Mounts specifies a list of mount points to
-diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
-index 6e91e00ae..29df78f5c 100644
---- a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
-+++ b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
-@@ -61,6 +61,26 @@ type InitConfiguration struct {
- type ClusterConfiguration struct {
- 	metav1.TypeMeta `json:",inline"`
- 
-+	// Pause holds the image source for pause container
-+	// This is only for bottlerocket
-+	// +optional
-+	Pause Pause `json:"pause,omitempty"`
-+
-+	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-+	// This is only for bottlerocket
-+	// +optional
-+	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-+
-+	// Proxy holds the https and no proxy information
-+	// This is only for bottlerocket
-+	// +optional
-+	Proxy ProxyConfiguration `json:"proxy,omitempty"`
-+
-+	// RegistryMirror holds the image registry mirror information
-+	// This is only for bottlerocket
-+	// +optional
-+	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
-+
- 	// Etcd holds configuration for etcd.
- 	// NB: This value defaults to a Local (stacked) etcd
- 	// +optional
-@@ -128,6 +148,38 @@ type ClusterConfiguration struct {
- 	ClusterName string `json:"clusterName,omitempty"`
- }
- 
-+// Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
-+// This setting is ONLY for bottlerocket nodes, as this needs to be set pre-boot time along with user-data
-+type Pause struct {
-+	// ImageMeta allows to customize the image used for the Pause component
-+	ImageMeta `json:",inline"`
-+}
-+
-+// BottlerocketBootstrap holds the settings of kubeadm bootstrap container for bottlerocket nodes
-+// This setting is ONLY for bottlerocket nodes.
-+type BottlerocketBootstrap struct {
-+	// ImageMeta allows to customize the image used for the BottlerocketBootstrap component
-+	ImageMeta `json:",inline"`
-+}
-+
-+// ProxyConfiguration holds the settings for proxying bottlerocket services
-+type ProxyConfiguration struct {
-+	// HTTPS proxy
-+	HTTPSProxy string `json:"httpsProxy,omitempty"`
-+
-+	// No proxy, list of ips that should not use proxy
-+	NoProxy []string `json:"noProxy,omitempty"`
-+}
-+
-+// RegistryMirrorConfiguration holds the settings for image registry mirror
-+type RegistryMirrorConfiguration struct {
-+	// Endpoint defines the registry mirror endpoint to use for pulling images
-+	Endpoint string `json:"endpoint,omitempty"`
-+
-+	// CACert defines the CA cert for the registry mirror
-+	CACert string `json:"caCert,omitempty"`
-+}
-+
- // ControlPlaneComponent holds settings common to control plane component of the cluster.
- type ControlPlaneComponent struct {
- 	// ExtraArgs is an extra set of flags to pass to the control plane component.
-@@ -338,6 +390,26 @@ type ExternalEtcd struct {
- type JoinConfiguration struct {
- 	metav1.TypeMeta `json:",inline"`
- 
-+	// Pause holds the image source for pause container
-+	// This is only for bottlerocket
-+	// +optional
-+	Pause Pause `json:"pause,omitempty"`
-+
-+	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-+	// This is only for bottlerocket
-+	// +optional
-+	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
-+
-+	// Proxy holds the https and no proxy information
-+	// This is only for bottlerocket
-+	// +optional
-+	Proxy ProxyConfiguration `json:"proxy,omitempty"`
-+
-+	// RegistryMirror holds the image registry mirror information
-+	// This is only for bottlerocket
-+	// +optional
-+	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
-+
- 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
- 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
- 	// across both InitConfiguration and JoinConfiguration
-diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
-index 64425edf6..a231641e4 100644
---- a/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
-+++ b/internal/apis/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
-@@ -23,7 +23,7 @@ import (
- )
- 
- // Format specifies the output format of the bootstrap data
--// +kubebuilder:validation:Enum=cloud-config
-+// +kubebuilder:validation:Enum=cloud-config;bottlerocket
- type Format string
- 
- const (
-diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-index 68ff783ce..9c1b31ed0 100644
---- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-+++ b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-@@ -90,6 +90,16 @@ func RegisterConversions(s *runtime.Scheme) error {
- 	}); err != nil {
- 		return err
- 	}
-+	if err := s.AddGeneratedConversionFunc((*BottlerocketBootstrap)(nil), (*v1beta1.BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(a.(*BottlerocketBootstrap), b.(*v1beta1.BottlerocketBootstrap), scope)
-+	}); err != nil {
-+		return err
-+	}
-+	if err := s.AddGeneratedConversionFunc((*v1beta1.BottlerocketBootstrap)(nil), (*BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(a.(*v1beta1.BottlerocketBootstrap), b.(*BottlerocketBootstrap), scope)
-+	}); err != nil {
-+		return err
-+	}
- 	if err := s.AddGeneratedConversionFunc((*ClusterConfiguration)(nil), (*v1beta1.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
- 		return Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta1.ClusterConfiguration), scope)
- 	}); err != nil {
-@@ -360,6 +370,36 @@ func RegisterConversions(s *runtime.Scheme) error {
- 	}); err != nil {
- 		return err
- 	}
-+	if err := s.AddGeneratedConversionFunc((*Pause)(nil), (*v1beta1.Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1alpha4_Pause_To_v1beta1_Pause(a.(*Pause), b.(*v1beta1.Pause), scope)
-+	}); err != nil {
-+		return err
-+	}
-+	if err := s.AddGeneratedConversionFunc((*v1beta1.Pause)(nil), (*Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1beta1_Pause_To_v1alpha4_Pause(a.(*v1beta1.Pause), b.(*Pause), scope)
-+	}); err != nil {
-+		return err
-+	}
-+	if err := s.AddGeneratedConversionFunc((*ProxyConfiguration)(nil), (*v1beta1.ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(a.(*ProxyConfiguration), b.(*v1beta1.ProxyConfiguration), scope)
-+	}); err != nil {
-+		return err
-+	}
-+	if err := s.AddGeneratedConversionFunc((*v1beta1.ProxyConfiguration)(nil), (*ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(a.(*v1beta1.ProxyConfiguration), b.(*ProxyConfiguration), scope)
-+	}); err != nil {
-+		return err
-+	}
-+	if err := s.AddGeneratedConversionFunc((*RegistryMirrorConfiguration)(nil), (*v1beta1.RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(a.(*RegistryMirrorConfiguration), b.(*v1beta1.RegistryMirrorConfiguration), scope)
-+	}); err != nil {
-+		return err
-+	}
-+	if err := s.AddGeneratedConversionFunc((*v1beta1.RegistryMirrorConfiguration)(nil), (*RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-+		return Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(a.(*v1beta1.RegistryMirrorConfiguration), b.(*RegistryMirrorConfiguration), scope)
-+	}); err != nil {
-+		return err
-+	}
- 	if err := s.AddGeneratedConversionFunc((*SecretFileSource)(nil), (*v1beta1.SecretFileSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
- 		return Convert_v1alpha4_SecretFileSource_To_v1beta1_SecretFileSource(a.(*SecretFileSource), b.(*v1beta1.SecretFileSource), scope)
- 	}); err != nil {
-@@ -541,7 +581,43 @@ func Convert_v1beta1_BootstrapTokenString_To_v1alpha4_BootstrapTokenString(in *v
- 	return autoConvert_v1beta1_BootstrapTokenString_To_v1alpha4_BootstrapTokenString(in, out, s)
- }
- 
-+func autoConvert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
-+	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
-+		return err
-+	}
-+	return nil
-+}
-+
-+// Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap is an autogenerated conversion function.
-+func Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta1.BottlerocketBootstrap, s conversion.Scope) error {
-+	return autoConvert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in, out, s)
-+}
-+
-+func autoConvert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in *v1beta1.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
-+	if err := Convert_v1beta1_ImageMeta_To_v1alpha4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
-+		return err
-+	}
-+	return nil
-+}
-+
-+// Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap is an autogenerated conversion function.
-+func Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in *v1beta1.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
-+	return autoConvert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(in, out, s)
-+}
-+
- func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *ClusterConfiguration, out *v1beta1.ClusterConfiguration, s conversion.Scope) error {
-+	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
-+		return err
-+	}
- 	if err := Convert_v1alpha4_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
- 		return err
- 	}
-@@ -575,10 +651,18 @@ func Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *C
- }
- 
- func autoConvert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(in *v1beta1.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
--	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
--	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
--	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
--	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
-+	if err := Convert_v1beta1_Pause_To_v1alpha4_Pause(&in.Pause, &out.Pause, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
-+		return err
-+	}
- 	if err := Convert_v1beta1_Etcd_To_v1alpha4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
- 		return err
- 	}
-@@ -955,6 +1039,18 @@ func autoConvert_v1beta1_InitConfiguration_To_v1alpha4_InitConfiguration(in *v1b
- }
- 
- func autoConvert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinConfiguration, out *v1beta1.JoinConfiguration, s conversion.Scope) error {
-+	if err := Convert_v1alpha4_Pause_To_v1beta1_Pause(&in.Pause, &out.Pause, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1alpha4_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
-+		return err
-+	}
- 	if err := Convert_v1alpha4_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
- 		return err
- 	}
-@@ -972,10 +1068,18 @@ func Convert_v1alpha4_JoinConfiguration_To_v1beta1_JoinConfiguration(in *JoinCon
- }
- 
- func autoConvert_v1beta1_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1beta1.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
--	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
--	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
--	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
--	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
-+	if err := Convert_v1beta1_Pause_To_v1alpha4_Pause(&in.Pause, &out.Pause, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1alpha4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
-+		return err
-+	}
-+	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
-+		return err
-+	}
- 	if err := Convert_v1beta1_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
- 		return err
- 	}
-@@ -1088,15 +1192,7 @@ func Convert_v1beta1_KubeadmConfigList_To_v1alpha4_KubeadmConfigList(in *v1beta1
- }
- 
- func autoConvert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *KubeadmConfigSpec, out *v1beta1.KubeadmConfigSpec, s conversion.Scope) error {
--	if in.ClusterConfiguration != nil {
--		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
--		*out = new(v1beta1.ClusterConfiguration)
--		if err := Convert_v1alpha4_ClusterConfiguration_To_v1beta1_ClusterConfiguration(*in, *out, s); err != nil {
--			return err
--		}
--	} else {
--		out.ClusterConfiguration = nil
--	}
-+	out.ClusterConfiguration = (*v1beta1.ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
- 	if in.InitConfiguration != nil {
- 		in, out := &in.InitConfiguration, &out.InitConfiguration
- 		*out = new(v1beta1.InitConfiguration)
-@@ -1154,15 +1250,7 @@ func Convert_v1alpha4_KubeadmConfigSpec_To_v1beta1_KubeadmConfigSpec(in *Kubeadm
- }
- 
- func autoConvert_v1beta1_KubeadmConfigSpec_To_v1alpha4_KubeadmConfigSpec(in *v1beta1.KubeadmConfigSpec, out *KubeadmConfigSpec, s conversion.Scope) error {
--	if in.ClusterConfiguration != nil {
--		in, out := &in.ClusterConfiguration, &out.ClusterConfiguration
--		*out = new(ClusterConfiguration)
--		if err := Convert_v1beta1_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(*in, *out, s); err != nil {
--			return err
--		}
--	} else {
--		out.ClusterConfiguration = nil
--	}
-+	out.ClusterConfiguration = (*ClusterConfiguration)(unsafe.Pointer(in.ClusterConfiguration))
- 	if in.InitConfiguration != nil {
- 		in, out := &in.InitConfiguration, &out.InitConfiguration
- 		*out = new(InitConfiguration)
-@@ -1505,6 +1593,74 @@ func Convert_v1beta1_Partition_To_v1alpha4_Partition(in *v1beta1.Partition, out
- 	return autoConvert_v1beta1_Partition_To_v1alpha4_Partition(in, out, s)
- }
- 
-+func autoConvert_v1alpha4_Pause_To_v1beta1_Pause(in *Pause, out *v1beta1.Pause, s conversion.Scope) error {
-+	if err := Convert_v1alpha4_ImageMeta_To_v1beta1_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
-+		return err
-+	}
-+	return nil
-+}
-+
-+// Convert_v1alpha4_Pause_To_v1beta1_Pause is an autogenerated conversion function.
-+func Convert_v1alpha4_Pause_To_v1beta1_Pause(in *Pause, out *v1beta1.Pause, s conversion.Scope) error {
-+	return autoConvert_v1alpha4_Pause_To_v1beta1_Pause(in, out, s)
-+}
-+
-+func autoConvert_v1beta1_Pause_To_v1alpha4_Pause(in *v1beta1.Pause, out *Pause, s conversion.Scope) error {
-+	if err := Convert_v1beta1_ImageMeta_To_v1alpha4_ImageMeta(&in.ImageMeta, &out.ImageMeta, s); err != nil {
-+		return err
-+	}
-+	return nil
-+}
-+
-+// Convert_v1beta1_Pause_To_v1alpha4_Pause is an autogenerated conversion function.
-+func Convert_v1beta1_Pause_To_v1alpha4_Pause(in *v1beta1.Pause, out *Pause, s conversion.Scope) error {
-+	return autoConvert_v1beta1_Pause_To_v1alpha4_Pause(in, out, s)
-+}
-+
-+func autoConvert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *ProxyConfiguration, out *v1beta1.ProxyConfiguration, s conversion.Scope) error {
-+	out.HTTPSProxy = in.HTTPSProxy
-+	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
-+	return nil
-+}
-+
-+// Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration is an autogenerated conversion function.
-+func Convert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *ProxyConfiguration, out *v1beta1.ProxyConfiguration, s conversion.Scope) error {
-+	return autoConvert_v1alpha4_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in, out, s)
-+}
-+
-+func autoConvert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1beta1.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
-+	out.HTTPSProxy = in.HTTPSProxy
-+	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
-+	return nil
-+}
-+
-+// Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration is an autogenerated conversion function.
-+func Convert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1beta1.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
-+	return autoConvert_v1beta1_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in, out, s)
-+}
-+
-+func autoConvert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta1.RegistryMirrorConfiguration, s conversion.Scope) error {
-+	out.Endpoint = in.Endpoint
-+	out.CACert = in.CACert
-+	return nil
-+}
-+
-+// Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration is an autogenerated conversion function.
-+func Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta1.RegistryMirrorConfiguration, s conversion.Scope) error {
-+	return autoConvert_v1alpha4_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in, out, s)
-+}
-+
-+func autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in *v1beta1.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
-+	out.Endpoint = in.Endpoint
-+	out.CACert = in.CACert
-+	return nil
-+}
-+
-+// Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration is an autogenerated conversion function.
-+func Convert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in *v1beta1.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
-+	return autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in, out, s)
-+}
-+
- func autoConvert_v1alpha4_SecretFileSource_To_v1beta1_SecretFileSource(in *SecretFileSource, out *v1beta1.SecretFileSource, s conversion.Scope) error {
- 	out.Name = in.Name
- 	out.Key = in.Key
 diff --git a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go b/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
 index dbae328d9..d7b753a82 100644
 --- a/internal/apis/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
@@ -2046,5 +1657,5 @@ index ac1ae21e3..7aa525c07 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 -- 
-2.42.0
+2.46.2
 

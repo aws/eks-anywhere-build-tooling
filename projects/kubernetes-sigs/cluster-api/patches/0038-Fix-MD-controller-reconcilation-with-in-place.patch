@@ -1,7 +1,7 @@
-From 73f15fa283592232e9541a2ad8216e3197f22d99 Mon Sep 17 00:00:00 2001
+From 0ea1b7dbe14d0143e5231914144e131f890ac125 Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Mon, 5 Feb 2024 23:45:36 -0800
-Subject: [PATCH 38/39] Fix MD controller reconcilation with in-place
+Subject: [PATCH 38/40] Fix MD controller reconcilation with in-place
 
 ---
  .../machinedeployment_controller_test.go      | 398 ++++++++++++++++++
@@ -12,7 +12,7 @@ Subject: [PATCH 38/39] Fix MD controller reconcilation with in-place
  delete mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace_test.go
 
 diff --git a/internal/controllers/machinedeployment/machinedeployment_controller_test.go b/internal/controllers/machinedeployment/machinedeployment_controller_test.go
-index b54f128cb..bbe6074e2 100644
+index a82768f2a..4f69cc53e 100644
 --- a/internal/controllers/machinedeployment/machinedeployment_controller_test.go
 +++ b/internal/controllers/machinedeployment/machinedeployment_controller_test.go
 @@ -25,8 +25,10 @@ import (
@@ -643,10 +643,10 @@ index cbda181cb..000000000
 -
 -}
 diff --git a/internal/controllers/machinedeployment/mdutil/util.go b/internal/controllers/machinedeployment/mdutil/util.go
-index fc168d8cb..814005c08 100644
+index 1c58f2b19..aef98ec5a 100644
 --- a/internal/controllers/machinedeployment/mdutil/util.go
 +++ b/internal/controllers/machinedeployment/mdutil/util.go
-@@ -555,7 +555,7 @@ func NewMSNewReplicas(deployment *clusterv1.MachineDeployment, allMSs []*cluster
+@@ -583,7 +583,7 @@ func NewMSNewReplicas(deployment *clusterv1.MachineDeployment, allMSs []*cluster
  		// Do not exceed the number of desired replicas.
  		scaleUpCount = min(scaleUpCount, *(deployment.Spec.Replicas)-newMSReplicas)
  		return newMSReplicas + scaleUpCount, nil
@@ -655,7 +655,7 @@ index fc168d8cb..814005c08 100644
  		// Find the total number of machines
  		currentMachineCount := TotalMachineSetsReplicaSum(allMSs)
  		if currentMachineCount >= *(deployment.Spec.Replicas) {
-@@ -566,8 +566,6 @@ func NewMSNewReplicas(deployment *clusterv1.MachineDeployment, allMSs []*cluster
+@@ -594,8 +594,6 @@ func NewMSNewReplicas(deployment *clusterv1.MachineDeployment, allMSs []*cluster
  		// the desired number of replicas in the MachineDeployment
  		scaleUpCount := *(deployment.Spec.Replicas) - currentMachineCount
  		return newMSReplicas + scaleUpCount, nil
@@ -665,5 +665,5 @@ index fc168d8cb..814005c08 100644
  		return 0, fmt.Errorf("failed to compute replicas: deployment strategy %v isn't supported", deployment.Spec.Strategy.Type)
  	}
 -- 
-2.42.0
+2.46.2
 

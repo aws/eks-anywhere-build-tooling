@@ -1,7 +1,7 @@
-From 4dbd67f641686e8c69e33fbf2f61fceec4b49128 Mon Sep 17 00:00:00 2001
+From d76fa1f81e3d7c3d6b2eb7dd512e1cbff42f363e Mon Sep 17 00:00:00 2001
 From: Abhinav <abhinavmpandey08@gmail.com>
 Date: Wed, 1 Feb 2023 16:34:23 -0800
-Subject: [PATCH 23/39] Add support for configuring NTP servers on bottlerocket
+Subject: [PATCH 23/40] Add support for configuring NTP servers on bottlerocket
  through CAPI
 
 Signed-off-by: Abhinav <abhinavmpandey08@gmail.com>
@@ -138,10 +138,10 @@ index 374c7e313..e21afb266 100644
  	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
  	if err != nil {
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index add3f6f82..f65477490 100644
+index 5c3fa4362..8aeee0313 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -536,6 +536,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -524,6 +524,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		if len(scope.Config.Spec.InitConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = scope.Config.Spec.InitConfiguration.NodeRegistration.Taints
  		}
@@ -151,7 +151,7 @@ index add3f6f82..f65477490 100644
  
  	}
  
-@@ -752,6 +755,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -770,6 +773,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		if len(scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
  		}
@@ -161,7 +161,7 @@ index add3f6f82..f65477490 100644
  		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -891,6 +897,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -921,6 +927,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		if len(scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
  		}
@@ -172,5 +172,5 @@ index add3f6f82..f65477490 100644
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 -- 
-2.42.0
+2.46.2
 

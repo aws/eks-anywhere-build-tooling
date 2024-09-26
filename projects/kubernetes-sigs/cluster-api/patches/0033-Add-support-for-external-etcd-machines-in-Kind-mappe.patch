@@ -1,14 +1,14 @@
-From 1620bce645113e9e7fcf8f01cda4084c8df245e3 Mon Sep 17 00:00:00 2001
+From b59fb24b8a2ea390874887c486f684614babdd88 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 16 Aug 2023 19:58:01 -0700
-Subject: [PATCH 33/39] Add support for external etcd machines in Kind mapper
+Subject: [PATCH 33/40] Add support for external etcd machines in Kind mapper
 
 ---
  .../client/cluster/objectgraph_test.go        |  2 +-
  .../dockermachinepool_controller_phases.go    |  2 +-
- .../controllers/dockermachine_controller.go   | 13 ++--
+ .../controllers/dockermachine_controller.go   | 35 ++++++----
  .../docker/internal/docker/machine.go         | 69 +++++++++++++------
- 4 files changed, 54 insertions(+), 32 deletions(-)
+ 4 files changed, 70 insertions(+), 38 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
 index 2b92ba3bc..48b617339 100644
@@ -24,20 +24,20 @@ index 2b92ba3bc..48b617339 100644
  					objs := []client.Object{}
  					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
 diff --git a/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go b/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
-index 7e4726246..2b79c351c 100644
+index e455b931b..24597fa78 100644
 --- a/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
 +++ b/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
 @@ -99,7 +99,7 @@ func createDockerContainer(ctx context.Context, name string, cluster *clusterv1.
  	}
  
- 	log.Info("Creating container for machinePool", "name", name, "machinePool", machinePool.Name)
+ 	log.Info("Creating container for machinePool", "name", name, "MachinePool", klog.KObj(machinePool))
 -	if err := externalMachine.Create(ctx, dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, machinePool.Spec.Template.Spec.Version, labels, dockerMachinePool.Spec.Template.ExtraMounts); err != nil {
 +	if err := externalMachine.Create(ctx, dockerMachinePool.Spec.Template.CustomImage, constants.WorkerNodeRoleValue, machinePool.Spec.Template.Spec.Version, labels, dockerMachinePool.Spec.Template.ExtraMounts, false); err != nil {
  		return errors.Wrapf(err, "failed to create docker machine with name %s", name)
  	}
  	return nil
 diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-index 029c5614b..cc9162212 100644
+index e9b987bc8..6bc384d31 100644
 --- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 +++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
 @@ -295,7 +295,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
@@ -58,32 +58,51 @@ index 029c5614b..cc9162212 100644
  				conditions.MarkFalse(dockerMachine, infrav1.BootstrapExecSucceededCondition, infrav1.BootstrapFailedReason, clusterv1.ConditionSeverityWarning, "Repeating bootstrap")
  				return ctrl.Result{}, errors.Wrap(err, "failed to exec DockerMachine bootstrap")
  			}
-@@ -416,12 +416,12 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -415,24 +415,29 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+ 	// set to true after a control plane machine has a node ref. If we would requeue here in this case, the
  	// Machine will never get a node ref as ProviderID is required to set the node ref, so we would get a deadlock.
  	if cluster.Spec.ControlPlaneRef != nil &&
- 		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) &&
--		!isEtcdMachine(machine) {
+-		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) {
++		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) &&
 +		!util.IsEtcdMachine(machine) {
  		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
  	}
  
- 	// In case of an etcd cluster, there is no concept of kubernetes node. So we can generate the node Provider ID and set it on machine spec directly
--	if !isEtcdMachine(machine) {
+-	// Usually a cloud provider will do this, but there is no docker-cloud provider.
+-	// Requeue if there is an error, as this is likely momentary load balancer
+-	// state changes during control plane provisioning.
+-	remoteClient, err := r.Tracker.GetClient(ctx, client.ObjectKeyFromObject(cluster))
+-	if err != nil {
+-		return ctrl.Result{}, errors.Wrap(err, "failed to generate workload cluster client")
+-	}
+-	if err := externalMachine.CloudProviderNodePatch(ctx, remoteClient, dockerMachine); err != nil {
+-		if errors.As(err, &docker.ContainerNotRunningError{}) {
+-			return ctrl.Result{}, errors.Wrap(err, "failed to patch the Kubernetes node with the machine providerID")
++	// In case of an etcd cluster, there is no concept of kubernetes node. So we can generate the node Provider ID and set it on machine spec directly
 +	if !util.IsEtcdMachine(machine) {
- 		// Usually a cloud provider will do this, but there is no docker-cloud provider.
- 		// Requeue if there is an error, as this is likely momentary load balancer
- 		// state changes during control plane provisioning.
-@@ -610,8 +610,3 @@ func setMachineAddress(ctx context.Context, dockerMachine *infrav1.DockerMachine
- 
- 	return nil
- }
--
--func isEtcdMachine(machine *clusterv1.Machine) bool {
--	_, ok := machine.Labels[clusterv1.MachineEtcdClusterLabelName]
--	return ok
--}
++		// Usually a cloud provider will do this, but there is no docker-cloud provider.
++		// Requeue if there is an error, as this is likely momentary load balancer
++		// state changes during control plane provisioning.
++		remoteClient, err := r.Tracker.GetClient(ctx, client.ObjectKeyFromObject(cluster))
++		if err != nil {
++			return ctrl.Result{}, errors.Wrap(err, "failed to generate workload cluster client")
++		}
++		if err := externalMachine.CloudProviderNodePatch(ctx, remoteClient, dockerMachine); err != nil {
++			if errors.As(err, &docker.ContainerNotRunningError{}) {
++				return ctrl.Result{}, errors.Wrap(err, "failed to patch the Kubernetes node with the machine providerID")
++			}
++			log.Error(err, "Failed to patch the Kubernetes node with the machine providerID")
++			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+ 		}
+-		log.Error(err, "Failed to patch the Kubernetes node with the machine providerID")
+-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+ 	}
++
+ 	// Set ProviderID so the Cluster API Machine Controller can pull it
+ 	providerID := externalMachine.ProviderID()
+ 	dockerMachine.Spec.ProviderID = &providerID
 diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
-index daa98e4be..2e5f306b8 100644
+index b354ed894..3f02a3508 100644
 --- a/test/infrastructure/docker/internal/docker/machine.go
 +++ b/test/infrastructure/docker/internal/docker/machine.go
 @@ -48,6 +48,7 @@ import (
@@ -190,5 +209,5 @@ index daa98e4be..2e5f306b8 100644
  
  	kindMapping := kind.GetMapping(semVer, image)
 -- 
-2.42.0
+2.46.2
 
