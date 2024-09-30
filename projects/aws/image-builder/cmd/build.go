@@ -106,9 +106,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		log.Fatal(err.Error())
 	}
 
-	// Setting default to bios for everything but ubuntu raw since that defaults to efi
+	// Setting default to bios for everything but ubuntu/rhel 9 raw since that defaults to efi
 	if bo.Firmware == "" {
-		if bo.Os == builder.Ubuntu && bo.Hypervisor == builder.Baremetal {
+		if bo.Hypervisor == builder.Baremetal && (bo.Os == builder.Ubuntu ||
+			(bo.Os == builder.RedHat && builder.SliceContains(builder.SupportedRedHatEfiVersions, bo.OsVersion))) {
 			bo.Firmware = builder.EFI
 		} else {
 			bo.Firmware = builder.BIOS
@@ -408,8 +409,13 @@ func validateFirmware(firmware, os, osVersion, hypervisor string) error {
 		}
 	}
 
-	if firmware == builder.BIOS && os == builder.Ubuntu && hypervisor == builder.Baremetal {
-		return fmt.Errorf("Ubuntu Raw builds only support EFI firmware.")
+	if firmware == builder.BIOS && hypervisor == builder.Baremetal {
+		if os == builder.Ubuntu {
+			return fmt.Errorf("Ubuntu Raw builds only support EFI firmware.")
+		}
+		if os == builder.RedHat && builder.SliceContains(builder.SupportedRedHatEfiVersions, osVersion) {
+			return fmt.Errorf("RedHat version 9 Raw builds only support EFI firmware")
+		}
 	}
 
 	return nil

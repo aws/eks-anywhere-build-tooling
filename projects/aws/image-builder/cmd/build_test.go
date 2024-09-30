@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"io/ioutil"
+	"log"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -210,12 +213,22 @@ func TestValidateFirmware(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			testName: "Redhat raw with no bios",
+			testName: "Redhat raw with no firmware",
 			buildOptions: builder.BuildOptions{
 				Os:         "redhat",
 				OsVersion:  "8",
 				Hypervisor: "baremetal",
 				Firmware:   "",
+			},
+			wantErr: "",
+		},
+		{
+			testName: "Redhat 9 ova with bios",
+			buildOptions: builder.BuildOptions{
+				Os:         "redhat",
+				OsVersion:  "9",
+				Hypervisor: "vsphere",
+				Firmware:   "bios",
 			},
 			wantErr: "",
 		},
@@ -238,6 +251,16 @@ func TestValidateFirmware(t *testing.T) {
 			},
 			wantErr: "Only RedHat version 9 supports EFI firmware",
 		},
+		{
+			testName: "Redhat raw with unsupported bios version",
+			buildOptions: builder.BuildOptions{
+				Os:         "redhat",
+				OsVersion:  "9",
+				Hypervisor: "baremetal",
+				Firmware:   "bios",
+			},
+			wantErr: "RedHat version 9 Raw builds only support EFI firmware",
+		},
 	}
 
 	for _, tt := range testCases {
@@ -251,4 +274,89 @@ func TestValidateFirmware(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateInputsFirmwareDefaulting(t *testing.T) {
+	baremetalConfigFile = "test-baremetal-config"
+	cloudstackConfigFile = baremetalConfigFile
+	vSphereConfigFile = baremetalConfigFile
+	err = ioutil.WriteFile(baremetalConfigFile, []byte(`{"rhel_username": "un", "rhel_password": "pw", "iso_url": "fake-iso", "iso_checksum": "fake", "iso_checksum_type": "sha256"}`), 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	testCases := []struct {
+		testName     string
+		buildOptions builder.BuildOptions
+		wantFirmware string
+	}{
+		{
+			testName: "Ubuntu 20.04 Raw no firmware",
+			buildOptions: builder.BuildOptions{
+				Os:         "ubuntu",
+				OsVersion:  "20.04",
+				Hypervisor: "baremetal",
+				Firmware:   "",
+			},
+			wantFirmware: "efi",
+		},
+		{
+			testName: "Ubuntu 22.04 Raw no firmware",
+			buildOptions: builder.BuildOptions{
+				Os:         "ubuntu",
+				OsVersion:  "22.04",
+				Hypervisor: "baremetal",
+				Firmware:   "",
+			},
+			wantFirmware: "efi",
+		},
+		{
+			testName: "Redhat 9 Raw no firmware",
+			buildOptions: builder.BuildOptions{
+				Os:         "redhat",
+				OsVersion:  "9",
+				Hypervisor: "baremetal",
+				Firmware:   "",
+			},
+			wantFirmware: "efi",
+		},
+		{
+			testName: "Redhat 8 Raw no firmware",
+			buildOptions: builder.BuildOptions{
+				Os:         "redhat",
+				OsVersion:  "8",
+				Hypervisor: "baremetal",
+				Firmware:   "",
+			},
+			wantFirmware: "bios",
+		},
+		{
+			testName: "Redhat 9 cloudstack no firmware",
+			buildOptions: builder.BuildOptions{
+				Os:         "redhat",
+				OsVersion:  "9",
+				Hypervisor: "cloudstack",
+				Firmware:   "",
+			},
+			wantFirmware: "bios",
+		},
+		{
+			testName: "Ubuntu 22.04 vsphere no firmware",
+			buildOptions: builder.BuildOptions{
+				Os:         "ubuntu",
+				OsVersion:  "22.04",
+				Hypervisor: "vsphere",
+				Firmware:   "",
+			},
+			wantFirmware: "bios",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.testName, func(t *testing.T) {
+			err := ValidateInputs(&tt.buildOptions)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantFirmware, tt.buildOptions.Firmware)
+		})
+	}
+	os.RemoveAll(baremetalConfigFile)
 }

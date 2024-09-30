@@ -203,11 +203,7 @@ func (b *BuildOptions) BuildImage() {
 		case Ubuntu:
 			buildCommand = fmt.Sprintf("make -C %s local-build-raw-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
 		case RedHat:
-			if b.Firmware == EFI {
-				buildCommand = fmt.Sprintf("make -C %s local-build-raw-redhat-%s-efi", imageBuilderProjectPath, b.OsVersion)
-			} else {
-				buildCommand = fmt.Sprintf("make -C %s local-build-raw-redhat-%s", imageBuilderProjectPath, b.OsVersion)
-			}
+			buildCommand = fmt.Sprintf("make -C %s local-build-raw-redhat-%s", imageBuilderProjectPath, b.OsVersion)
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.BaremetalConfig.RhelUsername),
 				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.BaremetalConfig.RhelPassword),
