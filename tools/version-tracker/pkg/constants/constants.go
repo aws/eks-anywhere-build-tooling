@@ -142,6 +142,11 @@ var (
 			BinaryName:       "linux-amd64/helm",
 			Extract:          true,
 		},
+		"linuxkit/linuxkit": {
+			AssetName:  "linuxkit-linux-amd64",
+			BinaryName: "linuxkit-linux-amd64",
+			Extract:    false,
+		},
 		"kubernetes-sigs/cluster-api": {
 			AssetName:  "clusterctl-linux-amd64",
 			BinaryName: "clusterctl-linux-amd64",
@@ -258,6 +263,10 @@ var (
 		},
 		"helm/helm": {
 			SourceOfTruthFile:     ".github/workflows/release.yaml",
+			GoVersionSearchString: `go-version: '(1\.\d\d)'`,
+		},
+		"linuxkit/linuxkit": {
+			SourceOfTruthFile:     ".github/workflows/release.yml",
 			GoVersionSearchString: `go-version: '(1\.\d\d)'`,
 		},
 		"kube-vip/kube-vip": {
