@@ -1,7 +1,7 @@
-From cc5a405a8c6ffc98943060b2dde6b3c0ac077cf9 Mon Sep 17 00:00:00 2001
+From 7546fd94b2e8bfca0a8d482ab123b5e2b7e900bf Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 17 Jan 2024 09:28:18 -0800
-Subject: [PATCH 35/39] Add support for in-place upgrade in KCP
+Subject: [PATCH 35/40] Add support for in-place upgrade in KCP
 
 ---
  .../kubeadm/api/v1beta1/kubeadm_control_plane_types.go |  8 ++++++++
@@ -10,7 +10,7 @@ Subject: [PATCH 35/39] Add support for in-place upgrade in KCP
  3 files changed, 18 insertions(+), 4 deletions(-)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_types.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_types.go
-index 8e488f187..32b297f12 100644
+index 88f5395a3..97864ec67 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_types.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_types.go
 @@ -35,6 +35,9 @@ const (
@@ -23,20 +23,20 @@ index 8e488f187..32b297f12 100644
  )
  
  const (
-@@ -65,6 +68,11 @@ const (
- 	// failures in updating remediation retry (the counter restarts from zero).
- 	RemediationForAnnotation = "controlplane.cluster.x-k8s.io/remediation-for"
- 
+@@ -74,6 +77,11 @@ const (
+ 	// DefaultMinHealthyPeriod defines the default minimum period before we consider a remediation on a
+ 	// machine unrelated from the previous remediation.
+ 	DefaultMinHealthyPeriod = 1 * time.Hour
++
 +	// InPlaceUpgradeAnnotation is used to denote that the KCP object needs to be in-place upgraded by an external entity.
 +	// This annotation will be added to the KCP object when `rolloutStrategy.type` is set to `InPlace`.
 +	// The external upgrader entity should watch for the annotation and trigger an upgrade when it's added.
 +	InPlaceUpgradeAnnotation = "controlplane.clusters.x-k8s.io/in-place-upgrade-needed"
-+
- 	// DefaultMinHealthyPeriod defines the default minimum period before we consider a remediation on a
- 	// machine unrelated from the previous remediation.
- 	DefaultMinHealthyPeriod = 1 * time.Hour
+ )
+ 
+ // KubeadmControlPlaneSpec defines the desired state of KubeadmControlPlane.
 diff --git a/controlplane/kubeadm/internal/controllers/upgrade.go b/controlplane/kubeadm/internal/controllers/upgrade.go
-index 651d0c2a7..ff8df3c9a 100644
+index 20a158929..4ecb46729 100644
 --- a/controlplane/kubeadm/internal/controllers/upgrade.go
 +++ b/controlplane/kubeadm/internal/controllers/upgrade.go
 @@ -18,6 +18,7 @@ package controllers
@@ -48,9 +48,9 @@ index 651d0c2a7..ff8df3c9a 100644
  	"github.com/blang/semver/v4"
  	"github.com/pkg/errors"
 @@ -27,6 +28,7 @@ import (
+ 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
  	controlplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
  	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
- 	"sigs.k8s.io/cluster-api/util"
 +	"sigs.k8s.io/cluster-api/util/annotations"
  	"sigs.k8s.io/cluster-api/util/collections"
  	"sigs.k8s.io/cluster-api/util/version"
@@ -101,5 +101,5 @@ index e6b95e49a..cd9909827 100644
  		)
  	}
 -- 
-2.42.0
+2.46.2
 

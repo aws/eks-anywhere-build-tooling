@@ -1,7 +1,7 @@
-From 67d623b4578573af4507485d11cdc77751ba62d7 Mon Sep 17 00:00:00 2001
+From 721ea9ce67e07b1ffdeb43d20d3dbba65dbc4542 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 16 May 2023 11:03:09 -0500
-Subject: [PATCH 30/39] CAPI Move Cluster Filter
+Subject: [PATCH 30/40] CAPI Move Cluster Filter
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
@@ -15,7 +15,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  7 files changed, 214 insertions(+), 33 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index 4910963e6..547a9beda 100644
+index 9f4630f6e..f9c1dbbce 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -51,13 +51,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
@@ -113,10 +113,10 @@ index 4910963e6..547a9beda 100644
  	}
  
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index 40255c3c2..41f6c2b27 100644
+index 742b8fa77..efac9776a 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
-@@ -738,7 +738,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
+@@ -739,7 +739,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -125,7 +125,7 @@ index 40255c3c2..41f6c2b27 100644
  
  			// Run backupTargetObject on nodes in graph
  			mover := objectMover{
-@@ -829,7 +829,7 @@ func Test_objectMover_restoreTargetObject(t *testing.T) {
+@@ -830,7 +830,7 @@ func Test_objectMover_restoreTargetObject(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -134,7 +134,7 @@ index 40255c3c2..41f6c2b27 100644
  
  			// gets a fakeProxy to an empty cluster with all the required CRDs
  			toProxy := getFakeProxyWithCRDs()
-@@ -937,7 +937,7 @@ func Test_objectMover_toDirectory(t *testing.T) {
+@@ -938,7 +938,7 @@ func Test_objectMover_toDirectory(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -143,7 +143,7 @@ index 40255c3c2..41f6c2b27 100644
  
  			// Run toDirectory
  			mover := objectMover{
-@@ -1158,7 +1158,7 @@ func Test_getMoveSequence(t *testing.T) {
+@@ -1159,7 +1159,7 @@ func Test_getMoveSequence(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -152,7 +152,7 @@ index 40255c3c2..41f6c2b27 100644
  
  			moveSequence := getMoveSequence(graph)
  			g.Expect(moveSequence.groups).To(HaveLen(len(tt.wantMoveGroups)))
-@@ -1191,7 +1191,7 @@ func Test_objectMover_move_dryRun(t *testing.T) {
+@@ -1192,7 +1192,7 @@ func Test_objectMover_move_dryRun(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -161,7 +161,7 @@ index 40255c3c2..41f6c2b27 100644
  
  			// gets a fakeProxy to an empty cluster with all the required CRDs
  			toProxy := getFakeProxyWithCRDs()
-@@ -1266,7 +1266,7 @@ func Test_objectMover_move(t *testing.T) {
+@@ -1267,7 +1267,7 @@ func Test_objectMover_move(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -170,7 +170,7 @@ index 40255c3c2..41f6c2b27 100644
  
  			// gets a fakeProxy to an empty cluster with all the required CRDs
  			toProxy := getFakeProxyWithCRDs()
-@@ -1378,7 +1378,7 @@ func Test_objectMover_move_with_Mutator(t *testing.T) {
+@@ -1379,7 +1379,7 @@ func Test_objectMover_move_with_Mutator(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -179,7 +179,7 @@ index 40255c3c2..41f6c2b27 100644
  
  			// gets a fakeProxy to an empty cluster with all the required CRDs
  			toProxy := getFakeProxyWithCRDs()
-@@ -1663,7 +1663,7 @@ func Test_objectMover_checkProvisioningCompleted(t *testing.T) {
+@@ -1664,7 +1664,7 @@ func Test_objectMover_checkProvisioningCompleted(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -197,7 +197,7 @@ index 40255c3c2..41f6c2b27 100644
  
  			mover := objectMover{
  				fromProxy: graph.proxy,
-@@ -2388,7 +2388,7 @@ func TestWaitReadyForMove(t *testing.T) {
+@@ -2435,7 +2435,7 @@ func TestWaitReadyForMove(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -207,7 +207,7 @@ index 40255c3c2..41f6c2b27 100644
  			backoff := wait.Backoff{
  				Steps: 1,
 diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
-index 942d1fc09..cb436dc83 100644
+index 73ec6450d..b001a36ab 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph.go
 @@ -417,8 +417,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
@@ -533,5 +533,5 @@ index 2a51bf2c0..55ca608ec 100644
  	})
  }
 -- 
-2.42.0
+2.46.2
 
