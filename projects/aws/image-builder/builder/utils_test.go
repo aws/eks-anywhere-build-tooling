@@ -2,13 +2,25 @@ package builder
 
 import (
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
+func init() {
+	_, filename, _, _ := runtime.Caller(0)
+	// change to the parent folder of the eks-anywhere-build-tooling
+	dir := path.Join(path.Dir(filename), "..", "..", "..", "..", "..")
+	err := os.Chdir(dir)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func TestGetSupportedReleaseBranchesSuccess(t *testing.T) {
 	b := BuildOptions{
-		ReleaseChannel: "1-24",
+		ReleaseChannel: "1-30",
 	}
 
 	supportedReleaseBranches := GetSupportedReleaseBranches()
@@ -109,11 +121,9 @@ func TestSetRhsmProxy(t *testing.T) {
 }
 
 func TestDownloadFile(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Error getting current working dir: %v", err)
-	}
-	testDir := filepath.Join(cwd, "testdata")
+	_, filename, _, _ := runtime.Caller(0)
+	// change to the parent folder of the eks-anywhere-build-tooling
+	testDir := path.Join(path.Dir(filename), "testdata")
 	os.MkdirAll(testDir, 0o755)
 	testcases := []struct {
 		name    string

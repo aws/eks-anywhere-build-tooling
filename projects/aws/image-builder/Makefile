@@ -34,6 +34,9 @@ EXTRA_GOBUILD_FLAGS=-buildvcs=false
 
 include $(BASE_DIRECTORY)/Common.mk
 
+
+build: unit-test
+
 $(REPO):
 	@mkdir $@
 	source $(BUILD_LIB)/common.sh && retry git clone --depth 1 --filter=blob:none --sparse -b $(BRANCH_NAME) $(EKS_ANYWHERE_CLONE_URL) $(EKS_ANYWHERE_REPO)
@@ -58,8 +61,9 @@ clean-extra:
 
 clean: clean-extra
 
-unit-test:
-	go test ./...
+unit-test: | $$(ENABLE_DOCKER)
+	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION); \
+	go test -v ./...
 
 
 ########### DO NOT EDIT #############################
