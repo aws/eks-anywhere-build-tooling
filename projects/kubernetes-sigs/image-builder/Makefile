@@ -234,6 +234,8 @@ ALL_FINAL_FILE_PATHS=\
 
 SPECIAL_TARGET_SECONDARY=$(strip $(ALL_FINAL_FILE_PATHS))
 
+EXPECTED_FILES_PATH=expected-artifacts/expected_artifacts_$(IMAGE_FORMAT)$(if $(filter bottlerocket,$(IMAGE_OS)),_bottlerocket,)
+
 
 include $(BASE_DIRECTORY)/Common.mk
 

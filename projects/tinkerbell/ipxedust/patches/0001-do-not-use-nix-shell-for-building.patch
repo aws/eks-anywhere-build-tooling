@@ -1,0 +1,39 @@
+From 908da0ea58aeae0616fa112bd85f70f70bf97c50 Mon Sep 17 00:00:00 2001
+From: Jackson West <jaxesn@gmail.com>
+Date: Wed, 24 Jul 2024 21:27:05 +0000
+Subject: [PATCH] do not use nix-shell or cross compile for building
+
+---
+ Makefile                    | 2 +-
+ binary/script/build_ipxe.sh | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 2f175cd..a57ddcc 100644
+--- a/Makefile
++++ b/Makefile
+@@ -36,7 +36,7 @@ binary/undionly.kpxe: $(ipxe_readme) ## build undionly.kpxe
+ 	+${IPXE_BUILD_SCRIPT} bin/undionly.kpxe "$(ipxe_sha_or_tag)" $@
+ 
+ binary/snp.efi: $(ipxe_readme) ## build snp.efi
+-	+${IPXE_BUILD_SCRIPT} bin-arm64-efi/snp.efi "$(ipxe_sha_or_tag)" $@ "CROSS_COMPILE=aarch64-unknown-linux-gnu-"
++	+${IPXE_BUILD_SCRIPT} bin-arm64-efi/snp.efi "$(ipxe_sha_or_tag)" $@
+ 
+ binary/ipxe.iso: $(ipxe_readme) ## build ipxe.iso
+ 	+${IPXE_BUILD_SCRIPT} bin-x86_64-efi/ipxe.iso "$(ipxe_sha_or_tag)" $@
+diff --git a/binary/script/build_ipxe.sh b/binary/script/build_ipxe.sh
+index e21e8ef..d767e6d 100755
+--- a/binary/script/build_ipxe.sh
++++ b/binary/script/build_ipxe.sh
+@@ -134,7 +134,7 @@ function main() {
+     hasUname
+     # while nix-shell is not used in this script,
+     # we should be in nix-shell for the iPXE build.
+-    hasNixShell
++    # hasNixShell
+ 
+     local ipxe_src=upstream-${ipxe_sha_or_tag}
+     local build_dir=${ipxe_src}-${final_path##*/}
+-- 
+2.34.1
+
