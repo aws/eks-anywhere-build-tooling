@@ -9,6 +9,7 @@
 ##@ GIT/Repo Targets
 clone-repo:  ## Clone upstream `flux2`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `flux` for `linux/amd64 linux/arm64`
@@ -16,10 +17,10 @@ _output/bin/flux2/linux-amd64/flux: ## Build `_output/bin/flux2/linux-amd64/flux
 _output/bin/flux2/linux-arm64/flux: ## Build `_output/bin/flux2/linux-arm64/flux`
 
 ##@ Image Targets
-local-images: ## Builds `flux-cli/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `flux-cli/images/push` to IMAGE_REPO
-flux-cli/images/amd64: ## Builds/pushes `flux-cli/images/amd64`
-flux-cli/images/push: ## Builds/pushes `flux-cli/images/push`
+local-images: ## Builds `flux2/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `flux2/images/push` to IMAGE_REPO
+flux2/images/amd64: ## Builds/pushes `flux2/images/amd64`
+flux2/images/push: ## Builds/pushes `flux2/images/push`
 
 ##@ Fetch Binary Targets
 _output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
