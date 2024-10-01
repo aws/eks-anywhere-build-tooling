@@ -47,7 +47,7 @@ if [ "${EKSA_SKIP_VALIDATE_DEPENDENCIES:-false}" = "true" ]; then
 fi
 
 # ansible
-ANSIBLE_VERSION=$(yq ".ansible" $DEPENDENCY_YAML)
+ANSIBLE_VERSION=$(yq -r ".ansible" $DEPENDENCY_YAML)
 if [[ "$(ansible --version | head -n 1)" != *"[core $ANSIBLE_VERSION]"* ]]; then
     echo "The version of ansible-core ($(ansible --version | head -n 1)) does not match the version ($ANSIBLE_VERSION) which has been tested by the EKS-A team."
     echo "    (Recommened) Remove this version and rerun your image build and the correct version of ansible-core will be installed."
@@ -56,7 +56,7 @@ if [[ "$(ansible --version | head -n 1)" != *"[core $ANSIBLE_VERSION]"* ]]; then
 fi
 
 # packer
-PACKER_VERSION=$(yq ".packer.version" $DEPENDENCY_YAML)
+PACKER_VERSION=$(yq -r ".packer.version" $DEPENDENCY_YAML)
 if [[ "$(packer --version)" != "$PACKER_VERSION" ]]; then
     echo "The version of packer ($(packer --version)) does not match the version ($PACKER_VERSION) which has been tested by the EKS-A team."
     echo "    (Recommened) Remove this version and rerun your image build and the correct version of packer will be installed."
@@ -65,7 +65,7 @@ if [[ "$(packer --version)" != "$PACKER_VERSION" ]]; then
 fi
 
 # ansible plugin
-PACKER_PLUGIN_ANSIBLE=$(yq ".packer.plugins.ansible" $DEPENDENCY_YAML)
+PACKER_PLUGIN_ANSIBLE=$(yq -r ".packer.plugins.ansible" $DEPENDENCY_YAML)
 if [[ "$(packer plugins installed | grep plugin-ansible)" != *"v$PACKER_PLUGIN_ANSIBLE"* ]]; then
     echo "The version of packer-plugin-ansible does not match the version ($PACKER_PLUGIN_ANSIBLE) which has been tested by the EKS-A team."
     echo "Current plugin: $(packer plugins installed | grep plugin-ansible)"
@@ -73,7 +73,7 @@ if [[ "$(packer plugins installed | grep plugin-ansible)" != *"v$PACKER_PLUGIN_A
 fi
 
 # nutanix plugn
-PACKER_PLUGIN_NUTANIX=$(yq ".packer.plugins.nutanix" $DEPENDENCY_YAML)
+PACKER_PLUGIN_NUTANIX=$(yq -r ".packer.plugins.nutanix" $DEPENDENCY_YAML)
 if [ "${IMAGE_FORMAT}" = "nutanix" ] && [[ "$(packer plugins installed | grep plugin-nutanix)" != *"v$PACKER_PLUGIN_NUTANIX"* ]]; then
     echo "The version of packer-plugin-nutanix does not match the version ($PACKER_PLUGIN_NUTANIX) which has been tested by the EKS-A team."
     echo "Current plugin: $(packer plugins installed | grep plugin-nutanix)"
