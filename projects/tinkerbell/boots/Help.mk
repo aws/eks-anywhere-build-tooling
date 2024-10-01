@@ -21,6 +21,10 @@ images: ## Pushes `boots/images/push` to IMAGE_REPO
 boots/images/amd64: ## Builds/pushes `boots/images/amd64`
 boots/images/push: ## Builds/pushes `boots/images/push`
 
+##@ Fetch Binary Targets
+_output/dependencies/linux-amd64/eksa/tinkerbell/ipxedust: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/ipxedust`
+_output/dependencies/linux-arm64/eksa/tinkerbell/ipxedust: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/ipxedust`
+
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
