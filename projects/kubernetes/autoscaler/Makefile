@@ -41,8 +41,22 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(REMOVE_CLOUD_PROVIDERS_TARGET)
 attributions: $(REMOVE_CLOUD_PROVIDERS_TARGET)
 
 $(REMOVE_CLOUD_PROVIDERS_TARGET): $(GIT_PATCH_TARGET)
+	@echo "Remove cloud providers"
 	cd ./autoscaler/cluster-autoscaler/cloudprovider && ls . | grep -v -e builder -e clusterapi -e mocks -e test -e .go | xargs rm -rf
 	touch $@
+
+
+.PHONY: update-go-mod-and-create-patch
+update-go-mod-and-create-patch: $(REMOVE_CLOUD_PROVIDERS_TARGET)
+	@echo "Running 'go mod tidy'"
+	cd $(REPO)/cluster-autoscaler && go mod tidy
+	@echo "Creating patch..."
+	git -C  $(REPO) add cluster-autoscaler/go.mod cluster-autoscaler/go.sum
+	git -C  $(REPO) commit -m "Update go.mod Dependencies"
+	git -C  $(REPO) format-patch -1
+	@echo "Copying patch to release branch patches directory..."
+	mv $(REPO)/*.patch $(BASE_DIRECTORY)/projects/kubernetes/autoscaler/$(RELEASE_BRANCH)/patches/
+
 
 $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES)
 
