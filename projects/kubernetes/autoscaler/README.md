@@ -52,7 +52,7 @@ Replace `1-XX` with the actual release branch number (e.g., `1-28`).
 
 This command performs the following actions:
 - Invokes REMOVE_CLOUD_PROVIDER target
-- Runs `go.mod.tidy` and updates the `go.mod` file with the latest dependencies
+- Runs `go mod tidy` and updates the `go.mod` file with the latest dependencies
 - Creates a patch file containing the changes
 - Copies the patch file to the specified `RELEASE_BRANCH` patches directory
 
