@@ -57,6 +57,7 @@ function retry_image_builder() {
     ["Timeout waiting for SSH"]="Wrong VM IP might be fetched"
     ["Cancelling provisioner after a timeout"]="Provisioner timed out"
     ["image size mistmatch"]="Nutanix image size mismatch"
+    ["Connection timed out during banner exchange"]="Ansible SSH connection timed out"
   )
 
   until [ $n -eq $max ]; do
