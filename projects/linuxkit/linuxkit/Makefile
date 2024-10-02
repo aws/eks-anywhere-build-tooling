@@ -62,7 +62,7 @@ UPLOAD_DO_NOT_DELETE=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-dhcpcd/images/% getty/images/% modprobe/images/% openntpd/images/% rngd/images/% sysctl/images/% sysfs/images/%: IMAGE_BUILD_ARGS=MOBY_CONFIG
+dhcpcd/images/% getty/images/% modprobe/images/% openntpd/images/% rngd/images/% sysctl/images/% sysfs/images/%: IMAGE_BUILD_ARGS+=MOBY_CONFIG
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_LINUXKIT_TARGET) $(FIX_LICENSES_HYPERKIT_TARGE)
 
