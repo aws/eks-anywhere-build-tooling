@@ -1,0 +1,109 @@
+From 79fa5de9df184d11c6cdfeb6b3b8448c49e94409 Mon Sep 17 00:00:00 2001
+From: Jackson West <jaxesn@gmail.com>
+Date: Wed, 2 Oct 2024 17:57:37 +0000
+Subject: [PATCH] add moby config to dockerfiles for packages used by hook
+
+---
+ pkg/dhcpcd/Dockerfile   | 2 ++
+ pkg/getty/Dockerfile    | 2 ++
+ pkg/modprobe/Dockerfile | 2 ++
+ pkg/openntpd/Dockerfile | 2 ++
+ pkg/rngd/Dockerfile     | 2 ++
+ pkg/sysctl/Dockerfile   | 2 ++
+ pkg/sysfs/Dockerfile    | 2 ++
+ 7 files changed, 14 insertions(+)
+
+diff --git a/pkg/dhcpcd/Dockerfile b/pkg/dhcpcd/Dockerfile
+index ed760cfed..0ff5500e9 100644
+--- a/pkg/dhcpcd/Dockerfile
++++ b/pkg/dhcpcd/Dockerfile
+@@ -10,6 +10,8 @@ RUN apk add --no-cache --initdb -p /out \
+ RUN rm -rf /out/etc/apk /out/lib/apk /out/var/cache
+ 
+ FROM scratch
++ARG MOBY_CONFIG
++LABEL "org.mobyproject.config"="${MOBY_CONFIG}"
+ ENTRYPOINT []
+ CMD []
+ WORKDIR /
+diff --git a/pkg/getty/Dockerfile b/pkg/getty/Dockerfile
+index ae10de07d..60d687065 100644
+--- a/pkg/getty/Dockerfile
++++ b/pkg/getty/Dockerfile
+@@ -27,6 +27,8 @@ RUN cp /out/usr/bin/setsid /out/usr/bin/setsid.getty
+ RUN rm -rf /out/etc/inittab
+ 
+ FROM scratch
++ARG MOBY_CONFIG
++LABEL "org.mobyproject.config"="${MOBY_CONFIG}"
+ ENTRYPOINT ["/sbin/tini","-s","-v","--"]
+ WORKDIR /
+ COPY --from=mirror /out/ /
+diff --git a/pkg/modprobe/Dockerfile b/pkg/modprobe/Dockerfile
+index 0cb683fa6..3c1cab58c 100644
+--- a/pkg/modprobe/Dockerfile
++++ b/pkg/modprobe/Dockerfile
+@@ -7,6 +7,8 @@ RUN apk add --no-cache --initdb -p /out \
+ RUN rm -rf /out/var/cache
+ 
+ FROM scratch
++ARG MOBY_CONFIG
++LABEL "org.mobyproject.config"="${MOBY_CONFIG}"
+ ENTRYPOINT []
+ CMD []
+ WORKDIR /
+diff --git a/pkg/openntpd/Dockerfile b/pkg/openntpd/Dockerfile
+index b8c073005..4fd4928c3 100644
+--- a/pkg/openntpd/Dockerfile
++++ b/pkg/openntpd/Dockerfile
+@@ -10,6 +10,8 @@ RUN apk add --no-cache --initdb -p /out \
+ RUN rm -rf /out/etc/apk /out/lib/apk /out/var/cache
+ 
+ FROM scratch
++ARG MOBY_CONFIG
++LABEL "org.mobyproject.config"="${MOBY_CONFIG}"
+ ENTRYPOINT []
+ CMD []
+ WORKDIR /
+diff --git a/pkg/rngd/Dockerfile b/pkg/rngd/Dockerfile
+index 58695caef..9bca2ac43 100644
+--- a/pkg/rngd/Dockerfile
++++ b/pkg/rngd/Dockerfile
+@@ -14,6 +14,8 @@ COPY . /go/src/rngd/
+ RUN REQUIRE_CGO=1 go-compile.sh /go/src/rngd/cmd/rngd
+ 
+ FROM scratch
++ARG MOBY_CONFIG
++LABEL "org.mobyproject.config"="${MOBY_CONFIG}"
+ ENTRYPOINT []
+ CMD []
+ WORKDIR /
+diff --git a/pkg/sysctl/Dockerfile b/pkg/sysctl/Dockerfile
+index c989b81be..4abac9b15 100644
+--- a/pkg/sysctl/Dockerfile
++++ b/pkg/sysctl/Dockerfile
+@@ -12,6 +12,8 @@ COPY . /go/src/sysctl/
+ RUN go-compile.sh /go/src/sysctl
+ 
+ FROM scratch
++ARG MOBY_CONFIG
++LABEL "org.mobyproject.config"="${MOBY_CONFIG}"
+ ENTRYPOINT []
+ CMD []
+ WORKDIR /
+diff --git a/pkg/sysfs/Dockerfile b/pkg/sysfs/Dockerfile
+index b38ef5cbe..e4c048f9f 100644
+--- a/pkg/sysfs/Dockerfile
++++ b/pkg/sysfs/Dockerfile
+@@ -11,6 +11,8 @@ COPY . /go/src/sysfs/
+ RUN go-compile.sh /go/src/sysfs
+ 
+ FROM scratch
++ARG MOBY_CONFIG
++LABEL "org.mobyproject.config"="${MOBY_CONFIG}"
+ ENTRYPOINT []
+ CMD []
+ WORKDIR /
+-- 
+2.34.1
+

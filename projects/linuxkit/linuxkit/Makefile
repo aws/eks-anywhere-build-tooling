@@ -26,6 +26,11 @@ DHCPCD_IMAGE_COMPONENT=linuxkit/dhcpcd
 OPENNTPD_IMAGE_COMPONENT=linuxkit/openntpd
 GETTY_IMAGE_COMPONENT=linuxkit/getty
 
+# when using yq to conver to json 0666 is being parsed as a number and converted to 438
+# replace it back to 0600
+# https://github.com/mikefarah/yq/issues/1634
+MOBY_CONFIG='$(shell set -x && yq '.config' $(REPO)/pkg/$(IMAGE_NAME)/build.yml | yq -o=json -I=0 | sed 's/438/"0666"/g')'
+
 # we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
 # it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
 # and the combine-images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L846)
@@ -57,6 +62,7 @@ UPLOAD_DO_NOT_DELETE=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+dhcpcd/images/% getty/images/% modprobe/images/% openntpd/images/% rngd/images/% sysctl/images/% sysfs/images/%: IMAGE_BUILD_ARGS=MOBY_CONFIG
 
 $(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_LINUXKIT_TARGET) $(FIX_LICENSES_HYPERKIT_TARGE)
 
