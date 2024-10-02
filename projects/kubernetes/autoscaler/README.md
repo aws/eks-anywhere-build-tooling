@@ -1,10 +1,9 @@
 ## **Kubernetes Cluster Autoscaler**
-![1.25 Version](https://img.shields.io/badge/1--25%20version-cluster--autoscaler--1.25.3-blue)
-![1.26 Version](https://img.shields.io/badge/1--26%20version-cluster--autoscaler--1.26.8-blue)
 ![1.27 Version](https://img.shields.io/badge/1--27%20version-cluster--autoscaler--1.27.8-blue)
 ![1.28 Version](https://img.shields.io/badge/1--28%20version-cluster--autoscaler--1.28.6-blue)
 ![1.29 Version](https://img.shields.io/badge/1--29%20version-cluster--autoscaler--1.29.4-blue)
 ![1.30 Version](https://img.shields.io/badge/1--30%20version-cluster--autoscaler--1.30.2-blue)
+![1.31 Version](https://img.shields.io/badge/1--31%20version-cluster--autoscaler--1.31.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiL0tWckptdkxsZEd1cXNiNTBncjRNVU5oekpZRlBkTDNBcFVvZkFOVHZwbTBKUm91QkR6RVN4QlhJWk42cXF3L29FMmdnTXUrVndiay8zVUQ0YjJsc21vPSIsIml2UGFyYW1ldGVyU3BlYyI6Ik1Gd2UwbmRXVWxSRTMvUHQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Autoscaler](https://github.com/kubernetes/autoscaler) defines the cluster autoscaler.
@@ -45,15 +44,15 @@ commit and generate a patch using `git format-patch -1 HEAD`.
 
 To update go mod dependencies and create a patch, follow these steps:
 
-1. Set the `RELEASE_BRANCH` environment variable to the desired branch name (e.g., `1-28` for version 1.28).
-2. Run the following command:
+* Run the following command:
 ```
  RELEASE_BRANCH=1-XX make update-go-mod-and-create-patch
 ```
 Replace `1-XX` with the actual release branch number (e.g., `1-28`).
 
 This command performs the following actions:
-- Updates the `go.mod` file with the latest dependencies
+- Invokes REMOVE_CLOUD_PROVIDER target
+- Runs `go.mod.tidy` and updates the `go.mod` file with the latest dependencies
 - Creates a patch file containing the changes
 - Copies the patch file to the specified `RELEASE_BRANCH` patches directory
 
