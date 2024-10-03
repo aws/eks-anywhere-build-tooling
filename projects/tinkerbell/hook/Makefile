@@ -58,6 +58,10 @@ KERNEL_CONFIG_HOST_PATH=$(MAKE_ROOT)/$(OUTPUT_DIR)/kernel-config
 HOOK_EMBEDDED_FOLDER=$(REPO)/images/hook-embedded
 EMBEDDED_IMAGES=$(foreach platform,$(HOOK_PLATFORMS),$(OUTPUT_DIR)/hook-embedded/$(subst /,-,$(platform))/images)
 
+LINUXKIT_VERSION=$(shell cat $(MAKE_ROOT)/../../linuxkit/linuxkit/GIT_TAG | cut -c2-)
+LINUXKIT_CACHE_FILE=$(REPO)/cache/linuxkit-linux-$(BUILDER_PLATFORM_ARCH)-$(LINUXKIT_VERSION)
+LINUXKIT_IMAGE_REPO?=$(IMAGE_REPO)
+
 # we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
 # it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
 # and the combine-images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L846)
@@ -71,10 +75,10 @@ BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
 BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
 BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
-BUILDSPEC_1_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 tinkerbell_tink_linux_amd64 tinkerbell_tink_linux_arm64 tinkerbell_hub
+BUILDSPEC_1_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 tinkerbell_tink linuxkit_linuxkit tinkerbell_hub
 BUILDSPEC_2_DEPENDS_ON_OVERRIDE=tinkerbell_hook_linux_amd64 tinkerbell_hook_linux_arm64
 
-PROJECT_DEPENDENCIES=eksa/containerd/containerd eksa/tinkerbell/hub eksa/tinkerbell/tink
+PROJECT_DEPENDENCIES=eksa/containerd/containerd eksa/tinkerbell/hub eksa/tinkerbell/tink eksa/linuxkit/linuxkit
 
 # Since we build the arm and amd binaries on difference instances in codebuild
 # we do not want to delete missing files when s3 sync-ing from local to the bucket
@@ -130,11 +134,26 @@ $(OUTPUT_DIR)/kernel/%:
 	@mkdir -p $(@D)
 	cp -f $(REPO)/kernel/$* $@
 
+$(LINUXKIT_CACHE_FILE): $(PROJECT_DEPENDENCIES_TARGETS)
+	@mkdir -p $(@D)
+	cp $(BINARY_DEPS_DIR)/linux-$(BUILDER_PLATFORM_ARCH)/eksa/linuxkit/linuxkit/linuxkit $@
+
 $(CREATE_HOOK_FILES_PATTERN)-%: BUILD_ARCH=$(if $(findstring x86_64,$*),amd64,arm64)
-$(CREATE_HOOK_FILES_PATTERN)-%: | $$(ENABLE_DOCKER)
+$(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE) | $$(ENABLE_DOCKER)
 	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION); \
+	if [ -f $(REPO)/out/linuxkit-hook-default-$(BUILD_ARCH)/hook-cmdline ]; then echo "remove hook/out before continuing"; exit 1; fi; \
+	sed -i 's/[^ ]*linuxkit\/\([^:]*\)\(:.*$$\)/$(subst /,\/,$(LINUXKIT_IMAGE_REPO))\/linuxkit\/\1:$(LATEST_TAG)/' $(REPO)/linuxkit-templates/hook.template.yaml; \
+	images=(); \
+	while read -r image; do \
+		if [[ "$$image" == *"sshd"* ]]; then continue; fi; \
+		images+=($$image); \
+	done < <(sed -n 's/.*\($(subst /,\/,$(LINUXKIT_IMAGE_REPO)).*$$\)/\1/p' $(REPO)/linuxkit-templates/hook.template.yaml); \
+	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-ip hook-mdev hook-embedded; do \
+		images+=($(IMAGE_REPO)/tinkerbell/$$image:$(LATEST_TAG)$(IMAGE_TAG_SUFFIX)); \
+	done; \
+	for image in "$${images[@]}"; do build::common::echo_and_run retry $(LINUXKIT_CACHE_FILE) cache pull --cache $(REPO)/cache/linuxkit $$image; done; \
 	cd $(REPO); \
-	DEBUG=yes HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
+	DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
 		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
 		HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
 		HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
@@ -181,12 +200,12 @@ $(OUTPUT_DIR)/hook-embedded/linux-%/images: $(GIT_PATCH_TARGET)
 	fi
 
 .PHONY: run-kernel-in-qemu
-run-kernel-in-qemu: $(CREATE_HOOK_FILES)
+run-kernel-in-qemu: $(CREATE_HOOK_FILES) $(LINUXKIT_CACHE_FILE)
 	mkdir -p $(REPO)/out/linuxkit-hook-default-$(BUILDER_PLATFORM_ARCH)
 	cp $(REPO)/out/hook/vmlinuz-$(KERNEL_ARCH) $(REPO)/out/linuxkit-hook-default-$(BUILDER_PLATFORM_ARCH)/hook-kernel
 	cp $(REPO)/out/hook/initramfs-$(KERNEL_ARCH) $(REPO)/out/linuxkit-hook-default-$(BUILDER_PLATFORM_ARCH)/hook-initrd.img
 	cd $(REPO); \
-	DEBUG=yes TINK_WORKER_IMAGE=127.0.0.1/embedded/tink-worker \
+	DEBUG=yes TINK_WORKER_IMAGE=127.0.0.1/embedded/tink-worker LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) \
 		sudo -E ./build.sh run hook-default-$(BUILDER_PLATFORM_ARCH)
 
 kernel-config-%: | ensure-docker

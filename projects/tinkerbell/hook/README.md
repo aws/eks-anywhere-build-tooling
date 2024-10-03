@@ -19,8 +19,6 @@ We only support building with one golang version per project, pick the latest fr
 1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
 
 
-create-new-config-patch
-menuconfig
 ### Development
 
 1. The project consists of 3 images. `hook-bootkit`, `hoot-containerd`, `hook-docker`, `hook-embedded`, `hook-runc` and `kernel`.
