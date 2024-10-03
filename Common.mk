@@ -178,12 +178,12 @@ IMAGE_USERADD_USER_ID?=1000
 IMAGE_USERADD_USER_NAME?=
 
 # When building from outside the build account, such as prow, this is set to enable pulling the cache from the build acct
-ADDITIONAL_IMAGE_CACHE_REPOS=?
+ADDITIONAL_IMAGE_CACHE_REPOS?=
 # Branch builds should look at the current branch latest image for cache as well as main branch latest for cache to cover the cases
 # where its the first build from a new release branch
-IMAGE_CACHE_TAGS=$(LATEST_TAG) $(if $(filter latest,$(LATEST_TAG)),,latest)
-IMAGE_IMPORT_CACHE?=$(foreach repo,$(IMAGE_REPO) $(ADDITIONAL_IMAGE_CACHE_REPOS),$(foreach tag,$(IMAGE_CACHE_TAGS),type=registry,ref=$(repo)/$(IMAGE_REPO_COMPONENT):$(tag)$(IMAGE_TAG_SUFFIX)-cache))
-IMAGE_EXPORT_CACHE?=type=registry,mode=max,image-manifest=true,oci-mediatypes=true,ref=$(LATEST_IMAGE)-cache
+IMAGE_CACHE_TAGS=$(foreach tag,$(LATEST_TAG) $(if $(filter latest,$(LATEST_TAG)),,latest),$(tag)$(IMAGE_TAG_SUFFIX) $(tag)$(IMAGE_TAG_SUFFIX)-cache)
+IMAGE_IMPORT_CACHE?=$(foreach repo,$(strip $(IMAGE_REPO) $(ADDITIONAL_IMAGE_CACHE_REPOS)),$(foreach tag,$(IMAGE_CACHE_TAGS),type=registry,ref=$(repo)/$(IMAGE_REPO_COMPONENT):$(tag)))
+IMAGE_EXPORT_CACHE?=--export-cache type=registry,mode=max,image-manifest=true,oci-mediatypes=true,ref=$(LATEST_IMAGE)-cache
 
 BUILD_OCI_TARS?=false
 
@@ -570,7 +570,7 @@ define BUILDCTL
 		--progress plain \
 		--local dockerfile=$(DOCKERFILE_FOLDER) \
 		--local context=$(IMAGE_CONTEXT_DIR) \
-		$(if $(filter push=true,$(IMAGE_OUTPUT)),--export-cache $(IMAGE_EXPORT_CACHE)) \
+		$(if $(filter push=true,$(IMAGE_OUTPUT)),$(IMAGE_EXPORT_CACHE)) \
 		$(foreach IMPORT_CACHE,$(IMAGE_IMPORT_CACHE),--import-cache $(IMPORT_CACHE)) \
 		--opt target=$(IMAGE_TARGET) \
 		--output type=$(IMAGE_OUTPUT_TYPE),oci-mediatypes=true,\"name=$(IMAGE),$(LATEST_IMAGE)\",$(IMAGE_OUTPUT)
@@ -854,6 +854,7 @@ clean-job-caches: $(and $(findstring presubmit,$(JOB_TYPE)),$(filter true,$(PRUN
 PHONY: combine-images
 combine-images: IMAGE_BUILD_ARGS=IMAGE
 combine-images: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/combine
+combine-images: IMAGE_EXPORT_CACHE=--export-cache type=inline
 combine-images: images
 
 ## Helm Targets
