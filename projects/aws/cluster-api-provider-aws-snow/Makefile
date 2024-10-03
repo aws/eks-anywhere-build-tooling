@@ -13,6 +13,9 @@ IMAGE_COMPONENT=aws/cluster-api-provider-aws-snow/manager
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
+# workaround issue pushing external image cache to ecr when dockerimage is a simple FROM statement
+IMAGE_EXPORT_CACHE=--export-cache type=inline
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
