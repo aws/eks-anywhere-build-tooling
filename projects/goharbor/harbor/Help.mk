@@ -12,17 +12,15 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `harbor-core harbor-jobservice harbor-registryctl harbor-migrate-patch harbor-migrate harbor-exporter` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `harbor-core harbor-jobservice harbor-registryctl harbor-migrate harbor-exporter` for `linux/amd64 linux/arm64`
 _output/bin/harbor/linux-amd64/harbor-core: ## Build `_output/bin/harbor/linux-amd64/harbor-core`
 _output/bin/harbor/linux-amd64/harbor-jobservice: ## Build `_output/bin/harbor/linux-amd64/harbor-jobservice`
 _output/bin/harbor/linux-amd64/harbor-registryctl: ## Build `_output/bin/harbor/linux-amd64/harbor-registryctl`
-_output/bin/harbor/linux-amd64/harbor-migrate-patch: ## Build `_output/bin/harbor/linux-amd64/harbor-migrate-patch`
 _output/bin/harbor/linux-amd64/harbor-migrate: ## Build `_output/bin/harbor/linux-amd64/harbor-migrate`
 _output/bin/harbor/linux-amd64/harbor-exporter: ## Build `_output/bin/harbor/linux-amd64/harbor-exporter`
 _output/bin/harbor/linux-arm64/harbor-core: ## Build `_output/bin/harbor/linux-arm64/harbor-core`
 _output/bin/harbor/linux-arm64/harbor-jobservice: ## Build `_output/bin/harbor/linux-arm64/harbor-jobservice`
 _output/bin/harbor/linux-arm64/harbor-registryctl: ## Build `_output/bin/harbor/linux-arm64/harbor-registryctl`
-_output/bin/harbor/linux-arm64/harbor-migrate-patch: ## Build `_output/bin/harbor/linux-arm64/harbor-migrate-patch`
 _output/bin/harbor/linux-arm64/harbor-migrate: ## Build `_output/bin/harbor/linux-arm64/harbor-migrate`
 _output/bin/harbor/linux-arm64/harbor-exporter: ## Build `_output/bin/harbor/linux-arm64/harbor-exporter`
 
@@ -84,13 +82,11 @@ run-in-docker/harbor/src/eks-anywhere-go-mod-download: ## Run `harbor/src/eks-an
 run-in-docker/_output/bin/harbor/linux-amd64/harbor-core: ## Run `_output/bin/harbor/linux-amd64/harbor-core` in docker builder container
 run-in-docker/_output/bin/harbor/linux-amd64/harbor-jobservice: ## Run `_output/bin/harbor/linux-amd64/harbor-jobservice` in docker builder container
 run-in-docker/_output/bin/harbor/linux-amd64/harbor-registryctl: ## Run `_output/bin/harbor/linux-amd64/harbor-registryctl` in docker builder container
-run-in-docker/_output/bin/harbor/linux-amd64/harbor-migrate-patch: ## Run `_output/bin/harbor/linux-amd64/harbor-migrate-patch` in docker builder container
 run-in-docker/_output/bin/harbor/linux-amd64/harbor-migrate: ## Run `_output/bin/harbor/linux-amd64/harbor-migrate` in docker builder container
 run-in-docker/_output/bin/harbor/linux-amd64/harbor-exporter: ## Run `_output/bin/harbor/linux-amd64/harbor-exporter` in docker builder container
 run-in-docker/_output/bin/harbor/linux-arm64/harbor-core: ## Run `_output/bin/harbor/linux-arm64/harbor-core` in docker builder container
 run-in-docker/_output/bin/harbor/linux-arm64/harbor-jobservice: ## Run `_output/bin/harbor/linux-arm64/harbor-jobservice` in docker builder container
 run-in-docker/_output/bin/harbor/linux-arm64/harbor-registryctl: ## Run `_output/bin/harbor/linux-arm64/harbor-registryctl` in docker builder container
-run-in-docker/_output/bin/harbor/linux-arm64/harbor-migrate-patch: ## Run `_output/bin/harbor/linux-arm64/harbor-migrate-patch` in docker builder container
 run-in-docker/_output/bin/harbor/linux-arm64/harbor-migrate: ## Run `_output/bin/harbor/linux-arm64/harbor-migrate` in docker builder container
 run-in-docker/_output/bin/harbor/linux-arm64/harbor-exporter: ## Run `_output/bin/harbor/linux-arm64/harbor-exporter` in docker builder container
 run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
