@@ -14,6 +14,7 @@ GITREV?=$(shell git -C $(REPO) rev-parse --short HEAD)
 EXTRA_GO_LDFLAGS=-X main.GitRev=${GITREV}
 
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
+SKIP_CHECKSUM_VALIDATION=true
 
 PROJECT_DEPENDENCIES=eksa/tinkerbell/ipxedust
 BUILDSPEC_DEPENDS_ON_OVERRIDE=tinkerbell_ipxedust_linux_amd64 tinkerbell_ipxedust_linux_arm64
