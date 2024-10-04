@@ -138,6 +138,18 @@ $(LINUXKIT_CACHE_FILE): $(PROJECT_DEPENDENCIES_TARGETS)
 	@mkdir -p $(@D)
 	cp $(BINARY_DEPS_DIR)/linux-$(BUILDER_PLATFORM_ARCH)/eksa/linuxkit/linuxkit/linuxkit $@
 
+# We use the linuxkit built from eks-a build tooling
+# This includes the linuxkit bin and the images
+# The hook linuxkit-template has two sets of images it pulls in
+# - from linuxkit upstream (dhcp/init/sysctl/etc)
+# - from hook builds (ip/mdev)
+# Before calling the hook target to build the OSIE files we replace the images it is
+# pulling from upstream linuxkit with those built via eksa
+# The images provided by hook are handled by the hook support for overriding those
+# We use the sed approach instead of a patch to avoid having to update conflicts with each update
+# After the images are replaced in the hook.template.yaml
+# Using sed they are pulled back out so that we can run cache pull with retries since we tend to see
+# issues from time to time pulling from ecr
 $(CREATE_HOOK_FILES_PATTERN)-%: BUILD_ARCH=$(if $(findstring x86_64,$*),amd64,arm64)
 $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE) | $$(ENABLE_DOCKER)
 	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION); \
