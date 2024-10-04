@@ -1,0 +1,28 @@
+From c1df3e862ba2717623a6193fd9bd78ce3fea540b Mon Sep 17 00:00:00 2001
+From: Saurabh Parekh <sjparekh@amazon.com>
+Date: Thu, 3 Oct 2024 21:24:40 -0700
+Subject: [PATCH 13/13] Revert "Optionally source /etc/default/kubelet in kubelet.service"
+
+We are reverting the upstream change that optionally source /etc/default/kubelet in kubelet service.
+We will continue using /etc/sysconfig/kubelet environment file to update the kubelet extra args for 
+ubuntu to configure the ecr credentials for curated packages.
+
+Signed-off-by: Saurabh Parekh <sjparekh@amazon.com>
+---
+ .../usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf     | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/images/capi/ansible/roles/kubernetes/templates/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf b/images/capi/ansible/roles/kubernetes/templates/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+index 4f1b8156b..165becb18 100644
+--- a/images/capi/ansible/roles/kubernetes/templates/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
++++ b/images/capi/ansible/roles/kubernetes/templates/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+@@ -7,6 +7,5 @@ EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
+ # This is a file that the user can use for overrides of the kubelet args as a last resort. Preferably, the user should use
+ # the .NodeRegistration.KubeletExtraArgs object in the configuration files instead. KUBELET_EXTRA_ARGS should be sourced from this file.
+ EnvironmentFile=-/etc/sysconfig/kubelet
+-EnvironmentFile=-/etc/default/kubelet
+ ExecStart=
+ ExecStart={{ sysusr_prefix }}/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
+-- 
+2.46.2
+
