@@ -45,6 +45,8 @@ _output/dependencies/linux-amd64/eksa/containerd/containerd: ## Fetch `_output/d
 _output/dependencies/linux-arm64/eksa/containerd/containerd: ## Fetch `_output/dependencies/linux-arm64/eksa/containerd/containerd`
 _output/dependencies/linux-amd64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/tink`
 _output/dependencies/linux-arm64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/tink`
+_output/dependencies/linux-amd64/eksa/linuxkit/linuxkit: ## Fetch `_output/dependencies/linux-amd64/eksa/linuxkit/linuxkit`
+_output/dependencies/linux-arm64/eksa/linuxkit/linuxkit: ## Fetch `_output/dependencies/linux-arm64/eksa/linuxkit/linuxkit`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
