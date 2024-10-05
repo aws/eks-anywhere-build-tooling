@@ -18,11 +18,9 @@ HAS_LICENSES=false
 
 TAR_FILE_PREFIX=bootconfig
 HAS_S3_ARTIFACTS=true
-SKIP_CHECKSUM_VALIDATION=true
 
 IMAGE_NAMES=
 
-EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 BUILDSPEC_VARS_KEYS=BINARY_PLATFORMS
@@ -40,11 +38,17 @@ include $(BASE_DIRECTORY)/Common.mk
 
 tarballs: gather-non-golang-licenses $(OUTPUT_DIR)/ATTRIBUTION.txt
 
+# To be reproducible:
+# -debug-prefix-map to reset the build folder
+# - gcc 7, the verison in al2, does not support -macro-prefix-map which replaces
+#   __FILE__ automatically to avoid the build folder from creeping in to the final bin
+#   manually replace this since we are only building from one c/h files
 $(OUTPUT_BIN_DIR)/%: MAKEFLAGS=
 $(OUTPUT_BIN_DIR)/%: PLATFORM=$(subst -,/,$(*D:/tools=))
 $(OUTPUT_BIN_DIR)/%: $(GIT_CHECKOUT_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
 	@mkdir -p $(MAKE_ROOT)/$(@D); \
-	$(MAKE) -C $(REPO)/tools/bootconfig OUTPUT=$(MAKE_ROOT)/$(@D)/
+	sed -i 's/__FILE__/"lib\/bootconfig.c"/' linux/tools/bootconfig/include/linux/bootconfig.h; \
+	$(MAKE) -C $(REPO)/tools/bootconfig OUTPUT=$(MAKE_ROOT)/$(@D)/ CFLAGS="-Wall -g -I$(MAKE_ROOT)/$(REPO)/tools/bootconfig/include -fdebug-prefix-map=$(MAKE_ROOT)=/buildroot"
 
 .PHONY: gather-non-golang-licenses
 gather-non-golang-licenses: $(GIT_CHECKOUT_TARGET)
