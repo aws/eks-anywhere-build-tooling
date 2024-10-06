@@ -28,8 +28,9 @@ EXTRA_GOBUILD_FLAGS="$8"
 GO_LDFLAGS="$9"
 CGO_ENABLED="${10}"
 CGO_LDFLAGS="${11}"
-REPO_SUBPATH="${12:-}"
-ALL_TARGET_FILES="${13:-}"
+CGO_CFLAGS_ALLOW="${12}"
+REPO_SUBPATH="${13:-}"
+ALL_TARGET_FILES="${14:-}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
@@ -40,7 +41,7 @@ function build::simple::print_go_env(){
       echo "$var: ${!var:-}"
     fi
     if [ "$var" = "CGO_ENABLED" ] && [ "${!var:-}" = "1" ]; then
-      for other in "CGO_LDFLAGS" "CGO_CFLAGS" "LD_LIBRARY_PATH" "PKG_CONFIG_PATH"; do echo "$other: ${!other:-}"; done
+      for other in "CGO_LDFLAGS" "CGO_CFLAGS" "LD_LIBRARY_PATH" "PKG_CONFIG_PATH" "CGO_CFLAGS_ALLOW"; do echo "$other: ${!other:-}"; done
     fi
   done
 }
@@ -58,6 +59,7 @@ function build::simple::binaries(){
       export CGO_CFLAGS="-I$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/include"
       export LD_LIBRARY_PATH=$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64:${LD_LIBRARY_PATH-}
       export PKG_CONFIG_PATH=$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64/pkgconfig:${PKG_CONFIG_PATH-}
+      export CGO_CFLAGS_ALLOW="$CGO_CFLAGS_ALLOW"
     fi
 
     # target file is meant to be treated as a folder since multiple binaries will written out
