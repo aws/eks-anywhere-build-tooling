@@ -31,6 +31,7 @@ const (
 	GoVersionFile                           = "GOLANG_VERSION"
 	ChecksumsFile                           = "CHECKSUMS"
 	AttributionsFilePattern                 = "*ATTRIBUTION.txt"
+	ManifestsDirectory                      = "manifests"
 	PatchesDirectory                        = "patches"
 	FailedPatchApplyMarker                  = "patch does not apply"
 	SemverRegex                             = `v?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
@@ -39,6 +40,7 @@ const (
 	BottlerocketReleasesFile                = "BOTTLEROCKET_RELEASES"
 	BottlerocketContainerMetadataFileFormat = "BOTTLEROCKET_%s_CONTAINER_METADATA"
 	BottlerocketHostContainersTOMLFile      = "sources/shared-defaults/public-host-containers.toml"
+	CertManagerManifestYAMLFile             = "cert-manager.yaml"
 	CiliumImageRepository                   = "public.ecr.aws/isovalent/cilium"
 	GithubPerPage                           = 100
 	datetimeFormat                          = "%Y-%m-%dT%H:%M:%SZ"

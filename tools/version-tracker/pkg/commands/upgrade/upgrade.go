@@ -383,6 +383,15 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 						updatedFiles = append(updatedFiles, updatedCiliumImageDigestFiles...)
 					}
 				}
+
+				if projectName == "cert-manager/cert-manager" {
+					err := updateCertManagerManifestFile(projectRootFilepath)
+					if err != nil {
+						failedSteps["Cert-manager manifest file update"] = err
+					} else {
+						updatedFiles = append(updatedFiles, filepath.Join(projectPath, constants.ManifestsDirectory, constants.CertManagerManifestYAMLFile))
+					}
+				}
 			}
 
 			if projectName == "kubernetes-sigs/image-builder" {
@@ -463,9 +472,11 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		}
 		failedUpgradeComment := fmt.Sprintf(constants.FailedUpgradeCommentBody, strings.Join(failedStepsList, "\n"))
 
-		err = github.AddCommentOnPR(client, baseRepoOwner, failedUpgradeComment, pullRequest)
-		if err != nil {
-			return fmt.Errorf("commenting failed upgrade comment on pull request [%s]: %v", *pullRequest.HTMLURL, err)
+		if !upgradeOptions.DryRun {
+			err = github.AddCommentOnPR(client, baseRepoOwner, failedUpgradeComment, pullRequest)
+			if err != nil {
+				return fmt.Errorf("commenting failed upgrade comment on pull request [%s]: %v", *pullRequest.HTMLURL, err)
+			}
 		}
 
 		return errors.New(strings.Join(errorsList, "\n"))
@@ -748,6 +759,17 @@ func updateCiliumImageDigestFiles(projectRootFilepath, projectPath string) ([]st
 		updateCiliumFiles = append(updateCiliumFiles, filepath.Join(projectPath, "images", directory, "IMAGE_DIGEST"))
 	}
 	return updateCiliumFiles, nil
+}
+
+func updateCertManagerManifestFile(projectRootFilepath string) error {
+	updateCertManagerManifestCommandSequence := fmt.Sprintf("make -C %s update-cert-manager-manifest", projectRootFilepath)
+	updateCertManagerManifestCmd := exec.Command("bash", "-c", updateCertManagerManifestCommandSequence)
+	_, err := command.ExecCommand(updateCertManagerManifestCmd)
+	if err != nil {
+		return fmt.Errorf("running update-cert-manager-manifest Make command: %v", err)
+	}
+
+	return nil
 }
 
 func updateBottlerocketVersionFiles(client *gogithub.Client, projectRootFilepath, projectPath, branchName string) (string, string, []string, error) {
