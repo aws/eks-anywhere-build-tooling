@@ -21,7 +21,15 @@ USERMODE_HELPER_TARGETS=$(foreach platform,$(IMAGE_PLATFORMS),$(OUTPUT_BIN_DIR)/
 
 IMAGE_NAMES=init ca-certificates firmware rngd sysctl sysfs modprobe dhcpcd openntpd getty
 
-DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
+# we are building these using the upstream dockerfiles for now
+# the plan is to convert these to our standard build process
+# We are using this pattern of setting the dockerfile_folder instead of local to the target
+# because this project uses the combine-images target which overrides the dockerfile_folder
+# to the standard combine-images dockerfile
+# If we setup our override in this Makefile at the target it does not allow the combine-images
+# to override it
+IMAGES_USING_UPSTREAM_DOCKERFILES=ca-certificates dhcpcd firmware getty init modprobe openntpd
+DOCKERFILE_FOLDER=$(if $(filter $(IMAGE_NAME),$(IMAGES_USING_UPSTREAM_DOCKERFILES)),$(REPO)/pkg/$(IMAGE_NAME),./docker/linux/$(IMAGE_NAME))
 
 INIT_IMAGE_COMPONENT=linuxkit/init
 CA_CERTIFICATES_IMAGE_COMPONENT=linuxkit/ca-certificates
@@ -83,9 +91,6 @@ $(OUTPUT_BIN_DIR)/linux-%/rngd: EXTRA_GO_LDFLAGS=-extldflags -static
 $(OUTPUT_BIN_DIR)/linux-%/rngd: EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
 $(OUTPUT_DIR)/rngd/attribution/go-license.csv: CGO_CREATE_BINARIES=true
 
-# we are building these using the upstream dockerfiles for now
-# the plan is to convert these to our standard build process
-ca-certificates/images/% dhcpcd/images/% firmware/images/% getty/images/% init/images/% modprobe/images/% openntpd/images/%: DOCKERFILE_FOLDER=$(REPO)/pkg/$(IMAGE_NAME)
 ca-certificates/images/% dhcpcd/images/% firmware/images/% getty/images/% modprobe/images/% openntpd/images/%: IMAGE_CONTEXT_DIR=$(REPO)/pkg/$(IMAGE_NAME)
 
 $(OUTPUT_BIN_DIR)/%/usermode-helper: MAKEFLAGS=
