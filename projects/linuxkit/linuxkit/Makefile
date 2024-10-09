@@ -6,14 +6,22 @@ REPO_OWNER=linuxkit
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
-BINARY_TARGET_FILES=linuxkit
-GO_MOD_PATHS=src/cmd/linuxkit
+BINARY_TARGET_FILES=linuxkit rngd sysfs sysctl init rc.init service
+GO_MOD_PATHS=src/cmd/linuxkit pkg/rngd pkg/sysfs pkg/sysctl pkg/init pkg/init pkg/init
+SOURCE_PATTERNS=. ./cmd/rngd . . ./cmd/init ./cmd/rc.init ./cmd/service
+
+
+# this is a native build which we can not cross compile
+# ensure we are building to a directory based on the current
+# host platform to avoid ever creating a different arch'd
+# binary in the wrong folder
+BINARY_PLATFORMS?=linux/$(BUILDER_PLATFORM_ARCH)
+IMAGE_PLATFORMS?=linux/$(BUILDER_PLATFORM_ARCH)
+USERMODE_HELPER_TARGETS=$(foreach platform,$(IMAGE_PLATFORMS),$(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/usermode-helper)
 
 IMAGE_NAMES=init ca-certificates firmware rngd sysctl sysfs modprobe dhcpcd openntpd getty
-# we are building these using the upstream dockerfiles for now
-# the plan is to convert these to our standard build process
-DOCKERFILE_FOLDER=$(REPO)/pkg/$(IMAGE_NAME)
-IMAGE_CONTEXT_DIR=$(REPO)/pkg/$(IMAGE_NAME)
+
+DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 INIT_IMAGE_COMPONENT=linuxkit/init
 CA_CERTIFICATES_IMAGE_COMPONENT=linuxkit/ca-certificates
@@ -29,7 +37,7 @@ GETTY_IMAGE_COMPONENT=linuxkit/getty
 # when using yq to conver to json 0666 is being parsed as a number and converted to 438
 # replace it back to 0600
 # https://github.com/mikefarah/yq/issues/1634
-MOBY_CONFIG='$(shell set -x && yq '.config' $(REPO)/pkg/$(IMAGE_NAME)/build.yml | yq -o=json -I=0 | sed 's/438/"0666"/g')'
+MOBY_CONFIG='$(shell yq '.config' $(REPO)/pkg/$(IMAGE_NAME)/build.yml | yq -o=json -I=0 | sed 's/438/"0666"/g')'
 
 # we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
 # it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
@@ -38,14 +46,12 @@ MOBY_CONFIG='$(shell set -x && yq '.config' $(REPO)/pkg/$(IMAGE_NAME)/build.yml 
 # the images target being the actual action, its version of the set takes prioirty and resets to empty
 # setting it explicitly to empty here takes allows the combine-images override to take proirty
 IMAGE_BUILD_ARGS=
-
 VERSION=$(shell git -C $(REPO) describe --tags)
 GIT_COMMIT=$(shell git -C $(REPO) rev-parse HEAD)
-EXTRA_GO_LDFLAGS=-X github.com/linuxkit/linuxkit/src/cmd/linuxkit/version.GitCommit=$(GIT_COMMIT) -X github.com/linuxkit/linuxkit/src/cmd/linuxkit/version.Version=$(VERSION)
 
 HAS_S3_ARTIFACTS=true
 
-FIX_LICENSES_LINUXKIT_TARGET=$(REPO)/src/cmd/linuxkit/LICENSE
+FIX_LICENSES_SUB_MOD_TARGETS=$(REPO)/src/cmd/linuxkit/LICENSE $(REPO)/pkg/rngd/LICENSE $(REPO)/pkg/sysctl/LICENSE $(REPO)/pkg/sysfs/LICENSE $(REPO)/pkg/init/LICENSE
 FIX_LICENSES_HYPERKIT_TARGE=$(REPO)/src/cmd/linuxkit/vendor/github.com/moby/hyperkit/go/README.md
 
 BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
@@ -62,11 +68,34 @@ UPLOAD_DO_NOT_DELETE=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
+# build usermode-helper with binary targets
+validate-checksums: $(USERMODE_HELPER_TARGETS)
+
 dhcpcd/images/% getty/images/% modprobe/images/% openntpd/images/% rngd/images/% sysctl/images/% sysfs/images/%: IMAGE_BUILD_ARGS+=MOBY_CONFIG
 
-$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_LINUXKIT_TARGET) $(FIX_LICENSES_HYPERKIT_TARGE)
+$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_SUB_MOD_TARGETS) $(FIX_LICENSES_HYPERKIT_TARGE)
 
-$(FIX_LICENSES_LINUXKIT_TARGET): $(REPO)
+$(OUTPUT_BIN_DIR)/linux-%/linuxkit: EXTRA_GO_LDFLAGS=-X github.com/linuxkit/linuxkit/src/cmd/linuxkit/version.GitCommit=$(GIT_COMMIT) -X github.com/linuxkit/linuxkit/src/cmd/linuxkit/version.Version=$(VERSION)
+
+$(OUTPUT_BIN_DIR)/linux-%/rngd: CGO_CREATE_BINARIES=true
+$(OUTPUT_BIN_DIR)/linux-%/rngd: CGO_CFLAGS_ALLOW=(-mrdrnd|-mrdseed)
+$(OUTPUT_BIN_DIR)/linux-%/rngd: EXTRA_GO_LDFLAGS=-extldflags -static
+$(OUTPUT_BIN_DIR)/linux-%/rngd: EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
+$(OUTPUT_DIR)/rngd/attribution/go-license.csv: CGO_CREATE_BINARIES=true
+
+# we are building these using the upstream dockerfiles for now
+# the plan is to convert these to our standard build process
+ca-certificates/images/% dhcpcd/images/% firmware/images/% getty/images/% init/images/% modprobe/images/% openntpd/images/%: DOCKERFILE_FOLDER=$(REPO)/pkg/$(IMAGE_NAME)
+ca-certificates/images/% dhcpcd/images/% firmware/images/% getty/images/% modprobe/images/% openntpd/images/%: IMAGE_CONTEXT_DIR=$(REPO)/pkg/$(IMAGE_NAME)
+
+$(OUTPUT_BIN_DIR)/%/usermode-helper: MAKEFLAGS=
+$(OUTPUT_BIN_DIR)/%/usermode-helper: PLATFORM=$(subst -,/,$*)
+$(OUTPUT_BIN_DIR)/%/usermode-helper: $(GIT_PATCH_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
+	@mkdir -p $(MAKE_ROOT)/$(@D); \
+	LDFLAGS=-static CFLAGS=-Werror $(MAKE) -C $(REPO)/pkg/init usermode-helper; \
+	mv $(REPO)/pkg/init/usermode-helper $@
+
+$(FIX_LICENSES_SUB_MOD_TARGETS): $(GIT_PATCH_TARGET)
 # the src/cmd/linuxkit dir does not have the license file, copy from repo root
 	cp $(REPO)/LICENSE $@
 

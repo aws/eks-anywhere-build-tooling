@@ -1,0 +1,60 @@
+From 07ca76275ceda7f3e3eb5302f20c57bf5d05bc62 Mon Sep 17 00:00:00 2001
+From: Jackson West <jaxesn@gmail.com>
+Date: Sat, 31 Aug 2024 02:17:22 +0000
+Subject: [PATCH 2/3] init dockerfile to use eks-a built bins
+
+---
+ pkg/init/Dockerfile | 28 ++++++++++------------------
+ 1 file changed, 10 insertions(+), 18 deletions(-)
+
+diff --git a/pkg/init/Dockerfile b/pkg/init/Dockerfile
+index 4436e7adc..76d28e34c 100644
+--- a/pkg/init/Dockerfile
++++ b/pkg/init/Dockerfile
+@@ -1,28 +1,20 @@
+ # Dockerfile to build linuxkit/init for linuxkit
+-FROM linuxkit/containerd-dev:af26a5c09a71b919ee8113501d783a5bf299482d AS containerd-dev
+ FROM linuxkit/alpine:146f540f25cd92ec8ff0c5b0c98342a9a95e479e AS build
+-RUN apk add --no-cache --initdb alpine-baselayout make gcc musl-dev git linux-headers
+ 
+-ADD usermode-helper.c ./
+-RUN LDFLAGS=-static CFLAGS=-Werror make usermode-helper
++ARG TARGETARCH
++ARG TARGETOS
+ 
+-RUN apk add --no-cache go musl-dev
+-ENV GOPATH=/go PATH=$PATH:/go/bin
+-ARG GOPKGVERSION
+-ENV ldflags="-X main.Version=$GOPKGVERSION"
++COPY _output/bin/linuxkit/$TARGETOS-$TARGETARCH/usermode-helper /
++COPY _output/bin/linuxkit/$TARGETOS-$TARGETARCH/init /go/bin/init
++COPY _output/bin/linuxkit/$TARGETOS-$TARGETARCH/rc.init /go/bin/rc.init
+ 
+-# Hack to work around an issue with go on arm64 requiring gcc
+-RUN [ $(uname -m) = aarch64 ] && apk add --no-cache gcc || true
+-
+-COPY . /go/src
+-RUN go-compile.sh /go/src/cmd/init
+-RUN go-compile.sh /go/src/cmd/rc.init
+ # this makes sure that the multi stage build copies as a symlink
+ RUN mkdir /tmp/bin && cd /tmp/bin/ && cp /go/bin/rc.init . && ln -s rc.init rc.shutdown
+ 
+-COPY --from=containerd-dev /go/src/github.com/containerd/containerd $GOPATH/src/github.com/containerd/containerd
+-RUN cd /go/src/cmd/service && ./skanky-vendor.sh $GOPATH/src/github.com/containerd/containerd
+-RUN go-compile.sh /go/src/cmd/service
++COPY INIT_ATTRIBUTION.txt /tmp/bin
++COPY RC.INIT_ATTRIBUTION.txt /tmp/bin
++COPY _output/bin/linuxkit/$TARGETOS-$TARGETARCH/service /go/bin/service
++COPY SERVICE_ATTRIBUTION.txt /tmp/bin
+ 
+ # volumes link to start
+ RUN mkdir -p /etc/init.d && ln -s /usr/bin/service /etc/init.d/005-volumes
+@@ -48,4 +40,4 @@ COPY --from=build /go/bin/service /usr/bin/
+ COPY --from=build usermode-helper /sbin/
+ COPY --from=build /etc/init.d/ /etc/init.d/
+ COPY --from=mirror /out/ /
+-COPY etc etc/
++COPY linuxkit/pkg/init/etc/ etc/
+-- 
+2.34.1
+

@@ -408,17 +408,13 @@ DOCKER_PLATFORM?=
 ######################
 
 #### BUILD FLAGS ####
-ifeq ($(CGO_CREATE_BINARIES),true)
-	CGO_ENABLED=1
-	GO_LDFLAGS?=-s -w -buildid= $(EXTRA_GO_LDFLAGS)
-	CGO_LDFLAGS?=-Wl,--build-id=none
-	EXTRA_GOBUILD_FLAGS?=-gcflags=-trimpath=$(MAKE_ROOT) -asmflags=-trimpath=$(MAKE_ROOT)
-else
-	CGO_ENABLED=0
-	GO_LDFLAGS?=-s -w -buildid= -extldflags -static $(EXTRA_GO_LDFLAGS)
-	CGO_LDFLAGS?=
-	EXTRA_GOBUILD_FLAGS?=
-endif
+CGO_ENABLED=$(if $(filter true,$(CGO_CREATE_BINARIES)),1,0)
+GO_LDFLAGS?=$(if $(filter true,$(CGO_CREATE_BINARIES)),-s -w -buildid= $(EXTRA_GO_LDFLAGS),-s -w -buildid= -extldflags -static $(EXTRA_GO_LDFLAGS))
+CGO_BUILD_ID=-Wl,--build-id=none
+CGO_LDFLAGS?=$(if $(filter true,$(CGO_CREATE_BINARIES)),$(CGO_BUILD_ID),)
+EXTRA_GOBUILD_FLAGS?=$(if $(filter true,$(CGO_CREATE_BINARIES)),-gcflags=-trimpath=$(MAKE_ROOT) -asmflags=-trimpath=$(MAKE_ROOT),)
+CGO_CFLAGS_ALLOW?=
+
 EXTRA_GO_LDFLAGS?=
 GOBUILD_COMMAND?=build
 ######################
@@ -663,7 +659,7 @@ $(OUTPUT_BIN_DIR)/%: GO_MOD_DOWNLOAD_TARGET=$(call GO_MOD_DOWNLOAD_TARGET_FROM_G
 # if cgo build, set platform when running the docker container
 $(OUTPUT_BIN_DIR)/%: SET_PLATFORM=$(if $(filter true,$(NEEDS_CGO_BUILDER)),$(PLATFORM),)
 $(OUTPUT_BIN_DIR)/%: $$(GO_MOD_DOWNLOAD_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(SET_PLATFORM))
-	@$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_PATH) $(REPO) $(GOLANG_VERSION) $(PLATFORM) "$(SOURCE_PATTERN)" "$(GOBUILD_COMMAND)" "$(EXTRA_GOBUILD_FLAGS)" "$(GO_LDFLAGS)" $(CGO_ENABLED) "$(CGO_LDFLAGS)" "$(GO_MOD_PATH)" "$(BINARY_TARGET_FILES_BUILD_TOGETHER)"
+	@$(BASE_DIRECTORY)/build/lib/simple_create_binaries.sh $(MAKE_ROOT) $(MAKE_ROOT)/$(OUTPUT_PATH) $(REPO) $(GOLANG_VERSION) $(PLATFORM) "$(SOURCE_PATTERN)" "$(GOBUILD_COMMAND)" "$(EXTRA_GOBUILD_FLAGS)" "$(GO_LDFLAGS)" $(CGO_ENABLED) "$(CGO_LDFLAGS)" "$(CGO_CFLAGS_ALLOW)" "$(GO_MOD_PATH)" "$(BINARY_TARGET_FILES_BUILD_TOGETHER)"
 endif
 
 .PHONY: binaries
