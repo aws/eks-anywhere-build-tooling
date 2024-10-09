@@ -11,23 +11,24 @@ SIMPLE_CREATE_BINARIES=false # not a go project, can't use this script "simple_c
 # host platform to avoid ever creating a different arch'd
 # binary in the wrong folder
 BINARY_PLATFORMS?=linux/$(BUILDER_PLATFORM_ARCH)
-BINARY_TARGETS_AMD64=$(OUTPUT_BIN_DIR)/linux-amd64/ipxe.efi $(OUTPUT_BIN_DIR)/linux-amd64/undionly.kpxe
-BINARY_TARGETS_ARM64=$(OUTPUT_BIN_DIR)/linux-arm64/snp.efi
 
 # we are not building these because we do not need them
 # but the smee import is going to reguire them so we 
 # create empty files
 FAKE_BINARY_TARGETS=$(OUTPUT_BIN_DIR)/linux-amd64/ipxe.iso $(OUTPUT_BIN_DIR)/linux-amd64/ipxe-efi.img
-BINARY_TARGETS=$(if $(findstring amd64,$(BINARY_PLATFORMS)),$(BINARY_TARGETS_AMD64),) $(if $(findstring arm64,$(BINARY_PLATFORMS)),$(BINARY_TARGETS_ARM64),) $(FAKE_BINARY_TARGETS)
+BINARY_TARGETS_AMD64=$(OUTPUT_BIN_DIR)/linux-amd64/ipxe.efi $(OUTPUT_BIN_DIR)/linux-amd64/undionly.kpxe $(FAKE_BINARY_TARGETS)
+BINARY_TARGETS_ARM64=$(OUTPUT_BIN_DIR)/linux-arm64/snp.efi
+
+BINARY_TARGETS=$(if $(findstring amd64,$(BINARY_PLATFORMS)),$(BINARY_TARGETS_AMD64),) $(if $(findstring arm64,$(BINARY_PLATFORMS)),$(BINARY_TARGETS_ARM64),)
+
+SOURCE_DATE_EPOCH=$(shell git -C $(REPO) log -1 --format=%at)
 
 HAS_LICENSES=false
 
 HAS_S3_ARTIFACTS=true
-SKIP_CHECKSUM_VALIDATION=true
 
 IMAGE_NAMES=
 
-EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 BUILDSPECS=buildspec.yml
@@ -55,11 +56,18 @@ $(FAKE_BINARY_TARGETS):
 	touch $@
 
 # since we are yum installing, we need to run the docker container as root
+# To be reproducible:
+# - ipxe builds in a build timestamp, set that to the date from the ipxedust repo's last commit
+# - ipxe also builds in a build_id which is based on a checksum from a number of the makefiles
+#   as well as some of the built .a files, such as blib.a. When the final ipxe binary is built
+#   debugging symbols and other unncessary data is stripped out, making reproducibilty easier
+#   However the blib.a is not stripped so things like the build path will change the checksum and 
+#   therefore the build_id. We use -debug-prefix-map to reset the build folder
 $(OUTPUT_BIN_DIR)/%: MAKEFLAGS=
 $(OUTPUT_BIN_DIR)/%: $(GIT_PATCH_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
 	sudo yum install -y genisoimage perl syslinux xz-devel; \
 	mkdir -p $(@D); \
-	$(MAKE) -C $(REPO) binary/$(@F); \
+	$(MAKE) -C $(REPO) binary/$(@F) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) EXTRA_CFLAGS="-fdebug-prefix-map=$(MAKE_ROOT)=/buildroot"; \
 	cp $(REPO)/binary/$(@F) $@
 
 .PHONY: gather-non-golang-licenses

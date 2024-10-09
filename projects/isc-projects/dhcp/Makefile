@@ -17,11 +17,9 @@ HAS_LICENSES=false
 
 TAR_FILE_PREFIX=dhcp
 HAS_S3_ARTIFACTS=true
-SKIP_CHECKSUM_VALIDATION=true
 
 IMAGE_NAMES=
 
-EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 BUILDSPEC_VARS_KEYS=BINARY_PLATFORMS
@@ -39,13 +37,15 @@ include $(BASE_DIRECTORY)/Common.mk
 
 tarballs: gather-non-golang-licenses $(OUTPUT_DIR)/ATTRIBUTION.txt
 
+# To be reproducible:
+# -debug-prefix-map to reset the build folder
 $(OUTPUT_BIN_DIR)/%: MAKEFLAGS=
 $(OUTPUT_BIN_DIR)/%: PLATFORM=$(subst -,/,$(*D:/dhcp=))
 $(OUTPUT_BIN_DIR)/%: $(GIT_CHECKOUT_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
 	@mkdir -p $(MAKE_ROOT)/$(@D); \
-	yum install perl -y; \
+	sudo yum install file perl -y; \
 	cd $(REPO) && \
-	./configure && \
+	./configure CFLAGS="-fdebug-prefix-map=$(MAKE_ROOT)=/buildroot" && \
 	$(MAKE) && \
 	cp relay/dhcrelay $(MAKE_ROOT)/$(@D)/
 
