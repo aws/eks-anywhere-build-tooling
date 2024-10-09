@@ -13,6 +13,10 @@ If the config file names change upstream be sure to change `HOOK_IMAGE_FILES` in
 1. Verify the golang version has not changed. Currently for `hook-bootkit` and `hook-docker` the version mentioned in a [dockerfile](https://github.com/tinkerbell/hook/blob/main/images/hook-bootkit/Dockerfile) of the respective projects is being used to build.
 We only support building with one golang version per project, pick the latest from these two dockerfiles if they do not match.
 1. Verify no changes have been made to the dockerfile for each image. Looking specifically for added runtime deps.
+1. Pay attention to new or changed scripts referenced in the [hook-template](https://github.com/tinkerbell/hook/blob/main/linuxkit-templates/hook.template.yaml). For example
+the [dhcp.sh](https://github.com/tinkerbell/hook/blob/main/linuxkit-templates/hook.template.yaml#L280) script, if changes are made that require new runtime deps
+be sure to update the dhcpcd [Dockerfile](../../linuxkit/linuxkit/docker/linux/dhcpcd/Dockerfile).  If new ones are added, be sure the runtime images we are building which 
+execute that respective script have the needed dependencies.
 1. `hook-docker` image has docker runtime. Hence, verify no new changes have been made with docker version updates.
 1. Update checksums and attribution using `make attribution checksums`.
 1. Update the version at the top of this Readme.

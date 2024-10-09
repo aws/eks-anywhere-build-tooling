@@ -6,9 +6,11 @@ REPO_OWNER=linuxkit
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
-BINARY_TARGET_FILES=linuxkit rngd sysfs sysctl init rc.init service
-GO_MOD_PATHS=src/cmd/linuxkit pkg/rngd pkg/sysfs pkg/sysctl pkg/init pkg/init pkg/init
-SOURCE_PATTERNS=. ./cmd/rngd . . ./cmd/init ./cmd/rc.init ./cmd/service
+# The go_mod_path for usermode/dhcpcd/ntpd are set to the linuxkit path to avoid issues trying to go mod vendor
+# and source_patterns are ignored since these are native builds
+BINARY_TARGET_FILES=linuxkit usermode-helper dhcpcd/usr/sbin/dhcpcd openntpd/usr/sbin/ntpd rngd sysfs sysctl init rc.init service
+GO_MOD_PATHS=src/cmd/linuxkit src/cmd/linuxkit src/cmd/linuxkit src/cmd/linuxkit pkg/rngd pkg/sysfs pkg/sysctl pkg/init pkg/init pkg/init
+SOURCE_PATTERNS=. . . . ./cmd/rngd . . ./cmd/init ./cmd/rc.init ./cmd/service
 
 
 # this is a native build which we can not cross compile
@@ -17,7 +19,6 @@ SOURCE_PATTERNS=. ./cmd/rngd . . ./cmd/init ./cmd/rc.init ./cmd/service
 # binary in the wrong folder
 BINARY_PLATFORMS?=linux/$(BUILDER_PLATFORM_ARCH)
 IMAGE_PLATFORMS?=linux/$(BUILDER_PLATFORM_ARCH)
-USERMODE_HELPER_TARGETS=$(foreach platform,$(IMAGE_PLATFORMS),$(OUTPUT_BIN_DIR)/$(subst /,-,$(platform))/usermode-helper)
 
 IMAGE_NAMES=init ca-certificates firmware rngd sysctl sysfs modprobe dhcpcd openntpd getty
 
@@ -28,7 +29,7 @@ IMAGE_NAMES=init ca-certificates firmware rngd sysctl sysfs modprobe dhcpcd open
 # to the standard combine-images dockerfile
 # If we setup our override in this Makefile at the target it does not allow the combine-images
 # to override it
-IMAGES_USING_UPSTREAM_DOCKERFILES=ca-certificates dhcpcd firmware getty init modprobe openntpd
+IMAGES_USING_UPSTREAM_DOCKERFILES=ca-certificates firmware getty init modprobe
 DOCKERFILE_FOLDER=$(if $(filter $(IMAGE_NAME),$(IMAGES_USING_UPSTREAM_DOCKERFILES)),$(REPO)/pkg/$(IMAGE_NAME),./docker/linux/$(IMAGE_NAME))
 
 INIT_IMAGE_COMPONENT=linuxkit/init
@@ -69,6 +70,7 @@ BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
 BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
 BUILDSPEC_2_DEPENDS_ON_OVERRIDE=linuxkit_linuxkit_linux_amd64 linuxkit_linuxkit_linux_arm64
 
+
 # Since we build the arm and amd binaries on difference instances in codebuild
 # we do not want to delete missing files when s3 sync-ing from local to the bucket
 # since this would clobber the other build's artifacts
@@ -76,8 +78,6 @@ UPLOAD_DO_NOT_DELETE=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-# build usermode-helper with binary targets
-validate-checksums: $(USERMODE_HELPER_TARGETS)
 
 dhcpcd/images/% getty/images/% modprobe/images/% openntpd/images/% rngd/images/% sysctl/images/% sysfs/images/%: IMAGE_BUILD_ARGS+=MOBY_CONFIG
 
@@ -91,7 +91,12 @@ $(OUTPUT_BIN_DIR)/linux-%/rngd: EXTRA_GO_LDFLAGS=-extldflags -static
 $(OUTPUT_BIN_DIR)/linux-%/rngd: EXTRA_GOBUILD_FLAGS=-tags netgo,osusergo,static_build
 $(OUTPUT_DIR)/rngd/attribution/go-license.csv: CGO_CREATE_BINARIES=true
 
-ca-certificates/images/% dhcpcd/images/% firmware/images/% getty/images/% modprobe/images/% openntpd/images/%: IMAGE_CONTEXT_DIR=$(REPO)/pkg/$(IMAGE_NAME)
+ca-certificates/images/% firmware/images/% getty/images/% modprobe/images/%: IMAGE_CONTEXT_DIR=$(REPO)/pkg/$(IMAGE_NAME)
+
+dhcpcd/images/% openntpd/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-glibc
+
+$(call IMAGE_TARGETS_FOR_NAME,openntpd): openntpd-useradd/images/export
+openntpd-useradd/images/export: IMAGE_USERADD_USER_NAME=_ntp
 
 $(OUTPUT_BIN_DIR)/%/usermode-helper: MAKEFLAGS=
 $(OUTPUT_BIN_DIR)/%/usermode-helper: PLATFORM=$(subst -,/,$*)
@@ -99,6 +104,42 @@ $(OUTPUT_BIN_DIR)/%/usermode-helper: $(GIT_PATCH_TARGET) | $$(call ENABLE_DOCKER
 	@mkdir -p $(MAKE_ROOT)/$(@D); \
 	LDFLAGS=-static CFLAGS=-Werror $(MAKE) -C $(REPO)/pkg/init usermode-helper; \
 	mv $(REPO)/pkg/init/usermode-helper $@
+
+$(OUTPUT_BIN_DIR)/%/dhcpcd/usr/sbin/dhcpcd: MAKEFLAGS=
+$(OUTPUT_BIN_DIR)/%/dhcpcd/usr/sbin/dhcpcd: PLATFORM=$(subst -,/,$*)
+$(OUTPUT_BIN_DIR)/%/dhcpcd/usr/sbin/dhcpcd: OUTPUT_PATH=$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$*/dhcpcd
+$(OUTPUT_BIN_DIR)/%/dhcpcd/usr/sbin/dhcpcd: VERSION=$(shell yq '.DHCPCD.version' dependencies.yaml )
+$(OUTPUT_BIN_DIR)/%/dhcpcd/usr/sbin/dhcpcd: SHA256SUM=$(shell yq '.DHCPCD.sha256sum' dependencies.yaml )
+$(OUTPUT_BIN_DIR)/%/dhcpcd/usr/sbin/dhcpcd: $(GIT_PATCH_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
+	mkdir -p $(OUTPUT_DIR)/dhcpcd; \
+	cd $(OUTPUT_DIR)/dhcpcd; \
+	curl -qL --retry-connrefused -O https://github.com/NetworkConfiguration/dhcpcd/releases/download/v$(VERSION)/dhcpcd-$(VERSION).tar.xz; \
+	echo "$(SHA256SUM)  dhcpcd-$(VERSION).tar.xz" > shasum; \
+	sha256sum -c shasum; \
+	tar -xf dhcpcd-$(VERSION).tar.xz; \
+	cd dhcpcd-$(VERSION); \
+	LDFLAGS="-Wl,--build-id=none" ./configure; \
+	make; \
+	DESTDIR=$(OUTPUT_PATH) make install; \
+	mv $(OUTPUT_PATH)/sbin $(OUTPUT_PATH)/usr
+
+$(OUTPUT_BIN_DIR)/%/openntpd/usr/sbin/ntpd: MAKEFLAGS=
+$(OUTPUT_BIN_DIR)/%/openntpd/usr/sbin/ntpd: PLATFORM=$(subst -,/,$*)
+$(OUTPUT_BIN_DIR)/%/openntpd/usr/sbin/ntpd: OUTPUT_PATH=$(MAKE_ROOT)/$(OUTPUT_BIN_DIR)/$*/openntpd
+$(OUTPUT_BIN_DIR)/%/openntpd/usr/sbin/ntpd: VERSION=$(shell yq '.NTPD.version' dependencies.yaml )
+$(OUTPUT_BIN_DIR)/%/openntpd/usr/sbin/ntpd: SHA256SUM=$(shell yq '.NTPD.sha256sum' dependencies.yaml )
+$(OUTPUT_BIN_DIR)/%/openntpd/usr/sbin/ntpd: $(GIT_PATCH_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
+	mkdir -p $(OUTPUT_DIR)/openntpd $(OUTPUT_PATH)/usr; \
+	cd $(OUTPUT_DIR)/openntpd; \
+	curl -qL --retry-connrefused -O https://cdn.openbsd.org/pub/OpenBSD/OpenNTPD/openntpd-$(VERSION).tar.gz; \
+	echo "$(SHA256SUM)  openntpd-$(VERSION).tar.gz" > shasum; \
+	sha256sum -c shasum; \
+	tar -xf openntpd-$(VERSION).tar.gz; \
+	cd openntpd-$(VERSION); \
+	LDFLAGS="-Wl,--build-id=none" ./configure --prefix=/usr; \
+	make; \
+	DESTDIR=$(OUTPUT_PATH) make install
+
 
 $(FIX_LICENSES_SUB_MOD_TARGETS): $(GIT_PATCH_TARGET)
 # the src/cmd/linuxkit dir does not have the license file, copy from repo root
