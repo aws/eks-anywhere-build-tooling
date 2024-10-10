@@ -12,9 +12,14 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `linuxkit` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `linuxkit rngd sysfs sysctl init rc.init service` for `linux/amd64`
 _output/bin/linuxkit/linux-amd64/linuxkit: ## Build `_output/bin/linuxkit/linux-amd64/linuxkit`
-_output/bin/linuxkit/linux-arm64/linuxkit: ## Build `_output/bin/linuxkit/linux-arm64/linuxkit`
+_output/bin/linuxkit/linux-amd64/rngd: ## Build `_output/bin/linuxkit/linux-amd64/rngd`
+_output/bin/linuxkit/linux-amd64/sysfs: ## Build `_output/bin/linuxkit/linux-amd64/sysfs`
+_output/bin/linuxkit/linux-amd64/sysctl: ## Build `_output/bin/linuxkit/linux-amd64/sysctl`
+_output/bin/linuxkit/linux-amd64/init: ## Build `_output/bin/linuxkit/linux-amd64/init`
+_output/bin/linuxkit/linux-amd64/rc.init: ## Build `_output/bin/linuxkit/linux-amd64/rc.init`
+_output/bin/linuxkit/linux-amd64/service: ## Build `_output/bin/linuxkit/linux-amd64/service`
 
 ##@ Image Targets
 local-images: ## Builds `init/images/amd64 ca-certificates/images/amd64 firmware/images/amd64 rngd/images/amd64 sysctl/images/amd64 sysfs/images/amd64 modprobe/images/amd64 dhcpcd/images/amd64 openntpd/images/amd64 getty/images/amd64` as oci tars for presumbit validation
@@ -57,9 +62,24 @@ run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
 run-in-docker/linuxkit/src/cmd/linuxkit/eks-anywhere-go-mod-download: ## Run `linuxkit/src/cmd/linuxkit/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/linuxkit/pkg/rngd/eks-anywhere-go-mod-download: ## Run `linuxkit/pkg/rngd/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/linuxkit/pkg/sysfs/eks-anywhere-go-mod-download: ## Run `linuxkit/pkg/sysfs/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/linuxkit/pkg/sysctl/eks-anywhere-go-mod-download: ## Run `linuxkit/pkg/sysctl/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/linuxkit/pkg/init/eks-anywhere-go-mod-download: ## Run `linuxkit/pkg/init/eks-anywhere-go-mod-download` in docker builder container
 run-in-docker/_output/bin/linuxkit/linux-amd64/linuxkit: ## Run `_output/bin/linuxkit/linux-amd64/linuxkit` in docker builder container
-run-in-docker/_output/bin/linuxkit/linux-arm64/linuxkit: ## Run `_output/bin/linuxkit/linux-arm64/linuxkit` in docker builder container
+run-in-docker/_output/bin/linuxkit/linux-amd64/rngd: ## Run `_output/bin/linuxkit/linux-amd64/rngd` in docker builder container
+run-in-docker/_output/bin/linuxkit/linux-amd64/sysfs: ## Run `_output/bin/linuxkit/linux-amd64/sysfs` in docker builder container
+run-in-docker/_output/bin/linuxkit/linux-amd64/sysctl: ## Run `_output/bin/linuxkit/linux-amd64/sysctl` in docker builder container
+run-in-docker/_output/bin/linuxkit/linux-amd64/init: ## Run `_output/bin/linuxkit/linux-amd64/init` in docker builder container
+run-in-docker/_output/bin/linuxkit/linux-amd64/rc.init: ## Run `_output/bin/linuxkit/linux-amd64/rc.init` in docker builder container
+run-in-docker/_output/bin/linuxkit/linux-amd64/service: ## Run `_output/bin/linuxkit/linux-amd64/service` in docker builder container
 run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/rngd/attribution/go-license.csv: ## Run `_output/rngd/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/sysfs/attribution/go-license.csv: ## Run `_output/sysfs/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/sysctl/attribution/go-license.csv: ## Run `_output/sysctl/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/init/attribution/go-license.csv: ## Run `_output/init/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/rc.init/attribution/go-license.csv: ## Run `_output/rc.init/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/service/attribution/go-license.csv: ## Run `_output/service/attribution/go-license.csv` in docker builder container
 
 ##@ Artifact Targets
 tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
