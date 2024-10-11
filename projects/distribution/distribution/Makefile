@@ -15,6 +15,8 @@ EXTRA_GO_LDFLAGS=-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision
 EXTRA_GOBUILD_FLAGS=-tags include_oss,include_gcs
 
 HAS_S3_ARTIFACTS=true
+EXCLUDE_FROM_STAGING_BUILDSPEC=true
+SKIP_ON_RELEASE_BRANCH=true
 IMAGE_NAMES=
 
 FIX_LICENSES_REDIS_TARGET=$(REPO)/vendor/github.com/garyburd/redigo/LICENSE.txt
