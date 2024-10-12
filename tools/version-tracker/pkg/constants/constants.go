@@ -360,8 +360,8 @@ var (
 			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)"`,
 		},
 		"tinkerbell/rufio": {
-			SourceOfTruthFile:     ".github/workflows/ci.yaml",
-			GoVersionSearchString: `GO_VERSION: '(1\.\d\d)'`,
+			SourceOfTruthFile:     "Dockerfile",
+			GoVersionSearchString: `golang:(1\.\d\d)`,
 		},
 		"tinkerbell/hook": {
 			SourceOfTruthFile:     "images/hook-bootkit/Dockerfile",
