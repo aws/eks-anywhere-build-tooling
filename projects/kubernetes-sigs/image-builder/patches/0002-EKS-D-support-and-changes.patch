@@ -1,4 +1,4 @@
-From f494f6e61d78ddd9c5f23cef9455905aaa0ce951 Mon Sep 17 00:00:00 2001
+From ac818fa81aec7ae7535c99b616cb5b697169acf6 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 18:36:56 -0800
 Subject: [PATCH 02/13] EKS-D support and changes
@@ -16,7 +16,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  .../ansible/roles/kubernetes/tasks/url.yml    | 37 ++++++++++++++++++-
  images/capi/packer/ami/packer.json            |  7 +++-
  images/capi/packer/config/ansible-args.json   |  2 +-
- images/capi/packer/config/kubernetes.json     |  4 ++
+ images/capi/packer/config/kubernetes.json     |  6 ++-
  images/capi/packer/goss/goss-command.yaml     | 20 +++++++++-
  images/capi/packer/goss/goss-files.yaml       |  6 +++
  images/capi/packer/goss/goss-vars.yaml        |  6 +++
@@ -24,7 +24,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  images/capi/packer/ova/packer-node.json       |  5 +++
  images/capi/packer/qemu/packer.json           |  7 +++-
  images/capi/packer/raw/packer.json            |  7 +++-
- 12 files changed, 101 insertions(+), 22 deletions(-)
+ 12 files changed, 102 insertions(+), 23 deletions(-)
 
 diff --git a/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml b/images/capi/ansible/roles/kubernetes/tasks/crictl-url.yml
 index 615a441e6..33101f6f1 100644
@@ -129,7 +129,7 @@ index 537c4adec..0bfbf32cd 100644
        "version": "{{user `goss_version`}}"
      }
 diff --git a/images/capi/packer/config/ansible-args.json b/images/capi/packer/config/ansible-args.json
-index b100f8e74..92481888b 100644
+index b100f8e74..d7a90cc5a 100644
 --- a/images/capi/packer/config/ansible-args.json
 +++ b/images/capi/packer/config/ansible-args.json
 @@ -1,5 +1,5 @@
@@ -140,29 +140,32 @@ index b100f8e74..92481888b 100644
    "ansible_scp_extra_args": "{{env `ANSIBLE_SCP_EXTRA_ARGS`}}"
  }
 diff --git a/images/capi/packer/config/kubernetes.json b/images/capi/packer/config/kubernetes.json
-index e6ae7e3d9..ff84c58aa 100644
+index ba75172c4..0c51278d7 100644
 --- a/images/capi/packer/config/kubernetes.json
 +++ b/images/capi/packer/config/kubernetes.json
 @@ -4,6 +4,9 @@
    "crictl_source_type": "pkg",
    "crictl_url": "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{user `crictl_version`}}/crictl-v{{user `crictl_version`}}-linux-{{user `crictl_arch`}}.tar.gz",
-   "crictl_version": "1.29.0",
+   "crictl_version": "1.30.0",
 +  "etcd_http_source":"",
 +  "etcd_version":"",
 +  "etcdadm_http_source":"",
    "kubeadm_template": "etc/kubeadm.yml",
    "kubernetes_apiserver_port": "6443",
    "kubernetes_container_registry": "registry.k8s.io",
-@@ -18,6 +21,7 @@
+@@ -18,8 +21,9 @@
    "kubernetes_rpm_repo": "https://pkgs.k8s.io/core:/stable:/{{ user `kubernetes_series` }}/rpm/",
    "kubernetes_rpm_repo_arch": "x86_64",
-   "kubernetes_rpm_version": "1.29.7",
-+  "kubernetes_full_version": "v1.29.7",
-   "kubernetes_semver": "v1.29.7",
-   "kubernetes_series": "v1.29",
+   "kubernetes_rpm_version": "1.30.5",
++  "kubernetes_full_version": "v1.30.5",
+   "kubernetes_semver": "v1.30.5",
+-  "kubernetes_series": "v1.30",
++  "kubernetes_series": "v1.29",
    "kubernetes_source_type": "pkg",
+   "systemd_prefix": "/usr/lib/systemd",
+   "sysusr_prefix": "/usr",
 diff --git a/images/capi/packer/goss/goss-command.yaml b/images/capi/packer/goss/goss-command.yaml
-index aa2179c6d..36cebb4b3 100644
+index 7ea9925e8..d084fe1ac 100644
 --- a/images/capi/packer/goss/goss-command.yaml
 +++ b/images/capi/packer/goss/goss-command.yaml
 @@ -37,6 +37,11 @@ command:
@@ -316,5 +319,5 @@ index 1d52a5f98..29a3b34c2 100644
        "version": "{{user `goss_version`}}"
      }
 -- 
-2.46.2
+2.46.1
 
