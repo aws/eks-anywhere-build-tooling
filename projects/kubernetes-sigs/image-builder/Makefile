@@ -419,6 +419,7 @@ local-build-%: validate-supported-image-% validate-dependency-versions-$$(IMAGE_
 		touch $(FINAL_IMAGE_DIR)/packer.log; \
 		tail -f $(FINAL_IMAGE_DIR)/packer.log & \
 	fi
+	cat $(IMAGE_BUILDER_DIR)/packer/ova/packer-common.json
 	DEBUG=$(DEBUG) PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(FINAL_IMAGE_DIR)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
 		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
 		$(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,build-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
