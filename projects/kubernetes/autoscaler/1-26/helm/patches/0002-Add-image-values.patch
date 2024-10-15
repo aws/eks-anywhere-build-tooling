@@ -1,0 +1,89 @@
+From 7cc575072c71e7256b7fd092423e6312e2aacc88 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Thu, 15 Sep 2022 10:30:11 -0400
+Subject: [PATCH 2/2] Add image values
+
+---
+ .../templates/deployment.yaml                 | 12 +++++------
+ charts/cluster-autoscaler/values.yaml         | 20 +++++++++----------
+ 2 files changed, 15 insertions(+), 17 deletions(-)
+
+diff --git a/charts/cluster-autoscaler/templates/deployment.yaml b/charts/cluster-autoscaler/templates/deployment.yaml
+index 4850c7903..5cd7052e0 100644
+--- a/charts/cluster-autoscaler/templates/deployment.yaml
++++ b/charts/cluster-autoscaler/templates/deployment.yaml
+@@ -37,6 +37,10 @@ spec:
+ {{ toYaml .Values.podLabels | indent 8 }}
+       {{- end }}
+     spec:
++      {{- with .Values.imagePullSecrets }}
++      imagePullSecrets:
++        {{- toYaml . | nindent 8 }}
++      {{- end }}
+       {{- if .Values.priorityClassName }}
+       priorityClassName: "{{ .Values.priorityClassName }}"
+       {{- end }}
+@@ -52,7 +56,7 @@ spec:
+       {{- end }}
+       containers:
+         - name: {{ template "cluster-autoscaler.name" . }}
+-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
++          image: "{{ .Values.sourceRegistry }}/{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+           command:
+             - ./cluster-autoscaler
+@@ -333,11 +337,5 @@ spec:
+           secret:
+             secretName: {{ .Values.clusterAPIKubeconfigSecret }}
+       {{- end }}
+-      {{- end }}
+-      {{- if .Values.image.pullSecrets }}
+-      imagePullSecrets:
+-      {{- range .Values.image.pullSecrets }}
+-        - name: {{ . }}
+-      {{- end }}
+     {{- end }}
+ {{- end }}
+diff --git a/charts/cluster-autoscaler/values.yaml b/charts/cluster-autoscaler/values.yaml
+index 7358add50..88e71ab45 100644
+--- a/charts/cluster-autoscaler/values.yaml
++++ b/charts/cluster-autoscaler/values.yaml
+@@ -255,18 +255,15 @@ hostNetwork: false
+ 
+ image:
+   # image.repository -- Image repository
+-  repository: registry.k8s.io/autoscaling/cluster-autoscaler
+-  # image.tag -- Image tag
+-  tag: v1.31.0
++  repository: kubernetes/autoscaler
++  # image.digest -- Image digest
++  digest: {{kubernetes/autoscaler}}
++
+   # image.pullPolicy -- Image pull policy
+   pullPolicy: IfNotPresent
+-  ## Optionally specify an array of imagePullSecrets.
+-  ## Secrets must be manually created in the namespace.
+-  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+-  ##
+-  # image.pullSecrets -- Image pull secrets
+-  pullSecrets: []
+-  # - myRegistrKeySecretName
++
++# image pull secrets
++imagePullSecrets: []
+ 
+ # kubeTargetVersionOverride -- Allow overriding the `.Capabilities.KubeVersion.GitVersion` check. Useful for `helm template` commands.
+ kubeTargetVersionOverride: ""
+@@ -407,6 +404,9 @@ serviceMonitor:
+   # serviceMonitor.metricRelabelings -- MetricRelabelConfigs to apply to samples before ingestion.
+   metricRelabelings: {}
+ 
++# sourceRegistry -- Image registry
++sourceRegistry: 783794618700.dkr.ecr.us-west-2.amazonaws.com
++
+ # tolerations -- List of node taints to tolerate (requires Kubernetes >= 1.6).
+ tolerations: []
+ 
+-- 
+2.46.2
+

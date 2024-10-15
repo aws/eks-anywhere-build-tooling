@@ -1,4 +1,5 @@
 ## **Kubernetes Cluster Autoscaler**
+![1.26 Version](https://img.shields.io/badge/1--26%20version-cluster--autoscaler--1.26.8-blue)
 ![1.27 Version](https://img.shields.io/badge/1--27%20version-cluster--autoscaler--1.27.8-blue)
 ![1.28 Version](https://img.shields.io/badge/1--28%20version-cluster--autoscaler--1.28.6-blue)
 ![1.29 Version](https://img.shields.io/badge/1--29%20version-cluster--autoscaler--1.29.4-blue)
