@@ -23,14 +23,9 @@ func controlPlaneInit() error {
 	// start optional EBS initialization
 	ebsInitControl := startEbsInit()
 
-	cmd := exec.Command(kubeadmBinary, "version", "-o=short")
-	out, err := cmd.CombinedOutput()
+	kubeadmVersion, err := getKubeAdmVersion()
 	if err != nil {
-		return errors.Wrapf(err, "Error running command: %v, Output: %s\n", cmd, string(out))
-	}
-	kubeadmVersion, err := versionutil.ParseGeneric(strings.TrimSuffix(string(out), "\n"))
-	if err != nil {
-		return errors.Wrapf(err, "%s is not a valid kubeadm version", string(out))
+		return errors.Wrapf(err, "getting kubeadm version")
 	}
 
 	k8s129Compare, err := kubeadmVersion.Compare("1.29.0")
@@ -53,8 +48,8 @@ func controlPlaneInit() error {
 
 	// Generate keys and write all the manifests
 	fmt.Println("Running kubeadm init commands")
-	cmd = exec.Command(kubeadmBinary, utils.LogVerbosity, "init", "phase", "certs", "all", "--config", kubeadmFile)
-	out, err = cmd.CombinedOutput()
+	cmd := exec.Command(kubeadmBinary, utils.LogVerbosity, "init", "phase", "certs", "all", "--config", kubeadmFile)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Error running command, out: %s", string(out))
 	}
@@ -198,4 +193,19 @@ func controlPlaneInit() error {
 		checkEbsInit(ebsInitControl)
 	}
 	return nil
+}
+
+func getKubeAdmVersion() (*versionutil.Version, error) {
+	cmd := exec.Command(kubeadmBinary, "version", "-o=short")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, errors.Wrapf(err, "running command: %v, Output: %s\n", cmd, string(out))
+	}
+
+	kubeadmVersion, err := versionutil.ParseGeneric(strings.TrimSuffix(string(out), "\n"))
+	if err != nil {
+		return nil, errors.Wrapf(err, "%s is not a valid kubeadm version", string(out))
+	}
+
+	return kubeadmVersion, nil
 }
