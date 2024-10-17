@@ -23,7 +23,7 @@ func controlPlaneInit() error {
 	// start optional EBS initialization
 	ebsInitControl := startEbsInit()
 
-	kubeadmVersion, err := getKubeAdmVersion()
+	kubeadmVersion, err := getKubeadmVersion()
 	if err != nil {
 		return errors.Wrapf(err, "getting kubeadm version")
 	}
@@ -195,7 +195,7 @@ func controlPlaneInit() error {
 	return nil
 }
 
-func getKubeAdmVersion() (*versionutil.Version, error) {
+func getKubeadmVersion() (*versionutil.Version, error) {
 	cmd := exec.Command(kubeadmBinary, "version", "-o=short")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
