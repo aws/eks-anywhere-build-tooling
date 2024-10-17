@@ -1,4 +1,4 @@
-From 1f95eaaf701cfb5a4a1ce7f9d40be2cbf9c5dbd7 Mon Sep 17 00:00:00 2001
+From ec3ebee7cfa9a8d2a7f4c4fe8465788716ca5cc1 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Fri, 23 Jun 2023 10:50:08 -0500
 Subject: [PATCH 04/12] Ubuntu 22.04 support and improvements
@@ -11,27 +11,27 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
  images/capi/Makefile                          |   6 +-
  .../raw/linux/ubuntu/http/22.04.efi/meta-data |   0
- .../raw/linux/ubuntu/http/22.04.efi/user-data | 115 ++++++++++++++++++
+ .../ubuntu/http/22.04.efi/user-data.tmpl      | 115 ++++++++++++++++++
  .../raw/linux/ubuntu/http/22.04/meta-data     |   0
- .../raw/linux/ubuntu/http/22.04/user-data     |  94 ++++++++++++++
- images/capi/packer/raw/packer.json            |   1 +
+ .../linux/ubuntu/http/22.04/user-data.tmpl    |  94 ++++++++++++++
+ images/capi/packer/raw/packer.json.tmpl       |   1 +
  .../capi/packer/raw/raw-ubuntu-2004-efi.json  |   1 +
  images/capi/packer/raw/raw-ubuntu-2004.json   |   1 +
  .../capi/packer/raw/raw-ubuntu-2204-efi.json  |  14 +++
  images/capi/packer/raw/raw-ubuntu-2204.json   |  13 ++
  10 files changed, 244 insertions(+), 1 deletion(-)
  create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data
- create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
+ create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data.tmpl
  create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04/meta-data
- create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04/user-data
+ create mode 100644 images/capi/packer/raw/linux/ubuntu/http/22.04/user-data.tmpl
  create mode 100644 images/capi/packer/raw/raw-ubuntu-2204-efi.json
  create mode 100644 images/capi/packer/raw/raw-ubuntu-2204.json
 
 diff --git a/images/capi/Makefile b/images/capi/Makefile
-index 4f75cb173..bdc274ee9 100644
+index ecfec48e9..25fc78199 100644
 --- a/images/capi/Makefile
 +++ b/images/capi/Makefile
-@@ -365,7 +365,7 @@ QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2204-cloudim
+@@ -381,7 +381,7 @@ QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2204-cloudim
  
  QEMU_KUBEVIRT_BUILD_NAMES	:= $(addprefix kubevirt-,$(QEMU_BUILD_NAMES))
  
@@ -40,7 +40,7 @@ index 4f75cb173..bdc274ee9 100644
  
  POWERVS_BUILD_NAMES         ?= powervs-centos-8 powervs-centos-9
  
-@@ -810,6 +810,8 @@ build-qemu-all: $(QEMU_BUILD_TARGETS) ## Builds all Qemu images
+@@ -829,6 +829,8 @@ build-qemu-all: $(QEMU_BUILD_TARGETS) ## Builds all Qemu images
  build-raw-flatcar: ## Builds Flatcar RAW image
  build-raw-ubuntu-2004: ## Builds Ubuntu 20.04 RAW image
  build-raw-ubuntu-2004-efi: ## Builds Ubuntu 20.04 RAW image that EFI boots
@@ -49,7 +49,7 @@ index 4f75cb173..bdc274ee9 100644
  build-raw-rhel-8: ## Builds RHEL 8 RAW image
  build-raw-rhel-9: ## Builds RHEL 9 RAW image
  build-raw-rhel-9-efi: ## Builds RHEL 9 RAW image that EFI boots
-@@ -988,6 +990,8 @@ validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
+@@ -1007,6 +1009,8 @@ validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
  validate-raw-flatcar: ## Validates Flatcar RAW image packer config
  validate-raw-ubuntu-2004: ## Validates Ubuntu 20.04 RAW image packer config
  validate-raw-ubuntu-2004-efi: ## Validates Ubuntu 20.04 RAW EFI image packer config
@@ -61,11 +61,11 @@ index 4f75cb173..bdc274ee9 100644
 diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/meta-data
 new file mode 100644
 index 000000000..e69de29bb
-diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
+diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data.tmpl b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data.tmpl
 new file mode 100644
-index 000000000..d14d0fa49
+index 000000000..619c32bfc
 --- /dev/null
-+++ b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data
++++ b/images/capi/packer/raw/linux/ubuntu/http/22.04.efi/user-data.tmpl
 @@ -0,0 +1,115 @@
 +#cloud-config
 +# Copyright 2022 The Kubernetes Authors.
@@ -160,8 +160,8 @@ index 000000000..d14d0fa49
 +  user-data:
 +    users:
 +      - name: builder
-+        # openssl passwd -6 -stdin <<< builder
-+        passwd: $6$xyz$UtXVazU08Q5b8AW.TJ3MPYZglyXa3Ttf2RCel8MCUPlEYO1evWxeWBhZ2QqivU/Ij4tqYAxMCqc2ujEM4dMSe1
++        # openssl passwd -6 -salt <random salt> -stdin <<< <SSH password>
++        passwd: $ENCRYPTED_SSH_PASSWORD
 +        groups: [adm, cdrom, dip, plugdev, lxd, sudo]
 +        lock-passwd: false
 +        sudo: ALL=(ALL) NOPASSWD:ALL
@@ -185,11 +185,11 @@ index 000000000..d14d0fa49
 diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04/meta-data b/images/capi/packer/raw/linux/ubuntu/http/22.04/meta-data
 new file mode 100644
 index 000000000..e69de29bb
-diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data b/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data
+diff --git a/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data.tmpl b/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data.tmpl
 new file mode 100644
-index 000000000..a5ed32346
+index 000000000..aa6d0dee0
 --- /dev/null
-+++ b/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data
++++ b/images/capi/packer/raw/linux/ubuntu/http/22.04/user-data.tmpl
 @@ -0,0 +1,94 @@
 +#cloud-config
 +# Copyright 2022 The Kubernetes Authors.
@@ -263,8 +263,8 @@ index 000000000..a5ed32346
 +  user-data:
 +    users:
 +      - name: builder
-+        # openssl passwd -6 -stdin <<< builder
-+        passwd: $6$xyz$UtXVazU08Q5b8AW.TJ3MPYZglyXa3Ttf2RCel8MCUPlEYO1evWxeWBhZ2QqivU/Ij4tqYAxMCqc2ujEM4dMSe1
++        # openssl passwd -6 -salt <random salt> -stdin <<< <SSH password>
++        passwd: $ENCRYPTED_SSH_PASSWORD
 +        groups: [adm, cdrom, dip, plugdev, lxd, sudo]
 +        lock-passwd: false
 +        sudo: ALL=(ALL) NOPASSWD:ALL
@@ -285,10 +285,10 @@ index 000000000..a5ed32346
 +    - curtin in-target --target=/target -- apt-get purge --auto-remove -y
 +    - curtin in-target --target=/target -- apt-get clean
 +    - curtin in-target --target=/target -- rm -rf /var/lib/apt/lists/*
-diff --git a/images/capi/packer/raw/packer.json b/images/capi/packer/raw/packer.json
-index 96eafaf88..82596dfef 100644
---- a/images/capi/packer/raw/packer.json
-+++ b/images/capi/packer/raw/packer.json
+diff --git a/images/capi/packer/raw/packer.json.tmpl b/images/capi/packer/raw/packer.json.tmpl
+index 015b5efbb..9ad3f937f 100644
+--- a/images/capi/packer/raw/packer.json.tmpl
++++ b/images/capi/packer/raw/packer.json.tmpl
 @@ -118,6 +118,7 @@
        "vars_inline": {
          "ARCH": "amd64",
