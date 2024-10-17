@@ -679,7 +679,7 @@ func applyPatchesToRepo(projectRootFilepath, projectRepo, releaseBranch string, 
 	applyPatchesCmd := exec.Command("bash", "-c", applyPatchesCommandSequence)
 	applyPatchesOutput, err := command.ExecCommand(applyPatchesCmd)
 	if err != nil {
-		if strings.Contains(applyPatchesOutput, constants.FailedPatchApplyMarker) {
+		if strings.Contains(applyPatchesOutput, constants.FailedPatchApplyMarker) || strings.Contains(applyPatchesOutput, constants.DoesNotExistInIndexMarker) {
 			patchApplySucceeded = false
 		} else {
 			return 0, "", "", fmt.Errorf("running patch-repo Make command: %v", err)
@@ -707,10 +707,14 @@ func applyPatchesToRepo(projectRootFilepath, projectRepo, releaseBranch string, 
 		failedPatchRegex := regexp.MustCompile(constants.FailedPatchApplyRegex)
 		failedPatch = failedPatchRegex.FindString(applyPatchesOutput)
 
-		failedPatchFileRegex := regexp.MustCompile(constants.FailedPatchFilesRegex)
+		failedPatchFileRegex := regexp.MustCompile(fmt.Sprintf("%s|%s", constants.FailedPatchFilesRegex, constants.DoesNotExistInIndexFilesRegex))
 		applyFailedFiles := failedPatchFileRegex.FindAllStringSubmatch(applyPatchesOutput, -1)
 		for _, files := range applyFailedFiles {
-			failedFiles = append(failedFiles, fmt.Sprintf("`%s`", files[1]))
+			if files[1] != "" {
+				failedFiles = append(failedFiles, fmt.Sprintf("`%s`", files[1]))
+			} else if files[2] != "" {
+				failedFiles = append(failedFiles, fmt.Sprintf("`%s`", files[2]))
+			}
 		}
 
 		failedFilesInPatch = strings.Join(failedFiles, ",")
