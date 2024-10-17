@@ -377,6 +377,8 @@ var (
 
 	CiliumImageDirectories = []string{"cilium", "operator-generic", "cilium-chart"}
 
+	ADOTImageDirectories = []string{"collector"}
+
 	ProjectsSupportingPrereleaseTags = []string{"kubernetes-sigs/cluster-api-provider-cloudstack"}
 
 	// These projects will be upgraded only on main and won't be triggered on release branches.
