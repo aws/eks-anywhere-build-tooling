@@ -34,9 +34,11 @@ const (
 	ManifestsDirectory                      = "manifests"
 	PatchesDirectory                        = "patches"
 	FailedPatchApplyMarker                  = "patch does not apply"
+	DoesNotExistInIndexMarker               = "does not exist in index"
 	SemverRegex                             = `v?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
 	FailedPatchApplyRegex                   = "Patch failed at .*"
 	FailedPatchFilesRegex                   = "error: (.*): patch does not apply"
+	DoesNotExistInIndexFilesRegex           = "error: (.*): does not exist in index"
 	BottlerocketReleasesFile                = "BOTTLEROCKET_RELEASES"
 	BottlerocketContainerMetadataFileFormat = "BOTTLEROCKET_%s_CONTAINER_METADATA"
 	BottlerocketHostContainersTOMLFile      = "sources/models/shared-defaults/public-host-containers.toml"
