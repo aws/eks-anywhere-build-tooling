@@ -384,6 +384,15 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					}
 				}
 
+				if projectName == "aws-observability/aws-otel-collector" {
+					updatedADOTImageDigestFiles, err := updateADOTImageDigestFiles(projectRootFilepath, projectPath)
+					if err != nil {
+						failedSteps["ADOT image digest update"] = err
+					} else {
+						updatedFiles = append(updatedFiles, updatedADOTImageDigestFiles...)
+					}
+				}
+
 				if projectName == "cert-manager/cert-manager" {
 					err := updateCertManagerManifestFile(projectRootFilepath)
 					if err != nil {
@@ -763,6 +772,21 @@ func updateCiliumImageDigestFiles(projectRootFilepath, projectPath string) ([]st
 		updateCiliumFiles = append(updateCiliumFiles, filepath.Join(projectPath, "images", directory, "IMAGE_DIGEST"))
 	}
 	return updateCiliumFiles, nil
+}
+
+func updateADOTImageDigestFiles(projectRootFilepath, projectPath string) ([]string, error) {
+	updateADOTFiles := []string{}
+	updateDigestsCommandSequence := fmt.Sprintf("make -C %s update-digests", projectRootFilepath)
+	updateDigestsCmd := exec.Command("bash", "-c", updateDigestsCommandSequence)
+	_, err := command.ExecCommand(updateDigestsCmd)
+	if err != nil {
+		return nil, fmt.Errorf("running update-digests Make command: %v", err)
+	}
+
+	for _, directory := range constants.ADOTImageDirectories {
+		updateADOTFiles = append(updateADOTFiles, filepath.Join(projectPath, "images", directory, "IMAGE_DIGEST"))
+	}
+	return updateADOTFiles, nil
 }
 
 func updateCertManagerManifestFile(projectRootFilepath string) error {
