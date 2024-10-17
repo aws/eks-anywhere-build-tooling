@@ -81,8 +81,6 @@ func WaitForSystemdService(service string, timeout time.Duration) error {
 			return errors.New("Timeout checking for kubelet status")
 		}
 	}
-
-	return nil
 }
 
 func WaitFor200(url string, timeout time.Duration) error {
@@ -124,7 +122,6 @@ func WaitFor200(url string, timeout time.Duration) error {
 			}
 		}
 	}
-	return nil
 }
 
 func KillCmdAfterFilesGeneration(cmd *exec.Cmd, checkFiles []string) error {
@@ -173,9 +170,8 @@ func KillCmdAfterFilesGeneration(cmd *exec.Cmd, checkFiles []string) error {
 	case <-timeout:
 		cmd.Process.Kill()
 		cancel()
-		return errors.New("Kubeadm join kubelet-start killed after timeout")
+		return errors.New(fmt.Sprintf("command: %s killed after timeout", strings.Join(cmd.Args, " ")))
 	}
-	return nil
 }
 
 func waitForPodLiveness(podDefinition *v1.Pod) error {
