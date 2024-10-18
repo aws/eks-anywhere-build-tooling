@@ -1,6 +1,6 @@
-From c7343600fda37356310744408172059751f3b50c Mon Sep 17 00:00:00 2001
-From: Prow Bot <prow@amazonaws.com>
-Date: Sun, 2 Jun 2024 17:37:38 -0700
+From 467db22328a4958b0ea1d6b106ce3bd324033201 Mon Sep 17 00:00:00 2001
+From: Jhaanvi Golani <jhaanvi@amazon.com>
+Date: Fri, 18 Oct 2024 12:22:26 -0700
 Subject: [PATCH 2/2] Remove Addon Resizer
 
 ---
@@ -10,12 +10,14 @@ Subject: [PATCH 2/2] Remove Addon Resizer
  .../templates/configmaps-nanny.yaml           | 17 --------
  .../metrics-server/templates/deployment.yaml  | 39 -------------------
  .../metrics-server/templates/role-nanny.yaml  | 27 -------------
+ .../templates/rolebinding-nanny.yaml          | 19 ---------
  charts/metrics-server/values.yaml             | 34 ----------------
- 7 files changed, 169 deletions(-)
+ 8 files changed, 188 deletions(-)
  delete mode 100644 charts/metrics-server/templates/clusterrole-nanny.yaml
  delete mode 100644 charts/metrics-server/templates/clusterrolebinding-nanny.yaml
  delete mode 100644 charts/metrics-server/templates/configmaps-nanny.yaml
  delete mode 100644 charts/metrics-server/templates/role-nanny.yaml
+ delete mode 100644 charts/metrics-server/templates/rolebinding-nanny.yaml
 
 diff --git a/charts/metrics-server/templates/_helpers.tpl b/charts/metrics-server/templates/_helpers.tpl
 index 492e4623..e9b47284 100644
@@ -201,6 +203,31 @@ index f0bf8fce..00000000
 -  - patch
 -{{- end -}}
 -{{- end -}}
+diff --git a/charts/metrics-server/templates/rolebinding-nanny.yaml b/charts/metrics-server/templates/rolebinding-nanny.yaml
+deleted file mode 100644
+index 228c0cfe..00000000
+--- a/charts/metrics-server/templates/rolebinding-nanny.yaml
++++ /dev/null
+@@ -1,19 +0,0 @@
+-{{- if .Values.rbac.create -}}
+-{{- if .Values.addonResizer.enabled -}}
+-apiVersion: rbac.authorization.k8s.io/v1
+-kind: RoleBinding
+-metadata:
+-  name: {{ printf "%s-nanny" (include "metrics-server.fullname" .)  }}
+-  namespace: {{ .Release.Namespace }}
+-  labels:
+-    {{- include "metrics-server.labels" . | nindent 4 }}
+-roleRef:
+-  apiGroup: rbac.authorization.k8s.io
+-  kind: Role
+-  name: {{ include "metrics-server.addonResizer.role" . }}
+-subjects:
+-  - kind: ServiceAccount
+-    name: {{ include "metrics-server.serviceAccountName" . }}
+-    namespace: {{ .Release.Namespace }}
+-{{- end -}}
+-{{- end -}}
 diff --git a/charts/metrics-server/values.yaml b/charts/metrics-server/values.yaml
 index 340c3640..0008cee1 100644
 --- a/charts/metrics-server/values.yaml
@@ -254,5 +281,5 @@ index 340c3640..0008cee1 100644
  extraVolumeMounts: []
  
 -- 
-2.46.2
+2.44.0
 
