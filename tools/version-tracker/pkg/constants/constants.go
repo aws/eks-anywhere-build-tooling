@@ -354,8 +354,8 @@ var (
 			GoVersionSearchString: `GOLANG_VERSION := (1\.\d\d)`,
 		},
 		"tinkerbell/hegel": {
-			SourceOfTruthFile:     "go.mod",
-			GoVersionSearchString: `go (1\.\d\d)`,
+			SourceOfTruthFile:     ".github/workflows/ci.yaml",
+			GoVersionSearchString: `GO_VERSION: "(1\.\d\d)"`,
 		},
 		"tinkerbell/tink": {
 			SourceOfTruthFile:     ".github/workflows/ci.yaml",
