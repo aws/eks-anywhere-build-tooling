@@ -1,4 +1,4 @@
-From 8ad7e443e3d5ee865fc2d7e4d685edb3fa6a99d3 Mon Sep 17 00:00:00 2001
+From b03d1d507cef9cbb976f0ad548e9fbe16feac965 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 03/40] Add unstacked etcd support
@@ -88,13 +88,13 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  .../cluster/cluster_controller_phases.go      | 109 +++++++++++++
  .../cluster/cluster_controller_test.go        | 136 +++++++++++++++++
  .../machine/machine_controller_noderef.go     |   8 +
- .../machine_controller_noderef_test.go        |  48 ++++++
+ .../machine_controller_noderef_test.go        |  46 ++++++
  .../machine/machine_controller_phases.go      | 123 +++++++++++++++
  util/collections/machine_filters.go           |  26 ++++
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 28 files changed, 891 insertions(+), 9 deletions(-)
+ 28 files changed, 889 insertions(+), 9 deletions(-)
 
 diff --git a/api/v1beta1/cluster_types.go b/api/v1beta1/cluster_types.go
 index ccefcd694..e00a22535 100644
@@ -1256,10 +1256,10 @@ index bf5f0c46e..55f117f75 100644
  
  	g.Expect(actual).To(BeComparableTo(expected))
 diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 091a11210..e75d9c877 100644
+index 67a4d028e..979870b0c 100644
 --- a/internal/controllers/machine/machine_controller_noderef.go
 +++ b/internal/controllers/machine/machine_controller_noderef.go
-@@ -55,6 +55,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
+@@ -56,6 +56,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
  		return ctrl.Result{}, err
  	}
  
@@ -1275,7 +1275,7 @@ index 091a11210..e75d9c877 100644
  	if machine.Spec.ProviderID == nil || *machine.Spec.ProviderID == "" {
  		log.Info("Waiting for infrastructure provider to report spec.providerID", machine.Spec.InfrastructureRef.Kind, klog.KRef(machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name))
 diff --git a/internal/controllers/machine/machine_controller_noderef_test.go b/internal/controllers/machine/machine_controller_noderef_test.go
-index 52dfc4233..4fe915ee0 100644
+index 40d64b9f0..c0e395e71 100644
 --- a/internal/controllers/machine/machine_controller_noderef_test.go
 +++ b/internal/controllers/machine/machine_controller_noderef_test.go
 @@ -26,6 +26,7 @@ import (
@@ -1286,16 +1286,16 @@ index 52dfc4233..4fe915ee0 100644
  	"k8s.io/utils/ptr"
  	ctrl "sigs.k8s.io/controller-runtime"
  	"sigs.k8s.io/controller-runtime/pkg/client"
-@@ -35,6 +36,7 @@ import (
- 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
- 	"sigs.k8s.io/cluster-api/controllers/remote"
+@@ -38,6 +39,7 @@ import (
+ 	"sigs.k8s.io/cluster-api/internal/test/builder"
+ 	"sigs.k8s.io/cluster-api/internal/topology/ownerrefs"
  	"sigs.k8s.io/cluster-api/util"
 +	"sigs.k8s.io/cluster-api/util/conditions"
  	"sigs.k8s.io/cluster-api/util/kubeconfig"
  )
  
-@@ -994,3 +996,49 @@ func newFakeMachineDeployment(namespace, clusterName string) *clusterv1.MachineD
- 		},
+@@ -1145,3 +1147,47 @@ func Test_shouldNodeHaveOutdatedTaint(t *testing.T) {
+ 		})
  	}
  }
 +
@@ -1329,7 +1329,6 @@ index 52dfc4233..4fe915ee0 100644
 +			},
 +		},
 +	}
-+
 +	for _, tc := range testCases {
 +		t.Run(tc.name, func(t *testing.T) {
 +			g := NewWithT(t)
@@ -1338,7 +1337,6 @@ index 52dfc4233..4fe915ee0 100644
 +				cluster: &clusterv1.Cluster{},
 +				machine: tc.machine,
 +			}
-+
 +			g.Expect(r.reconcileNode(ctx, s)).To(Equal(ctrl.Result{}))
 +			g.Expect(conditions.Get(tc.machine, clusterv1.MachineNodeHealthyCondition)).To(BeNil())
 +		})
@@ -1581,5 +1579,5 @@ index 3892d81cd..17d9d444e 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.46.2
+2.47.0
 
