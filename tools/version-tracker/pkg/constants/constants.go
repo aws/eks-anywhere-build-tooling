@@ -31,6 +31,7 @@ const (
 	GoVersionFile                           = "GOLANG_VERSION"
 	ChecksumsFile                           = "CHECKSUMS"
 	AttributionsFilePattern                 = "*ATTRIBUTION.txt"
+	BuildDirectory                          = "build"
 	ManifestsDirectory                      = "manifests"
 	PatchesDirectory                        = "patches"
 	FailedPatchApplyMarker                  = "patch does not apply"
@@ -44,6 +45,7 @@ const (
 	BottlerocketHostContainersTOMLFile      = "sources/shared-defaults/public-host-containers.toml"
 	CertManagerManifestYAMLFile             = "cert-manager.yaml"
 	CiliumImageRepository                   = "public.ecr.aws/isovalent/cilium"
+	KindNodeImageBuildArgsScriptFile        = "node-image-build-args.sh"
 	GithubPerPage                           = 100
 	datetimeFormat                          = "%Y-%m-%dT%H:%M:%SZ"
 	MainBranchName                          = "main"
