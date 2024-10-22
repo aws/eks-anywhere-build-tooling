@@ -6,7 +6,6 @@ REPO=hook
 REPO_OWNER=tinkerbell
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
-DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 HOOK_BOOTKIT_IMAGE_COMPONENT=tinkerbell/hook-bootkit
 HOOK_DOCKER_IMAGE_COMPONENT=tinkerbell/hook-docker
@@ -19,13 +18,25 @@ HOOK_IP_IMAGE_COMPONENT=tinkerbell/hook-ip
 HOOK_MDEV_IMAGE_COMPONENT=tinkerbell/hook-mdev
 
 IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-ip hook-mdev hook-dind hook-embedded
+
+# We are using this pattern of setting the dockerfile_folder instead of local to the target
+# because this project uses the combine-images target which overrides the dockerfile_folder
+# to the standard combine-images dockerfile
+# If we setup our override in this Makefile at the target it does not allow the combine-images
+# to override it
+# edge cases:
+# - kernel is a different folder in the hook repo (hook/kernel vs hook/images/*)
+# - hook-dind uses the hook-docker image with a different target
+IMAGES_USING_UPSTREAM_DOCKERFILES=kernel hook-ip hook-mdev
+DOCKERFILE_FOLDER=$(strip $(if $(filter $(IMAGE_NAME),$(IMAGES_USING_UPSTREAM_DOCKERFILES)),\
+	$(if $(filter kernel,$(IMAGE_NAME)),$(REPO)/kernel,$(REPO)/images/$(IMAGE_NAME)),\
+	$(if $(filter hook-dind,$(IMAGE_NAME)),./docker/linux/hook-docker,./docker/linux/$(IMAGE_NAME))))
+
 # historically we have included these two images in our bundle even tho we really do not
 # need them at runtime since they are built into the final vmlinuz/initramfs files
-# when in codebuild we run the combine-images build, only bother merging these two
-# merging the others is actually a bit more complicated since we override the dockerfile location
-# the combine-images target does not easily support this case since we have not needed it before
+# when in codebuild we run the combine-images build, only bother merging these three
 ifneq ($(findstring combine-images,$(RELEASE_TARGETS)),)
-IMAGE_NAMES=hook-bootkit hook-docker
+IMAGE_NAMES=hook-bootkit hook-docker kernel
 endif
 
 BINARY_TARGET_FILES=hook-bootkit hook-docker
@@ -98,13 +109,11 @@ $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_HOOK_BOOTKIT_TARGET) $(FIX_LICENSES
 # We are using eks-distro-minimal-base-glibc as the base and builder to install docker.
 hook-docker/images/% hook-dind/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base-iptables
 
-hook-dind/images/%: DOCKERFILE_FOLDER=./docker/linux/hook-docker
 hook-dind/images/%: IMAGE_TARGET=hook-dind
 
-kernel-config/images/% kernel/images/%: IMAGE_BUILD_ARGS=KERNEL_MAJOR_V KERNEL_VERSION DEFCONFIG
+kernel-config/images/% kernel/images/%: IMAGE_BUILD_ARGS+=KERNEL_MAJOR_V KERNEL_VERSION DEFCONFIG
 kernel-config/images/% kernel/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/kernel
 kernel-config/images/% kernel/images/%: BASE_IMAGE=public.ecr.aws/amazonlinux/amazonlinux:2023
-kernel-config/images/% kernel/images/%: DOCKERFILE_FOLDER=$(REPO)/kernel
 
 $(call IMAGE_TARGETS_FOR_NAME, kernel): $(HOOK_IMAGE_FILES)
 $(call IMAGE_TARGETS_FOR_NAME, kernel-config): $(HOOK_IMAGE_FILES)
@@ -118,11 +127,7 @@ $(call IMAGE_TARGETS_FOR_NAME,hook-embedded): $(EMBEDDED_IMAGES)
 
 # upstream hook builds these instead of using the linuxkit provided images
 # building this from their dockerfile
-hook-ip/images/%: DOCKERFILE_FOLDER=$(REPO)/images/hook-ip
-hook-ip/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/hook-ip
-
-hook-mdev/images/%: DOCKERFILE_FOLDER=$(REPO)/images/hook-mdev
-hook-mdev/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/hook-mdev
+hook-ip/images/% hook-mdev/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/$(IMAGE_NAME)
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
@@ -221,7 +226,7 @@ run-kernel-in-qemu: $(CREATE_HOOK_FILES) $(LINUXKIT_CACHE_FILE)
 		sudo -E ./build.sh run hook-default-$(BUILDER_PLATFORM_ARCH)
 
 kernel-config-%: | ensure-docker
-	@$(MAKE) kernel-config/images/$(BUILDER_PLATFORM_ARCH) IMAGE_NAMES=kernel-config
+	@$(MAKE) kernel-config/images/$(BUILDER_PLATFORM_ARCH) IMAGE_NAMES=kernel-config DOCKERFILE_FOLDER=$(REPO)/kernel
 	@mkdir -p $(KERNEL_CONFIG_HOST_PATH)
 	docker run -it -v $(KERNEL_CONFIG_HOST_PATH):/host hook-kernel-builder:$(KERNEL_VERSION) bash -c "cp .config /host/$(EKSA_DEFCONFIG) && make $* && cp -v .config /host/$(USER_DEFCONFIG)"
 
