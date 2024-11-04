@@ -1,7 +1,7 @@
 ## **Kubernetes vSphere Cloud Provider**
 ![1.27 Version](https://img.shields.io/badge/1--27%20version-v1.27.0-blue)
 ![1.28 Version](https://img.shields.io/badge/1--28%20version-v1.28.1-blue)
-![1.29 Version](https://img.shields.io/badge/1--29%20version-v1.29.1-blue)
+![1.29 Version](https://img.shields.io/badge/1--29%20version-v1.29.2-blue)
 ![1.30 Version](https://img.shields.io/badge/1--30%20version-v1.30.2-blue)
 ![1.31 Version](https://img.shields.io/badge/1--31%20version-v1.31.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiYzQ3dzRvZHVqU2MvYnVuMzB3QmRZdVd1U1RabVorWnlqTXBYUGxDSGk2NXJXUU12c3pLQ25CQUdaQmlNUE84S0JIVVZUU0ozeTJJb3J0NWxNejNSbzk4PSIsIml2UGFyYW1ldGVyU3BlYyI6IkhLNTZwQ0hiZDZVUzVRdXYiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
