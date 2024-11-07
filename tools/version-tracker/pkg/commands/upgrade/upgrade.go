@@ -232,7 +232,11 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			}
 		}
 
-		pullRequestBody = fmt.Sprintf(constants.DefaultUpgradePullRequestBody, projectOrg, projectRepo, currentRevision, latestRevision)
+		prLabels := constants.DefaultProjectUpgradePRLabels
+		if slices.Contains(constants.CuratedPackagesProjects, projectName) {
+			prLabels = constants.PackagesProjectUpgradePRLabels
+		}
+		pullRequestBody = fmt.Sprintf(constants.DefaultUpgradePullRequestBody, projectOrg, projectRepo, currentRevision, latestRevision, prLabels)
 
 		// Upgrade project if latest commit was made after current commit and the semver of the latest revision is
 		// greater than the semver of the current version.
@@ -471,7 +475,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 	if len(failedSteps) > 0 {
 		var failedStepsList []string
-		var errorsList[] string
+		var errorsList []string
 		for step, err := range failedSteps {
 			if step == "Patch application" {
 				step = fmt.Sprintf("%s\n%s", step, patchesWarningComment)
