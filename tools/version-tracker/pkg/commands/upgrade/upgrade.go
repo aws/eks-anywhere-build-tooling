@@ -236,7 +236,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		if slices.Contains(constants.CuratedPackagesProjects, projectName) {
 			prLabels = constants.PackagesProjectUpgradePRLabels
 		}
-		pullRequestBody = fmt.Sprintf(constants.DefaultUpgradePullRequestBody, projectOrg, projectRepo, currentRevision, latestRevision, prLabels)
+		pullRequestBody = fmt.Sprintf(constants.DefaultUpgradePullRequestBody, projectOrg, projectRepo, currentRevision, latestRevision, strings.Join(prLabels, "\n"))
 
 		// Upgrade project if latest commit was made after current commit and the semver of the latest revision is
 		// greater than the semver of the current version.
