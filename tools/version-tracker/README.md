@@ -33,7 +33,6 @@ Global Flags:
 $ version-tracker display
 ORGANIZATION          REPOSITORY                       CURRENT VERSION                           LATEST VERSION                                 
 apache                cloudstack-cloudmonkey           6.3.0                                     6.3.0                                          
-aquasecurity          harbor-scanner-trivy             v0.30.7                                   v0.30.19                                       
 aquasecurity          trivy                            v0.37.3                                   v0.47.0                                        
 aws                   etcdadm-bootstrap-provider       v1.0.10                                   v1.0.10                                        
 aws                   etcdadm-controller               v1.0.15                                   v1.0.15                                        
@@ -52,6 +51,7 @@ fluxcd                kustomize-controller             v1.0.0                   
 fluxcd                notification-controller          v1.0.0                                    v1.1.0                                         
 fluxcd                source-controller                v1.0.0                                    v1.1.2                                         
 goharbor              harbor                           v2.9.1                                    v2.9.1                                         
+goharbor              harbor-scanner-trivy             v0.30.7                                   v0.30.19                                       
 helm                  helm                             v3.12.1                                   v3.13.2                                        
 kube-vip              kube-vip                         v0.6.0                                    v0.6.3                                         
 kubernetes            autoscaler                       5bcb526e08c17ff93cc6093ee89a95730a90e45b  cluster-autoscaler-chart-9.32.1                
@@ -124,8 +124,7 @@ ORGANIZATION          REPOSITORY
 --------------------  -------------------------------  
 apache                cloudstack-cloudmonkey           
 --------------------  -------------------------------  
-aquasecurity          harbor-scanner-trivy             
-                      trivy                            
+aquasecurity          trivy                            
 --------------------  -------------------------------  
                       etcdadm-bootstrap-provider       
 aws                   etcdadm-controller               
@@ -154,6 +153,7 @@ fluxcd                kustomize-controller
                       source-controller                
 --------------------  -------------------------------  
 goharbor              harbor                           
+                      harbor-scanner-trivy             
 --------------------  -------------------------------  
 helm                  helm                             
 --------------------  -------------------------------  

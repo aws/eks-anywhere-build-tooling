@@ -102,12 +102,6 @@ var (
 			BinaryName: "cmk.linux.x86-64",
 			Extract:    false,
 		},
-		"aquasecurity/harbor-scanner-trivy": {
-			AssetName:                "harbor-scanner-trivy_%s_Linux_x86_64.tar.gz",
-			BinaryName:               "scanner-trivy",
-			Extract:                  true,
-			TrimLeadingVersionPrefix: true,
-		},
 		"aquasecurity/trivy": {
 			AssetName:                "trivy_%s_Linux-64bit.tar.gz",
 			BinaryName:               "trivy",
@@ -136,6 +130,12 @@ var (
 		"fluxcd/flux2": {
 			AssetName:                "flux_%s_linux_amd64.tar.gz",
 			BinaryName:               "flux",
+			Extract:                  true,
+			TrimLeadingVersionPrefix: true,
+		},
+		"goharbor/harbor-scanner-trivy": {
+			AssetName:                "harbor-scanner-trivy_%s_Linux_x86_64.tar.gz",
+			BinaryName:               "scanner-trivy",
 			Extract:                  true,
 			TrimLeadingVersionPrefix: true,
 		},
@@ -200,10 +200,6 @@ var (
 			SourceOfTruthFile:     ".github/workflows/build.yml",
 			GoVersionSearchString: `go-version: (1\.\d\d)`,
 		},
-		"aquasecurity/harbor-scanner-trivy": {
-			SourceOfTruthFile:     "go.mod",
-			GoVersionSearchString: `go (1\.\d\d)`,
-		},
 		"aquasecurity/trivy": {
 			SourceOfTruthFile:     "Dockerfile.protoc",
 			GoVersionSearchString: `golang:(1\.\d\d)`,
@@ -263,6 +259,10 @@ var (
 		"goharbor/harbor": {
 			SourceOfTruthFile:     "Makefile",
 			GoVersionSearchString: `GOBUILDIMAGE=golang:(1\.\d\d)`,
+		},
+		"goharbor/harbor-scanner-trivy": {
+			SourceOfTruthFile:     "go.mod",
+			GoVersionSearchString: `go (1\.\d\d)`,
 		},
 		"helm/helm": {
 			SourceOfTruthFile:     ".github/workflows/release.yaml",
@@ -402,6 +402,7 @@ var (
 		"distribution/distribution",
 		"emissary-ingress/emissary",
 		"goharbor/harbor",
+		"goharbor/harbor-scanner-trivy",
 		"kubernetes/autoscaler",
 		"kubernetes/cloud-provider-aws",
 		"kubernetes-sigs/metrics-server",

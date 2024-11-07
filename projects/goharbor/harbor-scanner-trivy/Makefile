@@ -2,7 +2,7 @@ BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG=$(shell cat GIT_TAG)
 GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 REPO=harbor-scanner-trivy
-REPO_OWNER=aquasecurity
+REPO_OWNER=goharbor
 
 BINARY_TARGET_FILES=scanner-trivy
 SOURCE_PATTERNS=./cmd/scanner-trivy

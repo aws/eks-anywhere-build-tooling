@@ -59,8 +59,8 @@ _output/dependencies/linux-amd64/eksa/distribution/distribution: ## Fetch `_outp
 _output/dependencies/linux-arm64/eksa/distribution/distribution: ## Fetch `_output/dependencies/linux-arm64/eksa/distribution/distribution`
 _output/dependencies/linux-amd64/eksa/aquasecurity/trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/aquasecurity/trivy`
 _output/dependencies/linux-arm64/eksa/aquasecurity/trivy: ## Fetch `_output/dependencies/linux-arm64/eksa/aquasecurity/trivy`
-_output/dependencies/linux-amd64/eksa/aquasecurity/harbor-scanner-trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/aquasecurity/harbor-scanner-trivy`
-_output/dependencies/linux-arm64/eksa/aquasecurity/harbor-scanner-trivy: ## Fetch `_output/dependencies/linux-arm64/eksa/aquasecurity/harbor-scanner-trivy`
+_output/dependencies/linux-amd64/eksa/goharbor/harbor-scanner-trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/goharbor/harbor-scanner-trivy`
+_output/dependencies/linux-arm64/eksa/goharbor/harbor-scanner-trivy: ## Fetch `_output/dependencies/linux-arm64/eksa/goharbor/harbor-scanner-trivy`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
