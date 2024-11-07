@@ -59,8 +59,7 @@ By submitting this pull request, I confirm that you can use, modify, copy, and r
 [Compare changes](https://github.com/%[1]s/%[2]s/compare/%[3]s...%[4]s)
 [Release notes](https://github.com/%[1]s/%[2]s/releases/%[4]s)
 
-/hold
-/area dependencies
+%s
 
 By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
 	BottlerocketUpgradePullRequestBody = `This PR bumps Bottlerocket releases to the latest Git revision.
@@ -375,6 +374,9 @@ var (
 		},
 	}
 
+	DefaultProjectUpgradePRLabels  = []string{"/hold", "/area dependencies"}
+	PackagesProjectUpgradePRLabels = []string{"/hold", "/area dependencies", "/sig curated-packages"}
+
 	ProjectsWithUnconventionalUpgradeFlows = []string{
 		"cilium/cilium",
 		"kubernetes-sigs/image-builder",
@@ -391,7 +393,7 @@ var (
 	ProjectsSupportingPrereleaseTags = []string{"kubernetes-sigs/cluster-api-provider-cloudstack"}
 
 	// These projects will be upgraded only on main and won't be triggered on release branches.
-	ProjectsUpgradedOnlyOnMainBranch = []string{
+	CuratedPackagesProjects = []string{
 		"aquasecurity/harbor-scanner-trivy",
 		"aquasecurity/trivy",
 		"aws/rolesanywhere-credential-helper",
@@ -402,11 +404,17 @@ var (
 		"goharbor/harbor",
 		"kubernetes/autoscaler",
 		"kubernetes/cloud-provider-aws",
-		"kubernetes-sigs/cluster-api",
 		"kubernetes-sigs/metrics-server",
 		"metallb/metallb",
 		"prometheus/node_exporter",
 		"prometheus/prometheus",
 		"redis/redis",
 	}
+
+	ProjectsUpgradedOnlyOnMainBranch = append(
+		[]string{
+			"kubernetes-sigs/cluster-api",
+		},
+		CuratedPackagesProjects...,
+	)
 )
