@@ -183,12 +183,12 @@ stop-docker-builder:
 
 .PHONY: run-buildkit-and-registry
 run-buildkit-and-registry:
-	docker run --rm -d --name buildkitd --net host --privileged moby/buildkit:v0.12.2-rootless
+	docker buildx create --name multiarch --driver docker-container --use --driver-opt network=host
 	docker run --rm -d --name registry  --net host registry:2
 
 .PHONY: stop-buildkit-and-registry
 stop-buildkit-and-registry:
-	docker rm -v --force buildkitd
+	docker buildx rm multiarch
 	docker rm -v --force registry
 
 .PHONY: generate-project-list

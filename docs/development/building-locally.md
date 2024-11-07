@@ -73,10 +73,12 @@ Each project folder contains a Makefile with the following build targets.
 ## Pre-requisites for building container images
 
 * There are two options for building container images
-	* (Experimental) `docker buildx` can be used which may be easier to setup since docker now ships with the buildx plugin.
+	* (Default) `docker buildx` can be used which may be easier to setup since docker now ships with the buildx plugin.
 	docker buildx also uses buildkit behind the scenes so it should result in creating an image which is the same as using `buildctl` directly as prow does.
-		* You need to create a builder using either the `docker-container` or `remote` driver. For example: `docker buildx create --name multiarch --driver docker-container --use`
-	* `buildctl` can be used instead of docker to match our prow builds.  Running `local-images` targets 
+		* You need to create a builder using either the `docker-container` or `remote` driver.
+		* Use `make run-buildkit-and-registry` to create the buildx builder and a local registry. Set `IMAGE_REPO=localhost:5000` when building to push to local registry
+		* To manually create the buildx builder: `docker buildx create --name multiarch --driver docker-container --use`
+	* (Legacy) `buildctl` can be used instead of docker to match our prow builds.  Running `local-images` targets 
 	will export images to a tar, but if running `images` targets which push images, a registry is required.  By default,
 	an ECR repo in the currently logged in AWS account will be used.  A common alternative is to run docker registry locally and override
 	this default behavior. This can be done with `IMAGE_REPO=localhost:5000 make images`. To run buildkit and the docker registry run from the repo root (or a specific project folder):
