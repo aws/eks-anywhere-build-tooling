@@ -391,7 +391,7 @@ var (
 	ProjectsSupportingPrereleaseTags = []string{"kubernetes-sigs/cluster-api-provider-cloudstack"}
 
 	// These projects will be upgraded only on main and won't be triggered on release branches.
-	UpstreamPackagesProjects = []string{
+	ProjectsUpgradedOnlyOnMainBranch = []string{
 		"aquasecurity/harbor-scanner-trivy",
 		"aquasecurity/trivy",
 		"aws/rolesanywhere-credential-helper",
@@ -402,6 +402,7 @@ var (
 		"goharbor/harbor",
 		"kubernetes/autoscaler",
 		"kubernetes/cloud-provider-aws",
+		"kubernetes-sigs/cluster-api",
 		"kubernetes-sigs/metrics-server",
 		"metallb/metallb",
 		"prometheus/node_exporter",
