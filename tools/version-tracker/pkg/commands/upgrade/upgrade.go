@@ -356,7 +356,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					}
 					if _, err := os.Stat(projectChecksumsFile); err == nil {
 						logger.Info("Updating project checksums and attribution files")
-						err = updateChecksumsAttributionFiles(projectRootFilepath)
+						err = updateChecksumsAttributionFiles(projectRootFilepath, releaseBranch)
 						if err != nil {
 							failedSteps["Checksums and attribution generation"] = err
 						} else {
@@ -738,8 +738,8 @@ func applyPatchesToRepo(projectRootFilepath, projectRepo, releaseBranch string, 
 
 // updateChecksumsAttributionFiles runs a Make command to update the checksums and attribution files
 // corresponding to the project being upgraded.
-func updateChecksumsAttributionFiles(projectRootFilepath string) error {
-	updateChecksumsAttributionCommandSequence := fmt.Sprintf("make -C %s attribution-checksums", projectRootFilepath)
+func updateChecksumsAttributionFiles(projectRootFilepath, releaseBranch string) error {
+	updateChecksumsAttributionCommandSequence := fmt.Sprintf("RELEASE_BRANCH=%s make -C %s attribution-checksums", releaseBranch, projectRootFilepath)
 	updateChecksumsAttributionCmd := exec.Command("bash", "-c", updateChecksumsAttributionCommandSequence)
 	_, err := command.ExecCommand(updateChecksumsAttributionCmd)
 	if err != nil {
