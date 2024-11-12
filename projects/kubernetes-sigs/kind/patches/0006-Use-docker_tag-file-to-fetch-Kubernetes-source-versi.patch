@@ -1,0 +1,45 @@
+From a83b77dc1f7d8da0f143890a8c1909cddc934489 Mon Sep 17 00:00:00 2001
+From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
+Date: Mon, 11 Nov 2024 17:25:26 -0800
+Subject: [PATCH 6/6] Use docker_tag file to fetch Kubernetes source version
+
+Kind v0.25.0 introduced a change to use the `version` file in the Kubernetes server binaries tarball to
+fetch the Kubernetes source version. But the server tarball from EKS Distro does not include this file.
+So we are reverting that change to keep the previous behavior of using the docker_tag file as the source
+of truth for the Kubernetes version
+
+Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
+---
+ pkg/build/nodeimage/internal/kube/builder_remote.go  | 2 +-
+ pkg/build/nodeimage/internal/kube/builder_tarball.go | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/pkg/build/nodeimage/internal/kube/builder_remote.go b/pkg/build/nodeimage/internal/kube/builder_remote.go
+index 86133312..8420559b 100644
+--- a/pkg/build/nodeimage/internal/kube/builder_remote.go
++++ b/pkg/build/nodeimage/internal/kube/builder_remote.go
+@@ -77,7 +77,7 @@ func (b *remoteBuilder) Build() (Bits, error) {
+ 	}
+ 
+ 	binDir := filepath.Join(tmpDir, "kubernetes/server/bin")
+-	contents, err := os.ReadFile(filepath.Join(tmpDir, "kubernetes/version"))
++	contents, err := os.ReadFile(filepath.Join(binDir, "kube-apiserver.docker_tag"))
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/pkg/build/nodeimage/internal/kube/builder_tarball.go b/pkg/build/nodeimage/internal/kube/builder_tarball.go
+index 61443f7f..30c87b26 100644
+--- a/pkg/build/nodeimage/internal/kube/builder_tarball.go
++++ b/pkg/build/nodeimage/internal/kube/builder_tarball.go
+@@ -58,7 +58,7 @@ func (b *directoryBuilder) Build() (Bits, error) {
+ 	}
+ 
+ 	binDir := filepath.Join(tmpDir, "kubernetes/server/bin")
+-	contents, err := os.ReadFile(filepath.Join(tmpDir, "kubernetes/version"))
++	contents, err := os.ReadFile(filepath.Join(binDir, "kube-apiserver.docker_tag"))
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-- 
+2.46.1
+
