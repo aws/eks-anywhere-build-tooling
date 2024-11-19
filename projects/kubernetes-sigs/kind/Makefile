@@ -173,6 +173,10 @@ $(FIX_LICENSES_KINDNETD_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 #go-licenses requires a LICENSE file in each folder with the go.mod
 	cp $(REPO)/LICENSE $@
 
+.PHONY: update-manifest-images
+update-manifest-images:
+	build/update_manifest_images.sh $(GIT_TAG)
+
 .PHONY: create-kind-cluster-%
 create-kind-cluster-%:
 	build/create-kind-cluster.sh $(IMAGE_REPO)/$(KIND_NODE_IMAGE_COMPONENT):$(NODE_IMAGE_LATEST_TAG) $* $(RELEASE_BRANCH)
