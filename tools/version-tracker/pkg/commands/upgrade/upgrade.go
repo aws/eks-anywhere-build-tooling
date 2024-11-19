@@ -174,6 +174,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			if err != nil {
 				return fmt.Errorf("getting default EKS Distro release branch: %v", err)
 			}
+			os.Setenv(constants.ReleaseBranchEnvvar, releaseBranch)
 		}
 		if isReleaseBranched {
 			supportedReleaseBranches, err := getSupportedReleaseBranches(buildToolingRepoPath)
@@ -329,7 +330,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 
 				// If project has patches, attempt to apply them. Track failed patches and files that failed to apply, if any.
 				if projectHasPatches {
-					appliedPatchesCount, failedPatch, applyFailedFiles, err := applyPatchesToRepo(projectRootFilepath, projectRepo, releaseBranch, totalPatchCount)
+					appliedPatchesCount, failedPatch, applyFailedFiles, err := applyPatchesToRepo(projectRootFilepath, projectRepo, totalPatchCount)
 					if appliedPatchesCount == totalPatchCount {
 						patchApplySucceeded = true
 					}
@@ -352,7 +353,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					}
 					if _, err := os.Stat(projectChecksumsFile); err == nil {
 						logger.Info("Updating project checksums and attribution files")
-						err = updateChecksumsAttributionFiles(projectRootFilepath, releaseBranch)
+						err = updateChecksumsAttributionFiles(projectRootFilepath)
 						if err != nil {
 							failedSteps["Checksums and attribution generation"] = err
 						} else {
@@ -375,30 +376,13 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					}
 				}
 
-				if projectName == "cilium/cilium" {
-					updatedCiliumImageDigestFiles, err := updateCiliumImageDigestFiles(projectRootFilepath, projectPath)
+				op, message := getProjectSpecificUpdateOperation(projectName)
+				if op != nil {
+					updatedProjectFiles, err := op(projectRootFilepath, projectPath)
 					if err != nil {
-						failedSteps["Cilium image digest update"] = err
+						failedSteps[message] = err
 					} else {
-						updatedFiles = append(updatedFiles, updatedCiliumImageDigestFiles...)
-					}
-				}
-
-				if projectName == "aws-observability/aws-otel-collector" {
-					updatedADOTImageDigestFiles, err := updateADOTImageDigestFiles(projectRootFilepath, projectPath)
-					if err != nil {
-						failedSteps["ADOT image digest update"] = err
-					} else {
-						updatedFiles = append(updatedFiles, updatedADOTImageDigestFiles...)
-					}
-				}
-
-				if projectName == "cert-manager/cert-manager" {
-					err := updateCertManagerManifestFile(projectRootFilepath)
-					if err != nil {
-						failedSteps["Cert-manager manifest file update"] = err
-					} else {
-						updatedFiles = append(updatedFiles, filepath.Join(projectPath, constants.ManifestsDirectory, constants.CertManagerManifestYAMLFile))
+						updatedFiles = append(updatedFiles, updatedProjectFiles...)
 					}
 				}
 			}
@@ -679,12 +663,12 @@ func updateUpstreamProjectsTrackerFile(projectsList *types.ProjectsList, buildTo
 
 // applyPatchesToRepo runs a Make command to apply patches to the cloned repository of the project
 // being upgraded.
-func applyPatchesToRepo(projectRootFilepath, projectRepo, releaseBranch string, totalPatchCount int) (int, string, string, error) {
+func applyPatchesToRepo(projectRootFilepath, projectRepo string, totalPatchCount int) (int, string, string, error) {
 	var patchesApplied int
 	var failedPatch, failedFilesInPatch string
 	patchApplySucceeded := true
 
-	applyPatchesCommandSequence := fmt.Sprintf("RELEASE_BRANCH=%s make -C %s patch-repo", releaseBranch, projectRootFilepath)
+	applyPatchesCommandSequence := fmt.Sprintf("make -C %s patch-repo", projectRootFilepath)
 	applyPatchesCmd := exec.Command("bash", "-c", applyPatchesCommandSequence)
 	applyPatchesOutput, err := command.ExecCommand(applyPatchesCmd)
 	if err != nil {
@@ -734,8 +718,8 @@ func applyPatchesToRepo(projectRootFilepath, projectRepo, releaseBranch string, 
 
 // updateChecksumsAttributionFiles runs a Make command to update the checksums and attribution files
 // corresponding to the project being upgraded.
-func updateChecksumsAttributionFiles(projectRootFilepath, releaseBranch string) error {
-	updateChecksumsAttributionCommandSequence := fmt.Sprintf("RELEASE_BRANCH=%s make -C %s attribution-checksums", releaseBranch, projectRootFilepath)
+func updateChecksumsAttributionFiles(projectRootFilepath string) error {
+	updateChecksumsAttributionCommandSequence := fmt.Sprintf("make -C %s attribution-checksums", projectRootFilepath)
 	updateChecksumsAttributionCmd := exec.Command("bash", "-c", updateChecksumsAttributionCommandSequence)
 	_, err := command.ExecCommand(updateChecksumsAttributionCmd)
 	if err != nil {
@@ -789,15 +773,26 @@ func updateADOTImageDigestFiles(projectRootFilepath, projectPath string) ([]stri
 	return updateADOTFiles, nil
 }
 
-func updateCertManagerManifestFile(projectRootFilepath string) error {
+func updateCertManagerManifestFile(projectRootFilepath, projectPath string) ([]string, error) {
 	updateCertManagerManifestCommandSequence := fmt.Sprintf("make -C %s update-cert-manager-manifest", projectRootFilepath)
 	updateCertManagerManifestCmd := exec.Command("bash", "-c", updateCertManagerManifestCommandSequence)
 	_, err := command.ExecCommand(updateCertManagerManifestCmd)
 	if err != nil {
-		return fmt.Errorf("running update-cert-manager-manifest Make command: %v", err)
+		return nil, fmt.Errorf("running update-cert-manager-manifest Make command: %v", err)
 	}
 
-	return nil
+	return []string{filepath.Join(projectPath, constants.ManifestsDirectory, constants.CertManagerManifestYAMLFile)}, nil
+}
+
+func updateKindManifestImages(projectRootFilepath, projectPath string) ([]string, error) {
+	updateKindManifestImagesCommandSequence := fmt.Sprintf("make -C %s update-manifest-images", projectRootFilepath)
+	updateKindManifestImagesCmd := exec.Command("bash", "-c", updateKindManifestImagesCommandSequence)
+	_, err := command.ExecCommand(updateKindManifestImagesCmd)
+	if err != nil {
+		return nil, fmt.Errorf("running update-manifest-images Make command: %v", err)
+	}
+
+	return []string{filepath.Join(projectPath, constants.BuildDirectory, constants.KindNodeImageBuildArgsScriptFile)}, nil
 }
 
 func updateBottlerocketVersionFiles(client *gogithub.Client, projectRootFilepath, projectPath, branchName string) (string, string, []string, error) {
@@ -1002,4 +997,19 @@ func getDefaultReleaseBranch(buildToolingRepoPath string) (string, error) {
 	}
 
 	return defaultReleaseBranch, nil
+}
+
+func getProjectSpecificUpdateOperation(projectName string) (func(projectRootFilepath, projectPath string) ([]string, error), string) {
+	switch projectName {
+	case "aws-observability/aws-otel-collector":
+		return updateADOTImageDigestFiles, "ADOT image digest update"
+	case "cert-manager/cert-manager":
+		return updateCertManagerManifestFile, "Cert-manager manifest file update"
+	case "cilium/cilium":
+		return updateCiliumImageDigestFiles, "Cilium image digest update"
+	case "kubernetes-sigs/kind":
+		return updateKindManifestImages, "Kind manifest images update"
+	default:
+		return nil, ""
+	}
 }
