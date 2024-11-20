@@ -40,7 +40,7 @@ build::docker::retry_pull $QEMU_INSTALLER_IMAGE
 
 if [[ "$(uname -m)" == "x86_64" ]]; then
     EMULATOR_ARCH="aarch64"
-else if [[ "$(uname -m)" == "arm64" ]]
+elif [[ "$(uname -m)" == "arm64" ]]; then
     EMULATOR_ARCH="amd64"
 fi
 docker run --privileged --rm $QEMU_INSTALLER_IMAGE --install $EMULATOR_ARCH
