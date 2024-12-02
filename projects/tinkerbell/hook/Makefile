@@ -72,6 +72,10 @@ EMBEDDED_IMAGES=$(foreach platform,$(HOOK_PLATFORMS),$(OUTPUT_DIR)/hook-embedded
 LINUXKIT_VERSION=$(shell cat $(MAKE_ROOT)/../../linuxkit/linuxkit/GIT_TAG | cut -c2-)
 LINUXKIT_CACHE_FILE=$(REPO)/cache/linuxkit-linux-$(BUILDER_PLATFORM_ARCH)-$(LINUXKIT_VERSION)
 LINUXKIT_IMAGE_REPO?=$(IMAGE_REPO)
+EMBEDDED_IMAGES_REPO?=$(IMAGE_REPO)
+
+HOOK_TEMPLATE_FILE=$(OUTPUT_DIR)/hook.template.yaml
+POPULATE_LINUXKIT_CACHE_FILE=$(REPO)/cache/linuxkit/index.json
 
 # we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
 # it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
@@ -143,6 +147,23 @@ $(LINUXKIT_CACHE_FILE): $(PROJECT_DEPENDENCIES_TARGETS)
 	@mkdir -p $(@D)
 	cp $(BINARY_DEPS_DIR)/linux-$(BUILDER_PLATFORM_ARCH)/eksa/linuxkit/linuxkit/linuxkit $@
 
+$(HOOK_TEMPLATE_FILE):
+	mkdir -p $(@D) 
+	git -C $(REPO) checkout -- linuxkit-templates/hook.template.yaml
+	sed 's/[^ ]*linuxkit\/\([^:]*\)\(:.*$$\)/$(subst /,\/,$(LINUXKIT_IMAGE_REPO))\/linuxkit\/\1:$(LATEST_TAG)/' $(REPO)/linuxkit-templates/hook.template.yaml > $@
+
+$(POPULATE_LINUXKIT_CACHE_FILE): $(HOOK_TEMPLATE_FILE) | $$(ENABLE_LOGGING)
+	@source $(BUILD_LIB)/common.sh; \
+	images=(); \
+	while read -r image; do \
+		if [[ "$$image" == *"sshd"* ]]; then continue; fi; \
+		images+=($$image); \
+	done < <(sed -n 's/.*\($(subst /,\/,$(LINUXKIT_IMAGE_REPO)).*$$\)/\1/p' $(HOOK_TEMPLATE_FILE)); \
+	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-ip hook-mdev hook-embedded; do \
+		images+=($(IMAGE_REPO)/tinkerbell/$$image:$(LATEST_TAG)$(IMAGE_TAG_SUFFIX)); \
+	done; \
+	for image in "$${images[@]}"; do build::common::echo_and_run retry $(LINUXKIT_CACHE_FILE) cache pull --cache $(REPO)/cache/linuxkit $$image; done
+
 # We use the linuxkit built from eks-a build tooling
 # This includes the linuxkit bin and the images
 # The hook linuxkit-template has two sets of images it pulls in
@@ -156,19 +177,10 @@ $(LINUXKIT_CACHE_FILE): $(PROJECT_DEPENDENCIES_TARGETS)
 # Using sed they are pulled back out so that we can run cache pull with retries since we tend to see
 # issues from time to time pulling from ecr
 $(CREATE_HOOK_FILES_PATTERN)-%: BUILD_ARCH=$(if $(findstring x86_64,$*),amd64,arm64)
-$(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE) | $$(ENABLE_DOCKER)
+$(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE) $(POPULATE_LINUXKIT_CACHE_FILE) | $$(ENABLE_DOCKER)
 	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION); \
-	if [ -f $(REPO)/out/linuxkit-hook-default-$(BUILD_ARCH)/hook-cmdline ]; then echo "remove hook/out before continuing"; exit 1; fi; \
-	sed -i 's/[^ ]*linuxkit\/\([^:]*\)\(:.*$$\)/$(subst /,\/,$(LINUXKIT_IMAGE_REPO))\/linuxkit\/\1:$(LATEST_TAG)/' $(REPO)/linuxkit-templates/hook.template.yaml; \
-	images=(); \
-	while read -r image; do \
-		if [[ "$$image" == *"sshd"* ]]; then continue; fi; \
-		images+=($$image); \
-	done < <(sed -n 's/.*\($(subst /,\/,$(LINUXKIT_IMAGE_REPO)).*$$\)/\1/p' $(REPO)/linuxkit-templates/hook.template.yaml); \
-	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-ip hook-mdev hook-embedded; do \
-		images+=($(IMAGE_REPO)/tinkerbell/$$image:$(LATEST_TAG)$(IMAGE_TAG_SUFFIX)); \
-	done; \
-	for image in "$${images[@]}"; do build::common::echo_and_run retry $(LINUXKIT_CACHE_FILE) cache pull --cache $(REPO)/cache/linuxkit $$image; done; \
+	if [ -f $(REPO)/out/linuxkit-hook-default-$(BUILD_ARCH)/hook-cmdline ]; then echo "rm -rf hook/out before continuing"; exit 1; fi; \
+	cp $(HOOK_TEMPLATE_FILE) $(REPO)/linuxkit-templates/hook.template.yaml; \
 	cd $(REPO); \
 	DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
 		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
@@ -194,9 +206,9 @@ $(OUTPUT_DIR)/hook-embedded/linux-%/images: IMAGE_TAG_SUFFIX=
 $(OUTPUT_DIR)/hook-embedded/linux-%/images: DIND_IMAGE=$(shell $(MAKE) var-value-LATEST_IMAGE IMAGE_NAME=hook-dind)
 $(OUTPUT_DIR)/hook-embedded/linux-%/images: $(GIT_PATCH_TARGET)
 	mkdir -p $(@D)
-	echo "$$($(MAKE) -C $(MAKE_ROOT)/../tink var-value-LATEST_IMAGE IMAGE_NAME=tink-worker) 127.0.0.1/embedded/tink-worker true" > $@.txt
+	echo "$$($(MAKE) -C $(MAKE_ROOT)/../tink var-value-LATEST_IMAGE IMAGE_NAME=tink-worker IMAGE_REPO=$(EMBEDDED_IMAGES_REPO)) 127.0.0.1/embedded/tink-worker true" > $@.txt
 	for action in cexec kexec image2disk oci2disk writefile reboot; do \
-		echo "$$($(MAKE) -C $(MAKE_ROOT)/../hub var-value-LATEST_IMAGE IMAGE_NAME=$$action) 127.0.0.1/embedded/$$action true" >> $@.txt; \
+		echo "$$($(MAKE) -C $(MAKE_ROOT)/../hub var-value-LATEST_IMAGE IMAGE_NAME=$$action IMAGE_REPO=$(EMBEDDED_IMAGES_REPO)) 127.0.0.1/embedded/$$action true" >> $@.txt; \
 	done
 	cat $@.txt
 	@if [[ "$(JOB_TYPE)" == "presubmit" ]] && [[ "$(DOCKER_AVAILABLE)" == "false" ]]; then \
@@ -243,6 +255,10 @@ clean-repo: clean-extra
 .PHONY: clean-extra
 clean-extra:	
 	sudo rm -rf $(EMBEDDED_IMAGES) $(REPO)/out
+
+.PHONY: clean-hook
+clean-hook:
+	sudo rm -rf $(REPO)/out $(REPO)/cache $(OUTPUT_DIR)/hook $(HOOK_TEMPLATE_FILE)
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
