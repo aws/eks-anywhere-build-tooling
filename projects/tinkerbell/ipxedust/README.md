@@ -1,5 +1,5 @@
 ## **ipxedust**
-![Version](https://img.shields.io/badge/version-8221c71edb529ebdfa65d870cc1171266c8d0773-blue)
+![Version](https://img.shields.io/badge/version-1e7b8c4c00c8bb61af52a12186eddadf46ff0227-blue)
 ![Build Status]()
 
 [ipxedust](https://github.com/tinkerbell/ipxedust) is a TFTP and HTTP library and cli for serving iPXE binaries. ipxedust is a go mod
