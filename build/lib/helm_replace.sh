@@ -39,10 +39,12 @@ DEST_DIR=${OUTPUT_DIR}/helm/${CHART_NAME}
 #
 TEMPLATE_DIR=helm/templates
 SEDFILE=${OUTPUT_DIR}/helm/sedfile
-for file in Chart.yaml values.yaml
-do
-  build::common::echo_and_run $SED -f ${SEDFILE} -i ${DEST_DIR}/${file}
-done
+build::common::echo_and_run $SED -f ${SEDFILE} -i ${DEST_DIR}/Chart.yaml
+
+# Process values.yaml if it exists
+if [ -f ${DEST_DIR}/values.yaml ]; then
+  build::common::echo_and_run $SED -f ${SEDFILE} -i ${DEST_DIR}/values.yaml
+fi
 
 if [ -d ${OUTPUT_DIR}/helm/${CHART_NAME}/crds ]; then
   for file in crds/*.yaml 
