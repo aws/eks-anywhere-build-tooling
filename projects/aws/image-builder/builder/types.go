@@ -119,7 +119,6 @@ type NutanixConfig struct {
 	ImageName         string `json:"image_name"`
 	ImageUrl          string `json:"image_url,omitempty"`
 	ImageExport       string `json:"image_export,omitempty"`
-	SourceImageName   string `json:"source_image_name,omitempty"`
 	NutanixEndpoint   string `json:"nutanix_endpoint"`
 	NutanixInsecure   string `json:"nutanix_insecure"`
 	NutanixPort       string `json:"nutanix_port"`
