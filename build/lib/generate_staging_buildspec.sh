@@ -112,7 +112,7 @@ for project in "${PROJECTS[@]}"; do
             PROJECT_DEPENDENCIES=$(make_var $PROJECT_PATH PROJECT_DEPENDENCIES)
         fi
 
-        if [ -n "$PROJECT_DEPENDENCIES" ] && [[ "${buildspec}" = "buildspecs/combine-images.yml" || "$SKIP_DEPEND_ON" != "true" ]]; then
+        if [ -n "$PROJECT_DEPENDENCIES" ] && [[ "${buildspec}" = "buildspecs/combine-images.yml" || "$SKIP_DEPEND_ON" != "true" || "${buildspec}" = "projects/kubernetes-sigs/kind/buildspecs/node-images.yml" ]]; then
             DEPS=(${PROJECT_DEPENDENCIES// / })
             for dep in "${DEPS[@]}"; do
                 if [ "$HARDCODED_DEP" = "true" ]; then
@@ -221,11 +221,23 @@ for project in "${PROJECTS[@]}"; do
                 for val1 in "${ARR_1[@]}"; do
                     for val2 in "${ARR_2[@]}"; do
                         BUILDSPEC_NAME=$(basename $buildspec .yml)
-                        IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//-/_}_${val2//-/_}_${BUILDSPEC_NAME//-/_}
+                        IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//[-\/]/_}_${val2//[-\/]/_}_${BUILDSPEC_NAME//-/_}
                         # TODO: revisit this to make it more dynamic if other projects need it in the future
                         EXTRA_VARS=""
                         if [[ "$IDENTIFIER" =~ "kubernetes_sigs_image_builder_bottlerocket" ]]; then
                             EXTRA_VARS+=",\"IMAGE_OS_VERSION\":\"1\""
+                        fi
+                        if [ "${KEYS[1]}" = "IMAGE_PLATFORMS" ]; then
+                            EXTRA_VARS+=",\"BINARY_PLATFORMS\":\"${val2}\",\"IMAGE_TAG_SUFFIX\":\"-${val2#linux/}\""
+                        fi
+                        # If building on one binary platform assume we want to run on a specific arch instance
+                        ARCH_TYPE="\"type\":\"$BUILDSPEC_PLATFORM\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
+                        if [ "${KEYS[1]}" = "BINARY_PLATFORMS" ] || [ "${KEYS[1]}" = "IMAGE_PLATFORMS" ]; then
+                            if [ "${val2}" = "linux/amd64" ]; then
+                                ARCH_TYPE="\"type\":\"LINUX_CONTAINER\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
+                            else
+                                ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
+                            fi
                         fi
                         ALL_PROJECT_IDS+="\"$IDENTIFIER\","
                         yq eval -i -P \
