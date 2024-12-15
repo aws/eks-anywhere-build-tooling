@@ -33,8 +33,8 @@ EKSD_KUBE_VERSION=
 # Overriding since kind is released branch it will try to add git_tag to latest tag
 LATEST_TAG=$(LATEST)
 
-UNVERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(GIT_TAG)-$(GIT_HASH)
-VERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)-$(GIT_TAG)-$(GIT_HASH)
+UNVERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(GIT_TAG)-$(GIT_HASH)$(IMAGE_TAG_SUFFIX)
+VERSIONED_BASE_IMAGE=$(IMAGE_REPO)/$(KIND_BASE_IMAGE_COMPONENT):$(EKSD_KUBE_VERSION)-$(GIT_TAG)-$(GIT_HASH)$(IMAGE_TAG_SUFFIX)
 
 HAS_S3_ARTIFACTS?=true
 HAS_RELEASE_BRANCHES=true
@@ -52,17 +52,49 @@ IMAGE_NAMES?=haproxy kindnetd kind-base
 
 FIX_LICENSES_KINDNETD_TARGET=$(REPO)/images/kindnetd/LICENSE
 
-BUILDSPECS=buildspecs/binaries.yml buildspecs/images.yml
+# we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
+# it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
+# and the combine-images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L846)
+# since combine-images has images as prereq target, the ?= does not really behavior as one might expect.
+# the images target being the actual action, its version of the set takes prioirty and resets to empty
+# setting it explicitly to empty here takes allows the combine-images override to take proirty
+IMAGE_BUILD_ARGS=
+
+# We are using this pattern of setting the dockerfile_folder instead of local to the target
+# because this project uses the combine-images target which overrides the dockerfile_folder
+# to the standard combine-images dockerfile
+# If we setup our override in this Makefile at the target it does not allow the combine-images
+# to override it
+DOCKERFILE_FOLDER=$(strip $(if $(findstring kind-base,$(IMAGE_NAME)),$(REPO)/images/base,$(if $(filter kind-node,$(IMAGE_NAME)),./images/node,./images/$(IMAGE_NAME))))
+
+# setting image_tarrget similiar to how we set dockerfile_folder as to be able to override it in combine-images
+KIND_BASE_IMAGE_TARGET=base
+KIND_BASE_VERSIONED_IMAGE_TARGET=base-versioned
+KIND_NODE_IMAGE_TARGET=node
+IMAGE_TARGET=$(call IF_OVERRIDE_VARIABLE,$(call TO_UPPER,$(IMAGE_NAME))_IMAGE_TARGET,)
+
+KIND_BASE_IMAGE_CONTEXT_DIR=$(REPO)/images/base
+KIND_BASE_VERSIONED_IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base
+KIND_NODE_IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
+KIND_IF_OVERRIDE_VARIABLE=$(if $(filter undefined,$(origin $1)),$(2),$($(1)))
+IMAGE_CONTEXT_DIR=$(call KIND_IF_OVERRIDE_VARIABLE,$(call TO_UPPER,$(IMAGE_NAME))_IMAGE_CONTEXT_DIR,.)
+
+BUILDSPECS=projects/kubernetes-sigs/kind/buildspecs/binaries.yml projects/kubernetes-sigs/kind/buildspecs/base-images.yml projects/kubernetes-sigs/kind/buildspecs/node-images.yml buildspecs/combine-images.yml
 BUILDSPEC_1_PLATFORM=ARM_CONTAINER
 BUILDSPEC_1_DEPENDS_ON_OVERRIDE=none
-BUILDSPEC_2_PLATFORM=LINUX_CONTAINER
-BUILDSPEC_2_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
-BUILDSPEC_2_VARS_KEYS=RELEASE_BRANCH
-BUILDSPEC_2_VARS_VALUES=SUPPORTED_K8S_VERSIONS
-
+BUILDSPEC_2_VARS_KEYS=IMAGE_PLATFORMS
+BUILDSPEC_2_VARS_VALUES=IMAGE_PLATFORMS
+BUILDSPEC_3_VARS_KEYS=RELEASE_BRANCH IMAGE_PLATFORMS
+BUILDSPEC_3_VARS_VALUES=SUPPORTED_K8S_VERSIONS IMAGE_PLATFORMS
+BUILDSPEC_3_DEPENDS_ON_OVERRIDE=kubernetes_sigs_kind_linux_amd64 kubernetes_sigs_kind_linux_arm64
+BUILDSPEC_4_VARS_KEYS=RELEASE_BRANCH
+BUILDSPEC_4_VARS_VALUES=SUPPORTED_K8S_VERSIONS
+BUILDSPEC_4_DEPENDS_ON_OVERRIDE=$(foreach version,$(SUPPORTED_K8S_VERSIONS),$(foreach arch,arm64 amd64,kubernetes_sigs_kind_$(subst -,_,$(version))_linux_$(arch)_node_images))
+BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
 
 include $(BASE_DIRECTORY)/Common.mk
+
 
 # Do not need to import if running clean or any var-value-% targets
 ifneq ($(and $(RELEASE_BRANCH),$(filter-out clean help-list add-generated-help-block,$(MAKECMDGOALS_WITHOUT_VAR_VALUE))),)
@@ -82,7 +114,6 @@ create-ecr-repos: kind-node/create-ecr-repo
 $(OUTPUT_BIN_DIR)/%/kind: EXTRA_GO_LDFLAGS=-X=sigs.k8s.io/kind/pkg/cmd/kind/version.gitCommit=$(shell git -C $(REPO) rev-list -n 1  "${GIT_TAG}")
 
 # haproxy
-haproxy/images/%: DOCKERFILE_FOLDER=./images/haproxy
 haproxy/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_HAPROXY_IMAGE_NAME)
 $(call IMAGE_TARGETS_FOR_NAME, haproxy): $(HAPROXY_CFG)
 
@@ -91,44 +122,32 @@ $(HAPROXY_CFG): $(GIT_PATCH_TARGET)
 	cp $(REPO)/images/haproxy/haproxy.cfg $@
 
 # Kindnetd
-kindnetd/images/%: DOCKERFILE_FOLDER=./images/kindnetd
 kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_IPTABLES_IMAGE_NAME)
 
 # Kind-base
-kind-base/images/% kind-base-versioned/images/%: DOCKERFILE_FOLDER=$(REPO)/images/base
 kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
 kind-base/images/% kind-base-versioned/images/%: BASE_IMAGE_OS_VERSION=$(MINIMAL_BASE_KIND_IMAGE_NAME_OS_VERSION)
-kind-base/images/% kind-base-versioned/images/%: IMAGE_BUILD_ARGS=CNI_PLUGINS_AMD64_URL CNI_PLUGINS_ARM64_URL CNI_PLUGINS_AMD64_SHA256SUM \
-	CNI_PLUGINS_ARM64_SHA256SUM
+kind-base-versioned/images/%: IMAGE_BUILD_ARGS+=CNI_PLUGINS_AMD64_URL CNI_PLUGINS_ARM64_URL CNI_PLUGINS_AMD64_SHA256SUM CNI_PLUGINS_ARM64_SHA256SUM
 
-kind-base/images/%: IMAGE_TARGET=base
-kind-base/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/base
-$(call IMAGE_TARGETS_FOR_NAME, kind-base): $(KIND_BASE_IMAGE_BUILD_ARGS)
-
-kind-base-versioned/images/%: IMAGE_TARGET=base-versioned
 kind-base-versioned/images/%: IMAGE_TAG:=$(EKSD_KUBE_VERSION)-$(IMAGE_TAG)
 kind-base-versioned/images/%: LATEST_TAG:=$(EKSD_KUBE_VERSION)-$(LATEST_TAG)
-kind-base-versioned/images/%: IMAGE_CONTEXT_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base
 kind-base-versioned/images/%: BUILDER_IMAGE=$(UNVERSIONED_BASE_IMAGE)
-$(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_KUBEADM_OVERRIDE)
+$(call IMAGE_TARGETS_FOR_NAME, kind-base-versioned): $(KIND_BASE_IMAGE_BUILD_ARGS) $(KIND_BASE_KUBEADM_OVERRIDE)
 
 # Kind-node
-kind-node/images/push: DOCKERFILE_FOLDER=./images/node
-kind-node/images/push: IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
 kind-node/images/push: BASE_IMAGE=$(VERSIONED_BASE_IMAGE)
 # We are fully overriding the base_image above, setting the name is to ensure the builder image is set correctly
 kind-node/images/push: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
 kind-node/images/push: BASE_IMAGE_OS_VERSION=$(MINIMAL_BASE_KIND_IMAGE_NAME_OS_VERSION)
 kind-node/images/push: IMAGE_TAG=$(NODE_IMAGE_TAG)
 kind-node/images/push: LATEST_TAG=$(NODE_IMAGE_LATEST_TAG)
-kind-node/images/push: IMAGE_TARGET=node
-kind-node/images/push: $(KIND_NODE_BUILD_AMD64_TARGET) $(KIND_NODE_BUILD_ARM64_TARGET) $(ARM_ENV_CONF_TARGET)
+kind-node/images/push: $(if $(filter linux/amd64,$(IMAGE_PLATFORMS)),$(KIND_NODE_BUILD_AMD64_TARGET),) $(if $(filter linux/arm64,$(IMAGE_PLATFORMS)),$(KIND_NODE_BUILD_ARM64_TARGET) $(ARM_ENV_CONF_TARGET),)
 
 $(KIND_BASE_IMAGE_BUILD_ARGS): | ensure-yq $$(ENABLE_LOGGING)
 	@build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@ $(LATEST)
 
 $(KIND_NODE_IMAGE_BUILD_ARGS): | ensure-yq $$(ENABLE_LOGGING)
-	@build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) "$(ARTIFACTS_BUCKET)" $(IMAGE_TAG) $(LATEST) $@
+	@build/node-image-build-args.sh $(RELEASE_BRANCH) $(KINDNETD_IMAGE_COMPONENT) $(IMAGE_REPO) "$(ARTIFACTS_BUCKET)" $(IMAGE_TAG) $(LATEST) $@ $(IMAGE_TAG_SUFFIX)
 
 # Tweak the kind/base image to have a hardcode kubeadm config
 # so that during the image pull phase it pulls eks-d images
@@ -151,7 +170,9 @@ $(KIND_NODE_BUILD_AMD64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARI
 	$(MAKE) $(KIND_CLI) BINARY_PLATFORMS=$(BUILDER_PLATFORM)
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) amd64 $(BUILDER_PLATFORM_ARCH)
 
+$(KIND_NODE_BUILD_ARM64_TARGET): KIND_CLI=./$(OUTPUT_BIN_DIR)/$(subst /,-,$(BUILDER_PLATFORM))/kind
 $(KIND_NODE_BUILD_ARM64_TARGET): $(KIND_NODE_IMAGE_BUILD_ARGS) $(ORGANIZE_BINARIES_ARM64_TARGET) | ensure-jq
+	$(MAKE) $(KIND_CLI) BINARY_PLATFORMS=$(BUILDER_PLATFORM)
 	build/build-kind-node-image.sh $(RELEASE_BRANCH) $(VERSIONED_BASE_IMAGE) arm64 $(BUILDER_PLATFORM_ARCH)
 
 $(ORGANIZE_BINARIES_AMD64_TARGET): $(HANDLE_DEPENDENCIES_TARGET)
