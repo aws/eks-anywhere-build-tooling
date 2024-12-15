@@ -204,7 +204,7 @@ endif
 
 #####################################################################
 
-BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml projects/$(COMPONENT)/buildspecs/ami.yml
+BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml
 BUILDSPEC_DEPENDS_ON_OVERRIDE=none
 BUILDSPEC_VARS_KEYS=IMAGE_OS RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_OS_DISTROS SUPPORTED_K8S_VERSIONS
