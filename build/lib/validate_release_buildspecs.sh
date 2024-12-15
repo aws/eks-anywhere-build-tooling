@@ -19,15 +19,23 @@ set -o nounset
 set -o pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-RELEASE_BUILDSPECS=("$REPO_ROOT/release/checksums-build.yml" "$REPO_ROOT/release/staging-build.yml")
+RELEASE_BUILDSPECS=("$REPO_ROOT/release/checksums-build.yml" "$REPO_ROOT/release/staging-build.yml" "$REPO_ROOT/tools/version-tracker/buildspecs/upgrade.yml")
 
 VALIDATIONS_FAILED=0
 for buildspec in "${RELEASE_BUILDSPECS[@]}"; do
+    echo "Validating builds count in build graph for buildspec - $buildspec"
+    num_builds_in_batch=$(yq ".batch.build-graph | length" $buildspec)
+    if [[ $num_builds_in_batch -ge 100 ]]; then
+        echo "Maximum allowed builds in batch is 100, current number of builds: $num_builds_in_batch"
+        VALIDATIONS_FAILED=1
+        INVALID_BUILDSPEC="true"
+    fi
+
     depends_on_list=($(yq "[.batch.build-graph[].depend-on[] | select(. != \"null\")] | unique | .[]" $buildspec))
     identifier_list=($(yq ".batch.build-graph[].identifier" $buildspec))
 
     INVALID_BUILDSPEC="false"
-    echo "Validating identifier unqiueness in the buildspec - $buildspec"
+    echo "Validating identifier uniqueness in the buildspec - $buildspec"
     duplicate_ids=($(printf '%s\n' "${identifier_list[@]}"|awk '!($0 in seen){seen[$0];next} 1' | uniq))
     if [ "${#duplicate_ids[@]}" -gt 0 ]; then
         printf -v duplicate_id_csv '%s,' "${duplicate_ids[@]}"
@@ -36,10 +44,12 @@ for buildspec in "${RELEASE_BUILDSPECS[@]}"; do
         INVALID_BUILDSPEC="true"
     fi
 
-    echo "Validating identifiers in depend-on list are valid identifiers in build graph in the buildspec - $buildspec"
-    invalid_dependencies=($(for dependency in ${depends_on_list[@]}; do
-        [[ ${identifier_list[*]} =~ (^|[[:space:]])"$dependency"($|[[:space:]]) ]] || echo "$dependency"
-    done))
+    if [ "${#depends_on_list[@]}" -gt 0 ]; then
+        echo "Validating identifiers in depend-on list are valid identifiers in build graph in the buildspec - $buildspec"
+        invalid_dependencies=($(for dependency in ${depends_on_list[@]}; do
+            [[ ${identifier_list[*]} =~ (^|[[:space:]])"$dependency"($|[[:space:]]) ]] || echo "$dependency"
+        done))
+    fi
 
     if [ "${#invalid_dependencies[@]}" -gt 0 ]; then
         printf -v invalid_deps_csv '%s,' "${invalid_dependencies[@]}"
