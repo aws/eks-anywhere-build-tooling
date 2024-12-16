@@ -17,7 +17,6 @@ EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 SKIP_CHECKSUM_VALIDATION=true
 
 PROJECT_DEPENDENCIES=eksa/tinkerbell/ipxedust
-BUILDSPEC_DEPENDS_ON_OVERRIDE=tinkerbell_ipxedust_linux_amd64 tinkerbell_ipxedust_linux_arm64
 
 OVERRIDE_VENDOR_BINARIES_TARGET=$(REPO)/vendor/github.com/tinkerbell/ipxedust/binary/eks-a-overridden
 

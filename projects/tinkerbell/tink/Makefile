@@ -9,13 +9,8 @@ DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 PROJECT_DEPENDENCIES=eksa/isc-projects/dhcp
 
-BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
-BUILDSPEC_1_DEPENDS_ON_OVERRIDE=none
+BUILDSPECS=$(BUILDSPECS_FOR_COMBINE_IMAGES)
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
-BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
-BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
-BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
-BUILDSPEC_2_DEPENDS_ON_OVERRIDE=tinkerbell_tink_linux_amd64 tinkerbell_tink_linux_arm64
 
 # we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
 # it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)

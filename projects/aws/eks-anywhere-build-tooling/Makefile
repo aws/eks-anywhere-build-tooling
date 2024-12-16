@@ -25,6 +25,9 @@ REPO_NO_CLONE=true
 
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
+# By default the kind combine-images build will be added to the dep list
+# to avoid waiting for that to finish, just wait on the binaries
+BUILDSPEC_DEPENDS_ON_OVERRIDE=fluxcd_flux2 kubernetes_sigs_cluster_api kubernetes_sigs_kind_binaries replicatedhq_troubleshoot vmware_govmomi helm_helm apache_cloudstack_cloudmonkey
 
 include $(BASE_DIRECTORY)/Common.mk
 
