@@ -4,7 +4,7 @@ GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 REPO=kind
 REPO_OWNER=kubernetes-sigs
 
-BINARY_TARGET_FILES=kind kindnetd
+BINARY_TARGET_FILES?=kind kindnetd
 SOURCE_PATTERNS=. ./cmd/kindnetd
 GO_MOD_PATHS=. ./images/kindnetd
 
@@ -79,18 +79,32 @@ KIND_NODE_IMAGE_CONTEXT_DIR=$(BINARY_DEPS_DIR)
 KIND_IF_OVERRIDE_VARIABLE=$(if $(filter undefined,$(origin $1)),$(2),$($(1)))
 IMAGE_CONTEXT_DIR=$(call KIND_IF_OVERRIDE_VARIABLE,$(call TO_UPPER,$(IMAGE_NAME))_IMAGE_CONTEXT_DIR,.)
 
-BUILDSPECS=projects/kubernetes-sigs/kind/buildspecs/binaries.yml projects/kubernetes-sigs/kind/buildspecs/base-images.yml projects/kubernetes-sigs/kind/buildspecs/node-images.yml buildspecs/combine-images.yml
-BUILDSPEC_1_PLATFORM=ARM_CONTAINER
+# BUILDSPECS=projects/$(COMPONENT)/buildspecs/binaries.yml projects/$(COMPONENT)/buildspecs/base-images.yml projects/$(COMPONENT)/buildspecs/node-images.yml buildspecs/combine-images.yml
+# BUILDSPEC_1_PLATFORM=ARM_CONTAINER
+# BUILDSPEC_1_DEPENDS_ON_OVERRIDE=none
+# BUILDSPEC_1_IDENTIFIER_OVERRIDE=kubernetes_sigs_kind_binaries
+# BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+# BUILDSPEC_2_VARS_KEYS=IMAGE_PLATFORMS
+# BUILDSPEC_2_VARS_VALUES=IMAGE_PLATFORMS
+# BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_MEDIUM
+# BUILDSPEC_3_VARS_KEYS=RELEASE_BRANCH IMAGE_PLATFORMS
+# BUILDSPEC_3_VARS_VALUES=SUPPORTED_K8S_VERSIONS IMAGE_PLATFORMS
+# BUILDSPEC_3_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+# BUILDSPEC_3_DEPENDS_ON_OVERRIDE=kubernetes_sigs_kind_linux_amd64 kubernetes_sigs_kind_linux_arm64
+# BUILDSPEC_4_DEPENDS_ON_OVERRIDE=$(foreach version,$(SUPPORTED_K8S_VERSIONS),$(foreach arch,arm64 amd64,kubernetes_sigs_kind_$(subst -,_,$(version))_linux_$(arch)_node_images))
+
+BUILDSPECS=projects/$(COMPONENT)/buildspecs/binaries.yml projects/$(COMPONENT)/buildspecs/base-images.yml projects/$(COMPONENT)/buildspecs/node-images.yml buildspecs/combine-images.yml
+# Building just the binaries does not require any of the project deps
 BUILDSPEC_1_DEPENDS_ON_OVERRIDE=none
+BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_MEDIUM
 BUILDSPEC_2_VARS_KEYS=IMAGE_PLATFORMS
 BUILDSPEC_2_VARS_VALUES=IMAGE_PLATFORMS
-BUILDSPEC_3_VARS_KEYS=RELEASE_BRANCH IMAGE_PLATFORMS
-BUILDSPEC_3_VARS_VALUES=SUPPORTED_K8S_VERSIONS IMAGE_PLATFORMS
-BUILDSPEC_3_DEPENDS_ON_OVERRIDE=kubernetes_sigs_kind_linux_amd64 kubernetes_sigs_kind_linux_arm64
-BUILDSPEC_4_VARS_KEYS=RELEASE_BRANCH
-BUILDSPEC_4_VARS_VALUES=SUPPORTED_K8S_VERSIONS
-BUILDSPEC_4_DEPENDS_ON_OVERRIDE=$(foreach version,$(SUPPORTED_K8S_VERSIONS),$(foreach arch,arm64 amd64,kubernetes_sigs_kind_$(subst -,_,$(version))_linux_$(arch)_node_images))
-BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+BUILDSPEC_2_COMPUTE_TYPE=BUILD_GENERAL1_MEDIUM
+BUILDSPEC_3_VARS_KEYS=IMAGE_PLATFORMS
+BUILDSPEC_3_VARS_VALUES=IMAGE_PLATFORMS
+BUILDSPEC_3_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+BUILDSPEC_3_DEPENDS_ON_OVERRIDE=BUILDSPEC_2
+BUILDSPEC_4_DEPENDS_ON_OVERRIDE=BUILDSPEC_3
 
 
 include $(BASE_DIRECTORY)/Common.mk
@@ -141,7 +155,11 @@ kind-node/images/push: BASE_IMAGE_NAME=$(MINIMAL_BASE_KIND_IMAGE_NAME)
 kind-node/images/push: BASE_IMAGE_OS_VERSION=$(MINIMAL_BASE_KIND_IMAGE_NAME_OS_VERSION)
 kind-node/images/push: IMAGE_TAG=$(NODE_IMAGE_TAG)
 kind-node/images/push: LATEST_TAG=$(NODE_IMAGE_LATEST_TAG)
-kind-node/images/push: $(if $(filter linux/amd64,$(IMAGE_PLATFORMS)),$(KIND_NODE_BUILD_AMD64_TARGET),) $(if $(filter linux/arm64,$(IMAGE_PLATFORMS)),$(KIND_NODE_BUILD_ARM64_TARGET) $(ARM_ENV_CONF_TARGET),)
+# if image_platforms is set via an env, like in the case in CI, only run the prereqs for request platform
+# if its not set, run both prereqs since this is the push target which by default builds both archs
+kind-node/images/push: AMD64_PREREQ=$(and $(if $(findstring combine-images,$(RELEASE_TARGETS)),,true),$(if $(findstring linux/amd64,$(call IF_OVERRIDE_VARIABLE,IMAGE_PLATFORMS,linux/amd64)),$(KIND_NODE_BUILD_AMD64_TARGET),))
+kind-node/images/push: ARM64_PREREQS=$(and $(if $(findstring combine-images,$(RELEASE_TARGETS)),,true),$(if $(findstring linux/arm64,$(call IF_OVERRIDE_VARIABLE,IMAGE_PLATFORMS,linux/arm64)),$(KIND_NODE_BUILD_ARM64_TARGET) $(ARM_ENV_CONF_TARGET),))
+kind-node/images/push: $$(AMD64_PREREQ) $$(ARM64_PREREQS)
 
 $(KIND_BASE_IMAGE_BUILD_ARGS): | ensure-yq $$(ENABLE_LOGGING)
 	@build/base-image-build-args.sh $(RELEASE_BRANCH) $(ARTIFACTS_BUCKET) $@ $(LATEST)
