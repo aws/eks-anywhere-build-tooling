@@ -10,7 +10,7 @@ source "${SCRIPT_ROOT}/common.sh"
 source /docker.sh 
 
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
-QEMU_INSTALLER_IMAGE="public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v7.0.0"
+# QEMU_INSTALLER_IMAGE="public.ecr.aws/eks-distro-build-tooling/binfmt-misc:qemu-v7.0.0"
 GIT_CONFIG_SCOPE="--global"
 if [[ "$CODEBUILD_CI" = "true" ]] && [[ "$CODEBUILD_BUILD_ID" =~ "aws-staging-bundle-build" ]]; then
     GIT_CONFIG_SCOPE="--system"
@@ -36,12 +36,12 @@ update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
 start::dockerd
 wait::for::dockerd
 
-build::docker::retry_pull $QEMU_INSTALLER_IMAGE
+# build::docker::retry_pull $QEMU_INSTALLER_IMAGE
 
-CURRENT_ARCH="$(uname -m)"
-if [[ "$CURRENT_ARCH" == "amd64" || "$CURRENT_ARCH" == "x86_64" ]]; then
-    EMULATOR_ARCH="aarch64"
-elif [[ "$CURRENT_ARCH" == "arm64" || "$CURRENT_ARCH" == "aarch64" ]]; then
-    EMULATOR_ARCH="amd64"
-fi
-docker run --privileged --rm $QEMU_INSTALLER_IMAGE --install $EMULATOR_ARCH
+# CURRENT_ARCH="$(uname -m)"
+# if [[ "$CURRENT_ARCH" == "amd64" || "$CURRENT_ARCH" == "x86_64" ]]; then
+#     EMULATOR_ARCH="aarch64"
+# elif [[ "$CURRENT_ARCH" == "arm64" || "$CURRENT_ARCH" == "aarch64" ]]; then
+#     EMULATOR_ARCH="amd64"
+# fi
+# docker run --privileged --rm $QEMU_INSTALLER_IMAGE --install $EMULATOR_ARCH

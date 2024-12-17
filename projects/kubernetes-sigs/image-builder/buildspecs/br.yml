@@ -1,0 +1,15 @@
+version: 0.2
+
+env:
+  variables:
+    CLI_FOLDER: "projects/aws/image-builder"
+
+phases:
+  pre_build:
+    commands:
+      - git config --global credential.helper '!aws codecommit credential-helper $@'
+      - git config --global credential.UseHttpPath true
+
+  build:
+    commands:      
+      - for format in raw ova; do make release IMAGE_OS=bottlerocket IMAGE_OS_VERSION=1 IMAGE_FORMAT=$format -C $PROJECT_PATH; done

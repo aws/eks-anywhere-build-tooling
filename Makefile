@@ -199,7 +199,7 @@ generate-project-list: | ensure-locale
 generate-staging-buildspec: export BINARY_PLATFORMS=linux/amd64 linux/arm64
 generate-staging-buildspec: export IMAGE_PLATFORMS=linux/amd64 linux/arm64
 generate-staging-buildspec: | ensure-locale
-	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/release/staging-build.yml" "$(BASE_DIRECTORY)/buildspec.yml"
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/release/staging-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" false EXCLUDE_FROM_STAGING_BUILDSPEC BUILDSPECS false
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/release/checksums-build.yml" "$(BASE_DIRECTORY)/buildspecs/checksums-buildspec.yml" true EXCLUDE_FROM_CHECKSUMS_BUILDSPEC CHECKSUMS_BUILDSPECS false buildspecs/checksums-pr-buildspec.yml
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_bottlerocket-bootstrap" "$(BASE_DIRECTORY)/projects/aws/bottlerocket-bootstrap/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "kubernetes_cloud-provider-vsphere" "$(BASE_DIRECTORY)/projects/kubernetes/cloud-provider-vsphere/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
@@ -210,6 +210,7 @@ generate-staging-buildspec: | ensure-locale
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "isc-projects_dhcp" "$(BASE_DIRECTORY)/projects/isc-projects/dhcp/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_hook" "$(BASE_DIRECTORY)/projects/tinkerbell/hook/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_ipxedust" "$(BASE_DIRECTORY)/projects/tinkerbell/ipxedust/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_rufio" "$(BASE_DIRECTORY)/projects/tinkerbell/rufio/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_tink" "$(BASE_DIRECTORY)/projects/tinkerbell/tink/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "linuxkit_linuxkit" "$(BASE_DIRECTORY)/projects/linuxkit/linuxkit/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "emissary-ingress_emissary" "$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
@@ -239,7 +240,7 @@ check-project-path-exists:
 
 .PHONY: validate-release-buildspecs
 validate-release-buildspecs:
-	build/lib/validate_release_buildspecs.sh
+	build/lib/validate_release_buildspecs.sh "$(BASE_DIRECTORY)/release/checksums-build.yml" "$(BASE_DIRECTORY)/release/staging-build.yml" "$(BASE_DIRECTORY)/tools/version-tracker/buildspecs/upgrade.yml"
 
 .PHONY: validate-eksd-releases
 validate-eksd-releases:

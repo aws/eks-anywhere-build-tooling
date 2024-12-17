@@ -81,13 +81,8 @@ LINUXKIT_IMAGE_REPO?=$(IMAGE_REPO)
 # setting it explicitly to empty here takes allows the combine-images override to take proirty
 IMAGE_BUILD_ARGS=
 
-BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
+BUILDSPECS=$(BUILDSPECS_FOR_COMBINE_IMAGES)
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
-BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
-BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
-BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
-BUILDSPEC_1_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 tinkerbell_tink linuxkit_linuxkit tinkerbell_hub
-BUILDSPEC_2_DEPENDS_ON_OVERRIDE=tinkerbell_hook_linux_amd64 tinkerbell_hook_linux_arm64
 
 PROJECT_DEPENDENCIES=eksa/containerd/containerd eksa/tinkerbell/hub eksa/tinkerbell/tink eksa/linuxkit/linuxkit
 

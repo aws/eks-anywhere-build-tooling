@@ -22,7 +22,6 @@ IMAGE_NAMES=$(BINARY_TARGET_FILES) reboot
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 PROJECT_DEPENDENCIES=eksa/torvalds/linux
-BUILDSPEC_DEPENDS_ON_OVERRIDE=torvalds_linux_linux_amd64 torvalds_linux_linux_arm64
 
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
