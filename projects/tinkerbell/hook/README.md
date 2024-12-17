@@ -22,7 +22,18 @@ We only support building with one golang version per project, pick the latest fr
 ### Development
 
 1. The project consists of 3 images. `hook-bootkit`, `hoot-containerd`, `hook-docker`, `hook-embedded`, `hook-runc` and `kernel`.
-1. For building the in-memory OS files (vmlinuz and initramfs), `hook` uses [linuxkit](https://github.com/linuxkit/linuxkit). `linuxkit build` expects the project images to be present in the repository represented by `IMAGE_REPO` variable.
+1. For building the in-memory OS files (vmlinuz and initramfs), `hook` uses [linuxkit](https://github.com/linuxkit/linuxkit). 
+    * `linuxkit build` expects a number of images to be present in the repository represented by `IMAGE_REPO` variable:
+        * images built via this project listed above
+        * images built via [linuxkit](../../linuxkit/linuxkit/Makefile)
+        * images built via [tink](../tink/Makefile)
+        * images built via [hub](../hub/Makefile)
+    * One option is to run `make images` in each of the above project folders to populate your local/ecr registry.
+    * Alternatively you can pull these images from the EKS-A build account ecr using the following variables:
+        * `LINUXKIT_IMAGE_REPO=857151390494.dkr.ecr.us-west-2.amazonaws.com`
+        * `EMBEDDED_IMAGES_REPO=857151390494.dkr.ecr.us-west-2.amazonaws.com`
+    * After running `make images` in this project, to rerun the vmlinuz/initramfs target quickly use `make hook/out/hook/vmlinuz-x86_64` or `make hook/out/hook/vmlinuz-aarch64`
+    * If you change your image repos or make code changes and want rebuild these files run `make clean-hook` to remove the edited template/image cache/output folders/etc. 
 1. For `kernel`, the image builds from the kernel source version defined in the `LINUX_KERNEL_VERSION` file. The upstream's [Dockerfile](https://github.com/tinkerbell/hook/blob/main/kernel/Dockerfile) is patched to use AL23 instead of alpine.
 This image is used by linuxkit build and ends up on the "host" via the built vmlinuz. This should be kept to the latest patch for the choosen minor.
 1. The `hook-bootkit`, `hoot-containerd` and `hook-runc` images are used during the linuxkit build process and ends up on the "host" via the built initramfs.
@@ -32,6 +43,7 @@ This image is used by linuxkit build and ends up on the "host" via the built vml
 These embedded images allow customers to point our "latest" action images without neededing to update their cluster specs and avoids pulling these images at runtime.
 1. To build locally, we suggest using a local registry, or your personal public ecr repos, and setting `IMAGE_REPO` variable.
     - To assist in creating the ecr repos, you can run `make create-ecr-repos`. If using public ecr, be sure to set `IMAGE_REPO`
+    - Refer to [building-locally](../../../docs/development/building-locally.md) for building images locally
 
 #### Kernel
 
