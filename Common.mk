@@ -103,7 +103,7 @@ SUPPORTED_K8S_VERSIONS?=$(shell cat $(BASE_DIRECTORY)/release/SUPPORTED_RELEASE_
 SKIPPED_K8S_VERSIONS?=
 BINARIES_ARE_RELEASE_BRANCHED?=true
 IS_RELEASE_BRANCH_BUILD=$(filter true,$(HAS_RELEASE_BRANCHES))
-UNRELEASE_BRANCH_BINARY_TARGETS=patch-repo binaries attribution checksums
+UNRELEASE_BRANCH_BINARY_TARGETS=patch-repo binaries attribution checksums validate-checksums
 IS_UNRELEASE_BRANCH_TARGET=$(and $(filter false,$(BINARIES_ARE_RELEASE_BRANCHED)),$(filter $(UNRELEASE_BRANCH_BINARY_TARGETS) $(foreach target,$(UNRELEASE_BRANCH_BINARY_TARGETS),run-$(target)-in-docker run-in-docker/$(target)),$(MAKECMDGOALS)))
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH?=
 TARGETS_ALLOWED_WITH_NO_RELEASE_BRANCH+=build release clean clean-extra clean-go-cache help start-docker-builder stop-docker-builder create-ecr-repos all-attributions all-checksums all-attributions-checksums update-patch-numbers check-for-release-branch-skip run-buildkit-and-registry $(if $(filter false, $(HAS_LICENSES)),attribution,) $(if $(filter true, $(HAS_HELM_CHART)),,helm/push)
@@ -851,6 +851,8 @@ PHONY: combine-images
 combine-images: IMAGE_BUILD_ARGS=IMAGE
 combine-images: DOCKERFILE_FOLDER=$(BUILD_LIB)/docker/linux/combine
 combine-images: IMAGE_EXPORT_CACHE=--export-cache type=inline
+combine-images: IMAGE_TARGET=
+combine-images: IMAGE_CONTEXT_DIR=.
 combine-images: images
 
 ## Helm Targets
