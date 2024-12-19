@@ -62,12 +62,8 @@ HAS_S3_ARTIFACTS=true
 FIX_LICENSES_SUB_MOD_TARGETS=$(REPO)/src/cmd/linuxkit/LICENSE $(REPO)/pkg/rngd/LICENSE $(REPO)/pkg/sysctl/LICENSE $(REPO)/pkg/sysfs/LICENSE $(REPO)/pkg/init/LICENSE
 FIX_LICENSES_HYPERKIT_TARGE=$(REPO)/src/cmd/linuxkit/vendor/github.com/moby/hyperkit/go/README.md
 
-BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
+BUILDSPECS=$(BUILDSPECS_FOR_COMBINE_IMAGES)
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
-BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
-BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
-BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
-BUILDSPEC_2_DEPENDS_ON_OVERRIDE=linuxkit_linuxkit_linux_amd64 linuxkit_linuxkit_linux_arm64
 
 # Since we build the arm and amd binaries on difference instances in codebuild
 # we do not want to delete missing files when s3 sync-ing from local to the bucket

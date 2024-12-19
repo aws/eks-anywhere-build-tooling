@@ -25,7 +25,6 @@ EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 BUILDSPEC_VARS_KEYS=BINARY_PLATFORMS
 BUILDSPEC_VARS_VALUES=BINARY_PLATFORMS
-BUILDSPEC_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
 
 # Since we build the arm and amd binaries on difference instances in codebuild
 # we do not want to delete missing files when s3 sync-ing from local to the bucket
