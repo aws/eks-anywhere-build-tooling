@@ -84,6 +84,10 @@ BUILDSPEC_VARS_KEYS?=
 BUILDSPEC_VARS_VALUES?=
 BUILDSPEC_PLATFORM?=ARM_CONTAINER
 BUILDSPEC_COMPUTE_TYPE?=BUILD_GENERAL1_SMALL
+BUILDSPECS_FOR_COMBINE_IMAGES=buildspec.yml buildspecs/combine-images.yml
+BUILDSPEC_1_VARS_KEYS?=$(if $(findstring $(BUILDSPECS_FOR_COMBINE_IMAGES),$(BUILDSPECS)),IMAGE_PLATFORMS,)
+BUILDSPEC_1_VARS_VALUES?=$(if $(findstring $(BUILDSPECS_FOR_COMBINE_IMAGES),$(BUILDSPECS)),IMAGE_PLATFORMS,)
+BUILDSPEC_2_DEPENDS_ON_OVERRIDE?=$(if $(filter buildspecs/combine-images.yml,$(word 2,$(BUILDSPECS))),BUILDSPEC_1,)
 ####################################################
 
 #################### GIT ###########################
@@ -901,7 +905,7 @@ release: $(or $(RELEASE_TARGETS_OVERRIDE),$(RELEASE_TARGETS))
 	@set -e; \
 	for version in $(SUPPORTED_K8S_VERSIONS) ; do \
 	    if ! [[ "$(SKIPPED_K8S_VERSIONS)" =~ $$version  ]]; then \
-			$(MAKE) $* $(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),clean-output,) RELEASE_BRANCH=$$version; \
+			$(MAKE) $* $(if $(filter true,$(BINARIES_ARE_RELEASE_BRANCHED)),clean-output,) RELEASE_BRANCH=$$version IMAGE_PLATFORMS=$(call IF_OVERRIDE_VARIABLE,IMAGE_PLATFORMS,); \
 		fi \
 	done;
 
