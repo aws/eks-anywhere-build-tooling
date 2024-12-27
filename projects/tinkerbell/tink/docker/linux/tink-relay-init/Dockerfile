@@ -6,7 +6,7 @@ FROM $BUILDER_IMAGE as builder
 WORKDIR /newroot
 
 RUN set -x && \
-    install_binary /usr/sbin/awk /usr/bin/nmap /usr/bin/head /usr/sbin/ip /usr/bin/echo && \
+    install_binary /usr/sbin/awk /usr/bin/nmap /usr/bin/head /usr/sbin/ip /usr/bin/echo /usr/bin/env && \
     install_rpm bash && \
     cleanup "deps"
 
