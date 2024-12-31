@@ -652,10 +652,13 @@ func updateUpstreamProjectsTrackerFile(projectsList *types.ProjectsList, buildTo
 	}
 	b.Write([]byte("\n"))
 
-	// Create a new YAML encoder with an appropriate indentation value and encode the project list into a byte buufer
+	// Create a new YAML encoder with an appropriate indentation value and encode the project list into a byte buffer
 	yamlEncoder := goyamlv3.NewEncoder(&b)
 	yamlEncoder.SetIndent(2)
-	yamlEncoder.Encode(&projectsList)
+	err = yamlEncoder.Encode(&projectsList)
+	if err != nil {
+		return fmt.Errorf("encoding the project list into a byte buffer: %v", err)
+	}
 
 	err = os.WriteFile(upstreamProjectsTrackerFilePath, b.Bytes(), 0o644)
 	if err != nil {
