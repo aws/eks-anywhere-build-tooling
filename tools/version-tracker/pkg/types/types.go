@@ -67,10 +67,11 @@ type ImageMetadata struct {
 }
 
 type EKSDistroRelease struct {
-	Branch      string `json:"branch"`
-	KubeVersion string `json:"kubeVersion"`
-	Number      int    `json:"number"`
-	Dev         *bool  `json:"dev,omitempty"`
+	Branch               string `json:"branch"`
+	KubeVersion          string `json:"kubeVersion"`
+	Number               int    `json:"number"`
+	Dev                  *bool  `json:"dev,omitempty"`
+	EndOfStandardSupport string `json:"endOfStandardSupport,omitempty"`
 }
 
 type EKSDistroLatestReleases struct {
