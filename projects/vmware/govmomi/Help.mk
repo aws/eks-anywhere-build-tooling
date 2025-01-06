@@ -31,7 +31,7 @@ run-in-docker/checksums: ## Run `checksums` in docker builder container
 run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
-run-in-docker/govmomi/eks-anywhere-go-mod-download: ## Run `govmomi/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/govmomi/govc/eks-anywhere-go-mod-download: ## Run `govmomi/govc/eks-anywhere-go-mod-download` in docker builder container
 run-in-docker/_output/bin/govmomi/linux-amd64/govc: ## Run `_output/bin/govmomi/linux-amd64/govc` in docker builder container
 run-in-docker/_output/bin/govmomi/linux-arm64/govc: ## Run `_output/bin/govmomi/linux-arm64/govc` in docker builder container
 run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
