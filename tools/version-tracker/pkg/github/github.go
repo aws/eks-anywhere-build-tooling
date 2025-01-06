@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/aws/eks-anywhere/pkg/semver"
@@ -100,7 +102,9 @@ func GetFileContents(client *github.Client, org, repo, filePath, ref string) ([]
 func GetLatestRevision(client *github.Client, org, repo, currentRevision, branchName string, isTrackedUsingCommitHash, releaseBranched bool) (string, bool, error) {
 	logger.V(6).Info(fmt.Sprintf("Getting latest revision for [%s/%s] repository", org, repo))
 	var currentRevisionCommit, latestRevision string
-	needsUpgrade := false
+	var needsUpgrade bool
+
+	projectFullName := fmt.Sprintf("%s/%s", org, repo)
 
 	// Get all GitHub tags for this project.
 	allTags, err := getTagsForRepo(client, org, repo)
@@ -174,8 +178,24 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision, branch
 			if err != nil {
 				return "", false, fmt.Errorf("getting semver for the version under consideration: %v", err)
 			}
-			if !slices.Contains(constants.ProjectsSupportingPrereleaseTags, fmt.Sprintf("%s/%s", org, repo)) && revisionSemver.Prerelease != "" {
+			if !slices.Contains(constants.ProjectsSupportingPrereleaseTags, projectFullName) && revisionSemver.Prerelease != "" {
 				continue
+			}
+			if _, ok := constants.ProjectMaximumSemvers[projectFullName]; ok {
+				maximumAllowedVersion := constants.ProjectMaximumSemvers[projectFullName]
+				numDots := strings.Count(maximumAllowedVersion, ".")
+				for range 2 - numDots {
+					maximumAllowedVersion += fmt.Sprintf(".%s", strconv.Itoa(math.MaxInt))
+				}
+
+				maximumSemver, err := semver.New(maximumAllowedVersion)
+				if err != nil {
+					return "", false, fmt.Errorf("getting semver for the maximum allowed version: %v", err)
+				}
+
+				if revisionSemver.GreaterThan(maximumSemver) {
+					continue
+				}
 			}
 
 			latestRevision = tagName
@@ -197,8 +217,7 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision, branch
 
 // isUpgradeRequired determines if the project requires an upgrade by comparing the current revision to the latest revision.
 func isUpgradeRequired(client *github.Client, org, repo, latestRevision string, currentRevisionCommitEpoch int64, currentRevisionSemver *semver.Version, allTags []*github.RepositoryTag) (bool, bool, error) {
-	needsUpgrade := false
-	shouldBreak := false
+	var needsUpgrade, shouldBreak bool
 
 	// Get commit hash corresponding to latest revision tag.
 	latestRevisionCommit := getCommitForTag(allTags, latestRevision)
