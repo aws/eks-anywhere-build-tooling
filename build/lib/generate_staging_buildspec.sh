@@ -25,7 +25,7 @@ SKIP_DEPEND_ON="${5:-false}"
 EXCLUDE_VAR="${6:-EXCLUDE_FROM_STAGING_BUILDSPEC}"
 BUILDSPECS_VAR="${7:-BUILDSPECS}"
 FAST_FAIL="${8:-true}"
-ADD_FINAL_STAGE="${9:-}"
+FINAL_STAGE_BUILDSPECS_CSV="${9:-}"
 NO_DEPS_FOR_FINAL_STAGE="${10:-false}"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -85,7 +85,7 @@ for project in "${PROJECTS[@]}"; do
         if [[ $(realpath $buildspec) == $(realpath $DEFAULT_BUILDSPEC_FILE) ]]; then
             buildspec_field=""
         fi
-        
+
         DEPEND_ON=""
         # something other than empty string since some overrides are empty strings
         PROJECT_DEPENDENCIES="false"
@@ -107,9 +107,9 @@ for project in "${PROJECTS[@]}"; do
                 break
             fi
         done
-               
+
         PREVIOUS_SPEC_IDENTIFIERS=""
-        
+
         BUILDSPEC_NAME=$(basename $buildspec .yml)
         BUILDSPEC_IDENTIFIER_OVERRIDE="$(make_var $PROJECT_PATH BUILDSPEC_$((( $i + 1 )))_IDENTIFIER_OVERRIDE)"
         if [[ -n "$BUILDSPEC_IDENTIFIER_OVERRIDE" ]]; then
@@ -117,7 +117,7 @@ for project in "${PROJECTS[@]}"; do
         elif [[ "${BUILDSPEC_NAME}" != *buildspec* ]]; then
             IDENTIFIER+="_${BUILDSPEC_NAME//-/_}"
         fi
-       
+
         echo "Adding: $IDENTIFIER"
 
         if [ "$PROJECT_DEPENDENCIES" = "false" ]; then
@@ -146,7 +146,7 @@ for project in "${PROJECTS[@]}"; do
                 fi
 
                 DEP_IDENTIFIER=${DEP_ORG//-/_}_${DEP_REPO//-/_}
-                
+
                 if [ -n "${DEP_RELEASE_BRANCH}" ]; then
                     DEP_IDENTIFIER=${DEP_ORG//-/_}_${DEP_REPO//-/_}_${DEP_RELEASE_BRANCH//[-\/]/_}
                 fi
@@ -170,7 +170,7 @@ for project in "${PROJECTS[@]}"; do
         if [[ -z "$BUILDSPEC_VARS_KEYS" ]]; then
             BUILDSPEC_VARS_KEYS=$(make_var $PROJECT_PATH BUILDSPEC_$((( $i + 1 )))_VARS_KEYS)
         fi
-        
+
         BUILDSPEC_PLATFORM=$(make_var $PROJECT_PATH BUILDSPEC_$((( $i + 1 )))_PLATFORM)
         if [[ -z "$BUILDSPEC_PLATFORM" ]]; then
             BUILDSPEC_PLATFORM=$(make_var $PROJECT_PATH BUILDSPEC_PLATFORM)
@@ -192,13 +192,13 @@ for project in "${PROJECTS[@]}"; do
                     BUILDSPEC_VARS_KEYS="RELEASE_BRANCH"
                     BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS"
                 fi
-            elif [[ "${BUILDSPEC_VARS_KEYS}" = "IMAGE_PLATFORMS" ]]; then            
+            elif [[ "${BUILDSPEC_VARS_KEYS}" = "IMAGE_PLATFORMS" ]]; then
                 BUILDSPEC_VARS_KEYS=""
             fi
         fi
 
         if [[ "$BUILDSPECS_VAR" == "UPGRADE_BUILDSPECS" ]]; then
-            if [[ "${IDENTIFIER}" = "kubernetes_sigs_image_builder" ]]; then            
+            if [[ "${IDENTIFIER}" = "kubernetes_sigs_image_builder" ]]; then
                 BUILDSPEC_VARS_KEYS=""
             elif [[ "true" == "$(make_var $PROJECT_PATH HAS_RELEASE_BRANCHES)" ]]; then
                 if [[ "false" == "$(make_var $PROJECT_PATH BINARIES_ARE_RELEASE_BRANCHED)" ]]; then
@@ -220,15 +220,15 @@ for project in "${PROJECTS[@]}"; do
                 fi
             fi
             VARS=(${BUILDSPEC_VARS_VALUES// / })
-            
-            # Note: only support 1 or 2 vars for now since that is all we need for kind + image-builder 
+
+            # Note: only support 1 or 2 vars for now since that is all we need for kind + image-builder
             if [ ${#VARS[@]} -eq 1 ]; then
                 VALUES_1=$(make_var $PROJECT_PATH ${VARS[0]})
                 ARR_1=(${VALUES_1// / })
-                
-                for val1 in "${ARR_1[@]}"; do                
+
+                for val1 in "${ARR_1[@]}"; do
                     IDENTIFIER_WITH_VAL=${IDENTIFIER}_${val1//[-\/]/_}
-                    
+
                     # If building on one binary platform assume we want to run on a specific arch instance
                     ARCH_TYPE="\"type\":\"$BUILDSPEC_PLATFORM\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
                     if [ "${KEYS[0]}" = "BINARY_PLATFORMS" ] || [ "${KEYS[0]}" = "IMAGE_PLATFORMS" ]; then
@@ -239,7 +239,7 @@ for project in "${PROJECTS[@]}"; do
                         fi
                     fi
 
-                    EXTRA_VARS=""    
+                    EXTRA_VARS=""
                     if [ "${KEYS[0]}" = "IMAGE_PLATFORMS" ]; then
                         EXTRA_VARS+=",\"BINARY_PLATFORMS\":\"${val1}\",\"IMAGE_TAG_SUFFIX\":\"-${val1#linux/}\""
                         HAS_HELM_CHART=$(make_var $PROJECT_PATH HAS_HELM_CHART)
@@ -285,7 +285,7 @@ for project in "${PROJECTS[@]}"; do
                         PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER_WITH_VAL "
                         yq eval -i -P \
                             ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"$EXTRA_VARS}}}]" \
-                            $STAGING_BUILDSPEC_FILE 
+                            $STAGING_BUILDSPEC_FILE
                     done
                 done
             fi
@@ -294,21 +294,28 @@ for project in "${PROJECTS[@]}"; do
             PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER "
             yq eval -i -P \
                 ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL}}}]" \
-                $STAGING_BUILDSPEC_FILE 
+                $STAGING_BUILDSPEC_FILE
         fi
-        
     done
 done
 
-if [ -n "${ADD_FINAL_STAGE}" ]; then
-    ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"BUILD_GENERAL1_SMALL\""
-    DEPEND_ON=",\"depend-on\":[${ALL_PROJECT_IDS%?}]"
-    if [ "$NO_DEPS_FOR_FINAL_STAGE" = "true" ]; then
-        DEPEND_ON=""
-    fi
-    yq eval -i -P \
-        ".batch.build-graph += [{\"identifier\":\"final_stage\",\"buildspec\":\"$ADD_FINAL_STAGE\",\"env\":{$ARCH_TYPE}$DEPEND_ON}]" \
-        $STAGING_BUILDSPEC_FILE 
+if [ -n "${FINAL_STAGE_BUILDSPECS_CSV}" ]; then
+    IFS=',' read -r -a FINAL_STAGE_BUILDSPECS <<< "$FINAL_STAGE_BUILDSPECS_CSV"
+    for i in "${!FINAL_STAGE_BUILDSPECS[@]}";
+        do
+            IDENTIFIER="final_stage"
+            if [[ "$i" -gt 0 ]]; then
+                IDENTIFIER="final_stage_$((i+1))"
+            fi
+            ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"BUILD_GENERAL1_SMALL\""
+            DEPEND_ON=",\"depend-on\":[${ALL_PROJECT_IDS%?}]"
+            if [ "$NO_DEPS_FOR_FINAL_STAGE" = "true" ]; then
+                DEPEND_ON=""
+            fi
+            yq eval -i -P \
+                ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",\"buildspec\":\"${FINAL_STAGE_BUILDSPECS[$i]}\",\"env\":{$ARCH_TYPE}$DEPEND_ON}]" \
+                $STAGING_BUILDSPEC_FILE
+        done
 fi
 
 HEAD_COMMENT=$(cat $BASE_DIRECTORY/hack/boilerplate.yq.txt)
