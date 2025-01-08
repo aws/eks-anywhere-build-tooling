@@ -44,7 +44,7 @@ func Run(displayOptions *types.DisplayOptions) error {
 	// Get base repository owner environment variable if set.
 	baseRepoOwner := os.Getenv(constants.BaseRepoOwnerEnvvar)
 	if baseRepoOwner == "" {
-		baseRepoOwner = constants.DefaultBaseRepoOwner
+		baseRepoOwner = constants.AWSOrgName
 	}
 
 	// Clone the eks-anywhere-build-tooling repository.
