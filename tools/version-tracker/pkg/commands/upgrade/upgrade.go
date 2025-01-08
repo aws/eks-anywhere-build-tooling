@@ -146,6 +146,43 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		if isUpdated {
 			updatedFiles = append(updatedFiles, constants.EKSDistroLatestReleasesFile)
 		}
+	} else if isEKSDistroBuildToolingUpgrade(projectName) {
+		headBranchName = fmt.Sprintf("update-eks-distro-base-image-tag-files-%s", branchName)
+		baseBranchName = branchName
+		commitMessage = "Bump EKS Distro base image tag files to latest"
+
+		// Checkout a new branch to keep track of version upgrade chaneges.
+		err = git.Checkout(worktree, headBranchName, true)
+		if err != nil {
+			return fmt.Errorf("checking out worktree at branch %s: %v", headBranchName, err)
+		}
+
+		// Reset current worktree to get a clean index.
+		err = git.ResetToHEAD(worktree, headCommit)
+		if err != nil {
+			return fmt.Errorf("resetting new branch to [origin/%s] HEAD: %v", branchName, err)
+		}
+
+		eksDistroBaseTagFilesGlobPattern := filepath.Join(buildToolingRepoPath, constants.EKSDistroBaseTagFilesPattern)
+		eksDistroBaseTagFilesGlob, err := filepath.Glob(eksDistroBaseTagFilesGlobPattern)
+		if err != nil {
+			return fmt.Errorf("finding filenames matching EKS Distro Base tag file pattern [%s]: %v", constants.EKSDistroBaseTagFilesPattern, err)
+		}
+
+		updatedPackages, isUpdated, err := updateEKSDistroBaseImageTagFiles(client, buildToolingRepoPath, eksDistroBaseTagFilesGlob)
+		if err != nil {
+			return fmt.Errorf("updating EKS Distro base tag files: %v", err)
+		}
+		if isUpdated {
+			pullRequestBody = fmt.Sprintf(constants.EKSDistroBuildToolingUpgradePullRequestBody, updatedPackages)
+			for _, tagFile := range eksDistroBaseTagFilesGlob {
+				tagFileRelativePath, err := filepath.Rel(buildToolingRepoPath, tagFile)
+				if err != nil {
+					return fmt.Errorf("getting relative path for tag file: %v", err)
+				}
+				updatedFiles = append(updatedFiles, tagFileRelativePath)
+			}
+		}
 	} else {
 		// Validate if the project name provided exists in the repository.
 		projectPath := filepath.Join("projects", projectName)
@@ -527,6 +564,56 @@ func updateEKSDistroReleasesFile(buildToolingRepoPath string) (bool, error) {
 	return isUpdated, nil
 }
 
+func updateEKSDistroBaseImageTagFiles(client *gogithub.Client, buildToolingRepoPath string, tagFileGlob []string) (string, bool, error) {
+	var updatedPackages string
+	var isUpdated bool
+
+	eksDistroBaseTagYAMLContents, err := github.GetFileContents(client, constants.AWSOrgName, constants.EKSDistroBuildToolingRepoName, constants.EKSDistroBaseTagsYAMLFile, "main")
+	if err != nil {
+		return "", false, fmt.Errorf("getting contents of EKS Distro Base tag file: %v", err)
+	}
+
+	var eksDistroBaseTagYAMLMap map[string]interface{}
+	err = yaml.Unmarshal(eksDistroBaseTagYAMLContents, &eksDistroBaseTagYAMLMap)
+	if err != nil {
+		return "", false, fmt.Errorf("unmarshalling EKS Distro Base tag file: %v", err)
+	}
+
+	for _, tagFile := range tagFileGlob {
+		tagFileContents, err := os.ReadFile(tagFile)
+		if err != nil {
+			return "", false, fmt.Errorf("reading tag file: %v", err)
+		}
+		tagFileName := filepath.Base(tagFile)
+		imageName := strings.TrimSuffix(tagFileName, constants.TagFileSuffix)
+
+		tagFileKey := strings.ReplaceAll(strings.ToLower(imageName), "_", "-")
+		osFolder := "2"
+		osKey := "al2"
+		if strings.HasSuffix(tagFileKey, "al2023") {
+			tagFileKey = strings.TrimSuffix(tagFileKey, constants.AL2023Suffix)
+			osFolder = "2023"
+			osKey = "al2023"
+		}
+		tagReleaseDate := eksDistroBaseTagYAMLMap[osKey].(map[string]interface{})[tagFileKey].(string)
+
+		if string(tagFileContents) != tagReleaseDate {
+			isUpdated = true
+			err = os.WriteFile(tagFile, []byte(fmt.Sprintf("%s\n", tagReleaseDate)), 0o644)
+			if err != nil {
+				return "", false, fmt.Errorf("writing tag file: %v", err)
+			}
+
+			updatedPackagesFilesContents, err := github.GetFileContents(client, constants.AWSOrgName, constants.EKSDistroBuildToolingRepoName, fmt.Sprintf(constants.EKSDistroBaseUpdatedPackagesFileFormat, osFolder, tagFileKey), "main")
+			if err != nil {
+				return "", false, fmt.Errorf("getting contents of EKS Distro Base image updated packages: %v", err)
+			}
+			updatedPackages = fmt.Sprintf("%s#### %s\nThe following yum packages were updated:\n```bash\n%s```\n\n", updatedPackages, imageName, string(updatedPackagesFilesContents))
+		}
+	}
+	return updatedPackages, isUpdated, nil
+}
+
 func getSupportedReleaseBranches(buildToolingRepoPath string) ([]string, error) {
 	supportedReleaseBranchesFilepath := filepath.Join(buildToolingRepoPath, constants.SupportedReleaseBranchesFile)
 
@@ -683,7 +770,7 @@ func applyPatchesToRepo(projectRootFilepath, projectRepo string, totalPatchCount
 		patchesApplied = totalPatchCount
 	} else {
 		failedFiles := []string{}
-		gitDescribeRegex := regexp.MustCompile(`v?\d+\.\d+\.\d+(-([0-9]+)-g.*)?`)
+		gitDescribeRegex := regexp.MustCompile(constants.GitDescribeRegex)
 		gitDescribeCmd := exec.Command("git", "-C", filepath.Join(projectRootFilepath, projectRepo), "describe", "--tag")
 		gitDescribeOutput, err := command.ExecCommand(gitDescribeCmd)
 		if err != nil {
@@ -883,16 +970,16 @@ func verifyBRImageExists(channel, format, bottlerocketVersion string) (bool, err
 	switch format {
 	case "ami":
 		variant = "aws"
-		imageTarget = fmt.Sprintf("bottlerocket-%s-k8s-%s-x86_64-%s.img.lz4", variant, kubeVersion, bottlerocketVersion)
+		imageTarget = fmt.Sprintf(constants.BottlerocketAMIImageTargetFormat, variant, kubeVersion, bottlerocketVersion)
 	case "ova":
 		variant = "vmware"
-		imageTarget = fmt.Sprintf("bottlerocket-%s-k8s-%s-x86_64-%s.ova", variant, kubeVersion, bottlerocketVersion)
+		imageTarget = fmt.Sprintf(constants.BottlerocketOVAImageTargetFormat, variant, kubeVersion, bottlerocketVersion)
 	case "raw":
 		variant = "metal"
-		imageTarget = fmt.Sprintf("bottlerocket-%s-k8s-%s-x86_64-%s.img.lz4", variant, kubeVersion, bottlerocketVersion)
+		imageTarget = fmt.Sprintf(constants.BottlerocketRawImageTargetFormat, variant, kubeVersion, bottlerocketVersion)
 	}
 
-	timestampURL := fmt.Sprintf("https://updates.bottlerocket.aws/2020-07-07/%s-k8s-%s/x86_64/timestamp.json", variant, kubeVersion)
+	timestampURL := fmt.Sprintf(constants.BottlerocketTimestampJSONURLFormat, variant, kubeVersion)
 	timestampManifest, err := file.ReadURL(timestampURL)
 	if err != nil {
 		return false, fmt.Errorf("reading Bottlerocket timestamp URL: %v", err)
@@ -907,7 +994,7 @@ func verifyBRImageExists(channel, format, bottlerocketVersion string) (bool, err
 	version := timestampData.(map[string]interface{})["signed"].(map[string]interface{})["version"].(float64)
 	versionString := fmt.Sprintf("%.0f", version)
 
-	targetsURL := fmt.Sprintf("https://updates.bottlerocket.aws/2020-07-07/%s-k8s-%s/x86_64/%s.targets.json", variant, kubeVersion, versionString)
+	targetsURL := fmt.Sprintf(constants.BottlerocketTargetsJSONURLFormat, variant, kubeVersion, versionString)
 	targetsManifest, err := file.ReadURL(targetsURL)
 	if err != nil {
 		return false, fmt.Errorf("reading Bottlerocket targets URL: %v", err)
@@ -931,7 +1018,7 @@ func verifyBRImageExists(channel, format, bottlerocketVersion string) (bool, err
 
 func updateBottlerocketHostContainerMetadata(client *gogithub.Client, projectRootFilepath, projectPath, latestBottlerocketVersion string) ([]string, error) {
 	updatedHostContainerFiles := []string{}
-	hostContainersTOMLContents, err := github.GetFileContents(client, "bottlerocket-os", "bottlerocket", constants.BottlerocketHostContainersTOMLFile, latestBottlerocketVersion)
+	hostContainersTOMLContents, err := github.GetFileContents(client, constants.BottlerocketOrgName, constants.BottlerocketRepoName, constants.BottlerocketHostContainersTOMLFile, latestBottlerocketVersion)
 	if err != nil {
 		return nil, fmt.Errorf("getting contents of Bottlerocket host containers file: %v", err)
 	}
@@ -986,6 +1073,10 @@ func updateBottlerocketHostContainerMetadata(client *gogithub.Client, projectRoo
 
 func isEKSDistroUpgrade(projectName string) bool {
 	return projectName == "aws/eks-distro"
+}
+
+func isEKSDistroBuildToolingUpgrade(projectName string) bool {
+	return projectName == "aws/eks-distro-build-tooling"
 }
 
 func getDefaultReleaseBranch(buildToolingRepoPath string) (string, error) {
