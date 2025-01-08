@@ -16,11 +16,19 @@ const (
 	DefaultCommitAuthorName                 = "EKS Distro PR Bot"
 	DefaultCommitAuthorEmail                = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
 	BuildToolingRepoName                    = "eks-anywhere-build-tooling"
-	DefaultBaseRepoOwner                    = "aws"
+	EKSDistroBuildToolingRepoName           = "eks-distro-build-tooling"
+	AWSOrgName                              = "aws"
+	BottlerocketOrgName                     = "bottlerocket-os"
+	BottlerocketRepoName                    = "bottlerocket"
 	BuildToolingRepoURL                     = "https://github.com/%s/eks-anywhere-build-tooling"
 	ReadmeFile                              = "README.md"
 	ReadmeUpdateScriptFile                  = "build/lib/readme_check.sh"
 	LicenseBoilerplateFile                  = "hack/boilerplate.yq.txt"
+	BottlerocketTargetsJSONURLFormat        = "https://updates.bottlerocket.aws/2020-07-07/%s-k8s-%s/x86_64/%s.targets.json"
+	BottlerocketTimestampJSONURLFormat      = "https://updates.bottlerocket.aws/2020-07-07/%s-k8s-%s/x86_64/timestamp.json"
+	BottlerocketAMIImageTargetFormat        = "bottlerocket-%s-k8s-%s-x86_64-%s.img.lz4"
+	BottlerocketOVAImageTargetFormat        = "bottlerocket-%s-k8s-%s-x86_64-%s.ova"
+	BottlerocketRawImageTargetFormat        = "bottlerocket-%s-k8s-%s-x86_64-%s.img.lz4"
 	EKSDistroLatestReleasesFile             = "EKSD_LATEST_RELEASES"
 	EKSDistroReleaseChannelsFileURLFormat   = "https://distro.eks.amazonaws.com/releasechannels/%s.yaml"
 	EKSDistroReleaseManifestURLFormat       = "https://distro.eks.amazonaws.com/kubernetes-%[1]s/kubernetes-%[1]s-eks-%d.yaml"
@@ -31,6 +39,8 @@ const (
 	GoVersionFile                           = "GOLANG_VERSION"
 	ChecksumsFile                           = "CHECKSUMS"
 	AttributionsFilePattern                 = "*ATTRIBUTION.txt"
+	EKSDistroBaseTagFilesPattern            = "EKS_DISTRO*TAG_FILE"
+	EKSDistroBaseUpdatedPackagesFileFormat  = "eks-distro-base-updates/%s/update_packages-%s"
 	BuildDirectory                          = "build"
 	ManifestsDirectory                      = "manifests"
 	PatchesDirectory                        = "patches"
@@ -40,17 +50,29 @@ const (
 	FailedPatchApplyRegex                   = "Patch failed at .*"
 	FailedPatchFilesRegex                   = "error: (.*): patch does not apply"
 	DoesNotExistInIndexFilesRegex           = "error: (.*): does not exist in index"
+	GitDescribeRegex                        = `v?\d+\.\d+\.\d+(-([0-9]+)-g.*)?`
 	BottlerocketReleasesFile                = "BOTTLEROCKET_RELEASES"
 	BottlerocketContainerMetadataFileFormat = "BOTTLEROCKET_%s_CONTAINER_METADATA"
 	BottlerocketHostContainersTOMLFile      = "sources/shared-defaults/public-host-containers.toml"
 	CertManagerManifestYAMLFile             = "cert-manager.yaml"
 	CiliumImageRepository                   = "public.ecr.aws/isovalent/cilium"
+	EKSDistroBaseTagsYAMLFile               = "EKS_DISTRO_TAG_FILE.yaml"
+	AL2023Suffix                            = "-al2023"
+	TagFileSuffix                           = "_TAG_FILE"
 	KindNodeImageBuildArgsScriptFile        = "node-image-build-args.sh"
 	GithubPerPage                           = 100
 	datetimeFormat                          = "%Y-%m-%dT%H:%M:%SZ"
 	MainBranchName                          = "main"
 	BaseRepoHeadRevisionPattern             = "refs/remotes/origin/%s"
 	EKSDistroUpgradePullRequestBody         = `This PR bumps EKS Distro releases to the latest available release versions.
+
+/hold
+/area dependencies
+
+By submitting this pull request, I confirm that you can use, modify, copy, and redistribute this contribution, under the terms of your choice.`
+	EKSDistroBuildToolingUpgradePullRequestBody = `This PR updates the base image tag in tag file(s) with the tag of the newly-built EKS Distro base image and/or its minimal variants.
+
+%s
 
 /hold
 /area dependencies

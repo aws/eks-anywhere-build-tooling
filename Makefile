@@ -216,7 +216,7 @@ generate-staging-buildspec: | ensure-locale
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "emissary-ingress_emissary" "$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "goharbor_harbor" "$(BASE_DIRECTORY)/projects/goharbor/harbor/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "aws_upgrader" "$(BASE_DIRECTORY)/projects/aws/upgrader/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
-	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/tools/version-tracker/buildspecs/upgrade.yml" "$(BASE_DIRECTORY)/buildspecs/upgrade-buildspec.yml" true EXCLUDE_FROM_UPGRADE_BUILDSPEC UPGRADE_BUILDSPECS false buildspecs/upgrade-eks-distro-buildspec.yml true
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "$(ALL_PROJECTS)" "$(BASE_DIRECTORY)/tools/version-tracker/buildspecs/upgrade.yml" "$(BASE_DIRECTORY)/buildspecs/upgrade-buildspec.yml" true EXCLUDE_FROM_UPGRADE_BUILDSPEC UPGRADE_BUILDSPECS false "buildspecs/upgrade-eks-distro-buildspec.yml,buildspecs/upgrade-eks-distro-build-tooling-buildspec.yml" true
 
 .PHONY: generate
 generate: generate-project-list generate-staging-buildspec
