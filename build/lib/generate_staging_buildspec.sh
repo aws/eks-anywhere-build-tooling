@@ -76,6 +76,7 @@ for project in "${PROJECTS[@]}"; do
 
     BUILDSPECS=$(make_var $PROJECT_PATH $BUILDSPECS_VAR)
     SPECS=(${BUILDSPECS// / })
+    PREVIOUS_SPEC_IDENTIFIERS=""
     for (( i=0; i < ${#SPECS[@]}; i++ )); do
         IDENTIFIER="${org//-/_}_${repo//-/_}"
 
@@ -94,17 +95,28 @@ for project in "${PROJECTS[@]}"; do
             if [[ "none" = "$BUILDSPEC_DEPENDS_ON" ]]; then
                 PROJECT_DEPENDENCIES=""
                 break
+            elif [[ -n "$BUILDSPEC_DEPENDS_ON" ]] && [[ $BUILDSPEC_DEPENDS_ON  == BUILDSPEC_* ]]; then
+                # TODO: In the makefiles we will use `BUILDSPEC_1` as if you can control the specific buildspec
+                # to depend on. This code assumes its always the previous
+                HARDCODED_DEP="true"
+                PROJECT_DEPENDENCIES=$PREVIOUS_SPEC_IDENTIFIERS
+                break
             elif [[ -n "$BUILDSPEC_DEPENDS_ON" ]]; then
                 HARDCODED_DEP="true"
                 PROJECT_DEPENDENCIES=$BUILDSPEC_DEPENDS_ON
                 break
             fi
         done
-
+               
+        PREVIOUS_SPEC_IDENTIFIERS=""
+        
+        BUILDSPEC_NAME=$(basename $buildspec .yml)
         BUILDSPEC_IDENTIFIER_OVERRIDE="$(make_var $PROJECT_PATH BUILDSPEC_$((( $i + 1 )))_IDENTIFIER_OVERRIDE)"
         if [[ -n "$BUILDSPEC_IDENTIFIER_OVERRIDE" ]]; then
             IDENTIFIER="$BUILDSPEC_IDENTIFIER_OVERRIDE"
-        fi   
+        elif [[ "${BUILDSPEC_NAME}" != *buildspec* ]]; then
+            IDENTIFIER+="_${BUILDSPEC_NAME//-/_}"
+        fi
        
         echo "Adding: $IDENTIFIER"
 
@@ -134,10 +146,20 @@ for project in "${PROJECTS[@]}"; do
                 fi
 
                 DEP_IDENTIFIER=${DEP_ORG//-/_}_${DEP_REPO//-/_}
+                
                 if [ -n "${DEP_RELEASE_BRANCH}" ]; then
                     DEP_IDENTIFIER=${DEP_ORG//-/_}_${DEP_REPO//-/_}_${DEP_RELEASE_BRANCH//[-\/]/_}
                 fi
-                DEPEND_ON+="\"${DEP_IDENTIFIER}\","
+                # if dep is split by binary platform, append platform/arch
+                DEP_BUILDSPEC_VARS="$(make_var $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO BUILDSPEC_VARS_KEYS)"
+                DEP_BUILDSPECS="$(make_var $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO BUILDSPECS)"
+                if [[ "$DEP_BUILDSPEC_VARS" == "BINARY_PLATFORMS" ]]; then
+                    DEPEND_ON+="\"${DEP_IDENTIFIER}_linux_amd64\",\"${DEP_IDENTIFIER}_linux_arm64\","
+                elif [[ $DEP_BUILDSPECS == *combine-images.yml* ]]; then
+                    DEPEND_ON+="\"${DEP_IDENTIFIER}_combine_images\","
+                else
+                    DEPEND_ON+="\"${DEP_IDENTIFIER}\","
+                fi
             done
         fi
 
@@ -160,21 +182,42 @@ for project in "${PROJECTS[@]}"; do
         fi
 
         ARCH_TYPE="\"type\":\"$BUILDSPEC_PLATFORM\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
-    
-        if [[ "$BUILDSPECS_VAR" == "CHECKSUMS_BUILDSPECS" ]] && [[ "${BUILDSPEC_VARS_KEYS}" = "IMAGE_PLATFORMS" || ("$BUILDSPEC_VARS_KEYS" == "RELEASE_BRANCH" && "false" == "$(make_var $PROJECT_PATH BINARIES_ARE_RELEASE_BRANCHED)") ]]; then
-            BUILDSPEC_VARS_KEYS=""
+
+        BUILDSPEC_VARS_VALUES=""
+        if [[ "$BUILDSPECS_VAR" == "CHECKSUMS_BUILDSPECS" ]]; then
+            if [[ "true" == "$(make_var $PROJECT_PATH HAS_RELEASE_BRANCHES)" ]]; then
+                if [[ "false" == "$(make_var $PROJECT_PATH BINARIES_ARE_RELEASE_BRANCHED)" ]]; then
+                    BUILDSPEC_VARS_KEYS=""
+                else
+                    BUILDSPEC_VARS_KEYS="RELEASE_BRANCH"
+                    BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS"
+                fi
+            elif [[ "${BUILDSPEC_VARS_KEYS}" = "IMAGE_PLATFORMS" ]]; then            
+                BUILDSPEC_VARS_KEYS=""
+            fi
         fi
 
-        if [[ "$BUILDSPECS_VAR" == "UPGRADE_BUILDSPECS" ]] && [[ "${IDENTIFIER}" = "kubernetes_sigs_image_builder" ]]; then
-            BUILDSPEC_VARS_KEYS=""
+        if [[ "$BUILDSPECS_VAR" == "UPGRADE_BUILDSPECS" ]]; then
+            if [[ "${IDENTIFIER}" = "kubernetes_sigs_image_builder" ]]; then            
+                BUILDSPEC_VARS_KEYS=""
+            elif [[ "true" == "$(make_var $PROJECT_PATH HAS_RELEASE_BRANCHES)" ]]; then
+                if [[ "false" == "$(make_var $PROJECT_PATH BINARIES_ARE_RELEASE_BRANCHED)" ]]; then
+                    BUILDSPEC_VARS_KEYS=""
+                else
+                    BUILDSPEC_VARS_KEYS="RELEASE_BRANCH"
+                    BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS"
+                fi
+            fi
         fi
 
         if [[ -n "$BUILDSPEC_VARS_KEYS" ]]; then
             KEYS=(${BUILDSPEC_VARS_KEYS// / })
 
-            BUILDSPEC_VARS_VALUES=$(make_var $PROJECT_PATH BUILDSPEC_VARS_VALUES)
             if [[ -z "$BUILDSPEC_VARS_VALUES" ]]; then
-                BUILDSPEC_VARS_VALUES=$(make_var $PROJECT_PATH BUILDSPEC_$((( $i + 1 )))_VARS_VALUES)
+                BUILDSPEC_VARS_VALUES=$(make_var $PROJECT_PATH BUILDSPEC_VARS_VALUES)
+                if [[ -z "$BUILDSPEC_VARS_VALUES" ]]; then
+                    BUILDSPEC_VARS_VALUES=$(make_var $PROJECT_PATH BUILDSPEC_$((( $i + 1 )))_VARS_VALUES)
+                fi
             fi
             VARS=(${BUILDSPEC_VARS_VALUES// / })
 
@@ -184,8 +227,7 @@ for project in "${PROJECTS[@]}"; do
                 ARR_1=(${VALUES_1// / })
                 
                 for val1 in "${ARR_1[@]}"; do                
-                    BUILDSPEC_NAME=$(basename $buildspec .yml)
-                    IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//[-\/]/_}
+                    IDENTIFIER_WITH_VAL=${IDENTIFIER}_${val1//[-\/]/_}
                     
                     # If building on one binary platform assume we want to run on a specific arch instance
                     ARCH_TYPE="\"type\":\"$BUILDSPEC_PLATFORM\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
@@ -206,9 +248,10 @@ for project in "${PROJECTS[@]}"; do
                         fi
                     fi
 
-                    ALL_PROJECT_IDS+="\"$IDENTIFIER\","
+                    ALL_PROJECT_IDS+="\"$IDENTIFIER_WITH_VAL\","
+                    PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER_WITH_VAL "
                     yq eval -i -P \
-                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"$EXTRA_VARS}}}]" \
+                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"$EXTRA_VARS}}}]" \
                         $STAGING_BUILDSPEC_FILE
 
                 done
@@ -220,8 +263,7 @@ for project in "${PROJECTS[@]}"; do
                 ARR_2=(${VALUES_2// / })
                 for val1 in "${ARR_1[@]}"; do
                     for val2 in "${ARR_2[@]}"; do
-                        BUILDSPEC_NAME=$(basename $buildspec .yml)
-                        IDENTIFIER=${org//-/_}_${repo//-/_}_${val1//[-\/]/_}_${val2//[-\/]/_}_${BUILDSPEC_NAME//-/_}
+                        IDENTIFIER_WITH_VAL=${IDENTIFIER}_${val1//[-\/]/_}_${val2//[-\/]/_}
                         # TODO: revisit this to make it more dynamic if other projects need it in the future
                         EXTRA_VARS=""
                         if [[ "$IDENTIFIER" =~ "kubernetes_sigs_image_builder_bottlerocket" ]]; then
@@ -239,15 +281,17 @@ for project in "${PROJECTS[@]}"; do
                                 ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
                             fi
                         fi
-                        ALL_PROJECT_IDS+="\"$IDENTIFIER\","
+                        ALL_PROJECT_IDS+="\"$IDENTIFIER_WITH_VAL\","
+                        PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER_WITH_VAL "
                         yq eval -i -P \
-                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"$EXTRA_VARS}}}]" \
+                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"$EXTRA_VARS}}}]" \
                             $STAGING_BUILDSPEC_FILE 
                     done
                 done
             fi
         else
             ALL_PROJECT_IDS+="\"$IDENTIFIER\","
+            PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER "
             yq eval -i -P \
                 ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL}}}]" \
                 $STAGING_BUILDSPEC_FILE
@@ -284,3 +328,5 @@ if [[ "${#PROJECTS[@]}" = "1" ]]; then
     yq -i 'del(.. | select(tag == "!!map" and length == 0))' $STAGING_BUILDSPEC_FILE
     yq -i 'del(.. | select(tag == "!!map" and length == 0))' $STAGING_BUILDSPEC_FILE
 fi
+
+$SCRIPT_ROOT/validate_release_buildspecs.sh "$STAGING_BUILDSPEC_FILE"

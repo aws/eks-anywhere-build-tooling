@@ -29,7 +29,19 @@ SIMPLE_CREATE_TARBALLS=false
 FIX_LICENSES_HOOK_BOOTKIT_TARGET=$(REPO)/hook-bootkit/LICENSE
 FIX_LICENSES_HOOK_DOCKER_TARGET=$(REPO)/hook-docker/LICENSE
 
-BUILDSPECS=buildspec.yml
+# we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
+# it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
+# and the combine-images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L846)
+# since combine-images has images as prereq target, the ?= does not really behavior as one might expect.
+# the images target being the actual action, its version of the set takes prioirty and resets to empty
+# setting it explicitly to empty here takes allows the combine-images override to take proirty
+IMAGE_BUILD_ARGS=
+
+BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
+BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
+BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
+BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
 
 include $(BASE_DIRECTORY)/Common.mk
 

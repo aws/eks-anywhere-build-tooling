@@ -8,10 +8,6 @@ GIT_TAG=v$(RELEASE_BRANCH)-$(shell yq e ".releases[] | select(.branch==\"${RELEA
 
 HAS_RELEASE_BRANCHES=true
 
-EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
-# for the staging buildspec generation
-BUILDSPEC_DEPENDS_ON_OVERRIDE=containerd_containerd_linux_amd64 containerd_containerd_linux_arm64 kubernetes_sigs_cri_tools
-
 # Go 1.18 and newer automatically embeds vcs information if the go module being built
 # belongs (upwards) to a git repo. In this case, that repo is the buildtooling repo, 
 # which is problematic. Given these binaries are built from different banches,
@@ -33,14 +29,9 @@ GIT_CHECKOUT_TARGET=main.go
 FAKE_GIT_REPO_TARGET=.git
 REPO_NO_CLONE=true
 
-
-BUILDSPECS=buildspec.yml buildspecs/combine-images.yml
+BUILDSPECS=$(BUILDSPECS_FOR_COMBINE_IMAGES)
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
-BUILDSPEC_1_VARS_KEYS=IMAGE_PLATFORMS
-BUILDSPEC_1_VARS_VALUES=IMAGE_PLATFORMS
-BUILDSPEC_1_ARCH_TYPES=LINUX_CONTAINER ARM_CONTAINER
-BUILDSPEC_2_DEPENDS_ON_OVERRIDE=aws_upgrader_linux_amd64 aws_upgrader_linux_arm64
-
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 BASE_IMAGE_NAME=eks-distro-minimal-base-nsenter
 IMAGE_NAMES=upgrader

@@ -121,6 +121,7 @@ BOTTLEROCKET_OVA_RELEASE_VERSION=$(and $(RELEASE_BRANCH),$(shell yq e ".$(RELEAS
 BOTTLEROCKET_RAW_RELEASE_VERSION=$(and $(RELEASE_BRANCH),$(shell yq e ".$(RELEASE_BRANCH).raw-release-version" $(MAKE_ROOT)/BOTTLEROCKET_RELEASES))
 
 NOT_SUPPORTED_RELEASE_BRANCH_CONFIGURATION=$(if $(or $(filter-out bottlerocket,$(IMAGE_OS)),$(filter-out null,$(BOTTLEROCKET_$(call TO_UPPER,$(IMAGE_FORMAT))_RELEASE_VERSION))),false,true)
+SKIPPED_K8S_VERSIONS=$(shell yq e 'with_entries(select(.value.$(IMAGE_FORMAT)-release-version == null)) | keys | join(" ")' BOTTLEROCKET_RELEASES)
 
 IMAGE_OS?=ubuntu
 IMAGE_OS_VERSION?=$(DEFAULT_$(call TO_UPPER,$(IMAGE_OS))_VERSION)
@@ -204,10 +205,10 @@ endif
 
 #####################################################################
 
-BUILDSPECS=projects/$(COMPONENT)/buildspecs/ova.yml projects/$(COMPONENT)/buildspecs/raw.yml
+BUILDSPECS=projects/$(COMPONENT)/buildspecs/br.yml
+# in the staging buildspec we only run the br "builds" which do not rely on etcdadm/crictl
 BUILDSPEC_DEPENDS_ON_OVERRIDE=none
-BUILDSPEC_VARS_KEYS=IMAGE_OS RELEASE_BRANCH
-BUILDSPEC_VARS_VALUES=SUPPORTED_OS_DISTROS SUPPORTED_K8S_VERSIONS
+BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_MEDIUM
 SUPPORTED_OS_DISTROS=bottlerocket
 
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
