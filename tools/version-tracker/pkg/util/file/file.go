@@ -4,7 +4,16 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
+
+func ReadContentsTrimmed(filePath string) (string, error) {
+	contents, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(contents)), nil
+}
 
 // Download downloads a file from the given URL to the destination filepath.
 func Download(url, filepath string) error {
