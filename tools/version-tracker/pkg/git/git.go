@@ -131,7 +131,7 @@ func Commit(worktree *git.Worktree, commitMessage string) error {
 }
 
 // Push pushes changes to the given remote branch on GitHub.
-func Push(repo *git.Repository, headRepoOwner, branch, githubToken string) error {
+func Push(repo *git.Repository, headRepoOwner, branch, githubToken string, force bool) error {
 	logger.V(6).Info(fmt.Sprintf("Pushing changes to remote [%s]", headRepoOwner))
 	progress := io.Discard
 	if logger.Verbosity >= 6 {
@@ -145,7 +145,7 @@ func Push(repo *git.Repository, headRepoOwner, branch, githubToken string) error
 			Password: githubToken,
 		},
 		Progress: progress,
-		Force:    true,
+		Force:    force,
 	})
 	if err != nil {
 		if err == git.NoErrAlreadyUpToDate {

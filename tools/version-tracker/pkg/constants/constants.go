@@ -449,4 +449,9 @@ var (
 		"opencontainers/runc":                               "v1.1",
 		"prometheus/prometheus":                             "v2",
 	}
+
+	ProjectsWithSeparateArchitectures = []string{
+		"containerd/containerd",
+		"tinkerbell/tink",
+	}
 )

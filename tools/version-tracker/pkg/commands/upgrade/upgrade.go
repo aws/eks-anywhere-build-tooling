@@ -470,9 +470,10 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			return fmt.Errorf("committing updated project version files for [%s] project: %v", projectName, err)
 		}
 
+		force := !slices.Contains(constants.ProjectsWithSeparateArchitectures, projectName)
 		if !upgradeOptions.DryRun {
 			// Push the changes to the target branch in the head repository.
-			err = git.Push(repo, headRepoOwner, headBranchName, githubToken)
+			err = git.Push(repo, headRepoOwner, headBranchName, githubToken, force)
 			if err != nil {
 				return fmt.Errorf("pushing updated project version files for [%s] project: %v", projectName, err)
 			}
