@@ -580,7 +580,7 @@ func updateEKSDistroBaseImageTagFiles(client *gogithub.Client, buildToolingRepoP
 	}
 
 	for _, tagFile := range tagFileGlob {
-		tagFileContents, err := os.ReadFile(tagFile)
+		tagFileContents, err := file.ReadContentsTrimmed(tagFile)
 		if err != nil {
 			return "", false, fmt.Errorf("reading tag file: %v", err)
 		}
