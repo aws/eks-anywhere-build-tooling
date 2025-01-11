@@ -7,3 +7,4 @@ The [kube-vip project](https://github.com/kube-vip/kube-vip) provides High-Avail
 In EKS-A, kube-vip offers HA and load-balancing services for Kubernetes clusters on vSphere infrastructure.
 
 You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/kube-vip/kube-vip).
+
