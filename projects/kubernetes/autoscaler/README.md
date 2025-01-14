@@ -5,6 +5,7 @@
 ![1.29 Version](https://img.shields.io/badge/1--29%20version-cluster--autoscaler--1.29.5-blue)
 ![1.30 Version](https://img.shields.io/badge/1--30%20version-cluster--autoscaler--1.30.3-blue)
 ![1.31 Version](https://img.shields.io/badge/1--31%20version-cluster--autoscaler--1.31.1-blue)
+![1.32 Version](https://img.shields.io/badge/1--32%20version-cluster--autoscaler--1.32.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiL0tWckptdkxsZEd1cXNiNTBncjRNVU5oekpZRlBkTDNBcFVvZkFOVHZwbTBKUm91QkR6RVN4QlhJWk42cXF3L29FMmdnTXUrVndiay8zVUQ0YjJsc21vPSIsIml2UGFyYW1ldGVyU3BlYyI6Ik1Gd2UwbmRXVWxSRTMvUHQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Autoscaler](https://github.com/kubernetes/autoscaler) defines the cluster autoscaler.
