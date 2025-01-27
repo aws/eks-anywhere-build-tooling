@@ -14,10 +14,10 @@ KERNEL_IMAGE_COMPONENT=tinkerbell/hook-kernel
 HOOK_RUNC_IMAGE_COMPONENT=tinkerbell/hook-runc
 HOOK_CONTAINERD_IMAGE_COMPONENT=tinkerbell/hook-containerd
 HOOK_EMBEDDED_IMAGE_COMPONENT=tinkerbell/hook-embedded
-HOOK_IP_IMAGE_COMPONENT=tinkerbell/hook-ip
 HOOK_MDEV_IMAGE_COMPONENT=tinkerbell/hook-mdev
+MKIMAGE_ISO_EFI_INITRD_IMAGE_COMPONENT=linuxkit/mkimage-iso-efi-initrd
 
-IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-ip hook-mdev hook-dind hook-embedded
+IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-mdev hook-dind hook-embedded
 
 # We are using this pattern of setting the dockerfile_folder instead of local to the target
 # because this project uses the combine-images target which overrides the dockerfile_folder
@@ -27,7 +27,7 @@ IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-ip ho
 # edge cases:
 # - kernel is a different folder in the hook repo (hook/kernel vs hook/images/*)
 # - hook-dind uses the hook-docker image with a different target
-IMAGES_USING_UPSTREAM_DOCKERFILES=kernel hook-ip hook-mdev
+IMAGES_USING_UPSTREAM_DOCKERFILES=kernel hook-mdev
 DOCKERFILE_FOLDER=$(strip $(if $(filter $(IMAGE_NAME),$(IMAGES_USING_UPSTREAM_DOCKERFILES)),\
 	$(if $(filter kernel,$(IMAGE_NAME)),$(REPO)/kernel,$(REPO)/images/$(IMAGE_NAME)),\
 	$(if $(filter hook-dind,$(IMAGE_NAME)),./docker/linux/hook-docker,./docker/linux/$(IMAGE_NAME))))
@@ -122,7 +122,7 @@ $(call IMAGE_TARGETS_FOR_NAME,hook-embedded): $(EMBEDDED_IMAGES)
 
 # upstream hook builds these instead of using the linuxkit provided images
 # building this from their dockerfile
-hook-ip/images/% hook-mdev/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/$(IMAGE_NAME)
+hook-mdev/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/$(IMAGE_NAME)
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
@@ -150,8 +150,12 @@ $(LINUXKIT_CACHE_FILE): $(PROJECT_DEPENDENCIES_TARGETS)
 # After the images are replaced in the hook.template.yaml
 # Using sed they are pulled back out so that we can run cache pull with retries since we tend to see
 # issues from time to time pulling from ecr
+# We skip ENABLE_DOCKER here because for some of the image builds in linuxkit such as the ISO
+# linuxkit pulls in the base image and does a docker run.
+# Since the docker daemon isn't running on the build container this would not work.
+# We build on host to circumvent the above problem, this wouldn't ever occur on our CI builds.
 $(CREATE_HOOK_FILES_PATTERN)-%: BUILD_ARCH=$(if $(findstring x86_64,$*),amd64,arm64)
-$(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE) | $$(ENABLE_DOCKER)
+$(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION); \
 	if [ -f $(REPO)/out/linuxkit-hook-default-$(BUILD_ARCH)/hook-cmdline ]; then echo "remove hook/out before continuing"; exit 1; fi; \
 	sed -i 's/[^ ]*linuxkit\/\([^:]*\)\(:.*$$\)/$(subst /,\/,$(LINUXKIT_IMAGE_REPO))\/linuxkit\/\1:$(LATEST_TAG)/' $(REPO)/linuxkit-templates/hook.template.yaml; \
@@ -160,11 +164,19 @@ $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE) | $$(ENABLE_DOCKER)
 		if [[ "$$image" == *"sshd"* ]]; then continue; fi; \
 		images+=($$image); \
 	done < <(sed -n 's/.*\($(subst /,\/,$(LINUXKIT_IMAGE_REPO)).*$$\)/\1/p' $(REPO)/linuxkit-templates/hook.template.yaml); \
-	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-ip hook-mdev hook-embedded; do \
+	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-mdev hook-embedded; do \
 		images+=($(IMAGE_REPO)/tinkerbell/$$image:$(LATEST_TAG)$(IMAGE_TAG_SUFFIX)); \
 	done; \
 	for image in "$${images[@]}"; do build::common::echo_and_run retry $(LINUXKIT_CACHE_FILE) cache pull --cache $(REPO)/cache/linuxkit $$image; done; \
 	cd $(REPO); \
+	DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
+		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
+		HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
+		HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
+		HOOK_LK_CONTAINERS_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
+		EKS_A_BUILD_ISO_EFI_IMAGE=$(IMAGE_REPO)/$(MKIMAGE_ISO_EFI_INITRD_IMAGE_COMPONENT):$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
+		LINUXKIT_ISO=true \
+		./build.sh build hook-default-$(BUILD_ARCH); \
 	DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
 		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
 		HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
@@ -175,6 +187,7 @@ $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE) | $$(ENABLE_DOCKER)
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG); \
 	cp $(REPO)/out/hook/vmlinuz-$* $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
 	cp $(REPO)/out/hook/initramfs-$* $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
+	cp $(REPO)/out/hook-$*-efi-initrd.iso $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
 	mkdir -p $(ARTIFACTS_PATH); \
 	cp -rf $(OUTPUT_DIR)/hook/* $(ARTIFACTS_PATH)
 
