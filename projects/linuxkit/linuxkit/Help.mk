@@ -22,8 +22,8 @@ _output/bin/linuxkit/linux-amd64/rc.init: ## Build `_output/bin/linuxkit/linux-a
 _output/bin/linuxkit/linux-amd64/service: ## Build `_output/bin/linuxkit/linux-amd64/service`
 
 ##@ Image Targets
-local-images: ## Builds `init/images/amd64 ca-certificates/images/amd64 firmware/images/amd64 rngd/images/amd64 sysctl/images/amd64 sysfs/images/amd64 modprobe/images/amd64 dhcpcd/images/amd64 openntpd/images/amd64 getty/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `init/images/push ca-certificates/images/push firmware/images/push rngd/images/push sysctl/images/push sysfs/images/push modprobe/images/push dhcpcd/images/push openntpd/images/push getty/images/push` to IMAGE_REPO
+local-images: ## Builds `init/images/amd64 ca-certificates/images/amd64 firmware/images/amd64 rngd/images/amd64 sysctl/images/amd64 sysfs/images/amd64 modprobe/images/amd64 dhcpcd/images/amd64 openntpd/images/amd64 getty/images/amd64 mkimage-iso-efi-initrd/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `init/images/push ca-certificates/images/push firmware/images/push rngd/images/push sysctl/images/push sysfs/images/push modprobe/images/push dhcpcd/images/push openntpd/images/push getty/images/push mkimage-iso-efi-initrd/images/push` to IMAGE_REPO
 init/images/amd64: ## Builds/pushes `init/images/amd64`
 ca-certificates/images/amd64: ## Builds/pushes `ca-certificates/images/amd64`
 firmware/images/amd64: ## Builds/pushes `firmware/images/amd64`
@@ -34,6 +34,7 @@ modprobe/images/amd64: ## Builds/pushes `modprobe/images/amd64`
 dhcpcd/images/amd64: ## Builds/pushes `dhcpcd/images/amd64`
 openntpd/images/amd64: ## Builds/pushes `openntpd/images/amd64`
 getty/images/amd64: ## Builds/pushes `getty/images/amd64`
+mkimage-iso-efi-initrd/images/amd64: ## Builds/pushes `mkimage-iso-efi-initrd/images/amd64`
 init/images/push: ## Builds/pushes `init/images/push`
 ca-certificates/images/push: ## Builds/pushes `ca-certificates/images/push`
 firmware/images/push: ## Builds/pushes `firmware/images/push`
@@ -44,6 +45,7 @@ modprobe/images/push: ## Builds/pushes `modprobe/images/push`
 dhcpcd/images/push: ## Builds/pushes `dhcpcd/images/push`
 openntpd/images/push: ## Builds/pushes `openntpd/images/push`
 getty/images/push: ## Builds/pushes `getty/images/push`
+mkimage-iso-efi-initrd/images/push: ## Builds/pushes `mkimage-iso-efi-initrd/images/push`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
