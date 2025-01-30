@@ -1,4 +1,4 @@
-From a83b77dc1f7d8da0f143890a8c1909cddc934489 Mon Sep 17 00:00:00 2001
+From 01f1bef5f0d60d3a62f039c11a5fb0330524ccef Mon Sep 17 00:00:00 2001
 From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 Date: Mon, 11 Nov 2024 17:25:26 -0800
 Subject: [PATCH 6/6] Use docker_tag file to fetch Kubernetes source version
@@ -15,31 +15,31 @@ Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/pkg/build/nodeimage/internal/kube/builder_remote.go b/pkg/build/nodeimage/internal/kube/builder_remote.go
-index 86133312..8420559b 100644
+index c76e4517..901b1675 100644
 --- a/pkg/build/nodeimage/internal/kube/builder_remote.go
 +++ b/pkg/build/nodeimage/internal/kube/builder_remote.go
-@@ -77,7 +77,7 @@ func (b *remoteBuilder) Build() (Bits, error) {
+@@ -78,7 +78,7 @@ func (b *remoteBuilder) Build() (Bits, error) {
  	}
  
  	binDir := filepath.Join(tmpDir, "kubernetes/server/bin")
 -	contents, err := os.ReadFile(filepath.Join(tmpDir, "kubernetes/version"))
 +	contents, err := os.ReadFile(filepath.Join(binDir, "kube-apiserver.docker_tag"))
- 	if err != nil {
- 		return nil, err
- 	}
+ 	// fallback for Kubernetes < v1.31 which doesn't have the version file
+ 	// this approach only works for release tags as the format happens to match
+ 	// for pre-release builds the docker tag is mangled and not valid semver
 diff --git a/pkg/build/nodeimage/internal/kube/builder_tarball.go b/pkg/build/nodeimage/internal/kube/builder_tarball.go
-index 61443f7f..30c87b26 100644
+index 58c2a58c..23547a84 100644
 --- a/pkg/build/nodeimage/internal/kube/builder_tarball.go
 +++ b/pkg/build/nodeimage/internal/kube/builder_tarball.go
-@@ -58,7 +58,7 @@ func (b *directoryBuilder) Build() (Bits, error) {
+@@ -59,7 +59,7 @@ func (b *directoryBuilder) Build() (Bits, error) {
  	}
  
  	binDir := filepath.Join(tmpDir, "kubernetes/server/bin")
 -	contents, err := os.ReadFile(filepath.Join(tmpDir, "kubernetes/version"))
 +	contents, err := os.ReadFile(filepath.Join(binDir, "kube-apiserver.docker_tag"))
- 	if err != nil {
- 		return nil, err
- 	}
+ 	// fallback for Kubernetes < v1.31 which doesn't have the version file
+ 	// this approach only works for release tags as the format happens to match
+ 	// for pre-release builds the docker tag is mangled and not valid semver
 -- 
-2.46.1
+2.47.1
 
