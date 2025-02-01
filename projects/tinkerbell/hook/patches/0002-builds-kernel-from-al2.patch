@@ -1,14 +1,14 @@
-From bcbc69bfef4d8434fb3c08b55ec13b0db01cacbf Mon Sep 17 00:00:00 2001
+From 1ab3249a30d653aae005208a55d5a66d09f8c79c Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Mon, 15 Jul 2024 20:41:42 +0000
-Subject: [PATCH 2/4] builds kernel from al2
+Subject: [PATCH] builds kernel from al2
 
 ---
- kernel/Dockerfile | 34 +++++++++++++++++++++++++++-------
- 1 file changed, 27 insertions(+), 7 deletions(-)
+ kernel/Dockerfile | 35 ++++++++++++++++++++++++++++-------
+ 1 file changed, 28 insertions(+), 7 deletions(-)
 
 diff --git a/kernel/Dockerfile b/kernel/Dockerfile
-index 34903b6..d5146a6 100644
+index 34903b6..a776295 100644
 --- a/kernel/Dockerfile
 +++ b/kernel/Dockerfile
 @@ -1,11 +1,27 @@
@@ -40,7 +40,7 @@ index 34903b6..d5146a6 100644
 +
 +RUN set -x && yum -y update && \
 +        yum -y groupinstall "Development Tools" && \
-+        yum -y install --allowerasing bc ncurses-devel openssl-devel gnupg2-full && \
++        yum -y install --allowerasing bc ncurses-devel openssl-devel gnupg2-full kmod flex bison xz && \
 +        yum clean all && \
 +        rm -rf /var/cache/yum
  
@@ -57,6 +57,14 @@ index 34903b6..d5146a6 100644
  # Kernel config; copy the correct defconfig as .config, and run olddefconfig
  RUN set -x && make "ARCH=${KERNEL_ARCH}" olddefconfig
  
+@@ -65,6 +85,7 @@ ARG KERNEL_OUTPUT_IMAGE
+ RUN mkdir /out
+ 
+ RUN sed -i 's/#define COMMAND_LINE_SIZE 2048/#define COMMAND_LINE_SIZE 4096/' arch/x86/include/asm/setup.h
++RUN sed -i 's/#define COMMAND_LINE_SIZE 2048/#define COMMAND_LINE_SIZE 4096/' arch/arm64/include/uapi/asm/setup.h
+ 
+ # Kernel build. ENVs in previous stages are inherited; thus ARCH, CROSS_COMPILE, KCFLAGS, KBUILD_BUILD_USER, KBUILD_BUILD_HOST are available
+ RUN set -x && \
 -- 
-2.34.1
+2.40.1
 
