@@ -444,9 +444,8 @@ var (
 	)
 
 	ProjectMaximumSemvers = map[string]string{
-		"containerd/containerd":                             "v1",
-		"nutanix-cloud-native/cluster-api-provider-nutanix": "v1.4",
-		"opencontainers/runc":                               "v1.1",
-		"prometheus/prometheus":                             "v2",
+		"containerd/containerd": "v1",
+		"opencontainers/runc":   "v1.1",
+		"prometheus/prometheus": "v2",
 	}
 )
