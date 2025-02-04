@@ -79,7 +79,7 @@ func getCommitDateEpoch(client *github.Client, org, repo, commitSHA string) (int
 
 	commit, _, err := client.Repositories.GetCommit(context.Background(), org, repo, commitSHA, nil)
 	if err != nil {
-		return 0, fmt.Errorf("getting date for commit %s in [%s/%s] repository: %v", commit, org, repo, err)
+		return 0, fmt.Errorf("getting date for commit %s in [%s/%s] repository: %v", commitSHA, org, repo, err)
 	}
 
 	return (*commit.Commit.Author.Date).Unix(), nil
