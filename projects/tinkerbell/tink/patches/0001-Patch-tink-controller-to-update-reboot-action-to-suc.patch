@@ -1,0 +1,37 @@
+From c1c3437f78511a64ef97d8e9e64aa449f48e1201 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulgab@amazon.com>
+Date: Tue, 4 Feb 2025 20:54:26 +0000
+Subject: [PATCH] Patch tink-controller to update reboot action to success by
+ default
+
+In reboot action, sometimes the power off happens too fast before the
+tink-worker is able to report the status back to the server. This causes
+the workflow to never proceed to successful state even when the reboot
+happens successfully. Patch controller to default to success state if
+the action is reboot.
+
+Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
+---
+ internal/deprecated/workflow/reconciler.go | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/internal/deprecated/workflow/reconciler.go b/internal/deprecated/workflow/reconciler.go
+index 5922fa6..ecd552d 100644
+--- a/internal/deprecated/workflow/reconciler.go
++++ b/internal/deprecated/workflow/reconciler.go
+@@ -295,6 +295,12 @@ func (r *Reconciler) processRunningWorkflow(stored *v1alpha1.Workflow) {
+ 			if action.Status == v1alpha1.WorkflowStateRunning && stored.Status.CurrentAction != action.Name {
+ 				stored.Status.CurrentAction = action.Name
+ 			}
++
++			if action.Name == "reboot" && action.Status == v1alpha1.WorkflowStateRunning {
++				stored.Status.Tasks[ti].Actions[ai].Status = v1alpha1.WorkflowStateSuccess
++				stored.Status.Tasks[ti].Actions[ai].Seconds = int64(r.nowFunc().Sub(action.StartedAt.Time).Seconds())
++				stored.Status.State = v1alpha1.WorkflowStatePost
++			}
+ 		}
+ 	}
+ }
+-- 
+2.40.1
+
