@@ -1,0 +1,60 @@
+From d2242fa831b29364d9684339b9b5214c22ac59f8 Mon Sep 17 00:00:00 2001
+From: Jiayi Wang <jiayiwang7@yahoo.com>
+Date: Mon, 9 Jan 2023 15:41:05 -0500
+Subject: [PATCH 20/39] Mark etcd machine status to running after etcd
+ controller adds the etcd machine ready label
+
+---
+ api/v1beta1/machine_types.go                              | 5 ++++-
+ internal/controllers/machine/machine_controller_phases.go | 2 +-
+ internal/controllers/machine/machine_controller_status.go | 3 +--
+ 3 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/api/v1beta1/machine_types.go b/api/v1beta1/machine_types.go
+index 583d2d6f9..c9c30211b 100644
+--- a/api/v1beta1/machine_types.go
++++ b/api/v1beta1/machine_types.go
+@@ -30,9 +30,12 @@ const (
+ 	// MachineControlPlaneLabel is the label set on machines or related objects that are part of a control plane.
+ 	MachineControlPlaneLabel = "cluster.x-k8s.io/control-plane"
+ 
+-	//MachineEtcdClusterLabelName is the label set on machines or related objects that are part of an etcd cluster
++	// MachineEtcdClusterLabelName is the label set on machines or related objects that are part of an etcd cluster
+ 	MachineEtcdClusterLabelName = "cluster.x-k8s.io/etcd-cluster"
+ 
++	// MachineEtcdReadyLabelName is the label set on machines that have succesfully joined the etcd cluster.
++	MachineEtcdReadyLabelName = "cluster.x-k8s.io/etcd-ready"
++
+ 	// ExcludeNodeDrainingAnnotation annotation explicitly skips node draining if set.
+ 	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
+ 
+diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
+index 3d88ba6ca..52aab2c55 100644
+--- a/internal/controllers/machine/machine_controller_phases.go
++++ b/internal/controllers/machine/machine_controller_phases.go
+@@ -370,7 +370,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+ 							},
+ 						},
+ 						Data: map[string][]byte{
+-							"address": []byte(machineIP),
++							"address":    []byte(machineIP),
+ 							"clientUrls": []byte(fmt.Sprintf("https://%v:2379", machineIP)),
+ 						},
+ 						Type: clusterv1.ClusterSecretType,
+diff --git a/internal/controllers/machine/machine_controller_status.go b/internal/controllers/machine/machine_controller_status.go
+index e9a786958..9f8df57e5 100644
+--- a/internal/controllers/machine/machine_controller_status.go
++++ b/internal/controllers/machine/machine_controller_status.go
+@@ -797,8 +797,7 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
+ 	}
+ 
+ 	if _, ok := m.Labels[clusterv1.MachineEtcdClusterLabelName]; ok {
+-		// Status.NodeRef does not get set for etcd machines since they don't correspond to k8s node objects
+-		if m.Status.InfrastructureReady {
++		if _, ok := m.Labels[clusterv1.MachineEtcdReadyLabelName]; ok && m.Status.InfrastructureReady {
+ 			m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
+ 		}
+ 	}
+-- 
+2.45.2
+
