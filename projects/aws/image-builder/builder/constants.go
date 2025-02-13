@@ -50,6 +50,7 @@ const (
 	eksAReleaseManifestURLEnvVar          string = "EKSA_RELEASE_MANIFEST_URL"
 	eksABundlesURLEnvVar                  string = "EKSA_BUNDLE_MANIFEST_URL"
 	eksDManifestURLEnvVar                 string = "EKSD_MANIFEST_URL"
+	imageSizeGbNutanixEnvVar              string = "IMAGE_SIZE_GB"
 	packerAdditionalFilesConfigFileEnvVar string = "PACKER_ADDITIONAL_FILES_VAR_FILES"
 	rhelUsernameEnvVar                    string = "RHSM_USERNAME"
 	rhelPasswordEnvVar                    string = "RHSM_PASSWORD"
