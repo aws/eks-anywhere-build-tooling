@@ -1,0 +1,31 @@
+From 7c998e5f2b682b36d9662c2fb4fdceb5fedcbdf9 Mon Sep 17 00:00:00 2001
+From: Shizhao Liu <lshizhao@amazon.com>
+Date: Wed, 12 Feb 2025 22:04:46 -0800
+Subject: [PATCH 40/40] Requeue reconcilation if ControlPlaneEndpoint is not
+ found
+
+Since we move to CAPI 1.9.4 we start to see a temporary
+ControlPlaneEndpoint undefined state for KCP and it resulted in
+a wrong number of replicas being set on KCP.
+This is a temporary workaround for the issue by re-queuing the
+reconcilation call until controlPlaneEndpoint is valid.
+---
+ controlplane/kubeadm/internal/controllers/controller.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
+index 97a42b118..1584eb670 100644
+--- a/controlplane/kubeadm/internal/controllers/controller.go
++++ b/controlplane/kubeadm/internal/controllers/controller.go
+@@ -432,7 +432,7 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+ 		})
+ 
+ 		log.Info("Cluster does not yet have a ControlPlaneEndpoint defined")
+-		return ctrl.Result{}, nil
++		return ctrl.Result{Requeue: true}, nil
+ 	}
+ 
+ 	// Generate Cluster Kubeconfig if needed
+-- 
+2.45.2
+
