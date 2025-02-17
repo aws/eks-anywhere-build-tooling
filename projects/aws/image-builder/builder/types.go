@@ -117,6 +117,7 @@ type RhelConfig struct {
 type NutanixConfig struct {
 	ClusterName       string `json:"nutanix_cluster_name"`
 	ImageName         string `json:"image_name"`
+	ImageSizeGb       string `json:"image_size_gb,omitempty"`
 	ImageUrl          string `json:"image_url,omitempty"`
 	ImageExport       string `json:"image_export,omitempty"`
 	NutanixEndpoint   string `json:"nutanix_endpoint"`

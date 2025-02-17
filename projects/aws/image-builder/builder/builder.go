@@ -268,6 +268,13 @@ func (b *BuildOptions) BuildImage() {
 
 		if b.NutanixConfig != nil {
 			commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerTypeVarFilesEnvVar, nutanixConfigFile))
+
+			if b.NutanixConfig.ImageSizeGb == "" {
+				// Set default image size for Linux to 10GB as it implemented in image-builder upstream
+				b.NutanixConfig.ImageSizeGb = "10"
+			}
+
+			commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", imageSizeGbNutanixEnvVar, b.NutanixConfig.ImageSizeGb))
 		}
 
 		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)

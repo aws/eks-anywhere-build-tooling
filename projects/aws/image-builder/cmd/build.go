@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -232,6 +233,17 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				if err = validateAirGapped(&bo.NutanixConfig.AirGappedConfig,
 					bo.NutanixConfig.ExtraRepos, bo.NutanixConfig.ImageName); err != nil {
 					return err
+				}
+			}
+
+			if bo.NutanixConfig.ImageSizeGb != "" {
+				imageSizeGb, err := strconv.Atoi(bo.NutanixConfig.ImageSizeGb)
+				if err != nil {
+					return fmt.Errorf("invalid image size: %v", err)
+				}
+
+				if imageSizeGb < 0 {
+					return fmt.Errorf("image size must be a positive integer")
 				}
 			}
 			// TODO Validate other fields as well
