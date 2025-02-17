@@ -280,7 +280,7 @@ func TestValidateInputsFirmwareDefaulting(t *testing.T) {
 	baremetalConfigFile = "test-baremetal-config"
 	cloudstackConfigFile = baremetalConfigFile
 	vSphereConfigFile = baremetalConfigFile
-	err = ioutil.WriteFile(baremetalConfigFile, []byte(`{"rhel_username": "un", "rhel_password": "pw", "iso_url": "fake-iso", "iso_checksum": "fake", "iso_checksum_type": "sha256"}`), 0644)
+	err = ioutil.WriteFile(baremetalConfigFile, []byte(`{"rhel_username": "un", "rhel_password": "pw", "iso_url": "fake-iso", "iso_checksum": "fake", "iso_checksum_type": "sha256"}`), 0o644)
 	if err != nil {
 		log.Fatal(err)
 	}
