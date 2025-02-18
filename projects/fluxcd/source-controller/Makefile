@@ -12,6 +12,9 @@ FIX_LICENSES_API_LICENSE_TARGET=$(REPO)/vendor/github.com/fluxcd/source-controll
 FIX_LICENSES_SHA1CD=$(REPO)/vendor/github.com/pjbgf/sha1cd/LICENSE
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
+BUILDSPEC_VARS_KEYS=BINARY_PLATFORMS
+BUILDSPEC_VARS_VALUES=BINARY_PLATFORMS
+
 include $(BASE_DIRECTORY)/Common.mk
 
 
