@@ -26,7 +26,7 @@ about calling breaking changes and other upgrade gotchas between release. Please
 about changes necessary to eks-anywhere to support the new version and/or automatically update between 
 eks-anywhere version reach out to @jiayiwang7 or @danbudris
 1. Compare the old tag to the new, looking specifically for Makefile changes. 
-ex: [v1.2.2 compared to v1.5.0](https://github.com/fluxcd/source-controller/compare/v1.2.2...v1.2.3). Check the `build` target for
+ex: [v1.4.1 compared to v1.5.0](https://github.com/fluxcd/source-controller/compare/v1.4.1...v1.5.0). Check the `build` target for
 any build flag changes, tag changes, dependencies, etc.
 1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.  There is also
 a [dockerfile](https://github.com/fluxcd/source-controller/blob/main/Dockerfile#L2) they use for building which has it defined.
