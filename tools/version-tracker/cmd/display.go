@@ -27,5 +27,4 @@ var displayCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(displayCmd)
 	displayCmd.Flags().StringVar(&displayOptions.ProjectName, "project", "", "Specify the project name to track versions for")
-	displayCmd.Flags().BoolVar(&displayOptions.PrintLatestVersion, "print-latest-version", false, "Flag to print only the latest version of the project")
 }
