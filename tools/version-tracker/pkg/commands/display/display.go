@@ -102,9 +102,7 @@ func Run(displayOptions *types.DisplayOptions) error {
 			if displayOptions.ProjectName != "" && displayOptions.ProjectName != fullRepoName {
 				continue
 			}
-			if fullRepoName == "envoyproxy/envoy" || fullRepoName == "isc-projects/dhcp" {
-				continue
-			}
+
 			releaseBranched := false
 			var currentVersion types.Version
 			if len(repo.Versions) > 1 {
@@ -135,8 +133,8 @@ func Run(displayOptions *types.DisplayOptions) error {
 				currentVersionList = append(currentVersionList, currentRevision)
 
 				var latestRevision string
-				if fullRepoName == "cilium/cilium" {
-					latestRevision, _, err = ecrpublic.GetLatestRevision(constants.CiliumImageRepository, currentRevision, branchName)
+				if fullRepoName == "cilium/cilium" || fullRepoName == "envoyproxy/envoy" {
+					latestRevision, _, err = ecrpublic.GetLatestRevision(constants.ECRImageRepositories[fullRepoName], currentRevision, branchName)
 					if err != nil {
 						return fmt.Errorf("getting latest revision from ECR Public: %v", err)
 					}

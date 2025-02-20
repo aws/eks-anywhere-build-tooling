@@ -3,7 +3,6 @@ module github.com/aws/eks-anywhere-build-tooling/tools/version-tracker
 go 1.22
 
 require (
-	github.com/aws/eks-anywhere v0.18.3
 	github.com/aws/eks-distro-build-tooling/release v0.0.0-20240513204929-c69ded04ed10
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-git/go-git/v5 v5.11.0
@@ -68,6 +67,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	k8s.io/api v0.26.2 // indirect
 	k8s.io/apimachinery v0.26.2 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5 // indirect
