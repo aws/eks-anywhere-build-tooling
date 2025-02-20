@@ -2,8 +2,7 @@ package types
 
 // DisplayOptions represents the options that can be passed to the `display` command.
 type DisplayOptions struct {
-	ProjectName        string
-	PrintLatestVersion bool
+	ProjectName string
 }
 
 // UpgradeOptions represents the options that can be passed to the `upgrade` command.
@@ -42,6 +41,7 @@ type ProjectVersionInfo struct {
 	Repo           string
 	CurrentVersion string
 	LatestVersion  string
+	UpToDate       string
 }
 
 // ReleaseTarball represents the GitHub release asset name, binary name and related settings to get the

@@ -136,12 +136,12 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision, branch
 		needsUpgrade = true
 	} else {
 		semverRegex := regexp.MustCompile(constants.SemverRegex)
-		currentRevisionForSemver := semverRegex.FindString(currentRevision)
+		currentRevisionForSemver := version.EnsurePatchVersion(semverRegex.FindString(currentRevision))
 
 		// Get SemVer construct corresponding to the current revision tag.
 		currentRevisionSemver, err := semver.New(currentRevisionForSemver)
 		if err != nil {
-			return "", false, fmt.Errorf("getting semver for current version: %v", err)
+			return "", false, fmt.Errorf("getting semver for current version %s: %v", currentRevisionForSemver, err)
 		}
 
 		for _, tag := range allTags {
@@ -154,7 +154,7 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision, branch
 					continue
 				}
 			}
-			tagNameForSemver := semverRegex.FindString(tagName)
+			tagNameForSemver := version.EnsurePatchVersion(semverRegex.FindString(tagName))
 			if tagNameForSemver == "" {
 				continue
 			}
@@ -232,7 +232,7 @@ func isUpgradeRequired(client *github.Client, org, repo, latestRevision string, 
 	}
 
 	semverRegex := regexp.MustCompile(constants.SemverRegex)
-	latestRevisionForSemver := semverRegex.FindString(latestRevision)
+	latestRevisionForSemver := version.EnsurePatchVersion(semverRegex.FindString(latestRevision))
 
 	// Get SemVer construct corresponding to the latest revision tag.
 	latestRevisionSemver, err := semver.New(latestRevisionForSemver)

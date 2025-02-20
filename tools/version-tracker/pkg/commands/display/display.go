@@ -21,8 +21,6 @@ import (
 
 // Run contains the business logic to execute the `display` subcommand.
 func Run(displayOptions *types.DisplayOptions) error {
-	projectName := displayOptions.ProjectName
-
 	// Check if branch name environment variable has been set.
 	branchName, ok := os.LookupEnv(constants.BranchNameEnvVar)
 	if !ok {
@@ -98,69 +96,90 @@ func Run(displayOptions *types.DisplayOptions) error {
 	for _, project := range projectsList.Projects {
 		org := project.Org
 		for _, repo := range project.Repos {
+			var currentVersionList, latestVersionList, upToDateList []string
 			repoName := repo.Name
 			fullRepoName := fmt.Sprintf("%s/%s", org, repoName)
 			if displayOptions.ProjectName != "" && displayOptions.ProjectName != fullRepoName {
 				continue
 			}
-			var releaseBranched bool
+			if fullRepoName == "envoyproxy/envoy" || fullRepoName == "isc-projects/dhcp" {
+				continue
+			}
+			releaseBranched := false
 			var currentVersion types.Version
 			if len(repo.Versions) > 1 {
 				releaseBranched = true
 			}
-			if releaseBranched {
-				supportedReleaseBranches, err := getSupportedReleaseBranches(buildToolingRepoPath)
-				if err != nil {
-					return fmt.Errorf("getting supported EKS Distro release branches: %v", err)
-				}
-				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
+
+			supportedReleaseBranches, err := getSupportedReleaseBranches(buildToolingRepoPath)
+			if err != nil {
+				return fmt.Errorf("getting supported EKS Distro release branches: %v", err)
+			}
+
+			for _, releaseBranch := range supportedReleaseBranches {
+				err := os.Setenv(constants.ReleaseBranchEnvvar, releaseBranch)
 				releaseBranchIndex := slices.Index(supportedReleaseBranches, releaseBranch)
+				if !releaseBranched && releaseBranchIndex > 0 {
+					break
+				}
 				currentVersion = repo.Versions[releaseBranchIndex]
-			} else {
-				currentVersion = repo.Versions[0]
+
+				var isTrackedByCommitHash bool
+				var currentRevision string
+				if currentVersion.Tag != "" {
+					currentRevision = currentVersion.Tag
+				} else if currentVersion.Commit != "" {
+					currentRevision = currentVersion.Commit
+					isTrackedByCommitHash = true
+				}
+				currentVersionList = append(currentVersionList, currentRevision)
+
+				var latestRevision string
+				if fullRepoName == "cilium/cilium" {
+					latestRevision, _, err = ecrpublic.GetLatestRevision(constants.CiliumImageRepository, currentRevision, branchName)
+					if err != nil {
+						return fmt.Errorf("getting latest revision from ECR Public: %v", err)
+					}
+				} else {
+					// Get latest revision for the project from GitHub.
+					latestRevision, _, err = github.GetLatestRevision(client, org, repoName, currentRevision, branchName, isTrackedByCommitHash, releaseBranched)
+					if err != nil {
+						return fmt.Errorf("getting latest revision from GitHub for project %s: %v", fullRepoName, err)
+					}
+				}
+
+				latestVersionList = append(latestVersionList, latestRevision)
+				upToDateList = append(upToDateList, fmt.Sprintf("%t", currentRevision == latestRevision))
 			}
 
-			var currentRevision string
-			var isTrackedByCommitHash bool
-			if currentVersion.Tag != "" {
-				currentRevision = currentVersion.Tag
-			} else if currentVersion.Commit != "" {
-				currentRevision = currentVersion.Commit
-				isTrackedByCommitHash = true
-			}
-
-			var latestRevision string
-			if projectName == "cilium/cilium" {
-				latestRevision, _, err = ecrpublic.GetLatestRevision(constants.CiliumImageRepository, currentRevision, branchName)
-				if err != nil {
-					return fmt.Errorf("getting latest revision from ECR Public: %v", err)
+			var paddedOrgName, paddedRepoName string
+			if len(currentVersionList) > 2 {
+				padding := strings.Repeat("\n", len(currentVersionList)/2)
+				smallerPadding := strings.Repeat("\n", len(currentVersionList)/2-1)
+				if len(currentVersionList)%2 == 0 {
+					paddedOrgName = fmt.Sprintf("%s%s%s", padding, org, smallerPadding)
+					paddedRepoName = fmt.Sprintf("%s%s%s", padding, repoName, smallerPadding)
+				} else {
+					paddedOrgName = fmt.Sprintf("%s%s%s", padding, org, padding)
+					paddedRepoName = fmt.Sprintf("%s%s%s", padding, repoName, padding)
 				}
 			} else {
-				// Get latest revision for the project from GitHub.
-				latestRevision, _, err = github.GetLatestRevision(client, org, repoName, currentRevision, branchName, isTrackedByCommitHash, releaseBranched)
-				if err != nil {
-					return fmt.Errorf("getting latest revision from GitHub: %v", err)
-				}
+				paddedOrgName = org
+				paddedRepoName = repoName
 			}
 
-			// Check if we should print only the latest version of the project.
-			if displayOptions.PrintLatestVersion {
-				fmt.Println(latestRevision)
-				return nil
-			} else {
-				projectVersionInfoList = append(projectVersionInfoList, types.ProjectVersionInfo{Org: org, Repo: repoName, CurrentVersion: currentRevision, LatestVersion: latestRevision})
-			}
+			projectVersionInfoList = append(projectVersionInfoList, types.ProjectVersionInfo{Org: paddedOrgName, Repo: paddedRepoName, CurrentVersion: strings.Join(currentVersionList, "\n"), LatestVersion: strings.Join(latestVersionList, "\n"), UpToDate: strings.Join(upToDateList, "\n")})
 		}
 	}
 
 	// Create a new table with the required column names in uppercase.
-	tbl := table.New("Organization", "Repository", "Current Version", "Latest Version").WithHeaderFormatter(func(format string, vals ...interface{}) string {
+	tbl := table.New("Organization", "Repository", "Current Version", "Latest Version", "Up-To-Date").WithHeaderFormatter(func(format string, vals ...interface{}) string {
 		return strings.ToUpper(fmt.Sprintf(format, vals...))
 	})
 
 	// Add rows to the table for each project in the list.
 	for _, versionInfo := range projectVersionInfoList {
-		tbl.AddRow(versionInfo.Org, versionInfo.Repo, versionInfo.CurrentVersion, versionInfo.LatestVersion)
+		tbl.AddRow(versionInfo.Org, versionInfo.Repo, versionInfo.CurrentVersion, versionInfo.LatestVersion, versionInfo.UpToDate)
 	}
 
 	// Print the table contents to standard output.

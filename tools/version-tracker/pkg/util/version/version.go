@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/command"
 )
@@ -21,4 +22,30 @@ func GetGoVersion(goBinaryLocation string) (string, error) {
 	matches := pattern.FindStringSubmatch(commandOutput)
 
 	return matches[1], nil
+}
+
+func EnsurePatchVersion(version string) string {
+	// Remove 'v' prefix if present
+	version = strings.TrimPrefix(version, "v")
+
+	// Regular expression to match version components
+	re := regexp.MustCompile(`^(\d+\.\d+)(?:\.(\d+))?(.*)$`)
+	matches := re.FindStringSubmatch(version)
+
+	if len(matches) < 2 {
+		// If the version string doesn't match the expected format, return it unchanged
+		return version
+	}
+
+	majorMinor := matches[1]
+	patch := matches[2]
+	metadata := matches[3]
+
+	if patch == "" {
+		// If patch version is missing, add ".0"
+		return fmt.Sprintf("%s.0%s", majorMinor, metadata)
+	}
+
+	// If patch version is present, return the original version
+	return version
 }
