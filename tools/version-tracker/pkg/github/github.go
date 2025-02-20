@@ -13,12 +13,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/eks-anywhere/pkg/semver"
 	"github.com/google/go-github/v53/github"
 
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/file"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/logger"
+	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/semver"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/tar"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/version"
 )

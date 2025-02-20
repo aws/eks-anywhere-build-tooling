@@ -46,7 +46,7 @@ const (
 	PatchesDirectory                        = "patches"
 	FailedPatchApplyMarker                  = "patch does not apply"
 	DoesNotExistInIndexMarker               = "does not exist in index"
-	SemverRegex                             = `v?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)(\.(?P<patch>0|[1-9]\d*))?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
+	SemverRegex                             = `v?(?P<major>0|[1-9]\d*)(\.|_)(?P<minor>0|[1-9]\d*)((\.|_)(?P<patch>0|[1-9]\d*))?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
 	FailedPatchApplyRegex                   = "Patch failed at .*"
 	FailedPatchFilesRegex                   = "error: (.*): patch does not apply"
 	DoesNotExistInIndexFilesRegex           = "error: (.*): does not exist in index"
@@ -56,6 +56,7 @@ const (
 	BottlerocketHostContainersTOMLFile      = "sources/shared-defaults/public-host-containers.toml"
 	CertManagerManifestYAMLFile             = "cert-manager.yaml"
 	CiliumImageRepository                   = "public.ecr.aws/isovalent/cilium"
+	EnvoyImageRepository                    = "public.ecr.aws/appmesh/aws-appmesh-envoy"
 	EKSDistroBaseTagsYAMLFile               = "EKS_DISTRO_TAG_FILE.yaml"
 	AL2023Suffix                            = "-al2023"
 	TagFileSuffix                           = "_TAG_FILE"
@@ -447,5 +448,10 @@ var (
 		"containerd/containerd": "v1",
 		"opencontainers/runc":   "v1.1",
 		"prometheus/prometheus": "v2",
+	}
+
+	ECRImageRepositories = map[string]string{
+		"cilium/cilium":    CiliumImageRepository,
+		"envoyproxy/envoy": EnvoyImageRepository,
 	}
 )

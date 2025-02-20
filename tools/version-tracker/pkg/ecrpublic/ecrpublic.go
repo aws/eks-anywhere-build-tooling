@@ -7,10 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/aws/eks-anywhere/pkg/semver"
-
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/command"
+	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/util/semver"
 )
 
 func GetLatestRevision(imageRepository, currentRevision, branchName string) (string, bool, error) {
@@ -35,6 +34,7 @@ func GetLatestRevision(imageRepository, currentRevision, branchName string) (str
 	ciliumTags := tagsList.(map[string]interface{})["Tags"].([]interface{})
 
 	latestRevisionSemver := currentRevisionSemver
+	latestRevision = currentRevision
 	for _, tag := range ciliumTags {
 		tag := tag.(string)
 		if !strings.HasPrefix(tag, "v") {
