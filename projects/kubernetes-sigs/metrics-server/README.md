@@ -5,6 +5,7 @@
 ![1.29 Version](https://img.shields.io/badge/1--29%20version-v0.7.2-blue)
 ![1.30 Version](https://img.shields.io/badge/1--30%20version-v0.7.2-blue)
 ![1.31 Version](https://img.shields.io/badge/1--31%20version-v0.7.2-blue)
+![1.32 Version](https://img.shields.io/badge/1--32%20version-v0.7.2-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiSEFNYVlKSURxN25YRGpuWURwWmZOS05vbkl6YTdHTzNHTFJpdzdHZGJUL001ZlNqS1JhblM0QTl2VytuUzNRQ09WazJwRHVUZnp0dVRCb3dLTUVxb2w4PSIsIml2UGFyYW1ldGVyU3BlYyI6IkJIOGVvTFk2bWVVcnhUTkoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 AWS Distro for ([Metrics Server](https://github.com/kubernetes-sigs/metrics-server)) is an AWS supported version of the upstream Metrics Server and is distributed by Amazon EKS-D.
