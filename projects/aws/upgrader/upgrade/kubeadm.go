@@ -366,6 +366,17 @@ func (u *InPlaceUpgrader) backUpAndDeleteCoreDNSConfig(ctx context.Context, cmpD
 }
 
 func (u *InPlaceUpgrader) restoreCoreDNSConfig(ctx context.Context, cmpDir string) error {
+	// Since CAPI 1.9. the coreDNS config gets re-created during kubeadm upgrade when upgrading from 1.31 to 1.32,
+	// so we skip restoring coredns configmap if it already exists in cluster.
+	getCoreDNSConfCmd := []string{"kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true"}
+	coreDNSConf, err := u.ExecCommand(ctx, getCoreDNSConfCmd[0], getCoreDNSConfCmd[1:]...)
+	if err != nil {
+		return execError(getCoreDNSConfCmd, string(coreDNSConf))
+	}
+	if len(coreDNSConf) > 0 {
+		logger.Info("coreDNS config already exists, skip restoring")
+		return nil
+	}
 	coreDNSBackup := fmt.Sprintf("%s/coredns.yaml", cmpDir)
 	createCoreDNSConfCmd := []string{"kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath}
 	out, err := u.ExecCommand(ctx, createCoreDNSConfCmd[0], createCoreDNSConfCmd[1:]...)

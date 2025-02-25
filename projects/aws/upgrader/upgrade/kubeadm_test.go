@@ -145,6 +145,7 @@ func TestKubeAdmFirstCPBackupExist(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
@@ -183,6 +184,7 @@ func TestKubeAdmFirstCPBackupDoesNotExist(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
@@ -227,7 +229,8 @@ func TestKubeAdm130FirstCPBackupDoesNotExist(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
-	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).MaxTimes(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
 	tt.Expect(err).To(BeNil())
@@ -488,6 +491,38 @@ func TestKubeAdmFirstCPCoreDNSCMDeleteError(t *testing.T) {
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
 	tt.Expect(err).ToNot(BeNil())
+}
+
+func TestKubeAdmFirstCPCoreDNSConfigAlreadyExists(t *testing.T) {
+	kubeAdmConfigBackUp := fmt.Sprintf("%s/kubeadm-config.backup.yaml", upgCompBinDir)
+	newKubeAdmConfig := fmt.Sprintf("%s/kubeadm-config.yaml", upgCompBinDir)
+	clusterConfigBytes := []byte(clusterConfig)
+	appendedKubeletConfigBytes := []byte(fmt.Sprintf("%s%s%s", clusterConfig, "---\n", kubeletConfig))
+	ctx := context.TODO()
+	tt := newInPlaceUpgraderTest(t, upgrade.WithKubernetesVersion("v1.29.1-eks-1-29-6"), upgrade.WithEtcdVersion("v3.5.10-eks-1-29-6"))
+	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
+	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte(updatedClusterConfig), fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubelet-config", "-ojsonpath='{.data.kubelet}'", "--kubeconfig", kubeConfigPath).Return([]byte(kubeletConfig), nil).Times(1)
+	tt.s.EXPECT().WriteFile(newKubeAdmConfig, appendedKubeletConfigBytes, fileMode640).Return(nil)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig).Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration", "--config", newKubeAdmConfig, "--allow-experimental-upgrades", "--yes", "--force").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
+	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return([]byte("coredns-conf"), nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(0)
+
+	err := tt.u.KubeAdmInFirstCP(ctx)
+	tt.Expect(err).To(BeNil())
 }
 
 func TestKubeAdmFirstCPKubeAdmVersionCmdError(t *testing.T) {
@@ -764,6 +799,7 @@ func TestKubeAdmFirstCPRestoreCoreDNSError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInFirstCP(ctx)
@@ -783,6 +819,7 @@ func TestKubeAdmRestCPBackupExists(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
 
 	err := tt.u.KubeAdmInRestCP(ctx)
@@ -809,6 +846,7 @@ func TestKubeAdmRestCPBackupNotExists(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
 
 	err := tt.u.KubeAdmInRestCP(ctx)
@@ -997,6 +1035,7 @@ func TestKubeAdmRestCPRestoreCoreDNSError(t *testing.T) {
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, errors.New("")).Times(1)
 
 	err := tt.u.KubeAdmInRestCP(ctx)
