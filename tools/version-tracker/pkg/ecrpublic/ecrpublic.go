@@ -15,6 +15,7 @@ import (
 
 func GetLatestRevision(imageRepository, currentRevision, branchName string) (string, bool, error) {
 	var latestRevision string
+	var needsUpgrade bool
 	currentRevisionSemver, err := semver.New(currentRevision)
 	if err != nil {
 		return "", false, fmt.Errorf("getting semver for current version: %v", err)
@@ -32,10 +33,11 @@ func GetLatestRevision(imageRepository, currentRevision, branchName string) (str
 		return "", false, fmt.Errorf("unmarshalling output of Skopeo list-tags command: %v", err)
 	}
 
-	ciliumTags := tagsList.(map[string]interface{})["Tags"].([]interface{})
+	imageTags := tagsList.(map[string]interface{})["Tags"].([]interface{})
 
 	latestRevisionSemver := currentRevisionSemver
-	for _, tag := range ciliumTags {
+	latestRevision = currentRevision
+	for _, tag := range imageTags {
 		tag := tag.(string)
 		if !strings.HasPrefix(tag, "v") {
 			continue
@@ -43,7 +45,7 @@ func GetLatestRevision(imageRepository, currentRevision, branchName string) (str
 
 		tagSemver, err := semver.New(tag)
 		if err != nil {
-			return "", false, fmt.Errorf("getting semver for Cilium tag [%s]: %v", tag, err)
+			return "", false, fmt.Errorf("getting semver for %s tag [%s]: %v", imageRepository, tag, err)
 		}
 
 		if branchName != constants.MainBranchName {
@@ -56,11 +58,9 @@ func GetLatestRevision(imageRepository, currentRevision, branchName string) (str
 		if tagSemver.GreaterThan(latestRevisionSemver) {
 			latestRevisionSemver = tagSemver
 			latestRevision = tag
+			needsUpgrade = true
 		}
 	}
-	if latestRevision == "" {
-		return "", false, nil
-	}
 
-	return latestRevision, true, nil
+	return latestRevision, needsUpgrade, nil
 }
