@@ -403,7 +403,6 @@ var (
 	PackagesProjectUpgradePRLabels = []string{"/hold", "/area dependencies", "/sig curated-packages"}
 
 	ProjectsWithUnconventionalUpgradeFlows = []string{
-		"cilium/cilium",
 		"kubernetes-sigs/image-builder",
 	}
 
