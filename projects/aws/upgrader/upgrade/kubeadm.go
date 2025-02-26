@@ -25,6 +25,7 @@ const (
 	kubeadmCMName            = "kubeadm-config"
 	kubeSystemNS             = "kube-system"
 	kubeVersion130           = "v1.30"
+	kubeVersion132           = "v1.32"
 )
 
 // KubeAdmInFirstCP upgrades the first control plane node
@@ -182,6 +183,20 @@ func (u *InPlaceUpgrader) kubeAdmUpgradeVersion130AndAbove(ctx context.Context, 
 	logger.Info("components to be upgraded with kubeadm", "output", string(kubeAdmUpgPlan))
 
 	kubeAdmUpgCmd := []string{"kubeadm", "upgrade", "apply", "--config", kubeAdmUpgradeConfigYaml}
+	// K8s version passed to the upgrader object is of the form vMajor.Minor.Patch-eksd-tag
+	// so it's safe to parse the version
+	kubeVersion := semver.MajorMinor(u.kubernetesVersion)
+	// From version 1.32 and above kubeadm upgrade tries to upgrade coredns
+	// even when the config map is deleted from the cluster. The coredns
+	// upgrade fails to update the actual deployment and we want capi
+	// to handle coredns upgrades.
+	//
+	// Ref: https://github.com/kubernetes/kubernetes/pull/126032
+	if semver.Compare(kubeVersion, kubeVersion132) >= 0 {
+		logger.Info("detected kubernetes version >= 1.32, skipping CoreDNS upgrade phase", "phase", "addon/coredns")
+		kubeAdmUpgCmd = append(kubeAdmUpgCmd, "--skip-phases=addon/coredns")
+	}
+
 	kubeAdmUpg, err := u.ExecCommand(ctx, kubeAdmUpgCmd[0], kubeAdmUpgCmd[1:]...)
 	if err != nil {
 		return execError(kubeAdmUpgCmd, string(kubeAdmUpg))
@@ -221,6 +236,20 @@ func (u *InPlaceUpgrader) KubeAdmInRestCP(ctx context.Context) error {
 	logger.Info("current version of kubeadm", "cmd", "kubeadm version -oshort", "output", string(version))
 
 	kubeAdmUpgNodeCmd := []string{"kubeadm", "upgrade", "node", "--ignore-preflight-errors=CoreDNSUnsupportedPlugins,CoreDNSMigration"}
+	// K8s version passed to the upgrader object is of the form vMajor.Minor.Patch-eksd-tag
+	// so it's safe to parse the version
+	kubeVersion := semver.MajorMinor(u.kubernetesVersion)
+	// From version 1.32 and above kubeadm upgrade tries to upgrade coredns
+	// even when the config map is deleted from the cluster. The coredns
+	// upgrade fails to update the actual deployment and we want capi
+	// to handle coredns upgrades.
+	//
+	// Ref: https://github.com/kubernetes/kubernetes/pull/126032
+	if semver.Compare(kubeVersion, kubeVersion132) >= 0 {
+		logger.Info("detected kubernetes version >= 1.32, skipping CoreDNS upgrade phase", "phase", "addon/coredns")
+		kubeAdmUpgNodeCmd = append(kubeAdmUpgNodeCmd, "--skip-phases=addon/coredns")
+	}
+
 	kubeAdmUpg, err := u.ExecCommand(ctx, kubeAdmUpgNodeCmd[0], kubeAdmUpgNodeCmd[1:]...)
 	if err != nil {
 		return execError(kubeAdmUpgNodeCmd, string(kubeAdmUpg))
