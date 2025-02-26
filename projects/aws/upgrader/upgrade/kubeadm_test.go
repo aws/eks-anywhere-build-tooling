@@ -99,6 +99,46 @@ const (
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.30.0-eks-1-30-4
 	`
+	clusterConfig132 = `
+	apiServer:
+		extraArgs:
+			tls-cipher-suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+	apiVersion: kubeadm.k8s.io/v1beta3
+	certificatesDir: /etc/kubernetes/pki
+	clusterName: dummy-tst
+	controlPlaneEndpoint: 195.17.1.74:6443
+	dns:
+		imageRepository: public.ecr.aws/eks-distro/coredns
+		imageTag: v1.9.3-eks-1-25-34
+	etcd:
+		local:
+		dataDir: /var/lib/etcd
+		imageRepository: public.ecr.aws/eks-distro/etcd-io
+		imageTag: v3.5.10-eks-1-29-11
+	imageRepository: public.ecr.aws/eks-distro/kubernetes
+	kind: ClusterConfiguration
+	kubernetesVersion: v1.32.0-eks-1-32-1
+	`
+	updatedClusterConfig132 = `
+	apiServer:
+		extraArgs:
+			tls-cipher-suites: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+	apiVersion: kubeadm.k8s.io/v1beta3
+	certificatesDir: /etc/kubernetes/pki
+	clusterName: dummy-tst
+	controlPlaneEndpoint: 195.17.1.74:6443
+	dns:
+		imageRepository: public.ecr.aws/eks-distro/coredns
+		imageTag: v1.9.3-eks-1-25-34
+	etcd:
+		local:
+		dataDir: /var/lib/etcd
+		imageRepository: public.ecr.aws/eks-distro/etcd-io
+		imageTag: v3.5.10-eks-1-30-4
+	imageRepository: public.ecr.aws/eks-distro/kubernetes
+	kind: ClusterConfiguration
+	kubernetesVersion: v1.32.0-eks-1-32-1
+	`
 	kubeletConfig = `
 	apiVersion: kubelet.config.k8s.io/v1beta1
 	cgroupDriver: systemd
@@ -212,7 +252,7 @@ func TestKubeAdm130FirstCPBackupDoesNotExist(t *testing.T) {
 	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte(updatedClusterConfig130), fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return([]byte(updatedClusterConfig130), nil).Times(1)
 
-	kubeAdmConfCM, kubeAdmUpgConf := generateObjectsFor130Test(updatedClusterConfig130, "v1.30.0-eks-1-30-4")
+	kubeAdmConfCM, kubeAdmUpgConf := generateObjectsForTest(updatedClusterConfig130, "v1.30.0-eks-1-30-4")
 	kubeAdmConfCMData, _ := yaml.Marshal(&kubeAdmConfCM)
 	upgradeConfigData, _ := yaml.Marshal(&kubeAdmUpgConf)
 	tt.s.EXPECT().WriteFile(KubeAdmConfCMYaml, kubeAdmConfCMData, fileMode640).Return(nil).Times(1)
@@ -223,6 +263,50 @@ func TestKubeAdm130FirstCPBackupDoesNotExist(t *testing.T) {
 	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "apply", "-f", KubeAdmConfCMYaml, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--config", kubeAdmUpgradeConfigYaml).Return(nil, nil).Times(1)
 	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--config", kubeAdmUpgradeConfigYaml).Return(nil, nil).Times(1)
+	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
+	tt.s.EXPECT().WriteFile(staticKubeVipPath, nil, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "create", "-f", coreDNSBackup, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
+
+	err := tt.u.KubeAdmInFirstCP(ctx)
+	tt.Expect(err).To(BeNil())
+}
+
+func TestKubeAdm132FirstCPBackupDoesNotExist(t *testing.T) {
+	kubeAdmConfigBackUp := fmt.Sprintf("%s/kubeadm-config.backup.yaml", upgCompBinDir)
+	newKubeAdmConfig := fmt.Sprintf("%s/kubeadm-config.yaml", upgCompBinDir)
+	kubeAdmBackup := fmt.Sprintf("%s/%s", upgCompBinDir, "kubeadm.bk")
+	newKubeAdm := fmt.Sprintf("%s/%s", upgCompBinDir, "kubeadm")
+	KubeAdmConfCMYaml := fmt.Sprintf("%s/kubeadm-config-cm.yaml", upgCompBinDir)
+	kubeAdmUpgradeConfigYaml := fmt.Sprintf("%s/kubeadm-upgrade-config.yaml", upgCompBinDir)
+	clusterConfigBytes := []byte(clusterConfig132)
+	ctx := context.TODO()
+	tt := newInPlaceUpgraderTest(t, upgrade.WithKubernetesVersion("v1.32.0-eks-1-32-0"), upgrade.WithEtcdVersion("v3.5.10-eks-1-30-4"))
+	tt.s.EXPECT().Executable().Return("/foo/eks-upgrades/tools", nil).AnyTimes()
+	tt.s.EXPECT().Stat(fmt.Sprintf("%s/%s.bk", upgCompBinDir, "kubeadm")).Return(nil, errors.New("")).Times(1)
+	tt.s.EXPECT().ReadFile(kubeAdmBinDir).Return([]byte{}, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmBackup, []byte{}, fileMode640)
+	tt.s.EXPECT().ReadFile(newKubeAdm).Return([]byte{}, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmBinDir, []byte{}, fileMode640).Return(nil).Times(1)
+
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "kubeadm-config", "-ojsonpath='{.data.ClusterConfiguration}'", "--kubeconfig", kubeConfigPath).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmConfigBackUp, clusterConfigBytes, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(kubeAdmConfigBackUp).Return(clusterConfigBytes, nil).Times(1)
+	tt.s.EXPECT().WriteFile(newKubeAdmConfig, []byte(updatedClusterConfig132), fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().ReadFile(newKubeAdmConfig).Return([]byte(updatedClusterConfig132), nil).Times(1)
+
+	kubeAdmConfCM, kubeAdmUpgConf := generateObjectsForTest(updatedClusterConfig132, "v1.32.0-eks-1-32-0")
+	kubeAdmConfCMData, _ := yaml.Marshal(&kubeAdmConfCM)
+	upgradeConfigData, _ := yaml.Marshal(&kubeAdmUpgConf)
+	tt.s.EXPECT().WriteFile(KubeAdmConfCMYaml, kubeAdmConfCMData, fileMode640).Return(nil).Times(1)
+	tt.s.EXPECT().WriteFile(kubeAdmUpgradeConfigYaml, upgradeConfigData, fileMode640).Return(nil)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "get", "cm", "-n", kubeSystemNS, "coredns", "-oyaml", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "delete", "cm", "-n", kubeSystemNS, "coredns", "--kubeconfig", kubeConfigPath, "--ignore-not-found=true").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "version", "-oshort").Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubectl", "apply", "-f", KubeAdmConfCMYaml, "--kubeconfig", kubeConfigPath).Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "plan", "--config", kubeAdmUpgradeConfigYaml).Return(nil, nil).Times(1)
+	tt.s.EXPECT().ExecCommand(ctx, "kubeadm", "upgrade", "apply", "--config", kubeAdmUpgradeConfigYaml, "--skip-phases=addon/coredns").Return(nil, nil).Times(1)
 	tt.s.EXPECT().ReadFile(staticKubeVipPath).Return(nil, nil).Times(1)
 	tt.s.EXPECT().WriteFile(kubeVipBackup, nil, fileMode640).Return(nil).Times(1)
 	tt.s.EXPECT().ReadFile(newKubeVip).Return(nil, nil).Times(1)
@@ -1084,7 +1168,7 @@ func TestKubeAdmWorkerKubeadmUpgradeError(t *testing.T) {
 	tt.Expect(err).ToNot(BeNil())
 }
 
-func generateObjectsFor130Test(clusterConfig, version string) (corev1.ConfigMap, upgrade.UpgradeConfiguration) {
+func generateObjectsForTest(clusterConfig, version string) (corev1.ConfigMap, upgrade.UpgradeConfiguration) {
 	preflightErrorsList := []string{"CoreDNSUnsupportedPlugins", "CoreDNSMigration"}
 	t := true
 	return corev1.ConfigMap{
