@@ -1,15 +1,15 @@
-From 2870709f3626a543aad2a3cf2a9edad643393a79 Mon Sep 17 00:00:00 2001
+From 48900a0e97c7133006b91bdc3b429348272f3879 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Mon, 21 Aug 2023 18:40:07 -0500
-Subject: [PATCH 07/13] adds retries and timeout to packer image-builder
+Subject: [PATCH 06/13] adds retries and timeout to packer image-builder
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
  images/capi/packer/ami/packer.json       |  2 ++
  images/capi/packer/ova/packer-node.json  | 22 ++++++++++++++++------
  images/capi/packer/qemu/packer.json.tmpl |  7 ++++++-
- images/capi/packer/raw/packer.json.tmpl  |  7 ++++++-
- 4 files changed, 30 insertions(+), 8 deletions(-)
+ images/capi/packer/raw/packer.json.tmpl  |  2 +-
+ 4 files changed, 25 insertions(+), 8 deletions(-)
 
 diff --git a/images/capi/packer/ami/packer.json b/images/capi/packer/ami/packer.json
 index 33fcfd43a..a302529c7 100644
@@ -149,40 +149,18 @@ index 8070daed7..e53f3ac3f 100644
        "user": "builder"
      },
 diff --git a/images/capi/packer/raw/packer.json.tmpl b/images/capi/packer/raw/packer.json.tmpl
-index 9ad3f937f..4535322f6 100644
+index f65d1f961..90ffc8b5b 100644
 --- a/images/capi/packer/raw/packer.json.tmpl
 +++ b/images/capi/packer/raw/packer.json.tmpl
-@@ -25,8 +25,9 @@
-       "output_directory": "{{user `output_directory`}}",
-       "qemu_binary": "{{user `qemu_binary`}}",
+@@ -33,7 +33,7 @@
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'usermod -L {{user `ssh_username`}} && {{user `shutdown_command`}}'",
-+      "ssh_handshake_attempts": "100",
+       "ssh_handshake_attempts": "100",
        "ssh_password": "{{user `ssh_password`}}",
 -      "ssh_timeout": "2h",
 +      "ssh_timeout": "40m",
        "ssh_username": "{{user `ssh_username`}}",
        "type": "qemu",
        "vm_name": "{{user `vm_name`}}"
-@@ -72,7 +73,9 @@
-         "--scp-extra-args",
-         "{{user `ansible_scp_extra_args`}}"
-       ],
-+      "max_retries": 5,
-       "playbook_file": "./ansible/firstboot.yml",
-+      "timeout": "30m",
-       "type": "ansible",
-       "user": "builder"
-     },
-@@ -98,7 +101,9 @@
-         "--scp-extra-args",
-         "{{user `ansible_scp_extra_args`}}"
-       ],
-+      "max_retries": 5,
-       "playbook_file": "./ansible/node.yml",
-+      "timeout": "30m",
-       "type": "ansible",
-       "user": "builder"
-     },
 -- 
 2.46.1
 
