@@ -5,6 +5,7 @@ REPO=source-controller
 REPO_OWNER=fluxcd
 
 BINARY_TARGET_FILES=source-controller
+BUILDSPEC_PLATFORM=LINUX_CONTAINER
 
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 FIX_LICENSES_ALIBABACLOUD_TARGET=$(REPO)/vendor/github.com/alibabacloud-go/cr-20160607/LICENSE
