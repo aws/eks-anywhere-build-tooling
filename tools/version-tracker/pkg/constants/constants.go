@@ -391,7 +391,6 @@ var (
 	}
 
 	ProjectsWithUnconventionalUpgradeFlows = []string{
-		"cilium/cilium",
 		"kubernetes-sigs/image-builder",
 	}
 
