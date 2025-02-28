@@ -48,7 +48,7 @@ func GetLatestRevision(imageRepository, currentRevision, branchName string) (str
 		}
 
 		if branchName != constants.MainBranchName {
-			tagRegex := regexp.MustCompile(fmt.Sprintf(`^v%d.%d.\d+`, currentRevisionSemver.Major, currentRevisionSemver.Minor))
+			tagRegex := regexp.MustCompile(fmt.Sprintf(`^v?%d(\.|_)%d(\.|_)\d+`, currentRevisionSemver.Major, currentRevisionSemver.Minor))
 			if !tagRegex.MatchString(tag) {
 				continue
 			}
