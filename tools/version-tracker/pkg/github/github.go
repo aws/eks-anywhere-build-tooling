@@ -154,21 +154,22 @@ func GetLatestRevision(client *github.Client, org, repo, currentRevision, branch
 					continue
 				}
 			}
-			tagNameForSemver := version.EnsurePatchVersion(semverRegex.FindString(tagName))
-			if tagNameForSemver == "" {
+			detectedSemver := semverRegex.FindString(tagName)
+			if detectedSemver == "" {
 				continue
 			}
+			tagNameForSemver := version.EnsurePatchVersion(detectedSemver)
 
 			if releaseBranched {
 				releaseBranch := os.Getenv(constants.ReleaseBranchEnvvar)
 				releaseNumber := strings.Split(releaseBranch, "-")[1]
-				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v?1.%s.\d+$`, releaseNumber))
+				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v?1(\.|_)%s(\.|_)\d+$`, releaseNumber))
 				if !tagRegex.MatchString(tagNameForSemver) {
 					continue
 				}
 			}
 			if branchName != constants.MainBranchName {
-				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v%d.%d.\d+`, currentRevisionSemver.Major, currentRevisionSemver.Minor))
+				tagRegex := regexp.MustCompile(fmt.Sprintf(`^v?%d(\.|_)%d(\.|_)\d+`, currentRevisionSemver.Major, currentRevisionSemver.Minor))
 				if !tagRegex.MatchString(tagNameForSemver) {
 					continue
 				}
