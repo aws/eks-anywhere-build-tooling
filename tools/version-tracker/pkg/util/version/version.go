@@ -25,8 +25,11 @@ func GetGoVersion(goBinaryLocation string) (string, error) {
 }
 
 func EnsurePatchVersion(version string) string {
+	hasLeadingV := (version[0] == 'v')
 	// Remove 'v' prefix if present
-	version = strings.TrimPrefix(version, "v")
+	if hasLeadingV {
+		version = strings.TrimPrefix(version, "v")
+	}
 
 	// Regular expression to match version components
 	re := regexp.MustCompile(`^(\d+\.\d+)(?:\.(\d+))?(.*)$`)
@@ -43,7 +46,11 @@ func EnsurePatchVersion(version string) string {
 
 	if patch == "" {
 		// If patch version is missing, add ".0"
-		return fmt.Sprintf("%s.0%s", majorMinor, metadata)
+		version = fmt.Sprintf("%s.0%s", majorMinor, metadata)
+	}
+
+	if hasLeadingV {
+		version = fmt.Sprintf("v%s", version)
 	}
 
 	// If patch version is present, return the original version
