@@ -1049,7 +1049,9 @@ func updateBottlerocketHostContainerMetadata(client *gogithub.Client, projectRoo
 			return nil, fmt.Errorf("unmarshalling Bottlerocket %s container metadata file: %v", container, err)
 		}
 
-		hostContainerSourceImage := hostContainersTOMLMap.(map[string]interface{})["settings"].(map[string]interface{})["host-containers"].(map[string]interface{})[container].(map[string]interface{})["source"].(string)
+		hostContainerSourceCommand := hostContainersTOMLMap.(map[string]interface{})["metadata"].(map[string]interface{})["settings"].(map[string]interface{})["host-containers"].(map[string]interface{})[container].(map[string]interface{})["source"].(map[string]interface{})["setting-generator"].(map[string]interface{})["command"].(string)
+		hostContainerSourceImageRegex := regexp.MustCompile(constants.BottlerocketHostContainerSourceImageRegex)
+		hostContainerSourceImage := hostContainerSourceImageRegex.FindAllStringSubmatch(hostContainerSourceCommand, -1)[0][1]
 		hostContainerSourceImageTag := strings.Split(hostContainerSourceImage, ":")[1]
 
 		if hostContainerImageMetadata.Tag != hostContainerSourceImageTag {
