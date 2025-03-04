@@ -1,4 +1,4 @@
-From cab7d20c3d8a9d25e50989abfab824e07dd1327d Mon Sep 17 00:00:00 2001
+From e2bf1f9f9db1c47ab9d598955038d35567907846 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/40] Add unstacked etcd support
@@ -98,10 +98,10 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  29 files changed, 886 insertions(+), 11 deletions(-)
 
 diff --git a/api/v1beta1/cluster_types.go b/api/v1beta1/cluster_types.go
-index bbce8f181..1199e1171 100644
+index d4d9d1b6d..807850810 100644
 --- a/api/v1beta1/cluster_types.go
 +++ b/api/v1beta1/cluster_types.go
-@@ -478,6 +478,11 @@ type ClusterSpec struct {
+@@ -479,6 +479,11 @@ type ClusterSpec struct {
  	// +optional
  	ControlPlaneRef *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
  
@@ -113,7 +113,7 @@ index bbce8f181..1199e1171 100644
  	// infrastructureRef is a reference to a provider-specific resource that holds the details
  	// for provisioning infrastructure for a cluster in said provider.
  	// +optional
-@@ -896,6 +901,15 @@ type ClusterStatus struct {
+@@ -906,6 +911,15 @@ type ClusterStatus struct {
  	// +optional
  	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
  
@@ -171,7 +171,7 @@ index fccc584fe..583d2d6f9 100644
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index 5e30202d7..d775dc847 100644
+index aba6b8183..79691d209 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -270,7 +270,8 @@ func (o *objectMover) checkProvisioningCompleted(ctx context.Context, graph *obj
@@ -185,7 +185,7 @@ index 5e30202d7..d775dc847 100644
  		}
  	}
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 4ad163561..08476c22f 100644
+index 2e46a2b83..35354088d 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 @@ -187,6 +187,45 @@ spec:
@@ -358,7 +358,7 @@ index 4ad163561..08476c22f 100644
                paused:
                  description: paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -1782,6 +1917,15 @@ spec:
+@@ -1791,6 +1926,15 @@ spec:
                  description: infrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -742,7 +742,7 @@ index ef74d2c71..16259e47b 100644
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
 diff --git a/internal/apis/core/v1alpha4/zz_generated.conversion.go b/internal/apis/core/v1alpha4/zz_generated.conversion.go
-index 14df0dfc9..3a401477e 100644
+index f5c0433a6..77cf3d564 100644
 --- a/internal/apis/core/v1alpha4/zz_generated.conversion.go
 +++ b/internal/apis/core/v1alpha4/zz_generated.conversion.go
 @@ -731,6 +731,7 @@ func autoConvert_v1alpha4_ClusterSpec_To_v1beta1_ClusterSpec(in *ClusterSpec, ou
@@ -780,7 +780,7 @@ index 14df0dfc9..3a401477e 100644
  	return nil
  }
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index a0a9d5542..279e8cdd8 100644
+index 50ac43548..959047510 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
 @@ -19,6 +19,7 @@ package cluster
@@ -812,7 +812,7 @@ index a0a9d5542..279e8cdd8 100644
  		Watches(
  			&clusterv1.MachineDeployment{},
  			handler.EnqueueRequestsFromMapFunc(r.machineDeploymentToCluster),
-@@ -239,6 +245,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -243,6 +249,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
  		r.reconcileControlPlaneInitialized,
@@ -820,7 +820,7 @@ index a0a9d5542..279e8cdd8 100644
  	)
  	return doReconcile(ctx, reconcileNormal, s)
  }
-@@ -249,6 +256,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+@@ -253,6 +260,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
  		conditions.WithConditions(
  			clusterv1.ControlPlaneReadyCondition,
  			clusterv1.InfrastructureReadyCondition,
@@ -828,7 +828,7 @@ index a0a9d5542..279e8cdd8 100644
  		),
  	)
  
-@@ -260,6 +268,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+@@ -264,6 +272,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
  			clusterv1.ReadyCondition,
  			clusterv1.ControlPlaneReadyCondition,
  			clusterv1.InfrastructureReadyCondition,
@@ -836,7 +836,7 @@ index a0a9d5542..279e8cdd8 100644
  		}},
  		patch.WithOwnedV1Beta2Conditions{Conditions: []string{
  			clusterv1.ClusterInfrastructureReadyV1Beta2Condition,
-@@ -454,6 +463,36 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
+@@ -458,6 +467,36 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
  			return ctrl.Result{}, nil
  		}
  	}
@@ -873,7 +873,7 @@ index a0a9d5542..279e8cdd8 100644
  
  	if cluster.Spec.InfrastructureRef != nil {
  		if s.infraCluster == nil {
-@@ -510,6 +549,7 @@ type clusterDescendants struct {
+@@ -514,6 +553,7 @@ type clusterDescendants struct {
  	machinesToBeRemediated collections.Machines
  	unhealthyMachines      collections.Machines
  	machinePools           expv1.MachinePoolList
@@ -881,7 +881,7 @@ index a0a9d5542..279e8cdd8 100644
  }
  
  // objectsPendingDeleteCount returns the number of descendants pending delete.
-@@ -541,6 +581,13 @@ func (c *clusterDescendants) objectsPendingDeleteNames(cluster *clusterv1.Cluste
+@@ -545,6 +585,13 @@ func (c *clusterDescendants) objectsPendingDeleteNames(cluster *clusterv1.Cluste
  			descendants = append(descendants, "Control plane Machines: "+clog.StringListToString(controlPlaneMachineNames))
  		}
  	}
@@ -895,7 +895,7 @@ index a0a9d5542..279e8cdd8 100644
  	machineDeploymentNames := make([]string, len(c.machineDeployments.Items))
  	for i, machineDeployment := range c.machineDeployments.Items {
  		machineDeploymentNames[i] = machineDeployment.Name
-@@ -609,7 +656,8 @@ func (r *Reconciler) getDescendants(ctx context.Context, s *scope) (reconcile.Re
+@@ -613,7 +660,8 @@ func (r *Reconciler) getDescendants(ctx context.Context, s *scope) (reconcile.Re
  	// Split machines into control plane and worker machines
  	descendants.allMachines = collections.FromMachineList(&machines)
  	descendants.controlPlaneMachines = descendants.allMachines.Filter(collections.ControlPlaneMachines(cluster.Name))
@@ -905,7 +905,7 @@ index a0a9d5542..279e8cdd8 100644
  	descendants.machinesToBeRemediated = descendants.allMachines.Filter(collections.IsUnhealthyAndOwnerRemediated)
  	descendants.unhealthyMachines = descendants.allMachines.Filter(collections.IsUnhealthy)
  
-@@ -655,6 +703,9 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
+@@ -659,6 +707,9 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
  		&c.machineSets,
  		toObjectList(c.workerMachines),
  	}
@@ -915,7 +915,7 @@ index a0a9d5542..279e8cdd8 100644
  	if feature.Gates.Enabled(feature.MachinePool) {
  		lists = append([]client.ObjectList{&c.machinePools}, lists...)
  	}
-@@ -745,6 +796,36 @@ func (r *Reconciler) controlPlaneMachineToCluster(ctx context.Context, o client.
+@@ -749,6 +800,36 @@ func (r *Reconciler) controlPlaneMachineToCluster(ctx context.Context, o client.
  	}}
  }
  
@@ -1265,7 +1265,7 @@ index 612b31d0b..00df217cb 100644
  	})
  
 diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 683468242..05a94cc27 100644
+index 4e9bfab85..4c5f13d4a 100644
 --- a/internal/controllers/machine/machine_controller_noderef.go
 +++ b/internal/controllers/machine/machine_controller_noderef.go
 @@ -57,6 +57,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
@@ -1284,10 +1284,10 @@ index 683468242..05a94cc27 100644
  	if machine.Spec.ProviderID == nil || *machine.Spec.ProviderID == "" {
  		log.Info("Waiting for infrastructure provider to report spec.providerID", machine.Spec.InfrastructureRef.Kind, klog.KRef(machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name))
 diff --git a/internal/controllers/machine/machine_controller_noderef_test.go b/internal/controllers/machine/machine_controller_noderef_test.go
-index ef56f947e..766a60a5e 100644
+index 4d2ee8195..245fb12c3 100644
 --- a/internal/controllers/machine/machine_controller_noderef_test.go
 +++ b/internal/controllers/machine/machine_controller_noderef_test.go
-@@ -27,6 +27,7 @@ import (
+@@ -28,6 +28,7 @@ import (
  	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
  	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
  	"k8s.io/client-go/tools/record"
@@ -1295,7 +1295,7 @@ index ef56f947e..766a60a5e 100644
  	"k8s.io/utils/ptr"
  	ctrl "sigs.k8s.io/controller-runtime"
  	"sigs.k8s.io/controller-runtime/pkg/client"
-@@ -41,6 +42,7 @@ import (
+@@ -42,6 +43,7 @@ import (
  	"sigs.k8s.io/cluster-api/controllers/remote"
  	"sigs.k8s.io/cluster-api/internal/topology/ownerrefs"
  	"sigs.k8s.io/cluster-api/util"
@@ -1303,7 +1303,7 @@ index ef56f947e..766a60a5e 100644
  	"sigs.k8s.io/cluster-api/util/kubeconfig"
  	"sigs.k8s.io/cluster-api/util/test/builder"
  )
-@@ -1362,3 +1364,47 @@ func Test_shouldNodeHaveOutdatedTaint(t *testing.T) {
+@@ -1413,3 +1415,47 @@ func Test_shouldNodeHaveOutdatedTaint(t *testing.T) {
  		})
  	}
  }
@@ -1487,10 +1487,10 @@ index 88925e279..43dfa579b 100644
  	var failureDomain string
  	err = util.UnstructuredUnmarshalField(s.infraMachine, &failureDomain, "spec", "failureDomain")
 diff --git a/internal/controllers/machine/machine_controller_status.go b/internal/controllers/machine/machine_controller_status.go
-index bf03e3cb3..e9a786958 100644
+index 38e09e957..5eba9941c 100644
 --- a/internal/controllers/machine/machine_controller_status.go
 +++ b/internal/controllers/machine/machine_controller_status.go
-@@ -796,6 +796,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
+@@ -799,6 +799,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
  	}
  
@@ -1593,5 +1593,5 @@ index dfe38100e..6ef08e5c6 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.45.2
+2.48.1
 
