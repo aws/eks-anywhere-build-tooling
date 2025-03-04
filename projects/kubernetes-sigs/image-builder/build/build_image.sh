@@ -171,22 +171,27 @@ elif [[ $image_format == "nutanix" ]]; then
     jq -s add $nutanix_config_file $redhat_config_file > $image_builder_config_file
 
     image_url=$(jq -r '.image_url' $image_builder_config_file)
-    image_filename_query=${image_url##*/}
-    image_filename=${image_filename_query%%[?#]*}
-
-    # Download Nutanix source image locally
-    $MAKE_ROOT/build/download_iso.sh $image_filename $image_url
-
-    # Create file server to host Nutanix image directory
-    default_interface=$(cat /proc/net/route | awk '$2 == "00000000" && $8 == "00000000" { print $1 }' | head -1)
-    host_ip=$(ip addr show dev $default_interface | awk '/inet / {print $2}' | cut -d/ -f1)
-    python3 -m http.server -d /tmp &
-
-    # Point image URL in config file to the file server endpoint
-    build::jq::update_in_place $image_builder_config_file '.image_url = '"\"http://$host_ip:8000/$image_filename\""''
-  else
+    source_image_name=source-$image_name.qcow2
+  elif [[ $image_os == "ubuntu" ]]; then
     image_builder_config_file=$nutanix_config_file
+    if [[ $image_os_version == "2004" ]]; then
+      image_url=https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
+    elif [[ $image_os_version == "2204" ]]; then
+      image_url=https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+    fi
+    source_image_name=source-$image_name.img
   fi
+
+  # Download Nutanix source image locally
+  $MAKE_ROOT/build/download_iso.sh $source_image_name $image_url
+
+  # Create file server to host Nutanix image directory
+  default_interface=$(cat /proc/net/route | awk '$2 == "00000000" && $8 == "00000000" { print $1 }' | head -1)
+  host_ip=$(ip addr show dev $default_interface | awk '/inet / {print $2}' | cut -d/ -f1)
+  python3 -m http.server -d /tmp &
+
+  # Point image URL in config file to the file server endpoint
+  build::jq::update_in_place $image_builder_config_file '.image_url = '"\"http://$host_ip:8000/$source_image_name\""''
   cat $image_builder_config_file
 
   # Run image-builder CLI
