@@ -5,6 +5,30 @@
     "default": {},
     "title": "Root Schema",
     "properties": {
+        "nameOverride": {
+            "type": "string",
+            "default": "",
+            "title": "The nameOverride Schema",
+            "examples": [
+                ""
+            ]
+        },
+        "fullnameOverride": {
+            "type": "string",
+            "default": "",
+            "title": "The fullnameOverride Schema",
+            "examples": [
+                ""
+            ]
+        },
+        "defaultNamespace": {
+            "type": "string",
+            "default": "emissary-system",
+            "title": "The defaultNamespace Schema",
+            "examples": [
+                "emissary-system"
+            ]
+        },
         "replicaCount": {
             "type": "integer",
             "default": 2,
@@ -19,6 +43,129 @@
             "title": "The daemonSet Schema",
             "examples": [
                 false
+            ]
+        },
+        "barePod": {
+            "type": "boolean",
+            "default": false,
+            "title": "The barePod Schema",
+            "examples": [
+                false
+            ]
+        },
+        "test": {
+            "type": "object",
+            "default": {},
+            "title": "The test Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "title": "The enabled Schema",
+                    "examples": [
+                        false
+                    ]
+                },
+                "image": {
+                    "type": "string",
+                    "default": "busybox",
+                    "title": "The image Schema",
+                    "examples": [
+                        "busybox"
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "enabled": false,
+                    "image": "busybox"
+                }
+            ]
+        },
+        "canary": {
+            "type": "object",
+            "default": {},
+            "title": "The canary Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "title": "The enabled Schema",
+                    "examples": [
+                        false
+                    ]
+                },
+                "mixPods": {
+                    "type": "boolean",
+                    "default": false,
+                    "title": "The mixPods Schema",
+                    "examples": [
+                        false
+                    ]
+                },
+                "replicaCount": {
+                    "type": "integer",
+                    "default": 0,
+                    "title": "The replicaCount Schema",
+                    "examples": [
+                        0
+                    ]
+                },
+                "image": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The image Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {
+                        "repository": {
+                            "type": "string",
+                            "default": "",
+                            "title": "The repository Schema",
+                            "examples": [
+                                ""
+                            ]
+                        },
+                        "tag": {
+                            "type": "string",
+                            "default": "",
+                            "title": "The tag Schema",
+                            "examples": [
+                                ""
+                            ]
+                        }
+                    },
+                    "examples": [
+                        {
+                            "repository": "",
+                            "tag": ""
+                        }
+                    ]
+                },
+                "envRaw": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The envRaw Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {}
+                }
+            },
+            "examples": [
+                {
+                    "enabled": false,
+                    "mixPods": false,
+                    "replicaCount": 0,
+                    "image": {
+                        "repository": "",
+                        "tag": ""
+                    },
+                    "envRaw": {}
+                }
             ]
         },
         "ingressClassResource": {
@@ -68,14 +215,229 @@
                 "name": "ambassador",
                 "default": false,
                 "controllerValue": "getambassador.io/ingress-controller"
-            }]
+                }
+            ]
+        },
+        "autoscaling": {
+            "type": "object",
+            "default": {},
+            "title": "The autoscaling Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "title": "The enabled Schema",
+                    "examples": [
+                        false
+                    ]
+                },
+                "minReplicas": {
+                    "type": "integer",
+                    "default": 2,
+                    "title": "The minReplicas Schema",
+                    "examples": [
+                        2
+                    ]
+                },
+                "maxReplicas": {
+                    "type": "integer",
+                    "default": 5,
+                    "title": "The maxReplicas Schema",
+                    "examples": [
+                        5
+                    ]
+                },
+                "metrics": {
+                    "type": "array",
+                    "default": [],
+                    "title": "The metrics Schema",
+                    "items": {
+                        "type": "object",
+                        "default": {},
+                        "title": "Root Schema",
+                        "required": [],
+                        "additionalProperties": false,
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "default": "Resource",
+                                "title": "The type Schema",
+                                "examples": [
+                                    "Resource"
+                                ]
+                            },
+                            "resource": {
+                                "type": "object",
+                                "default": {},
+                                "title": "The resource Schema",
+                                "required": [],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "default": "memory",
+                                        "title": "The name Schema",
+                                        "examples": [
+                                            "memory"
+                                        ]
+                                    },
+                                    "target": {
+                                        "type": "object",
+                                        "default": {},
+                                        "title": "The target Schema",
+                                        "required": [],
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "type": {
+                                                "type": "string",
+                                                "default": "Utilization",
+                                                "title": "The type Schema",
+                                                "examples": [
+                                                    "Utilization"
+                                                ]
+                                            },
+                                            "averageUtilization": {
+                                                "type": "integer",
+                                                "default": 100,
+                                                "title": "The averageUtilization Schema",
+                                                "examples": [
+                                                    100
+                                                ]
+                                            }
+                                        },
+                                        "examples": [
+                                            {
+                                                "type": "Utilization",
+                                                "averageUtilization": 100
+                                            }
+                                        ]
+                                    }
+                                },
+                                "examples": [
+                                    {
+                                        "name": "memory",
+                                        "target": {
+                                            "type": "Utilization",
+                                            "averageUtilization": 100
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        "examples": [
+                            {
+                                "type": "Resource",
+                                "resource": {
+                                    "name": "memory",
+                                    "target": {
+                                        "type": "Utilization",
+                                        "averageUtilization": 100
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "examples": [
+                        [
+                            {
+                                "type": "Resource",
+                                "resource": {
+                                    "name": "memory",
+                                    "target": {
+                                        "type": "Utilization",
+                                        "averageUtilization": 100
+                                    }
+                                }
+                            },
+                            {
+                                "type": "Resource",
+                                "resource": {
+                                    "name": "cpu",
+                                    "target": {
+                                        "type": "Utilization",
+                                        "averageUtilization": 300
+                                    }
+                                }
+                            }
+                        ]
+                    ]
+                },
+                "behavior": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The behavior Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {}
+                }
+            },
+            "examples": [
+                {
+                    "enabled": false,
+                    "minReplicas": 2,
+                    "maxReplicas": 5,
+                    "metrics": [
+                        {
+                            "type": "Resource",
+                            "resource": {
+                                "name": "memory",
+                                "target": {
+                                    "type": "Utilization",
+                                    "averageUtilization": 100
+                                }
+                            }
+                        },
+                        {
+                            "type": "Resource",
+                            "resource": {
+                                "name": "cpu",
+                                "target": {
+                                    "type": "Utilization",
+                                    "averageUtilization": 300
+                                }
+                            }
+                        }
+                    ],
+                    "behavior": {}
+                }
+            ]
         },
         "podDisruptionBudget": {
             "type": "object",
             "default": {},
             "title": "The podDisruptionBudget Schema",
-            "properties": {},
-            "examples": [{}]
+            "required": [],
+            "additionalProperties": false,
+            "properties": {}
+        },
+        "namespace": {
+            "type": "object",
+            "default": {},
+            "title": "The namespace Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "name": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "The name Schema",
+                    "examples": []
+                }
+            },
+            "examples": [
+                {
+                    "name": null
+                }
+            ]
         },
         "env": {
             "type": "object",
@@ -84,13 +446,91 @@
             "properties": {},
             "examples": [{}]
         },
+        "envRaw": {
+            "type": "object",
+            "default": {},
+            "title": "The envRaw Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {}
+        },
         "imagePullSecrets": {
             "type": "array",
             "default": [],
             "title": "The imagePullSecrets Schema",
             "items": {},
+            "examples": []
+        },
+        "security": {
+            "type": "object",
+            "default": {},
+            "title": "The security Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "podSecurityContext": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The podSecurityContext Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {
+                        "runAsUser": {
+                            "type": "integer",
+                            "default": 8888,
+                            "title": "The runAsUser Schema",
             "examples": [
-                []
+                                8888
+                            ]
+                        }
+                    },
+                    "examples": [
+                        {
+                            "runAsUser": 8888
+                        }
+                    ]
+                },
+                "containerSecurityContext": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The containerSecurityContext Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {
+                        "allowPrivilegeEscalation": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "The allowPrivilegeEscalation Schema",
+                            "examples": [
+                                false
+                            ]
+                        }
+                    },
+                    "examples": [
+                        {
+                            "allowPrivilegeEscalation": false
+                        }
+                    ]
+                },
+                "podSecurityPolicy": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The podSecurityPolicy Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {}
+                }
+            },
+            "examples": [
+                {
+                    "podSecurityContext": {
+                        "runAsUser": 8888
+                    },
+                    "containerSecurityContext": {
+                        "allowPrivilegeEscalation": false
+                    },
+                    "podSecurityPolicy": {}
+                }
             ]
         },
         "sourceRegistry": {
@@ -127,7 +567,14 @@
                     ]
                 },
                 "tag": {
-                    "type": "null",
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
                     "default": null,
                     "title": "The tag Schema",
                     "examples": [
@@ -143,12 +590,14 @@
                     ]
                 }
             },
-            "examples": [{
+            "examples": [
+                {
                 "repository": "emissary-ingress/emissary",
                 "digest": "sha256:735898bc7a555ce0d842cf28eefaa9824eb5f28396e9eb229ae05c0d601c4e3e",
                 "tag": null,
                 "pullPolicy": "IfNotPresent"
-            }]
+                }
+            ]
         },
         "dnsPolicy": {
             "type": "string",
@@ -177,7 +626,7 @@
             "properties": {
                 "type": {
                     "type": "string",
-                    "default": "",
+                    "default": "LoadBalancer",
                     "title": "The type Schema",
                     "examples": [
                         "LoadBalancer"
@@ -198,6 +647,7 @@
                         "properties": {
                             "name": {
                                 "type": "string",
+                                "default": "http",
                                 "title": "The name Schema",
                                 "examples": [
                                     "http",
@@ -206,6 +656,7 @@
                             },
                             "port": {
                                 "type": "integer",
+                                "default": 80,
                                 "title": "The port Schema",
                                 "examples": [
                                     80,
@@ -221,7 +672,8 @@
                                 ]
                             }
                         },
-                        "examples": [{
+                        "examples": [
+                            {
                             "name": "http",
                             "port": 80,
                             "targetPort": 8080
@@ -230,10 +682,12 @@
                             "name": "https",
                             "port": 443,
                             "targetPort": 8443
-                        }]
+                        }
+]
                     },
                     "examples": [
-                        [{
+                        [
+                            {
                             "name": "http",
                             "port": 80,
                             "targetPort": 8080
@@ -242,7 +696,8 @@
                             "name": "https",
                             "port": 443,
                             "targetPort": 8443
-                        }]
+                            }
+                        ]
                     ]
                 },
                 "portsRaw": {
@@ -295,7 +750,14 @@
                     "examples": [{}]
                 },
                 "nameOverride": {
-                    "type": "null",
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
                     "default": null,
                     "title": "The nameOverride Schema",
                     "examples": [
@@ -303,9 +765,11 @@
                     ]
                 }
             },
-            "examples": [{
+            "examples": [
+                {
                 "type": "LoadBalancer",
-                "ports": [{
+                    "ports": [
+                        {
                     "name": "http",
                     "port": 80,
                     "targetPort": 8080
@@ -314,7 +778,8 @@
                     "name": "https",
                     "port": 443,
                     "targetPort": 8443
-                }],
+                        }
+                    ],
                 "portsRaw": "",
                 "externalTrafficPolicy": null,
                 "sessionAffinity": null,
@@ -322,7 +787,8 @@
                 "externalIPs": [],
                 "annotations": {},
                 "nameOverride": null
-            }]
+                }
+            ]
         },
         "adminService": {
             "type": "object",
@@ -367,7 +833,14 @@
                     ]
                 },
                 "nodePort": {
-                    "type": "null",
+                    "anyOf": [
+                        {
+                            "type": "integer"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
                     "default": null,
                     "title": "The nodePort Schema",
                     "examples": [
@@ -383,7 +856,14 @@
                     "examples": [{}]
                 },
                 "loadBalancerIP": {
-                    "type": "null",
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
                     "default": null,
                     "title": "The loadBalancerIP Schema",
                     "examples": [
@@ -391,7 +871,14 @@
                     ]
                 },
                 "loadBalancerSourceRanges": {
-                    "type": "null",
+                    "anyOf": [
+                        {
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
                     "default": null,
                     "title": "The loadBalancerSourceRanges Schema",
                     "examples": [
@@ -399,7 +886,8 @@
                     ]
                 }
             },
-            "examples": [{
+            "examples": [
+                {
                 "create": true,
                 "type": "ClusterIP",
                 "port": 8877,
@@ -408,7 +896,8 @@
                 "annotations": {},
                 "loadBalancerIP": null,
                 "loadBalancerSourceRanges": null
-            }]
+                }
+            ]
         },
         "rbac": {
             "type": "object",
@@ -436,7 +925,14 @@
                     ]
                 },
                 "nameOverride": {
-                    "type": "null",
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
                     "default": null,
                     "title": "The nameOverride Schema",
                     "examples": [
@@ -448,7 +944,30 @@
                 "create": true,
                 "podSecurityPolicies": [],
                 "nameOverride": null
-            }]
+                }
+            ]
+        },
+        "scope": {
+            "type": "object",
+            "default": {},
+            "title": "The scope Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "singleNamespace": {
+                    "type": "boolean",
+                    "default": false,
+                    "title": "The singleNamespace Schema",
+                    "examples": [
+                        false
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "singleNamespace": false
+                }
+            ]
         },
         "serviceAccount": {
             "type": "object",
@@ -467,7 +986,14 @@
                     ]
                 },
                 "name": {
-                    "type": "null",
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
                     "default": null,
                     "title": "The name Schema",
                     "examples": [
@@ -506,9 +1032,154 @@
                     ]
                 }
             },
-            "examples": [{
+            "examples": [
+                {
                 "type": "RollingUpdate"
-            }]
+                }
+            ]
+        },
+        "progressDeadlines": {
+            "type": "object",
+            "default": {},
+            "title": "The progressDeadlines Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "ambassador": {
+                    "type": "integer",
+                    "default": 600,
+                    "title": "The ambassador Schema",
+                    "examples": [
+                        600
+                    ]
+                },
+                "agent": {
+                    "type": "integer",
+                    "default": 600,
+                    "title": "The agent Schema",
+                    "examples": [
+                        600
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "ambassador": 600,
+                    "agent": 600
+                }
+            ]
+        },
+        "restartPolicy": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "The restartPolicy Schema",
+            "examples": []
+        },
+        "terminationGracePeriodSeconds": {
+            "anyOf": [
+                {
+                    "type": "integer"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "The terminationGracePeriodSeconds Schema",
+            "examples": []
+        },
+        "waitForApiext": {
+            "type": "object",
+            "default": {},
+            "title": "The waitForApiext Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "title": "The enabled Schema",
+                    "examples": [
+                        true
+                    ]
+                },
+                "deploymentName": {
+                    "type": "string",
+                    "default": "emissary-apiext",
+                    "title": "The deploymentName Schema",
+                    "examples": [
+                        "emissary-apiext"
+                    ]
+                },
+                "deploymentNamespace": {
+                    "type": "string",
+                    "default": "emissary-system",
+                    "title": "The deploymentNamespace Schema",
+                    "examples": [
+                        "emissary-system"
+                    ]
+                },
+                "securityContext": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The securityContext Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {
+                        "runAsUser": {
+                            "type": "integer",
+                            "default": 8888,
+                            "title": "The runAsUser Schema",
+                            "examples": [
+                                8888
+                            ]
+                        }
+                    },
+                    "examples": [
+                        {
+                            "runAsUser": 8888
+                        }
+                    ]
+                },
+                "createRoles": {
+                    "type": "boolean",
+                    "default": true,
+                    "title": "The createRoles Schema",
+                    "examples": [
+                        true
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "enabled": true,
+                    "deploymentName": "emissary-apiext",
+                    "deploymentNamespace": "emissary-system",
+                    "securityContext": {
+                        "runAsUser": 8888
+                    },
+                    "createRoles": true
+                }
+            ]
+        },
+        "initContainers": {
+            "type": "array",
+            "default": [],
+            "title": "The initContainers Schema",
+            "examples": []
+        },
+        "sidecarContainers": {
+            "type": "array",
+            "default": [],
+            "title": "The sidecarContainers Schema",
+            "examples": []
         },
         "livenessProbe": {
             "type": "object",
@@ -545,11 +1216,13 @@
                     ]
                 }
             },
-            "examples": [{
+            "examples": [
+                {
                 "initialDelaySeconds": 30,
                 "periodSeconds": 3,
                 "failureThreshold": 3
-            }]
+                }
+            ]
         },
         "readinessProbe": {
             "type": "object",
@@ -586,11 +1259,21 @@
                     ]
                 }
             },
-            "examples": [{
+            "examples": [
+                {
                 "initialDelaySeconds": 30,
                 "periodSeconds": 3,
                 "failureThreshold": 3
-            }]
+                }
+            ]
+        },
+        "startupProbe": {
+            "type": "object",
+            "default": {},
+            "title": "The startupProbe Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {}
         },
         "volumes": {
             "type": "array",
@@ -609,6 +1292,38 @@
             "examples": [
                 []
             ]
+        },
+        "podLabels": {
+            "type": "object",
+            "default": {},
+            "title": "The podLabels Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {}
+        },
+        "podAnnotations": {
+            "type": "object",
+            "default": {},
+            "title": "The podAnnotations Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {}
+        },
+        "deploymentLabels": {
+            "type": "object",
+            "default": {},
+            "title": "The deploymentLabels Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {}
+        },
+        "deploymentAnnotations": {
+            "type": "object",
+            "default": {},
+            "title": "The deploymentAnnotations Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {}
         },
         "resources": {
             "type": "object",
@@ -676,13 +1391,16 @@
                             ]
                         }
                     },
-                    "examples": [{
+                    "examples": [
+                        {
                         "cpu": "200m",
                         "memory": "300Mi"
-                    }]
+                        }
+                    ]
                 }
             },
-            "examples": [{
+            "examples": [
+                {
                 "limits": {
                     "cpu": "1000m",
                     "memory": "600Mi"
@@ -691,7 +1409,16 @@
                     "cpu": "200m",
                     "memory": "300Mi"
                 }
-            }]
+                }
+            ]
+        },
+        "priorityClassName": {
+            "type": "string",
+            "default": "",
+            "title": "The priorityClassName Schema",
+            "examples": [
+                ""
+            ]
         },
         "nodeSelector": {
             "type": "object",
@@ -715,34 +1442,370 @@
             "default": {},
             "title": "The affinity Schema",
             "required": [],
-            "properties": {},
-            "examples": [{}]
+            "properties": {}
+        },
+        "topologySpreadConstraints": {
+            "type": "array",
+            "default": [],
+            "title": "The topologySpreadConstraints Schema",
+            "examples": []
+        },
+        "ambassadorConfig": {
+            "type": "string",
+            "default": "",
+            "title": "The ambassadorConfig Schema",
+            "examples": [
+                ""
+            ]
+        },
+        "metrics": {
+            "type": "object",
+            "default": {},
+            "title": "The metrics Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "serviceMonitor": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The serviceMonitor Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "The enabled Schema",
+                            "examples": [
+                                false
+                            ]
+                        }
+                    },
+                    "examples": [
+                        {
+                            "enabled": false
+                        }
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "serviceMonitor": {
+                        "enabled": false
+                    }
+                }
+            ]
+        },
+        "resolvers": {
+            "type": "object",
+            "default": {},
+            "title": "The resolvers Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "endpoint": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The endpoint Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "The create Schema",
+                            "examples": [
+                                false
+                            ]
+                        },
+                        "name": {
+                            "type": "string",
+                            "default": "endpoint",
+                            "title": "The name Schema",
+                            "examples": [
+                                "endpoint"
+                            ]
+                        }
+                    },
+                    "examples": [
+                        {
+                            "create": false,
+                            "name": "endpoint"
+                        }
+                    ]
+                },
+                "consul": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The consul Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "The create Schema",
+                            "examples": [
+                                false
+                            ]
+                        },
+                        "name": {
+                            "type": "string",
+                            "default": "consul-dc1",
+                            "title": "The name Schema",
+                            "examples": [
+                                "consul-dc1"
+                            ]
+                        },
+                        "spec": {
+                            "type": "object",
+                            "default": {},
+                            "title": "The spec Schema",
+                            "required": [],
+                            "additionalProperties": false,
+                            "properties": {}
+                        }
+                    },
+                    "examples": [
+                        {
+                            "create": false,
+                            "name": "consul-dc1",
+                            "spec": {}
+                        }
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "endpoint": {
+                        "create": false,
+                        "name": "endpoint"
+                    },
+                    "consul": {
+                        "create": false,
+                        "name": "consul-dc1",
+                        "spec": {}
+                    }
+                }
+            ]
+        },
+        "module": {
+            "type": "object",
+            "default": {},
+            "title": "The module Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "diagnostics": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The diagnostics Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "The enabled Schema",
+                            "examples": [
+                                false
+                            ]
+                        }
+                    },
+                    "examples": [
+                        {
+                            "enabled": false
+                        }
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "diagnostics": {
+                        "enabled": false
+                    }
+                }
+            ]
+        },
+        "prometheusExporter": {
+            "type": "object",
+            "default": {},
+            "title": "The prometheusExporter Schema",
+            "required": [],
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "title": "The enabled Schema",
+                    "examples": [
+                        false
+                    ]
+                },
+                "repository": {
+                    "type": "string",
+                    "default": "prom/statsd-exporter",
+                    "title": "The repository Schema",
+                    "examples": [
+                        "prom/statsd-exporter"
+                    ]
+                },
+                "tag": {
+                    "type": "string",
+                    "default": "v0.8.1",
+                    "title": "The tag Schema",
+                    "examples": [
+                        "v0.8.1"
+                    ]
+                },
+                "pullPolicy": {
+                    "type": "string",
+                    "default": "IfNotPresent",
+                    "title": "The pullPolicy Schema",
+                    "examples": [
+                        "IfNotPresent"
+                    ]
+                },
+                "resources": {
+                    "type": "object",
+                    "default": {},
+                    "title": "The resources Schema",
+                    "required": [],
+                    "additionalProperties": false,
+                    "properties": {}
+                }
+            },
+            "examples": [
+                {
+                    "enabled": false,
+                    "repository": "prom/statsd-exporter",
+                    "tag": "v0.8.1",
+                    "pullPolicy": "IfNotPresent",
+                    "resources": {}
+                }
+            ]
+        },
+        "deploymentTool": {
+            "type": "string",
+            "default": "",
+            "title": "The deploymentTool Schema",
+            "examples": [
+                ""
+            ]
         },
         "docker": {
             "type": "object",
             "default": {},
             "title": "The docker Schema",
             "required": [],
-            "properties": {},
-            "examples": [{}]
+            "properties": {}
+        },
+        "createNamespace": {
+            "type": "boolean",
+            "default": false,
+            "title": "The createNamespace Schema",
+            "examples": [
+                false
+            ]
+        },
+        "createDefaultListeners": {
+            "type": "boolean",
+            "default": false,
+            "title": "The createDefaultListeners Schema",
+            "examples": [
+                false
+            ]
+        },
+        "lifecycle": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "The lifecycle Schema",
+            "examples": []
         }
     },
-    "examples": [{
-        "replicaCount": 2,
-        "barePod": false,
-        "ingressClassResource": {
-            "enabled": true,
-            "name": "ambassador",
-            "default": false,
-            "controllerValue": "getambassador.io/ingress-controller"
-        },
+    "examples": [
+        {
+            "nameOverride": "",
+            "fullnameOverride": "",
+            "defaultNamespace": "emissary-system",
+            "replicaCount": 2,
+            "daemonSet": false,
+            "barePod": false,
+            "test": {
+                "enabled": false,
+                "image": "busybox"
+            },
+            "canary": {
+                "enabled": false,
+                "mixPods": false,
+                "replicaCount": 0,
+                "image": {
+                    "repository": "",
+                    "tag": ""
+                },
+                "envRaw": {}
+            },
+            "ingressClassResource": {
+                "enabled": true,
+                "name": "ambassador",
+                "default": false,
+                "controllerValue": "getambassador.io/ingress-controller"
+            },
+            "autoscaling": {
+                "enabled": false,
+                "minReplicas": 2,
+                "maxReplicas": 5,
+                "metrics": [
+                    {
+                        "type": "Resource",
+                        "resource": {
+                            "name": "memory",
+                            "target": {
+                                "type": "Utilization",
+                                "averageUtilization": 100
+                            }
+                        }
+                    },
+                    {
+                        "type": "Resource",
+                        "resource": {
+                            "name": "cpu",
+                            "target": {
+                                "type": "Utilization",
+                                "averageUtilization": 300
+                            }
+                        }
+                    }
+                ],
+                "behavior": {}
+            },
         "podDisruptionBudget": {},
+            "namespace": {
+                "name": null
+            },
         "env": {},
+            "envRaw": {},
         "imagePullSecrets": [],
+            "security": {
+                "podSecurityContext": {
+                    "runAsUser": 8888
+                },
+                "containerSecurityContext": {
+                    "allowPrivilegeEscalation": false
+                },
+                "podSecurityPolicy": {}
+            },
         "sourceRegistry": "public.ecr.aws/eks-anywhere",
         "image": {
             "repository": "emissary-ingress/emissary",
-            "digest": "sha256:735898bc7a555ce0d842cf28eefaa9824eb5f28396e9eb229ae05c0d601c4e3e",
+                "digest": "sha256:3a91477b41f093c0b251311b8e77e383b27c3952ecac88b7c6c73cf16bcfbcf2",
             "tag": null,
             "pullPolicy": "IfNotPresent"
         },
@@ -750,7 +1813,8 @@
         "hostNetwork": false,
         "service": {
             "type": "LoadBalancer",
-            "ports": [{
+                "ports": [
+                    {
                 "name": "http",
                 "port": 80,
                 "targetPort": 8080
@@ -759,7 +1823,8 @@
                 "name": "https",
                 "port": 443,
                 "targetPort": 8443
-            }],
+                    }
+                ],
             "portsRaw": "",
             "externalTrafficPolicy": null,
             "sessionAffinity": null,
@@ -783,6 +1848,9 @@
             "podSecurityPolicies": [],
             "nameOverride": null
         },
+            "scope": {
+                "singleNamespace": false
+            },
         "serviceAccount": {
             "create": true,
             "name": null,
@@ -791,6 +1859,23 @@
         "deploymentStrategy": {
             "type": "RollingUpdate"
         },
+            "progressDeadlines": {
+                "ambassador": 600,
+                "agent": 600
+            },
+            "restartPolicy": null,
+            "terminationGracePeriodSeconds": null,
+            "waitForApiext": {
+                "enabled": true,
+                "deploymentName": "emissary-apiext",
+                "deploymentNamespace": "emissary-system",
+                "securityContext": {
+                    "runAsUser": 8888
+                },
+                "createRoles": true
+            },
+            "initContainers": [],
+            "sidecarContainers": [],
         "livenessProbe": {
             "initialDelaySeconds": 30,
             "periodSeconds": 3,
@@ -801,8 +1886,13 @@
             "periodSeconds": 3,
             "failureThreshold": 3
         },
+            "startupProbe": {},
         "volumes": [],
         "volumeMounts": [],
+            "podLabels": {},
+            "podAnnotations": {},
+            "deploymentLabels": {},
+            "deploymentAnnotations": {},
         "resources": {
             "limits": {
                 "cpu": "1000m",
@@ -813,9 +1903,45 @@
                 "memory": "300Mi"
             }
         },
+            "priorityClassName": "",
         "nodeSelector": {},
         "tolerations": [],
         "affinity": {},
-        "docker": {}
-    }]
+            "topologySpreadConstraints": [],
+            "ambassadorConfig": "",
+            "metrics": {
+                "serviceMonitor": {
+                    "enabled": false
+                }
+            },
+            "resolvers": {
+                "endpoint": {
+                    "create": false,
+                    "name": "endpoint"
+                },
+                "consul": {
+                    "create": false,
+                    "name": "consul-dc1",
+                    "spec": {}
+                }
+            },
+            "module": {
+                "diagnostics": {
+                    "enabled": false
+                }
+            },
+            "prometheusExporter": {
+                "enabled": false,
+                "repository": "prom/statsd-exporter",
+                "tag": "v0.8.1",
+                "pullPolicy": "IfNotPresent",
+                "resources": {}
+            },
+            "deploymentTool": "",
+            "docker": {},
+            "createNamespace": false,
+            "createDefaultListeners": false,
+            "lifecycle": null
+        }
+    ]
 }
