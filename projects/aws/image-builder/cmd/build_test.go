@@ -149,7 +149,7 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 				Os:        "rocky",
 				OsVersion: "1",
 			},
-			wantErr: "rocky is not a supported OS.",
+			wantErr: "rocky is not a supported OS",
 		},
 	}
 
@@ -200,7 +200,7 @@ func TestValidateFirmware(t *testing.T) {
 				Hypervisor: "baremetal",
 				Firmware:   "bios",
 			},
-			wantErr: "Ubuntu Raw builds only support EFI firmware.",
+			wantErr: "Ubuntu Raw builds only support EFI firmware",
 		},
 		{
 			testName: "Redhat raw with efi",
