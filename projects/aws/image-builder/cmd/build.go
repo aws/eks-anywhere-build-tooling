@@ -3,8 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -95,8 +95,8 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		bo.OsVersion = "8"
 	}
 
-	if bo.Hypervisor != builder.Nutanix && bo.Hypervisor != builder.CloudStack && bo.Hypervisor != builder.Baremetal && bo.Os == builder.RedHat && bo.OsVersion != "8" {
-		log.Fatalf("Invalid OS version for RedHat. Please choose 8")
+	if bo.Hypervisor != builder.Nutanix && bo.Hypervisor != builder.CloudStack && bo.Hypervisor != builder.Baremetal && bo.Os == builder.RedHat && bo.OsVersion != "8" && bo.OsVersion != "9" {
+		log.Fatalf("Invalid OS version for RedHat. Please choose 8 or 9")
 	}
 
 	if err = validateOSVersion(bo.Os, bo.OsVersion); err != nil {
@@ -164,7 +164,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		if err != nil {
 			return fmt.Errorf("Error converting %s config file path to absolute path: %v", bo.Hypervisor, err)
 		}
-		config, err := ioutil.ReadFile(configPath)
+		config, err := os.ReadFile(configPath)
 		if err != nil {
 			return fmt.Errorf("Error reading %s config file: %v", bo.Hypervisor, err)
 		}
@@ -303,7 +303,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 	}
 
 	if additionalFilesConfigFile != "" {
-		filesConfig, err := ioutil.ReadFile(additionalFilesConfigFile)
+		filesConfig, err := os.ReadFile(additionalFilesConfigFile)
 		if err != nil {
 			return fmt.Errorf("Error reading additional files config path: %v", err)
 		}
@@ -381,7 +381,7 @@ func validateSupportedHypervisors(hypervisor string) error {
 
 func validateOSVersion(os, osVersion string) error {
 	if os != builder.RedHat && os != builder.Ubuntu {
-		return fmt.Errorf("%s is not a supported OS.", os)
+		return fmt.Errorf("%s is not a supported OS", os)
 	}
 
 	if os == builder.Ubuntu && !builder.SliceContains(builder.SupportedUbuntuVersions, osVersion) {
@@ -423,7 +423,7 @@ func validateFirmware(firmware, os, osVersion, hypervisor string) error {
 
 	if firmware == builder.BIOS && hypervisor == builder.Baremetal {
 		if os == builder.Ubuntu {
-			return fmt.Errorf("Ubuntu Raw builds only support EFI firmware.")
+			return fmt.Errorf("Ubuntu Raw builds only support EFI firmware")
 		}
 		if os == builder.RedHat && builder.SliceContains(builder.SupportedRedHatEfiVersions, osVersion) {
 			return fmt.Errorf("RedHat version 9 Raw builds only support EFI firmware")
