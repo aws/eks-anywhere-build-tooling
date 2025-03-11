@@ -32,21 +32,35 @@ fi
 TMP_FOLDER="$MAKE_ROOT/_output/tmp"
 BIN_FOLDER="$MAKE_ROOT/_output/.bin"
 ZIP="$BIN_FOLDER/7zz"
+TAR=$(build::find::gnu_variant_on_mac tar)
 
 mkdir -p $BIN_FOLDER $TMP_FOLDER
 
 if [ ! -f "$ZIP" ]; then
-    build::common::echo_and_run curl -L https://www.7-zip.org/a/7z2406-linux-$([ "x86_64" = "$(uname -m)" ] && echo x64 || echo arm64).tar.xz  | tar -xJ -C $BIN_FOLDER 7zz
+    build::common::echo_and_run curl -L https://www.7-zip.org/a/7z2406-$([ "Darwin" = "$(uname -s)" ] && echo mac || echo linux)$([ "Linux" = "$(uname -s)" ] && ([ "x86_64" = "$(uname -m)" ] && echo -x64 || echo -arm64)).tar.xz  | $TAR -xJ -C $BIN_FOLDER 7zz
 fi
 
-VMDK="$(tar --wildcards -tf $OVA_PATH '*.vmdk')"
-build::common::echo_and_run tar -C $TMP_FOLDER -xf $OVA_PATH $VMDK
+VMDK="$($TAR --wildcards -tf $OVA_PATH '*.vmdk')"
+build::common::echo_and_run $TAR -C $TMP_FOLDER -xf $OVA_PATH $VMDK
 
-build::common::echo_and_run $ZIP -y -o$TMP_FOLDER e $TMP_FOLDER/$VMDK usr/bin/kubelet > /dev/null
+if $ZIP l $TMP_FOLDER/$VMDK | grep -q "usr/bin/kubelet"; then
+    build::common::echo_and_run $ZIP -y -o$TMP_FOLDER e $TMP_FOLDER/$VMDK usr/bin/kubelet > /dev/null
+    ACTUAL_VERSION="$($TMP_FOLDER/kubelet --version)"
+else
+    IMG=$($ZIP l $TMP_FOLDER/$VMDK | grep -oP "\d+[A-Za-z .]*\.img$" | sort | tail -n 1)
+    if [ -n "$IMG" ]; then
+        build::common::echo_and_run $ZIP -y -o$TMP_FOLDER e $TMP_FOLDER/$VMDK $IMG
+        if [ -f "$TMP_FOLDER/$IMG" ]; then
+            ACTUAL_VERSION=$(strings "$TMP_FOLDER/$IMG" | grep -P "^v\d+\.\d+\.\d+-eks-.*$" | head -1)
+        fi
+    fi
+fi
+if [ -z "$ACTUAL_VERSION" ]; then
+    echo "ERROR: unable to determine Kubelet version on image!"
+    exit 1
+fi
 
 EXPECTED_VERSION="$(jq -r '.kubernetes_semver' $KUBERNETES_PACKER_CONFIG)"
-ACTUAL_VERSION="$($TMP_FOLDER/kubelet --version)"
-
 if [[ $ACTUAL_VERSION != *"$EXPECTED_VERSION"* ]]; then
     echo "ERROR: kubelet version unexpected!"
     echo "expected: $EXPECTED_VERSION, actual: $ACTUAL_VERSION"
