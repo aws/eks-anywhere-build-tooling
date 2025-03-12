@@ -43,7 +43,7 @@ fi
 VMDK="$($TAR --wildcards -tf $OVA_PATH '*.vmdk')"
 build::common::echo_and_run $TAR -C $TMP_FOLDER -xf $OVA_PATH $VMDK
 
-if $ZIP l $TMP_FOLDER/$VMDK | grep -q "usr/bin/kubelet"; then
+if $ZIP l $TMP_FOLDER/$VMDK | grep "usr/bin/kubelet"; then
     build::common::echo_and_run $ZIP -y -o$TMP_FOLDER e $TMP_FOLDER/$VMDK usr/bin/kubelet > /dev/null
     ACTUAL_VERSION="$($TMP_FOLDER/kubelet --version)"
 else
