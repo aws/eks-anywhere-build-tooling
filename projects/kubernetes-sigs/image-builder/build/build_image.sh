@@ -112,7 +112,7 @@ if [[ $image_format == "ova" ]]; then
   fi
 
   firmware_arg=""
-  if [ -n "$firmware" ] && [[ "$image_os" == "ubuntu" ]]; then
+  if [ -n "$firmware" ]; then
     firmware_arg="--firmware $firmware"
   fi
   cat $image_builder_config_file

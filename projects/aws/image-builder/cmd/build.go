@@ -409,8 +409,8 @@ func validateFirmware(firmware, os, osVersion, hypervisor string) error {
 			return fmt.Errorf("For Ubuntu, EFI firmware is only supported for OVA and Raw builds")
 		}
 		if os == builder.RedHat {
-			if hypervisor != builder.Baremetal {
-				return fmt.Errorf("For RedHat, EFI firmware is only supported for Raw builds")
+			if !builder.SliceContains([]string{builder.VSphere, builder.Baremetal}, hypervisor) {
+				return fmt.Errorf("For RedHat, EFI firmware is only supported for OVA and Raw builds")
 			}
 			if !builder.SliceContains(builder.SupportedRedHatEfiVersions, osVersion) {
 				return fmt.Errorf("Only RedHat version 9 supports EFI firmware")
