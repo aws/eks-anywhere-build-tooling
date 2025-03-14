@@ -1,7 +1,8 @@
 module github.com/aws/eks-anywhere-build-tooling/tools/version-tracker
 
-go 1.22
-toolchain go1.23.7
+go 1.24
+
+toolchain go1.24.0
 
 require (
 	github.com/aws/eks-distro-build-tooling/release v0.0.0-20240513204929-c69ded04ed10
