@@ -4,7 +4,7 @@ BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
 
 BINARY_NAME?=version-tracker
 BINARY_PATH?=bin/$(BINARY_NAME)
-GOLANG_VERSION=1.22
+GOLANG_VERSION=1.24
 GO ?= $(shell source $(BASE_DIRECTORY)/build/lib/common.sh && build::common::get_go_path $(GOLANG_VERSION))/go
 DRY_RUN?=false
 VERBOSITY?=0
