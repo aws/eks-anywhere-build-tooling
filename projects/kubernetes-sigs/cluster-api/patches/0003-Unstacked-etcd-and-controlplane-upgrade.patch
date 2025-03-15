@@ -1,4 +1,4 @@
-From 7820e435e485d2a4646fc0385f214553b3e67d94 Mon Sep 17 00:00:00 2001
+From 6863fe22e489a9898b922e786c6c2452ad7272a7 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
 Subject: [PATCH 03/40] Unstacked etcd and controlplane upgrade
@@ -645,10 +645,10 @@ index 317d6cad5..021cd9ede 100644
 +	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
 +)
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index 959047510..3df9eef46 100644
+index 279e8cdd8..15815d60b 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
-@@ -222,6 +222,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -218,6 +218,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  
  	alwaysReconcile := []clusterReconcileFunc{
  		r.reconcileInfrastructure,
@@ -656,7 +656,7 @@ index 959047510..3df9eef46 100644
  		r.reconcileControlPlane,
  		r.getDescendants,
  	}
-@@ -249,7 +250,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -245,7 +246,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
  		r.reconcileControlPlaneInitialized,
@@ -664,7 +664,7 @@ index 959047510..3df9eef46 100644
  	)
  	return doReconcile(ctx, reconcileNormal, s)
  }
-@@ -468,7 +468,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
+@@ -464,7 +464,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
  		}
  	}
  	if cluster.Spec.ManagedExternalEtcdRef != nil {
@@ -673,7 +673,7 @@ index 959047510..3df9eef46 100644
  		switch {
  		case apierrors.IsNotFound(errors.Cause(err)):
  			// Etcd cluster has been deleted
-@@ -708,7 +708,7 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
+@@ -704,7 +704,7 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
  		toObjectList(c.workerMachines),
  	}
  	if cluster.Spec.ManagedExternalEtcdRef != nil {
@@ -1212,5 +1212,5 @@ index e4990032b..a68d61ae8 100644
  func hasAnnotation(o metav1.Object, annotation string) bool {
  	annotations := o.GetAnnotations()
 -- 
-2.48.1
+2.45.2
 
