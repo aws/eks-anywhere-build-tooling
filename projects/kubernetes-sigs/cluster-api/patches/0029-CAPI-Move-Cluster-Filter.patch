@@ -1,4 +1,4 @@
-From 10bd1f26d411c94b8a8206418a7819ecc828dd62 Mon Sep 17 00:00:00 2001
+From 2481417c4feb2fcacb1e1188852e4104fcc0528e Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 16 May 2023 11:03:09 -0500
 Subject: [PATCH 29/40] CAPI Move Cluster Filter
@@ -15,7 +15,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  7 files changed, 213 insertions(+), 31 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index 79691d209..c563f9555 100644
+index d775dc847..502cfd796 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -51,13 +51,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
@@ -113,7 +113,7 @@ index 79691d209..c563f9555 100644
  	}
  
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index f34b80dd5..9f4e958a8 100644
+index 742b8fa77..efac9776a 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
 @@ -739,7 +739,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
@@ -188,7 +188,7 @@ index f34b80dd5..9f4e958a8 100644
  
  			o := &objectMover{
  				fromProxy: graph.proxy,
-@@ -1921,7 +1921,7 @@ func Test_objectMoverService_ensureNamespaces(t *testing.T) {
+@@ -1909,7 +1909,7 @@ func Test_objectMoverService_ensureNamespaces(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// Trigger discovery the content of the source cluster
@@ -197,7 +197,7 @@ index f34b80dd5..9f4e958a8 100644
  
  			mover := objectMover{
  				fromProxy: graph.proxy,
-@@ -2447,7 +2447,7 @@ func TestWaitReadyForMove(t *testing.T) {
+@@ -2435,7 +2435,7 @@ func TestWaitReadyForMove(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -207,10 +207,10 @@ index f34b80dd5..9f4e958a8 100644
  			backoff := wait.Backoff{
  				Steps: 1,
 diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
-index ce9c85332..8ca86d385 100644
+index 73ec6450d..b001a36ab 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph.go
-@@ -428,8 +428,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
+@@ -417,8 +417,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
  }
  
  // Discovery reads all the Kubernetes objects existing in a namespace (or in all namespaces if empty) for the types received in input, and then adds
@@ -221,19 +221,18 @@ index ce9c85332..8ca86d385 100644
  	log := logf.Log
  	log.Info("Discovering Cluster API objects")
  
-@@ -561,10 +561,46 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
+@@ -480,6 +480,42 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
  	// Completes the graph by setting for each node the list of tenants the node belongs to.
  	o.setTenants()
  
 +	// Filter and remove nodes in the graph that do not belong to cluster
 +	if clusterName != "" {
 +		return o.filterCluster(clusterName)
-+	}	
++	}
 +
- 	// Ensure objects which are referenced across namespaces are not deleted.
- 	return o.setShouldNotDelete(ctx, namespace)
- }
- 
++	return nil
++}
++
 +// filterCluster removes all objects but provided cluster and its dependents and soft-dependents
 +func (o *objectGraph) filterCluster(clusterName string) error {
 +	for _, object := range o.getNodes() {
@@ -262,17 +261,14 @@ index ce9c85332..8ca86d385 100644
 +			}
 +		}
 +	}
-+	return nil
-+}
-+
- // fetchRef collects specified reference and adds to moved objects.
- func (o *objectGraph) fetchRef(ctx context.Context, opts wait.Backoff, ref *corev1.ObjectReference) (*unstructured.Unstructured, error) {
- 	if ref == nil {
+ 	return nil
+ }
+ 
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index 52e9fd933..23e9d2c2a 100644
+index ebc2b1092..ec209f1ee 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
-@@ -1797,7 +1797,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
+@@ -1788,7 +1788,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
@@ -281,7 +277,7 @@ index 52e9fd933..23e9d2c2a 100644
  			if tt.wantErr {
  				g.Expect(err).To(HaveOccurred())
  				return
-@@ -2193,7 +2193,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+@@ -1946,7 +1946,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
@@ -520,5 +516,5 @@ index 9f0d16693..3e82551d4 100644
  	})
  }
 -- 
-2.48.1
+2.45.2
 
