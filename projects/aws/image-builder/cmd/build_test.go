@@ -233,6 +233,26 @@ func TestValidateFirmware(t *testing.T) {
 			wantErr: "",
 		},
 		{
+			testName: "Redhat 8 ova with efi",
+			buildOptions: builder.BuildOptions{
+				Os:         "redhat",
+				OsVersion:  "8",
+				Hypervisor: "vsphere",
+				Firmware:   "efi",
+			},
+			wantErr: "Only RedHat version 9 supports EFI firmware",
+		},
+		{
+			testName: "Redhat 9 ova with efi",
+			buildOptions: builder.BuildOptions{
+				Os:         "redhat",
+				OsVersion:  "9",
+				Hypervisor: "vsphere",
+				Firmware:   "efi",
+			},
+			wantErr: "",
+		},
+		{
 			testName: "Redhat raw with bad firmware",
 			buildOptions: builder.BuildOptions{
 				Os:         "redhat",

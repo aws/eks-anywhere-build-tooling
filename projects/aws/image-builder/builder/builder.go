@@ -152,7 +152,11 @@ func (b *BuildOptions) BuildImage() {
 				buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
 			}
 		case RedHat:
-			buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s", imageBuilderProjectPath, b.OsVersion)
+			if b.Firmware == EFI {
+				buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s-efi", imageBuilderProjectPath, b.OsVersion)
+			} else {
+				buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s", imageBuilderProjectPath, b.OsVersion)
+			}
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.VsphereConfig.RhelUsername),
 				fmt.Sprintf("%s=%s", rhelPasswordEnvVar, b.VsphereConfig.RhelPassword),

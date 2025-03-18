@@ -191,7 +191,7 @@ DEFAULT_REDHAT_VERSION=8
 ALLOWED_BOTTLEROCKET_VERSIONS=1
 DEFAULT_BOTTLEROCKET_VERSION=1
 
-ALLOWED_EFI_OS_FORMATS=ubuntu-ova redhat-raw
+ALLOWED_EFI_OS_FORMATS=ubuntu-ova redhat-raw redhat-ova
 
 # run image os/format validation before running release target(s)
 RELEASE_TARGETS=validate-supported-image-all
@@ -464,7 +464,7 @@ validate-supported-image-%:
 		echo "efi is the only supported custom firmware"; \
 		exit 1; \
 	elif [ -n "$(IMAGE_OS_FIRMWARE)" ] && [[ "$(ALLOWED_EFI_OS_FORMATS)" != *"$(IMAGE_OS)-$(IMAGE_FORMAT)"* ]]; then \
-		echo "EFI is only supported for Ubuntu OVAs and Redhat RAW builds"; \
+		echo "EFI is only supported for Ubuntu/RedHat OVAs and Redhat RAW builds"; \
 		exit 1; \
 	fi
 
