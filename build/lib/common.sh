@@ -160,6 +160,12 @@ function build::gather_licenses() {
   export GOOS=linux 
   export GOARCH=amd64 
   export CGO_ENABLED=$cgo_enabled
+  # Setting this variable to local so that it always uses the local
+  # bundled toolchain regardless of the version specified in go.mod file
+  # It was introduced in this commit from Go1.21 onwards:
+  # https://github.com/golang/go/commit/83dfe5cf62234427eae04131dc6e4551fd283463
+  # Upstream issue:- https://github.com/google/go-licenses/issues/244
+  export GOTOOLCHAIN=local
 
   build::common::use_go_version "$golang_version"
 
@@ -181,9 +187,9 @@ function build::gather_licenses() {
   # the following messages are safe to ignore since we do not need the license url for our process
   NOISY_MESSAGES="cannot determine URL for|Error discovering license URL|unsupported package host|contains non-Go code|has empty version|\.(h|s|c)$"
  
-  build::common::echo_and_run go-licenses save --confidence_threshold $threshold --force $patterns --save_path "${outputdir}/LICENSES" 2> >(grep -vE "$NOISY_MESSAGES") --ignore=$(go list std | awk 'NR > 1 { printf(",") } { printf("%s",$0) } END { print "" }')
+  build::common::echo_and_run go-licenses save --confidence_threshold $threshold --force $patterns --save_path "${outputdir}/LICENSES" 2> >(grep -vE "$NOISY_MESSAGES")
   
-  build::common::echo_and_run go-licenses csv --confidence_threshold $threshold $patterns 2> >(grep -vE "$NOISY_MESSAGES") --ignore=$(go list std | awk 'NR > 1 { printf(",") } { printf("%s",$0) } END { print "" }') > "${outputdir}/attribution/go-license.csv"
+  build::common::echo_and_run go-licenses csv --confidence_threshold $threshold $patterns 2> >(grep -vE "$NOISY_MESSAGES") > "${outputdir}/attribution/go-license.csv"  
 
   if cat "${outputdir}/attribution/go-license.csv" | grep -q "^vendor\/golang.org\/x"; then
       echo " go-licenses created a file with a std golang package (golang.org/x/*)"
