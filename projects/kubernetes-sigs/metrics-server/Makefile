@@ -1,10 +1,11 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-EKS_ADDON_TAG=$(shell cat GIT_TAG)
-GIT_TAG=$(EKS_ADDON_TAG)
+EKS_ADDON_IMAGE_TAG=$(shell cat EKS_ADDON_IMAGE_TAG)
+GIT_TAG=$(EKS_ADDON_IMAGE_TAG)
 HELM_GIT_TAG=$(shell cat HELM_GIT_TAG)
+
  # Upstream images are used directly without re-building and re-tagging in build
  # tooling, so the IMAGE_TAG needs to be overwritten to match upstream ECR tags.
-IMAGE_TAG=$(EKS_ADDON_TAG)
+IMAGE_TAG=$(EKS_ADDON_IMAGE_TAG)
 
 REPO_OWNER=kubernetes-sigs
 REPO=metrics-server
@@ -37,7 +38,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 # To avoid issues cloning/checking out the repo, git_tag is set to
 # a valid branch/tag
-$(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_ADDON_TAG)))
+$(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_ADDON_IMAGE_TAG)))
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
