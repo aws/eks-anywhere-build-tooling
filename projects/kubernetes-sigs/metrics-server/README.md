@@ -17,4 +17,4 @@ Review [helm chart releases](https://github.com/kubernetes-sigs/metrics-server/r
     --query 'addons[0].addonVersions[0].addonVersion' \
     --output text
     ```
-2. For updating HELM_GIT_TAG, monitor [upstream releases](https://github.com/kubernetes-sigs/metrics-server/releases) and changelogs and when to bump the tag. Reach out to @jonathanmeier5 if you have any questions.
+2. For updating HELM_GIT_TAG, monitor [upstream releases](https://github.com/kubernetes-sigs/metrics-server/releases) and changelogs and when to bump the tag.
