@@ -18,6 +18,7 @@ Supported OSes
 * Red Hat Enterprise Linux
 
 Supported Release Channels
+* 1-32
 * 1-31
 * 1-30
 * 1-29
@@ -108,6 +109,7 @@ sudo snap install yq
   "resource_pool":"<resource pool used for image building vm>",
   "username":"<vcenter username>",
   "vcenter_server":"<vcenter fqdn>",
+  "vmx_version":"<hardware version of virtual machine>"
 }
 ```
 4. Run the image builder tool for appropriate release channel
