@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -118,6 +119,15 @@ func (b *BuildOptions) BuildImage() {
 	}
 	var outputImageGlobPattern string
 	if b.Hypervisor == VSphere {
+		if b.VsphereConfig.VmxVersion != "" {
+			vmxVersion, err := strconv.Atoi(b.VsphereConfig.VmxVersion)
+			if err != nil {
+				log.Fatalf("Error parsing vmx_version in vsphere config: %v", err)
+			}
+			if vmxVersion < minVmVersion {
+				log.Fatalf("vmx_version cannot be less than %d, have %d in vsphere config", minVmVersion, vmxVersion)
+			}
+		}
 		if b.AirGapped {
 			airGapEnvVars, err := getAirGapCmdEnvVars(b.VsphereConfig.ImageBuilderRepoUrl, detectedEksaVersion, b.ReleaseChannel)
 			if err != nil {

@@ -74,6 +74,7 @@ type VsphereConfig struct {
 	VcenterServer      string `json:"vcenter_server"`
 	Username           string `json:"username"`
 	Password           string `json:"password"`
+	VmxVersion         string `json:"vmx_version,omitempty"`
 	IsoConfig
 	RhelConfig
 	ProxyConfig
