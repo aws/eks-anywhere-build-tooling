@@ -1,5 +1,5 @@
 ## **AWS Distro for OpenTelemetry Collector**
-![Version](https://img.shields.io/badge/version-v0.42.0-blue)
+![Version](https://img.shields.io/badge/version-v0.43.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiMkdVcDNnUnZnd3NUNE4xeEtERUdyNnpRclN6aXdsbWZhaXdtL1dJYkVRNlJlWVZlMUlGSFlKbHVxTXZIMWgzTUdNWW1kU3FiSHI3ZFY0eDIrcXFNQnNZPSIsIml2UGFyYW1ldGVyU3BlYyI6IlFzaGhYckdMcVI3eTlYTksiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 AWS Distro for OpenTelemetry Collector ([ADOT Collector](https://github.com/aws-observability/aws-otel-collector)) is an AWS supported version of the upstream OpenTelemetry Collector and is distributed by Amazon. It supports the selected components from the OpenTelemetry community.
