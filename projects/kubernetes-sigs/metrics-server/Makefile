@@ -1,12 +1,11 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-EKS_D_TAG=$(shell source $(BUILD_LIB)/common.sh && build::eksd_releases::get_eksd_component_asset_image_tag metrics-server metrics-server-image $(RELEASE_BRANCH))
-GIT_TAG=$(EKS_D_TAG)
-HELM_GIT_TAG=$(shell cat $(RELEASE_BRANCH)/HELM_GIT_TAG)
+EKS_ADDON_IMAGE_TAG=$(shell cat EKS_ADDON_IMAGE_TAG)
+GIT_TAG=$(EKS_ADDON_IMAGE_TAG)
+HELM_GIT_TAG=$(shell cat HELM_GIT_TAG)
+
  # Upstream images are used directly without re-building and re-tagging in build
  # tooling, so the IMAGE_TAG needs to be overwritten to match upstream ECR tags.
-IMAGE_TAG=$(EKS_D_TAG)
-
-HAS_RELEASE_BRANCHES=true
+IMAGE_TAG=$(EKS_ADDON_IMAGE_TAG)
 
 REPO_OWNER=kubernetes-sigs
 REPO=metrics-server
@@ -23,11 +22,11 @@ SKIP_ON_RELEASE_BRANCH=true
 
 HAS_HELM_CHART=true
 
-HELM_SOURCE_IMAGE_REPO=public.ecr.aws
+HELM_SOURCE_IMAGE_REPO=602401143452.dkr.ecr.us-west-2.amazonaws.com
 HELM_SOURCE_OWNER=kubernetes-sigs
 HELM_SOURCE_REPOSITORY=metrics-server
 HELM_DIRECTORY=charts/metrics-server
-HELM_IMAGE_LIST=$(if $(filter true,$(shell yq e ".releases[] | select(.branch==\"${RELEASE_BRANCH}\").dev" $(BASE_DIRECTORY)/EKSD_LATEST_RELEASES)),h1r8a7l5,eks-distro)/kubernetes-sigs/metrics-server
+HELM_IMAGE_LIST=eks/metrics-server
 HELM_USE_UPSTREAM_IMAGE=true
 
 HELM_CHART_NAMES=metrics-server/charts/metrics-server
@@ -39,7 +38,7 @@ include $(BASE_DIRECTORY)/Common.mk
 
 # To avoid issues cloning/checking out the repo, git_tag is set to
 # a valid branch/tag
-$(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_D_TAG)))
+$(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_ADDON_IMAGE_TAG)))
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
