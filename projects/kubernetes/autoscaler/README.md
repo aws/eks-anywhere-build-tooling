@@ -5,7 +5,7 @@
 ![1.29 Version](https://img.shields.io/badge/1--29%20version-cluster--autoscaler--1.29.5-blue)
 ![1.30 Version](https://img.shields.io/badge/1--30%20version-cluster--autoscaler--1.30.3-blue)
 ![1.31 Version](https://img.shields.io/badge/1--31%20version-cluster--autoscaler--1.31.1-blue)
-![1.32 Version](https://img.shields.io/badge/1--32%20version-cluster--autoscaler--1.32.0-blue)
+![1.32 Version](https://img.shields.io/badge/1--32%20version-cluster--autoscaler--1.32.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiL0tWckptdkxsZEd1cXNiNTBncjRNVU5oekpZRlBkTDNBcFVvZkFOVHZwbTBKUm91QkR6RVN4QlhJWk42cXF3L29FMmdnTXUrVndiay8zVUQ0YjJsc21vPSIsIml2UGFyYW1ldGVyU3BlYyI6Ik1Gd2UwbmRXVWxSRTMvUHQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Autoscaler](https://github.com/kubernetes/autoscaler) defines the cluster autoscaler.
@@ -41,8 +41,12 @@ builder_all.go
 builder_clusterapi.go
 cloud_provider_builder.go
 ```
-
+```
+git add builder_all.go
+```
 commit and generate a patch using `git format-patch -1 HEAD`.
+
+Move the patch file to folder `1-xx/patches/`
 
 To update go mod dependencies and create a patch, follow these steps:
 
@@ -51,6 +55,8 @@ To update go mod dependencies and create a patch, follow these steps:
  RELEASE_BRANCH=1-XX make update-go-mod-and-create-patch
 ```
 Replace `1-XX` with the actual release branch number (e.g., `1-28`).
+
+P.S. if the patch file `xxxx-Update-go.mod-Dependencies.patch` appears in the `1-xx/patches` folder beforehand, delete this patch file first before running the command `RELEASE_BRANCH=1-XX make update-go-mod-and-create-patch` since this command will generate a new patch `xxxx-Update-go.mod-Dependencies.patch`
 
 This command performs the following actions:
 - Invokes REMOVE_CLOUD_PROVIDER target
