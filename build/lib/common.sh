@@ -423,6 +423,14 @@ function build::common::wait_for_tag() {
     git fetch --tags > /dev/null 2>&1
     echo "Tag ${tag} does not exist!"
     echo "Waiting for tag ${tag}..."
+
+    # also check for branch if tag not found
+    echo "Checking for branch ${tag}..."
+    git rev-parse --verify --quiet "origin/${tag}" && echo "Branch ${tag} exists!" && break
+    git fetch --all > /dev/null 2>&1
+    echo "Branch ${tag} does not exist!"
+    echo "Waiting for branch ${tag}..."
+    
     sleep $sleep_interval
     if [ "$i" = "60" ]; then
       exit 1

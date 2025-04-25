@@ -604,6 +604,7 @@ $(GIT_CHECKOUT_TARGET): | $(REPO)
 	@rm -f $(REPO)/eks-anywhere-*
 	(cd $(REPO) && $(BASE_DIRECTORY)/build/lib/wait_for_tag.sh $(GIT_TAG))
 	git -C $(REPO) checkout --quiet -f $(GIT_TAG)
+	@mkdir -p $(dir $@)
 	@touch $@
 	@echo -e $(call TARGET_END_LOG)
 
