@@ -38,7 +38,14 @@ function build::simple::tarball() {
   for platform in "${SUPPORTED_PLATFORMS[@]}"; do
     OS="$(cut -d '/' -f1 <<< ${platform})"
     ARCH="$(cut -d '/' -f2 <<< ${platform})"
-    TAR_FILE="${TAR_FILE_PREFIX}-${OS}-${ARCH}-${TAG}.tar.gz"
+
+    # Check if TAG contains '/' and create directory if needed
+    if [[ "$TAG" == *"/"* ]]; then
+        mkdir -p "${TAR_PATH}/${TAR_FILE_PREFIX}-${OS}-${ARCH}-${TAG%/*}"
+        TAR_FILE="${TAR_FILE_PREFIX}-${OS}-${ARCH}-${TAG}.tar.gz"
+    else
+        TAR_FILE="${TAR_FILE_PREFIX}-${OS}-${ARCH}-${TAG}.tar.gz"
+    fi
 
     for path in "${LICENSE_PATHS[@]}"; do
       build::common::echo_and_run build::common::copy_if_source_destination_different $path ${OUTPUT_BIN_DIR}/${OS}-${ARCH}/
