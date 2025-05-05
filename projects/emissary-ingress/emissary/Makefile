@@ -57,7 +57,7 @@ $(AMBASSADOR_VERSION_TARGET): export VERSION=v3.6.0
 $(AMBASSADOR_VERSION_TARGET): export CHART_VERSION:=$(CHART_VERSION)
 $(AMBASSADOR_VERSION_TARGET): export GOPATH=/var
 $(AMBASSADOR_VERSION_TARGET): | $$(ENABLE_DOCKER)
-	@$(MAKE) -C $(REPO) python/ambassador.version
+	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) && $(MAKE) -C $(REPO) python/ambassador.version
 
 
 ########### DO NOT EDIT #############################
