@@ -7,7 +7,7 @@ FROM public.ecr.aws/appmesh/aws-appmesh-envoy:$APPMESH_VERSION as envoy
 FROM $BUILDER_IMAGE as yum-installer
 
 RUN install_rpm libcap htop && \
-    install_binary /usr/bin/chgrp /usr/bin/chmod && \
+    install_binary /usr/bin/curl /usr/bin/chgrp /usr/bin/chmod && \
     cleanup "yum-installer"
 
 
