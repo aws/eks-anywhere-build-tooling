@@ -446,10 +446,9 @@ var (
 
 	ProjectMaximumSemvers = map[string]string{
 		"containerd/containerd": "v1",
-		"kubernetes-sigs/cluster-api": "v1.9.4",
 		"opencontainers/runc":   "v1.1",
 		"prometheus/prometheus": "v2",
-		"helm/helm": "v3.16.4",
+		"helm/helm":             "v3.16.4",
 	}
 
 	ECRImageRepositories = map[string]string{
