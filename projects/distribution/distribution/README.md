@@ -1,5 +1,5 @@
 ## **distribution**
-![Version](https://img.shields.io/badge/version-v3.0.0-blue)
+![Version](https://img.shields.io/badge/version-v2.8.3-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoieGduSTVGQXp1STQ1b2VjY0tiZnJOVStJa1pja2pjbDJYQTdMS2V5R0lyWFJ0R1lya1lYREhuYy9xRE5sMlc2SmZVWXlNRGRJdGhwZXl5V0cwMXB2ck5nPSIsIml2UGFyYW1ldGVyU3BlYyI6IlQwNHZleTBzMzZQMjZ1VCsiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 This [distribution project](https://github.com/distribution/distribution)'s main product is the Open Source Registry implementation for storing and distributing container images using the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec). The goal of this project is to provide a simple, secure, and scalable base for building a large scale registry solution or running a simple private registry. It is a core library for many registry operators including Docker Hub, GitHub Container Registry, GitLab Container Registry and DigitalOcean Container Registry, as well as the CNCF Harbor Project, and VMware Harbor Registry.
