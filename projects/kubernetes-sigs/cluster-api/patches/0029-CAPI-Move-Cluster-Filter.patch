@@ -1,21 +1,21 @@
-From 2481417c4feb2fcacb1e1188852e4104fcc0528e Mon Sep 17 00:00:00 2001
+From 999308de89aa53bb200081907fc0c849572766e5 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 16 May 2023 11:03:09 -0500
-Subject: [PATCH 29/40] CAPI Move Cluster Filter
+Subject: [PATCH] CAPI Move Cluster Filter
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
  cmd/clusterctl/client/cluster/mover.go        |  31 +++--
  cmd/clusterctl/client/cluster/mover_test.go   |  20 +--
- cmd/clusterctl/client/cluster/objectgraph.go  |  40 +++++-
+ cmd/clusterctl/client/cluster/objectgraph.go  |  48 ++++++-
  .../client/cluster/objectgraph_test.go        | 131 +++++++++++++++++-
  cmd/clusterctl/client/move.go                 |  10 +-
  cmd/clusterctl/client/move_test.go            |   8 +-
  cmd/clusterctl/cmd/move.go                    |   4 +
- 7 files changed, 213 insertions(+), 31 deletions(-)
+ 7 files changed, 218 insertions(+), 34 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index d775dc847..502cfd796 100644
+index 79691d209..c563f9555 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -51,13 +51,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
@@ -113,7 +113,7 @@ index d775dc847..502cfd796 100644
  	}
  
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index 742b8fa77..efac9776a 100644
+index f34b80dd5..9f4e958a8 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
 @@ -739,7 +739,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
@@ -188,7 +188,7 @@ index 742b8fa77..efac9776a 100644
  
  			o := &objectMover{
  				fromProxy: graph.proxy,
-@@ -1909,7 +1909,7 @@ func Test_objectMoverService_ensureNamespaces(t *testing.T) {
+@@ -1921,7 +1921,7 @@ func Test_objectMoverService_ensureNamespaces(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// Trigger discovery the content of the source cluster
@@ -197,7 +197,7 @@ index 742b8fa77..efac9776a 100644
  
  			mover := objectMover{
  				fromProxy: graph.proxy,
-@@ -2435,7 +2435,7 @@ func TestWaitReadyForMove(t *testing.T) {
+@@ -2447,7 +2447,7 @@ func TestWaitReadyForMove(t *testing.T) {
  			g.Expect(graph.getDiscoveryTypes(ctx)).To(Succeed())
  
  			// trigger discovery the content of the source cluster
@@ -207,10 +207,25 @@ index 742b8fa77..efac9776a 100644
  			backoff := wait.Backoff{
  				Steps: 1,
 diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
-index 73ec6450d..b001a36ab 100644
+index ce9c85332..c9275ebd7 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph.go
-@@ -417,8 +417,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
+@@ -43,9 +43,11 @@ import (
+ 	secretutil "sigs.k8s.io/cluster-api/util/secret"
+ )
+ 
+-const clusterTopologyNameKey = "cluster.spec.topology.class"
+-const clusterTopologyNamespaceKey = "cluster.spec.topology.classNamespace"
+-const clusterResourceSetBindingClusterNameKey = "clusterresourcesetbinding.spec.clustername"
++const (
++	clusterTopologyNameKey                  = "cluster.spec.topology.class"
++	clusterTopologyNamespaceKey             = "cluster.spec.topology.classNamespace"
++	clusterResourceSetBindingClusterNameKey = "clusterresourcesetbinding.spec.clustername"
++)
+ 
+ type empty struct{}
+ 
+@@ -428,8 +430,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
  }
  
  // Discovery reads all the Kubernetes objects existing in a namespace (or in all namespaces if empty) for the types received in input, and then adds
@@ -221,7 +236,7 @@ index 73ec6450d..b001a36ab 100644
  	log := logf.Log
  	log.Info("Discovering Cluster API objects")
  
-@@ -480,6 +480,42 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
+@@ -561,10 +563,46 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
  	// Completes the graph by setting for each node the list of tenants the node belongs to.
  	o.setTenants()
  
@@ -230,16 +245,17 @@ index 73ec6450d..b001a36ab 100644
 +		return o.filterCluster(clusterName)
 +	}
 +
-+	return nil
-+}
-+
+ 	// Ensure objects which are referenced across namespaces are not deleted.
+ 	return o.setShouldNotDelete(ctx, namespace)
+ }
+ 
 +// filterCluster removes all objects but provided cluster and its dependents and soft-dependents
 +func (o *objectGraph) filterCluster(clusterName string) error {
 +	for _, object := range o.getNodes() {
 +
 +		hasFilterCluster := false
 +		var clusterTenants []string
-+		for tenant, _ := range object.tenant {
++		for tenant := range object.tenant {
 +			if tenant.identity.GroupVersionKind().GroupKind() == clusterv1.GroupVersion.WithKind("Cluster").GroupKind() {
 +				clusterTenants = append(clusterTenants, tenant.identity.Name)
 +				if tenant.identity.Name == clusterName {
@@ -261,14 +277,17 @@ index 73ec6450d..b001a36ab 100644
 +			}
 +		}
 +	}
- 	return nil
- }
- 
++	return nil
++}
++
+ // fetchRef collects specified reference and adds to moved objects.
+ func (o *objectGraph) fetchRef(ctx context.Context, opts wait.Backoff, ref *corev1.ObjectReference) (*unstructured.Unstructured, error) {
+ 	if ref == nil {
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index ebc2b1092..ec209f1ee 100644
+index 52e9fd933..23e9d2c2a 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
-@@ -1788,7 +1788,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
+@@ -1797,7 +1797,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
@@ -277,7 +296,7 @@ index ebc2b1092..ec209f1ee 100644
  			if tt.wantErr {
  				g.Expect(err).To(HaveOccurred())
  				return
-@@ -1946,7 +1946,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+@@ -2193,7 +2193,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
