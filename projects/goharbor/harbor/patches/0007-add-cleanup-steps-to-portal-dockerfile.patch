@@ -1,0 +1,39 @@
+From f65412e671bf411256bb922b962c6c1574ac6764 Mon Sep 17 00:00:00 2001
+From: Amazon Q <amazonq@amazonaws.com>
+Date: Thu, 8 May 2025 11:32:30 -0700
+Subject: [PATCH] add cleanup steps to portal dockerfile
+
+---
+ docker/linux/harbor-portal/Dockerfile | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/docker/linux/harbor-portal/Dockerfile b/docker/linux/harbor-portal/Dockerfile
+index 1234567..abcdef0 100644
+--- a/docker/linux/harbor-portal/Dockerfile
++++ b/docker/linux/harbor-portal/Dockerfile
+@@ -10,13 +10,21 @@ COPY _output/harbor-portal/ /
+ ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org
+ 
+ RUN apt-get update \
+-    && apt-get install -y --no-install-recommends python-yaml \
++    && apt-get install -y --no-install-recommends python-yaml \
++    # Clean apt cache to free up space
++    && apt-get clean \
++    && rm -rf /var/lib/apt/lists/* \
+     && npm install --unsafe-perm \\ 
+     && npm run generate-build-timestamp \\\
+     && npm --prefix /build_dir/app-swagger-ui install --unsafe-perm \\\
+     && npm --prefix /build_dir/app-swagger-ui run build \\\
++    # Clean npm cache to free up space
++    && npm cache clean --force \
+     && node --max_old_space_size=2048 'node_modules/@angular/cli/bin/ng' build --configuration production \\\
+-    && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json \\\
++    # Remove node_modules after build to free up space
++    && rm -rf node_modules \
++    && rm -rf /build_dir/app-swagger-ui/node_modules \
++    && python -c 'import sys, yaml, json; y=yaml.load(sys.stdin.read()); print json.dumps(y)' < swagger.yaml > dist/swagger.json \\\
+     && cp swagger.yaml dist \\\
+     && mkdir -p /newroot/var/log/nginx /newroot/usr/share/nginx/html \\\
+     && chmod 755 /newroot/var/log/nginx \\\
+-- 
+2.48.1
