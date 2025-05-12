@@ -1,11 +1,11 @@
-From eabaef2403f167cc8adce13e75f35a4b740876fa Mon Sep 17 00:00:00 2001
+From 44ac0f3ebc6a320feb08f81e0f5ade56516bb5c1 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
-Date: Fri, 24 May 2024 22:55:47 +0000
-Subject: [PATCH] Remove Cloud Provider Builders Except Cluster-API
+Date: Sun, 20 Apr 2025 20:16:04 -0700
+Subject: [PATCH] Remove-Cloud-Provider-Builders-Except-CAPI
 
 ---
  .../cloudprovider/builder/builder_alicloud.go |  44 -------
- .../cloudprovider/builder/builder_all.go      | 115 +-----------------
+ .../cloudprovider/builder/builder_all.go      | 114 +-----------------
  .../cloudprovider/builder/builder_aws.go      |  44 -------
  .../cloudprovider/builder/builder_azure.go    |  44 -------
  .../builder/builder_baiducloud.go             |  44 -------
@@ -15,6 +15,7 @@ Subject: [PATCH] Remove Cloud Provider Builders Except Cluster-API
  .../cloudprovider/builder/builder_civo.go     |  44 -------
  .../builder/builder_cloudstack.go             |  44 -------
  .../builder/builder_digitalocean.go           |  44 -------
+ .../builder/builder_equinixmetal.go           |  45 -------
  .../cloudprovider/builder/builder_exoscale.go |  44 -------
  .../builder/builder_externalgrpc.go           |  44 -------
  .../cloudprovider/builder/builder_gce.go      |  44 -------
@@ -27,14 +28,13 @@ Subject: [PATCH] Remove Cloud Provider Builders Except Cluster-API
  .../cloudprovider/builder/builder_linode.go   |  44 -------
  .../cloudprovider/builder/builder_magnum.go   |  44 -------
  .../cloudprovider/builder/builder_oci.go      |  44 -------
- .../cloudprovider/builder/builder_ovhcloud.go |  43 -------
- .../cloudprovider/builder/builder_packet.go   |  45 -------
+ .../cloudprovider/builder/builder_ovhcloud.go |  44 -------
  .../cloudprovider/builder/builder_rancher.go  |  44 -------
  .../cloudprovider/builder/builder_scaleway.go |  44 -------
  .../builder/builder_tencentcloud.go           |  44 -------
  .../builder/builder_volcengine.go             |  44 -------
- .../cloudprovider/builder/builder_vultr.go    |  43 -------
- 30 files changed, 2 insertions(+), 1389 deletions(-)
+ .../cloudprovider/builder/builder_vultr.go    |  44 -------
+ 30 files changed, 1 insertion(+), 1391 deletions(-)
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_alicloud.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_aws.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_azure.go
@@ -45,6 +45,7 @@ Subject: [PATCH] Remove Cloud Provider Builders Except Cluster-API
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_civo.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_cloudstack.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_digitalocean.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_equinixmetal.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_exoscale.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_externalgrpc.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_gce.go
@@ -58,7 +59,6 @@ Subject: [PATCH] Remove Cloud Provider Builders Except Cluster-API
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_magnum.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_oci.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_ovhcloud.go
- delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_packet.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_rancher.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_scaleway.go
  delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_tencentcloud.go
@@ -116,10 +116,10 @@ index 566cfeb92..000000000
 -	return nil
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_all.go b/cluster-autoscaler/cloudprovider/builder/builder_all.go
-index 83db9b2f2..a1692d4d1 100644
+index 91252196a..c19dcc8b0 100644
 --- a/cluster-autoscaler/cloudprovider/builder/builder_all.go
 +++ b/cluster-autoscaler/cloudprovider/builder/builder_all.go
-@@ -21,70 +21,14 @@ package builder
+@@ -21,138 +21,26 @@ package builder
  
  import (
  	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
@@ -190,13 +190,13 @@ index 83db9b2f2..a1692d4d1 100644
  }
  
  // DefaultCloudProvider is GCE.
-@@ -93,66 +37,11 @@ const DefaultCloudProvider = cloudprovider.GceProviderName
+-const DefaultCloudProvider = cloudprovider.GceProviderName
++const DefaultCloudProvider = cloudprovider.ClusterAPIProviderName
+ 
  func buildCloudProvider(opts config.AutoscalingOptions,
  	do cloudprovider.NodeGroupDiscoveryOptions,
  	rl *cloudprovider.ResourceLimiter,
--	informerFactory informers.SharedInformerFactory) cloudprovider.CloudProvider {
-+	informerFactory informers.SharedInformerFactory,
-+) cloudprovider.CloudProvider {
+ 	informerFactory informers.SharedInformerFactory) cloudprovider.CloudProvider {
  	switch opts.CloudProviderName {
 -	case cloudprovider.BizflyCloudProviderName:
 -		return bizflycloud.BuildBizflyCloud(opts, do, rl)
@@ -411,7 +411,7 @@ index 05e466948..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_bizflycloud.go b/cluster-autoscaler/cloudprovider/builder/builder_bizflycloud.go
 deleted file mode 100644
-index 35797f766..000000000
+index b8388ba7e..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_bizflycloud.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -448,7 +448,7 @@ index 35797f766..000000000
 -	cloudprovider.BizflyCloudProviderName,
 -}
 -
--// DefaultCloudProvider build is Bizflycloud..
+-// DefaultCloudProvider for Bizflycloud-only build is Bizflycloud.
 -const DefaultCloudProvider = cloudprovider.BizflyCloudProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -461,7 +461,7 @@ index 35797f766..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_brightbox.go b/cluster-autoscaler/cloudprovider/builder/builder_brightbox.go
 deleted file mode 100644
-index ba1936d9f..000000000
+index 4b321a252..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_brightbox.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -498,7 +498,7 @@ index ba1936d9f..000000000
 -	cloudprovider.BrightboxProviderName,
 -}
 -
--// DefaultCloudProvider is Brightbox
+-// DefaultCloudProvider for Brightbox-only build is Brightbox.
 -const DefaultCloudProvider = cloudprovider.BrightboxProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -511,7 +511,7 @@ index ba1936d9f..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_cherry.go b/cluster-autoscaler/cloudprovider/builder/builder_cherry.go
 deleted file mode 100644
-index 7b5de93f3..000000000
+index 455be264c..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_cherry.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -548,7 +548,7 @@ index 7b5de93f3..000000000
 -	cherry.ProviderName,
 -}
 -
--// DefaultCloudProvider for Cherry-only build is Cherry
+-// DefaultCloudProvider for Cherry-only build is Cherry.
 -const DefaultCloudProvider = cherry.ProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -561,7 +561,7 @@ index 7b5de93f3..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_civo.go b/cluster-autoscaler/cloudprovider/builder/builder_civo.go
 deleted file mode 100644
-index e51e86f63..000000000
+index f63ddb994..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_civo.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -598,7 +598,7 @@ index e51e86f63..000000000
 -	cloudprovider.CivoProviderName,
 -}
 -
--// DefaultCloudProvider for civo-only build is Civo.
+-// DefaultCloudProvider for Civo-only build is Civo.
 -const DefaultCloudProvider = cloudprovider.CivoProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -611,7 +611,7 @@ index e51e86f63..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_cloudstack.go b/cluster-autoscaler/cloudprovider/builder/builder_cloudstack.go
 deleted file mode 100644
-index 5151b9954..000000000
+index eb32c4c83..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_cloudstack.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -651,7 +651,7 @@ index 5151b9954..000000000
 -// DefaultCloudProvider for cloudstack-only build is cloudstack.
 -const DefaultCloudProvider = cloudprovider.CloudStackProviderName
 -
--func BuildCloudStack(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
 -	switch opts.CloudProviderName {
 -	case cloudprovider.CloudStackProviderName:
 -		return cloudstack.BuildCloudStack(opts, do, rl)
@@ -661,7 +661,7 @@ index 5151b9954..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_digitalocean.go b/cluster-autoscaler/cloudprovider/builder/builder_digitalocean.go
 deleted file mode 100644
-index 469887803..000000000
+index c7d9ba5a6..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_digitalocean.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -693,12 +693,12 @@ index 469887803..000000000
 -	"k8s.io/client-go/informers"
 -)
 -
--// AvailableCloudProviders supported by the digtalocean cloud provider builder.
+-// AvailableCloudProviders supported by the DigitalOcean cloud provider builder.
 -var AvailableCloudProviders = []string{
 -	cloudprovider.DigitalOceanProviderName,
 -}
 -
--// DefaultCloudProvider for do-only build is DigitalOcean.
+-// DefaultCloudProvider for DigitalOcean-only build is DigitalOcean.
 -const DefaultCloudProvider = cloudprovider.DigitalOceanProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -709,9 +709,60 @@ index 469887803..000000000
 -
 -	return nil
 -}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_equinixmetal.go b/cluster-autoscaler/cloudprovider/builder/builder_equinixmetal.go
+deleted file mode 100644
+index e0c9b633e..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_equinixmetal.go
++++ /dev/null
+@@ -1,45 +0,0 @@
+-//go:build equinixmetal
+-// +build equinixmetal
+-
+-/*
+-Copyright 2019 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/equinixmetal"
+-	"k8s.io/autoscaler/cluster-autoscaler/config"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.PacketProviderName,
+-	cloudprovider.EquinixMetalProviderName,
+-}
+-
+-// DefaultCloudProvider for Packet or Equinix Metal-only build is Equinix Metal.
+-const DefaultCloudProvider = cloudprovider.EquinixMetalProviderName
+-
+-func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.PacketProviderName, cloudprovider.EquinixMetalProviderName:
+-		return equinixmetal.BuildCloudProvider(opts, do, rl)
+-	}
+-
+-	return nil
+-}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_exoscale.go b/cluster-autoscaler/cloudprovider/builder/builder_exoscale.go
 deleted file mode 100644
-index f6b078f8f..000000000
+index f2b220906..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_exoscale.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -748,7 +799,7 @@ index f6b078f8f..000000000
 -	cloudprovider.ExoscaleProviderName,
 -}
 -
--// DefaultCloudProvider is Exoscale.
+-// DefaultCloudProvider for Exoscale-only build is Exoscale.
 -const DefaultCloudProvider = cloudprovider.ExoscaleProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -811,7 +862,7 @@ index 4e5dfdd23..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_gce.go b/cluster-autoscaler/cloudprovider/builder/builder_gce.go
 deleted file mode 100644
-index 504eb3e8c..000000000
+index fc9dea05d..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_gce.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -848,7 +899,7 @@ index 504eb3e8c..000000000
 -	cloudprovider.GceProviderName,
 -}
 -
--// DefaultCloudProvider is GCE.
+-// DefaultCloudProvider for GCE-only build is GCE.
 -const DefaultCloudProvider = cloudprovider.GceProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -861,7 +912,7 @@ index 504eb3e8c..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_hetzner.go b/cluster-autoscaler/cloudprovider/builder/builder_hetzner.go
 deleted file mode 100644
-index 28c5931cf..000000000
+index 9ffdd85ae..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_hetzner.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -898,7 +949,7 @@ index 28c5931cf..000000000
 -	cloudprovider.HetznerProviderName,
 -}
 -
--// DefaultCloudProvider is Hetzner.
+-// DefaultCloudProvider for Hetzner-only build is Hetzner.
 -const DefaultCloudProvider = cloudprovider.HetznerProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -961,7 +1012,7 @@ index c7a5007e5..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_ionoscloud.go b/cluster-autoscaler/cloudprovider/builder/builder_ionoscloud.go
 deleted file mode 100644
-index a75817d20..000000000
+index 4fc73d53f..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_ionoscloud.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -998,7 +1049,7 @@ index a75817d20..000000000
 -	cloudprovider.IonoscloudProviderName,
 -}
 -
--// DefaultCloudProvider for IonosCloud-only build is ionoscloud.
+-// DefaultCloudProvider for IonosCloud-only build is IonosCloud.
 -const DefaultCloudProvider = cloudprovider.IonoscloudProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -1011,7 +1062,7 @@ index a75817d20..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_kamatera.go b/cluster-autoscaler/cloudprovider/builder/builder_kamatera.go
 deleted file mode 100644
-index ca0f2ae92..000000000
+index 34e85c417..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_kamatera.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -1048,7 +1099,7 @@ index ca0f2ae92..000000000
 -	cloudprovider.KamateraProviderName,
 -}
 -
--// DefaultCloudProvider is Kamatera.
+-// DefaultCloudProvider for Kamatera-only build is Kamatera.
 -const DefaultCloudProvider = cloudprovider.KamateraProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -1212,7 +1263,7 @@ index b8af94e1f..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_magnum.go b/cluster-autoscaler/cloudprovider/builder/builder_magnum.go
 deleted file mode 100644
-index a79aaa19b..000000000
+index ea14fd980..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_magnum.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -1249,7 +1300,7 @@ index a79aaa19b..000000000
 -	cloudprovider.MagnumProviderName,
 -}
 -
--// DefaultCloudProvider for OpenStack-only build is OpenStack.
+-// DefaultCloudProvider for Magnum-only build is Magnum.
 -const DefaultCloudProvider = cloudprovider.MagnumProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -1312,10 +1363,10 @@ index fb33f5571..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_ovhcloud.go b/cluster-autoscaler/cloudprovider/builder/builder_ovhcloud.go
 deleted file mode 100644
-index 8198a3288..000000000
+index 6e081209b..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_ovhcloud.go
 +++ /dev/null
-@@ -1,43 +0,0 @@
+@@ -1,44 +0,0 @@
 -//go:build ovhcloud
 -// +build ovhcloud
 -
@@ -1339,6 +1390,7 @@ index 8198a3288..000000000
 -
 -import (
 -	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ovhcloud"
 -	"k8s.io/autoscaler/cluster-autoscaler/config"
 -	"k8s.io/client-go/informers"
 -)
@@ -1348,64 +1400,13 @@ index 8198a3288..000000000
 -	cloudprovider.OVHcloudProviderName,
 -}
 -
--// DefaultCloudProvider is OVHcloud.
+-// DefaultCloudProvider for OVHcloud-only build is OVHcloud.
 -const DefaultCloudProvider = cloudprovider.OVHcloudProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
 -	switch opts.CloudProviderName {
 -	case cloudprovider.OVHcloudProviderName:
 -		return ovhcloud.BuildOVHcloud(opts, do, rl)
--	}
--
--	return nil
--}
-diff --git a/cluster-autoscaler/cloudprovider/builder/builder_packet.go b/cluster-autoscaler/cloudprovider/builder/builder_packet.go
-deleted file mode 100644
-index 5fc36299e..000000000
---- a/cluster-autoscaler/cloudprovider/builder/builder_packet.go
-+++ /dev/null
-@@ -1,45 +0,0 @@
--//go:build equinixmetal
--// +build equinixmetal
--
--/*
--Copyright 2019 The Kubernetes Authors.
--
--Licensed under the Apache License, Version 2.0 (the "License");
--you may not use this file except in compliance with the License.
--You may obtain a copy of the License at
--
--    http://www.apache.org/licenses/LICENSE-2.0
--
--Unless required by applicable law or agreed to in writing, software
--distributed under the License is distributed on an "AS IS" BASIS,
--WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
--See the License for the specific language governing permissions and
--limitations under the License.
--*/
--
--package builder
--
--import (
--	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
--	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/equinixmetal"
--	"k8s.io/autoscaler/cluster-autoscaler/config"
--	"k8s.io/client-go/informers"
--)
--
--// AvailableCloudProviders supported by the cloud provider builder.
--var AvailableCloudProviders = []string{
--	cloudprovider.PacketProviderName,
--	cloudprovider.EquinixMetalProviderName,
--}
--
--// DefaultCloudProvider for Packet-only build is Packet.
--const DefaultCloudProvider = cloudprovider.EquinixMetalProviderName
--
--func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
--	switch opts.CloudProviderName {
--	case cloudprovider.PacketProviderName, cloudprovider.EquinixMetalProviderName:
--		return equinixmetal.BuildCloudProvider(opts, do, rl)
 -	}
 -
 -	return nil
@@ -1462,7 +1463,7 @@ index ba240e62e..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_scaleway.go b/cluster-autoscaler/cloudprovider/builder/builder_scaleway.go
 deleted file mode 100644
-index e52f78ccb..000000000
+index 36ca6b314..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_scaleway.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -1499,7 +1500,7 @@ index e52f78ccb..000000000
 -	cloudprovider.ScalewayProviderName,
 -}
 -
--// DefaultCloudProvider for do-only build is Scaleway.
+-// DefaultCloudProvider for Scaleway-only build is Scaleway.
 -const DefaultCloudProvider = cloudprovider.ScalewayProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
@@ -1512,7 +1513,7 @@ index e52f78ccb..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_tencentcloud.go b/cluster-autoscaler/cloudprovider/builder/builder_tencentcloud.go
 deleted file mode 100644
-index 3d190e270..000000000
+index 6b1e96684..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_tencentcloud.go
 +++ /dev/null
 @@ -1,44 +0,0 @@
@@ -1549,8 +1550,8 @@ index 3d190e270..000000000
 -	cloudprovider.TencentcloudProviderName,
 -}
 -
--// DefaultCloudProvider is TKE.
--const DefaultCloudProvider = cloudprovider.TkeProviderName
+-// DefaultCloudProvider for Tencent-only build is Tencent.
+-const DefaultCloudProvider = cloudprovider.TencentcloudProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
 -	switch opts.CloudProviderName {
@@ -1612,10 +1613,10 @@ index 4be39817f..000000000
 -}
 diff --git a/cluster-autoscaler/cloudprovider/builder/builder_vultr.go b/cluster-autoscaler/cloudprovider/builder/builder_vultr.go
 deleted file mode 100644
-index da98eb363..000000000
+index ca3f89fc2..000000000
 --- a/cluster-autoscaler/cloudprovider/builder/builder_vultr.go
 +++ /dev/null
-@@ -1,43 +0,0 @@
+@@ -1,44 +0,0 @@
 -//go:build vultr
 -// +build vultr
 -
@@ -1639,6 +1640,7 @@ index da98eb363..000000000
 -
 -import (
 -	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vultr"
 -	"k8s.io/autoscaler/cluster-autoscaler/config"
 -	"k8s.io/client-go/informers"
 -)
@@ -1648,17 +1650,17 @@ index da98eb363..000000000
 -	cloudprovider.VultrProviderName,
 -}
 -
--// DefaultCloudProvider for linode-only build is linode.
+-// DefaultCloudProvider for vultr-only build is vultr.
 -const DefaultCloudProvider = cloudprovider.VultrProviderName
 -
 -func buildCloudProvider(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
 -	switch opts.CloudProviderName {
 -	case cloudprovider.VultrProviderName:
--		return vultr.BuildLinode(opts, do, rl)
+-		return vultr.BuildVultr(opts, do, rl)
 -	}
 -
 -	return nil
 -}
 -- 
-2.40.1
+2.48.1
 

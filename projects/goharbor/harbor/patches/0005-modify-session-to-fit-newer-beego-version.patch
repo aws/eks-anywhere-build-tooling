@@ -1,0 +1,68 @@
+From 6e0ab35dd5b25244cd332854951b2f2089fb1f57 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Tue, 6 May 2025 21:56:01 -0700
+Subject: [PATCH] modify session to fit newer beego version
+
+---
+ src/core/session/session.go | 33 ++++++++++++++++++++++++++-------
+ 1 file changed, 26 insertions(+), 7 deletions(-)
+
+diff --git a/src/core/session/session.go b/src/core/session/session.go
+index 77b57f826..448ed1a97 100644
+--- a/src/core/session/session.go
++++ b/src/core/session/session.go
+@@ -84,25 +84,44 @@ func (rs *Store) SessionID(_ context.Context) string {
+ 	return rs.sid
+ }
+ 
+-// SessionRelease save session values to redis
+-func (rs *Store) SessionRelease(ctx context.Context, _ http.ResponseWriter) {
+-	b, err := session.EncodeGob(rs.values)
++func (rs *Store) releaseSession(ctx context.Context, _ http.ResponseWriter, requirePresent bool) {
++	rs.lock.RLock()
++	values := rs.values
++	rs.lock.RUnlock()
++	b, err := session.EncodeGob(values)
+ 	if err != nil {
+ 		return
+ 	}
+-
+ 	if ctx == nil {
+ 		ctx = context.TODO()
+ 	}
+ 	maxlifetime := time.Duration(systemSessionTimeout(ctx, rs.maxlifetime))
+ 	if rdb, ok := rs.c.(*redis.Cache); ok {
+-		cmd := rdb.Client.Set(ctx, rs.sid, string(b), maxlifetime)
+-		if cmd.Err() != nil {
+-			log.Debugf("release session error: %v", err)
++		if requirePresent {
++			cmd := rdb.Client.SetXX(ctx, rs.sid, string(b), maxlifetime)
++			if cmd.Err() != nil {
++				log.Debugf("release session error: %v", err)
++			}
++		} else {
++			cmd := rdb.Client.Set(ctx, rs.sid, string(b), maxlifetime)
++			if cmd.Err() != nil {
++				log.Debugf("release session error: %v", err)
++			}
+ 		}
+ 	}
+ }
+ 
++// SessionRelease save session values to redis
++func (rs *Store) SessionRelease(ctx context.Context, w http.ResponseWriter) {
++	rs.releaseSession(ctx, w, false)
++}
++
++// added by beego version v2.3.4, commit https://github.com/beego/beego/commit/06d869664a9c55aea6c2bb6ac3866f8a39b1100c#diff-bc81cfdba9f5250f9bf95ccaae2e4e34b37af87e2091dda11ef49dc58bd91c2c
++// SessionReleaseIfPresent save session values to redis when key is present
++func (rs *Store) SessionReleaseIfPresent(ctx context.Context, w http.ResponseWriter) {
++	rs.releaseSession(ctx, w, true)
++}
++
+ // Provider redis session provider
+ type Provider struct {
+ 	maxlifetime int64
+-- 
+2.48.1
+

@@ -24,7 +24,8 @@ DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base-python
 BASE_IMAGE_OS_VERSION=al2023
-
+BASE_IMAGE_TAG=3.11-2025-05-05-1746471660.2023
+COMPILER_IMAGE=public.ecr.aws/eks-distro-build-tooling/python:3.11-2025-04-30-1746043275.2023
 COMPILER_IMAGE_VERSION=3.11
 
 HAS_HELM_CHART?=true
@@ -57,7 +58,7 @@ $(AMBASSADOR_VERSION_TARGET): export VERSION=v3.6.0
 $(AMBASSADOR_VERSION_TARGET): export CHART_VERSION:=$(CHART_VERSION)
 $(AMBASSADOR_VERSION_TARGET): export GOPATH=/var
 $(AMBASSADOR_VERSION_TARGET): | $$(ENABLE_DOCKER)
-	@$(MAKE) -C $(REPO) python/ambassador.version
+	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION) && $(MAKE) -C $(REPO) python/ambassador.version
 
 
 ########### DO NOT EDIT #############################
