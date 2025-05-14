@@ -153,8 +153,10 @@ add-generated-help-block: $(addprefix add-generated-help-block-project-, $(ALL_P
 .PHONY: attribution-files-project-%
 attribution-files-project-%:
 	$(eval PROJECT_PATH=$(call PROJECT_PATH_MAP,$*))
-	$(MAKE) -C $(PROJECT_PATH) all-attributions
-
+	if $(MAKE) -C $(PROJECT_PATH) check-for-release-branch-skip; then \
+		$(MAKE) -C $(PROJECT_PATH) all-attributions; \
+	fi
+	
 .PHONY: attribution-files
 attribution-files: $(addprefix attribution-files-project-, $(ALL_PROJECTS))
 	cat _output/total_summary.txt
