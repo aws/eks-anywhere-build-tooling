@@ -1,4 +1,4 @@
-From 22b0dcaaa14fc575476253e7cca7682514e08d1b Mon Sep 17 00:00:00 2001
+From f2ae23c6b51f56f6b8e8fe1b51bde93f29a44b85 Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Thu, 5 Jan 2023 14:56:09 -0500
 Subject: [PATCH 19/40] Make bottlerocket admin, control, custom bootstrap
@@ -10,10 +10,10 @@ Subject: [PATCH 19/40] Make bottlerocket admin, control, custom bootstrap
  2 files changed, 60 insertions(+)
 
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-index b6788345b..58f982d8f 100644
+index 5d1c16b86..38b5c273b 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-@@ -167,6 +167,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -168,6 +168,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{"metadata", "*"},
  		// spec.kubeadmConfigSpec.clusterConfiguration
  		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
@@ -23,7 +23,7 @@ index b6788345b..58f982d8f 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
-@@ -211,6 +214,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -212,6 +215,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, kubeadmConfigSpec, joinConfiguration, "discovery"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "discovery", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
@@ -32,12 +32,12 @@ index b6788345b..58f982d8f 100644
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
  		// spec.kubeadmConfigSpec
- 		{spec, kubeadmConfigSpec, preKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, bootCommands},
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-index 01c97806b..46a7d68fd 100644
+index a28d6d368..4c7110f75 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-@@ -728,6 +728,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -729,6 +729,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
  	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
  
@@ -62,7 +62,7 @@ index 01c97806b..46a7d68fd 100644
  	tests := []struct {
  		name                  string
  		enableIgnitionFeature bool
-@@ -1091,6 +1109,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1092,6 +1110,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateClusterConfBRBootstrapImage,
  		},
@@ -87,7 +87,7 @@ index 01c97806b..46a7d68fd 100644
  		{
  			name:      "should allow changes to join configuration pause image",
  			expectErr: false,
-@@ -1103,6 +1139,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1104,6 +1140,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateJoinConfBRBootstrapImage,
  		},
@@ -113,5 +113,5 @@ index 01c97806b..46a7d68fd 100644
  
  	for _, tt := range tests {
 -- 
-2.45.2
+2.49.0
 

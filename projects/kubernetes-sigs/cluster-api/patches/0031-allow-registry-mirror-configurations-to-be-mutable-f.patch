@@ -1,4 +1,4 @@
-From d38ce08d449a867c6d04d2c675019a5546ffca96 Mon Sep 17 00:00:00 2001
+From a9fa3efe5dd0176606459ccf3e435a51934eb046 Mon Sep 17 00:00:00 2001
 From: Cavaughn Browne <cxbrowne@amazon.com>
 Date: Thu, 20 Jul 2023 11:05:49 -0500
 Subject: [PATCH 31/40] allow registry mirror configurations to be mutable for
@@ -10,10 +10,10 @@ Subject: [PATCH 31/40] allow registry mirror configurations to be mutable for
  2 files changed, 47 insertions(+)
 
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-index 01823383e..62403b9b2 100644
+index 6586dac09..ead9887d6 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-@@ -194,6 +194,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -195,6 +195,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, kubeadmConfigSpec, clusterConfiguration, controllerManager, "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler},
  		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler, "*"},
@@ -21,16 +21,16 @@ index 01823383e..62403b9b2 100644
  		// spec.kubeadmConfigSpec.initConfiguration
  		{spec, kubeadmConfigSpec, initConfiguration, nodeRegistration},
  		{spec, kubeadmConfigSpec, initConfiguration, nodeRegistration, "*"},
-@@ -219,6 +220,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -220,6 +221,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketSettings", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "registryMirror", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
  		// spec.kubeadmConfigSpec
- 		{spec, kubeadmConfigSpec, preKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, bootCommands},
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-index 46a7d68fd..8d1337a99 100644
+index 4c7110f75..1ec78253d 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
 @@ -331,6 +331,10 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
@@ -55,7 +55,7 @@ index 46a7d68fd..8d1337a99 100644
  				},
  				PreKubeadmCommands: []string{
  					"test", "foo",
-@@ -746,6 +754,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -747,6 +755,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	validUpdateJoinConfBRCustomBootstrapContainers := before.DeepCopy()
  	validUpdateJoinConfBRCustomBootstrapContainers.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketCustomBootstrapContainers = []bootstrapv1.BottlerocketBootstrapContainer{{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}}
  
@@ -74,7 +74,7 @@ index 46a7d68fd..8d1337a99 100644
  	tests := []struct {
  		name                  string
  		enableIgnitionFeature bool
-@@ -1157,6 +1177,31 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1158,6 +1178,31 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateJoinConfBRCustomBootstrapContainers,
  		},
@@ -107,5 +107,5 @@ index 46a7d68fd..8d1337a99 100644
  
  	for _, tt := range tests {
 -- 
-2.45.2
+2.49.0
 
