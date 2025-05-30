@@ -1,4 +1,4 @@
-From 684973fddc3d8405a039cebb4181d64f6f2216bb Mon Sep 17 00:00:00 2001
+From 205bc0fc47dd50595c618897f692cfd055286acd Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 24 Jan 2024 00:00:03 -0800
 Subject: [PATCH 35/40] Add support for in-place upgrades in MachineDeployments
@@ -17,7 +17,7 @@ Subject: [PATCH 35/40] Add support for in-place upgrades in MachineDeployments
  create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace_test.go
 
 diff --git a/api/v1beta1/machinedeployment_types.go b/api/v1beta1/machinedeployment_types.go
-index 2828550ef..e0600e12e 100644
+index 80307605d..42e7a475c 100644
 --- a/api/v1beta1/machinedeployment_types.go
 +++ b/api/v1beta1/machinedeployment_types.go
 @@ -39,6 +39,9 @@ const (
@@ -43,7 +43,7 @@ index 2828550ef..e0600e12e 100644
  	// MachineDeploymentUniqueLabel is used to uniquely identify the Machines of a MachineSet.
  	// The MachineDeployment controller will set this label on a MachineSet when it is created.
  	// The label is also applied to the Machines of the MachineSet and used in the MachineSet selector.
-@@ -325,7 +334,7 @@ type MachineDeploymentSpec struct {
+@@ -334,7 +343,7 @@ type MachineDeploymentSpec struct {
  type MachineDeploymentStrategy struct {
  	// type of deployment. Allowed values are RollingUpdate and OnDelete.
  	// The default is RollingUpdate.
@@ -53,10 +53,10 @@ index 2828550ef..e0600e12e 100644
  	Type MachineDeploymentStrategyType `json:"type,omitempty"`
  
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-index 7c7d13ef3..b7764ca89 100644
+index 7d8f42572..843884e95 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-@@ -1622,6 +1622,7 @@ spec:
+@@ -1862,6 +1862,7 @@ spec:
                                enum:
                                - RollingUpdate
                                - OnDelete
@@ -65,10 +65,10 @@ index 7c7d13ef3..b7764ca89 100644
                            type: object
                          template:
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index aafe6c622..b0db92521 100644
+index 1f343357d..2bb244055 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -1654,6 +1654,7 @@ spec:
+@@ -1831,6 +1831,7 @@ spec:
                                    enum:
                                    - RollingUpdate
                                    - OnDelete
@@ -77,10 +77,10 @@ index aafe6c622..b0db92521 100644
                                type: object
                              variables:
 diff --git a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-index 4ebcaf5c2..0cc3d5df9 100644
+index 9445c8766..821a62a44 100644
 --- a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-@@ -767,6 +767,7 @@ spec:
+@@ -769,6 +769,7 @@ spec:
                      enum:
                      - RollingUpdate
                      - OnDelete
@@ -89,10 +89,10 @@ index 4ebcaf5c2..0cc3d5df9 100644
                  type: object
                template:
 diff --git a/internal/controllers/machinedeployment/machinedeployment_controller.go b/internal/controllers/machinedeployment/machinedeployment_controller.go
-index 4b714b3d6..063f0065b 100644
+index cd0194e52..a88a2bcab 100644
 --- a/internal/controllers/machinedeployment/machinedeployment_controller.go
 +++ b/internal/controllers/machinedeployment/machinedeployment_controller.go
-@@ -315,6 +315,10 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
+@@ -316,6 +316,10 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
  		return r.rolloutRolling(ctx, md, s.machineSets, templateExists)
  	}
  
@@ -286,5 +286,5 @@ index 1519b3dbe..71416fbcd 100644
  		return 0, fmt.Errorf("failed to compute replicas: deployment strategy %v isn't supported", deployment.Spec.Strategy.Type)
  	}
 -- 
-2.45.2
+2.49.0
 

@@ -30,6 +30,7 @@ FIX_LICENSES_GO_JSON_TARGET=$(REPO)/vendor/github.com/github.com/ajeddeloh/go-js
 FIX_LICENSES_TEST_CONTAINER_TARGET=$(REPO)/test/infrastructure/docker/LICENSE
 FIX_LICENSES_TEST_DOCKER_TARGET=$(REPO)/test/infrastructure/container/LICENSE
 FIX_LICENSES_TEST_KIND_TARGET=$(REPO)/test/infrastructure/kind/LICENSE
+FIX_LICENSES_TEST_INMEMORY_TARGET=$(REPO)/test/infrastructure/inmemory/LICENSE
 
 include $(BASE_DIRECTORY)/Common.mk
 
@@ -38,7 +39,7 @@ $(OUTPUT_BIN_DIR)/linux-%/cluster-api-provider-docker-manager: EXTRA_GO_LDFLAGS=
 
 s3-artifacts: create-manifests
 
-$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET) $(FIX_LICENSES_TEST_CONTAINER_TARGET) $(FIX_LICENSES_TEST_DOCKER_TARGET) $(FIX_LICENSES_TEST_KIND_TARGET)
+$(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_GO_JSON_TARGET) $(FIX_LICENSES_TEST_CONTAINER_TARGET) $(FIX_LICENSES_TEST_DOCKER_TARGET) $(FIX_LICENSES_TEST_KIND_TARGET) $(FIX_LICENSES_TEST_INMEMORY_TARGET)
 
 cluster-api-docker-controller/images/%: BASE_IMAGE_NAME=eks-distro-minimal-base
 
@@ -68,6 +69,11 @@ $(FIX_LICENSES_TEST_KIND_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # CAPD pulls in a dep in test/infrstructure/kind which does not have a LICENSE file and go-licenses does look it up
 # We use capi license instead
 	cp $(REPO)/LICENSE $@
+
+$(FIX_LICENSES_TEST_INMEMORY_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+# CAPD pulls in a dep in test/infrstructure/inmemory which does not have a LICENSE file and go-licenses does look it up
+# We use capi license instead
+	cp $(REPO)/LICENSE $@	
 
 
 ########### DO NOT EDIT #############################

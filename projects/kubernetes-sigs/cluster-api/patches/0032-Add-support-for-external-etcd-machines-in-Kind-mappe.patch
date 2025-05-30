@@ -1,4 +1,4 @@
-From 738a601fdff7cf2378bec7a30b5a15f0f7bca7cb Mon Sep 17 00:00:00 2001
+From 68159dfb62964518c5388cf7a35f8965f250aaca Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 16 Aug 2023 19:58:01 -0700
 Subject: [PATCH 32/40] Add support for external etcd machines in Kind mapper
@@ -6,15 +6,15 @@ Subject: [PATCH 32/40] Add support for external etcd machines in Kind mapper
 ---
  .../client/cluster/objectgraph_test.go        |  2 +-
  .../dockermachinepool_controller_phases.go    |  2 +-
- .../controllers/dockermachine_controller.go   | 34 +++++----
+ .../backends/docker/dockermachine_backend.go  |  4 +-
  .../docker/internal/docker/machine.go         | 69 +++++++++++++------
- 4 files changed, 69 insertions(+), 38 deletions(-)
+ 4 files changed, 52 insertions(+), 25 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index 5980f1b0d..88a85d9b2 100644
+index 68e48f1be..561186eac 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
-@@ -1933,7 +1933,7 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+@@ -2180,7 +2180,7 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
  		{
  			name: "two clusters with external force object, read only 1 cluster & both external objects",
  			args: args{
@@ -36,71 +36,30 @@ index e455b931b..24597fa78 100644
  		return errors.Wrapf(err, "failed to create docker machine with name %s", name)
  	}
  	return nil
-diff --git a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-index 03de44628..a2772ddbc 100644
---- a/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-+++ b/test/infrastructure/docker/internal/controllers/dockermachine_controller.go
-@@ -305,7 +305,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+diff --git a/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go b/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
+index 41e812b6e..938000d22 100644
+--- a/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
++++ b/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
+@@ -196,7 +196,7 @@ func (r *MachineBackendReconciler) ReconcileNormal(ctx context.Context, cluster
  	if !externalMachine.Exists() {
  		// NOTE: FailureDomains don't mean much in CAPD since it's all local, but we are setting a label on
  		// each container, so we can check placement.
--		if err := externalMachine.Create(ctx, dockerMachine.Spec.CustomImage, role, machine.Spec.Version, docker.FailureDomainLabel(machine.Spec.FailureDomain), dockerMachine.Spec.ExtraMounts); err != nil {
-+		if err := externalMachine.Create(ctx, dockerMachine.Spec.CustomImage, role, machine.Spec.Version, docker.FailureDomainLabel(machine.Spec.FailureDomain), dockerMachine.Spec.ExtraMounts, util.IsEtcdMachine(machine)); err != nil {
+-		if err := externalMachine.Create(ctx, dockerMachine.Spec.Backend.Docker.CustomImage, role, machine.Spec.Version, docker.FailureDomainLabel(machine.Spec.FailureDomain), dockerMachine.Spec.Backend.Docker.ExtraMounts); err != nil {
++		if err := externalMachine.Create(ctx, dockerMachine.Spec.Backend.Docker.CustomImage, role, machine.Spec.Version, docker.FailureDomainLabel(machine.Spec.FailureDomain), dockerMachine.Spec.Backend.Docker.ExtraMounts, util.IsEtcdMachine(machine)); err != nil {
  			return ctrl.Result{}, errors.Wrap(err, "failed to create worker DockerMachine")
  		}
  	}
-@@ -392,7 +392,7 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
+@@ -293,7 +293,7 @@ func (r *MachineBackendReconciler) ReconcileNormal(ctx context.Context, cluster
  			}()
  
  			// Run the bootstrap script. Simulates cloud-init/Ignition.
--			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, version, dockerMachine.Spec.CustomImage); err != nil {
-+			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, version, dockerMachine.Spec.CustomImage, util.IsEtcdMachine(machine)); err != nil {
+-			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, version, dockerMachine.Spec.Backend.Docker.CustomImage); err != nil {
++			if err := externalMachine.ExecBootstrap(timeoutCtx, bootstrapData, format, version, dockerMachine.Spec.Backend.Docker.CustomImage, util.IsEtcdMachine(machine)); err != nil {
  				conditions.MarkFalse(dockerMachine, infrav1.BootstrapExecSucceededCondition, infrav1.BootstrapFailedReason, clusterv1.ConditionSeverityWarning, "Repeating bootstrap")
- 				return ctrl.Result{}, errors.Wrap(err, "failed to exec DockerMachine bootstrap")
- 			}
-@@ -421,23 +421,27 @@ func (r *DockerMachineReconciler) reconcileNormal(ctx context.Context, cluster *
- 	// set to true after a control plane machine has a node ref. If we would requeue here in this case, the
- 	// Machine will never get a node ref as ProviderID is required to set the node ref, so we would get a deadlock.
- 	if cluster.Spec.ControlPlaneRef != nil &&
--		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) {
-+		!conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) &&
-+		!util.IsEtcdMachine(machine) {
- 		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
- 	}
- 
--	// Usually a cloud provider will do this, but there is no docker-cloud provider.
--	// Requeue if there is an error, as this is likely momentary load balancer
--	// state changes during control plane provisioning.
--	remoteClient, err := r.ClusterCache.GetClient(ctx, client.ObjectKeyFromObject(cluster))
--	if err != nil {
--		return ctrl.Result{}, errors.Wrap(err, "failed to generate workload cluster client")
--	}
--	if err := externalMachine.CloudProviderNodePatch(ctx, remoteClient, dockerMachine); err != nil {
--		if errors.As(err, &docker.ContainerNotRunningError{}) {
--			return ctrl.Result{}, errors.Wrap(err, "failed to patch the Kubernetes node with the machine providerID")
-+	// In case of an etcd cluster, there is no concept of kubernetes node. So we can generate the node Provider ID and set it on machine spec directly
-+	if !util.IsEtcdMachine(machine) {
-+		// Usually a cloud provider will do this, but there is no docker-cloud provider.
-+		// Requeue if there is an error, as this is likely momentary load balancer
-+		// state changes during control plane provisioning.
-+		remoteClient, err := r.ClusterCache.GetClient(ctx, client.ObjectKeyFromObject(cluster))
-+		if err != nil {
-+			return ctrl.Result{}, errors.Wrap(err, "failed to generate workload cluster client")
-+		}
-+		if err := externalMachine.CloudProviderNodePatch(ctx, remoteClient, dockerMachine); err != nil {
-+			if errors.As(err, &docker.ContainerNotRunningError{}) {
-+				return ctrl.Result{}, errors.Wrap(err, "failed to patch the Kubernetes node with the machine providerID")
-+			}
-+			log.Error(err, "Failed to patch the Kubernetes node with the machine providerID")
-+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
- 		}
--		log.Error(err, "Failed to patch the Kubernetes node with the machine providerID")
--		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
- 	}
- 	// Set ProviderID so the Cluster API Machine Controller can pull it
- 	providerID := externalMachine.ProviderID()
+ 				v1beta2conditions.Set(dockerMachine, metav1.Condition{
+ 					Type:    infrav1.DevMachineDockerContainerBootstrapExecSucceededV1Beta2Condition,
 diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
-index 80fe9fab2..fc33db2c3 100644
+index 13c831dff..f2cc3ee50 100644
 --- a/test/infrastructure/docker/internal/docker/machine.go
 +++ b/test/infrastructure/docker/internal/docker/machine.go
 @@ -48,6 +48,7 @@ import (
@@ -207,5 +166,5 @@ index 80fe9fab2..fc33db2c3 100644
  
  	kindMapping := kind.GetMapping(semVer, image)
 -- 
-2.45.2
+2.49.0
 

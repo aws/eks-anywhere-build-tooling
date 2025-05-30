@@ -1,4 +1,4 @@
-From 6863fe22e489a9898b922e786c6c2452ad7272a7 Mon Sep 17 00:00:00 2001
+From 5f305253076f9bbef3b330af327819b379ca73f5 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
 Subject: [PATCH 03/40] Unstacked etcd and controlplane upgrade
@@ -63,10 +63,10 @@ previous clients that expect this orchestration by default.
  create mode 100644 internal/test/builder/etcd.go
 
 diff --git a/api/v1beta1/common_types.go b/api/v1beta1/common_types.go
-index f70b0f3e4..68506e74f 100644
+index 2006bb88c..4b2e4ed71 100644
 --- a/api/v1beta1/common_types.go
 +++ b/api/v1beta1/common_types.go
-@@ -168,6 +168,9 @@ const (
+@@ -171,6 +171,9 @@ const (
  	// will receive the resulting object.
  	TopologyDryRunAnnotation = "topology.cluster.x-k8s.io/dry-run"
  
@@ -76,10 +76,10 @@ index f70b0f3e4..68506e74f 100644
  	// ReplicasManagedByAnnotation is an annotation that indicates external (non-Cluster API) management of infra scaling.
  	// The practical effect of this is that the capi "replica" count should be passively derived from the number of observed infra machines,
  	// instead of being a source of truth for eventual consistency.
-@@ -197,6 +200,10 @@ const (
- 	// VariableDefinitionFromInline indicates a patch or variable was defined in the `.spec` of a ClusterClass
- 	// rather than from an external patch extension.
- 	VariableDefinitionFromInline = "inline"
+@@ -210,6 +213,10 @@ const (
+ 	// Note: While the upgrade is blocked changes made to the Cluster Topology will be delayed propagating to the underlying
+ 	// objects while the object is waiting for upgrade.
+ 	BeforeClusterUpgradeHookAnnotationPrefix = "before-upgrade.hook.cluster.cluster.x-k8s.io"
 +
 +	// SkipControlPlanePauseManagedEtcdAnnotation indicates that the cluster controller should not pause or unpause
 +	// the control plane after the managed etcd cluster becomes not-ready/ready.
@@ -144,7 +144,7 @@ index e9870d34c..adc1b2a0a 100644
  
  const (
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index 967bda0e8..97a42b118 100644
+index dee9cc267..2c7088ca9 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -25,6 +25,7 @@ import (
@@ -155,7 +155,7 @@ index 967bda0e8..97a42b118 100644
  	"github.com/pkg/errors"
  	corev1 "k8s.io/api/core/v1"
  	apierrors "k8s.io/apimachinery/pkg/api/errors"
-@@ -203,28 +204,12 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -199,28 +200,12 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  		return ctrl.Result{Requeue: true}, nil
  	}
  	if cluster.Spec.ManagedExternalEtcdRef != nil {
@@ -187,7 +187,7 @@ index 967bda0e8..97a42b118 100644
  		}
  	}
  
-@@ -506,6 +491,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+@@ -497,6 +482,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
  		// NOTE: we are checking the condition already exists in order to avoid to set this condition at the first
  		// reconciliation/before a rolling upgrade actually starts.
  		if conditions.Has(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition) {
@@ -213,7 +213,7 @@ index 967bda0e8..97a42b118 100644
  			conditions.MarkTrue(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition)
  		}
  	}
-@@ -1490,3 +1494,76 @@ func (r *KubeadmControlPlaneReconciler) ensureCertificatesOwnerRef(ctx context.C
+@@ -1476,3 +1480,76 @@ func (r *KubeadmControlPlaneReconciler) ensureCertificatesOwnerRef(ctx context.C
  	}
  	return nil
  }
@@ -291,18 +291,18 @@ index 967bda0e8..97a42b118 100644
 +	return len(endpoints) == 0 || len(endpoints) == 1 && endpoints[0] == ""
 +}
 diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
-index 7644a8fbd..682143b67 100644
+index b0478ba89..ec0da15c8 100644
 --- a/controlplane/kubeadm/internal/controllers/controller_test.go
 +++ b/controlplane/kubeadm/internal/controllers/controller_test.go
-@@ -24,6 +24,7 @@ import (
- 	"crypto/x509/pkix"
+@@ -25,6 +25,7 @@ import (
  	"fmt"
  	"math/big"
+ 	"path"
 +	"strings"
  	"sync"
  	"testing"
  	"time"
-@@ -57,6 +58,7 @@ import (
+@@ -60,6 +61,7 @@ import (
  	"sigs.k8s.io/cluster-api/internal/util/ssa"
  	"sigs.k8s.io/cluster-api/internal/webhooks"
  	"sigs.k8s.io/cluster-api/util"
@@ -310,7 +310,7 @@ index 7644a8fbd..682143b67 100644
  	"sigs.k8s.io/cluster-api/util/certs"
  	"sigs.k8s.io/cluster-api/util/collections"
  	"sigs.k8s.io/cluster-api/util/conditions"
-@@ -2886,9 +2888,9 @@ func TestKubeadmControlPlaneReconciler_reconcilePreTerminateHook(t *testing.T) {
+@@ -3129,9 +3131,9 @@ func TestKubeadmControlPlaneReconciler_reconcilePreTerminateHook(t *testing.T) {
  				Client: fakeClient,
  			}
  
@@ -322,7 +322,7 @@ index 7644a8fbd..682143b67 100644
  			})
  
  			res, err := r.reconcilePreTerminateHook(ctx, tt.controlPlane)
-@@ -3452,6 +3454,210 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
+@@ -3695,6 +3697,210 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
  	})
  }
  
@@ -546,7 +546,7 @@ index 048df78ff..d0ec93fa3 100644
  	UpdateAPIServerInKubeadmConfigMap(apiServer bootstrapv1.APIServer) func(*bootstrapv1.ClusterConfiguration)
  	UpdateControllerManagerInKubeadmConfigMap(controllerManager bootstrapv1.ControlPlaneComponent) func(*bootstrapv1.ClusterConfiguration)
 diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd.go b/controlplane/kubeadm/internal/workload_cluster_etcd.go
-index 07f53f509..33f4a7a54 100644
+index 35bc3e51d..601a0ea88 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_etcd.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_etcd.go
 @@ -19,6 +19,7 @@ package internal
@@ -573,7 +573,7 @@ index 07f53f509..33f4a7a54 100644
  // Removing the last remaining member of the cluster is not supported.
  func (w *Workload) RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error {
 diff --git a/internal/apis/core/v1alpha3/common_types.go b/internal/apis/core/v1alpha3/common_types.go
-index 3ee944bb5..309fa3d36 100644
+index a4f921cdf..689da5808 100644
 --- a/internal/apis/core/v1alpha3/common_types.go
 +++ b/internal/apis/core/v1alpha3/common_types.go
 @@ -70,6 +70,13 @@ const (
@@ -609,7 +609,7 @@ index c9fd9e27e..868500943 100644
 +	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
 +)
 diff --git a/internal/apis/core/v1alpha4/common_types.go b/internal/apis/core/v1alpha4/common_types.go
-index bc17ac1ec..721dcdda7 100644
+index e623c118c..86b5fc728 100644
 --- a/internal/apis/core/v1alpha4/common_types.go
 +++ b/internal/apis/core/v1alpha4/common_types.go
 @@ -104,6 +104,13 @@ const (
@@ -645,10 +645,10 @@ index 317d6cad5..021cd9ede 100644
 +	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
 +)
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index 279e8cdd8..15815d60b 100644
+index ff1e2dd48..4fdfe4fb2 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
-@@ -218,6 +218,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -228,6 +228,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  
  	alwaysReconcile := []clusterReconcileFunc{
  		r.reconcileInfrastructure,
@@ -656,7 +656,7 @@ index 279e8cdd8..15815d60b 100644
  		r.reconcileControlPlane,
  		r.getDescendants,
  	}
-@@ -245,7 +246,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -255,7 +256,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
  		r.reconcileControlPlaneInitialized,
@@ -664,7 +664,7 @@ index 279e8cdd8..15815d60b 100644
  	)
  	return doReconcile(ctx, reconcileNormal, s)
  }
-@@ -464,7 +464,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
+@@ -481,7 +481,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
  		}
  	}
  	if cluster.Spec.ManagedExternalEtcdRef != nil {
@@ -673,7 +673,7 @@ index 279e8cdd8..15815d60b 100644
  		switch {
  		case apierrors.IsNotFound(errors.Cause(err)):
  			// Etcd cluster has been deleted
-@@ -704,7 +704,7 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
+@@ -723,7 +723,7 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
  		toObjectList(c.workerMachines),
  	}
  	if cluster.Spec.ManagedExternalEtcdRef != nil {
@@ -822,7 +822,7 @@ index f2ac66160..644d3e385 100644
  	conditions.SetMirror(cluster, clusterv1.ManagedExternalEtcdClusterReadyCondition,
  		conditions.UnstructuredGetter(etcdPlaneConfig),
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 00df217cb..de01840ac 100644
+index 2ccec4d4a..193a918c0 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
 @@ -18,23 +18,28 @@ package cluster
@@ -1196,11 +1196,11 @@ index 000000000..9c187575f
 +	return c.obj
 +}
 diff --git a/util/annotations/helpers.go b/util/annotations/helpers.go
-index e4990032b..a68d61ae8 100644
+index 964609ac9..49bc263bc 100644
 --- a/util/annotations/helpers.go
 +++ b/util/annotations/helpers.go
-@@ -88,6 +88,11 @@ func AddAnnotations(o metav1.Object, desired map[string]string) bool {
- 	return hasChanged
+@@ -119,6 +119,11 @@ func GetManagedAnnotations(m *clusterv1.Machine, additionalSyncMachineAnnotation
+ 	return managedAnnotations
  }
  
 +// HasAnnotation returns true if the object has the specified annotation.
@@ -1212,5 +1212,5 @@ index e4990032b..a68d61ae8 100644
  func hasAnnotation(o metav1.Object, annotation string) bool {
  	annotations := o.GetAnnotations()
 -- 
-2.45.2
+2.49.0
 
