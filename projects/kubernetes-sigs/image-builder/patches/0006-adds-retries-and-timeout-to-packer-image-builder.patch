@@ -1,4 +1,4 @@
-From e8431b594a50cda45002c1f8901e13e40b5950d0 Mon Sep 17 00:00:00 2001
+From 03932db8e7402d23b5ec3f5971f53ed2a2d1c5a0 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Mon, 21 Aug 2023 18:40:07 -0500
 Subject: [PATCH 06/13] adds retries and timeout to packer image-builder
@@ -12,10 +12,10 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  4 files changed, 25 insertions(+), 8 deletions(-)
 
 diff --git a/images/capi/packer/ami/packer.json b/images/capi/packer/ami/packer.json
-index 33fcfd43a..a302529c7 100644
+index ba9a9000e..bc69b9c7e 100644
 --- a/images/capi/packer/ami/packer.json
 +++ b/images/capi/packer/ami/packer.json
-@@ -107,7 +107,9 @@
+@@ -109,7 +109,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -26,7 +26,7 @@ index 33fcfd43a..a302529c7 100644
      },
      {
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 833b1cfae..3d0c3ed11 100644
+index e2101f927..d2343614e 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
 @@ -19,8 +19,9 @@
@@ -62,7 +62,7 @@ index 833b1cfae..3d0c3ed11 100644
        "ssh_username": "{{user `ssh_username`}}",
        "type": "vmware-iso",
        "version": "{{user `vmx_version`}}",
-@@ -175,8 +178,9 @@
+@@ -177,8 +180,9 @@
        "resource_pool": "{{user `resource_pool`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c '{{user `shutdown_command`}}'",
        "ssh_clear_authorized_keys": "false",
@@ -73,7 +73,7 @@ index 833b1cfae..3d0c3ed11 100644
        "ssh_username": "{{user `ssh_username`}}",
        "storage": [
          {
-@@ -242,7 +246,8 @@
+@@ -246,7 +250,8 @@
        "ssh_password": "{{user `ssh_password`}}",
        "ssh_proxy_host": "{{user `ssh_proxy_host`}}",
        "ssh_proxy_port": "{{user `ssh_proxy_port`}}",
@@ -83,7 +83,7 @@ index 833b1cfae..3d0c3ed11 100644
        "ssh_username": "{{user `ssh_username`}}",
        "storage": [
          {
-@@ -283,7 +288,8 @@
+@@ -287,7 +292,8 @@
        "resource_pool": "{{user `resource_pool`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
        "ssh_password": "{{user `ssh_password`}}",
@@ -93,7 +93,7 @@ index 833b1cfae..3d0c3ed11 100644
        "ssh_username": "{{user `ssh_username`}}",
        "template": "{{user `template`}}",
        "type": "vsphere-clone",
-@@ -383,7 +389,9 @@
+@@ -387,7 +393,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -103,7 +103,7 @@ index 833b1cfae..3d0c3ed11 100644
        "type": "ansible",
        "user": "{{user `ssh_username`}}"
      },
-@@ -416,7 +424,9 @@
+@@ -420,7 +428,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -114,7 +114,7 @@ index 833b1cfae..3d0c3ed11 100644
        "user": "{{user `ssh_username`}}"
      },
 diff --git a/images/capi/packer/qemu/packer.json.tmpl b/images/capi/packer/qemu/packer.json.tmpl
-index 8070daed7..e53f3ac3f 100644
+index 0b03e915a..9e5df5fb9 100644
 --- a/images/capi/packer/qemu/packer.json.tmpl
 +++ b/images/capi/packer/qemu/packer.json.tmpl
 @@ -30,8 +30,9 @@
@@ -138,7 +138,7 @@ index 8070daed7..e53f3ac3f 100644
        "type": "ansible",
        "user": "builder"
      },
-@@ -118,7 +121,9 @@
+@@ -119,7 +122,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -149,7 +149,7 @@ index 8070daed7..e53f3ac3f 100644
        "user": "builder"
      },
 diff --git a/images/capi/packer/raw/packer.json.tmpl b/images/capi/packer/raw/packer.json.tmpl
-index f65d1f961..90ffc8b5b 100644
+index 48c9c35ff..591487ed2 100644
 --- a/images/capi/packer/raw/packer.json.tmpl
 +++ b/images/capi/packer/raw/packer.json.tmpl
 @@ -33,7 +33,7 @@
@@ -162,5 +162,5 @@ index f65d1f961..90ffc8b5b 100644
        "type": "qemu",
        "vm_name": "{{user `vm_name`}}"
 -- 
-2.47.1
+2.49.0
 
