@@ -1,5 +1,5 @@
 ## **Kind**
-![Version](https://img.shields.io/badge/version-v0.26.0-blue)
+![Version](https://img.shields.io/badge/version-v0.29.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiVkgvQm93WHUvUWJ1U2ZhSG9JTUJNMFdjdGtwSkIyRCt1azM0THYxcWYweC8rM2lHRmNYMXI0QkVPUm4yZ0JZZ1c4RzdMeTJ3dGtpREdYeFpvTEhtc2FnPSIsIml2UGFyYW1ldGVyU3BlYyI6Im9GV2EzRGZQNVZ5c25kTmoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Kind](https://github.com/kubernetes-sigs/kind) is a tool for running local Kubernetes clusters using Docker container "nodes". kind bootstraps each "node" with `kubeadm`. kind consists of:
