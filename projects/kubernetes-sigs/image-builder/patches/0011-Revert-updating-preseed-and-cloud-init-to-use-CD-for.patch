@@ -1,4 +1,4 @@
-From 500c8e286e5b831a23cf7f776a0f0d46f388c87a Mon Sep 17 00:00:00 2001
+From 23b1ff1a01bc61a65b38fd02e253a21b8311775d Mon Sep 17 00:00:00 2001
 From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 Date: Thu, 19 Sep 2024 18:52:00 -0700
 Subject: [PATCH 11/13] Revert updating preseed and cloud-init to use CD for
@@ -21,10 +21,10 @@ Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
  8 files changed, 13 insertions(+), 29 deletions(-)
 
 diff --git a/images/capi/Dockerfile b/images/capi/Dockerfile
-index cbd9161ca..1ded69069 100644
+index fe5f53faa..d7db633a0 100644
 --- a/images/capi/Dockerfile
 +++ b/images/capi/Dockerfile
-@@ -36,8 +36,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+@@ -34,8 +34,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
  	wget \
  	qemu-system-x86 \
  	qemu-kvm \
@@ -34,10 +34,10 @@ index cbd9161ca..1ded69069 100644
  	&& apt-get purge --auto-remove -y \
  	&& rm -rf /var/lib/apt/lists/*
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index 3d0c3ed11..54e518181 100644
+index d2343614e..154b929fd 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
-@@ -203,8 +203,6 @@
+@@ -205,8 +205,6 @@
          "{{user `boot_command_suffix`}}"
        ],
        "boot_wait": "{{user `boot_wait`}}",
@@ -46,7 +46,7 @@ index 3d0c3ed11..54e518181 100644
        "cdrom_type": "{{user `cdrom_type`}}",
        "cluster": "{{user `cluster`}}",
        "communicator": "ssh",
-@@ -486,8 +484,6 @@
+@@ -490,8 +488,6 @@
      "block_nouveau_loading": "true",
      "build_timestamp": "{{timestamp}}",
      "build_version": "{{user `build_name`}}-kube-{{user `kubernetes_semver`}}",
@@ -159,10 +159,10 @@ index dd7a33587..0f910b6eb 100644
    "iso_checksum": "d6dab0c3a657988501b4bd76f1297c053df710e06e0c3aece60dead24f270b4d",
    "iso_checksum_type": "sha256",
 diff --git a/images/capi/scripts/ci-ova.sh b/images/capi/scripts/ci-ova.sh
-index 683670a35..5794d876c 100755
+index 0225173f4..f0ceda5b9 100755
 --- a/images/capi/scripts/ci-ova.sh
 +++ b/images/capi/scripts/ci-ova.sh
-@@ -75,9 +75,6 @@ export GOVC_DATACENTER="SDDC-Datacenter"
+@@ -84,9 +84,6 @@ export GOVC_DATACENTER="SDDC-Datacenter"
  export GOVC_CLUSTER="Cluster-1"
  export GOVC_INSECURE=true
  
@@ -173,5 +173,5 @@ index 683670a35..5794d876c 100755
  docker run --rm -d --name vpn -v "${HOME}/.openvpn/:${HOME}/.openvpn/" \
    -w "${HOME}/.openvpn/" --cap-add=NET_ADMIN --net=host --device=/dev/net/tun \
 -- 
-2.47.1
+2.49.0
 
