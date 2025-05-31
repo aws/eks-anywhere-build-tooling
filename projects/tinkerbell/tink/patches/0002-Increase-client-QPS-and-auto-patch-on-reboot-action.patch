@@ -1,0 +1,77 @@
+From 4ab8d9827e0fd5401ca038dc717a5e1dc0f6bc79 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulgab@amazon.com>
+Date: Wed, 28 May 2025 01:24:13 +0000
+Subject: [PATCH] Increase client QPS and auto-patch on reboot action
+
+When provisioning high number of nodes, the default client QPS runs into
+rate limit issues. Increase QPS and burst to support high number of
+concurrent provisioning. During the reboot actions sometimes the worker
+dies before upadting the status as the reboot is already kicked off.
+Auto-patch the workflow on server side if the current action is reboot.
+
+Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
+---
+ internal/server/kubernetes_api.go          |  6 ++++++
+ internal/server/kubernetes_api_workflow.go | 18 ++++++++++++++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/internal/server/kubernetes_api.go b/internal/server/kubernetes_api.go
+index b4bcdcc..d5f0cab 100644
+--- a/internal/server/kubernetes_api.go
++++ b/internal/server/kubernetes_api.go
+@@ -39,6 +39,12 @@ func NewKubeBackedServer(logger logr.Logger, kubeconfig, apiserver, namespace st
+ 	)
+ 
+ 	cfg, err := ccfg.ClientConfig()
++
++	// Increase QPS (queries per second) and Burst limits to handle high concurrency scenarios
++	// Default client-go values (5 QPS, 10 Burst) are too low for parallel provisioning of many nodes
++	// For provisioning high number of nodes in parallel, we need higher limits to avoid rate limiting
++	cfg.QPS = 100
++	cfg.Burst = 200
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/internal/server/kubernetes_api_workflow.go b/internal/server/kubernetes_api_workflow.go
+index af38426..df180cd 100644
+--- a/internal/server/kubernetes_api_workflow.go
++++ b/internal/server/kubernetes_api_workflow.go
+@@ -211,17 +211,35 @@ func (s *KubernetesBackedServer) ReportActionStatus(ctx context.Context, req *pr
+ 		return nil, status.Errorf(codes.InvalidArgument, errInvalidActionReported)
+ 	}
+ 
++	// Auto-patch reboot-image action to success if it's in RUNNING state
++	// This ensures the workflow continues even if the worker dies during reboot
++	isRebootAction := false
++	if strings.Contains(req.GetActionName(), "reboot") && req.GetActionStatus() == proto.State_STATE_RUNNING {
++		l.Info("Auto-patching reboot-image action to success state", "actionName", req.GetActionName())
++		req.ActionStatus = proto.State_STATE_SUCCESS
++		req.Message = "Auto-patched to success by server (reboot-image action)"
++		isRebootAction = true
++	}
++
+ 	wfContext := getWorkflowContextForRequest(req, wf)
+ 	err = s.modifyWorkflowState(wf, wfContext)
+ 	if err != nil {
+ 		l.Error(err, "modify workflow state")
+ 		return nil, status.Errorf(codes.InvalidArgument, errInvalidWorkflowID)
+ 	}
++
++	// For reboot actions, explicitly set the currentAction to maintain state consistency
++	// This prevents worker/server state desynchronization when auto-patching occurs
++	if isRebootAction {
++		wf.Status.CurrentAction = req.GetActionName()
++	}
++
+ 	l.Info("updating workflow in Kubernetes")
+ 	err = s.ClientFunc().Status().Update(ctx, wf)
+ 	if err != nil {
+ 		l.Error(err, "applying update to workflow")
+ 		return nil, status.Errorf(codes.InvalidArgument, errInvalidWorkflowID)
+ 	}
++
+ 	return &proto.Empty{}, nil
+ }
+-- 
+2.40.1
+
