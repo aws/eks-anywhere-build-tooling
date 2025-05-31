@@ -1,5 +1,5 @@
 ## **Cluster API Provider for CloudStack**
-![Version](https://img.shields.io/badge/version-v0.5.0-blue)
+![Version](https://img.shields.io/badge/version-v0.6.0-blue)
 [![Go Report Card](https://goreportcard.com/badge/kubernetes-sigs/cluster-api-provider-cloudstack)](https://goreportcard.com/report/kubernetes-sigs/cluster-api-provider-cloudstack)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiS0M4VGRyK0xWM2ZZY0pRbVMvY0pHRWlVSEJ3M1I4SXNRaVNxSnB5blVYTHpHSkNFWlpXcWhHSmdlSkhCVnVwSXJyVm16NFlSUzVSRC9vN2g2bmY5NjVnPSIsIml2UGFyYW1ldGVyU3BlYyI6ImQ4ZldMWnMweEIyTmxrTk8iLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
