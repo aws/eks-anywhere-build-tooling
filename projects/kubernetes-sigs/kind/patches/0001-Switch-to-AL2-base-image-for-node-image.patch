@@ -1,4 +1,4 @@
-From 83f122f8c90ba512b472cc7abd9f0d0fa9b26da4 Mon Sep 17 00:00:00 2001
+From dd8f30d177505a75393cd994cfc8980398ce505e Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 29 Jun 2023 00:56:53 -0700
 Subject: [PATCH 1/6] Switch to AL2 base image for node image
@@ -9,7 +9,7 @@ Subject: [PATCH 1/6] Switch to AL2 base image for node image
  2 files changed, 79 insertions(+), 147 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index 31a73078..b3b7e848 100644
+index 4a1e616f..b3b7e848 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -17,11 +17,19 @@
@@ -93,7 +93,7 @@ index 31a73078..b3b7e848 100644
 -# stage for building containerd
 -FROM go-build AS build-containerd
 -ARG TARGETARCH GO_VERSION
--ARG CONTAINERD_VERSION="v1.7.24"
+-ARG CONTAINERD_VERSION="v2.1.1"
 -ARG CONTAINERD_CLONE_URL="https://github.com/containerd/containerd"
 -# we don't build with optional snapshotters, we never select any of these
 -# they're not ideal inside kind anyhow, and we save some disk space
@@ -111,7 +111,7 @@ index 31a73078..b3b7e848 100644
 -# stage for building runc
 -FROM go-build AS build-runc
 -ARG TARGETARCH GO_VERSION
--ARG RUNC_VERSION="v1.2.3"
+-ARG RUNC_VERSION="v1.3.0"
 -ARG RUNC_CLONE_URL="https://github.com/opencontainers/runc"
 -RUN git clone --filter=tree:0 "${RUNC_CLONE_URL}" /runc \
 -    && cd /runc \
@@ -126,7 +126,7 @@ index 31a73078..b3b7e848 100644
 -FROM go-build AS build-crictl
 -ARG TARGETARCH GO_VERSION
 -ARG CRI_TOOLS_CLONE_URL="https://github.com/kubernetes-sigs/cri-tools"
--ARG CRICTL_VERSION="v1.32.0"
+-ARG CRICTL_VERSION="v1.33.0"
 -RUN git clone --filter=tree:0 "${CRI_TOOLS_CLONE_URL}" /cri-tools \
 -    && cd /cri-tools \
 -    && git checkout "${CRICTL_VERSION}" \
@@ -139,7 +139,7 @@ index 31a73078..b3b7e848 100644
 -# stage for building cni-plugins
 -FROM go-build AS build-cni
 -ARG TARGETARCH GO_VERSION
--ARG CNI_PLUGINS_VERSION="v1.6.1"
+-ARG CNI_PLUGINS_VERSION="v1.7.1"
 -ARG CNI_PLUGINS_CLONE_URL="https://github.com/containernetworking/plugins"
 -RUN git clone --filter=tree:0 "${CNI_PLUGINS_CLONE_URL}" /cni-plugins \
 -    && cd /cni-plugins \
@@ -147,7 +147,7 @@ index 31a73078..b3b7e848 100644
 -    && eval "$(gimme "${GO_VERSION}")" \
 -    && export GOTOOLCHAIN="go${GO_VERSION}" \
 -    && mkdir ./bin \
--    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=1 \
+-    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=0 \
 -    && go build -o ./bin/host-local -mod=vendor ./plugins/ipam/host-local \
 -    && go build -o ./bin/loopback -mod=vendor ./plugins/main/loopback \
 -    && go build -o ./bin/ptp -mod=vendor ./plugins/main/ptp \
@@ -290,5 +290,5 @@ index b0b861c3..f1d714a6 100755
 -   /usr/share/local/*
 +   /usr/share/local/* || true
 -- 
-2.47.1
+2.49.0
 
