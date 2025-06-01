@@ -1,4 +1,4 @@
-From b6ccb53f4cee80a2671c70f1fac04336c5eab4e4 Mon Sep 17 00:00:00 2001
+From 64f7e306858e06d413905a9bf8a5111094e6f940 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Sat, 2 Apr 2022 22:01:04 -0500
 Subject: [PATCH 2/6] skip ctr pulling required images since the build removes
@@ -6,49 +6,65 @@ Subject: [PATCH 2/6] skip ctr pulling required images since the build removes
 
 Signed-off-by: Jackson West <jgw@amazon.com>
 ---
- pkg/build/nodeimage/buildcontext.go | 36 +++++++++++++++--------------
- 1 file changed, 19 insertions(+), 17 deletions(-)
+ pkg/build/nodeimage/buildcontext.go | 52 ++++++++++++++---------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
 
 diff --git a/pkg/build/nodeimage/buildcontext.go b/pkg/build/nodeimage/buildcontext.go
-index 47da153c..431de327 100644
+index 60b048d8..cd992e85 100644
 --- a/pkg/build/nodeimage/buildcontext.go
 +++ b/pkg/build/nodeimage/buildcontext.go
-@@ -266,23 +266,25 @@ func (c *buildContext) prePullImagesAndWriteManifests(bits kube.Bits, parsedVers
+@@ -266,32 +266,32 @@ func (c *buildContext) prePullImagesAndWriteManifests(bits kube.Bits, parsedVers
  		}
  	}()
  
 -	fns := []func() error{}
+-	osArch := dockerBuildOsAndArch(c.arch)
 -	for _, image := range requiredImages {
 -		image := image // https://golang.org/doc/faq#closures_and_goroutines
--		fns = append(fns, func() error {
--			if !builtImages.Has(image) {
--				if err = importer.Pull(image, dockerBuildOsAndArch(c.arch)); err != nil {
+-		if !builtImages.Has(image) {
+-			fns = append(fns, func() error {
+-				if err = importer.Pull(image, osArch); err != nil {
 -					c.logger.Warnf("Failed to pull %s with error: %v", image, err)
 -					runE := exec.RunErrorForError(err)
 -					c.logger.Warn(string(runE.Output))
+-					c.logger.Warnf("Retrying %s pull after 1s ...", image)
+-					time.Sleep(time.Second)
+-					return importer.Pull(image, osArch)
 -				}
--			}
--			return nil
--		})
+-				return nil
+-			})
+-		}
+-	}
+-	// Wait for containerd socket to be ready, which may take 1s when running under emulation
+-	if err := importer.WaitForReady(); err != nil {
+-		c.logger.Errorf("Image build failed, containerd did not become ready %v", err)
+-		return nil, err
 -	}
 -	if err := errors.AggregateConcurrent(fns); err != nil {
 -		return nil, err
 -	}
-+	// The eks-a build process ends up removing all of these pulled images anyway
-+	// skip pulling requiredimages, only import the kube images which are already on disk as tarballs
 +	// fns := []func() error{}
++	// osArch := dockerBuildOsAndArch(c.arch)
 +	// for _, image := range requiredImages {
 +	// 	image := image // https://golang.org/doc/faq#closures_and_goroutines
-+	// 	fns = append(fns, func() error {
-+	// 		if !builtImages.Has(image) {
-+	// 			if err = importer.Pull(image, dockerBuildOsAndArch(c.arch)); err != nil {
++	// 	if !builtImages.Has(image) {
++	// 		fns = append(fns, func() error {
++	// 			if err = importer.Pull(image, osArch); err != nil {
 +	// 				c.logger.Warnf("Failed to pull %s with error: %v", image, err)
 +	// 				runE := exec.RunErrorForError(err)
 +	// 				c.logger.Warn(string(runE.Output))
++	// 				c.logger.Warnf("Retrying %s pull after 1s ...", image)
++	// 				time.Sleep(time.Second)
++	// 				return importer.Pull(image, osArch)
 +	// 			}
-+	// 		}
-+	// 		return nil
-+	// 	})
++	// 			return nil
++	// 		})
++	// 	}
++	// }
++	// // Wait for containerd socket to be ready, which may take 1s when running under emulation
++	// if err := importer.WaitForReady(); err != nil {
++	// 	c.logger.Errorf("Image build failed, containerd did not become ready %v", err)
++	// 	return nil, err
 +	// }
 +	// if err := errors.AggregateConcurrent(fns); err != nil {
 +	// 	return nil, err
@@ -57,5 +73,5 @@ index 47da153c..431de327 100644
  	// create a plan of image loading
  	loadFns := []func() error{}
 -- 
-2.47.1
+2.49.0
 
