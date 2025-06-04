@@ -1,19 +1,29 @@
-From 8fd13f8f64ef59009277eed7815c0f2b62ea8e70 Mon Sep 17 00:00:00 2001
+From b9037f6d2018a7914d8ed4f0be1e5678b649ae8d Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 17 Jan 2024 09:28:18 -0800
 Subject: [PATCH 34/40] Add support for in-place upgrade in KCP
 
 ---
- .../kubeadm/api/v1beta1/kubeadm_control_plane_types.go |  8 ++++++++
- controlplane/kubeadm/internal/controllers/upgrade.go   | 10 ++++++++--
- .../kubeadm/internal/webhooks/kubeadm_control_plane.go |  4 ++--
- 3 files changed, 18 insertions(+), 4 deletions(-)
+ .../api/v1beta1/kubeadm_control_plane_types.go | 18 +++++++++++++++---
+ ....cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  9 +++++++--
+ ....x-k8s.io_kubeadmcontrolplanetemplates.yaml |  9 +++++++--
+ .../kubeadm/internal/controllers/upgrade.go    | 10 ++++++++--
+ .../internal/webhooks/kubeadm_control_plane.go |  4 ++--
+ 5 files changed, 39 insertions(+), 11 deletions(-)
 
 diff --git a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_types.go b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_types.go
-index 0ab5d5d49..b39427bde 100644
+index 0ab5d5d49..222cc72c3 100644
 --- a/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_types.go
 +++ b/controlplane/kubeadm/api/v1beta1/kubeadm_control_plane_types.go
-@@ -36,6 +36,9 @@ const (
+@@ -29,13 +29,16 @@ import (
+ )
+ 
+ // RolloutStrategyType defines the rollout strategies for a KubeadmControlPlane.
+-// +kubebuilder:validation:Enum=RollingUpdate
++// +kubebuilder:validation:Enum=RollingUpdate;InPlace
+ type RolloutStrategyType string
+ 
+ const (
  	// RollingUpdateStrategyType replaces the old control planes by new one using rolling update
  	// i.e. gradually scale up or down the old control planes and scale up or down the new one.
  	RollingUpdateStrategyType RolloutStrategyType = "RollingUpdate"
@@ -35,6 +45,67 @@ index 0ab5d5d49..b39427bde 100644
  )
  
  // KubeadmControlPlaneSpec defines the desired state of KubeadmControlPlane.
+@@ -193,8 +201,12 @@ type RolloutBefore struct {
+ // RolloutStrategy describes how to replace existing machines
+ // with new ones.
+ type RolloutStrategy struct {
+-	// type of rollout. Currently the only supported strategy is
+-	// "RollingUpdate".
++	// type of rollout strategy to use.
++	// Supported values:
++	// - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
++	// i.e. gradually scale up or down the old control planes and scale up or down the new one.
++	// - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
++	//
+ 	// Default is RollingUpdate.
+ 	// +optional
+ 	Type RolloutStrategyType `json:"type,omitempty"`
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 32f469b9d..08c323785 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -6139,11 +6139,16 @@ spec:
+                     type: object
+                   type:
+                     description: |-
+-                      type of rollout. Currently the only supported strategy is
+-                      "RollingUpdate".
++                      type of rollout strategy to use.
++                      Supported values:
++                      - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
++                      i.e. gradually scale up or down the old control planes and scale up or down the new one.
++                      - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
++
+                       Default is RollingUpdate.
+                     enum:
+                     - RollingUpdate
++                    - InPlace
+                     type: string
+                 type: object
+               version:
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 664dc6956..e3c2906a9 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -4310,11 +4310,16 @@ spec:
+                             type: object
+                           type:
+                             description: |-
+-                              type of rollout. Currently the only supported strategy is
+-                              "RollingUpdate".
++                              type of rollout strategy to use.
++                              Supported values:
++                              - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
++                              i.e. gradually scale up or down the old control planes and scale up or down the new one.
++                              - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
++
+                               Default is RollingUpdate.
+                             enum:
+                             - RollingUpdate
++                            - InPlace
+                             type: string
+                         type: object
+                     required:
 diff --git a/controlplane/kubeadm/internal/controllers/upgrade.go b/controlplane/kubeadm/internal/controllers/upgrade.go
 index 20a158929..4ecb46729 100644
 --- a/controlplane/kubeadm/internal/controllers/upgrade.go
