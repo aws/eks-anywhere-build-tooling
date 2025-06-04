@@ -1,23 +1,23 @@
-From 205bc0fc47dd50595c618897f692cfd055286acd Mon Sep 17 00:00:00 2001
+From 399696140a49754b91c2a44d93e06c8114334e34 Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 24 Jan 2024 00:00:03 -0800
 Subject: [PATCH 35/40] Add support for in-place upgrades in MachineDeployments
 
 ---
- api/v1beta1/machinedeployment_types.go        |  11 +-
- .../cluster.x-k8s.io_clusterclasses.yaml      |   1 +
- .../crd/bases/cluster.x-k8s.io_clusters.yaml  |   1 +
- .../cluster.x-k8s.io_machinedeployments.yaml  |   1 +
+ api/v1beta1/machinedeployment_types.go        |  19 ++-
+ .../cluster.x-k8s.io_clusterclasses.yaml      |   9 +-
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  |   9 +-
+ .../cluster.x-k8s.io_machinedeployments.yaml  |  11 +-
  .../machinedeployment_controller.go           |   4 +
  .../machinedeployment_inplace.go              |  44 +++++++
  .../machinedeployment_inplace_test.go         | 113 ++++++++++++++++++
  .../machinedeployment/mdutil/util.go          |   2 +
- 8 files changed, 176 insertions(+), 1 deletion(-)
+ 8 files changed, 205 insertions(+), 6 deletions(-)
  create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace.go
  create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace_test.go
 
 diff --git a/api/v1beta1/machinedeployment_types.go b/api/v1beta1/machinedeployment_types.go
-index 80307605d..42e7a475c 100644
+index 80307605d..988f742b5 100644
 --- a/api/v1beta1/machinedeployment_types.go
 +++ b/api/v1beta1/machinedeployment_types.go
 @@ -39,6 +39,9 @@ const (
@@ -43,9 +43,18 @@ index 80307605d..42e7a475c 100644
  	// MachineDeploymentUniqueLabel is used to uniquely identify the Machines of a MachineSet.
  	// The MachineDeployment controller will set this label on a MachineSet when it is created.
  	// The label is also applied to the Machines of the MachineSet and used in the MachineSet selector.
-@@ -334,7 +343,7 @@ type MachineDeploymentSpec struct {
+@@ -332,9 +341,15 @@ type MachineDeploymentSpec struct {
+ // MachineDeploymentStrategy describes how to replace existing machines
+ // with new ones.
  type MachineDeploymentStrategy struct {
- 	// type of deployment. Allowed values are RollingUpdate and OnDelete.
+-	// type of deployment. Allowed values are RollingUpdate and OnDelete.
++	// type of rollout strategy to use.
++	// Supported values:
++	// - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++	// i.e. gradually scale down the old MachineSet and scale up the new one.
++	// - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed. 
++	// - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
++	//	
  	// The default is RollingUpdate.
 -	// +kubebuilder:validation:Enum=RollingUpdate;OnDelete
 +	// +kubebuilder:validation:Enum=RollingUpdate;OnDelete;InPlace
@@ -53,10 +62,22 @@ index 80307605d..42e7a475c 100644
  	Type MachineDeploymentStrategyType `json:"type,omitempty"`
  
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-index 7d8f42572..843884e95 100644
+index 7d8f42572..f9ee15948 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-@@ -1862,6 +1862,7 @@ spec:
+@@ -1857,11 +1857,18 @@ spec:
+                               type: object
+                             type:
+                               description: |-
+-                                type of deployment. Allowed values are RollingUpdate and OnDelete.
++                                type of rollout strategy to use.
++                                Supported values:
++                                - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++                                i.e. gradually scale down the old MachineSet and scale up the new one.
++                                - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
++                                - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
++
+                                 The default is RollingUpdate.
                                enum:
                                - RollingUpdate
                                - OnDelete
@@ -65,10 +86,22 @@ index 7d8f42572..843884e95 100644
                            type: object
                          template:
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 1f343357d..2bb244055 100644
+index 1f343357d..d58aac1be 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -1831,6 +1831,7 @@ spec:
+@@ -1826,11 +1826,18 @@ spec:
+                                   type: object
+                                 type:
+                                   description: |-
+-                                    type of deployment. Allowed values are RollingUpdate and OnDelete.
++                                    type of rollout strategy to use.
++                                    Supported values:
++                                    - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++                                    i.e. gradually scale down the old MachineSet and scale up the new one.
++                                    - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
++                                    - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
++
+                                     The default is RollingUpdate.
                                    enum:
                                    - RollingUpdate
                                    - OnDelete
@@ -77,10 +110,23 @@ index 1f343357d..2bb244055 100644
                                type: object
                              variables:
 diff --git a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-index 9445c8766..821a62a44 100644
+index 9445c8766..3453fda8d 100644
 --- a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-@@ -769,6 +769,7 @@ spec:
+@@ -764,11 +764,18 @@ spec:
+                     type: object
+                   type:
+                     description: |-
+-                      type of deployment.
+-                      Default is RollingUpdate.
++                      type of rollout strategy to use.
++                      Supported values:
++                      - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++                      i.e. gradually scale down the old MachineSet and scale up the new one.
++                      - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
++                      - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
++
++                      The default is RollingUpdate.
                      enum:
                      - RollingUpdate
                      - OnDelete
