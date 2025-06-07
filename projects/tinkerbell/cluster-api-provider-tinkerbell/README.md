@@ -1,5 +1,5 @@
 ## **Cluster API Provider for Tinkerbell**
-![Version](https://img.shields.io/badge/version-v0.6.4-blue)
+![Version](https://img.shields.io/badge/version-v0.6.5-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiZ2VEbkM5dXBVeFZhSE5IR2UvdjlNanY1RVo5S29zd0E2M1hiaCtNSEd5U3F2VUdCbkViWHVlclg5a093WVgrRUdqNnJLYUtpWjhqUWJaT0NJb3RaWWFjPSIsIml2UGFyYW1ldGVyU3BlYyI6ImtvQnZHalpsVjBCRk5jN2IiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Cluster API Provider Tinkerbell (CAPT)](https://github.com/tinkerbell/cluster-api-provider-tinkerbell) is an implementation of the Cluster API for Tinkerbell, which supports declarative infrastructure for Kubernetes cluster creation, configuration and management on Tinkerbell infrastructure. CAPT is designed to allow customers to bootstrap workload clusters using hardware managed by Tinkerbell. These clusters can be enhanced externally with remote power management and secure de-provisioning of instances using [Rufio](https://github.com/tinkerbell/rufio).
