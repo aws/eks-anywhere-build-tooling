@@ -83,12 +83,19 @@ func controlPlaneJoin() error {
 		return errors.Wrapf(err, "getting kubeadm version")
 	}
 
-	if isEtcdExternal, err := isClusterWithExternalEtcd(kubeconfigPath); err != nil {
+	isEtcdExternal, err := isClusterWithExternalEtcd(kubeconfigPath)
+	if err != nil {
 		return err
-	} else if !isEtcdExternal {
-		if err := joinLocalEtcd(kubeadmVersion); err != nil {
-			return err
-		}
+	}
+
+	// nothing to do for external etcd
+	if isEtcdExternal {
+		return nil 
+	}
+
+	kubeadmEtcdJoinCmd, err := joinLocalEtcd(kubeadmVersion)
+	if err != nil {
+		return err
 	}
 
 	// Migrate all static pods from this host-container to the bottlerocket host using the apiclient
@@ -143,13 +150,23 @@ func controlPlaneJoin() error {
 		checkEbsInit(ebsInitControl)
 	}
 
+	// For Kubernetes >= v1.33, we no longer kill the kubeadm process inside joinLocalEtcd. 
+	// Therefore, we explicitly wait for kubeadm to complete here 
+	// to ensure the control plane join phase (including etcd promotion) finishes successfully.
+	if kubeadmEtcdJoinCmd != nil {
+		fmt.Println("⏳ Waiting for kubeadm to finish...")
+		if err := cmd.Wait(); err != nil {
+			return errors.Wrapf(err, "command failed: %v", cmd)
+		}
+	}
+
 	return nil
 }
 
-func joinLocalEtcd(version *versionutil.Version) error {
+func joinLocalEtcd(version *versionutil.Version) (*exec.Cmd, error) {
 	k8s131Compare, err := version.Compare("1.31.0")
 	if err != nil {
-		return errors.Wrap(err, "Error comparing kubeadm version with v1.31.0")
+		return nil, errors.Wrap(err, "Error comparing kubeadm version with v1.31.0")
 	}
 
 	var cmd *exec.Cmd
@@ -167,14 +184,33 @@ func joinLocalEtcd(version *versionutil.Version) error {
 	cmd = exec.Command(kubeadmBinary, joinCmdArgs...)
 	cmd.Stdout = os.Stdout
 	if err := cmd.Start(); err != nil {
-		return errors.Wrapf(err, "Error running command: %v", cmd)
+		return nil, errors.Wrapf(err, "Error running command: %v", cmd)
 	}
+	
+	k8s133Compare, err := version.Compare("1.33.0")
+	if err != nil {
+		return nil, errors.Wrap(err, "error comparing kubeadm version with v1.33.0")
+	}
+
+	// Kill kubeadm for versions < v1.33.0.
+	// In v1.33.0 and above, kubeadm includes logic to promote the etcd learner to a voting member
+	// after the static pod is up, so we must allow kubeadm to continue running.
+	// Killing it early would prevent learner promotion and result in an incomplete etcd join.
+	shouldKill := k8s133Compare == -1 
 
 	// Get kubeadm to write out the manifest for etcd.
 	// It will wait for etcd to start, which won't succeed because we need to set the static-pods in the BR api.
 	etcdCheckFiles := []string{"/etc/kubernetes/manifests/etcd.yaml"}
-	if err := utils.KillCmdAfterFilesGeneration(cmd, etcdCheckFiles); err != nil {
-		return errors.Wrap(err, "Error waiting for etcd manifest files")
+	if err := utils.WaitForManifestAndOptionallyKillCmd(cmd, etcdCheckFiles, shouldKill); err != nil {
+		return nil, errors.Wrap(err, "Error waiting for etcd manifest files")
 	}
-	return nil
+
+	if shouldKill {
+		// Kubeadm was explicitly stopped earlier (for < v1.33), so nothing to wait for.
+		return nil, nil
+	}
+
+	// For >= v1.33, we let kubeadm run to allow etcd learner promotion.
+	// Returning the kubeadm command handle to wait for its completion before the bootstrap container exits.
+	return cmd, nil
 }
