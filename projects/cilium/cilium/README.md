@@ -1,5 +1,5 @@
 ## **Cilium**
-![Version](https://img.shields.io/badge/version-v1.15.14--eksa.1-blue)
+![Version](https://img.shields.io/badge/version-v1.15.16--eksa.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiYTh2UnBFVGhjQ1EyeENsWU91ZlJzMktyZHRINlpFWlc0RkZ5amU3Yy96b3p2Z2dxNThZZVQ5ZjRPTEZndGVNQVMwNkMvVmZZR000bGJXWDFqWDFnUlZVPSIsIml2UGFyYW1ldGVyU3BlYyI6ImZRZ2JzZmhRcWZtNFNHZTciLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Cilium](https://github.com/cilium/cilium) is an open-source software for providing and transparently securing network connectivity and load-balancing between application workloads such as application containers or processes. Cilium operates at Layer 3/4 to provide traditional networking and security services as well as at Layer 7 to protect and secure use of modern application protocols such as HTTP, gRPC and Kafka. Cilium is integrated into common orchestration frameworks such as Kubernetes. A new Linux kernel technology called [eBPF](https://ebpf.io) is at the foundation of Cilium. It supports dynamic insertion of eBPF bytecode into the Linux kernel at various integration points such as network I/O, application sockets and tracepoints to implement security, networking and visibility logic.
