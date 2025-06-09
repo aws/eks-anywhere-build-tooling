@@ -88,14 +88,12 @@ func controlPlaneJoin() error {
 		return err
 	}
 
-	// nothing to do for external etcd
-	if isEtcdExternal {
-		return nil 
-	}
-
-	kubeadmEtcdJoinCmd, err := joinLocalEtcd(kubeadmVersion)
-	if err != nil {
-		return err
+	var kubeadmEtcdJoinCmd *exec.Cmd
+	if !isEtcdExternal {
+		kubeadmEtcdJoinCmd, err = joinLocalEtcd(kubeadmVersion)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Migrate all static pods from this host-container to the bottlerocket host using the apiclient
