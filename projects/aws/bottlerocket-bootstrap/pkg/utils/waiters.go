@@ -124,7 +124,7 @@ func WaitFor200(url string, timeout time.Duration) error {
 	}
 }
 
-func KillCmdAfterFilesGeneration(cmd *exec.Cmd, checkFiles []string) error {
+func WaitForManifestAndOptionallyKillCmd(cmd *exec.Cmd, checkFiles []string, shouldKill bool) error {
 	// Check for files written and send ok signal back on channel
 	// ctx is used here to cancel the goroutine if the timeout has occurred
 	okChan := make(chan bool)
@@ -165,7 +165,9 @@ func KillCmdAfterFilesGeneration(cmd *exec.Cmd, checkFiles []string) error {
 	select {
 	case <-okChan:
 		fmt.Println("All files were created, exiting kubeadm command")
-		cmd.Process.Kill()
+		if shouldKill {
+			cmd.Process.Kill()
+		}
 		return nil
 	case <-timeout:
 		cmd.Process.Kill()

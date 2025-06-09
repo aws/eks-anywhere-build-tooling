@@ -44,7 +44,7 @@ func killCmdAfterJoinFilesGeneration(cmd *exec.Cmd) error {
 		"/var/lib/kubelet/kubeadm-flags.env",
 		"/var/lib/kubeadm/pki/ca.crt",
 	}
-	return utils.KillCmdAfterFilesGeneration(cmd, checkFiles)
+	return utils.WaitForManifestAndOptionallyKillCmd(cmd, checkFiles, true)
 }
 
 // checkEbsInit checks the execution of ebs-init goroutine,
