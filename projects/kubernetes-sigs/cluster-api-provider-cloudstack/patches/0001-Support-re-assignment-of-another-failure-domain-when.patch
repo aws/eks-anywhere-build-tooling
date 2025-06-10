@@ -1,19 +1,19 @@
-From 063b631cdeeb718048e7282f6895183c5dbaa7a6 Mon Sep 17 00:00:00 2001
+From 4d8718335eb653e78deda8cfcc8dfbbf0521e484 Mon Sep 17 00:00:00 2001
 From: Jhaanvi Golani <jhaanvi@amazon.com>
 Date: Mon, 11 Mar 2024 17:32:24 -0700
-Subject: [PATCH 1/2] Support re-assignment of another failure domain when the
+Subject: [PATCH] Support re-assignment of another failure domain when the
  machine failed to provision
 
 Signed-off-by: Jhaanvi Golani <jhaanvi@amazon.com>
 ---
  api/v1beta3/cloudstackmachine_types.go        |  37 +++
- config/rbac/role.yaml                         |   2 +
+ config/rbac/role.yaml                         |  13 +-
  controllers/cks_cluster_controller.go         |   4 +-
  controllers/cks_machine_controller.go         |   4 +-
  .../cloudstackaffinitygroup_controller.go     |   2 +-
  .../cloudstackfailuredomain_controller.go     |   2 +-
  .../cloudstackisolatednetwork_controller.go   |   2 +-
- controllers/cloudstackmachine_controller.go   | 113 +++++--
+ controllers/cloudstackmachine_controller.go   | 110 ++++--
  .../cloudstackmachine_controller_test.go      |   7 +-
  ...loudstackmachinestatechecker_controller.go |   2 +-
  controllers/controllers_suite_test.go         |  18 +-
@@ -29,7 +29,7 @@ Signed-off-by: Jhaanvi Golani <jhaanvi@amazon.com>
  pkg/failuredomains/client_test.go             | 159 +++++++++
  .../failuredomains_suite_test.go              |  33 ++
  pkg/metrics/metrics.go                        |  22 +-
- 23 files changed, 1244 insertions(+), 109 deletions(-)
+ 23 files changed, 1254 insertions(+), 107 deletions(-)
  create mode 100644 pkg/errors/cloudstack.go
  create mode 100644 pkg/errors/cloudstack_test.go
  create mode 100644 pkg/errors/errors_suite_test.go
@@ -40,7 +40,7 @@ Signed-off-by: Jhaanvi Golani <jhaanvi@amazon.com>
  create mode 100644 pkg/failuredomains/failuredomains_suite_test.go
 
 diff --git a/api/v1beta3/cloudstackmachine_types.go b/api/v1beta3/cloudstackmachine_types.go
-index 22afe0c..73442f5 100644
+index a725495..4d0e50b 100644
 --- a/api/v1beta3/cloudstackmachine_types.go
 +++ b/api/v1beta3/cloudstackmachine_types.go
 @@ -26,6 +26,9 @@ import (
@@ -95,23 +95,47 @@ index 22afe0c..73442f5 100644
  	// Cloudstack resource ID.
  	// +optional
 diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
-index 83ecdc6..187e51c 100644
+index c7283f2..18d55f9 100644
 --- a/config/rbac/role.yaml
 +++ b/config/rbac/role.yaml
-@@ -58,6 +58,8 @@ rules:
+@@ -29,13 +29,22 @@ rules:
+   resources:
+   - clusters
+   - clusters/status
+-  - machines/status
+   - machinesets
+   - machinesets/status
    verbs:
    - get
    - list
+   - watch
++- apiGroups:
++  - cluster.x-k8s.io
++  resources:
++  - machines/status
++  verbs:
++  - get
++  - list
++  - watch
 +  - patch
 +  - update
-   - watch
  - apiGroups:
    - cluster.x-k8s.io
+   resources:
+@@ -45,6 +54,8 @@ rules:
+   - get
+   - list
+   - watch
++  - patch
++  - update
+ - apiGroups:
+   - controlplane.cluster.x-k8s.io
+   resources:
 diff --git a/controllers/cks_cluster_controller.go b/controllers/cks_cluster_controller.go
-index 2511651..05d22ab 100644
+index c7b4a98..817efc6 100644
 --- a/controllers/cks_cluster_controller.go
 +++ b/controllers/cks_cluster_controller.go
-@@ -75,7 +75,7 @@ func (r *CksClusterReconciliationRunner) Reconcile() (res ctrl.Result, reterr er
+@@ -76,7 +76,7 @@ func (r *CksClusterReconciliationRunner) Reconcile() (res ctrl.Result, reterr er
  	// Prevent premature deletion.
  	controllerutil.AddFinalizer(r.ReconciliationSubject, CksClusterFinalizer)
  
@@ -120,7 +144,7 @@ index 2511651..05d22ab 100644
  	if r.ShouldReturn(res, err) {
  		return res, err
  	}
-@@ -94,7 +94,7 @@ func (r *CksClusterReconciliationRunner) ReconcileDelete() (ctrl.Result, error)
+@@ -95,7 +95,7 @@ func (r *CksClusterReconciliationRunner) ReconcileDelete() (ctrl.Result, error)
  		if len(r.FailureDomains.Items) == 0 {
  			return ctrl.Result{}, fmt.Errorf("no failure domains found")
  		}
@@ -130,10 +154,10 @@ index 2511651..05d22ab 100644
  			return res, err
  		}
 diff --git a/controllers/cks_machine_controller.go b/controllers/cks_machine_controller.go
-index 574f932..f8a8119 100644
+index 9f0e527..3e8e719 100644
 --- a/controllers/cks_machine_controller.go
 +++ b/controllers/cks_machine_controller.go
-@@ -63,7 +63,7 @@ func (reconciler *CksMachineReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -64,7 +64,7 @@ func (reconciler *CksMachineReconciler) Reconcile(ctx context.Context, req ctrl.
  	r.UsingBaseReconciler(reconciler.ReconcilerBase).ForRequest(req).WithRequestCtx(ctx)
  	r.WithAdditionalCommonStages(
  		r.GetFailureDomainByName(func() string { return r.ReconciliationSubject.Spec.FailureDomainName }, r.FailureDomain),
@@ -142,7 +166,7 @@ index 574f932..f8a8119 100644
  	return r.RunBaseReconciliationStages()
  }
  
-@@ -83,7 +83,7 @@ func (r *CksMachineReconciliationRunner) Reconcile() (res ctrl.Result, reterr er
+@@ -84,7 +84,7 @@ func (r *CksMachineReconciliationRunner) Reconcile() (res ctrl.Result, reterr er
  	// Prevent premature deletion.
  	controllerutil.AddFinalizer(r.ReconciliationSubject, CksMachineFinalizer)
  
@@ -165,7 +189,7 @@ index d825abf..f49dfea 100644
  }
  
 diff --git a/controllers/cloudstackfailuredomain_controller.go b/controllers/cloudstackfailuredomain_controller.go
-index 3084cf6..237f778 100644
+index 4dbb04c..7f2fc3f 100644
 --- a/controllers/cloudstackfailuredomain_controller.go
 +++ b/controllers/cloudstackfailuredomain_controller.go
 @@ -85,7 +85,7 @@ func (reconciler *CloudStackFailureDomainReconciler) Reconcile(ctx context.Conte
@@ -178,10 +202,10 @@ index 3084cf6..237f778 100644
  		return res, err
  	}
 diff --git a/controllers/cloudstackisolatednetwork_controller.go b/controllers/cloudstackisolatednetwork_controller.go
-index eeb33d3..85776fe 100644
+index 7740641..8daa46b 100644
 --- a/controllers/cloudstackisolatednetwork_controller.go
 +++ b/controllers/cloudstackisolatednetwork_controller.go
-@@ -61,7 +61,7 @@ func (reconciler *CloudStackIsoNetReconciler) Reconcile(ctx context.Context, req
+@@ -62,7 +62,7 @@ func (reconciler *CloudStackIsoNetReconciler) Reconcile(ctx context.Context, req
  	r.UsingBaseReconciler(reconciler.ReconcilerBase).ForRequest(req).WithRequestCtx(ctx)
  	r.WithAdditionalCommonStages(
  		r.GetFailureDomainByName(func() string { return r.ReconciliationSubject.Spec.FailureDomainName }, r.FailureDomain),
@@ -191,10 +215,10 @@ index eeb33d3..85776fe 100644
  	return r.RunBaseReconciliationStages()
  }
 diff --git a/controllers/cloudstackmachine_controller.go b/controllers/cloudstackmachine_controller.go
-index cc22a7b..f5e28d7 100644
+index 9c0a1aa..867b449 100644
 --- a/controllers/cloudstackmachine_controller.go
 +++ b/controllers/cloudstackmachine_controller.go
-@@ -19,17 +19,16 @@ package controllers
+@@ -19,16 +19,16 @@ package controllers
  import (
  	"context"
  	"fmt"
@@ -202,20 +226,18 @@ index cc22a7b..f5e28d7 100644
  	"reflect"
  	"regexp"
 -	"time"
--
--	"k8s.io/utils/pointer"
  
  	"github.com/pkg/errors"
  	corev1 "k8s.io/api/core/v1"
  	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
  	"k8s.io/apimachinery/pkg/types"
 +	"k8s.io/client-go/util/retry"
-+	"k8s.io/utils/pointer"
+ 	"k8s.io/utils/ptr"
 +	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
  	"sigs.k8s.io/cluster-api/util"
  	"sigs.k8s.io/cluster-api/util/predicates"
  	ctrl "sigs.k8s.io/controller-runtime"
-@@ -44,7 +43,8 @@ import (
+@@ -43,7 +43,8 @@ import (
  	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
  	"sigs.k8s.io/cluster-api-provider-cloudstack/controllers/utils"
  	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/cloud"
@@ -225,7 +247,7 @@ index cc22a7b..f5e28d7 100644
  )
  
  var (
-@@ -68,7 +68,7 @@ const (
+@@ -67,7 +68,7 @@ const (
  // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=cloudstackmachines,verbs=get;list;watch;create;update;patch;delete
  // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=cloudstackmachines/status,verbs=get;update;patch
  // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=cloudstackmachines/finalizers,verbs=update
@@ -234,7 +256,7 @@ index cc22a7b..f5e28d7 100644
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machinesets,verbs=get;list;watch
  // +kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes,verbs=get;list;watch
  // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-@@ -113,7 +113,7 @@ func (reconciler *CloudStackMachineReconciler) Reconcile(ctx context.Context, re
+@@ -112,7 +113,7 @@ func (reconciler *CloudStackMachineReconciler) Reconcile(ctx context.Context, re
  		r.RequeueIfCloudStackClusterNotReady,
  		r.SetFailureDomainOnCSMachine,
  		r.GetFailureDomainByName(func() string { return r.ReconciliationSubject.Spec.FailureDomainName }, r.FailureDomain),
@@ -243,7 +265,7 @@ index cc22a7b..f5e28d7 100644
  	return r.RunBaseReconciliationStages()
  }
  
-@@ -173,25 +173,53 @@ func (r *CloudStackMachineReconciliationRunner) ConsiderAffinity() (ctrl.Result,
+@@ -172,25 +173,53 @@ func (r *CloudStackMachineReconciliationRunner) ConsiderAffinity() (ctrl.Result,
  }
  
  // SetFailureDomainOnCSMachine sets the failure domain the machine should launch in.
@@ -315,7 +337,7 @@ index cc22a7b..f5e28d7 100644
  }
  
  // DeleteMachineIfFailuredomainNotExist delete CAPI machine if machine is deployed in a failuredomain that does not exist anymore.
-@@ -229,7 +257,7 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
+@@ -228,7 +257,7 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
  	// Get the kubeadm bootstrap secret for this machine.
  	secret := &corev1.Secret{}
  	key := types.NamespacedName{Namespace: r.CAPIMachine.Namespace, Name: *r.CAPIMachine.Spec.Bootstrap.DataSecretName}
@@ -324,7 +346,7 @@ index cc22a7b..f5e28d7 100644
  		return ctrl.Result{}, err
  	}
  	data, present := secret.Data["value"]
-@@ -241,6 +269,16 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
+@@ -250,6 +279,16 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
  	err := r.CSUser.GetOrCreateVMInstance(r.ReconciliationSubject, r.CAPIMachine, r.CSCluster, r.FailureDomain, r.AffinityGroup, userData)
  	if err != nil {
  		r.Recorder.Eventf(r.ReconciliationSubject, "Warning", "Creating", CSMachineCreationFailed, err.Error())
@@ -341,7 +363,7 @@ index cc22a7b..f5e28d7 100644
  	}
  	if err == nil && !controllerutil.ContainsFinalizer(r.ReconciliationSubject, infrav1.MachineFinalizer) { // Fetched or Created?
  		// Adding a finalizer will make reconcile-delete try to destroy the associated VM through instanceID.
-@@ -254,6 +292,29 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
+@@ -263,6 +302,29 @@ func (r *CloudStackMachineReconciliationRunner) GetOrCreateVMInstance() (retRes
  	return ctrl.Result{}, err
  }
  
@@ -372,13 +394,13 @@ index cc22a7b..f5e28d7 100644
  	// since cloudstack metadata does not allow custom data added into meta_data, following line is a workaround to specify a hostname name
  	// {{ ds.meta_data.hostname }} is expected to be used as a node name when kubelet register a node
 diff --git a/controllers/cloudstackmachine_controller_test.go b/controllers/cloudstackmachine_controller_test.go
-index e419572..80ac0c3 100644
+index b8a1e34..b7d020d 100644
 --- a/controllers/cloudstackmachine_controller_test.go
 +++ b/controllers/cloudstackmachine_controller_test.go
 @@ -27,14 +27,15 @@ import (
  	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
  	"k8s.io/apimachinery/pkg/types"
- 	"k8s.io/utils/pointer"
+ 	"k8s.io/utils/ptr"
 -	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
 -	dummies "sigs.k8s.io/cluster-api-provider-cloudstack/test/dummies/v1beta3"
  	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -392,16 +414,16 @@ index e419572..80ac0c3 100644
 +	dummies "sigs.k8s.io/cluster-api-provider-cloudstack/test/dummies/v1beta3"
  )
  
- var _ = Describe("CloudStackMachineReconciler", func() {
-@@ -250,7 +251,7 @@ var _ = Describe("CloudStackMachineReconciler", func() {
+ var _ = ginkgo.Describe("CloudStackMachineReconciler", func() {
+@@ -250,7 +251,7 @@ var _ = ginkgo.Describe("CloudStackMachineReconciler", func() {
  			setClusterReady(fakeCtrlClient)
  
  			requestNamespacedName := types.NamespacedName{Namespace: dummies.ClusterNameSpace, Name: dummies.CSMachine1.Name}
 -			MachineReconciler.AsFailureDomainUser(&dummies.CSFailureDomain1.Spec)
 +			MachineReconciler.AsFailureDomainUser(ctx, &dummies.CSFailureDomain1.Spec)
  			res, err := MachineReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: requestNamespacedName})
- 			Ω(err).ShouldNot(HaveOccurred())
- 			Ω(res.RequeueAfter).Should(BeZero())
+ 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+ 			gomega.Expect(res.RequeueAfter).Should(gomega.BeZero())
 diff --git a/controllers/cloudstackmachinestatechecker_controller.go b/controllers/cloudstackmachinestatechecker_controller.go
 index d3eba1e..5621943 100644
 --- a/controllers/cloudstackmachinestatechecker_controller.go
@@ -416,10 +438,10 @@ index d3eba1e..5621943 100644
  			if err := r.CSClient.ResolveVMInstanceDetails(r.CSMachine); err != nil {
  				if !strings.Contains(strings.ToLower(err.Error()), "no match found") {
 diff --git a/controllers/controllers_suite_test.go b/controllers/controllers_suite_test.go
-index c1b2d1d..d2bfeff 100644
+index 4082c0d..0ebddaf 100644
 --- a/controllers/controllers_suite_test.go
 +++ b/controllers/controllers_suite_test.go
-@@ -29,21 +29,20 @@ import (
+@@ -29,21 +29,22 @@ import (
  	"testing"
  	"time"
  
@@ -428,26 +450,27 @@ index c1b2d1d..d2bfeff 100644
 -
 -	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 -	"k8s.io/klog/v2"
--	"k8s.io/klog/v2/klogr"
 -
  	"github.com/apache/cloudstack-go/v2/cloudstack"
++
  	"github.com/go-logr/logr"
- 	"github.com/golang/mock/gomock"
- 	. "github.com/onsi/ginkgo/v2"
- 	. "github.com/onsi/gomega"
+ 	ginkgo "github.com/onsi/ginkgo/v2"
+ 	gomega "github.com/onsi/gomega"
  	"github.com/pkg/errors"
+ 	gomock "go.uber.org/mock/gomock"
 +	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
  	"k8s.io/client-go/kubernetes/scheme"
  	"k8s.io/client-go/rest"
 +	"k8s.io/client-go/tools/record"
 +	"k8s.io/klog/v2"
-+	"k8s.io/klog/v2/klogr"
 +	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 +	"sigs.k8s.io/cluster-api/util/patch"
  	ctrl "sigs.k8s.io/controller-runtime"
++	"sigs.k8s.io/cluster-api-provider-cloudstack/test/fakes"
  	"sigs.k8s.io/controller-runtime/pkg/client"
  	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-@@ -54,10 +53,7 @@ import (
+ 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+@@ -53,10 +54,7 @@ import (
  	csReconcilers "sigs.k8s.io/cluster-api-provider-cloudstack/controllers"
  	csCtrlrUtils "sigs.k8s.io/cluster-api-provider-cloudstack/controllers/utils"
  	"sigs.k8s.io/cluster-api-provider-cloudstack/pkg/mocks"
@@ -458,7 +481,7 @@ index c1b2d1d..d2bfeff 100644
  	//+kubebuilder:scaffold:imports
  )
  
-@@ -170,7 +166,7 @@ type MockCtrlrCloudClientImplementation struct {
+@@ -169,7 +167,7 @@ type MockCtrlrCloudClientImplementation struct {
  // AsFailureDomainUser is a method used in the reconciliation runner to set up the CloudStack client. Using this here
  // just sets the CSClient to a mock client.
  func (m *MockCtrlrCloudClientImplementation) AsFailureDomainUser(
@@ -557,25 +580,24 @@ index bf66c25..5ca3e97 100644
 +	return c.fdClientFactory.GetCloudClientAndUser(ctx, fdSpec)
 +}
 diff --git a/pkg/cloud/instance.go b/pkg/cloud/instance.go
-index 6fb5857..e622920 100644
+index 8ebe713..fcd1798 100644
 --- a/pkg/cloud/instance.go
 +++ b/pkg/cloud/instance.go
-@@ -22,16 +22,21 @@ import (
+@@ -22,15 +22,20 @@ import (
  	"strconv"
  	"strings"
  
--	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"github.com/apache/cloudstack-go/v2/cloudstack"
++	"github.com/pkg/errors"
++	corev1 "k8s.io/api/core/v1"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/utils/ptr"
 -
--	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
--
- 	"github.com/apache/cloudstack-go/v2/cloudstack"
- 	"github.com/hashicorp/go-multierror"
- 	"github.com/pkg/errors"
- 	corev1 "k8s.io/api/core/v1"
-+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
- 	"k8s.io/utils/pointer"
-+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-+
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+ 
+-	"github.com/apache/cloudstack-go/v2/cloudstack"
+-	"github.com/pkg/errors"
+-	corev1 "k8s.io/api/core/v1"
  	infrav1 "sigs.k8s.io/cluster-api-provider-cloudstack/api/v1beta3"
 +	cserrors "sigs.k8s.io/cluster-api-provider-cloudstack/pkg/errors"
 +)
@@ -586,7 +608,7 @@ index 6fb5857..e622920 100644
  )
  
  type VMIface interface {
-@@ -362,24 +367,26 @@ func (c *client) DeployVM(
+@@ -354,24 +359,26 @@ func (c *client) DeployVM(
  	if err != nil {
  		c.customMetrics.EvaluateErrorAndIncrementAcsReconciliationErrorCounter(err)
  
@@ -608,15 +630,15 @@ index 6fb5857..e622920 100644
 +			return deployVMError
  		}
  
- 		csMachine.Spec.InstanceID = pointer.String(vm.Id)
+ 		csMachine.Spec.InstanceID = ptr.To(vm.Id)
  		csMachine.Status.InstanceState = vm.State
  
 -		return fmt.Errorf("incomplete vm deployment (vm_id=%v): %w", vm.Id, err)
 +		return fmt.Errorf("incomplete vm deployment (vm_id=%v): %w", vm.Id, deployVMError)
  	}
  
- 	csMachine.Spec.InstanceID = pointer.String(deployVMResp.Id)
-@@ -452,6 +459,35 @@ func findVirtualMachine(
+ 	csMachine.Spec.InstanceID = ptr.To(deployVMResp.Id)
+@@ -444,6 +451,35 @@ func findVirtualMachine(
  
  // DestroyVMInstance Destroys a VM instance. Assumes machine has been fetched prior and has an instance ID.
  func (c *client) DestroyVMInstance(csMachine *infrav1.CloudStackMachine) error {
@@ -652,7 +674,7 @@ index 6fb5857..e622920 100644
  	p := c.cs.Configuration.NewListCapabilitiesParams()
  	capabilities, err := c.cs.Configuration.ListCapabilities(p)
  	expunge := true
-@@ -465,30 +501,32 @@ func (c *client) DestroyVMInstance(csMachine *infrav1.CloudStackMachine) error {
+@@ -457,30 +493,32 @@ func (c *client) DestroyVMInstance(csMachine *infrav1.CloudStackMachine) error {
  	if err != nil {
  		return err
  	}
@@ -698,7 +720,7 @@ index 6fb5857..e622920 100644
  
  func (c *client) listVMInstanceDatadiskVolumeIDs(instanceID string) ([]string, error) {
 diff --git a/pkg/cloud/network.go b/pkg/cloud/network.go
-index 53637a7..1aab56c 100644
+index 7adce7d..9e0c057 100644
 --- a/pkg/cloud/network.go
 +++ b/pkg/cloud/network.go
 @@ -17,15 +17,19 @@ limitations under the License.
@@ -721,7 +743,7 @@ index 53637a7..1aab56c 100644
  }
  
  const (
-@@ -79,6 +83,26 @@ func (c *client) ResolveNetwork(net *infrav1.Network) (retErr error) {
+@@ -102,6 +106,26 @@ func (c *client) ResolveNetwork(net *infrav1.Network) (retErr error) {
  	return nil
  }
  
@@ -1189,7 +1211,7 @@ index 0000000..866bbdd
 +}
 diff --git a/pkg/failuredomains/balancer_test.go b/pkg/failuredomains/balancer_test.go
 new file mode 100644
-index 0000000..e97b6af
+index 0000000..2dbaf89
 --- /dev/null
 +++ b/pkg/failuredomains/balancer_test.go
 @@ -0,0 +1,314 @@
@@ -1217,7 +1239,7 @@ index 0000000..e97b6af
 +	"strings"
 +
 +	"github.com/apache/cloudstack-go/v2/cloudstack"
-+	"github.com/golang/mock/gomock"
++	gomock "go.uber.org/mock/gomock"
 +	. "github.com/onsi/ginkgo/v2"
 +	. "github.com/onsi/gomega"
 +	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1588,7 +1610,7 @@ index 0000000..92259ab
 +}
 diff --git a/pkg/failuredomains/client_test.go b/pkg/failuredomains/client_test.go
 new file mode 100644
-index 0000000..d5ddfd6
+index 0000000..4674ad6
 --- /dev/null
 +++ b/pkg/failuredomains/client_test.go
 @@ -0,0 +1,159 @@
@@ -1614,7 +1636,7 @@ index 0000000..d5ddfd6
 +	"context"
 +
 +	"github.com/apache/cloudstack-go/v2/cloudstack"
-+	"github.com/golang/mock/gomock"
++	gomock "go.uber.org/mock/gomock"
 +	. "github.com/onsi/ginkgo/v2"
 +	. "github.com/onsi/gomega"
 +	corev1 "k8s.io/api/core/v1"
@@ -1840,5 +1862,5 @@ index 77e9413..7f7ce3b 100644
 +	return errorCode
  }
 -- 
-2.47.0
+2.49.0
 
