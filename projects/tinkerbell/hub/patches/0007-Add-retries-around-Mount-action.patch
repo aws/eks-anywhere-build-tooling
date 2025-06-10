@@ -1,0 +1,67 @@
+From 43f24db236ff7e8a9bea36ae3d93acd63ed9b6fd Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulgab@amazon.com>
+Date: Tue, 10 Jun 2025 22:28:34 +0000
+Subject: [PATCH] Add retries around Mount action
+
+Sometimes the block devices takes some time to load up eventhough
+the disk is already available. This could potentially be due to
+udev/mdev still loding up the devices. This change adds retries around
+the mount action and keeps trying for 5 minutes to see if the device
+becomes available.
+
+Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
+---
+ writefile/main.go | 32 ++++++++++++++++++++++++++++++--
+ 1 file changed, 30 insertions(+), 2 deletions(-)
+
+diff --git a/writefile/main.go b/writefile/main.go
+index 9922f7c..8ea5a90 100644
+--- a/writefile/main.go
++++ b/writefile/main.go
+@@ -174,9 +174,21 @@ func main() {
+ 		log.Fatalf("Error creating the action Mountpoint [%s]", mountAction)
+ 	}
+ 
++	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
++	defer cancel()
++
++	// Sometimes the device takes time to load even though the disk is available
++	// This could potentially be due to udev/mdev still loading up the drivers
+ 	// Mount the block device to the /mountAction point
+-	if err := syscall.Mount(blockDevice, mountAction, filesystemType, 0, ""); err != nil {
+-		log.Fatalf("Mounting [%s] -> [%s] error [%v]", blockDevice, mountAction, err)
++	err = Retry(ctx, 30, 10*time.Second, func() error {
++		return syscall.Mount(blockDevice, mountAction, filesystemType, 0, "")
++	})
++	if err != nil {
++		if errors.Is(err, context.DeadlineExceeded) {
++			log.Fatalf("Timed out waiting for mount action")
++		} else {
++			log.Fatalf("Operation failed after retries: Mounting [%s] -> [%s]: %v", blockDevice, mountAction, err)
++		}
+ 	}
+ 
+ 	log.Infof("Mounted [%s] -> [%s]", blockDevice, mountAction)
+@@ -600,3 +612,19 @@ func getVLANID(b string) (int, error) {
+ 
+ 	return strconv.Atoi(parsed[1])
+ }
++
++func Retry(ctx context.Context, attempts int, sleep time.Duration, fn func() error) error {
++	var err error
++	for i := 0; i < attempts; i++ {
++		if err = fn(); err == nil {
++			return nil
++		}
++		select {
++		case <-ctx.Done():
++			return ctx.Err()
++		case <-time.After(sleep):
++			continue
++		}
++	}
++	return err
++}
+-- 
+2.47.1
+
