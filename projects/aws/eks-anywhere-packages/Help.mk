@@ -38,8 +38,8 @@ _output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/depen
 _output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
 _output/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper`
 _output/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper`
-_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-29: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-29`
-_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-29: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-29`
+_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-28: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-28`
+_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-28: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-28`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
