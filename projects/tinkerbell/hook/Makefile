@@ -84,7 +84,7 @@ IMAGE_BUILD_ARGS=
 BUILDSPECS=$(BUILDSPECS_FOR_COMBINE_IMAGES)
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
-PROJECT_DEPENDENCIES=eksa/containerd/containerd eksa/tinkerbell/hub eksa/tinkerbell/tink eksa/linuxkit/linuxkit
+PROJECT_DEPENDENCIES=eksa/containerd/containerd eksa/tinkerbell/actions eksa/tinkerbell/tink eksa/linuxkit/linuxkit
 
 # Since we build the arm and amd binaries on difference instances in codebuild
 # we do not want to delete missing files when s3 sync-ing from local to the bucket
@@ -204,7 +204,7 @@ $(OUTPUT_DIR)/hook-embedded/linux-%/images: $(GIT_PATCH_TARGET)
 	mkdir -p $(@D)
 	echo "$$($(MAKE) -C $(MAKE_ROOT)/../tink var-value-LATEST_IMAGE IMAGE_NAME=tink-worker) 127.0.0.1/embedded/tink-worker true" > $@.txt
 	for action in cexec kexec image2disk oci2disk writefile reboot; do \
-		echo "$$($(MAKE) -C $(MAKE_ROOT)/../hub var-value-LATEST_IMAGE IMAGE_NAME=$$action) 127.0.0.1/embedded/$$action true" >> $@.txt; \
+		echo "$$($(MAKE) -C $(MAKE_ROOT)/../actions var-value-LATEST_IMAGE IMAGE_NAME=$$action) 127.0.0.1/embedded/$$action true" >> $@.txt; \
 	done
 	cat $@.txt
 	@if [[ "$(JOB_TYPE)" == "presubmit" ]] && [[ "$(DOCKER_AVAILABLE)" == "false" ]]; then \

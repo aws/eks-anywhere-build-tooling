@@ -1,7 +1,7 @@
-From 43f24db236ff7e8a9bea36ae3d93acd63ed9b6fd Mon Sep 17 00:00:00 2001
+From c661dd8f30ca5fbab7b43469881653b200371da1 Mon Sep 17 00:00:00 2001
 From: Rahul Ganesh <rahulgab@amazon.com>
 Date: Tue, 10 Jun 2025 22:28:34 +0000
-Subject: [PATCH] Add retries around Mount action
+Subject: [PATCH 7/8] Add retries around Mount action
 
 Sometimes the block devices takes some time to load up eventhough
 the disk is already available. This could potentially be due to
@@ -15,7 +15,7 @@ Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
  1 file changed, 30 insertions(+), 2 deletions(-)
 
 diff --git a/writefile/main.go b/writefile/main.go
-index 9922f7c..8ea5a90 100644
+index 3776031..5f283a5 100644
 --- a/writefile/main.go
 +++ b/writefile/main.go
 @@ -174,9 +174,21 @@ func main() {
@@ -42,11 +42,10 @@ index 9922f7c..8ea5a90 100644
  	}
  
  	log.Infof("Mounted [%s] -> [%s]", blockDevice, mountAction)
-@@ -600,3 +612,19 @@ func getVLANID(b string) (int, error) {
- 
+@@ -546,6 +558,22 @@ func getVLANID(b string) (int, error) {
  	return strconv.Atoi(parsed[1])
  }
-+
+ 
 +func Retry(ctx context.Context, attempts int, sleep time.Duration, fn func() error) error {
 +	var err error
 +	for i := 0; i < attempts; i++ {
@@ -62,6 +61,10 @@ index 9922f7c..8ea5a90 100644
 +	}
 +	return err
 +}
++
+ func recursiveEnsureDir(mountPath, path string, mode os.FileMode, uid, gid int) error {
+ 	// Does the directory already exist? If so we can return early
+ 	exists, err := dirExists(mountPath, path)
 -- 
 2.47.1
 
