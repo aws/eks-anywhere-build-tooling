@@ -7,22 +7,22 @@
 
 
 ##@ GIT/Repo Targets
-clone-repo:  ## Clone upstream `hub`
+clone-repo:  ## Clone upstream `actions`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `cexec kexec image2disk oci2disk writefile` for `linux/amd64 linux/arm64`
-_output/bin/hub/linux-amd64/cexec: ## Build `_output/bin/hub/linux-amd64/cexec`
-_output/bin/hub/linux-amd64/kexec: ## Build `_output/bin/hub/linux-amd64/kexec`
-_output/bin/hub/linux-amd64/image2disk: ## Build `_output/bin/hub/linux-amd64/image2disk`
-_output/bin/hub/linux-amd64/oci2disk: ## Build `_output/bin/hub/linux-amd64/oci2disk`
-_output/bin/hub/linux-amd64/writefile: ## Build `_output/bin/hub/linux-amd64/writefile`
-_output/bin/hub/linux-arm64/cexec: ## Build `_output/bin/hub/linux-arm64/cexec`
-_output/bin/hub/linux-arm64/kexec: ## Build `_output/bin/hub/linux-arm64/kexec`
-_output/bin/hub/linux-arm64/image2disk: ## Build `_output/bin/hub/linux-arm64/image2disk`
-_output/bin/hub/linux-arm64/oci2disk: ## Build `_output/bin/hub/linux-arm64/oci2disk`
-_output/bin/hub/linux-arm64/writefile: ## Build `_output/bin/hub/linux-arm64/writefile`
+_output/bin/actions/linux-amd64/cexec: ## Build `_output/bin/actions/linux-amd64/cexec`
+_output/bin/actions/linux-amd64/kexec: ## Build `_output/bin/actions/linux-amd64/kexec`
+_output/bin/actions/linux-amd64/image2disk: ## Build `_output/bin/actions/linux-amd64/image2disk`
+_output/bin/actions/linux-amd64/oci2disk: ## Build `_output/bin/actions/linux-amd64/oci2disk`
+_output/bin/actions/linux-amd64/writefile: ## Build `_output/bin/actions/linux-amd64/writefile`
+_output/bin/actions/linux-arm64/cexec: ## Build `_output/bin/actions/linux-arm64/cexec`
+_output/bin/actions/linux-arm64/kexec: ## Build `_output/bin/actions/linux-arm64/kexec`
+_output/bin/actions/linux-arm64/image2disk: ## Build `_output/bin/actions/linux-arm64/image2disk`
+_output/bin/actions/linux-arm64/oci2disk: ## Build `_output/bin/actions/linux-arm64/oci2disk`
+_output/bin/actions/linux-arm64/writefile: ## Build `_output/bin/actions/linux-arm64/writefile`
 
 ##@ Image Targets
 local-images: ## Builds `cexec/images/amd64 kexec/images/amd64 image2disk/images/amd64 oci2disk/images/amd64 writefile/images/amd64 reboot/images/amd64` as oci tars for presumbit validation
@@ -60,17 +60,17 @@ run-in-docker/checksums: ## Run `checksums` in docker builder container
 run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
-run-in-docker/hub/eks-anywhere-go-mod-download: ## Run `hub/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/_output/bin/hub/linux-amd64/cexec: ## Run `_output/bin/hub/linux-amd64/cexec` in docker builder container
-run-in-docker/_output/bin/hub/linux-amd64/kexec: ## Run `_output/bin/hub/linux-amd64/kexec` in docker builder container
-run-in-docker/_output/bin/hub/linux-amd64/image2disk: ## Run `_output/bin/hub/linux-amd64/image2disk` in docker builder container
-run-in-docker/_output/bin/hub/linux-amd64/oci2disk: ## Run `_output/bin/hub/linux-amd64/oci2disk` in docker builder container
-run-in-docker/_output/bin/hub/linux-amd64/writefile: ## Run `_output/bin/hub/linux-amd64/writefile` in docker builder container
-run-in-docker/_output/bin/hub/linux-arm64/cexec: ## Run `_output/bin/hub/linux-arm64/cexec` in docker builder container
-run-in-docker/_output/bin/hub/linux-arm64/kexec: ## Run `_output/bin/hub/linux-arm64/kexec` in docker builder container
-run-in-docker/_output/bin/hub/linux-arm64/image2disk: ## Run `_output/bin/hub/linux-arm64/image2disk` in docker builder container
-run-in-docker/_output/bin/hub/linux-arm64/oci2disk: ## Run `_output/bin/hub/linux-arm64/oci2disk` in docker builder container
-run-in-docker/_output/bin/hub/linux-arm64/writefile: ## Run `_output/bin/hub/linux-arm64/writefile` in docker builder container
+run-in-docker/actions/eks-anywhere-go-mod-download: ## Run `actions/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/_output/bin/actions/linux-amd64/cexec: ## Run `_output/bin/actions/linux-amd64/cexec` in docker builder container
+run-in-docker/_output/bin/actions/linux-amd64/kexec: ## Run `_output/bin/actions/linux-amd64/kexec` in docker builder container
+run-in-docker/_output/bin/actions/linux-amd64/image2disk: ## Run `_output/bin/actions/linux-amd64/image2disk` in docker builder container
+run-in-docker/_output/bin/actions/linux-amd64/oci2disk: ## Run `_output/bin/actions/linux-amd64/oci2disk` in docker builder container
+run-in-docker/_output/bin/actions/linux-amd64/writefile: ## Run `_output/bin/actions/linux-amd64/writefile` in docker builder container
+run-in-docker/_output/bin/actions/linux-arm64/cexec: ## Run `_output/bin/actions/linux-arm64/cexec` in docker builder container
+run-in-docker/_output/bin/actions/linux-arm64/kexec: ## Run `_output/bin/actions/linux-arm64/kexec` in docker builder container
+run-in-docker/_output/bin/actions/linux-arm64/image2disk: ## Run `_output/bin/actions/linux-arm64/image2disk` in docker builder container
+run-in-docker/_output/bin/actions/linux-arm64/oci2disk: ## Run `_output/bin/actions/linux-arm64/oci2disk` in docker builder container
+run-in-docker/_output/bin/actions/linux-arm64/writefile: ## Run `_output/bin/actions/linux-arm64/writefile` in docker builder container
 run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
 run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
 run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container

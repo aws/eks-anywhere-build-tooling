@@ -4,7 +4,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/bin/hub/$TARGETOS-$TARGETARCH/image2disk /usr/bin/image2disk
+COPY _output/bin/actions/$TARGETOS-$TARGETARCH/image2disk /usr/bin/image2disk
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
