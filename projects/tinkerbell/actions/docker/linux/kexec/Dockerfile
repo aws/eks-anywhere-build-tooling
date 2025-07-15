@@ -4,7 +4,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/bin/hub/$TARGETOS-$TARGETARCH/kexec /usr/bin/kexec
+COPY _output/bin/actions/$TARGETOS-$TARGETARCH/kexec /usr/bin/kexec
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
