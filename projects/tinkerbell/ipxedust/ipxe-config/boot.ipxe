@@ -1,0 +1,39 @@
+#!ipxe
+
+# Robust interface opening mechanism
+:retry_open
+
+echo Opening network interface...
+# Display a message indicating we're trying to open the network interface
+ifopen net0 || goto retry_open
+# Try to open the first network interface (net0)
+# If it fails (||), go back to the retry_open label and try again
+
+# Enhanced link detection
+:retry_link
+# This label marks the start of the link detection section
+echo Waiting for link...
+# Display a message indicating we're waiting for a network link
+ifstat net0 && isset net0/link || goto retry_link
+# Check if the interface has a link:
+# - ifstat net0: Get the status of net0
+# - isset net0/link: Check if the link variable is set
+# If either check fails (||), go back to retry_link and try again
+sleep 2
+# Wait 2 seconds to ensure the link is stable
+
+# Reliable DHCP configuration
+:retry_dhcp
+# This label marks the start of the DHCP configuration section
+echo Requesting IP configuration...
+# Display a message indicating we're requesting an IP address
+dhcp net0 || goto retry_dhcp
+# Try to get an IP address via DHCP for net0
+# If it fails (||), go back to retry_dhcp and try again
+
+# Success confirmation
+echo Network configured successfully: ${net0/ip}
+# Display a success message with the obtained IP address
+
+echo Chaining to auto.ipxe
+chain http://${next-server}:7171/${mac}/auto.ipxe
