@@ -1,7 +1,7 @@
-From 657eb0ea31d32e38fdf94db7b89063c67f5933e6 Mon Sep 17 00:00:00 2001
+From 8fa516bcfb72d295e8929c88c44d28f6ca70ecb3 Mon Sep 17 00:00:00 2001
 From: Ahree Hong <ahreeh@amazon.com>
 Date: Thu, 2 May 2024 12:51:23 -0700
-Subject: [PATCH 6/7] Fix net interface lookup
+Subject: [PATCH 6/8] Fix net interface lookup
 
 We use the mac address in /proc/cmdline
 to be sure we use the interface that is
@@ -12,17 +12,17 @@ interfaces are present.
 
 Signed-off-by: Ahree Hong <ahreeh@amazon.com>
 ---
- writefile/cmdline.go | 157 +++++++++++++++++++++++++++++++++++++++++++
+ writefile/cmdline.go | 156 +++++++++++++++++++++++++++++++++++++++++++
  writefile/main.go    |  16 +++++
- 2 files changed, 173 insertions(+)
+ 2 files changed, 172 insertions(+)
  create mode 100644 writefile/cmdline.go
 
 diff --git a/writefile/cmdline.go b/writefile/cmdline.go
 new file mode 100644
-index 0000000..d80d5bd
+index 0000000..a4003d2
 --- /dev/null
 +++ b/writefile/cmdline.go
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,156 @@
 +// Copyright 2018 the u-root Authors. All rights reserved
 +// Use of this source code is governed by a BSD-style
 +// license that can be found in the LICENSE file.
@@ -35,7 +35,6 @@ index 0000000..d80d5bd
 +// separately.
 +// https://github.com/u-root/u-root/blob/main/pkg/cmdline/
 +package main
-+
 +import (
 +	"io"
 +	"os"
@@ -180,8 +179,9 @@ index 0000000..d80d5bd
 +	value, present := c.AsMap[canonicalFlag]
 +	return value, present
 +}
+\ No newline at end of file
 diff --git a/writefile/main.go b/writefile/main.go
-index a64e696..9922f7c 100644
+index abc18ac..3776031 100644
 --- a/writefile/main.go
 +++ b/writefile/main.go
 @@ -309,6 +309,22 @@ func appendToUserData(contents string, filePath string) error {
@@ -205,8 +205,8 @@ index a64e696..9922f7c 100644
 +}
 +
  func determineNetIF() string {
- 	runtime.LockOSThread()
- 	defer runtime.UnlockOSThread()
+   runtime.LockOSThread()
+   defer runtime.UnlockOSThread()
 -- 
-2.40.0
+2.47.1
 

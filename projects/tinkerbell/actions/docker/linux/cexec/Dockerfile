@@ -4,7 +4,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/bin/hub/$TARGETOS-$TARGETARCH/cexec /usr/bin/cexec
+COPY _output/bin/actions/$TARGETOS-$TARGETARCH/cexec /usr/bin/cexec
 COPY _output/LICENSES /LICENSES
 COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 
