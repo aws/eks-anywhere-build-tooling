@@ -65,14 +65,7 @@ $(OUTPUT_BIN_DIR)/%: MAKEFLAGS=
 $(OUTPUT_BIN_DIR)/%: $(GIT_PATCH_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
 	sudo yum install -y genisoimage perl syslinux xz-devel; \
 	mkdir -p $(@D); \
-	if [ "$(@F)" = "ipxe.efi" ]; then \
-	  cp ipxe-config/boot.ipxe $(REPO)/binary/script/embed.ipxe; \
-	  mkdir -p $(REPO)/binary/script/ipxe-customizations/; \
-	  cp ipxe-config/custom.h $(REPO)/binary/script/ipxe-customizations/general.efi.h; \
-	  $(MAKE) -C $(REPO) binary/ipxe.efi SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) EXTRA_CFLAGS="-fdebug-prefix-map=$(MAKE_ROOT)=/buildroot"; \
-	else \
-	  $(MAKE) -C $(REPO) binary/$(@F) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) EXTRA_CFLAGS="-fdebug-prefix-map=$(MAKE_ROOT)=/buildroot"; \
-	fi; \
+	$(MAKE) -C $(REPO) binary/$(@F) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) EXTRA_CFLAGS="-fdebug-prefix-map=$(MAKE_ROOT)=/buildroot"; \
 	cp $(REPO)/binary/$(@F) $@
 
 .PHONY: gather-non-golang-licenses
