@@ -1,43 +1,36 @@
-From 23b1ff1a01bc61a65b38fd02e253a21b8311775d Mon Sep 17 00:00:00 2001
-From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
-Date: Thu, 19 Sep 2024 18:52:00 -0700
-Subject: [PATCH 11/13] Revert updating preseed and cloud-init to use CD for
- boot files
+From df88e549b72364da1af5c6a10107788954f2140f Mon Sep 17 00:00:00 2001
+From: Amelia Lu <63176721+peirulu@users.noreply.github.com>
+Date: Mon, 28 Jul 2025 17:44:42 -0700
+Subject: [PATCH] revert updating preseed and cloud init
 
-We are reverting the upstream change that updated preseed and cloud-init scripts
-to be obtained from CD, with the help of xorriso for image builds. We will continue
-to use floppy drives to mount the boot files until we add xorriso to the builder image.
-
-Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 ---
- images/capi/Dockerfile                      | 2 --
+ images/capi/Dockerfile                      | 1 -
  images/capi/packer/ova/packer-node.json     | 4 ----
  images/capi/packer/ova/photon-5.json        | 6 ++----
  images/capi/packer/ova/ubuntu-2204-efi.json | 6 ++----
  images/capi/packer/ova/ubuntu-2204.json     | 7 +++----
  images/capi/packer/ova/ubuntu-2404-efi.json | 7 +++----
  images/capi/packer/ova/ubuntu-2404.json     | 7 +++----
- images/capi/scripts/ci-ova.sh               | 3 ---
- 8 files changed, 13 insertions(+), 29 deletions(-)
+ images/capi/scripts/ci-ova.sh               | 3 +--
+ 8 files changed, 14 insertions(+), 27 deletions(-)
 
 diff --git a/images/capi/Dockerfile b/images/capi/Dockerfile
-index fe5f53faa..d7db633a0 100644
+index fe5f53f..73d08aa 100644
 --- a/images/capi/Dockerfile
 +++ b/images/capi/Dockerfile
-@@ -34,8 +34,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+@@ -34,7 +34,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
  	wget \
  	qemu-system-x86 \
  	qemu-kvm \
 -	# Adding xorriso to create iso for mounting cd_drives which then can be used for bootstrapping node image
--	xorriso \
+ 	xorriso \
  	&& useradd -ms /bin/bash imagebuilder \
  	&& apt-get purge --auto-remove -y \
- 	&& rm -rf /var/lib/apt/lists/*
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index d2343614e..154b929fd 100644
+index f469cbc..e49b931 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
-@@ -205,8 +205,6 @@
+@@ -143,8 +143,6 @@
          "{{user `boot_command_suffix`}}"
        ],
        "boot_wait": "{{user `boot_wait`}}",
@@ -46,17 +39,17 @@ index d2343614e..154b929fd 100644
        "cdrom_type": "{{user `cdrom_type`}}",
        "cluster": "{{user `cluster`}}",
        "communicator": "ssh",
-@@ -490,8 +488,6 @@
-     "block_nouveau_loading": "true",
-     "build_timestamp": "{{timestamp}}",
-     "build_version": "{{user `build_name`}}-kube-{{user `kubernetes_semver`}}",
--    "cd_files": "{{user `cd_content_location`}}",
--    "cd_label": "{{user `cd_label`}}",
-     "cdrom_adapter_type": "ide",
-     "cdrom_type": "ide",
-     "cluster": "",
+@@ -207,8 +205,6 @@
+         "{{user `boot_command_suffix`}}"
+       ],
+       "boot_wait": "{{user `boot_wait`}}",
+-      "cd_files": "{{user `cd_content_location`}}",
+-      "cd_label": "{{user `cd_label`}}",
+       "cdrom_type": "{{user `cdrom_type`}}",
+       "cluster": "{{user `cluster`}}",
+       "communicator": "ssh",
 diff --git a/images/capi/packer/ova/photon-5.json b/images/capi/packer/ova/photon-5.json
-index 612c552c0..82b5fa949 100644
+index 612c552..82b5fa9 100644
 --- a/images/capi/packer/ova/photon-5.json
 +++ b/images/capi/packer/ova/photon-5.json
 @@ -1,10 +1,8 @@
@@ -73,7 +66,7 @@ index 612c552c0..82b5fa949 100644
    "distro_arch": "amd64",
    "distro_name": "photon",
 diff --git a/images/capi/packer/ova/ubuntu-2204-efi.json b/images/capi/packer/ova/ubuntu-2204-efi.json
-index 85b548009..67ec60e7f 100644
+index 85b5480..67ec60e 100644
 --- a/images/capi/packer/ova/ubuntu-2204-efi.json
 +++ b/images/capi/packer/ova/ubuntu-2204-efi.json
 @@ -1,15 +1,13 @@
@@ -95,7 +88,7 @@ index 85b548009..67ec60e7f 100644
    "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
    "iso_checksum_type": "sha256",
 diff --git a/images/capi/packer/ova/ubuntu-2204.json b/images/capi/packer/ova/ubuntu-2204.json
-index 85991d07c..7cadf0227 100644
+index 85991d0..7cadf02 100644
 --- a/images/capi/packer/ova/ubuntu-2204.json
 +++ b/images/capi/packer/ova/ubuntu-2204.json
 @@ -1,13 +1,12 @@
@@ -116,7 +109,7 @@ index 85991d07c..7cadf0227 100644
    "iso_checksum": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
    "iso_checksum_type": "sha256",
 diff --git a/images/capi/packer/ova/ubuntu-2404-efi.json b/images/capi/packer/ova/ubuntu-2404-efi.json
-index 24ab003d3..ea0930bf9 100644
+index 24ab003..ea0930b 100644
 --- a/images/capi/packer/ova/ubuntu-2404-efi.json
 +++ b/images/capi/packer/ova/ubuntu-2404-efi.json
 @@ -1,14 +1,13 @@
@@ -138,7 +131,7 @@ index 24ab003d3..ea0930bf9 100644
    "iso_checksum": "d6dab0c3a657988501b4bd76f1297c053df710e06e0c3aece60dead24f270b4d",
    "iso_checksum_type": "sha256",
 diff --git a/images/capi/packer/ova/ubuntu-2404.json b/images/capi/packer/ova/ubuntu-2404.json
-index dd7a33587..0f910b6eb 100644
+index dd7a335..0f910b6 100644
 --- a/images/capi/packer/ova/ubuntu-2404.json
 +++ b/images/capi/packer/ova/ubuntu-2404.json
 @@ -1,13 +1,12 @@
@@ -159,19 +152,19 @@ index dd7a33587..0f910b6eb 100644
    "iso_checksum": "d6dab0c3a657988501b4bd76f1297c053df710e06e0c3aece60dead24f270b4d",
    "iso_checksum_type": "sha256",
 diff --git a/images/capi/scripts/ci-ova.sh b/images/capi/scripts/ci-ova.sh
-index 0225173f4..f0ceda5b9 100755
+index 4ce4db1..5a220f8 100755
 --- a/images/capi/scripts/ci-ova.sh
 +++ b/images/capi/scripts/ci-ova.sh
-@@ -84,9 +84,6 @@ export GOVC_DATACENTER="SDDC-Datacenter"
- export GOVC_CLUSTER="Cluster-1"
+@@ -73,8 +73,7 @@ export GOVC_DATACENTER="Datacenter"
+ export GOVC_CLUSTER="k8s-gcve-cluster"
  export GOVC_INSECURE=true
  
 -# Install xorriso which will be then used by packer to generate ISO for generating CD files
 -apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y xorriso
--
- # Run the vpn client in container
- docker run --rm -d --name vpn -v "${HOME}/.openvpn/:${HOME}/.openvpn/" \
-   -w "${HOME}/.openvpn/" --cap-add=NET_ADMIN --net=host --device=/dev/net/tun \
++
+ 
+ # If BOSKOS_HOST is set then acquire a vsphere-project from Boskos.
+ if [ -n "${BOSKOS_HOST:-}" ]; then
 -- 
-2.49.0
+2.48.1
 
