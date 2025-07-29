@@ -1,8 +1,13 @@
-From 74b373316d2e30058db312f6e3ad5ebfc1d5b9cb Mon Sep 17 00:00:00 2001
-From: Amelia Lu <63176721+peirulu@users.noreply.github.com>
-Date: Mon, 28 Jul 2025 18:02:51 -0700
-Subject: [PATCH] Add non efi builds for THEL 9 ova
+From 3d2f0f3dfbd0f6eaff5006ef8e1cf5ae0d3f8def Mon Sep 17 00:00:00 2001
+From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
+Date: Thu, 13 Mar 2025 12:11:42 -0700
+Subject: [PATCH 3/3] Add non-EFI builds for RHEL 9 OVA
 
+RHEL 9 OVA builds were defaulted to EFI upstream with no direct to override the firmware to BIOS. So we
+are splitting the builds into BIOS and EFI builds so that customers can choose the firmware option based
+on their requirements.
+
+Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 ---
  images/capi/Makefile                          |  5 +-
  .../ova/linux/rhel/http/9/ks-efi.cfg.tmpl     | 82 +++++++++++++++++++
@@ -14,7 +19,7 @@ Subject: [PATCH] Add non efi builds for THEL 9 ova
  create mode 100644 images/capi/packer/ova/rhel-9-efi.json
 
 diff --git a/images/capi/Makefile b/images/capi/Makefile
-index 18e47f2..477d996 100644
+index 18e47f216..d5378b1e5 100644
 --- a/images/capi/Makefile
 +++ b/images/capi/Makefile
 @@ -340,7 +340,7 @@ PACKER_POWERVS_NODE_FLAGS := $(foreach f,$(abspath $(COMMON_POWERVS_VAR_FILES)),
@@ -38,7 +43,7 @@ index 18e47f2..477d996 100644
  build-node-ova-vsphere-clone-rhel-7: ## Builds RHEL 7 Node OVA and template on vSphere
  build-node-ova-vsphere-clone-rhel-8: ## Builds RHEL 8 Node OVA and template on vSphere
  build-node-ova-vsphere-clone-rhel-9: ## Builds RHEL 9 Node OVA and template on vSphere
-+build-node-ova-vsphere-clone-rhel-9-efi: ## Builds RHEL 9 Node OVA and template on vSphere that EFI bootsbuild-node-ova-vsphere-clone-rhel-9-efi: ## Builds RHEL 9 Node OVA and template on vSphere that EFI boots
++build-node-ova-vsphere-clone-rhel-9-efi: ## Builds RHEL 9 Node OVA and template on vSphere that EFI boots
  build-node-ova-vsphere-clone-rockylinux-8: ## Builds RockyLinux 8 Node OVA and template on vSphere
  build-node-ova-vsphere-clone-rockylinux-9: ## Builds RockyLinux 9 Node OVA and template on vSphere
  build-node-ova-vsphere-clone-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA and template on vSphere
@@ -52,7 +57,7 @@ index 18e47f2..477d996 100644
  build-node-ova-vsphere-base-ubuntu-2004: ## Builds base Ubuntu 20.04 Node OVA and template on vSphere
 diff --git a/images/capi/packer/ova/linux/rhel/http/9/ks-efi.cfg.tmpl b/images/capi/packer/ova/linux/rhel/http/9/ks-efi.cfg.tmpl
 new file mode 100644
-index 0000000..d9b5519
+index 000000000..cc13d548d
 --- /dev/null
 +++ b/images/capi/packer/ova/linux/rhel/http/9/ks-efi.cfg.tmpl
 @@ -0,0 +1,82 @@
@@ -138,9 +143,8 @@ index 0000000..d9b5519
 +sed -i '/^\(HWADDR\|UUID\)=/d' /etc/sysconfig/network-scripts/ifcfg-*
 +
 +%end
-\ No newline at end of file
 diff --git a/images/capi/packer/ova/linux/rhel/http/9/ks.cfg.tmpl b/images/capi/packer/ova/linux/rhel/http/9/ks.cfg.tmpl
-index cc13d54..6cc9a6b 100644
+index cc13d548d..6cc9a6ba1 100644
 --- a/images/capi/packer/ova/linux/rhel/http/9/ks.cfg.tmpl
 +++ b/images/capi/packer/ova/linux/rhel/http/9/ks.cfg.tmpl
 @@ -36,7 +36,7 @@ timezone UTC
@@ -154,7 +158,7 @@ index cc13d54..6cc9a6b 100644
  
 diff --git a/images/capi/packer/ova/rhel-9-efi.json b/images/capi/packer/ova/rhel-9-efi.json
 new file mode 100644
-index 0000000..bcb28f4
+index 000000000..c5cbd9587
 --- /dev/null
 +++ b/images/capi/packer/ova/rhel-9-efi.json
 @@ -0,0 +1,21 @@
@@ -179,9 +183,8 @@ index 0000000..bcb28f4
 +  "vmx_version": "18",
 +  "vsphere_guest_os_type": "rhel9_64Guest"
 +}
-\ No newline at end of file
 diff --git a/images/capi/packer/ova/rhel-9.json b/images/capi/packer/ova/rhel-9.json
-index 0b806d1..91e351f 100644
+index 0b806d1a8..91e351f1a 100644
 --- a/images/capi/packer/ova/rhel-9.json
 +++ b/images/capi/packer/ova/rhel-9.json
 @@ -1,13 +1,12 @@
