@@ -1,0 +1,36 @@
+From 1ac5855e0fb23daa7b1699636eca91bdb8c48ac6 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulgab@amazon.com>
+Date: Thu, 31 Jul 2025 22:52:48 +0000
+Subject: [PATCH 2/2] Fix smee deployment tolerations rendering
+
+This patch fixes an issue with the smee chart's deployment.yaml file
+where the tolerations section is rendered incorrectly when both
+.Values.deployment.tolerations (which is an empty array by default) and
+.Values.singleNodeClusterConfig.controlPlaneTolerationsEnabled are true.
+This results in invalid YAML that causes the chart to fail to render.
+
+This change renders .Values.deployment.tolerations only if
+.Values.singleNodeClusterConfig.controlPlaneTolerationsEnabled is false.
+
+Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
+---
+ tinkerbell/smee/templates/deployment.yaml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/tinkerbell/smee/templates/deployment.yaml b/tinkerbell/smee/templates/deployment.yaml
+index 9f099c3..b3e8724 100644
+--- a/tinkerbell/smee/templates/deployment.yaml
++++ b/tinkerbell/smee/templates/deployment.yaml
+@@ -165,7 +165,9 @@ spec:
+       {{- end }}
+       {{- if or .Values.deployment.tolerations .Values.singleNodeClusterConfig.controlPlaneTolerationsEnabled }}
+       tolerations:
++      {{- if and .Values.deployment.tolerations (not .Values.singleNodeClusterConfig.controlPlaneTolerationsEnabled) }}
+       {{- .Values.deployment.tolerations | toYaml | nindent 8 }}
++      {{- end }}
+       {{- if .Values.singleNodeClusterConfig.controlPlaneTolerationsEnabled }}
+       {{- include "singleNodeClusterConfig" . | indent 6 }}
+       {{- end }}
+-- 
+2.47.1
+
