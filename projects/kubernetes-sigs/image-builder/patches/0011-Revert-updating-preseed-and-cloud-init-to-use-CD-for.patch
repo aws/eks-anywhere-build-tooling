@@ -1,8 +1,8 @@
-From de978b99ecb9b3b644450b9a4091004db2702bcd Mon Sep 17 00:00:00 2001
+From 23b1ff1a01bc61a65b38fd02e253a21b8311775d Mon Sep 17 00:00:00 2001
 From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 Date: Thu, 19 Sep 2024 18:52:00 -0700
-Subject: [PATCH 11/13] Revert updating preseed and cloud-init to use CD for boot
- files
+Subject: [PATCH 11/13] Revert updating preseed and cloud-init to use CD for
+ boot files
 
 We are reverting the upstream change that updated preseed and cloud-init scripts
 to be obtained from CD, with the help of xorriso for image builds. We will continue
@@ -17,8 +17,8 @@ Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
  images/capi/packer/ova/ubuntu-2204.json     | 7 +++----
  images/capi/packer/ova/ubuntu-2404-efi.json | 7 +++----
  images/capi/packer/ova/ubuntu-2404.json     | 7 +++----
- images/capi/scripts/ci-ova.sh               | 2 --
- 8 files changed, 13 insertions(+), 28 deletions(-)
+ images/capi/scripts/ci-ova.sh               | 3 ---
+ 8 files changed, 13 insertions(+), 29 deletions(-)
 
 diff --git a/images/capi/Dockerfile b/images/capi/Dockerfile
 index fe5f53faa..d7db633a0 100644
@@ -34,10 +34,10 @@ index fe5f53faa..d7db633a0 100644
  	&& apt-get purge --auto-remove -y \
  	&& rm -rf /var/lib/apt/lists/*
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index f469cbc84..98e62fa6f 100644
+index d2343614e..154b929fd 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
-@@ -207,8 +207,6 @@
+@@ -205,8 +205,6 @@
          "{{user `boot_command_suffix`}}"
        ],
        "boot_wait": "{{user `boot_wait`}}",
@@ -46,7 +46,7 @@ index f469cbc84..98e62fa6f 100644
        "cdrom_type": "{{user `cdrom_type`}}",
        "cluster": "{{user `cluster`}}",
        "communicator": "ssh",
-@@ -492,8 +490,6 @@
+@@ -490,8 +488,6 @@
      "block_nouveau_loading": "true",
      "build_timestamp": "{{timestamp}}",
      "build_version": "{{user `build_name`}}-kube-{{user `kubernetes_semver`}}",
@@ -159,18 +159,19 @@ index dd7a33587..0f910b6eb 100644
    "iso_checksum": "d6dab0c3a657988501b4bd76f1297c053df710e06e0c3aece60dead24f270b4d",
    "iso_checksum_type": "sha256",
 diff --git a/images/capi/scripts/ci-ova.sh b/images/capi/scripts/ci-ova.sh
-index 4ce4db1c0..1aa6bb889 100755
+index 0225173f4..f0ceda5b9 100755
 --- a/images/capi/scripts/ci-ova.sh
 +++ b/images/capi/scripts/ci-ova.sh
-@@ -73,8 +73,6 @@ export GOVC_DATACENTER="Datacenter"
- export GOVC_CLUSTER="k8s-gcve-cluster"
+@@ -84,9 +84,6 @@ export GOVC_DATACENTER="SDDC-Datacenter"
+ export GOVC_CLUSTER="Cluster-1"
  export GOVC_INSECURE=true
  
 -# Install xorriso which will be then used by packer to generate ISO for generating CD files
 -apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y xorriso
- 
- # If BOSKOS_HOST is set then acquire a vsphere-project from Boskos.
- if [ -n "${BOSKOS_HOST:-}" ]; then
+-
+ # Run the vpn client in container
+ docker run --rm -d --name vpn -v "${HOME}/.openvpn/:${HOME}/.openvpn/" \
+   -w "${HOME}/.openvpn/" --cap-add=NET_ADMIN --net=host --device=/dev/net/tun \
 -- 
 2.49.0
 
