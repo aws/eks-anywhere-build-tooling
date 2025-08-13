@@ -1,4 +1,4 @@
-From 1832b423cdeaf591a6ab5209a66f0cad74e3b91e Mon Sep 17 00:00:00 2001
+From 505d1e81c26bd2a3030a51e2e8c0c54c682ee134 Mon Sep 17 00:00:00 2001
 From: Jhaanvi Golani <jhaanvi@amazon.com>
 Date: Wed, 18 Dec 2024 15:50:49 -0800
 Subject: [PATCH] packages patches
@@ -10,7 +10,6 @@ Subject: [PATCH] packages patches
  .../charts => }/crds/templates/crds.yaml      |   2 +-
  charts/crds/values.yaml                       |   1 +
  charts/metallb/Chart.yaml                     |   8 -
- charts/metallb/charts/frr-k8s-0.0.16.tgz      | Bin 15818 -> 0 bytes
  charts/metallb/templates/_helpers.tpl         |   8 +
  .../metallb/templates/bgpadvertisements.yaml  |  15 +
  charts/metallb/templates/bgppeers.yaml        |  13 +
@@ -23,17 +22,16 @@ Subject: [PATCH] packages patches
  charts/metallb/templates/secret.yaml          |  16 +
  .../metallb/templates/service-accounts.yaml   |   4 +-
  charts/metallb/templates/servicemonitor.yaml  |  34 +-
- charts/metallb/templates/speaker.yaml         | 358 +-----------------
+ charts/metallb/templates/speaker.yaml         | 362 +-----------------
  charts/metallb/templates/webhooks.yaml        |  16 +-
  charts/metallb/values.schema.json             |  51 +--
  charts/metallb/values.yaml                    |  54 +--
- 23 files changed, 140 insertions(+), 507 deletions(-)
+ 22 files changed, 140 insertions(+), 511 deletions(-)
  rename charts/{metallb/charts => }/crds/.helmignore (100%)
  rename charts/{metallb/charts => }/crds/Chart.yaml (100%)
  rename charts/{metallb/charts => }/crds/README.md (100%)
  rename charts/{metallb/charts => }/crds/templates/crds.yaml (99%)
  create mode 100644 charts/crds/values.yaml
- delete mode 100644 charts/metallb/charts/frr-k8s-0.0.16.tgz
  create mode 100644 charts/metallb/templates/bgpadvertisements.yaml
  create mode 100644 charts/metallb/templates/bgppeers.yaml
  create mode 100644 charts/metallb/templates/ipaddresspools.yaml
@@ -56,16 +54,15 @@ diff --git a/charts/metallb/charts/crds/templates/crds.yaml b/charts/crds/templa
 similarity index 99%
 rename from charts/metallb/charts/crds/templates/crds.yaml
 rename to charts/crds/templates/crds.yaml
-index 8f241477..a8ba4803 100644
+index 3821ae76..756c8a4a 100644
 --- a/charts/metallb/charts/crds/templates/crds.yaml
 +++ b/charts/crds/templates/crds.yaml
-@@ -338,8 +338,8 @@ spec:
+@@ -338,7 +338,7 @@ spec:
        clientConfig:
-         caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tDQpNSUlGWlRDQ0EwMmdBd0lCQWdJVU5GRW1XcTM3MVpKdGkrMmlSQzk1WmpBV1MxZ3dEUVlKS29aSWh2Y05BUUVMDQpCUUF3UWpFTE1Ba0dBMVVFQmhNQ1dGZ3hGVEFUQmdOVkJBY01ERVJsWm1GMWJIUWdRMmwwZVRFY01Cb0dBMVVFDQpDZ3dUUkdWbVlYVnNkQ0JEYjIxd1lXNTVJRXgwWkRBZUZ3MHlNakEzTVRrd09UTXlNek5hRncweU1qQTRNVGd3DQpPVE15TXpOYU1FSXhDekFKQmdOVkJBWVRBbGhZTVJVd0V3WURWUVFIREF4RVpXWmhkV3gwSUVOcGRIa3hIREFhDQpCZ05WQkFvTUUwUmxabUYxYkhRZ1EyOXRjR0Z1ZVNCTWRHUXdnZ0lpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElDDQpEd0F3Z2dJS0FvSUNBUUNxVFpxMWZRcC9vYkdlenhES0o3OVB3Ny94azJwellualNzMlkzb1ZYSm5sRmM4YjVlDQpma2ZZQnY2bndscW1keW5PL2phWFBaQmRQSS82aFdOUDBkdVhadEtWU0NCUUpyZzEyOGNXb3F0MGNTN3pLb1VpDQpvcU1tQ0QvRXVBeFFNZjhRZDF2c1gvVllkZ0poVTZBRXJLZEpIaXpFOUJtUkNkTDBGMW1OVW55Rk82UnRtWFZUDQpidkxsTDVYeTc2R0FaQVBLOFB4aVlDa0NtbDdxN0VnTWNiOXlLWldCYmlxQ3VkTXE5TGJLNmdKNzF6YkZnSXV4DQo1L1pXK2JraTB2RlplWk9ZODUxb1psckFUNzJvMDI4NHNTWW9uN0pHZVZkY3NoUnh5R1VpSFpSTzdkaXZVTDVTDQpmM2JmSDFYbWY1ZDQzT0NWTWRuUUV2NWVaOG8zeWVLa3ZrbkZQUGVJMU9BbjdGbDlFRVNNR2dhOGFaSG1URSttDQpsLzlMSmdDYjBnQmtPT0M0WnV4bWh2aERKV1EzWnJCS3pMQlNUZXN0NWlLNVlwcXRWVVk2THRyRW9FelVTK1lsDQpwWndXY2VQWHlHeHM5ZURsR3lNVmQraW15Y3NTU1UvVno2Mmx6MnZCS21NTXBkYldDQWhud0RsRTVqU2dyMjRRDQp0eGNXLys2N3d5KzhuQlI3UXdqVTFITndVRjBzeERWdEwrZ1NHVERnSEVZSlhZelYvT05zMy94TkpoVFNPSkxNDQpoeXNVdyttaGdackdhbUdXcHVIVU1DUitvTWJzMTc1UkcrQjJnUFFHVytPTjJnUTRyOXN2b0ZBNHBBQm8xd1dLDQpRYjRhY3pmeVVscElBOVFoSmFsZEY3S3dPSHVlV3gwRUNrNXg0T2tvVDBvWVp0dzFiR0JjRGtaSmF3SURBUUFCDQpvMU13VVRBZEJnTlZIUTRFRmdRVW90UlNIUm9IWTEyRFZ4R0NCdEhpb1g2ZmVFQXdId1lEVlIwakJCZ3dGb0FVDQpvdFJTSFJvSFkxMkRWeEdDQnRIaW9YNmZlRUF3RHdZRFZSMFRBUUgvQkFVd0F3RUIvekFOQmdrcWhraUc5dzBCDQpBUXNGQUFPQ0FnRUFSbkpsWWRjMTFHd0VxWnh6RDF2R3BDR2pDN2VWTlQ3aVY1d3IybXlybHdPYi9aUWFEa0xYDQpvVStaOVVXT1VlSXJTdzUydDdmQUpvVVAwSm5iYkMveVIrU1lqUGhvUXNiVHduOTc2ZldBWTduM3FMOXhCd1Y0DQphek41OXNjeUp0dlhMeUtOL2N5ak1ReDRLajBIMFg0bWJ6bzVZNUtzWWtYVU0vOEFPdWZMcEd0S1NGVGgrSEFDDQpab1Q5YnZHS25adnNHd0tYZFF0Wnh0akhaUjVqK3U3ZGtQOTJBT051RFNabS8rWVV4b2tBK09JbzdSR3BwSHNXDQo1ZTdNY0FTVXRtb1FORXd6dVFoVkJaRWQ1OGtKYjUrV0VWbGNzanlXNnRTbzErZ25tTWNqR1BsMWgxR2hVbjV4DQpFY0lWRnBIWXM5YWo1NmpBSjk1MVQvZjhMaWxmTlVnanBLQ0c1bnl0SUt3emxhOHNtdGlPdm1UNEpYbXBwSkI2DQo4bmdHRVluVjUrUTYwWFJ2OEhSSGp1VG9CRHVhaERrVDA2R1JGODU1d09FR2V4bkZpMXZYWUxLVllWb1V2MXRKDQo4dVdUR1pwNllDSVJldlBqbzg5ZytWTlJSaVFYUThJd0dybXE5c0RoVTlqTjA0SjdVL1RvRDFpNHE3VnlsRUc5DQorV1VGNkNLaEdBeTJIaEhwVncyTGFoOS9lUzdZMUZ1YURrWmhPZG1laG1BOCtqdHNZamJadnR5Mm1SWlF0UUZzDQpUU1VUUjREbUR2bVVPRVRmeStpRHdzK2RkWXVNTnJGeVVYV2dkMnpBQU4ydVl1UHFGY2pRcFNPODFzVTJTU3R3DQoxVzAyeUtYOGJEYmZFdjBzbUh3UzliQnFlSGo5NEM1Mjg0YXpsdTBmaUdpTm1OUEM4ckJLRmhBPQ0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQ==
          service:
-+          namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
            name: metallb-webhook-service
 -          namespace: {{ .Release.Namespace }}
++          namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
            path: /convert
        conversionReviewVersions:
          - v1beta1
@@ -77,7 +74,7 @@ index 00000000..98176443
 @@ -0,0 +1 @@
 +defaultNamespace: "metallb-system"
 diff --git a/charts/metallb/Chart.yaml b/charts/metallb/Chart.yaml
-index ee04942b..9e57b0dd 100644
+index 1f305de0..e0d25aad 100644
 --- a/charts/metallb/Chart.yaml
 +++ b/charts/metallb/Chart.yaml
 @@ -5,14 +5,6 @@ home: https://metallb.universe.tf
@@ -87,328 +84,14 @@ index ee04942b..9e57b0dd 100644
 -dependencies:
 -- name: crds
 -  condition: crds.enabled
--  version: 0.14.9
+-  version: 0.15.2
 -- name: frr-k8s
 -  repository: https://metallb.github.io/frr-k8s
 -  condition: frrk8s.enabled
--  version: 0.0.16
+-  version: 0.0.20
  
  
  # A chart can be either an 'application' or a 'library' chart.
-diff --git a/charts/metallb/charts/frr-k8s-0.0.16.tgz b/charts/metallb/charts/frr-k8s-0.0.16.tgz
-deleted file mode 100644
-index 797f465f7d04132e28e309b62d319d3f5ffe8af0..0000000000000000000000000000000000000000
-GIT binary patch
-literal 0
-HcmV?d00001
-
-literal 15818
-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
-Rzp-uL?3a5Eh&w3A{{i2dxgG!j
-
 diff --git a/charts/metallb/templates/_helpers.tpl b/charts/metallb/templates/_helpers.tpl
 index cd89381d..a1f635e8 100644
 --- a/charts/metallb/templates/_helpers.tpl
@@ -595,7 +278,7 @@ index 42de8818..9848c47a 100644
    apiGroup: rbac.authorization.k8s.io
    kind: Role
 diff --git a/charts/metallb/templates/prometheusrules.yaml b/charts/metallb/templates/prometheusrules.yaml
-index 64e44c60..46cb5c31 100644
+index 7cff7545..4b3553d9 100644
 --- a/charts/metallb/templates/prometheusrules.yaml
 +++ b/charts/metallb/templates/prometheusrules.yaml
 @@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
@@ -607,7 +290,7 @@ index 64e44c60..46cb5c31 100644
      {{- include "metallb.labels" . | nindent 4 }}
      {{- if .Values.prometheus.prometheusRule.additionalLabels }}
 diff --git a/charts/metallb/templates/rbac.yaml b/charts/metallb/templates/rbac.yaml
-index 10ffbd8a..37b900ba 100644
+index 11d2ae04..e78fa1aa 100644
 --- a/charts/metallb/templates/rbac.yaml
 +++ b/charts/metallb/templates/rbac.yaml
 @@ -70,17 +70,12 @@ rules:
@@ -629,7 +312,7 @@ index 10ffbd8a..37b900ba 100644
    labels: {{- include "metallb.labels" . | nindent 4 }}
  rules:
  - apiGroups: [""]
-@@ -116,7 +111,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+@@ -119,7 +114,7 @@ apiVersion: rbac.authorization.k8s.io/v1
  kind: Role
  metadata:
    name: {{ include "metallb.fullname" . }}-controller
@@ -638,7 +321,7 @@ index 10ffbd8a..37b900ba 100644
    labels: {{- include "metallb.labels" . | nindent 4 }}
  rules:
  {{- if and .Values.speaker.enabled .Values.speaker.memberlist.enabled }}
-@@ -163,7 +158,7 @@ metadata:
+@@ -169,7 +164,7 @@ metadata:
  subjects:
  - kind: ServiceAccount
    name: {{ template "metallb.controller.serviceAccountName" . }}
@@ -647,7 +330,7 @@ index 10ffbd8a..37b900ba 100644
  roleRef:
    apiGroup: rbac.authorization.k8s.io
    kind: ClusterRole
-@@ -179,7 +174,7 @@ metadata:
+@@ -185,7 +180,7 @@ metadata:
  subjects:
  - kind: ServiceAccount
    name: {{ template "metallb.speaker.serviceAccountName" . }}
@@ -656,7 +339,7 @@ index 10ffbd8a..37b900ba 100644
  roleRef:
    apiGroup: rbac.authorization.k8s.io
    kind: ClusterRole
-@@ -189,7 +184,7 @@ apiVersion: rbac.authorization.k8s.io/v1
+@@ -195,7 +190,7 @@ apiVersion: rbac.authorization.k8s.io/v1
  kind: RoleBinding
  metadata:
    name: {{ include "metallb.fullname" . }}-pod-lister
@@ -665,7 +348,7 @@ index 10ffbd8a..37b900ba 100644
    labels: {{- include "metallb.labels" . | nindent 4 }}
  roleRef:
    apiGroup: rbac.authorization.k8s.io
-@@ -198,13 +193,14 @@ roleRef:
+@@ -204,13 +199,14 @@ roleRef:
  subjects:
  - kind: ServiceAccount
    name: {{ include "metallb.speaker.serviceAccountName" . }}
@@ -681,7 +364,7 @@ index 10ffbd8a..37b900ba 100644
    labels: {{- include "metallb.labels" . | nindent 4 }}
  roleRef:
    apiGroup: rbac.authorization.k8s.io
-@@ -213,4 +209,5 @@ roleRef:
+@@ -219,4 +215,5 @@ roleRef:
  subjects:
  - kind: ServiceAccount
    name: {{ include "metallb.controller.serviceAccountName" . }}
@@ -829,10 +512,10 @@ index 2a92e48a..3ae36994 100644
    apiGroup: rbac.authorization.k8s.io
    kind: Role
 diff --git a/charts/metallb/templates/speaker.yaml b/charts/metallb/templates/speaker.yaml
-index e70743ce..b82b2a68 100644
+index 8c3dbf28..b82b2a68 100644
 --- a/charts/metallb/templates/speaker.yaml
 +++ b/charts/metallb/templates/speaker.yaml
-@@ -1,125 +1,9 @@
+@@ -1,129 +1,9 @@
 -{{- if .Values.speaker.frr.enabled }}
 -{{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
 -{{- fail "speaker.frr.enabled and frrk8s.enabled / external are mutually exclusive!" }}
@@ -841,6 +524,10 @@ index e70743ce..b82b2a68 100644
 -
 -{{- if and .Values.frrk8s.enabled .Values.frrk8s.external }}
 -{{- fail "frrk8s.enabled frrk8s.external are mutually exclusive!" }}
+-{{- end }}
+-
+-{{- if and (not .Values.speaker.memberlist.enabled) .Values.speaker.nodeSelector }}
+-{{- fail "nodeSelector must be empty when memberlist is disabled" }}
 -{{- end }}
 -
 -{{- if .Values.speaker.frr.enabled }}
@@ -896,8 +583,8 @@ index e70743ce..b82b2a68 100644
 -    # Check /etc/pam.d/frr if you intend to use "vtysh"!
 -    #
 -    vtysh_enable=yes
--    zebra_options="  -A 127.0.0.1 -s 90000000"
--    bgpd_options="   -A 127.0.0.1 -p 0"
+-    zebra_options="  -A 127.0.0.1 -s 90000000 --limit-fds 100000"
+-    bgpd_options="   -A 127.0.0.1 -p 0 --limit-fds 100000"
 -    ospfd_options="  -A 127.0.0.1"
 -    ospf6d_options=" -A ::1"
 -    ripd_options="   -A 127.0.0.1"
@@ -910,8 +597,8 @@ index e70743ce..b82b2a68 100644
 -    babeld_options=" -A 127.0.0.1"
 -    sharpd_options=" -A 127.0.0.1"
 -    pbrd_options="   -A 127.0.0.1"
--    staticd_options="-A 127.0.0.1"
--    bfdd_options="   -A 127.0.0.1"
+-    staticd_options="-A 127.0.0.1 --limit-fds 100000"
+-    bfdd_options="   -A 127.0.0.1 --limit-fds 100000"
 -    fabricd_options="-A 127.0.0.1"
 -    vrrpd_options="  -A 127.0.0.1"
 -
@@ -959,7 +646,7 @@ index e70743ce..b82b2a68 100644
    labels:
      {{- include "metallb.labels" . | nindent 4 }}
      app.kubernetes.io/component: speaker
-@@ -140,9 +24,6 @@ spec:
+@@ -144,9 +24,6 @@ spec:
        annotations:
          {{- if .Values.prometheus.scrapeAnnotations }}
          prometheus.io/scrape: "true"
@@ -969,7 +656,7 @@ index e70743ce..b82b2a68 100644
          {{- end }}
          {{- with .Values.speaker.podAnnotations }}
            {{- toYaml . | nindent 8 }}
-@@ -187,50 +68,9 @@ spec:
+@@ -191,50 +68,9 @@ spec:
              defaultMode: 256
              name: metallb-excludel2
        {{- end }}
@@ -1021,7 +708,7 @@ index e70743ce..b82b2a68 100644
          {{- if .Values.speaker.image.pullPolicy }}
          imagePullPolicy: {{ .Values.speaker.image.pullPolicy }}
          {{- end }}
-@@ -255,9 +95,6 @@ spec:
+@@ -259,9 +95,6 @@ spec:
          {{- if .Values.prometheus.secureMetricsPort }}
          - --host=localhost
          {{- end }}
@@ -1031,7 +718,7 @@ index e70743ce..b82b2a68 100644
          env:
          - name: METALLB_NODE_NAME
            valueFrom:
-@@ -284,18 +121,6 @@ spec:
+@@ -288,18 +121,6 @@ spec:
          - name: METALLB_ML_SECRET_KEY_PATH
            value: "{{ .Values.speaker.memberlist.mlSecretKeyPath }}"
          {{- end }}
@@ -1050,7 +737,7 @@ index e70743ce..b82b2a68 100644
          - name: METALLB_POD_NAME
            valueFrom:
              fieldRef:
-@@ -351,194 +176,17 @@ spec:
+@@ -355,194 +176,17 @@ spec:
              - ALL
              add:
              - NET_RAW
@@ -1404,7 +1091,7 @@ index bc0dd840..0f333dfd 100644
    },
    "required": [
 diff --git a/charts/metallb/values.yaml b/charts/metallb/values.yaml
-index 50d26bca..6d7c30a9 100644
+index fc6e0b23..bff9a747 100644
 --- a/charts/metallb/values.yaml
 +++ b/charts/metallb/values.yaml
 @@ -6,6 +6,16 @@ imagePullSecrets: []
@@ -1442,7 +1129,7 @@ index 50d26bca..6d7c30a9 100644
      #   sourceLabels: [__name__]
  
      # 	relabel configs to apply to samples before ingestion.
-@@ -197,8 +207,8 @@ controller:
+@@ -201,8 +211,8 @@ controller:
    # command: /controller
    # webhookMode: enabled
    image:
@@ -1453,7 +1140,7 @@ index 50d26bca..6d7c30a9 100644
      pullPolicy:
    ## @param controller.updateStrategy.type Metallb controller deployment strategy type.
    ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
-@@ -272,7 +282,8 @@ speaker:
+@@ -277,7 +287,8 @@ speaker:
    ignoreExcludeLB: false
  
    image:
@@ -1463,7 +1150,7 @@ index 50d26bca..6d7c30a9 100644
      tag:
      pullPolicy:
    ## @param speaker.updateStrategy.type Speaker daemonset strategy type
-@@ -325,41 +336,8 @@ speaker:
+@@ -330,41 +341,8 @@ speaker:
      enabled: true
      failureThreshold: 30
      periodSeconds: 5
@@ -1506,5 +1193,5 @@ index 50d26bca..6d7c30a9 100644
 -  external: false
 -  namespace: ""
 -- 
-2.44.0
+2.48.1
 
