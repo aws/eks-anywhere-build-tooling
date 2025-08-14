@@ -1,7 +1,7 @@
-From 780976be05711814b494d316e4ceab405d8924af Mon Sep 17 00:00:00 2001
+From 6aefa76d0a7bfab14dffe1e05971746ce061bb31 Mon Sep 17 00:00:00 2001
 From: Ahree Hong <ahreeh@amazon.com>
 Date: Thu, 2 May 2024 12:42:22 -0700
-Subject: [PATCH 4/6] Create VLAN tagged interface if vlan_id exists in
+Subject: [PATCH 4/8] Create VLAN tagged interface if vlan_id exists in
  /proc/cmdline
 
 This enables a vlan tagged machine to boot properly.
@@ -12,7 +12,7 @@ Signed-off-by: Ahree Hong <ahreeh@amazon.com>
  1 file changed, 87 insertions(+), 20 deletions(-)
 
 diff --git a/writefile/main.go b/writefile/main.go
-index efe6261..e724375 100644
+index 38103ff..cc8330a 100644
 --- a/writefile/main.go
 +++ b/writefile/main.go
 @@ -14,6 +14,7 @@ import (
@@ -37,9 +37,9 @@ index efe6261..e724375 100644
  		}
 -		contents, err = dhcpAndWriteNetplan(ifname, timeout)
 +		netplanTemplate := `network:
-+    version: 2
-+    renderer: networkd
-+    ethernets:
++		version: 2
++		renderer: networkd
++		ethernets:
 +        id0:
 +            match:
 +                macaddress: {{ .HWAddr }}
@@ -61,8 +61,8 @@ index efe6261..e724375 100644
  		if err != nil {
  			log.Fatal(err)
  		}
-@@ -332,7 +355,43 @@ func ensureDir(mountPath, path string, mode os.FileMode, uid, gid int) error {
- 	return nil
+@@ -277,7 +300,43 @@ func dirExists(mountPath, path string) (bool, error) {
+ 	return !os.IsNotExist(err), nil
  }
  
 -func dhcpAndWriteNetplan(ifname string, dhcpTimeout time.Duration) (string, error) {
@@ -106,7 +106,7 @@ index efe6261..e724375 100644
  	// After locking a goroutine to its current OS thread with runtime.LockOSThread()
  	// and changing its network namespace, any new subsequent goroutine won't be scheduled
  	// on that thread while it's locked. Therefore, the new goroutine will run in a
-@@ -361,24 +420,6 @@ func dhcpAndWriteNetplan(ifname string, dhcpTimeout time.Duration) (string, erro
+@@ -306,24 +365,6 @@ func dhcpAndWriteNetplan(ifname string, dhcpTimeout time.Duration) (string, erro
  		return "", err
  	}
  
@@ -131,7 +131,7 @@ index efe6261..e724375 100644
  	return createNetplan(netplanTemplate, translate(d))
  }
  
-@@ -436,6 +477,32 @@ func translate(d *dhcpv4.DHCPv4) Info {
+@@ -381,10 +422,36 @@ func translate(d *dhcpv4.DHCPv4) Info {
  	info.IPAddr = net.IPNet{IP: d.YourIPAddr, Mask: d.SubnetMask()}
  	info.Gateway = d.GetOneOption(dhcpv4.OptionRouter)
  	info.Nameservers = d.DNS()
@@ -146,7 +146,7 @@ index efe6261..e724375 100644
  
  	return info
  }
-+
+ 
 +// getVLANID parses a string for a value from key `vlan_id=` and returns it.
 +func getVLANID(b string) (int, error) {
 +	i := strings.Index(b, "vlan_id=")
@@ -164,6 +164,10 @@ index efe6261..e724375 100644
 +
 +	return strconv.Atoi(parsed[1])
 +}
++
+ func recursiveEnsureDir(mountPath, path string, mode os.FileMode, uid, gid int) error {
+ 	// Does the directory already exist? If so we can return early
+ 	exists, err := dirExists(mountPath, path)
 -- 
-2.40.0
+2.47.1
 

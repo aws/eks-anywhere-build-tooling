@@ -1,17 +1,17 @@
 BASE_DIRECTORY:=$(abspath ../../../)
 GIT_TAG=$(shell cat GIT_TAG)
 GOLANG_VERSION=$(shell cat GOLANG_VERSION)
-REPO=hub
+REPO=actions
 REPO_OWNER=tinkerbell
 
 BASE_IMAGE_NAME?=eks-distro-minimal-base
 
-CEXEC_IMAGE_COMPONENT=tinkerbell/hub/cexec
-KEXEC_IMAGE_COMPONENT=tinkerbell/hub/kexec
-IMAGE2DISK_IMAGE_COMPONENT=tinkerbell/hub/image2disk
-OCI2DISK_IMAGE_COMPONENT=tinkerbell/hub/oci2disk
-WRITEFILE_IMAGE_COMPONENT=tinkerbell/hub/writefile
-REBOOT_IMAGE_COMPONENT=tinkerbell/hub/reboot
+CEXEC_IMAGE_COMPONENT=tinkerbell/actions/cexec
+KEXEC_IMAGE_COMPONENT=tinkerbell/actions/kexec
+IMAGE2DISK_IMAGE_COMPONENT=tinkerbell/actions/image2disk
+OCI2DISK_IMAGE_COMPONENT=tinkerbell/actions/oci2disk
+WRITEFILE_IMAGE_COMPONENT=tinkerbell/actions/writefile
+REBOOT_IMAGE_COMPONENT=tinkerbell/actions/reboot
 
 BINARY_TARGET_FILES=cexec kexec image2disk oci2disk writefile
 SOURCE_PATTERNS=./cexec ./kexec ./image2disk ./oci2disk ./writefile

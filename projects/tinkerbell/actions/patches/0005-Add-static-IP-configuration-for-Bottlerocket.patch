@@ -1,7 +1,7 @@
-From dff6baf346690eec9589b52458eaaa2fd40c25b0 Mon Sep 17 00:00:00 2001
+From 631794923b8714aba771c327bf1b12855da0ebdd Mon Sep 17 00:00:00 2001
 From: Ahree Hong <ahreeh@amazon.com>
 Date: Thu, 2 May 2024 12:47:50 -0700
-Subject: [PATCH 5/6] Add static IP configuration for Bottlerocket
+Subject: [PATCH 5/8] Add static IP configuration for Bottlerocket
 
 Static IPs provide more reliable IP handling.
 Since Bottlerocket v1.11.0 we can use the MAC
@@ -15,7 +15,7 @@ Signed-off-by: Ahree Hong <ahreeh@amazon.com>
  1 file changed, 103 insertions(+), 25 deletions(-)
 
 diff --git a/writefile/main.go b/writefile/main.go
-index e724375..a64e696 100644
+index cc8330a..abc18ac 100644
 --- a/writefile/main.go
 +++ b/writefile/main.go
 @@ -31,6 +31,7 @@ const (
@@ -79,9 +79,9 @@ index e724375..a64e696 100644
  			}
  		}
 -		netplanTemplate := `network:
--    version: 2
--    renderer: networkd
--    ethernets:
+-		version: 2
+-		renderer: networkd
+-		ethernets:
 -        id0:
 -            match:
 -                macaddress: {{ .HWAddr }}
@@ -167,9 +167,9 @@ index e724375..a64e696 100644
 +}
 +
  func determineNetIF() string {
- 	runtime.LockOSThread()
- 	defer runtime.UnlockOSThread()
-@@ -391,7 +460,7 @@ func vlanEnabled(f string) (ifname, netplanTemplate string, err error) {
+   runtime.LockOSThread()
+   defer runtime.UnlockOSThread()
+@@ -336,7 +405,7 @@ func vlanEnabled(f string) (ifname, netplanTemplate string, err error) {
  	return ifname, netplanTemplate, nil
  }
  
@@ -178,7 +178,7 @@ index e724375..a64e696 100644
  	// After locking a goroutine to its current OS thread with runtime.LockOSThread()
  	// and changing its network namespace, any new subsequent goroutine won't be scheduled
  	// on that thread while it's locked. Therefore, the new goroutine will run in a
-@@ -405,22 +474,31 @@ func dhcpAndWriteNetplan(ifname string, dhcpTimeout time.Duration, netplanTempla
+@@ -350,22 +419,31 @@ func dhcpAndWriteNetplan(ifname string, dhcpTimeout time.Duration, netplanTempla
  	// Change to PID 1 network namespace so we can do a DHCP using the host's interface.
  	ns1, err := netns.GetFromPid(1)
  	if err != nil {
@@ -213,7 +213,7 @@ index e724375..a64e696 100644
  }
  
  func netIPToString(ip []net.IP, sep string) string {
-@@ -444,8 +522,8 @@ func netToString(v interface{}) string {
+@@ -389,8 +467,8 @@ func netToString(v interface{}) string {
  	return fmt.Sprintf("%v", v)
  }
  
@@ -225,5 +225,5 @@ index e724375..a64e696 100644
  		return "", err
  	}
 -- 
-2.40.0
+2.47.1
 

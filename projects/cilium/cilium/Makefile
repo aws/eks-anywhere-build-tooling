@@ -10,25 +10,16 @@ CILIUM_CHART=cilium
 REPO=cilium
 REPO_OWNER=cilium
 
-HAS_S3_ARTIFACTS=true
+HAS_S3_ARTIFACTS=false
 SIMPLE_CREATE_BINARIES=false
 SIMPLE_CREATE_TARBALLS=false
 HAS_LICENSES=false
 IMAGE_NAMES=
 
-BUILD_TARGETS=upload-artifacts
-RELEASE_TARGETS=upload-artifacts
-
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-
-s3-artifacts: create-manifests
-
-.PHONY: create-manifests
-create-manifests:
-	build/create_manifests.sh $(GIT_TAG) $(ARTIFACTS_PATH) $(REGISTRY)
 
 .PHONY: update-digests
 update-digests: | ensure-skopeo

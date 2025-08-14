@@ -1,0 +1,172 @@
+From c7c26125f3bc6dc6e10f47b8f7cfdc89f122713f Mon Sep 17 00:00:00 2001
+From: rajeshvenkata <rajesh.venkat.p@gmail.com>
+Date: Wed, 11 Jun 2025 14:19:27 -0700
+Subject: [PATCH 2/2] Remove kube-rbac-proxy
+
+---
+ Makefile                                      |  7 +-----
+ .../auth_proxy_client_clusterrole.yaml        |  9 --------
+ .../auth_proxy_role.yaml                      | 17 --------------
+ .../auth_proxy_role_binding.yaml              | 12 ----------
+ .../auth_proxy_service.yaml                   | 15 -------------
+ .../kustomization.yaml                        | 14 ------------
+ .../manager_auth_proxy_patch.yaml             | 22 -------------------
+ 7 files changed, 1 insertion(+), 95 deletions(-)
+ delete mode 100644 config/default-with-metrics-port/auth_proxy_client_clusterrole.yaml
+ delete mode 100644 config/default-with-metrics-port/auth_proxy_role.yaml
+ delete mode 100644 config/default-with-metrics-port/auth_proxy_role_binding.yaml
+ delete mode 100644 config/default-with-metrics-port/auth_proxy_service.yaml
+ delete mode 100644 config/default-with-metrics-port/kustomization.yaml
+ delete mode 100644 config/default-with-metrics-port/manager_auth_proxy_patch.yaml
+
+diff --git a/Makefile b/Makefile
+index 8c8adb1..1cfa323 100644
+--- a/Makefile
++++ b/Makefile
+@@ -328,16 +328,11 @@ clean: ## Cleans up everything.
+ .PHONY: release-manifests
+ RELEASE_MANIFEST_TARGETS=$(RELEASE_DIR)/infrastructure-components.yaml $(RELEASE_DIR)/metadata.yaml
+ RELEASE_MANIFEST_INPUTS=$(KUSTOMIZE) config/.flag.mk $(shell find config)
+-RELEASE_MANIFEST_SOURCE_BASE ?= config/default
+ release-manifests: $(RELEASE_MANIFEST_TARGETS) ## Create kustomized release manifest in $RELEASE_DIR (defaults to out).
+ $(RELEASE_DIR)/%: $(RELEASE_MANIFEST_INPUTS)
+ 	@mkdir -p $(RELEASE_DIR)
+ 	cp metadata.yaml $(RELEASE_DIR)/metadata.yaml
+-	$(KUSTOMIZE) build $(RELEASE_MANIFEST_SOURCE_BASE) > $(RELEASE_DIR)/infrastructure-components.yaml
+-
+-.PHONY: release-manifests-metrics-port
+-release-manifests-metrics-port:
+-	make release-manifests RELEASE_MANIFEST_SOURCE_BASE=config/default-with-metrics-port
++	kustomize build config/default > $(RELEASE_DIR)/infrastructure-components.yaml
+ 
+ .PHONY: release-staging
+ release-staging: ## Builds and uploads manifests to the staging bucket and creates new tag
+diff --git a/config/default-with-metrics-port/auth_proxy_client_clusterrole.yaml b/config/default-with-metrics-port/auth_proxy_client_clusterrole.yaml
+deleted file mode 100644
+index 51a75db..0000000
+--- a/config/default-with-metrics-port/auth_proxy_client_clusterrole.yaml
++++ /dev/null
+@@ -1,9 +0,0 @@
+-apiVersion: rbac.authorization.k8s.io/v1
+-kind: ClusterRole
+-metadata:
+-  name: metrics-reader
+-rules:
+-- nonResourceURLs:
+-  - "/metrics"
+-  verbs:
+-  - get
+diff --git a/config/default-with-metrics-port/auth_proxy_role.yaml b/config/default-with-metrics-port/auth_proxy_role.yaml
+deleted file mode 100644
+index 80e1857..0000000
+--- a/config/default-with-metrics-port/auth_proxy_role.yaml
++++ /dev/null
+@@ -1,17 +0,0 @@
+-apiVersion: rbac.authorization.k8s.io/v1
+-kind: ClusterRole
+-metadata:
+-  name: proxy-role
+-rules:
+-- apiGroups:
+-  - authentication.k8s.io
+-  resources:
+-  - tokenreviews
+-  verbs:
+-  - create
+-- apiGroups:
+-  - authorization.k8s.io
+-  resources:
+-  - subjectaccessreviews
+-  verbs:
+-  - create
+diff --git a/config/default-with-metrics-port/auth_proxy_role_binding.yaml b/config/default-with-metrics-port/auth_proxy_role_binding.yaml
+deleted file mode 100644
+index ec7acc0..0000000
+--- a/config/default-with-metrics-port/auth_proxy_role_binding.yaml
++++ /dev/null
+@@ -1,12 +0,0 @@
+-apiVersion: rbac.authorization.k8s.io/v1
+-kind: ClusterRoleBinding
+-metadata:
+-  name: proxy-rolebinding
+-roleRef:
+-  apiGroup: rbac.authorization.k8s.io
+-  kind: ClusterRole
+-  name: proxy-role
+-subjects:
+-- kind: ServiceAccount
+-  name: controller-manager
+-  namespace: system
+diff --git a/config/default-with-metrics-port/auth_proxy_service.yaml b/config/default-with-metrics-port/auth_proxy_service.yaml
+deleted file mode 100644
+index dcb3b89..0000000
+--- a/config/default-with-metrics-port/auth_proxy_service.yaml
++++ /dev/null
+@@ -1,15 +0,0 @@
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  labels:
+-    control-plane: controller-manager
+-  name: controller-manager-metrics-service
+-  namespace: system
+-spec:
+-  ports:
+-  - name: https
+-    port: 8443
+-    protocol: TCP
+-    targetPort: https
+-  selector:
+-    control-plane: capc-controller-manager
+diff --git a/config/default-with-metrics-port/kustomization.yaml b/config/default-with-metrics-port/kustomization.yaml
+deleted file mode 100644
+index 7811196..0000000
+--- a/config/default-with-metrics-port/kustomization.yaml
++++ /dev/null
+@@ -1,14 +0,0 @@
+-apiVersion: kustomize.config.k8s.io/v1beta1
+-kind: Kustomization
+-
+-bases:
+-- ../default
+-
+-resources:
+-- auth_proxy_client_clusterrole.yaml
+-- auth_proxy_role.yaml
+-- auth_proxy_role_binding.yaml
+-- auth_proxy_service.yaml
+-
+-patchesStrategicMerge:
+-  - manager_auth_proxy_patch.yaml
+\ No newline at end of file
+diff --git a/config/default-with-metrics-port/manager_auth_proxy_patch.yaml b/config/default-with-metrics-port/manager_auth_proxy_patch.yaml
+deleted file mode 100644
+index d4f6481..0000000
+--- a/config/default-with-metrics-port/manager_auth_proxy_patch.yaml
++++ /dev/null
+@@ -1,22 +0,0 @@
+-# This patch inject a sidecar container which is a HTTP proxy for the
+-# controller manager, it performs RBAC authorization against the Kubernetes API using SubjectAccessReviews.
+-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  name: controller-manager
+-  namespace: system
+-spec:
+-  template:
+-    spec:
+-      containers:
+-      - name: kube-rbac-proxy
+-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+-        args:
+-        - "--secure-listen-address=0.0.0.0:8443"
+-        - "--upstream=http://127.0.0.1:8080/"
+-        - "--logtostderr=true"
+-        - "--v=10"
+-        ports:
+-        - containerPort: 8443
+-          protocol: TCP
+-          name: https
+-- 
+2.49.0
+
