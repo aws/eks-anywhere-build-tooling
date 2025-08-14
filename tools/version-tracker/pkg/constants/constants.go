@@ -448,7 +448,6 @@ var (
 		"containerd/containerd": "v1",
 		"opencontainers/runc":   "v1.1",
 		"prometheus/prometheus": "v2",
-		"helm/helm":             "v3.16.4",
 	}
 
 	ECRImageRepositories = map[string]string{
