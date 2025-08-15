@@ -1,5 +1,5 @@
 ## **Metal LB**
-![Version](https://img.shields.io/badge/version-v0.15.2-blue)
+![Version](https://img.shields.io/badge/version-v0.14.9-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiQSt5WjFpTGtiSGsxTFdFLzAxakxMbU1wZUE3LzNVR0NNMWlBYjNZeDVKeFl6YWxUZ2srNmJ4YW9ST2RxOHBTOStVMnVub1FYUW1LSWF5M3RsUGx5KzhNPSIsIml2UGFyYW1ldGVyU3BlYyI6IlEzdHh1SkJJMHV5WlZXbWUiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 Official website: https://metallb.universe.tf/
