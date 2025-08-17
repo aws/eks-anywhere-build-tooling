@@ -1,0 +1,98 @@
+From 159293af406a062bdc3b602469be36b219c66931 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Mon, 28 Apr 2025 12:32:50 -0700
+Subject: [PATCH] harbor patch
+
+---
+ go.mod                   |  1 -
+ go.sum                   |  2 --
+ registry/handlers/app.go |  3 ++-
+ registry/registry.go     | 20 ++++++++------------
+ 4 files changed, 10 insertions(+), 16 deletions(-)
+
+diff --git a/go.mod b/go.mod
+index 3c81f169..655e8b8e 100644
+--- a/go.mod
++++ b/go.mod
+@@ -31,7 +31,6 @@ require (
+ 	google.golang.org/api v0.230.0
+ 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
+ 	gopkg.in/yaml.v2 v2.4.0
+-	rsc.io/letsencrypt v0.0.3
+ )
+ 
+ require (
+diff --git a/go.sum b/go.sum
+index 1cd6accf..cab11243 100644
+--- a/go.sum
++++ b/go.sum
+@@ -459,5 +459,3 @@ gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
+ gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+ gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+ gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+-rsc.io/letsencrypt v0.0.3 h1:H7xDfhkaFFSYEJlKeq38RwX2jYcnTeHuDQyT+mMNMwM=
+-rsc.io/letsencrypt v0.0.3/go.mod h1:buyQKZ6IXrRnB7TdkHP0RyEybLx18HHyOSoTyoOLqNY=
+diff --git a/registry/handlers/app.go b/registry/handlers/app.go
+index 45cf4906..cc0b9d76 100644
+--- a/registry/handlers/app.go
++++ b/registry/handlers/app.go
+@@ -42,6 +42,7 @@ import (
+ 	"github.com/docker/go-metrics"
+ 	"github.com/docker/libtrust"
+ 	"github.com/gomodule/redigo/redis"
++	gomoduleredis "github.com/gomodule/redigo/redis"
+ 	"github.com/gorilla/mux"
+ 	"github.com/sirupsen/logrus"
+ )
+@@ -522,7 +523,7 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
+ 		sntnl := &sentinel.Sentinel{
+ 			Addrs:      strings.Split(configuration.Redis.Addr, ","),
+ 			MasterName: configuration.Redis.SentinelMasterSet,
+-			Dial: func(addr string) (redis.Conn, error) {
++			Dial: func(addr string) (gomoduleredis.Conn, error) {
+ 				c, err := redis.Dial("tcp", addr,
+ 					redisOptions...)
+ 				if err != nil {
+diff --git a/registry/registry.go b/registry/registry.go
+index 9486d8bb..4b81e4d9 100644
+--- a/registry/registry.go
++++ b/registry/registry.go
+@@ -13,7 +13,8 @@ import (
+ 	"syscall"
+ 	"time"
+ 
+-	"rsc.io/letsencrypt"
++	"golang.org/x/crypto/acme"
++	"golang.org/x/crypto/acme/autocert"
+ 
+ 	logrus_bugsnag "github.com/Shopify/logrus-bugsnag"
+ 
+@@ -246,19 +247,14 @@ func (registry *Registry) ListenAndServe() error {
+ 			if config.HTTP.TLS.Certificate != "" {
+ 				return fmt.Errorf("cannot specify both certificate and Let's Encrypt")
+ 			}
+-			var m letsencrypt.Manager
+-			if err := m.CacheFile(config.HTTP.TLS.LetsEncrypt.CacheFile); err != nil {
+-				return err
+-			}
+-			if !m.Registered() {
+-				if err := m.Register(config.HTTP.TLS.LetsEncrypt.Email, nil); err != nil {
+-					return err
+-				}
+-			}
+-			if len(config.HTTP.TLS.LetsEncrypt.Hosts) > 0 {
+-				m.SetHosts(config.HTTP.TLS.LetsEncrypt.Hosts)
++			m := &autocert.Manager{
++				HostPolicy: autocert.HostWhitelist(config.HTTP.TLS.LetsEncrypt.Hosts...),
++				Cache:      autocert.DirCache(config.HTTP.TLS.LetsEncrypt.CacheFile),
++				Email:      config.HTTP.TLS.LetsEncrypt.Email,
++				Prompt:     autocert.AcceptTOS,
+ 			}
+ 			tlsConf.GetCertificate = m.GetCertificate
++			tlsConf.NextProtos = append(tlsConf.NextProtos, acme.ALPNProto)
+ 		} else {
+ 			tlsConf.Certificates = make([]tls.Certificate, 1)
+ 			tlsConf.Certificates[0], err = tls.LoadX509KeyPair(config.HTTP.TLS.Certificate, config.HTTP.TLS.Key)
+-- 
+2.48.1
+
