@@ -14,7 +14,7 @@ REPO_OWNER=aws
 BUILD_TARGETS=validate
 RELEASE_TARGETS=validate-release-manifest-version latest-snow-raw-image
 
-PACKER_VERSION=1.8.0
+PACKER_VERSION=1.14.1
 
 EKSA_PRODUCTION_ARTIFACTS_BUCKET?=eksa-production-artifacts-bucket
 EKSA_RELEASE_MANIFEST_S3_PATH?=https://$(EKSA_PRODUCTION_ARTIFACTS_BUCKET).s3.amazonaws.com/releases/eks-a/manifest.yaml
