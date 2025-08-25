@@ -58,6 +58,7 @@ type BuildOptions struct {
 	Firmware           string
 	AnsibleVerbosity   int
 	EKSAReleaseVersion string
+	BuilderType        string
 }
 
 type VsphereConfig struct {

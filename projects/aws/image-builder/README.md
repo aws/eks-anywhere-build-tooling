@@ -111,12 +111,13 @@ sudo snap install yq
   "resource_pool":"<resource pool used for image building vm>",
   "username":"<vcenter username>",
   "vcenter_server":"<vcenter fqdn>",
-  "vmx_version":"<hardware version of virtual machine>"
+  "vmx_version":"<hardware version of virtual machine>",
+  "template": "<template used by clone builder>"
 }
 ```
 4. Run the image builder tool for appropriate release channel
 ```
-image-builder build --os ubuntu --hypervisor vsphere --vsphere-config <path to above json file> --release-channel <release channel, ex 1-23>
+image-builder build --os ubuntu --hypervisor vsphere --vsphere-config <path to above json file> --release-channel <release channel, ex 1-23> --builder <vsphere builder type, can be iso or clone>
 ```
 
 ### Building Node Images for Baremetal
