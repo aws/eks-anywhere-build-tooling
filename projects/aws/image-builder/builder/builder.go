@@ -119,6 +119,9 @@ func (b *BuildOptions) BuildImage() {
 	}
 	var outputImageGlobPattern string
 	if b.Hypervisor == VSphere {
+		if b.BuilderType == BuilderTypeClone && b.VsphereConfig.Template == "" {
+			log.Fatalf("Error: When using vsphere-clone, template cannot be empty")
+		}
 		if b.VsphereConfig.VmxVersion != "" {
 			vmxVersion, err := strconv.Atoi(b.VsphereConfig.VmxVersion)
 			if err != nil {
@@ -156,16 +159,32 @@ func (b *BuildOptions) BuildImage() {
 		var buildCommand string
 		switch b.Os {
 		case Ubuntu:
-			if b.Firmware == EFI {
-				buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s-efi", imageBuilderProjectPath, b.OsVersion)
+			if b.BuilderType == BuilderTypeClone {
+				if b.Firmware == EFI {
+					buildCommand = fmt.Sprintf("make -C %s local-clone-build-ova-ubuntu-%s-efi", imageBuilderProjectPath, b.OsVersion)
+				} else {
+					buildCommand = fmt.Sprintf("make -C %s local-clone-build-ova-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
+				}
 			} else {
-				buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
+				if b.Firmware == EFI {
+					buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s-efi", imageBuilderProjectPath, b.OsVersion)
+				} else {
+					buildCommand = fmt.Sprintf("make -C %s local-build-ova-ubuntu-%s", imageBuilderProjectPath, b.OsVersion)
+				}
 			}
 		case RedHat:
-			if b.Firmware == EFI {
-				buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s-efi", imageBuilderProjectPath, b.OsVersion)
+			if b.BuilderType == BuilderTypeClone {
+				if b.Firmware == EFI {
+					buildCommand = fmt.Sprintf("make -C %s local-clone-build-ova-redhat-%s-efi", imageBuilderProjectPath, b.OsVersion)
+				} else {
+					buildCommand = fmt.Sprintf("make -C %s local-clone-build-ova-redhat-%s", imageBuilderProjectPath, b.OsVersion)
+				}
 			} else {
-				buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s", imageBuilderProjectPath, b.OsVersion)
+				if b.Firmware == EFI {
+					buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s-efi", imageBuilderProjectPath, b.OsVersion)
+				} else {
+					buildCommand = fmt.Sprintf("make -C %s local-build-ova-redhat-%s", imageBuilderProjectPath, b.OsVersion)
+				}
 			}
 			commandEnvVars = append(commandEnvVars,
 				fmt.Sprintf("%s=%s", rhelUsernameEnvVar, b.VsphereConfig.RhelUsername),
