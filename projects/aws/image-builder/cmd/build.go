@@ -42,7 +42,7 @@ var buildCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().StringVar(&bo.Os, "os", "", "Operating system to use for EKS-A node image")
-	buildCmd.Flags().StringVar(&bo.OsVersion, "os-version", "", "Operating system version to use for EKS-A node image. Can be 20.04 or 22.04 for Ubuntu or 8 for Redhat.")
+	buildCmd.Flags().StringVar(&bo.OsVersion, "os-version", "", "Operating system version to use for EKS-A node image. Can be 20.04, 22.04 or 24.04 for Ubuntu, 8 or 9 for Redhat.")
 	buildCmd.Flags().StringVar(&bo.Hypervisor, "hypervisor", "", "Target hypervisor for EKS-A node image")
 	buildCmd.Flags().StringVar(&baremetalConfigFile, "baremetal-config", "", "Path to Baremetal Config file")
 	buildCmd.Flags().StringVar(&vSphereConfigFile, "vsphere-config", "", "Path to vSphere Config file")
@@ -50,7 +50,7 @@ func init() {
 	buildCmd.Flags().StringVar(&cloudstackConfigFile, "cloudstack-config", "", "Path to CloudStack Config file")
 	buildCmd.Flags().StringVar(&amiConfigFile, "ami-config", "", "Path to AMI Config file")
 	buildCmd.Flags().StringVar(&additionalFilesConfigFile, "files-config", "", "Path to Config file specifying additional files to be copied into EKS-A node image")
-	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-31", "EKS-D Release channel for node image. Can be 1-27, 1-28, 1-29, 1-30 or 1-31")
+	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-31", "EKS-D Release channel for node image. Can be 1-28, 1-29, 1-30, 1-31, 1-32, 1-33 or 1-34")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA & Raw, and Redhat 9 RAW builds.")
 	buildCmd.Flags().StringVar(&bo.EKSAReleaseVersion, "eksa-release", "", "The EKS-A CLI version to build images for")
