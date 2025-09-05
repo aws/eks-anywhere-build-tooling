@@ -22,11 +22,6 @@ run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
 
-##@ Artifact Targets
-tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
-s3-artifacts: # Prepare ARTIFACTS_PATH folder structure with tarballs/manifests/other items to be uploaded to s3
-upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S3
-
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-go-cache: ## Removes the GOMODCACHE AND GOCACHE folders
@@ -51,6 +46,6 @@ patch-for-dep-update: ## After bumping dep in go.mod file and updating vendor, g
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `upload-artifacts`
-release: ## Called via prow postsubmit + release jobs, calls `upload-artifacts`
+build: ## Called via prow presubmit, calls `github-rate-limit-pre validate-checksums attribution    attribution-pr github-rate-limit-post`
+release: ## Called via prow postsubmit + release jobs, calls `validate-checksums   `
 ########### END GENERATED ###########################
