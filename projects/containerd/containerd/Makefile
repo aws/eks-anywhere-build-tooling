@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(abspath ../../../)
-GIT_TAG=$(shell cat GIT_TAG)
-GOLANG_VERSION=$(shell cat GOLANG_VERSION)
+GIT_TAG=$(shell cat ./$(RELEASE_BRANCH)/GIT_TAG)
+GOLANG_VERSION=$(shell cat ./$(RELEASE_BRANCH)/GOLANG_VERSION)
 REPO=containerd
 REPO_OWNER=containerd
 
@@ -15,11 +15,12 @@ EXTRA_GOBUILD_FLAGS=-tags urfave_cli_no_docs,osusergo,netgo,static_build
 CGO_CREATE_BINARIES=true
 
 HAS_S3_ARTIFACTS=true
+HAS_RELEASE_BRANCHES=true
 
 IMAGE_NAMES=
 
-BUILDSPEC_VARS_KEYS=BINARY_PLATFORMS
-BUILDSPEC_VARS_VALUES=BINARY_PLATFORMS
+BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
+BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
 
 # Since we build the arm and amd binaries on difference instances in codebuild
 # we do not want to delete missing files when s3 sync-ing from local to the bucket
