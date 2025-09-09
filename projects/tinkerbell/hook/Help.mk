@@ -39,8 +39,8 @@ hook-dind/images/push: ## Builds/pushes `hook-dind/images/push`
 hook-embedded/images/push: ## Builds/pushes `hook-embedded/images/push`
 
 ##@ Fetch Binary Targets
-_output/dependencies/linux-amd64/eksa/containerd/containerd: ## Fetch `_output/dependencies/linux-amd64/eksa/containerd/containerd`
-_output/dependencies/linux-arm64/eksa/containerd/containerd: ## Fetch `_output/dependencies/linux-arm64/eksa/containerd/containerd`
+_output/dependencies/linux-amd64/eksa/containerd/containerd/1-33: ## Fetch `_output/dependencies/linux-amd64/eksa/containerd/containerd/1-33`
+_output/dependencies/linux-arm64/eksa/containerd/containerd/1-33: ## Fetch `_output/dependencies/linux-arm64/eksa/containerd/containerd/1-33`
 _output/dependencies/linux-amd64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/tink`
 _output/dependencies/linux-arm64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/tink`
 _output/dependencies/linux-amd64/eksa/linuxkit/linuxkit: ## Fetch `_output/dependencies/linux-amd64/eksa/linuxkit/linuxkit`
