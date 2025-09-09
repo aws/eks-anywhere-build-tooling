@@ -33,10 +33,30 @@ fi
 
 CHECKSUMS_FILE=$PROJECT_ROOT/CHECKSUMS
 
-rm -f $CHECKSUMS_FILE
+# Create associative array to store checksums
+declare -A checksums
+
+# Read existing checksums if the file exists
+if [ -f "$CHECKSUMS_FILE" ]; then
+    while IFS=' ' read -r checksum filepath || [ -n "$checksum" ]; do
+        # Skip empty lines and malformed entries
+        if [ -n "$checksum" ] && [ -n "$filepath" ]; then
+            checksums["$filepath"]="$checksum"
+        fi
+    done < "$CHECKSUMS_FILE"
+fi
+
+# Calculate checksums for files present in output directory
 for file in $(find ${OUTPUT_BIN_DIR} -type f | sort); do
     filepath=$($REALPATH --relative-base=$MAKE_ROOT $file)
-    sha256sum $filepath >> $CHECKSUMS_FILE
+    checksum=$(sha256sum $filepath | cut -d' ' -f1)
+    checksums["$filepath"]="$checksum"
+done
+
+# Write all checksums to file (both updated and preserved)
+rm -f $CHECKSUMS_FILE
+for filepath in $(printf '%s\n' "${!checksums[@]}" | sort); do
+    echo "${checksums[$filepath]}  $filepath" >> $CHECKSUMS_FILE
 done
 
 echo "*************** CHECKSUMS ***************"
