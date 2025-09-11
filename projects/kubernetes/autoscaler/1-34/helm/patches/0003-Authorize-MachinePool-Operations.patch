@@ -1,0 +1,31 @@
+From 070d75ae2023f265790ba746bae927d3a16247e3 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Mon, 22 May 2023 16:56:31 -0400
+Subject: [PATCH 3/3] Authorize MachinePool Operations
+
+https://github.com/kubernetes/autoscaler/pull/4676 Introduced a bug where the autoscaler runtime fails to reconcile other CAPI machine resources when its ClusterRole is not authorized to list and watch MachinePool resources.
+
+See: https://github.com/kubernetes/autoscaler/commit/17d2bd968e756d97598be3ffb333957f0cfe99bf#diff-c8813a0942bbcd464aaa04a04c2c71897d5df30b65a2db86cb81773016f24406R786
+
+To resolve this issue, we authorize appropriate operations on MachinePool resources.
+---
+ charts/cluster-autoscaler/templates/clusterrole.yaml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/charts/cluster-autoscaler/templates/clusterrole.yaml b/charts/cluster-autoscaler/templates/clusterrole.yaml
+index 7e23ec28a..aac23f6c9 100644
+--- a/charts/cluster-autoscaler/templates/clusterrole.yaml
++++ b/charts/cluster-autoscaler/templates/clusterrole.yaml
+@@ -155,7 +155,9 @@ rules:
+     - cluster.x-k8s.io
+     resources:
+     - machinedeployments
++    - machinedeployments/scale
+     - machinepools
++    - machinepools/scale
+     - machines
+     - machinesets
+     verbs:
+-- 
+2.48.1
+

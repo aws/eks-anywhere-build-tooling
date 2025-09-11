@@ -14,7 +14,7 @@ To force running targets on the host: `export FORCE_GO_BUILD_ON_HOST=true`.
 * Common utils required
 	* `sudo yum -y install bc jq git-core make lz4 rsync`
 * `yq` is required by a number of targets
-	* `sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$([ "x86_64" = "$(uname -m)" ] && echo amd64 || echo arm64) && sudo chmod +x /usr/local/bin/yq`
+	* `sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.30.6/yq_linux_$([ "x86_64" = "$(uname -m)" ] && echo amd64 || echo arm64) && sudo chmod +x /usr/local/bin/yq`
 * Building helm charts requires `helm` and `skopeo`
 	* https://helm.sh/docs/intro/install/ - `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash`
 	* https://github.com/containers/skopeo - There is no binary release of skopeo for linux see [installing](https://github.com/containers/skopeo/blob/main/install.md) or
@@ -37,7 +37,10 @@ To force running targets on the host: `export FORCE_GO_BUILD_ON_HOST=true`.
 
 ## Pre-requisites for building on MacOS host
 * Docker Desktop - https://docs.docker.com/desktop/install/mac-install/
-* Common utils required - `brew install jq yq`
+* Common utils required 
+	* `brew install jq`
+	* `sudo wget https://github.com/mikefarah/yq/releases/download/v4.30.6/yq_darwin_arm64 -O /usr/local/bin/yq && sudo chmod +x /usr/local/bin/yq`
+chmod +x /usr/local/bin/yq`
 * Bash 4.2+ is required - `brew install bash`
 * A number of targets which run on the host require the gnu variants of common tools
 	such as `date` `find` `sed` `stat` `tar` - `brew install coreutils findutils gnu-sed gnu-tar`
