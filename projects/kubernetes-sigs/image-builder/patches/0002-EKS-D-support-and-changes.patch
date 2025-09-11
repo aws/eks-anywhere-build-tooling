@@ -182,7 +182,7 @@ index ca6761d16..b89075504 100644
  {{if and (eq .Vars.kubernetes_source_type "http") (eq .Vars.kubernetes_cni_source_type "http") (not .Vars.kubernetes_load_additional_imgs)}}
  # The second last pipe of awk is to take out arch from kube-apiserver-amd64 (i.e. amd64 or any other arch)
 -  crictl images | grep -v 'IMAGE ID' | awk '{print $1}' | awk -F'/' '{print $NF}' | sed 's/-{{ .Vars.arch }}//g' | sort:
-+  crictl images | grep -v 'IMAGE ID' | awk -F'[ /]' '{print $4}' | sed 's/-{{ .Vars.arch }}//g' | sort:
++  crictl images -o json | jq -r '.images[] | (.repoTags // [] + .repoDigests // [])[]' | awk -F'[:/]' '{print $(NF-1)}' | sed 's/-{{ .Vars.arch }}//g' | sort -u:
      exit-status: 0
      stderr: []
      timeout: 0
@@ -197,7 +197,7 @@ index ca6761d16..b89075504 100644
  {{if and (eq .Vars.kubernetes_source_type "http") (eq .Vars.kubernetes_cni_source_type "http") (.Vars.kubernetes_load_additional_imgs)}}
  # The second last pipe of awk is to take out arch from kube-apiserver-amd64 (i.e. amd64 or any other arch)
 -  crictl images | grep -v 'IMAGE ID' | awk '{print $1}' | awk -F'/' '{print $NF}' | sed 's/-{{ .Vars.arch }}//g' | sort:
-+  crictl images | grep -v 'IMAGE ID' | awk -F'[ /]' '{print $4}' | sed 's/-{{ .Vars.arch }}//g' | sort:
++  crictl images -o json | jq -r '.images[] | (.repoTags // [] + .repoDigests // [])[]' | awk -F'[:/]' '{print $(NF-1)}' | sed 's/-{{ .Vars.arch }}//g' | sort -u:
      exit-status: 0
      stderr: []
      timeout: 0
