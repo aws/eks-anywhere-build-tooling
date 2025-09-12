@@ -1,0 +1,49 @@
+From 28f5174b897ccdded122f89cf4ce4fe5b7c270b9 Mon Sep 17 00:00:00 2001
+From: Shizhao Liu <lshizhao@amazon.com>
+Date: Fri, 12 Sep 2025 14:28:13 -0700
+Subject: [PATCH 14/14] Use rhsm_server_release_version as releasever
+
+Currently image-builder does a yum update during sys prep,
+this will always update the OS kernel version to latest,
+for example, when using a rhel iso of 9.4, the final output
+will be rhel 9.6.
+
+This change will use rhsm_server_release_version as the releasever
+during yum update so that if rhsm_server_release_version is specified,
+the OS release version will not be updated to latest.
+
+Signed-off-by: Shizhao Liu <lshizhao@amazon.com>
+---
+ images/capi/ansible/roles/setup/tasks/redhat.yml | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/images/capi/ansible/roles/setup/tasks/redhat.yml b/images/capi/ansible/roles/setup/tasks/redhat.yml
+index 9c692ce23..3a1813310 100644
+--- a/images/capi/ansible/roles/setup/tasks/redhat.yml
++++ b/images/capi/ansible/roles/setup/tasks/redhat.yml
+@@ -121,11 +121,22 @@
+ 
+ - ansible.builtin.import_tasks: rpm_repos.yml
+ 
++- name: Set releasever fact when rhsm_server_release_version is defined
++  ansible.builtin.set_fact:
++    yum_releasever: "{{ rhsm_server_release_version }}"
++  when: rhsm_server_release_version is defined and rhsm_server_release_version != ""
++
++- name: Set releasever fact to ansible_distribution_major_version when rhsm_server_release_version is not defined
++  ansible.builtin.set_fact:
++    yum_releasever: "{{ ansible_distribution_major_version }}"
++  when: rhsm_server_release_version is not defined or rhsm_server_release_version == ""
++
+ - name: Perform a yum update
+   ansible.builtin.yum:
+     name: "*"
+     state: latest
+     lock_timeout: 60
++    releasever: "{{ yum_releasever }}"
+ 
+ - name: Install baseline dependencies
+   ansible.builtin.yum:
+-- 
+2.49.0
+
