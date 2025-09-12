@@ -1,0 +1,54 @@
+From 8e1206d581e04198cf4dbe8b168f22a9299da6f5 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Mon, 30 Sep 2024 09:39:48 -0700
+Subject: [PATCH 2/3] Remove additional GCE Dependencies
+
+---
+ cluster-autoscaler/config/autoscaling_options.go | 3 ---
+ cluster-autoscaler/config/flags/flags.go         | 2 --
+ 2 files changed, 5 deletions(-)
+
+diff --git a/cluster-autoscaler/config/autoscaling_options.go b/cluster-autoscaler/config/autoscaling_options.go
+index cedc37e71..aca1d6422 100644
+--- a/cluster-autoscaler/config/autoscaling_options.go
++++ b/cluster-autoscaler/config/autoscaling_options.go
+@@ -19,7 +19,6 @@ package config
+ import (
+ 	"time"
+ 
+-	gce_localssdsize "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce/localssdsize"
+ 	kubelet_config "k8s.io/kubernetes/pkg/kubelet/apis/config"
+ 	scheduler_config "k8s.io/kubernetes/pkg/scheduler/apis/config"
+ )
+@@ -64,8 +63,6 @@ type GCEOptions struct {
+ 	MigInstancesMinRefreshWaitTime time.Duration
+ 	// DomainUrl is the GCE url used to make calls to GCE API.
+ 	DomainUrl string
+-	// LocalSSDDiskSizeProvider provides local ssd disk size based on machine type
+-	LocalSSDDiskSizeProvider gce_localssdsize.LocalSSDSizeProvider
+ 	// BulkMigInstancesListingEnabled means that cluster instances should be listed in bulk instead of per mig.
+ 	// Instances of migs having instances in creating or deleting state are re-fetched using igm.ListInstances. Inconsistencies are handled by re-fetching using igm.ListInstances
+ 	BulkMigInstancesListingEnabled bool
+diff --git a/cluster-autoscaler/config/flags/flags.go b/cluster-autoscaler/config/flags/flags.go
+index 8012fde26..5aaf8b0f9 100644
+--- a/cluster-autoscaler/config/flags/flags.go
++++ b/cluster-autoscaler/config/flags/flags.go
+@@ -26,7 +26,6 @@ import (
+ 	"github.com/spf13/pflag"
+ 
+ 	cloudBuilder "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/builder"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce/localssdsize"
+ 	"k8s.io/autoscaler/cluster-autoscaler/config"
+ 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
+ 	"k8s.io/autoscaler/cluster-autoscaler/expander"
+@@ -350,7 +349,6 @@ func createAutoscalingOptions() config.AutoscalingOptions {
+ 		GCEOptions: config.GCEOptions{
+ 			ConcurrentRefreshes:            *concurrentGceRefreshes,
+ 			MigInstancesMinRefreshWaitTime: *gceMigInstancesMinRefreshWaitTime,
+-			LocalSSDDiskSizeProvider:       localssdsize.NewSimpleLocalSSDProvider(),
+ 			BulkMigInstancesListingEnabled: *bulkGceMigInstancesListingEnabled,
+ 		},
+ 		ClusterAPICloudConfigAuthoritative: *clusterAPICloudConfigAuthoritative,
+-- 
+2.48.1
+
