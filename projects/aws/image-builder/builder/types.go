@@ -60,21 +60,22 @@ type BuildOptions struct {
 }
 
 type VsphereConfig struct {
-	Cluster            string `json:"cluster"`
-	ConvertToTemplate  string `json:"convert_to_template"`
-	CreateSnapshot     string `json:"create_snapshot"`
-	Datacenter         string `json:"datacenter"`
-	Datastore          string `json:"datastore"`
-	Folder             string `json:"folder"`
-	InsecureConnection string `json:"insecure_connection"`
-	LinkedClone        string `json:"linked_clone"`
-	Network            string `json:"network"`
-	ResourcePool       string `json:"resource_pool"`
-	Template           string `json:"template"`
-	VcenterServer      string `json:"vcenter_server"`
-	Username           string `json:"username"`
-	Password           string `json:"password"`
-	VmxVersion         string `json:"vmx_version,omitempty"`
+	Cluster                  string `json:"cluster"`
+	ConvertToTemplate        string `json:"convert_to_template"`
+	CreateSnapshot           string `json:"create_snapshot"`
+	Datacenter               string `json:"datacenter"`
+	Datastore                string `json:"datastore"`
+	Folder                   string `json:"folder"`
+	InsecureConnection       string `json:"insecure_connection"`
+	LinkedClone              string `json:"linked_clone"`
+	Network                  string `json:"network"`
+	ResourcePool             string `json:"resource_pool"`
+	Template                 string `json:"template"`
+	VcenterServer            string `json:"vcenter_server"`
+	Username                 string `json:"username"`
+	Password                 string `json:"password"`
+	VmxVersion               string `json:"vmx_version,omitempty"`
+	RhelServerReleaseVersion string `json:"rhsm_server_release_version,omitempty"`
 	IsoConfig
 	RhelConfig
 	ProxyConfig
