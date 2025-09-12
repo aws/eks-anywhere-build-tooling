@@ -77,6 +77,7 @@ unit-test: | $$(ENABLE_DOCKER)
 mocks: $(MOCKGEN)
 	$(GO) generate ./...
 
+
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion

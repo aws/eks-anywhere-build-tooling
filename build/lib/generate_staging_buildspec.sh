@@ -153,8 +153,24 @@ for project in "${PROJECTS[@]}"; do
                 # if dep is split by binary platform, append platform/arch
                 DEP_BUILDSPEC_VARS="$(make_var $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO BUILDSPEC_VARS_KEYS)"
                 DEP_BUILDSPECS="$(make_var $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO BUILDSPECS)"
-                if [[ "$DEP_BUILDSPEC_VARS" == "BINARY_PLATFORMS" ]]; then
-                    DEPEND_ON+="\"${DEP_IDENTIFIER}_linux_amd64\",\"${DEP_IDENTIFIER}_linux_arm64\","
+                DEP_HAS_RELEASE_BRANCHES="$(make_var $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO HAS_RELEASE_BRANCHES)"
+                
+                if [[ "$DEP_BUILDSPEC_VARS" == *"BINARY_PLATFORMS"* ]]; then
+                    # Check if dependency has release branches and binaries are release branched
+                    if [[ "$DEP_HAS_RELEASE_BRANCHES" == "true" ]]; then
+                        # Get supported K8s versions (release branches) for the dependency
+                        DEP_SUPPORTED_K8S_VERSIONS="$(make_var $MAKE_ROOT/projects/$DEP_ORG/$DEP_REPO SUPPORTED_K8S_VERSIONS)"
+                        DEP_K8S_VERSIONS=(${DEP_SUPPORTED_K8S_VERSIONS// / })
+                        
+                        # Generate dependencies for each release branch + platform combination
+                        for k8s_version in "${DEP_K8S_VERSIONS[@]}"; do
+                            DEP_IDENTIFIER_WITH_BRANCH=${DEP_ORG//-/_}_${DEP_REPO//-/_}_${k8s_version//[-\/]/_}
+                            DEPEND_ON+="\"${DEP_IDENTIFIER_WITH_BRANCH}_linux_amd64\",\"${DEP_IDENTIFIER_WITH_BRANCH}_linux_arm64\","
+                        done
+                    else
+                        # Original logic for dependencies without release branches
+                        DEPEND_ON+="\"${DEP_IDENTIFIER}_linux_amd64\",\"${DEP_IDENTIFIER}_linux_arm64\","
+                    fi
                 elif [[ $DEP_BUILDSPECS == *combine-images.yml* ]]; then
                     DEPEND_ON+="\"${DEP_IDENTIFIER}_combine_images\","
                 else
@@ -189,8 +205,14 @@ for project in "${PROJECTS[@]}"; do
                 if [[ "false" == "$(make_var $PROJECT_PATH BINARIES_ARE_RELEASE_BRANCHED)" ]]; then
                     BUILDSPEC_VARS_KEYS=""
                 else
-                    BUILDSPEC_VARS_KEYS="RELEASE_BRANCH"
-                    BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS"
+                    # Preserve BINARY_PLATFORMS if it exists in the original BUILDSPEC_VARS_KEYS
+                    if [[ "$BUILDSPEC_VARS_KEYS" == *"BINARY_PLATFORMS"* ]]; then
+                        BUILDSPEC_VARS_KEYS="RELEASE_BRANCH BINARY_PLATFORMS"
+                        BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS BINARY_PLATFORMS"
+                    else
+                        BUILDSPEC_VARS_KEYS="RELEASE_BRANCH"
+                        BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS"
+                    fi
                 fi
             elif [[ "${BUILDSPEC_VARS_KEYS}" = "IMAGE_PLATFORMS" ]]; then
                 BUILDSPEC_VARS_KEYS=""
@@ -204,8 +226,14 @@ for project in "${PROJECTS[@]}"; do
                 if [[ "false" == "$(make_var $PROJECT_PATH BINARIES_ARE_RELEASE_BRANCHED)" ]]; then
                     BUILDSPEC_VARS_KEYS=""
                 else
-                    BUILDSPEC_VARS_KEYS="RELEASE_BRANCH"
-                    BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS"
+                    # Preserve BINARY_PLATFORMS if it exists in the original BUILDSPEC_VARS_KEYS
+                    if [[ "$BUILDSPEC_VARS_KEYS" == *"BINARY_PLATFORMS"* ]]; then
+                        BUILDSPEC_VARS_KEYS="RELEASE_BRANCH BINARY_PLATFORMS"
+                        BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS BINARY_PLATFORMS"
+                    else
+                        BUILDSPEC_VARS_KEYS="RELEASE_BRANCH"
+                        BUILDSPEC_VARS_VALUES="SUPPORTED_K8S_VERSIONS"
+                    fi
                 fi
             fi
         fi
