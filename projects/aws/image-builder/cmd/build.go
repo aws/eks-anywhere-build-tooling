@@ -206,6 +206,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 					return err
 				}
 			}
+			if bo.BaremetalConfig != nil && bo.BaremetalConfig.DiskSizeMb != "" {
+				if _, err := strconv.Atoi(bo.BaremetalConfig.DiskSizeMb); err != nil {
+					return fmt.Errorf("parsing disk_size in baremetal config: %w", err)
+				}
+			}
 			if err = validateRHSM(bo.Os, &bo.BaremetalConfig.RhsmConfig); err != nil {
 				return err
 			}
