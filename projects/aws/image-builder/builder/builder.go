@@ -201,15 +201,22 @@ func (b *BuildOptions) BuildImage() {
 		}
 
 		baremetalConfigFile := filepath.Join(imageBuilderProjectPath, packerBaremetalConfigFile)
-		if b.BaremetalConfig != nil {
-			baremetalConfigData, err := json.Marshal(b.BaremetalConfig)
-			if err != nil {
-				log.Fatalf("Error marshalling baremetal config data: %v", err)
-			}
-			err = ioutil.WriteFile(baremetalConfigFile, baremetalConfigData, 0o644)
-			if err != nil {
-				log.Fatalf("Error writing baremetal config file to packer: %v", err)
-			}
+		if b.BaremetalConfig == nil {
+			b.BaremetalConfig = &BaremetalConfig{}
+		}
+		if b.BaremetalConfig.DiskSizeMb == "" {
+			b.BaremetalConfig.DiskSizeMb = DefaultBaremetalDiskSizeMb
+			log.Printf("Using default disk size: %s MB", b.BaremetalConfig.DiskSizeMb)
+		} else {
+			log.Printf("Using configured disk size: %s MB", b.BaremetalConfig.DiskSizeMb)
+		}
+		baremetalConfigData, err := json.Marshal(b.BaremetalConfig)
+		if err != nil {
+			log.Fatalf("Error marshalling baremetal config data: %v", err)
+		}
+		err = ioutil.WriteFile(baremetalConfigFile, baremetalConfigData, 0o644)
+		if err != nil {
+			log.Fatalf("Error writing baremetal config file to packer: %v", err)
 		}
 
 		var buildCommand string
@@ -229,7 +236,7 @@ func (b *BuildOptions) BuildImage() {
 			commandEnvVars = append(commandEnvVars, fmt.Sprintf("%s=%s", packerTypeVarFilesEnvVar, baremetalConfigFile))
 		}
 
-		err := executeMakeBuildCommand(buildCommand, commandEnvVars...)
+		err = executeMakeBuildCommand(buildCommand, commandEnvVars...)
 		if err != nil {
 			log.Fatalf("Error executing image-builder for raw hypervisor: %v", err)
 		}
