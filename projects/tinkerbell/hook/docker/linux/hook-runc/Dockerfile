@@ -15,8 +15,9 @@ WORKDIR /
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG RELEASE_BRANCH
 
 COPY --from=builder /etc/init.d/ /etc/init.d/
 COPY --from=builder /etc/shutdown.d/ /etc/shutdown.d/
 
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/1-33/usr/local/sbin /usr/bin
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/usr/local/sbin /usr/bin
