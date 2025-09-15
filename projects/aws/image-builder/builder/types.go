@@ -84,6 +84,7 @@ type VsphereConfig struct {
 }
 
 type BaremetalConfig struct {
+	DiskSizeMb string `json:"disk_size,omitempty"`
 	IsoConfig
 	RhelConfig
 	ProxyConfig
