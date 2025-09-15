@@ -14,9 +14,10 @@ WORKDIR /
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG RELEASE_BRANCH
 
 COPY --from=builder /etc/init.d/ /etc/init.d/
 COPY --from=builder /opt/containerd/ /opt/containerd/
 
-COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/$RELEASE_BRANCH/usr/local/bin /usr/bin
+COPY _output/$RELEASE_BRANCH/dependencies/$TARGETOS-$TARGETARCH/eksa/containerd/containerd/usr/local/bin /usr/bin
 COPY hook/images/hook-containerd/etc /etc/
