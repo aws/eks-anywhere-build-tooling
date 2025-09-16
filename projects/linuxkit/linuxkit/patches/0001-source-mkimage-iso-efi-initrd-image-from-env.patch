@@ -1,4 +1,4 @@
-From 8748fb2ce11195a954901e6989caa3e0d57080df Mon Sep 17 00:00:00 2001
+From 5de64f4a37ad004e80ab91e2d97ad1428e2eda51 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 22 Jan 2025 22:51:55 +0000
 Subject: [PATCH 1/4] source mkimage-iso-efi-initrd image from env
@@ -9,18 +9,18 @@ Signed-off-by: Prow Bot <prow@amazonaws.com>
  1 file changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/src/cmd/linuxkit/moby/build/output.go b/src/cmd/linuxkit/moby/build/output.go
-index fbacc8948..220f631ac 100644
+index e32cc485d..3ffe0b2e2 100644
 --- a/src/cmd/linuxkit/moby/build/output.go
 +++ b/src/cmd/linuxkit/moby/build/output.go
 @@ -66,7 +66,8 @@ var outFuns = map[string]func(base string, ir io.Reader, size int, arch string)
- 			return fmt.Errorf("Error converting to initrd: %v", err)
+ 			return fmt.Errorf("error converting to initrd: %v", err)
  		}
  
 -		err = outputImg(outputImages["iso-efi-initrd"], base+"-efi-initrd.iso", kernel, initrd, cmdline, arch)
 +		// For eks-a builds allow build tooling to set this image
 +		err = outputImg(os.Getenv("EKS_A_BUILD_ISO_EFI_IMAGE"), base+"-efi-initrd.iso", kernel, initrd, cmdline, arch)
  		if err != nil {
- 			return fmt.Errorf("Error writing iso-efi-initrd output: %v", err)
+ 			return fmt.Errorf("error writing iso-efi-initrd output: %v", err)
  		}
 @@ -219,10 +220,14 @@ func ensurePrereq(out, cache string) error {
  
@@ -41,5 +41,5 @@ index fbacc8948..220f631ac 100644
  }
  
 -- 
-2.40.1
+2.49.0
 

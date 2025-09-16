@@ -1,5 +1,5 @@
 ## **LinuxKit**
-![Version](https://img.shields.io/badge/version-v1.5.3-blue)
+![Version](https://img.shields.io/badge/version-v1.6.5-blue)
 ![Build Status]()
 
 [Linuxkit](https://github.com/linuxkit/linuxkit) is a toolkit for building secure, portable and lean operating systems for containers
