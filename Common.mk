@@ -138,7 +138,6 @@ else ifneq ($(IS_RELEASE_BRANCH_BUILD),)
 	# avoid warnings when trying to read GIT_TAG file which wont exist when no release_branch is given
 	GIT_TAG=non-existent
 	OUTPUT_DIR=non-existent
-	BINARY_TARGET_FILES=non-existent
 else
 	PROJECT_ROOT?=$(MAKE_ROOT)
 	ARTIFACTS_UPLOAD_PATH?=$(PROJECT_PATH)
