@@ -4,7 +4,7 @@ GOLANG_VERSION=$(shell cat ./$(RELEASE_BRANCH)/GOLANG_VERSION)
 REPO=containerd
 REPO_OWNER=containerd
 
-BINARY_TARGET_FILES=$(shell cat ./$(RELEASE_BRANCH)/BINARY_TARGET_FILES)
+BINARY_TARGET_FILES=$(if $(RELEASE_BRANCH),$(shell cat ./$(RELEASE_BRANCH)/BINARY_TARGET_FILES),)
 SOURCE_PATTERNS=$(foreach target,$(BINARY_TARGET_FILES),./cmd/$(target))
 
 GITVERSION=$(shell git -C $(REPO) describe --dirty --long --always)
