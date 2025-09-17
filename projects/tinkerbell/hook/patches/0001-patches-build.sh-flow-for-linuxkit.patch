@@ -1,4 +1,4 @@
-From 04a545cc148b90a072a500f5a82d6dfa56610f16 Mon Sep 17 00:00:00 2001
+From 3241fea2d511d7aedd4f1faa30faab537a8eec2b Mon Sep 17 00:00:00 2001
 From: Rahul Ganesh <rahulgab@amazon.com>
 Date: Wed, 22 Jan 2025 22:10:12 +0000
 Subject: [PATCH 1/4] patches build.sh flow for linuxkit
@@ -10,20 +10,20 @@ Subject: [PATCH 1/4] patches build.sh flow for linuxkit
 
 Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
 ---
- bash/common.sh                        |  6 ++-
+ bash/common.sh                        | 12 +++--
  bash/hook-lk-containers.sh            |  7 +++
- bash/kernel/kernel_default.sh         | 33 +++++++------
+ bash/kernel/kernel_default.sh         | 24 +++++----
  bash/linuxkit.sh                      | 70 ++++++++++++++-------------
  build.sh                              |  7 +--
  images/hook-docker/main.go            |  6 ++-
  linuxkit-templates/hook.template.yaml |  5 +-
- 7 files changed, 76 insertions(+), 58 deletions(-)
+ 7 files changed, 76 insertions(+), 55 deletions(-)
 
 diff --git a/bash/common.sh b/bash/common.sh
-index 7040554..250ed21 100644
+index 2b80e41..235f34e 100644
 --- a/bash/common.sh
 +++ b/bash/common.sh
-@@ -68,8 +68,10 @@ function define_id() {
+@@ -155,8 +155,10 @@ function define_id() {
  
  	declare str_dict
  	str_dict="$(declare -p dict)"                  # bash high sorcery; get a string representation of the dict
@@ -36,11 +36,24 @@ index 7040554..250ed21 100644
  	log debug "str dict for id=${id}: ${str_dict}" # this _will_ go wrong, so add a debug
  
  	# eval it into the inventory_dict dict
+@@ -201,8 +203,10 @@ function add_bootable_id() {
+ 
+ 	declare str_dict
+ 	str_dict="$(declare -p dict)"                  # bash high sorcery; get a string representation of the dict
+-	str_dict="${str_dict#*"dict=("}"               # remove 'declare -A dict=(' from the string
+-	str_dict="${str_dict%?}"                       # remove the last character, which is a ")"
++    # eks-a - the version of bash in the builder base uses single quote instead double
++	# this change removes all before the first ( and everything after the last )
++	str_dict="${str_dict#*(}"               # remove 'declare -A dict=(' from the string
++	str_dict="${str_dict%)*}"                       # remove the last character, which is a ")"
+ 	log debug "str dict for id=${id}: ${str_dict}" # this _will_ go wrong, so add a debug
+ 
+ 	# eval it into the inventory_dict dict
 diff --git a/bash/hook-lk-containers.sh b/bash/hook-lk-containers.sh
-index 3328072..33084ee 100644
+index e9d63f0..2a7e4b7 100644
 --- a/bash/hook-lk-containers.sh
 +++ b/bash/hook-lk-containers.sh
-@@ -27,10 +27,17 @@ function build_hook_linuxkit_container() {
+@@ -28,9 +28,16 @@ function build_hook_linuxkit_container() {
  	declare container_files_hash_short="${container_files_hash:0:8}"
  
  	declare container_oci_ref="${HOOK_LK_CONTAINERS_OCI_BASE}${container_dir}:${container_files_hash_short}-${DOCKER_ARCH}"
@@ -49,8 +62,7 @@ index 3328072..33084ee 100644
 +		container_oci_ref="${HOOK_LK_CONTAINERS_OCI_BASE}${container_dir}:${HOOK_LK_CONTAINERS_OCI_VERSION}"
 +	fi
  	log info "Consider building LK container ${container_oci_ref} from ${container_base_dir}/${container_dir} for platform ${DOCKER_ARCH}"
- 	output_var="${container_oci_ref}" # the the name reference
- 	echo "${output_var}" > /dev/null  # no-op; just to avoid shellcheck SC2034 (unused var; but it is actually a bash nameref)
+ 	hook_template_vars["${template_var}"]="${container_oci_ref}" # set the template var for envsubst
  
 +	# eks-a - skip pre pulling images
 +	return 0
@@ -59,10 +71,10 @@ index 3328072..33084ee 100644
  	log debug "Checking if image ${container_oci_ref} exists in local registry"
  	if [[ -n "$(docker images -q "${container_oci_ref}")" ]]; then
 diff --git a/bash/kernel/kernel_default.sh b/bash/kernel/kernel_default.sh
-index 9b53d0d..16af383 100644
+index 84e53eb..72e2e03 100644
 --- a/bash/kernel/kernel_default.sh
 +++ b/bash/kernel/kernel_default.sh
-@@ -46,20 +46,25 @@ function calculate_kernel_version_default() {
+@@ -51,15 +51,21 @@ function calculate_kernel_version_default() {
  	esac
  
  	# Grab the latest version from kernel.org
@@ -75,11 +87,6 @@ index 9b53d0d..16af383 100644
 -	input_hash="$(cat "kernel/configs/${INPUT_DEFCONFIG}" "kernel/Dockerfile" | sha256sum - | cut -d ' ' -f 1)"
 -	short_input_hash="${input_hash:0:8}"
 -	kernel_oci_version="${KERNEL_MAJOR}.${KERNEL_MINOR}.${KERNEL_POINT_RELEASE}-${short_input_hash}"
--
--	kernel_id_to_use="${inventory_id}"
--	if [[ -n "${USE_KERNEL_ID}" ]]; then
--		log warn "USE_KERNEL_ID is set to '${USE_KERNEL_ID}'; using it instead of the default inventory_id '${inventory_id}'."
--		kernel_id_to_use="${USE_KERNEL_ID}"
 +	declare -g KERNEL_POINT_RELEASE="${HOOK_KERNEL_POINT_RELEASE:-""}"
 +
 +	# eks-a - allow kernel tag to be overridden
@@ -93,20 +100,16 @@ index 9b53d0d..16af383 100644
 +		input_hash="$(cat "kernel/configs/${INPUT_DEFCONFIG}" "kernel/Dockerfile" | sha256sum - | cut -d ' ' -f 1)"
 +		short_input_hash="${input_hash:0:8}"
 +		kernel_oci_version="${KERNEL_MAJOR}.${KERNEL_MINOR}.${KERNEL_POINT_RELEASE}-${short_input_hash}"
++	fi
 +
-+		kernel_id_to_use="${inventory_id}"
-+		if [[ -n "${USE_KERNEL_ID}" ]]; then
-+			log warn "USE_KERNEL_ID is set to '${USE_KERNEL_ID}'; using it instead of the default inventory_id '${inventory_id}'."
-+			kernel_id_to_use="${USE_KERNEL_ID}"
-+		fi
- 	fi
- 
  	kernel_oci_image="${HOOK_KERNEL_OCI_BASE}:${kernel_oci_version}"
+ 
+ 	# Log the obtained version & images to stderr
 diff --git a/bash/linuxkit.sh b/bash/linuxkit.sh
-index 4e8fa19..f4e699f 100644
+index ca55484..cd41242 100644
 --- a/bash/linuxkit.sh
 +++ b/bash/linuxkit.sh
-@@ -33,21 +33,22 @@ function linuxkit_build() {
+@@ -36,21 +36,22 @@ function linuxkit_build() {
  		exit 1
  	fi
  
@@ -141,9 +144,9 @@ index 4e8fa19..f4e699f 100644
 +	# 	fi
 +	# fi
  
- 	# Build the containers in this repo used in the LinuxKit YAML;
- 	build_all_hook_linuxkit_containers # sets HOOK_CONTAINER_BOOTKIT_IMAGE, HOOK_CONTAINER_DOCKER_IMAGE, HOOK_CONTAINER_MDEV_IMAGE, HOOK_CONTAINER_CONTAINERD_IMAGE
-@@ -148,31 +149,32 @@ function linuxkit_build() {
+ 	# A dictionary (bash associative array) with variables and their values, for templating using envsubst.
+ 	declare -A -g hook_template_vars=(
+@@ -164,31 +165,32 @@ function linuxkit_build() {
  
  	declare -a output_files=("vmlinuz-${OUTPUT_ID}" "initramfs-${OUTPUT_ID}")
  
@@ -197,10 +200,10 @@ index 4e8fa19..f4e699f 100644
  	if [[ "${OUTPUT_TARBALL_FILELIST:-"no"}" == "yes" ]]; then
  		log info "OUTPUT_TARBALL_FILELIST=yes; including tar and filelist in output."
 diff --git a/build.sh b/build.sh
-index 4df377d..9ef58d1 100755
+index 032082c..e99eff6 100755
 --- a/build.sh
 +++ b/build.sh
-@@ -62,8 +62,8 @@ mkdir -p "${CACHE_DIR}" # ensure the directory exists
+@@ -73,8 +73,8 @@ mkdir -p "${CACHE_DIR}" # ensure the directory exists
  # Install OS dependencies
  install_dependencies
  
@@ -211,7 +214,7 @@ index 4df377d..9ef58d1 100755
  
  # These commands take no paramters and are handled first, and exit early.
  declare first_param="${CLI_NON_PARAM_ARGS[0]}"
-@@ -126,7 +126,8 @@ case "${first_param}" in
+@@ -163,7 +163,8 @@ case "${first_param}" in
  		;;
  
  	build-run-qemu | run-qemu | qemu-run | run | qemu)
@@ -222,7 +225,7 @@ index 4df377d..9ef58d1 100755
  
  	*)
 diff --git a/images/hook-docker/main.go b/images/hook-docker/main.go
-index 9257f42..403c2dc 100644
+index 4a7ff76..5a7ee0d 100644
 --- a/images/hook-docker/main.go
 +++ b/images/hook-docker/main.go
 @@ -54,8 +54,10 @@ func run() error {
@@ -239,18 +242,18 @@ index 9257f42..403c2dc 100644
  	cmd.Stderr = os.Stderr
  
 diff --git a/linuxkit-templates/hook.template.yaml b/linuxkit-templates/hook.template.yaml
-index 8eb3374..077a23e 100644
+index 6d88398..70dfc93 100644
 --- a/linuxkit-templates/hook.template.yaml
 +++ b/linuxkit-templates/hook.template.yaml
-@@ -89,7 +89,6 @@ services:
-       - /:/host_root
+@@ -120,7 +120,6 @@ services:
+       - /run:/run
        - /dev:/dev
        - /dev/console:/dev/console
 -      - /usr/bin/nerdctl:/usr/bin/nerdctl
      env:
        - INSECURE=true
      devices:
-@@ -231,8 +230,8 @@ services:
+@@ -263,8 +262,8 @@ services:
  files:
    - path: etc/profile.d/local.sh
      contents: |
@@ -262,5 +265,5 @@ index 8eb3374..077a23e 100644
        # only print WARNING or higher kernel messages to console
        echo 4 > /proc/sys/kernel/printk
 -- 
-2.40.1
+2.49.0
 
