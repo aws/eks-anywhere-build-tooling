@@ -23,6 +23,7 @@ var SupportedHypervisors = []string{
 var SupportedUbuntuVersions = []string{
 	"20.04",
 	"22.04",
+	"24.04",
 }
 
 var SupportedRedHatVersions = []string{

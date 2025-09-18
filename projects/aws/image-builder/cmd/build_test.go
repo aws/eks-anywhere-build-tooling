@@ -125,7 +125,15 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 				Os:        "ubuntu",
 				OsVersion: "24.04",
 			},
-			wantErr: "24.04 is not a supported version of Ubuntu. Please select one of 20.04,22.04",
+			wantErr: "",
+		},
+		{
+			testName: "Ubuntu 26.04",
+			buildOptions: builder.BuildOptions{
+				Os:        "ubuntu",
+				OsVersion: "26.04",
+			},
+			wantErr: "26.04 is not a supported version of Ubuntu. Please select one of 20.04,22.04,24.04",
 		},
 		{
 			testName: "Redhat 8",

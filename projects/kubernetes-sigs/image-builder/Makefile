@@ -145,18 +145,18 @@ FAKE_IMAGE_PATH_FROM_OS_WITH_VER=fake-$2-$1.$(call EXT_FROM_FORMAT,$(1),$(word 1
 
 # vsphere node images
 # packer/ova/vsphere.json needs to exist for the validation, but can be empty
-BUILD_OVA_TARGETS=packer/ova/vsphere.json $(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-ova-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,ova,$(os)) upload-artifacts-ova-$(os))
-BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload-artifacts-ova-ubuntu-2004-efi build-ova-ubuntu-2204-efi fake-ubuntu-2204-ova-efi.ova upload-artifacts-ova-ubuntu-2204-efi
+BUILD_OVA_TARGETS=packer/ova/vsphere.json $(foreach os,ubuntu-2004 ubuntu-2204 ubuntu-2404 redhat-8,build-ova-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,ova,$(os)) upload-artifacts-ova-$(os))
+BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload-artifacts-ova-ubuntu-2004-efi build-ova-ubuntu-2204-efi fake-ubuntu-2204-ova-efi.ova upload-artifacts-ova-ubuntu-2204-efi build-ova-ubuntu-2404-efi fake-ubuntu-2404-ova-efi.ova upload-artifacts-ova-ubuntu-2404-efi
 
 # only running release-raw-ubuntu-2004 on presubmit here since we are just validating the instance creation and do not need to run for every OS
 # tinkerbell/bare metal node images
-BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8 redhat-9,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) $(if $(filter true,$(SKIP_METAL_INSTANCE_TEST)),,metal-instance-test)
+BUILD_RAW_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 ubuntu-2404 redhat-8 redhat-9,build-raw-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,raw,$(os)) upload-artifacts-raw-$(os)) $(if $(filter true,$(SKIP_METAL_INSTANCE_TEST)),,metal-instance-test)
 
 # cloud stack node images
 BUILD_CLOUDSTACK_TARGETS=$(foreach os, redhat-8 redhat-9,build-cloudstack-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,cloudstack,$(os)) upload-artifacts-cloudstack-$(os))
 
 # nutanix node images
-BUILD_NUTANIX_TARGETS=packer/nutanix/nutanix.json $(foreach os,ubuntu-2004 ubuntu-2204 redhat-8 redhat-9,build-nutanix-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,nutanix,$(os)) upload-artifacts-nutanix-$(os))
+BUILD_NUTANIX_TARGETS=packer/nutanix/nutanix.json $(foreach os,ubuntu-2004 ubuntu-2204 ubuntu-2404 redhat-8 redhat-9,build-nutanix-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,nutanix,$(os)) upload-artifacts-nutanix-$(os))
 
 ifneq ($(BOTTLEROCKET_AMI_RELEASE_VERSION),null)
 	BUILD_AMI_TARGETS+=upload-bottlerocket-1-ami
@@ -184,7 +184,7 @@ ALLOWED_CLOUDSTACK_OS=redhat
 ALLOWED_AMI_OS=ubuntu bottlerocket
 ALLOWED_NUTANIX_OS=ubuntu redhat
 
-ALLOWED_UBUNTU_VERSIONS=2004 2204
+ALLOWED_UBUNTU_VERSIONS=2004 2204 2404
 DEFAULT_UBUNTU_VERSION=2004
 
 ALLOWED_REDHAT_VERSIONS=8 9
@@ -553,19 +553,24 @@ release-nutanix-redhat-9:
 
 build-ova-ubuntu-2004:
 build-ova-ubuntu-2204:
+build-ova-ubuntu-2404:
 build-ova-ubuntu-2004-efi:
 build-ova-ubuntu-2204-efi:
+build-ova-ubuntu-2404-efi:
 build-ova-redhat-8:
 release-ova-ubuntu-2004:
 release-ova-ubuntu-2204:
+release-ova-ubuntu-2404:
 release-ova-redhat-8:
 
 build-raw-ubuntu-2004:
 build-raw-ubuntu-2204:
+build-raw-ubuntu-2404:
 build-raw-redhat-8:
 build-raw-redhat-9-efi:
 release-raw-ubuntu-2004:
 release-raw-ubuntu-2204:
+release-raw-ubuntu-2404:
 release-raw-redhat-8:
 release-raw-redhat-9-efi:
 
