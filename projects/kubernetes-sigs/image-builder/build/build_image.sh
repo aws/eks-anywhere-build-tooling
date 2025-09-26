@@ -178,6 +178,8 @@ elif [[ $image_format == "nutanix" ]]; then
       image_url=https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
     elif [[ $image_os_version == "2204" ]]; then
       image_url=https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+    elif [[ $image_os_version == "2404" ]]; then
+      image_url=https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
     fi
     source_image_name=source-$image_name.img
   fi
