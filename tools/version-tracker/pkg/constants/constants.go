@@ -56,14 +56,13 @@ const (
 	BottlerocketHostContainersTOMLFile        = "sources/shared-defaults/public-host-containers.toml"
 	BottlerocketHostContainerSourceImageRegex = "schnauzer-v2 render --template '(.*)'"
 	CertManagerManifestYAMLFile               = "cert-manager.yaml"
-	CiliumImageRepository                     = "public.ecr.aws/isovalent/cilium"
+	CiliumImageRepository                     = "public.ecr.aws/eks/cilium/cilium"
 	EnvoyImageRepository                      = "public.ecr.aws/appmesh/aws-appmesh-envoy"
 	EKSDistroBaseTagsYAMLFile                 = "EKS_DISTRO_TAG_FILE.yaml"
 	AL2023Suffix                              = "-al2023"
 	TagFileSuffix                             = "_TAG_FILE"
 	KindNodeImageBuildArgsScriptFile          = "node-image-build-args.sh"
 	GithubPerPage                             = 100
-	datetimeFormat                            = "%Y-%m-%dT%H:%M:%SZ"
 	MainBranchName                            = "main"
 	BaseRepoHeadRevisionPattern               = "refs/remotes/origin/%s"
 	EKSDistroUpgradePullRequestBody           = `This PR bumps EKS Distro releases to the latest available release versions.

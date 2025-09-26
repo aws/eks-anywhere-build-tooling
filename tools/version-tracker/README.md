@@ -19,7 +19,6 @@ Usage:
 
 Flags:
   -h, --help                   help for display
-      --print-latest-version   Flag to print only the latest version of the project
       --project string         Specify the project name to track versions for
 
 Global Flags:
@@ -85,15 +84,9 @@ vmware                govmomi                          v0.30.5                  
 
 * Displaying the current and latest versions for a particular project
 ```
-$ version-tracker display --project vmware/govmomi
-ORGANIZATION  REPOSITORY  CURRENT VERSION  LATEST VERSION  
-vmware        govmomi     v0.30.5          v0.33.0
-```
-
-* Displaying only the latest revision for a specific project
-```
-$ version-tracker display --project vmware/govmomi --print-latest-version
-v0.33.0
+$ version-tracker display --project cilium/cilium
+ORGANIZATION  REPOSITORY  CURRENT VERSION  LATEST VERSION  UP-TO-DATE  
+cilium        cilium      v1.15.16-eksa.1  v1.17.6-0       false
 ```
 
 ### The `list-projects` subcommand
@@ -157,6 +150,8 @@ goharbor              harbor
 --------------------  -------------------------------  
 helm                  helm                             
 --------------------  -------------------------------  
+isc-projects          dhcp                             
+--------------------  -------------------------------  
 kube-vip              kube-vip                         
 --------------------  -------------------------------  
                       autoscaler                       
@@ -171,9 +166,12 @@ kubernetes-sigs       cri-tools
                       image-builder                    
                       kind                             
 --------------------  -------------------------------  
+linuxkit              linuxkit                             
+--------------------  -------------------------------  
 metallb               metallb                          
 --------------------  -------------------------------  
-nutanix-cloud-native  cluster-api-provider-nutanix     
+nutanix-cloud-native  cloud-provider-nutanix
+                      cluster-api-provider-nutanix     
 --------------------  -------------------------------  
 opencontainers        runc                             
 --------------------  -------------------------------  
@@ -186,11 +184,13 @@ redis                 redis
 --------------------  -------------------------------  
 replicatedhq          troubleshoot                     
 --------------------  -------------------------------  
-                      boots                            
+                      actions
+                      boots                          
+                      charts  
                       cluster-api-provider-tinkerbell  
                       hegel                            
 tinkerbell            hook                             
-                      hub                              
+                      ipxedust                              
                       rufio                            
                       tink                             
 --------------------  -------------------------------  
@@ -214,6 +214,7 @@ Usage:
   version-tracker upgrade --project <project name> [flags]
 
 Flags:
+      --dry-run          Upgrade the project locally but do not push changes and create PR
   -h, --help             help for upgrade
       --project string   Specify the project name to upgrade versions for
 
