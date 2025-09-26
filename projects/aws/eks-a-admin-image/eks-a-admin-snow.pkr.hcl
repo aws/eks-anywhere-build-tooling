@@ -31,7 +31,7 @@ source "amazon-ebs" "amazonlinux2" {
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     delete_on_termination = true
-    volume_size           = 60
+    volume_size           = 70
     volume_type           = "gp3"
     iops                  = 3000
     throughput            = 125
