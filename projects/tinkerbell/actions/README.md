@@ -1,8 +1,8 @@
-## **Hub**
-![Version](https://img.shields.io/badge/version-352706903455cebc260fd565a38708c0e6423dc7-blue)
+## **Actions**
+![Version](https://img.shields.io/badge/version-66e4fc9a20d946bc217ada425717e20cb9570657-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiQkRkY0htL2tWTlM0QmVLSS9SakxYOHBRTUxJNmczcVM4Nm1Wa0U1TFQvVkRDTHRadys0aEVIOStxc0V4aGxSQzNsdVZlaXV5R1YvaHZaOUZIZnRTTWtzPSIsIml2UGFyYW1ldGVyU3BlYyI6ImZjajIxazcybkxaZVdUR24iLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
-[Hub](https://github.com/tinkerbell/actions) is the repository that contains reusable Tinkerbell Actions. The different images are listed under [/actions](https://github.com/tinkerbell/actions/tree/main/actions).
+[Actions](https://github.com/tinkerbell/actions) is the repository that contains reusable Tinkerbell Actions. The different images are listed under [/actions](https://github.com/tinkerbell/actions/tree/main/actions).
 
 ### Updating
 
