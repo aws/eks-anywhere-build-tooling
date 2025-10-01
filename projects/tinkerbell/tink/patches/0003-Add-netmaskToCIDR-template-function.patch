@@ -1,0 +1,105 @@
+From 515a345d408512973c986c521ee357acd96f4d94 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulgab@amazon.com>
+Date: Tue, 30 Sep 2025 18:54:10 -0700
+Subject: [PATCH 3/3] Add netmaskToCIDR template function
+
+Adds netmaskToCIDR template function to convert netmask notation
+(e.g., "255.255.255.0") to CIDR notation (e.g., "24").
+
+The function is available in both deprecated and current workflow
+template contexts and handles invalid input by defaulting to "/24".
+
+Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
+---
+ .../deprecated/workflow/template_funcs.go     | 21 +++++++++++++++++++
+ internal/workflow/internal/template.go        | 21 +++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+
+diff --git a/internal/deprecated/workflow/template_funcs.go b/internal/deprecated/workflow/template_funcs.go
+index e725484..716a225 100644
+--- a/internal/deprecated/workflow/template_funcs.go
++++ b/internal/deprecated/workflow/template_funcs.go
+@@ -2,12 +2,15 @@ package workflow
+ 
+ import (
+ 	"fmt"
++	"net"
++	"strconv"
+ 	"strings"
+ )
+ 
+ // templateFuncs defines the custom functions available to workflow templates.
+ var templateFuncs = map[string]interface{}{
+ 	"formatPartition": formatPartition,
++	"netmaskToCIDR":   netmaskToCIDR,
+ }
+ 
+ // formatPartition formats a device path with partition for the device type. If it receives an
+@@ -30,3 +33,21 @@ func formatPartition(dev string, partition int) string {
+ 	}
+ 	return dev
+ }
++
++// netmaskToCIDR converts a netmask (e.g. 255.255.255.0) to CIDR notation (e.g. 24)
++func netmaskToCIDR(netmask string) string {
++	// Parse the netmask
++	ip := net.ParseIP(netmask)
++	if ip == nil {
++		return "24" // Default to /24 if parsing fails
++	}
++
++	// Count the number of 1 bits in the netmask
++	ipv4 := ip.To4()
++	if ipv4 == nil {
++		return "24" // Default to /24 if not IPv4
++	}
++
++	ones, _ := net.IPMask(ipv4).Size()
++	return strconv.Itoa(ones)
++}
+diff --git a/internal/workflow/internal/template.go b/internal/workflow/internal/template.go
+index f68a467..bd5bc31 100644
+--- a/internal/workflow/internal/template.go
++++ b/internal/workflow/internal/template.go
+@@ -2,6 +2,8 @@ package internal
+ 
+ import (
+ 	"fmt"
++	"net"
++	"strconv"
+ 	"strings"
+ )
+ 
+@@ -11,6 +13,7 @@ var workflowTemplateFuncs = map[string]interface{}{
+ 	"hasPrefix":       strings.HasPrefix,
+ 	"hasSuffix":       strings.HasSuffix,
+ 	"formatPartition": formatPartition,
++	"netmaskToCIDR":   netmaskToCIDR,
+ }
+ 
+ // formatPartition formats a device path with partition for the device type. If it receives an
+@@ -33,3 +36,21 @@ func formatPartition(dev string, partition int) string {
+ 	}
+ 	return dev
+ }
++
++// netmaskToCIDR converts a netmask (e.g. 255.255.255.0) to CIDR notation (e.g. 24)
++func netmaskToCIDR(netmask string) string {
++	// Parse the netmask
++	ip := net.ParseIP(netmask)
++	if ip == nil {
++		return "24" // Default to /24 if parsing fails
++	}
++
++	// Count the number of 1 bits in the netmask
++	ipv4 := ip.To4()
++	if ipv4 == nil {
++		return "24" // Default to /24 if not IPv4
++	}
++
++	ones, _ := net.IPMask(ipv4).Size()
++	return strconv.Itoa(ones)
++}
+-- 
+2.46.0
+
