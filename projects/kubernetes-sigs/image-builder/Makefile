@@ -107,7 +107,8 @@ EXT_FROM_FORMAT=$(if $(and $(filter bottlerocket,$2),$(filter-out ova,$1)),img.,
 CONVERT_TO_UPSTREAM_TARGET=$(strip \
 	$(eval _NEW_TARGET:=$1) \
 	$(eval _NEW_TARGET:=$(subst validate-ova-,validate-node-ova-local-,$(_NEW_TARGET))) \
-	$(eval _NEW_TARGET:=$(subst build-ova-,build-node-ova-vsphere-,$(_NEW_TARGET))) \
+	$(eval _NEW_TARGET:=$(subst build-clone-ova-,build-node-ova-vsphere-clone-,$(_NEW_TARGET))) \
+	$(eval _NEW_TARGET:=$(subst build-ova-,build-node-ova-vsphere-,$(_NEW_TARGET)))  \
 	$(eval _NEW_TARGET:=$(subst -redhat-,-rhel-,$(_NEW_TARGET))) \
 	$(eval _NEW_TARGET:=$(subst -cloudstack,-qemu,$(_NEW_TARGET))) \
 	$(eval _NEW_TARGET:=$(if $(findstring raw-ubuntu,$(_NEW_TARGET)),$(_NEW_TARGET)-efi,$(_NEW_TARGET))) \
@@ -145,8 +146,11 @@ FAKE_IMAGE_PATH_FROM_OS_WITH_VER=fake-$2-$1.$(call EXT_FROM_FORMAT,$(1),$(word 1
 
 # vsphere node images
 # packer/ova/vsphere.json needs to exist for the validation, but can be empty
-BUILD_OVA_TARGETS=packer/ova/vsphere.json $(foreach os,ubuntu-2004 ubuntu-2204 ubuntu-2404 redhat-8,build-ova-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,ova,$(os)) upload-artifacts-ova-$(os))
-BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload-artifacts-ova-ubuntu-2004-efi build-ova-ubuntu-2204-efi fake-ubuntu-2204-ova-efi.ova upload-artifacts-ova-ubuntu-2204-efi build-ova-ubuntu-2404-efi fake-ubuntu-2404-ova-efi.ova upload-artifacts-ova-ubuntu-2404-efi
+BUILD_OVA_TARGETS=packer/ova/vsphere.json $(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-ova-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,ova,$(os)) upload-artifacts-ova-$(os))
+BUILD_OVA_TARGETS+=build-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload-artifacts-ova-ubuntu-2004-efi build-ova-ubuntu-2204-efi fake-ubuntu-2204-ova-efi.ova upload-artifacts-ova-ubuntu-2204-efi
+# vsphere clone node images
+BUILD_OVA_CLONE_TARGETS=$(foreach os,ubuntu-2004 ubuntu-2204 redhat-8,build-clone-ova-$(os) $(call FAKE_IMAGE_PATH_FROM_OS_WITH_VER,ova,$(os)) upload-artifacts-clone-ova-$(os))
+BUILD_OVA_CLONE_TARGETS+=build-clone-ova-ubuntu-2004-efi fake-ubuntu-2004-ova-efi.ova upload-artifacts-clone-ova-ubuntu-2004-efi build-clone-ova-ubuntu-2204-efi fake-ubuntu-2204-ova-efi.ova upload-artifacts-clone-ova-ubuntu-2204-efi build-clone-ova-ubuntu-2404-efi build-ova-ubuntu-2404-efi fake-ubuntu-2404-ova-efi.ova upload-artifacts-ova-ubuntu-2404-efi
 
 # only running release-raw-ubuntu-2004 on presubmit here since we are just validating the instance creation and do not need to run for every OS
 # tinkerbell/bare metal node images
@@ -354,6 +358,15 @@ build-%: IMAGE_OS_FIRMWARE=$(word 4,$(subst -, ,$*))
 build-%: validate-supported-image-% setup-packer-configs-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,) | $$(ENABLE_LOGGING)
 	@PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,validate-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
 
+# ex: build-clone-ova-ubuntu-2004, build-clone-ova-redhat-8, build-clone-ova-ubuntu-2004-efi
+build-clone-%: MAKEFLAGS=
+build-clone-%: IMAGE_FORMAT=$(word 1,$(subst -, ,$*))
+build-clone-%: IMAGE_OS=$(word 2,$(subst -, ,$*))
+build-clone-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
+build-clone-%: IMAGE_OS_FIRMWARE=$(word 4,$(subst -, ,$*))
+build-clone-%: validate-supported-image-% setup-packer-configs-% $(if $(filter ami,$(IMAGE_FORMAT)),setup-ami-share,) | $$(ENABLE_LOGGING)
+	@PACKER_VAR_FILES="$(PACKER_VAR_FILES)" $(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,validate-$(IMAGE_FORMAT)-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
+
 validate-ova-kubelet:
 	@echo -e $(call TARGET_START_LOG)
 	build/validate_ova_kubelet.sh $(ARTIFACTS_PATH)/$(FINAL_IMAGE_FILE_NAME) $(RELEASE_BRANCH) $(FULL_OUTPUT_DIR)/config/kubernetes.json
@@ -387,6 +400,13 @@ release-ova-%: IMAGE_FORMAT=ova
 release-ova-%: validate-supported-image-% $(IF_REDHAT_CONFIG_TARGET) | ensure-jq $$(ENABLE_LOGGING)
 	@build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST) $(IMAGE_OS_FIRMWARE)
 
+release-clone-ova-%: IMAGE_FORMAT=ova
+release-clone-ova-%: IMAGE_OS=$(word 1,$(subst -, ,$*))
+release-clone-ova-%: IMAGE_OS_VERSION=$(word 2,$(subst -, ,$*))
+release-clone-ova-%: IMAGE_OS_FIRMWARE=$(word 3,$(subst -, ,$*))
+release-clone-ova-%: validate-supported-image-% $(IF_REDHAT_CONFIG_TARGET) | ensure-jq $$(ENABLE_LOGGING)
+	@build/build_image.sh $(IMAGE_OS) $(IMAGE_OS_VERSION) $(RELEASE_BRANCH) $(IMAGE_FORMAT) $(ARTIFACTS_BUCKET) $(LATEST) $(IMAGE_OS_FIRMWARE)
+
 release-raw-%: IMAGE_FORMAT=raw
 release-raw-%: release-image-build-on-metal-%
 	@echo Done building $@
@@ -409,6 +429,13 @@ release-image-build-on-metal-%: validate-supported-image-% $(GIT_PATCH_TARGET) $
 
 # These targets all end with <image format>-<os>-<os-version><optional -efi>
 # ex: local-build-ami-ubuntu-2004, s3-artifacts-ova-ubuntu-2004, upload-artifacts-ova-ubuntu-2004, upload-artifacts-ova-ubuntu-2004-efi
+# Special case for clone targets: local-clone-build-ova-redhat-9-efi
+local-clone-build-%: IMAGE_FORMAT=$(word 1,$(subst -, ,$*))
+local-clone-build-%: IMAGE_OS=$(word 2,$(subst -, ,$*))
+local-clone-build-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
+local-clone-build-%: IMAGE_OS_FIRMWARE=$(word 4,$(subst -, ,$*))
+
+# Standard pattern for non-clone targets
 local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_FORMAT=$(word 1,$(subst -, ,$*))
 local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS=$(word 2,$(subst -, ,$*))
 local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS_VERSION=$(word 3,$(subst -, ,$*))
@@ -416,6 +443,20 @@ local-build-% s3-artifacts-% upload-artifacts-%: IMAGE_OS_FIRMWARE=$(word 4,$(su
 
 ######################## IMAGE BUILDER CLI TARGETS #######################
 # OVF_CUSTOM_PROPERTIES is only for ova, but should be ok to passed since its ignored by other builds
+# Special case for clone targets
+local-clone-build-%: MAKEFLAGS=
+local-clone-build-%: validate-supported-image-% validate-dependency-versions-$$(IMAGE_FORMAT) setup-packer-configs-%
+	@echo -e $(call TARGET_START_LOG)
+	if [[ "$(DEBUG)" == "1" ]]; then \
+		touch $(FINAL_IMAGE_DIR)/packer.log; \
+		tail -f $(FINAL_IMAGE_DIR)/packer.log & \
+	fi
+	DEBUG=$(DEBUG) PACKER_FLAGS="-force" PACKER_LOG=1 PACKER_LOG_PATH=$(FINAL_IMAGE_DIR)/packer.log PACKER_VAR_FILES="$(PACKER_VAR_FILES)" \
+		OVF_CUSTOM_PROPERTIES="$(FULL_OUTPUT_DIR)/config/ovf_custom_properties.json" \
+		$(MAKE) -C $(IMAGE_BUILDER_DIR) $(call CONVERT_TO_UPSTREAM_TARGET,build-$(IMAGE_FORMAT)-clone-$(IMAGE_OS_WITH_VER)$(if $(IMAGE_OS_FIRMWARE),-$(IMAGE_OS_FIRMWARE),))
+	@echo -e $(call TARGET_END_LOG)
+
+# Standard pattern for non-clone targets
 local-build-%: MAKEFLAGS=
 local-build-%: validate-supported-image-% validate-dependency-versions-$$(IMAGE_FORMAT) setup-packer-configs-%
 	@echo -e $(call TARGET_START_LOG)

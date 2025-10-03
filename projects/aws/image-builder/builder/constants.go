@@ -11,6 +11,8 @@ const (
 	DefaultAMIVolumeType           string = "gp3"
 	DefaultAMIManifestOutput       string = "manifest.json"
 	DefaultBaremetalDiskSizeMb     string = "6656"
+	BuilderTypeIso                 string = "iso"
+	BuilderTypeClone               string = "clone"
 
 	// Paths and URLs
 	buildToolingRepoUrl              string = "https://github.com/aws/eks-anywhere-build-tooling.git"

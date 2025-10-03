@@ -22,6 +22,7 @@ var (
 	cloudstackConfigFile      string
 	amiConfigFile             string
 	additionalFilesConfigFile string
+	builderType               string
 	err                       error
 )
 
@@ -57,6 +58,7 @@ func init() {
 	buildCmd.Flags().StringVar(&bo.ManifestTarball, "manifest-tarball", "", "Path to Image Builder built EKS-D/A manifest tarball")
 	buildCmd.Flags().IntVar(&bo.AnsibleVerbosity, "ansible-verbosity", 0, "Verbosity level for the Ansible tasks run during image building, should be in the range 0-6")
 	buildCmd.Flags().BoolVar(&bo.AirGapped, "air-gapped", false, "Flag to instruct image builder to run in air-gapped mode. Requires --manifest-tarball to be set")
+	buildCmd.Flags().StringVar(&builderType, "builder", builder.BuilderTypeIso, "Builder type for VSphere. Can be iso or clone")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
 		log.Fatalf("Error marking flag as required: %v", err)
 	}
@@ -99,6 +101,10 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		log.Fatalf("Invalid OS version for RedHat. Please choose 8 or 9")
 	}
 
+	if bo.Hypervisor != builder.VSphere && bo.BuilderType == builder.BuilderTypeClone {
+		log.Fatalf("Clone builder is only supported for vSphere hypervisor")
+	}
+
 	if err = validateOSVersion(bo.Os, bo.OsVersion); err != nil {
 		log.Fatal(err.Error())
 	}
@@ -135,6 +141,12 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 	switch bo.Hypervisor {
 	case builder.VSphere:
 		configPath = vSphereConfigFile
+		// Validate builder type for VSphere
+		if builderType != builder.BuilderTypeIso && builderType != builder.BuilderTypeClone {
+			return fmt.Errorf("Invalid builder type. Please choose iso or clone")
+		}
+		// Set the builder type in BuildOptions
+		bo.BuilderType = builderType
 	case builder.Baremetal:
 		configPath = baremetalConfigFile
 	case builder.Nutanix:
@@ -174,7 +186,11 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 				return err
 			}
 			if bo.Os == builder.RedHat {
-				if err = validateRedhat(&bo.VsphereConfig.RhelConfig, bo.VsphereConfig.IsoUrl); err != nil {
+				isoUrl := bo.VsphereConfig.IsoUrl
+				if bo.BuilderType == builder.BuilderTypeClone {
+					isoUrl = "Don't validate iso URL"
+				}
+				if err = validateRedhat(&bo.VsphereConfig.RhelConfig, isoUrl); err != nil {
 					return err
 				}
 			}
