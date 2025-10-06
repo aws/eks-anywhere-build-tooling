@@ -1,25 +1,22 @@
 ## **Hook**
-![Version](https://img.shields.io/badge/version-v0.11.1-blue)
+![Version](https://img.shields.io/badge/version-v0.10.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoicVVYYXpIMzRpazNGUTBWdnY1dittK09zNDJvRmtlUlpTZUtZRFoyMkZ0YzlZT3NBMTRSSUFacFg3ZzdVNjg3SlhOZ2dZNmExOVkwaDE5U2RNQldWSTBzPSIsIml2UGFyYW1ldGVyU3BlYyI6ImdYN1lEaGZuSVpQMjhLM2EiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Hook](https://github.com/tinkerbell/hook) is the Tinkerbell Installation Environment for bare-metal. It runs in-memory, installs operating system, and handles deprovisioning.
 
 ### Updating
 
-1. Review commits upstream [repo](https://github.com/tinkerbell/hook) and decide on new release tag or commit to track.  
-2. Update the `GIT_TAG` file to have the new desired tag or commit based on upstream.  
-3. Update the `LINUX_KERNEL_VERSION` file to the **latest patch release** of the **currently tracked minor version**:  
-   - To find the latest patch release: visit [kernel.org](https://www.kernel.org/) and check the **Longterm** or **Stable** releases for your tracked minor (e.g., update `6.6.107` → `6.6.108`).  
-   - To see which minor is currently tracked: check the [hook kernel configs](https://github.com/tinkerbell/hook/tree/main/kernel/configs). Upstream supports multiple versions, consider bumping to a new supported minor
-   > **Note:** If the config file names change upstream, update `HOOK_IMAGE_FILES` in the Makefile.  
-
-4. Verify the golang version has not changed. Currently for `hook-bootkit` and `hook-docker`, the version mentioned in their respective [Dockerfiles](https://github.com/tinkerbell/hook/blob/main/images/hook-bootkit/Dockerfile) is used to build. We only support building with one golang version per project; pick the latest from these two Dockerfiles if they do not match.  
-5. Verify no changes have been made to the Dockerfile for each image, especially added runtime dependencies.  
-6. `hook-docker` image has Docker runtime. Verify no new changes have been made with Docker version updates.  
-7. Update checksums and attribution using `make attribution checksums`.  
-8. Update the version at the top of this README.  
-9. Run `make generate` to update the `UPSTREAM_PROJECTS.yaml` file.  
-
+1. Review commits upstream [repo](https://github.com/tinkerbell/hook) and decide on new release tag or commit to track.
+1. Update the `GIT_TAG` file to have the new desired tag or commit based on upstream.
+1. Update the `LINUX_KERNEL_VERSION` file to the latest patch version of the current minor kernel version tracked in [hook](https://github.com/tinkerbell/hook/tree/main/kernel/configs). Upstream supports multiple versions, consider bumping to a new supported minor.
+If the config file names change upstream be sure to change `HOOK_IMAGE_FILES` in the Makefile.
+1. Verify the golang version has not changed. Currently for `hook-bootkit` and `hook-docker` the version mentioned in a [dockerfile](https://github.com/tinkerbell/hook/blob/main/images/hook-bootkit/Dockerfile) of the respective projects is being used to build.
+We only support building with one golang version per project, pick the latest from these two dockerfiles if they do not match.
+1. Verify no changes have been made to the dockerfile for each image. Looking specifically for added runtime deps.
+1. `hook-docker` image has docker runtime. Hence, verify no new changes have been made with docker version updates.
+1. Update checksums and attribution using `make attribution checksums`.
+1. Update the version at the top of this Readme.
+1. Run `make generate` to update the UPSTREAM_PROJECTS.yaml file.
 
 
 ### Development
@@ -47,7 +44,7 @@ To create a new config patch:
 1. using the menu, enable the new options.
 1. click `save` and save the changes to `.config`.
 1. click `exit`.
-1. after the menuconfig is exited, `_output/kernel-config/generic-6.6.y-x86_64-eksa` will be created and `diff` will be ran to give you the config options to set in your new `config-patches` file.
+1. after the menuconfig is exited, `_output/kernel-config/generic-5.10.y-x86_64-eksa` will be created and `diff` will be ran to give you the config options to set in your new `config-patches` file.
 
 Running the built kernel image locally with qemu:
 1. run `make run-kernel-in-qemu`

@@ -38,15 +38,6 @@ RELEASE_BRANCH=${RELEASE_BRANCH_OVERRIDE:-$RELEASE_BRANCH}
 ARCH="$(cut -d '-' -f2 <<< ${OS_ARCH})"
 CODEBUILD_CI="${CODEBUILD_CI:-false}"
 
-# Special case: If we're building hook project and dependency is containerd,
-# use downloadpath as "latest" and release branch as "1-34"
-CURRENT_PROJECT_PATH=$(pwd)
-if [[ "$CURRENT_PROJECT_PATH" == *"/tinkerbell/hook"* ]] && [[ "$REPO_OWNER" == "containerd" ]] && [[ "$REPO" == "containerd" ]]; then
-    LATEST_TAG="latest"
-    RELEASE_BRANCH="1-34"
-    echo "Special case: Using latest/1-34 for hook's containerd dependency - we are building containerd v2 only from 1-34"
-fi
-
 OUTPUT_DIR_FILE=$BINARY_DEPS_DIR/linux-$ARCH/$PRODUCT/$REPO_OWNER/$REPO
 
 if [[ -n "$RELEASE_BRANCH_OVERRIDE" ]]; then

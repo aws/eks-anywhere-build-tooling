@@ -14,11 +14,10 @@ KERNEL_IMAGE_COMPONENT=tinkerbell/hook-kernel
 HOOK_RUNC_IMAGE_COMPONENT=tinkerbell/hook-runc
 HOOK_CONTAINERD_IMAGE_COMPONENT=tinkerbell/hook-containerd
 HOOK_EMBEDDED_IMAGE_COMPONENT=tinkerbell/hook-embedded
-HOOK_UDEV_IMAGE_COMPONENT=tinkerbell/hook-udev
-HOOK_ACPID_IMAGE_COMPONENT=tinkerbell/hook-acpid
+HOOK_MDEV_IMAGE_COMPONENT=tinkerbell/hook-mdev
 MKIMAGE_ISO_EFI_INITRD_IMAGE_COMPONENT=linuxkit/mkimage-iso-efi-initrd
 
-IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-dind hook-embedded hook-udev hook-acpid
+IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-mdev hook-dind hook-embedded
 
 # We are using this pattern of setting the dockerfile_folder instead of local to the target
 # because this project uses the combine-images target which overrides the dockerfile_folder
@@ -28,7 +27,7 @@ IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-dind 
 # edge cases:
 # - kernel is a different folder in the hook repo (hook/kernel vs hook/images/*)
 # - hook-dind uses the hook-docker image with a different target
-IMAGES_USING_UPSTREAM_DOCKERFILES=kernel hook-udev hook-acpid
+IMAGES_USING_UPSTREAM_DOCKERFILES=kernel hook-mdev
 DOCKERFILE_FOLDER=$(strip $(if $(filter $(IMAGE_NAME),$(IMAGES_USING_UPSTREAM_DOCKERFILES)),\
 	$(if $(filter kernel,$(IMAGE_NAME)),$(REPO)/kernel,$(REPO)/images/$(IMAGE_NAME)),\
 	$(if $(filter hook-dind,$(IMAGE_NAME)),./docker/linux/hook-docker,./docker/linux/$(IMAGE_NAME))))
@@ -50,7 +49,7 @@ HOOK_BOOTKIT_ATTRIBUTION_OVERRIDE=hook-bootkit
 CREATE_HOOK_FILES_PATTERN=$(REPO)/out/hook/vmlinuz
 HOOK_PLATFORMS=$(call IF_OVERRIDE_VARIABLE,IMAGE_PLATFORMS,linux/$(BUILDER_PLATFORM_ARCH))
 CREATE_HOOK_FILES=$(foreach platform,$(HOOK_PLATFORMS),$(CREATE_HOOK_FILES_PATTERN)-$(if $(findstring amd64,$(platform)),x86_64,aarch64))
-HOOK_IMAGE_FILES=$(OUTPUT_DIR)/kernel/config-patches $(OUTPUT_DIR)/kernel/keys.asc $(OUTPUT_DIR)/kernel/configs/generic-$(KERNEL_MAJOR_MINOR).y-aarch64 $(OUTPUT_DIR)/kernel/configs/generic-$(KERNEL_MAJOR_MINOR).y-x86_64 $(OUTPUT_DIR)/kernel/download.sh
+HOOK_IMAGE_FILES=$(OUTPUT_DIR)/kernel/config-patches $(OUTPUT_DIR)/kernel/keys.asc $(OUTPUT_DIR)/kernel/configs/generic-$(KERNEL_MAJOR_MINOR).y-aarch64 $(OUTPUT_DIR)/kernel/configs/generic-$(KERNEL_MAJOR_MINOR).y-x86_64 
 
 HAS_S3_ARTIFACTS=true
 SIMPLE_CREATE_TARBALLS=false
@@ -123,8 +122,7 @@ $(call IMAGE_TARGETS_FOR_NAME,hook-embedded): $(EMBEDDED_IMAGES)
 
 # upstream hook builds these instead of using the linuxkit provided images
 # building this from their dockerfile
-hook-udev/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/$(IMAGE_NAME)
-hook-acpid/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/$(IMAGE_NAME)
+hook-mdev/images/%: IMAGE_CONTEXT_DIR=$(REPO)/images/$(IMAGE_NAME)
 
 s3-artifacts: $(CREATE_HOOK_FILES)
 
@@ -166,7 +164,7 @@ $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 		if [[ "$$image" == *"sshd"* ]]; then continue; fi; \
 		images+=($$image); \
 	done < <(sed -n 's/.*\($(subst /,\/,$(LINUXKIT_IMAGE_REPO)).*$$\)/\1/p' $(REPO)/linuxkit-templates/hook.template.yaml); \
-	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-embedded hook-acpid hook-udev; do \
+	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-mdev hook-embedded; do \
 		images+=($(IMAGE_REPO)/tinkerbell/$$image:$(LATEST_TAG)$(IMAGE_TAG_SUFFIX)); \
 	done; \
 	for image in "$${images[@]}"; do build::common::echo_and_run retry $(LINUXKIT_CACHE_FILE) cache pull --cache $(REPO)/cache/linuxkit $$image; done; \
