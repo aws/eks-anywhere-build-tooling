@@ -1,4 +1,4 @@
-From 8554e892fa64d8e1f82abcb5c2f5981040d54250 Mon Sep 17 00:00:00 2001
+From 13baaa13ee4f77e687e89a386fa7d180df9c4a9d Mon Sep 17 00:00:00 2001
 From: Shizhao Liu <lshizhao@amazon.com>
 Date: Wed, 1 Oct 2025 17:54:37 -0700
 Subject: [PATCH 16/16] Vsphere Clone Builder support
@@ -11,15 +11,15 @@ is doing.
 
 Signed-off-by: Shizhao Liu <lshizhao@amazon.com>
 ---
- images/capi/ansible/roles/setup/tasks/debian.yml | 7 +++++++
- images/capi/ansible/roles/setup/tasks/redhat.yml | 7 +++++++
- 2 files changed, 14 insertions(+)
+ images/capi/ansible/roles/setup/tasks/debian.yml | 8 ++++++++
+ images/capi/ansible/roles/setup/tasks/redhat.yml | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
 diff --git a/images/capi/ansible/roles/setup/tasks/debian.yml b/images/capi/ansible/roles/setup/tasks/debian.yml
-index 41e0fd631..9205872ba 100644
+index 41e0fd631..afda78eb8 100644
 --- a/images/capi/ansible/roles/setup/tasks/debian.yml
 +++ b/images/capi/ansible/roles/setup/tasks/debian.yml
-@@ -128,3 +128,10 @@
+@@ -128,3 +128,11 @@
  - name: Remove '--no-tpm --no-efivars' from nullboot post install script
    ansible.builtin.command: sed -i 's/nullbootctl --no-tpm --no-efivars/nullbootctl/' /var/lib/dpkg/info/nullboot.postinst
    when: packer_build_name is search('cvm')
@@ -29,12 +29,13 @@ index 41e0fd631..9205872ba 100644
 +    name: ufw
 +    state: stopped
 +    enabled: false
++  ignore_errors: yes
 +  when: ansible_distribution == "Ubuntu"
 diff --git a/images/capi/ansible/roles/setup/tasks/redhat.yml b/images/capi/ansible/roles/setup/tasks/redhat.yml
-index 2a98dae54..820f3a714 100644
+index 2a98dae54..85ba5d398 100644
 --- a/images/capi/ansible/roles/setup/tasks/redhat.yml
 +++ b/images/capi/ansible/roles/setup/tasks/redhat.yml
-@@ -164,3 +164,10 @@
+@@ -164,3 +164,11 @@
      state: present
      lock_timeout: 60
    when: ansible_os_family == "RedHat" and ansible_distribution == "RedHat" and ansible_distribution_major_version == "9"
@@ -44,6 +45,7 @@ index 2a98dae54..820f3a714 100644
 +    name: firewalld
 +    state: stopped
 +    enabled: false
++  ignore_errors: yes
 +  when: ansible_service_mgr == "systemd"
 -- 
 2.49.0
