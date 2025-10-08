@@ -1,4 +1,4 @@
-From b3578594d6185a20a8cad42969681e4b216c3880 Mon Sep 17 00:00:00 2001
+From 1ab3249a30d653aae005208a55d5a66d09f8c79c Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Mon, 15 Jul 2024 20:41:42 +0000
 Subject: [PATCH 2/4] builds kernel from al2
@@ -8,11 +8,11 @@ Subject: [PATCH 2/4] builds kernel from al2
  1 file changed, 28 insertions(+), 7 deletions(-)
 
 diff --git a/kernel/Dockerfile b/kernel/Dockerfile
-index f7a5802..4f04a73 100644
+index 34903b6..a776295 100644
 --- a/kernel/Dockerfile
 +++ b/kernel/Dockerfile
 @@ -1,11 +1,27 @@
--FROM debian:stable AS kernel-source-unpacked
+-FROM debian:stable as kernel-source-unpacked
 -ENV DEBIAN_FRONTEND=noninteractive
 +ARG BASE_IMAGE
 +FROM ${BASE_IMAGE} as kernel-source-unpacked-amd64
@@ -46,7 +46,7 @@ index f7a5802..4f04a73 100644
  
  ARG KERNEL_MAJOR_V
  ARG KERNEL_VERSION
-@@ -41,6 +57,10 @@ ENV KBUILD_BUILD_HOST="tinkerbell"
+@@ -47,6 +63,10 @@ ENV KBUILD_BUILD_HOST="tinkerbell"
  WORKDIR /linux
  COPY /configs/${INPUT_DEFCONFIG} /linux/.config
  
@@ -57,7 +57,7 @@ index f7a5802..4f04a73 100644
  # Kernel config; copy the correct defconfig as .config, and run olddefconfig
  RUN set -x && make "ARCH=${KERNEL_ARCH}" olddefconfig
  
-@@ -59,6 +79,7 @@ ARG KERNEL_OUTPUT_IMAGE
+@@ -65,6 +85,7 @@ ARG KERNEL_OUTPUT_IMAGE
  RUN mkdir /out
  
  RUN sed -i 's/#define COMMAND_LINE_SIZE 2048/#define COMMAND_LINE_SIZE 4096/' arch/x86/include/asm/setup.h
@@ -66,5 +66,5 @@ index f7a5802..4f04a73 100644
  # Kernel build. ENVs in previous stages are inherited; thus ARCH, CROSS_COMPILE, KCFLAGS, KBUILD_BUILD_USER, KBUILD_BUILD_HOST are available
  RUN set -x && \
 -- 
-2.49.0
+2.40.1
 

@@ -1,5 +1,5 @@
 ## **Hook**
-![Version](https://img.shields.io/badge/version-v0.11.1-blue)
+![Version](https://img.shields.io/badge/version-v0.10.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoicVVYYXpIMzRpazNGUTBWdnY1dittK09zNDJvRmtlUlpTZUtZRFoyMkZ0YzlZT3NBMTRSSUFacFg3ZzdVNjg3SlhOZ2dZNmExOVkwaDE5U2RNQldWSTBzPSIsIml2UGFyYW1ldGVyU3BlYyI6ImdYN1lEaGZuSVpQMjhLM2EiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Hook](https://github.com/tinkerbell/hook) is the Tinkerbell Installation Environment for bare-metal. It runs in-memory, installs operating system, and handles deprovisioning.
@@ -18,8 +18,7 @@
 6. `hook-docker` image has Docker runtime. Verify no new changes have been made with Docker version updates.  
 7. Update checksums and attribution using `make attribution checksums`.  
 8. Update the version at the top of this README.  
-9. Run `make generate` to update the `UPSTREAM_PROJECTS.yaml` file.  
-
+9. Run `make generate` to update the `UPSTREAM_PROJECTS.yaml` file.
 
 
 ### Development
@@ -47,7 +46,7 @@ To create a new config patch:
 1. using the menu, enable the new options.
 1. click `save` and save the changes to `.config`.
 1. click `exit`.
-1. after the menuconfig is exited, `_output/kernel-config/generic-6.6.y-x86_64-eksa` will be created and `diff` will be ran to give you the config options to set in your new `config-patches` file.
+1. after the menuconfig is exited, `_output/kernel-config/generic-5.10.y-x86_64-eksa` will be created and `diff` will be ran to give you the config options to set in your new `config-patches` file.
 
 Running the built kernel image locally with qemu:
 1. run `make run-kernel-in-qemu`
