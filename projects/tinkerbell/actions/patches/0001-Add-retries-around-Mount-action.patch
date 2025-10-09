@@ -1,7 +1,7 @@
-From c661dd8f30ca5fbab7b43469881653b200371da1 Mon Sep 17 00:00:00 2001
+From 7ae41ea914476b6f001d3028eb9c3376f820e206 Mon Sep 17 00:00:00 2001
 From: Rahul Ganesh <rahulgab@amazon.com>
-Date: Tue, 10 Jun 2025 22:28:34 +0000
-Subject: [PATCH 7/8] Add retries around Mount action
+Date: Wed, 1 Oct 2025 15:51:27 -0700
+Subject: [PATCH 1/1] Add retries around Mount action
 
 Sometimes the block devices takes some time to load up eventhough
 the disk is already available. This could potentially be due to
@@ -11,15 +11,31 @@ becomes available.
 
 Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
 ---
- writefile/main.go | 32 ++++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
+ writefile/main.go | 34 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 32 insertions(+), 2 deletions(-)
 
 diff --git a/writefile/main.go b/writefile/main.go
-index 3776031..5f283a5 100644
+index 3d47ad8..0a11ca1 100644
 --- a/writefile/main.go
 +++ b/writefile/main.go
-@@ -174,9 +174,21 @@ func main() {
- 		log.Fatalf("Error creating the action Mountpoint [%s]", mountAction)
+@@ -1,6 +1,7 @@
+ package main
+ 
+ import (
++	"context"
+ 	"errors"
+ 	"fmt"
+ 	"log/slog"
+@@ -9,6 +10,7 @@ import (
+ 	"strconv"
+ 	"strings"
+ 	"syscall"
++	"time"
+ 
+ 	log "github.com/sirupsen/logrus"
+ )
+@@ -80,9 +82,21 @@ func main() {
+ 		os.Exit(1)
  	}
  
 +	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -29,21 +45,21 @@ index 3776031..5f283a5 100644
 +	// This could potentially be due to udev/mdev still loading up the drivers
  	// Mount the block device to the /mountAction point
 -	if err := syscall.Mount(blockDevice, mountAction, filesystemType, 0, ""); err != nil {
--		log.Fatalf("Mounting [%s] -> [%s] error [%v]", blockDevice, mountAction, err)
+-		logger.Error("Mounting block device", "blockDevice", blockDevice, "mountAction", mountAction, "error", err)
 +	err = Retry(ctx, 30, 10*time.Second, func() error {
 +		return syscall.Mount(blockDevice, mountAction, filesystemType, 0, "")
 +	})
 +	if err != nil {
 +		if errors.Is(err, context.DeadlineExceeded) {
-+			log.Fatalf("Timed out waiting for mount action")
++			logger.Error("Timed out waiting for mount action")
 +		} else {
-+			log.Fatalf("Operation failed after retries: Mounting [%s] -> [%s]: %v", blockDevice, mountAction, err)
++			logger.Error("Operation failed after retries: Mounting [%s] -> [%s]: %v", blockDevice, mountAction, err)
 +		}
+ 		os.Exit(1)
  	}
- 
- 	log.Infof("Mounted [%s] -> [%s]", blockDevice, mountAction)
-@@ -546,6 +558,22 @@ func getVLANID(b string) (int, error) {
- 	return strconv.Atoi(parsed[1])
+ 	defer func() {
+@@ -132,6 +146,22 @@ func dirExists(mountPath, path string) (bool, error) {
+ 	return !os.IsNotExist(err), nil
  }
  
 +func Retry(ctx context.Context, attempts int, sleep time.Duration, fn func() error) error {
@@ -66,5 +82,5 @@ index 3776031..5f283a5 100644
  	// Does the directory already exist? If so we can return early
  	exists, err := dirExists(mountPath, path)
 -- 
-2.47.1
+2.46.0
 
