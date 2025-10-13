@@ -62,22 +62,21 @@ type BuildOptions struct {
 }
 
 type VsphereConfig struct {
-	Cluster                  string `json:"cluster"`
-	ConvertToTemplate        string `json:"convert_to_template"`
-	CreateSnapshot           string `json:"create_snapshot"`
-	Datacenter               string `json:"datacenter"`
-	Datastore                string `json:"datastore"`
-	Folder                   string `json:"folder"`
-	InsecureConnection       string `json:"insecure_connection"`
-	LinkedClone              string `json:"linked_clone"`
-	Network                  string `json:"network"`
-	ResourcePool             string `json:"resource_pool"`
-	Template                 string `json:"template"`
-	VcenterServer            string `json:"vcenter_server"`
-	Username                 string `json:"username"`
-	Password                 string `json:"password"`
-	VmxVersion               string `json:"vmx_version,omitempty"`
-	RhelServerReleaseVersion string `json:"rhsm_server_release_version,omitempty"`
+	Cluster            string `json:"cluster"`
+	ConvertToTemplate  string `json:"convert_to_template"`
+	CreateSnapshot     string `json:"create_snapshot"`
+	Datacenter         string `json:"datacenter"`
+	Datastore          string `json:"datastore"`
+	Folder             string `json:"folder"`
+	InsecureConnection string `json:"insecure_connection"`
+	LinkedClone        string `json:"linked_clone"`
+	Network            string `json:"network"`
+	ResourcePool       string `json:"resource_pool"`
+	Template           string `json:"template"`
+	VcenterServer      string `json:"vcenter_server"`
+	Username           string `json:"username"`
+	Password           string `json:"password"`
+	VmxVersion         string `json:"vmx_version,omitempty"`
 	IsoConfig
 	RhelConfig
 	ProxyConfig
@@ -170,12 +169,13 @@ type ProxyConfig struct {
 }
 
 type RhsmConfig struct {
-	ProxyHostname        string `json:"rhsm_server_proxy_hostname,omitempty"`
-	ProxyPort            string `json:"rhsm_server_proxy_port,omitempty"`
-	ServerHostname       string `json:"rhsm_server_hostname,omitempty"`
-	ServerReleaseVersion string `json:"rhsm_server_release_version,omitempty"`
-	ActivationKey        string `json:"rhsm_activation_key,omitempty"`
-	OrgId                string `json:"rhsm_org_id,omitempty"`
+	ProxyHostname            string `json:"rhsm_server_proxy_hostname,omitempty"`
+	ProxyPort                string `json:"rhsm_server_proxy_port,omitempty"`
+	ServerHostname           string `json:"rhsm_server_hostname,omitempty"`
+	ServerReleaseVersion     string `json:"rhsm_server_release_version,omitempty"`
+	ActivationKey            string `json:"rhsm_activation_key,omitempty"`
+	OrgId                    string `json:"rhsm_org_id,omitempty"`
+	RhelServerReleaseVersion string `json:"rhsm_server_release_version,omitempty"`
 }
 
 type ExtraOverridesConfig struct {
