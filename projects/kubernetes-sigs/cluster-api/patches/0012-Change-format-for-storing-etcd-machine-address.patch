@@ -1,0 +1,43 @@
+From e5a3c9d3f9123fbd6f1566746e64b846a8ea4ed6 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Thu, 3 Mar 2022 15:01:35 -0800
+Subject: [PATCH 12/34] Change format for storing etcd machine address
+
+Once the first etcd member is initialized, the machine controller has
+to update the secret with the address of the machine, so it can be used
+by other members to join during cluster creation.
+The etcdadm-bootstrap-provider changes this address into an etcd client URL
+before passing it in to the join command.
+Recent changes in etcdadm, and etcdadm-controller will allow passing in
+client URLs of all etcd members. So this commit changes the format of stored
+address for the first machine from an IP address to the etcd client URL.
+NOTE: This only happens once initially during cluster creation. We need to
+keep this Secret because after clusterctl move, the etcdCluster's Initialized
+condition needs to be set based on the existence of this Secret.
+---
+ internal/controllers/machine/machine_controller_phases.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
+index e823b5831..b584f2eed 100644
+--- a/internal/controllers/machine/machine_controller_phases.go
++++ b/internal/controllers/machine/machine_controller_phases.go
+@@ -394,7 +394,6 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+ 					if machineIP == "" {
+ 						return ctrl.Result{}, fmt.Errorf("error getting etcd init IP address: %v", err)
+ 					}
+-
+ 					secret := &corev1.Secret{
+ 						ObjectMeta: metav1.ObjectMeta{
+ 							Name:      etcdSecretName,
+@@ -413,6 +412,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+ 						},
+ 						Data: map[string][]byte{
+ 							"address": []byte(machineIP),
++							"clientUrls": []byte(fmt.Sprintf("https://%v:2379", machineIP)),
+ 						},
+ 						Type: clusterv1.ClusterSecretType,
+ 					}
+-- 
+2.47.1
+

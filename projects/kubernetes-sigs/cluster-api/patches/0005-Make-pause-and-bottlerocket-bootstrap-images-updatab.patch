@@ -1,63 +1,1022 @@
-From ef4623ec56b6b1eb9232a878638c0e1ee56ed793 Mon Sep 17 00:00:00 2001
+From 5e321e5bb5d727ae0a2709ce616e2acc0ed75b87 Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Tue, 31 Aug 2021 15:56:28 +0000
-Subject: [PATCH 05/41] Make pause and bottlerocket bootstrap images updatable
+Subject: [PATCH 05/34] Make pause and bottlerocket bootstrap images updatable
  in validation webhook
 
 cr: https://code.amazon.com/reviews/CR-56335855
 ---
- .../webhooks/kubeadm_control_plane.go         |  4 +++
- .../webhooks/kubeadm_control_plane_test.go    | 36 +++++++++++++++++++
- 2 files changed, 40 insertions(+)
+ .../kubeadm/v1beta1/kubeadm_types.go          | 19 +++++
+ .../v1beta1/zz_generated.conversion.go        | 44 ++++++++++
+ .../kubeadm/v1beta1/zz_generated.deepcopy.go  | 17 ++++
+ .../kubeadm/v1beta2/kubeadm_types.go          | 21 +++++
+ .../kubeadm/v1beta2/zz_generated.deepcopy.go  | 17 ++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 78 +++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 84 +++++++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        | 19 +++++
+ .../internal/bottlerocket/bottlerocket.go     | 20 ++++-
+ .../controllers/kubeadmconfig_controller.go   |  9 ++
+ .../zz_generated.conversion.go                |  2 +
+ .../zz_generated.conversion.go                |  2 +
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 84 +++++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 84 +++++++++++++++++++
+ .../webhooks/kubeadm_control_plane.go         |  4 +
+ .../webhooks/kubeadm_control_plane_test.go    | 36 ++++++++
+ .../kubeadm/internal/workload_cluster_etcd.go |  2 +-
+ .../v1alpha3/zz_generated.conversion.go       |  2 +
+ .../kubeadm/v1alpha4/kubeadm_types.go         | 19 +++++
+ .../v1alpha4/zz_generated.conversion.go       | 44 ++++++++++
+ .../kubeadm/v1alpha4/zz_generated.deepcopy.go | 17 ++++
+ 21 files changed, 619 insertions(+), 5 deletions(-)
 
+diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
+index 6d1c8f0c5..5ae15a6ab 100644
+--- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
++++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
+@@ -92,6 +92,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	Proxy ProxyConfiguration `json:"proxy,omitempty"`
+ 
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -199,6 +204,15 @@ type ProxyConfiguration struct {
+ 	NoProxy []string `json:"noProxy,omitempty"`
+ }
+ 
++// RegistryMirrorConfiguration holds the settings for image registry mirror
++type RegistryMirrorConfiguration struct {
++	// Endpoint defines the registry mirror endpoint to use for pulling images
++	Endpoint string `json:"endpoint,omitempty"`
++
++	// CACert defines the CA cert for the registry mirror
++	CACert string `json:"caCert,omitempty"`
++}
++
+ // ControlPlaneComponent holds settings common to control plane component of the cluster.
+ type ControlPlaneComponent struct {
+ 	// extraArgs is an extra set of flags to pass to the control plane component.
+@@ -561,6 +575,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	Proxy ProxyConfiguration `json:"proxy,omitempty"`
+ 
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// nodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+index 3e8083317..41aa18437 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+@@ -300,6 +300,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*RegistryMirrorConfiguration)(nil), (*v1beta2.RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(a.(*RegistryMirrorConfiguration), b.(*v1beta2.RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta2.RegistryMirrorConfiguration)(nil), (*RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(a.(*v1beta2.RegistryMirrorConfiguration), b.(*RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*SecretFileSource)(nil), (*v1beta2.SecretFileSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_SecretFileSource_To_v1beta2_SecretFileSource(a.(*SecretFileSource), b.(*v1beta2.SecretFileSource), scope)
+ 	}); err != nil {
+@@ -694,6 +704,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_Etcd_To_v1beta2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -729,6 +742,9 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -1144,6 +1160,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -1167,6 +1186,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -1818,6 +1840,28 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
+ 	return autoConvert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in, out, s)
+ }
+ 
++func autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in, out, s)
++}
++
+ func autoConvert_v1beta1_SecretFileSource_To_v1beta2_SecretFileSource(in *SecretFileSource, out *v1beta2.SecretFileSource, s conversion.Scope) error {
+ 	out.Name = in.Name
+ 	out.Key = in.Key
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
+index d73d37506..568bdee53 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
+@@ -165,6 +165,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -626,6 +627,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -1310,6 +1312,21 @@ func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
+ 	*out = *in
+diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
+index 14862bfc6..f31154d73 100644
+--- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
++++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
+@@ -125,6 +125,15 @@ func (r *InitConfiguration) IsDefined() bool {
+ 	return !reflect.DeepEqual(r, &InitConfiguration{})
+ }
+ 
++// RegistryMirrorConfiguration holds the settings for image registry mirror
++type RegistryMirrorConfiguration struct {
++	// Endpoint defines the registry mirror endpoint to use for pulling images
++	Endpoint string `json:"endpoint,omitempty"`
++
++	// CACert defines the CA cert for the registry mirror
++	CACert string `json:"caCert,omitempty"`
++}
++
+ // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster.
+ // +kubebuilder:validation:MinProperties=1
+ type ClusterConfiguration struct {
+@@ -142,6 +151,12 @@ type ClusterConfiguration struct {
+ 	// This is only for bottlerocket
+ 	// +optional
+ 	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -669,6 +684,12 @@ type JoinConfiguration struct {
+ 	// This is only for bottlerocket
+ 	// +optional
+ 	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// nodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
+index 33ec37d7c..33dbb82be 100644
+--- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
++++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
+@@ -200,6 +200,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+ 	in.ControllerManager.DeepCopyInto(&out.ControllerManager)
+@@ -566,6 +567,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -1244,6 +1246,21 @@ func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *Scheduler) DeepCopyInto(out *Scheduler) {
+ 	*out = *in
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index d33f51ba0..4e98062d2 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -1363,6 +1363,19 @@ spec:
+                           type: string
+                         type: array
+                     type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                   scheduler:
+                     description: scheduler contains extra settings for the scheduler
+                       control plane component
+@@ -1924,6 +1937,19 @@ spec:
+                           type: string
+                         type: array
+                     type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                 type: object
+               mounts:
+                 description: mounts specifies a list of mount points to be setup.
+@@ -2906,6 +2932,19 @@ spec:
+                           type: string
+                         type: array
+                     type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                   scheduler:
+                     description: scheduler contains extra settings for the scheduler
+                       control plane component
+@@ -3946,6 +3985,19 @@ spec:
+                           type: string
+                         type: array
+                     type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                   skipPhases:
+                     description: |-
+                       skipPhases is a list of phases to skip during command execution.
+@@ -5168,6 +5220,19 @@ spec:
+                           type: string
+                         type: array
+                     type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                   scheduler:
+                     description: scheduler contains extra settings for the scheduler
+                       control plane component
+@@ -6359,6 +6424,19 @@ spec:
+                           type: string
+                         type: array
+                     type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                   skipPhases:
+                     description: |-
+                       skipPhases is a list of phases to skip during command execution.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index cab4d6eb5..a0be5ab77 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -1331,6 +1331,20 @@ spec:
+                                   type: string
+                                 type: array
+                             type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                           scheduler:
+                             description: scheduler contains extra settings for the
+                               scheduler control plane component
+@@ -1905,6 +1919,20 @@ spec:
+                                   type: string
+                                 type: array
+                             type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                         type: object
+                       mounts:
+                         description: mounts specifies a list of mount points to be
+@@ -2875,6 +2903,20 @@ spec:
+                                   type: string
+                                 type: array
+                             type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                           scheduler:
+                             description: scheduler contains extra settings for the
+                               scheduler control plane component
+@@ -3939,6 +3981,20 @@ spec:
+                                   type: string
+                                 type: array
+                             type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                           skipPhases:
+                             description: |-
+                               skipPhases is a list of phases to skip during command execution.
+@@ -5062,6 +5118,20 @@ spec:
+                                   type: string
+                                 type: array
+                             type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                           scheduler:
+                             description: scheduler contains extra settings for the
+                               scheduler control plane component
+@@ -6274,6 +6344,20 @@ spec:
+                                   type: string
+                                 type: array
+                             type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                           skipPhases:
+                             description: |-
+                               skipPhases is a list of phases to skip during command execution.
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index e4be8d945..886af6d87 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -31,6 +31,17 @@ user-data = "{{.BootstrapContainerUserData}}"
+ https-proxy = "{{.HTTPSProxyEndpoint}}"
+ no-proxy = "{{.NoProxyEndpoints}}"
+ {{- end -}}
++`
++	registryMirrorTemplate = `{{ define "registryMirrorSettings" -}}
++[settings.container-registry.mirrors]
++"public.ecr.aws" = ["https://{{.RegistryMirrorEndpoint}}"]
++{{- end -}}
++`
++	registryMirrorCACertTemplate = `{{ define "registryMirrorCACertSettings" -}}
++[settings.pki.registry-mirror-ca]
++data = "{{.RegistryMirrorCACert}}"
++trusted=true
++{{- end -}}
+ `
+ 	bottlerocketNodeInitSettingsTemplate = `{{template "bootstrapHostContainerSettings" .}}
+ 
+@@ -41,5 +52,13 @@ no-proxy = "{{.NoProxyEndpoints}}"
+ {{- if (ne .HTTPSProxyEndpoint "")}}
+ {{template "networkInitSettings" .}}
+ {{- end -}}
++
++{{- if (ne .RegistryMirrorEndpoint "")}}
++{{template "registryMirrorSettings" .}}
++{{- end -}}
++
++{{- if (ne .RegistryMirrorCACert "")}}
++{{template "registryMirrorCACertSettings" .}}
++{{- end -}}
+ `
+ )
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 18e559cc8..f41f0b23a 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -22,9 +22,10 @@ const (
+ )
+ 
+ type BottlerocketConfig struct {
+-	Pause                 bootstrapv1.Pause
+-	BottlerocketBootstrap bootstrapv1.BottlerocketBootstrap
+-	ProxyConfiguration    bootstrapv1.ProxyConfiguration
++	Pause                       bootstrapv1.Pause
++	BottlerocketBootstrap       bootstrapv1.BottlerocketBootstrap
++	ProxyConfiguration          bootstrapv1.ProxyConfiguration
++	RegistryMirrorConfiguration bootstrapv1.RegistryMirrorConfiguration
+ }
+ 
+ type BottlerocketSettingsInput struct {
+@@ -34,6 +35,8 @@ type BottlerocketSettingsInput struct {
+ 	PauseContainerSource       string
+ 	HTTPSProxyEndpoint         string
+ 	NoProxyEndpoints           []string
++	RegistryMirrorEndpoint     string
++	RegistryMirrorCACert       string
+ }
+ 
+ type HostPath struct {
+@@ -90,7 +93,12 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ 	if _, err := tm.Parse(networkInitTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse networks %s template", kind)
+ 	}
+-
++	if _, err := tm.Parse(registryMirrorTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse registry mirror %s template", kind)
++	}
++	if _, err := tm.Parse(registryMirrorCACertTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse registry mirror ca cert %s template", kind)
++	}
+ 	t, err := tm.Parse(tpl)
+ 	if err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
+@@ -125,6 +133,10 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 		PauseContainerSource:       fmt.Sprintf("%s:%s", config.Pause.ImageRepository, config.Pause.ImageTag),
+ 		HTTPSProxyEndpoint:         config.ProxyConfiguration.HTTPSProxy,
+ 		NoProxyEndpoints:           config.ProxyConfiguration.NoProxy,
++		RegistryMirrorEndpoint:     config.RegistryMirrorConfiguration.Endpoint,
++	}
++	if config.RegistryMirrorConfiguration.CACert != "" {
++		bottlerocketInput.RegistryMirrorCACert = base64.StdEncoding.EncodeToString([]byte(config.RegistryMirrorConfiguration.CACert))
+ 	}
+ 
+ 	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 086ef1e3b..130a0c4d6 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -569,6 +569,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
+ 		}
++		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
++			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
+@@ -862,6 +865,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+ 		}
++		if scope.Config.Spec.JoinConfiguration.RegistryMirror.Endpoint != "" {
++			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+@@ -1036,6 +1042,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+ 		}
++		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
++			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index 8cac4b994..529c988f2 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -381,6 +381,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
+ 	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
++	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -593,6 +594,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+ 	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
++	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+index 44ec72229..0c903b837 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+@@ -506,6 +506,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_Etcd_To_upstreamv1beta4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -760,6 +761,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta4_JoinConfiguration(
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 2a2d18460..cf2e86878 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -1594,6 +1594,20 @@ spec:
+                               type: string
+                             type: array
+                         type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                       scheduler:
+                         description: scheduler contains extra settings for the scheduler
+                           control plane component
+@@ -2163,6 +2177,20 @@ spec:
+                               type: string
+                             type: array
+                         type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                     type: object
+                   mounts:
+                     description: mounts specifies a list of mount points to be setup.
+@@ -3388,6 +3416,20 @@ spec:
+                               type: string
+                             type: array
+                         type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                       scheduler:
+                         description: scheduler contains extra settings for the scheduler
+                           control plane component
+@@ -4440,6 +4482,20 @@ spec:
+                               type: string
+                             type: array
+                         type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                       skipPhases:
+                         description: |-
+                           skipPhases is a list of phases to skip during command execution.
+@@ -6095,6 +6151,20 @@ spec:
+                               type: string
+                             type: array
+                         type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                       scheduler:
+                         description: scheduler contains extra settings for the scheduler
+                           control plane component
+@@ -7295,6 +7365,20 @@ spec:
+                               type: string
+                             type: array
+                         type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                       skipPhases:
+                         description: |-
+                           skipPhases is a list of phases to skip during command execution.
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 9d5b83610..8b8d415ff 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -386,6 +386,20 @@ spec:
+                                       type: string
+                                     type: array
+                                 type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                               scheduler:
+                                 description: scheduler contains extra settings for
+                                   the scheduler control plane component
+@@ -964,6 +978,20 @@ spec:
+                                       type: string
+                                     type: array
+                                 type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                             type: object
+                           mounts:
+                             description: mounts specifies a list of mount points to
+@@ -2094,6 +2122,20 @@ spec:
+                                       type: string
+                                     type: array
+                                 type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                               scheduler:
+                                 description: scheduler contains extra settings for
+                                   the scheduler control plane component
+@@ -3165,6 +3207,20 @@ spec:
+                                       type: string
+                                     type: array
+                                 type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                               skipPhases:
+                                 description: |-
+                                   skipPhases is a list of phases to skip during command execution.
+@@ -4487,6 +4543,20 @@ spec:
+                                       type: string
+                                     type: array
+                                 type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                               scheduler:
+                                 description: scheduler contains extra settings for
+                                   the scheduler control plane component
+@@ -5709,6 +5779,20 @@ spec:
+                                       type: string
+                                     type: array
+                                 type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                               skipPhases:
+                                 description: |-
+                                   skipPhases is a list of phases to skip during command execution.
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-index 9fcf55b31..8153911c3 100644
+index a132bd90f..6fb18f70b 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-@@ -166,6 +166,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -140,6 +140,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		// metadata
  		{"metadata", "*"},
  		// spec.kubeadmConfigSpec.clusterConfiguration
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageRepository"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "imageTag"},
- 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local", "extraArgs"},
-@@ -208,6 +210,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
- 		{spec, kubeadmConfigSpec, joinConfiguration, "controlPlane", "*"},
- 		{spec, kubeadmConfigSpec, joinConfiguration, "discovery"},
- 		{spec, kubeadmConfigSpec, joinConfiguration, "discovery", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local"},
+@@ -169,6 +171,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		{spec, kubeadmConfigSpec, initConfiguration, timeouts},
+ 		{spec, kubeadmConfigSpec, initConfiguration, timeouts, "*"},
+ 		// spec.kubeadmConfigSpec.joinConfiguration
 +		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
- 		// spec.kubeadmConfigSpec
- 		{spec, kubeadmConfigSpec, bootCommands},
- 		{spec, kubeadmConfigSpec, preKubeadmCommands},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, patches, directory},
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-index a008272e7..a28d6d368 100644
+index 1d738699d..19d487668 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-@@ -717,6 +717,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
- 	updateUseExperimentalRetryJoin := before.DeepCopy()
- 	updateUseExperimentalRetryJoin.Spec.KubeadmConfigSpec.UseExperimentalRetryJoin = false //nolint:staticcheck
+@@ -755,6 +755,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 		CACertificateValidityPeriodDays: 730,
+ 	}
  
 +	validUpdateClusterConfPauseImage := before.DeepCopy()
-+	validUpdateClusterConfPauseImage.Spec.KubeadmConfigSpec.ClusterConfiguration.Pause = bootstrapv1.Pause{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++	validUpdateClusterConfPauseImage.Spec.KubeadmConfigSpec.ClusterConfiguration.Pause = bootstrapv1.Pause{ImageRepository: "registry.k8s.io/pause", ImageTag: "v1.1.0+new"}
 +
 +	validUpdateClusterConfBRBootstrapImage := before.DeepCopy()
-+	validUpdateClusterConfBRBootstrapImage.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++	validUpdateClusterConfBRBootstrapImage.Spec.KubeadmConfigSpec.ClusterConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageRepository: "registry.k8s.io/bottlerocketbootstrap", ImageTag: "v1.1.0+new"}
 +
 +	validUpdateJoinConfPauseImage := before.DeepCopy()
-+	validUpdateJoinConfPauseImage.Spec.KubeadmConfigSpec.JoinConfiguration.Pause = bootstrapv1.Pause{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++	validUpdateJoinConfPauseImage.Spec.KubeadmConfigSpec.JoinConfiguration.Pause = bootstrapv1.Pause{ImageRepository: "registry.k8s.io/pause", ImageTag: "v1.1.0+new"}
 +
 +	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
-+	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageMeta: bootstrapv1.ImageMeta{ImageTag: "v1.1.0+new"}}
++	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageRepository: "registry.k8s.io/bottlerocketbootstrap", ImageTag: "v1.1.0+new"}
 +
  	tests := []struct {
  		name                  string
  		enableIgnitionFeature bool
-@@ -1068,6 +1080,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
- 			before:    beforeUseExperimentalRetryJoin,
- 			kcp:       updateUseExperimentalRetryJoin,
+@@ -1118,6 +1130,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before:    before,
+ 			kcp:       invalidUpdateCACertificateValidityPeriodDays,
  		},
 +		{
 +			name:      "should allow changes to cluster configuration pause image",
@@ -86,6 +1045,215 @@ index a008272e7..a28d6d368 100644
  	}
  
  	for _, tt := range tests {
+diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd.go b/controlplane/kubeadm/internal/workload_cluster_etcd.go
+index 6eee63e9c..e70df164a 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_etcd.go
++++ b/controlplane/kubeadm/internal/workload_cluster_etcd.go
+@@ -86,7 +86,7 @@ func (w *Workload) UpdateEtcdExternalInKubeadmConfigMap(etcdExternal bootstrapv1
+ 
+ func (w *Workload) UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx context.Context, endpoints []string, version semver.Version) error {
+ 	return w.UpdateClusterConfiguration(ctx, version, func(c *bootstrapv1.ClusterConfiguration) {
+-		if c.Etcd.External != nil {
++		if c.Etcd.External.IsDefined() {
+ 			c.Etcd.External.Endpoints = endpoints
+ 		}
+ 	})
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
+index a075d2ca4..0effa7124 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
+@@ -543,6 +543,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(i
+ 	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
++	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_Etcd_To_v1alpha3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -890,6 +891,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *v1b
+ 	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
++	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1alpha3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+index a147649f1..68c372963 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+@@ -76,6 +76,11 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	Proxy ProxyConfiguration `json:"proxy,omitempty"`
+ 
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -166,6 +171,15 @@ type ProxyConfiguration struct {
+ 	NoProxy []string `json:"noProxy,omitempty"`
+ }
+ 
++// RegistryMirrorConfiguration holds the settings for image registry mirror
++type RegistryMirrorConfiguration struct {
++	// Endpoint defines the registry mirror endpoint to use for pulling images
++	Endpoint string `json:"endpoint,omitempty"`
++
++	// CACert defines the CA cert for the registry mirror
++	CACert string `json:"caCert,omitempty"`
++}
++
+ // ControlPlaneComponent holds settings common to control plane component of the cluster.
+ type ControlPlaneComponent struct {
+ 	// extraArgs is an extra set of flags to pass to the control plane component.
+@@ -375,6 +389,11 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	Proxy ProxyConfiguration `json:"proxy,omitempty"`
+ 
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// nodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+index c64093b7c..02944831d 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+@@ -219,6 +219,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*RegistryMirrorConfiguration)(nil), (*v1beta2.RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(a.(*RegistryMirrorConfiguration), b.(*v1beta2.RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta2.RegistryMirrorConfiguration)(nil), (*RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(a.(*v1beta2.RegistryMirrorConfiguration), b.(*RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*SecretFileSource)(nil), (*v1beta2.SecretFileSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1alpha4_SecretFileSource_To_v1beta2_SecretFileSource(a.(*SecretFileSource), b.(*v1beta2.SecretFileSource), scope)
+ 	}); err != nil {
+@@ -563,6 +573,9 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta2_ClusterConfiguration(i
+ 	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1alpha4_Etcd_To_v1beta2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -598,6 +611,9 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_Etcd_To_v1alpha4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -938,6 +954,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
+ 	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1alpha4_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -959,6 +978,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -1430,6 +1452,28 @@ func Convert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1bet
+ 	return autoConvert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in, out, s)
+ }
+ 
++func autoConvert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in, out, s)
++}
++
+ func autoConvert_v1alpha4_SecretFileSource_To_v1beta2_SecretFileSource(in *SecretFileSource, out *v1beta2.SecretFileSource, s conversion.Scope) error {
+ 	out.Name = in.Name
+ 	out.Key = in.Key
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+index b6a144dbe..ed9b9e0cc 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+@@ -165,6 +165,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -501,6 +502,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -987,6 +989,21 @@ func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
+ 	*out = *in
 -- 
-2.49.0
+2.47.1
 

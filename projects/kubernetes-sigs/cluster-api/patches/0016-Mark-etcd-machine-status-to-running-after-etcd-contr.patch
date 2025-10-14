@@ -1,0 +1,78 @@
+From 3579563f5af189baf53dd83d40d478ca22af7b1d Mon Sep 17 00:00:00 2001
+From: Jiayi Wang <jiayiwang7@yahoo.com>
+Date: Mon, 9 Jan 2023 15:41:05 -0500
+Subject: [PATCH 16/34] Mark etcd machine status to running after etcd
+ controller adds the etcd machine ready label
+
+---
+ api/core/v1beta1/machine_types.go                         | 6 +++++-
+ api/core/v1beta2/machine_types.go                         | 5 ++++-
+ internal/controllers/machine/machine_controller_phases.go | 2 +-
+ internal/controllers/machine/machine_controller_status.go | 2 +-
+ 4 files changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/api/core/v1beta1/machine_types.go b/api/core/v1beta1/machine_types.go
+index 8cf242133..bdd481382 100644
+--- a/api/core/v1beta1/machine_types.go
++++ b/api/core/v1beta1/machine_types.go
+@@ -51,8 +51,12 @@ const (
+ 	// Note: The value of this label may be a hash if the control plane name is longer than 63 characters.
+ 	MachineControlPlaneNameLabel = "cluster.x-k8s.io/control-plane-name"
+ 
+-	//MachineEtcdClusterLabelName is the label set on machines or related objects that are part of an etcd cluster
++	// MachineEtcdClusterLabelName is the label set on machines or related objects that are part of an etcd cluster
+ 	MachineEtcdClusterLabelName = "cluster.x-k8s.io/etcd-cluster"
++
++	// MachineEtcdReadyLabelName is the label set on machines that have succesfully joined the etcd cluster.
++	MachineEtcdReadyLabelName = "cluster.x-k8s.io/etcd-ready"
++
+ 	// PreDrainDeleteHookAnnotationPrefix annotation specifies the prefix we
+ 	// search each annotation for during the pre-drain.delete lifecycle hook
+ 	// to pause reconciliation of deletion. These hooks will prevent removal of
+diff --git a/api/core/v1beta2/machine_types.go b/api/core/v1beta2/machine_types.go
+index bef57a29f..1f42bdada 100644
+--- a/api/core/v1beta2/machine_types.go
++++ b/api/core/v1beta2/machine_types.go
+@@ -30,9 +30,12 @@ const (
+ 	// MachineControlPlaneLabel is the label set on machines or related objects that are part of a control plane.
+ 	MachineControlPlaneLabel = "cluster.x-k8s.io/control-plane"
+ 
+-	//MachineEtcdClusterLabelName is the label set on machines or related objects that are part of an etcd cluster
++	// MachineEtcdClusterLabelName is the label set on machines or related objects that are part of an etcd cluster
+ 	MachineEtcdClusterLabelName = "cluster.x-k8s.io/etcd-cluster"
+ 
++	// MachineEtcdReadyLabelName is the label set on machines that have succesfully joined the etcd cluster.
++	MachineEtcdReadyLabelName = "cluster.x-k8s.io/etcd-ready"
++
+ 	// ExcludeNodeDrainingAnnotation annotation explicitly skips node draining if set.
+ 	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
+ 
+diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
+index b584f2eed..a3789efa9 100644
+--- a/internal/controllers/machine/machine_controller_phases.go
++++ b/internal/controllers/machine/machine_controller_phases.go
+@@ -411,7 +411,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+ 							},
+ 						},
+ 						Data: map[string][]byte{
+-							"address": []byte(machineIP),
++							"address":    []byte(machineIP),
+ 							"clientUrls": []byte(fmt.Sprintf("https://%v:2379", machineIP)),
+ 						},
+ 						Type: clusterv1.ClusterSecretType,
+diff --git a/internal/controllers/machine/machine_controller_status.go b/internal/controllers/machine/machine_controller_status.go
+index a0bc53603..f2a6d21c7 100644
+--- a/internal/controllers/machine/machine_controller_status.go
++++ b/internal/controllers/machine/machine_controller_status.go
+@@ -820,7 +820,7 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
+ 
+ 	if _, ok := m.Labels[clusterv1.MachineEtcdClusterLabelName]; ok {
+ 		// Status.NodeRef does not get set for etcd machines since they don't correspond to k8s node objects
+-		if ptr.Deref(m.Status.Initialization.InfrastructureProvisioned, false) {
++		if _, ok := m.Labels[clusterv1.MachineEtcdReadyLabelName]; ok && ptr.Deref(m.Status.Initialization.InfrastructureProvisioned, false) {
+ 			m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
+ 		}
+ 	}
+-- 
+2.47.1
+

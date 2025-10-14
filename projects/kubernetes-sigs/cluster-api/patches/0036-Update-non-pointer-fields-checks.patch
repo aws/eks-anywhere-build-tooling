@@ -1,0 +1,117 @@
+From 7ab1c65d088d898e516445b0467f88734d7b171c Mon Sep 17 00:00:00 2001
+From: Pankti <shah.pankti2609@gmail.com>
+Date: Tue, 7 Oct 2025 16:27:31 -0700
+Subject: [PATCH 36/36] Update non pointer fields checks
+
+---
+ controlplane/kubeadm/internal/controllers/controller.go     | 6 +++---
+ .../kubeadm/internal/workload_cluster_conditions.go         | 2 +-
+ controlplane/kubeadm/internal/workload_cluster_etcd.go      | 2 +-
+ internal/controllers/cluster/cluster_controller.go          | 4 ++--
+ internal/controllers/cluster/cluster_controller_phases.go   | 4 ++--
+ 5 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
+index bb729ee40..cf55b784d 100644
+--- a/controlplane/kubeadm/internal/controllers/controller.go
++++ b/controlplane/kubeadm/internal/controllers/controller.go
+@@ -201,7 +201,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+ 		log.Error(err, "Failed to configure the patch helper")
+ 		return ctrl.Result{Requeue: true}, nil
+ 	}
+-	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
++	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() && cluster.Spec.ManagedExternalEtcdRef.Kind == "EtcdadmCluster" {
+ 		managedEtcdResult, err := r.updateManagedExternalEtcdEndpoints(ctx, log, patchHelper, cluster, kcp)
+ 		if err != nil {
+ 			return ctrl.Result{}, err
+@@ -499,7 +499,7 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+ 				/* Once KCP upgrade has completed, the controller will annotate the external etcd object to indicate that the older KCP machines
+ 				are no longer part of the cluster, and so any older out-of-date etcd members and machines can be deleted
+ 				*/
+-				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
++				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() && controlPlane.Cluster.Spec.ManagedExternalEtcdRef.Kind == "EtcdadmCluster" {
+ 					etcdRef := controlPlane.Cluster.Spec.ManagedExternalEtcdRef
+ 					externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, controlPlane.Cluster.Namespace)
+ 					if err != nil {
+@@ -622,7 +622,7 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+ 		return ctrl.Result{}, err
+ 	}
+ 
+-	if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
++	if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() && controlPlane.Cluster.Spec.ManagedExternalEtcdRef.Kind == "EtcdadmCluster" {
+ 		for _, machine := range allMachines {
+ 			if util.IsEtcdMachine(machine) {
+ 				// remove external etcd-only machines from the "allMachines" collection so that the controlplane machines don't wait for etcd to be deleted first
+diff --git a/controlplane/kubeadm/internal/workload_cluster_conditions.go b/controlplane/kubeadm/internal/workload_cluster_conditions.go
+index 3ef955f72..53fea0261 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_conditions.go
++++ b/controlplane/kubeadm/internal/workload_cluster_conditions.go
+@@ -185,7 +185,7 @@ func (w *Workload) updateManagedEtcdConditions(ctx context.Context, controlPlane
+ 	} else {
+ 		// In case of errors, getCurrentEtcdMembersAndAlarms sets etcd member healthy conditions with the proper message;
+ 		// KCP still have to aggregate conditions set by  in case of errors + continue to reconcile at best effort, so we only log this error.
+-		log.Error(err, "Failed to get current etcd members and alarms")
++		log.Error(err, "---------------Failed to get current etcd members and alarms")
+ 	}
+ 
+ 	// Check if the list of etcd members and machines match each other.
+diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd.go b/controlplane/kubeadm/internal/workload_cluster_etcd.go
+index e70df164a..0e665d49d 100644
+--- a/controlplane/kubeadm/internal/workload_cluster_etcd.go
++++ b/controlplane/kubeadm/internal/workload_cluster_etcd.go
+@@ -86,7 +86,7 @@ func (w *Workload) UpdateEtcdExternalInKubeadmConfigMap(etcdExternal bootstrapv1
+ 
+ func (w *Workload) UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx context.Context, endpoints []string, version semver.Version) error {
+ 	return w.UpdateClusterConfiguration(ctx, version, func(c *bootstrapv1.ClusterConfiguration) {
+-		if c.Etcd.External.IsDefined() {
++		if c.Etcd.External.IsDefined() && len(c.Etcd.External.Endpoints) > 0 {
+ 			c.Etcd.External.Endpoints = endpoints
+ 		}
+ 	})
+diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
+index c66857819..f9e052d64 100644
+--- a/internal/controllers/cluster/cluster_controller.go
++++ b/internal/controllers/cluster/cluster_controller.go
+@@ -460,7 +460,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
+ 		}
+ 	}
+ 
+-	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
++	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() && cluster.Spec.ManagedExternalEtcdRef.Kind == "EtcdadmCluster" {
+ 		obj, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, cluster.Spec.ManagedExternalEtcdRef, cluster.Namespace)
+ 		switch {
+ 		case apierrors.IsNotFound(errors.Cause(err)):
+@@ -702,7 +702,7 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
+ 		&c.machineSets,
+ 		toObjectList(c.workerMachines),
+ 	}
+-	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
++	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() && cluster.Spec.ManagedExternalEtcdRef.Kind == "EtcdadmCluster" {
+ 		lists = append(lists, toObjectList(c.etcdMachines))
+ 	}
+ 	if feature.Gates.Enabled(feature.MachinePool) {
+diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
+index 6a383cc1d..536862940 100644
+--- a/internal/controllers/cluster/cluster_controller_phases.go
++++ b/internal/controllers/cluster/cluster_controller_phases.go
+@@ -251,7 +251,7 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
+ 		return ctrl.Result{}, nil
+ 	}
+ 
+-	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
++	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() && cluster.Spec.ManagedExternalEtcdRef.Kind == "EtcdadmCluster" {
+ 		if result, err := r.handlePauseControlPlaneWithExternalManagedEtcd(ctx, log, s); err != nil {
+ 			return ctrl.Result{}, err
+ 		} else if !result.IsZero() {
+@@ -408,7 +408,7 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, s *scope) (ctrl.R
+ 	log := ctrl.LoggerFrom(ctx)
+ 	cluster := s.cluster
+ 
+-	if !cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
++	if !cluster.Spec.ManagedExternalEtcdRef.IsDefined() || cluster.Spec.ManagedExternalEtcdRef.Kind != "EtcdadmCluster" {
+ 		return ctrl.Result{}, nil
+ 	}
+ 	// Call generic external reconciler.
+-- 
+2.51.0
+
