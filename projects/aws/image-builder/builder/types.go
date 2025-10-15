@@ -169,13 +169,12 @@ type ProxyConfig struct {
 }
 
 type RhsmConfig struct {
-	ProxyHostname            string `json:"rhsm_server_proxy_hostname,omitempty"`
-	ProxyPort                string `json:"rhsm_server_proxy_port,omitempty"`
-	ServerHostname           string `json:"rhsm_server_hostname,omitempty"`
-	ServerReleaseVersion     string `json:"rhsm_server_release_version,omitempty"`
-	ActivationKey            string `json:"rhsm_activation_key,omitempty"`
-	OrgId                    string `json:"rhsm_org_id,omitempty"`
-	RhelServerReleaseVersion string `json:"rhsm_server_release_version,omitempty"`
+	ProxyHostname        string `json:"rhsm_server_proxy_hostname,omitempty"`
+	ProxyPort            string `json:"rhsm_server_proxy_port,omitempty"`
+	ServerHostname       string `json:"rhsm_server_hostname,omitempty"`
+	ServerReleaseVersion string `json:"rhsm_server_release_version,omitempty"`
+	ActivationKey        string `json:"rhsm_activation_key,omitempty"`
+	OrgId                string `json:"rhsm_org_id,omitempty"`
 }
 
 type ExtraOverridesConfig struct {
