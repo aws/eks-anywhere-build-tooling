@@ -1,5 +1,5 @@
 ## **replicatedhq/troubleshoot**
-![Version](https://img.shields.io/badge/version-v0.123.10-blue)
+![Version](https://img.shields.io/badge/version-v0.122.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiWlJsdnRmNnRYUjhUV20xaHJYTng2WXVlVXFBbHZPQnpnblh2bzFLYk1VUHAra2VpWFRFNWpMY0ovTC9PWnBBN2JEcDBXcjRSeVoxd3pyWWxQVzQzZFY4PSIsIml2UGFyYW1ldGVyU3BlYyI6IjZxRUdIK2N6TVZNNUdqL0oiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [troubleshoot](https://troubleshoot.sh/) is a kubectl plugin providing diagnostic tools for Kubernetes applications. It provides tools for collecting and analyzing cluster information including deployment statuses, cluster resources, and host logs. 
