@@ -189,9 +189,14 @@ func waitForPodLiveness(podDefinition *v1.Pod) error {
 				scheme = "http"
 			}
 
-			url := fmt.Sprintf("%s://%s:%d%s", scheme, livenessProbeHandler.Host, livenessProbeHandler.Port.IntVal, livenessProbeHandler.Path)
+			port, err := ResolveContainerPort(livenessProbeHandler.Port, &container)
+			if err != nil {
+				return errors.Wrap(err, "Error resolving liveness probe port")
+			}
+
+			url := fmt.Sprintf("%s://%s:%d%s", scheme, livenessProbeHandler.Host, port, livenessProbeHandler.Path)
 			fmt.Printf("Waiting for probe check on pod: %s\n", podDefinition.Name)
-			err := WaitFor200(url, 5*time.Minute)
+			err = WaitFor200(url, 5*time.Minute)
 			if err != nil {
 				return errors.Wrap(err, "Error waiting for 200 OK")
 			}
