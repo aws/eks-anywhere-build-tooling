@@ -1,7 +1,7 @@
-From 5f305253076f9bbef3b330af327819b379ca73f5 Mon Sep 17 00:00:00 2001
+From 243a455e72106a9e0ed18db5c7a78cae0bdfb4ff Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
-Subject: [PATCH 03/41] Unstacked etcd and controlplane upgrade
+Subject: [PATCH 03/37] Unstacked etcd and controlplane upgrade
 
 Rename controlplane upgrade annotation variable
 
@@ -43,29 +43,96 @@ controller from pausing/unpausing the KCP when etcdadm cluster is not
 ready. We make this behavior opt-out to maintain compatibility with
 previous clients that expect this orchestration by default.
 ---
- api/v1beta1/common_types.go                   |   7 +
+ .../kubeadm/v1beta1/condition_consts.go       |   8 +
+ .../v1beta2/kubeadm_control_plane_types.go    |   8 +
+ api/core/v1beta1/common_types.go              |   7 +
+ api/core/v1beta2/common_types.go              |   7 +
  controllers/external/util.go                  |  29 ++
- .../kubeadm/api/v1beta1/condition_consts.go   |   8 +
- .../internal/controllers/controller.go        | 115 ++++++--
- .../internal/controllers/controller_test.go   | 210 +++++++++++++-
+ .../internal/controllers/controller.go        | 119 ++++++--
+ .../internal/controllers/controller_test.go   | 214 ++++++++++++++-
  .../kubeadm/internal/workload_cluster.go      |   1 +
  .../kubeadm/internal/workload_cluster_etcd.go |   9 +
- internal/apis/core/v1alpha3/common_types.go   |   7 +
- .../apis/core/v1alpha3/condition_consts.go    |  10 +
- internal/apis/core/v1alpha4/common_types.go   |   7 +
- .../apis/core/v1alpha4/condition_consts.go    |  10 +
- .../controllers/cluster/cluster_controller.go |   6 +-
- .../cluster/cluster_controller_phases.go      | 105 +++----
+ internal/api/core/v1alpha3/common_types.go    |   7 +
+ .../api/core/v1alpha3/condition_consts.go     |  10 +
+ internal/api/core/v1alpha4/common_types.go    |   7 +
+ .../api/core/v1alpha4/condition_consts.go     |  10 +
+ .../controllers/cluster/cluster_controller.go |   2 +-
+ .../cluster/cluster_controller_phases.go      | 101 ++++---
  .../cluster/cluster_controller_test.go        | 256 ++++++++++++++++++
- internal/test/builder/etcd.go                 |  80 ++++++
  util/annotations/helpers.go                   |   5 +
- 16 files changed, 794 insertions(+), 71 deletions(-)
- create mode 100644 internal/test/builder/etcd.go
+ util/test/builder/builders.go                 |   7 +
+ util/test/builder/etcd.go                     |  80 ++++++
+ util/test/builder/zz_generated.deepcopy.go    |  23 ++
+ 20 files changed, 841 insertions(+), 69 deletions(-)
+ create mode 100644 util/test/builder/etcd.go
 
-diff --git a/api/v1beta1/common_types.go b/api/v1beta1/common_types.go
+diff --git a/api/controlplane/kubeadm/v1beta1/condition_consts.go b/api/controlplane/kubeadm/v1beta1/condition_consts.go
+index c460c3a80..30c775801 100644
+--- a/api/controlplane/kubeadm/v1beta1/condition_consts.go
++++ b/api/controlplane/kubeadm/v1beta1/condition_consts.go
+@@ -56,6 +56,14 @@ const (
+ 	// RollingUpdateInProgressReason (Severity=Warning) documents a KubeadmControlPlane object executing a
+ 	// rolling upgrade for aligning the machines spec to the desired state.
+ 	RollingUpdateInProgressReason = "RollingUpdateInProgress"
++
++	// ExternalEtcdEndpointsAvailable documents that the external etcd cluster's endpoints are available, and if KCP spec has changed
++	// then a KCP rollout can progress.
++	ExternalEtcdEndpointsAvailable clusterv1beta1.ConditionType = "ExternalEtcdEndpointsAvailable"
++
++	// ExternalEtcdUndergoingUpgrade (Severity=Info) documents the external etcd cluster being used by current KCP object is
++	// undergoing an upgrade and that the etcd endpoints will change once the upgrade completes
++	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
+ )
+ 
+ const (
+diff --git a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
+index 95aeb6a5f..acb926355 100644
+--- a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
++++ b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
+@@ -413,6 +413,14 @@ const (
+ 	// KubeadmControlPlaneMachineEtcdMemberDeletingReason surfaces when the machine hosting an etcd member
+ 	// is being deleted.
+ 	KubeadmControlPlaneMachineEtcdMemberDeletingReason = "Deleting"
++
++	// ExternalEtcdEndpointsAvailable documents that the external etcd cluster's endpoints are available, and if KCP spec has changed
++	// then a KCP rollout can progress.
++	ExternalEtcdEndpointsAvailable clusterv1.ConditionType = "ExternalEtcdEndpointsAvailable"
++
++	// ExternalEtcdUndergoingUpgrade (Severity=Info) documents the external etcd cluster being used by current KCP object is
++	// undergoing an upgrade and that the etcd endpoints will change once the upgrade completes
++	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
+ )
+ 
+ // KubeadmControlPlaneSpec defines the desired state of KubeadmControlPlane.
+diff --git a/api/core/v1beta1/common_types.go b/api/core/v1beta1/common_types.go
 index 2006bb88c..4b2e4ed71 100644
---- a/api/v1beta1/common_types.go
-+++ b/api/v1beta1/common_types.go
+--- a/api/core/v1beta1/common_types.go
++++ b/api/core/v1beta1/common_types.go
+@@ -171,6 +171,9 @@ const (
+ 	// will receive the resulting object.
+ 	TopologyDryRunAnnotation = "topology.cluster.x-k8s.io/dry-run"
+ 
++	// ControlPlaneUpgradeCompletedAnnotation is set by the controlplane on the external etcd object after controlplane upgrade is completed.
++	ControlPlaneUpgradeCompletedAnnotation = "controlplane.cluster.x-k8s.io/upgrade-complete"
++
+ 	// ReplicasManagedByAnnotation is an annotation that indicates external (non-Cluster API) management of infra scaling.
+ 	// The practical effect of this is that the capi "replica" count should be passively derived from the number of observed infra machines,
+ 	// instead of being a source of truth for eventual consistency.
+@@ -210,6 +213,10 @@ const (
+ 	// Note: While the upgrade is blocked changes made to the Cluster Topology will be delayed propagating to the underlying
+ 	// objects while the object is waiting for upgrade.
+ 	BeforeClusterUpgradeHookAnnotationPrefix = "before-upgrade.hook.cluster.cluster.x-k8s.io"
++
++	// SkipControlPlanePauseManagedEtcdAnnotation indicates that the cluster controller should not pause or unpause
++	// the control plane after the managed etcd cluster becomes not-ready/ready.
++	SkipControlPlanePauseManagedEtcdAnnotation = "cluster.x-k8s.io/skip-pause-cp-managed-etcd"
+ )
+ 
+ // MachineSetPreflightCheck defines a valid MachineSet preflight check.
+diff --git a/api/core/v1beta2/common_types.go b/api/core/v1beta2/common_types.go
+index 55c37a288..178b36488 100644
+--- a/api/core/v1beta2/common_types.go
++++ b/api/core/v1beta2/common_types.go
 @@ -171,6 +171,9 @@ const (
  	// will receive the resulting object.
  	TopologyDryRunAnnotation = "topology.cluster.x-k8s.io/dry-run"
@@ -88,10 +155,10 @@ index 2006bb88c..4b2e4ed71 100644
  
  // MachineSetPreflightCheck defines a valid MachineSet preflight check.
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index 40d80bfa7..0cf9a919a 100644
+index 509df4dbb..498ac139d 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
-@@ -267,3 +267,32 @@ func GetExternalEtcdEndpoints(externalEtcd *unstructured.Unstructured) (string,
+@@ -286,3 +286,32 @@ func GetExternalEtcdEndpoints(externalEtcd *unstructured.Unstructured) (string,
  
  	return endpoints, found, nil
  }
@@ -124,27 +191,8 @@ index 40d80bfa7..0cf9a919a 100644
 +	annotations[clusterv1.ControlPlaneUpgradeCompletedAnnotation] = "true"
 +	return unstructured.SetNestedStringMap(externalEtcd.UnstructuredContent(), annotations, "metadata", "annotations")
 +}
-diff --git a/controlplane/kubeadm/api/v1beta1/condition_consts.go b/controlplane/kubeadm/api/v1beta1/condition_consts.go
-index e9870d34c..adc1b2a0a 100644
---- a/controlplane/kubeadm/api/v1beta1/condition_consts.go
-+++ b/controlplane/kubeadm/api/v1beta1/condition_consts.go
-@@ -54,6 +54,14 @@ const (
- 	// RollingUpdateInProgressReason (Severity=Warning) documents a KubeadmControlPlane object executing a
- 	// rolling upgrade for aligning the machines spec to the desired state.
- 	RollingUpdateInProgressReason = "RollingUpdateInProgress"
-+
-+	// ExternalEtcdEndpointsAvailable documents that the external etcd cluster's endpoints are available, and if KCP spec has changed
-+	// then a KCP rollout can progress.
-+	ExternalEtcdEndpointsAvailable clusterv1.ConditionType = "ExternalEtcdEndpointsAvailable"
-+
-+	// ExternalEtcdUndergoingUpgrade (Severity=Info) documents the external etcd cluster being used by current KCP object is
-+	// undergoing an upgrade and that the etcd endpoints will change once the upgrade completes
-+	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
- )
- 
- const (
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index dee9cc267..2c7088ca9 100644
+index c9faf2091..bb729ee40 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -25,6 +25,7 @@ import (
@@ -153,14 +201,16 @@ index dee9cc267..2c7088ca9 100644
  	"github.com/blang/semver/v4"
 +	"github.com/go-logr/logr"
  	"github.com/pkg/errors"
+ 	"go.uber.org/zap"
  	corev1 "k8s.io/api/core/v1"
- 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-@@ -199,28 +200,12 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -200,29 +201,13 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+ 		log.Error(err, "Failed to configure the patch helper")
  		return ctrl.Result{Requeue: true}, nil
  	}
- 	if cluster.Spec.ManagedExternalEtcdRef != nil {
+-	if cluster.Spec.ManagedExternalEtcdRef != nil {
 -		etcdRef := cluster.Spec.ManagedExternalEtcdRef
--		externalEtcd, err := external.Get(ctx, r.Client, etcdRef, cluster.Namespace)
+-		externalEtcd, err := external.Get(ctx, r.Client, etcdRef)
++	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
 +		managedEtcdResult, err := r.updateManagedExternalEtcdEndpoints(ctx, log, patchHelper, cluster, kcp)
  		if err != nil {
  			return ctrl.Result{}, err
@@ -187,17 +237,17 @@ index dee9cc267..2c7088ca9 100644
  		}
  	}
  
-@@ -497,6 +482,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+@@ -510,6 +495,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
  		// NOTE: we are checking the condition already exists in order to avoid to set this condition at the first
  		// reconciliation/before a rolling upgrade actually starts.
- 		if conditions.Has(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition) {
-+			if conditions.IsFalse(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition) {
+ 		if v1beta1conditions.Has(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateV1Beta1Condition) {
++			if conditions.IsFalse(controlPlane.KCP, string(controlplanev1.MachinesSpecUpToDateV1Beta1Condition)) {
 +				/* Once KCP upgrade has completed, the controller will annotate the external etcd object to indicate that the older KCP machines
 +				are no longer part of the cluster, and so any older out-of-date etcd members and machines can be deleted
 +				*/
-+				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef != nil {
++				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
 +					etcdRef := controlPlane.Cluster.Spec.ManagedExternalEtcdRef
-+					externalEtcd, err := external.Get(ctx, r.Client, etcdRef)
++					externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, controlPlane.Cluster.Namespace)
 +					if err != nil {
 +						return ctrl.Result{}, err
 +					}
@@ -210,10 +260,19 @@ index dee9cc267..2c7088ca9 100644
 +					}
 +				}
 +			}
- 			conditions.MarkTrue(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateCondition)
+ 			v1beta1conditions.MarkTrue(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateV1Beta1Condition)
  		}
  	}
-@@ -1476,3 +1480,76 @@ func (r *KubeadmControlPlaneReconciler) ensureCertificatesOwnerRef(ctx context.C
+@@ -618,7 +622,7 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+ 		return ctrl.Result{}, err
+ 	}
+ 
+-	if controlPlane.Cluster.Spec.ManagedExternalEtcdRef != nil {
++	if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
+ 		for _, machine := range allMachines {
+ 			if util.IsEtcdMachine(machine) {
+ 				// remove external etcd-only machines from the "allMachines" collection so that the controlplane machines don't wait for etcd to be deleted first
+@@ -1484,3 +1488,76 @@ func (r *KubeadmControlPlaneReconciler) ensureCertificatesOwnerRef(ctx context.C
  	}
  	return nil
  }
@@ -221,12 +280,12 @@ index dee9cc267..2c7088ca9 100644
 +func (r *KubeadmControlPlaneReconciler) updateManagedExternalEtcdEndpoints(
 +	ctx context.Context, log logr.Logger, patchHelper *patch.Helper, cluster *clusterv1.Cluster, kcp *controlplanev1.KubeadmControlPlane,
 +) (ctrl.Result, error) {
-+	if kcp.Spec.KubeadmConfigSpec.ClusterConfiguration == nil || kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External == nil {
++	if !kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.IsDefined() || !kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.IsDefined() {
 +		return ctrl.Result{}, errors.New("invalid kcp, external etcd not configured for cluster with managed external etcd")
 +	}
 +
 +	etcdRef := cluster.Spec.ManagedExternalEtcdRef
-+	externalEtcd, err := external.Get(ctx, r.Client, etcdRef)
++	externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, cluster.Namespace)
 +	if err != nil {
 +		return ctrl.Result{}, err
 +	}
@@ -267,8 +326,8 @@ index dee9cc267..2c7088ca9 100644
 +		}
 +		if etcdUpgradeInProgress {
 +			log.Info("Etcd undergoing upgrade, marking etcd endpoints available condition as false, since new endpoints will be available only after etcd upgrade")
-+			if conditions.IsTrue(kcp, controlplanev1.ExternalEtcdEndpointsAvailable) || conditions.IsUnknown(kcp, controlplanev1.ExternalEtcdEndpointsAvailable) {
-+				conditions.MarkFalse(kcp, controlplanev1.ExternalEtcdEndpointsAvailable, controlplanev1.ExternalEtcdUndergoingUpgrade, clusterv1.ConditionSeverityInfo, "")
++			if conditions.IsTrue(kcp, string(controlplanev1.ExternalEtcdEndpointsAvailable)) || conditions.IsUnknown(kcp, string(controlplanev1.ExternalEtcdEndpointsAvailable)) {
++				v1beta1conditions.MarkFalse(kcp, controlplanev1.ExternalEtcdEndpointsAvailable, controlplanev1.ExternalEtcdUndergoingUpgrade, clusterv1.ConditionSeverityInfo, "")
 +				if err := patchKubeadmControlPlane(ctx, patchHelper, kcp); err != nil {
 +					return ctrl.Result{}, err
 +				}
@@ -281,8 +340,8 @@ index dee9cc267..2c7088ca9 100644
 +			return ctrl.Result{}, err
 +		}
 +	}
-+	if conditions.IsFalse(kcp, controlplanev1.ExternalEtcdEndpointsAvailable) {
-+		conditions.MarkTrue(kcp, controlplanev1.ExternalEtcdEndpointsAvailable)
++	if conditions.IsFalse(kcp, string(controlplanev1.ExternalEtcdEndpointsAvailable)) {
++		v1beta1conditions.MarkTrue(kcp, controlplanev1.ExternalEtcdEndpointsAvailable)
 +	}
 +	return ctrl.Result{}, nil
 +}
@@ -291,7 +350,7 @@ index dee9cc267..2c7088ca9 100644
 +	return len(endpoints) == 0 || len(endpoints) == 1 && endpoints[0] == ""
 +}
 diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
-index b0478ba89..ec0da15c8 100644
+index 4f2f82002..ea598f3c7 100644
 --- a/controlplane/kubeadm/internal/controllers/controller_test.go
 +++ b/controlplane/kubeadm/internal/controllers/controller_test.go
 @@ -25,6 +25,7 @@ import (
@@ -302,7 +361,7 @@ index b0478ba89..ec0da15c8 100644
  	"sync"
  	"testing"
  	"time"
-@@ -60,6 +61,7 @@ import (
+@@ -58,6 +59,7 @@ import (
  	"sigs.k8s.io/cluster-api/internal/util/ssa"
  	"sigs.k8s.io/cluster-api/internal/webhooks"
  	"sigs.k8s.io/cluster-api/util"
@@ -310,7 +369,7 @@ index b0478ba89..ec0da15c8 100644
  	"sigs.k8s.io/cluster-api/util/certs"
  	"sigs.k8s.io/cluster-api/util/collections"
  	"sigs.k8s.io/cluster-api/util/conditions"
-@@ -3129,9 +3131,9 @@ func TestKubeadmControlPlaneReconciler_reconcilePreTerminateHook(t *testing.T) {
+@@ -3308,9 +3310,9 @@ func TestKubeadmControlPlaneReconciler_reconcilePreTerminateHook(t *testing.T) {
  				Client: fakeClient,
  			}
  
@@ -322,7 +381,7 @@ index b0478ba89..ec0da15c8 100644
  			})
  
  			res, err := r.reconcilePreTerminateHook(ctx, tt.controlPlane)
-@@ -3695,6 +3697,210 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
+@@ -3872,6 +3874,214 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
  	})
  }
  
@@ -334,9 +393,13 @@ index b0478ba89..ec0da15c8 100644
 +		unstructured.SetNestedField(managedEtcd.Object, true, "status", "ready")
 +		unstructured.SetNestedField(managedEtcd.Object, strings.Join(endpoints, ","), "status", "endpoints")
 +		cluster, kcp, _ := createClusterWithControlPlane(ns)
-+		cluster.Spec.ManagedExternalEtcdRef = external.GetObjectReference(managedEtcd)
-+		kcp.Spec.KubeadmConfigSpec.ClusterConfiguration = &bootstrapv1.ClusterConfiguration{
-+			Etcd: bootstrapv1.Etcd{External: &bootstrapv1.ExternalEtcd{}},
++		cluster.Spec.ManagedExternalEtcdRef = clusterv1.ContractVersionedObjectReference{
++			APIGroup: managedEtcd.GroupVersionKind().Group,
++			Kind:     managedEtcd.GetKind(),
++			Name:     managedEtcd.GetName(),
++		}
++		kcp.Spec.KubeadmConfigSpec.ClusterConfiguration = bootstrapv1.ClusterConfiguration{
++			Etcd: bootstrapv1.Etcd{External: bootstrapv1.ExternalEtcd{}},
 +		}
 +
 +		return cluster, kcp, managedEtcd
@@ -344,7 +407,7 @@ index b0478ba89..ec0da15c8 100644
 +	t.Run("should update the endpoints in the kcp", func(t *testing.T) {
 +		g := NewWithT(t)
 +		cluster, kcp, managedEtcd := setup()
-+		conditions.MarkFalse(kcp, controlplanev1.ExternalEtcdEndpointsAvailable, "", "", "")
++		v1beta1conditions.MarkFalse(kcp, controlplanev1.ExternalEtcdEndpointsAvailable, "", "", "")
 +
 +		fClient := newFakeClient(
 +			builder.GenericEtcdCRD.DeepCopy(),
@@ -374,7 +437,7 @@ index b0478ba89..ec0da15c8 100644
 +			g.Expect(
 +				cp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints,
 +			).To(Equal([]string{"0.0.0.0", "1.1.1.1", "2.2.2.2"}))
-+			conditions.IsTrue(kcp, controlplanev1.ExternalEtcdEndpointsAvailable)
++			conditions.IsTrue(kcp, string(controlplanev1.ExternalEtcdEndpointsAvailable))
 +		}, 5*time.Second).Should(Succeed())
 +	})
 +
@@ -525,7 +588,7 @@ index b0478ba89..ec0da15c8 100644
 +			g.Expect(
 +				cp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.External.Endpoints,
 +			).To(Equal([]string{"0.0.0.0", "1.1.1.1", "3.3.3.3"}))
-+			conditions.IsFalse(cp, controlplanev1.ExternalEtcdEndpointsAvailable)
++			conditions.IsFalse(cp, string(controlplanev1.ExternalEtcdEndpointsAvailable))
 +		}, 5*time.Second).Should(Succeed())
 +	})
 +}
@@ -534,19 +597,19 @@ index b0478ba89..ec0da15c8 100644
  	c := &clusterv1.Cluster{
  		ObjectMeta: metav1.ObjectMeta{
 diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
-index 048df78ff..d0ec93fa3 100644
+index 80d497b90..2533b7731 100644
 --- a/controlplane/kubeadm/internal/workload_cluster.go
 +++ b/controlplane/kubeadm/internal/workload_cluster.go
-@@ -104,6 +104,7 @@ type WorkloadCluster interface {
+@@ -90,6 +90,7 @@ type WorkloadCluster interface {
  	UpdateImageRepositoryInKubeadmConfigMap(imageRepository string) func(*bootstrapv1.ClusterConfiguration)
  	UpdateFeatureGatesInKubeadmConfigMap(kubeadmConfigSpec bootstrapv1.KubeadmConfigSpec, kubernetesVersion semver.Version) func(*bootstrapv1.ClusterConfiguration)
- 	UpdateEtcdLocalInKubeadmConfigMap(localEtcd *bootstrapv1.LocalEtcd) func(*bootstrapv1.ClusterConfiguration)
+ 	UpdateEtcdLocalInKubeadmConfigMap(localEtcd bootstrapv1.LocalEtcd) func(*bootstrapv1.ClusterConfiguration)
 +	UpdateExternalEtcdEndpointsInKubeadmConfigMap(ctx context.Context, endpoints []string, version semver.Version) error
- 	UpdateEtcdExternalInKubeadmConfigMap(externalEtcd *bootstrapv1.ExternalEtcd) func(*bootstrapv1.ClusterConfiguration)
+ 	UpdateEtcdExternalInKubeadmConfigMap(externalEtcd bootstrapv1.ExternalEtcd) func(*bootstrapv1.ClusterConfiguration)
  	UpdateAPIServerInKubeadmConfigMap(apiServer bootstrapv1.APIServer) func(*bootstrapv1.ClusterConfiguration)
- 	UpdateControllerManagerInKubeadmConfigMap(controllerManager bootstrapv1.ControlPlaneComponent) func(*bootstrapv1.ClusterConfiguration)
+ 	UpdateControllerManagerInKubeadmConfigMap(controllerManager bootstrapv1.ControllerManager) func(*bootstrapv1.ClusterConfiguration)
 diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd.go b/controlplane/kubeadm/internal/workload_cluster_etcd.go
-index 35bc3e51d..601a0ea88 100644
+index 66adc4e26..6eee63e9c 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_etcd.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_etcd.go
 @@ -19,6 +19,7 @@ package internal
@@ -557,7 +620,7 @@ index 35bc3e51d..601a0ea88 100644
  	"github.com/pkg/errors"
  	kerrors "k8s.io/apimachinery/pkg/util/errors"
  
-@@ -83,6 +84,14 @@ func (w *Workload) UpdateEtcdExternalInKubeadmConfigMap(etcdExternal *bootstrapv
+@@ -83,6 +84,14 @@ func (w *Workload) UpdateEtcdExternalInKubeadmConfigMap(etcdExternal bootstrapv1
  	}
  }
  
@@ -572,10 +635,10 @@ index 35bc3e51d..601a0ea88 100644
  // RemoveEtcdMemberForMachine removes the etcd member from the target cluster's etcd cluster.
  // Removing the last remaining member of the cluster is not supported.
  func (w *Workload) RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error {
-diff --git a/internal/apis/core/v1alpha3/common_types.go b/internal/apis/core/v1alpha3/common_types.go
+diff --git a/internal/api/core/v1alpha3/common_types.go b/internal/api/core/v1alpha3/common_types.go
 index a4f921cdf..689da5808 100644
---- a/internal/apis/core/v1alpha3/common_types.go
-+++ b/internal/apis/core/v1alpha3/common_types.go
+--- a/internal/api/core/v1alpha3/common_types.go
++++ b/internal/api/core/v1alpha3/common_types.go
 @@ -70,6 +70,13 @@ const (
  
  	// ClusterSecretType defines the type of secret created by core components.
@@ -590,10 +653,10 @@ index a4f921cdf..689da5808 100644
  )
  
  // MachineAddressType describes a valid MachineAddress type.
-diff --git a/internal/apis/core/v1alpha3/condition_consts.go b/internal/apis/core/v1alpha3/condition_consts.go
+diff --git a/internal/api/core/v1alpha3/condition_consts.go b/internal/api/core/v1alpha3/condition_consts.go
 index c9fd9e27e..868500943 100644
---- a/internal/apis/core/v1alpha3/condition_consts.go
-+++ b/internal/apis/core/v1alpha3/condition_consts.go
+--- a/internal/api/core/v1alpha3/condition_consts.go
++++ b/internal/api/core/v1alpha3/condition_consts.go
 @@ -200,3 +200,13 @@ const (
  	// EtcdHealthCheckFailedReason (Severity=Error) documents that healthcheck on an etcd member failed
  	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
@@ -608,10 +671,10 @@ index c9fd9e27e..868500943 100644
 +	// undergoing an upgrade and that the etcd endpoints will change once the upgrade completes
 +	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
 +)
-diff --git a/internal/apis/core/v1alpha4/common_types.go b/internal/apis/core/v1alpha4/common_types.go
+diff --git a/internal/api/core/v1alpha4/common_types.go b/internal/api/core/v1alpha4/common_types.go
 index e623c118c..86b5fc728 100644
---- a/internal/apis/core/v1alpha4/common_types.go
-+++ b/internal/apis/core/v1alpha4/common_types.go
+--- a/internal/api/core/v1alpha4/common_types.go
++++ b/internal/api/core/v1alpha4/common_types.go
 @@ -104,6 +104,13 @@ const (
  	// An external controller must fulfill the contract of the InfraCluster resource.
  	// External infrastructure providers should ensure that the annotation, once set, cannot be removed.
@@ -626,10 +689,10 @@ index e623c118c..86b5fc728 100644
  )
  
  const (
-diff --git a/internal/apis/core/v1alpha4/condition_consts.go b/internal/apis/core/v1alpha4/condition_consts.go
+diff --git a/internal/api/core/v1alpha4/condition_consts.go b/internal/api/core/v1alpha4/condition_consts.go
 index 317d6cad5..021cd9ede 100644
---- a/internal/apis/core/v1alpha4/condition_consts.go
-+++ b/internal/apis/core/v1alpha4/condition_consts.go
+--- a/internal/api/core/v1alpha4/condition_consts.go
++++ b/internal/api/core/v1alpha4/condition_consts.go
 @@ -267,3 +267,13 @@ const (
  	// EtcdHealthCheckFailedReason (Severity=Error) documents that healthcheck on an etcd member failed
  	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
@@ -645,10 +708,10 @@ index 317d6cad5..021cd9ede 100644
 +	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
 +)
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index ff1e2dd48..4fdfe4fb2 100644
+index 6afbcb58a..c66857819 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
-@@ -228,6 +228,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -208,6 +208,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  
  	alwaysReconcile := []clusterReconcileFunc{
  		r.reconcileInfrastructure,
@@ -656,54 +719,36 @@ index ff1e2dd48..4fdfe4fb2 100644
  		r.reconcileControlPlane,
  		r.getDescendants,
  	}
-@@ -255,7 +256,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -235,7 +236,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
- 		r.reconcileControlPlaneInitialized,
+ 		r.reconcileV1Beta1ControlPlaneInitialized,
 -		r.reconcileEtcdCluster,
  	)
  	return doReconcile(ctx, reconcileNormal, s)
  }
-@@ -481,7 +481,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
- 		}
- 	}
- 	if cluster.Spec.ManagedExternalEtcdRef != nil {
--		obj, err := external.Get(ctx, r.Client, cluster.Spec.ManagedExternalEtcdRef, cluster.Namespace)
-+		obj, err := external.Get(ctx, r.Client, cluster.Spec.ManagedExternalEtcdRef)
- 		switch {
- 		case apierrors.IsNotFound(errors.Cause(err)):
- 			// Etcd cluster has been deleted
-@@ -723,7 +723,7 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
- 		toObjectList(c.workerMachines),
- 	}
- 	if cluster.Spec.ManagedExternalEtcdRef != nil {
--		lists = append(lists, &c.etcdMachines)
-+		lists = append(lists, toObjectList(c.etcdMachines))
- 	}
- 	if feature.Gates.Enabled(feature.MachinePool) {
- 		lists = append([]client.ObjectList{&c.machinePools}, lists...)
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index f2ac66160..644d3e385 100644
+index 81a83b43b..6a383cc1d 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
-@@ -21,6 +21,7 @@ import (
- 	"fmt"
+@@ -22,6 +22,7 @@ import (
+ 	"strings"
  	"time"
  
 +	"github.com/go-logr/logr"
  	"github.com/pkg/errors"
  	corev1 "k8s.io/api/core/v1"
  	apierrors "k8s.io/apimachinery/pkg/api/errors"
-@@ -262,35 +263,10 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
+@@ -251,35 +252,10 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
  	}
  
- 	if cluster.Spec.ManagedExternalEtcdRef != nil {
+ 	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
 -		// check if the referenced etcd cluster is ready or not
 -		etcdRef := cluster.Spec.ManagedExternalEtcdRef
--		externalEtcd, err := external.Get(ctx, r.Client, etcdRef)
+-		externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, cluster.Namespace)
 -		if err != nil {
 -			if apierrors.IsNotFound(errors.Cause(err)) {
--				log.Info("Could not find external object for cluster, requeuing", "refGroupVersionKind", etcdRef.GroupVersionKind(), "refName", etcdRef.Name)
+-				log.Info("Could not find external object for cluster, requeuing", "refGroupVersionKind", etcdRef.GroupKind(), "refName", etcdRef.Name)
 -				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 -			}
 -			return ctrl.Result{}, err
@@ -715,10 +760,10 @@ index f2ac66160..644d3e385 100644
 -		}
 -		if !externalEtcdReady {
 -			// External Etcd Cluster has not been created, pause control plane provisioning by setting the paused annotation on the Control plane object
--			controlPlane, err := external.Get(ctx, r.Client, cluster.Spec.ControlPlaneRef)
+-			controlPlane, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, cluster.Spec.ControlPlaneRef, cluster.Namespace)
 -			if err != nil {
 -				if apierrors.IsNotFound(errors.Cause(err)) {
--					log.Info("Could not find control plane for cluster, requeuing", "refGroupVersionKind", cluster.Spec.ControlPlaneRef.GroupVersionKind(), "refName", cluster.Spec.ControlPlaneRef.Name)
+-					log.Info("Could not find control plane for cluster, requeuing", "refGroupVersionKind", cluster.Spec.ControlPlaneRef.GroupKind(), "refName", cluster.Spec.ControlPlaneRef.Name)
 -					return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 -				}
 -				return ctrl.Result{}, err
@@ -733,20 +778,18 @@ index f2ac66160..644d3e385 100644
  		}
  	}
  
-@@ -377,9 +353,61 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
+@@ -376,6 +352,58 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
  	return ctrl.Result{}, nil
  }
  
--func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv1.Cluster) (ctrl.Result, error) {
--	log := ctrl.LoggerFrom(ctx)
 +// handlePauseControlPlaneWithExternalManagedEtcd pauses or unpauses the control plane through the pause
 +// annotation based on the readiness of the external managed etcd (not-ready -> pause or ready -> unpause)
 +func (r *Reconciler) handlePauseControlPlaneWithExternalManagedEtcd(ctx context.Context, log logr.Logger, s *scope) (ctrl.Result, error) {
 +	cluster := s.cluster
-+	controlPlane, err := external.Get(ctx, r.Client, cluster.Spec.ControlPlaneRef)
++	controlPlane, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, cluster.Spec.ControlPlaneRef, cluster.Namespace)
 +	if apierrors.IsNotFound(errors.Cause(err)) {
 +		log.Info("Could not find control plane object for cluster, requeuing", "refGroupVersionKind",
-+			cluster.Spec.ControlPlaneRef.GroupVersionKind(), "refName", cluster.Spec.ControlPlaneRef.Name,
++			cluster.Spec.ControlPlaneRef.GroupKind(), "refName", cluster.Spec.ControlPlaneRef.Name,
 +		)
 +		s.controlPlane = nil
 +		s.controlPlaneIsNotFound = true
@@ -762,15 +805,15 @@ index f2ac66160..644d3e385 100644
 +	}
 +
 +	etcdRef := cluster.Spec.ManagedExternalEtcdRef
-+	externalEtcd, err := external.Get(ctx, r.Client, etcdRef)
++	externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, cluster.Namespace)
 +	if err != nil {
 +		if apierrors.IsNotFound(errors.Cause(err)) {
-+			log.Info("Could not find external object for cluster, requeuing", "refGroupVersionKind", etcdRef.GroupVersionKind(), "refName", etcdRef.Name)
++			log.Info("Could not find external object for cluster, requeuing", "refGroupVersionKind", etcdRef.GroupKind(), "refName", etcdRef.Name)
 +			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 +		}
 +		return ctrl.Result{}, err
 +	}
- 
++
 +	externalEtcdReady, err := external.IsReady(externalEtcd)
 +	if err != nil {
 +		return ctrl.Result{}, err
@@ -791,22 +834,19 @@ index f2ac66160..644d3e385 100644
 +	return ctrl.Result{}, nil
 +}
 +
-+func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, s *scope) (ctrl.Result, error) {
-+	log := ctrl.LoggerFrom(ctx)
-+	cluster := s.cluster
- 	if cluster.Spec.ManagedExternalEtcdRef == nil {
- 		return ctrl.Result{}, nil
- 	}
-@@ -408,23 +436,6 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, cluster *clusterv
+ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, s *scope) (ctrl.Result, error) {
+ 	log := ctrl.LoggerFrom(ctx)
+ 	cluster := s.cluster
+@@ -408,23 +436,6 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, s *scope) (ctrl.R
  	}
  	cluster.Status.ManagedExternalEtcdReady = ready
  
 -	if ready {
 -		// resume control plane
--		controlPlane, err := external.Get(ctx, r.Client, cluster.Spec.ControlPlaneRef)
+-		controlPlane, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, cluster.Spec.ControlPlaneRef, cluster.Namespace)
 -		if err != nil {
 -			if apierrors.IsNotFound(errors.Cause(err)) {
--				log.Info("Could not find control plane for cluster, requeuing", "refGroupVersionKind", cluster.Spec.ControlPlaneRef.GroupVersionKind(), "refName", cluster.Spec.ControlPlaneRef.Name)
+-				log.Info("Could not find control plane for cluster, requeuing", "refGroupVersionKind", cluster.Spec.ControlPlaneRef.GroupKind(), "refName", cluster.Spec.ControlPlaneRef.Name)
 -				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 -			}
 -			return ctrl.Result{}, err
@@ -819,10 +859,10 @@ index f2ac66160..644d3e385 100644
 -	}
 -
  	// Report a summary of current status of the etcd cluster object defined for this cluster.
- 	conditions.SetMirror(cluster, clusterv1.ManagedExternalEtcdClusterReadyCondition,
- 		conditions.UnstructuredGetter(etcdPlaneConfig),
+ 	v1beta1conditions.SetMirror(cluster, clusterv1.ManagedExternalEtcdClusterReadyCondition,
+ 		v1beta1conditions.UnstructuredGetter(etcdPlaneConfig),
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 2ccec4d4a..193a918c0 100644
+index 847023481..a627b9f97 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
 @@ -18,23 +18,28 @@ package cluster
@@ -845,18 +885,18 @@ index 2ccec4d4a..193a918c0 100644
 +	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 +	"sigs.k8s.io/controller-runtime/pkg/reconcile"
  
- 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
- 	expv1 "sigs.k8s.io/cluster-api/exp/api/v1beta1"
- 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1alpha1"
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+ 	runtimev1 "sigs.k8s.io/cluster-api/api/runtime/v1beta2"
  	"sigs.k8s.io/cluster-api/feature"
+ 	"sigs.k8s.io/cluster-api/internal/contract"
  	"sigs.k8s.io/cluster-api/util"
 +	"sigs.k8s.io/cluster-api/util/annotations"
  	"sigs.k8s.io/cluster-api/util/collections"
  	"sigs.k8s.io/cluster-api/util/conditions"
- 	v1beta2conditions "sigs.k8s.io/cluster-api/util/conditions/v1beta2"
-@@ -1060,3 +1065,254 @@ func TestReconcileControlPlaneInitializedControlPlaneRef(t *testing.T) {
+ 	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
+@@ -1131,3 +1136,254 @@ func TestReconcileV1Beta1ControlPlaneInitializedControlPlaneRef(t *testing.T) {
  	g.Expect(err).ToNot(HaveOccurred())
- 	g.Expect(conditions.Has(c, clusterv1.ControlPlaneInitializedCondition)).To(BeFalse())
+ 	g.Expect(v1beta1conditions.Has(c, clusterv1.ControlPlaneInitializedV1Beta1Condition)).To(BeFalse())
  }
 +
 +func TestReconcileWithManagedEtcd(t *testing.T) {
@@ -1109,11 +1149,52 @@ index 2ccec4d4a..193a918c0 100644
 +		g.Expect(err).NotTo(HaveOccurred())
 +	})
 +}
-diff --git a/internal/test/builder/etcd.go b/internal/test/builder/etcd.go
+diff --git a/util/annotations/helpers.go b/util/annotations/helpers.go
+index c378fa298..1a71cfee4 100644
+--- a/util/annotations/helpers.go
++++ b/util/annotations/helpers.go
+@@ -120,6 +120,11 @@ func GetManagedAnnotations(m *clusterv1.Machine, additionalSyncMachineAnnotation
+ 	return managedAnnotations
+ }
+ 
++// HasAnnotation returns true if the object has the specified annotation.
++func HasAnnotation(o metav1.Object, annotation string) bool {
++	return hasAnnotation(o, annotation)
++}
++
+ // hasAnnotation returns true if the object has the specified annotation.
+ func hasAnnotation(o metav1.Object, annotation string) bool {
+ 	annotations := o.GetAnnotations()
+diff --git a/util/test/builder/builders.go b/util/test/builder/builders.go
+index 042b97511..61ed45ce7 100644
+--- a/util/test/builder/builders.go
++++ b/util/test/builder/builders.go
+@@ -40,6 +40,7 @@ type ClusterBuilder struct {
+ 	infrastructureCluster *unstructured.Unstructured
+ 	controlPlane          *unstructured.Unstructured
+ 	network               clusterv1.ClusterNetwork
++	etcd                  *unstructured.Unstructured
+ }
+ 
+ // Cluster returns a ClusterBuilder with the given name and namespace.
+@@ -80,6 +81,12 @@ func (c *ClusterBuilder) WithControlPlane(t *unstructured.Unstructured) *Cluster
+ 	return c
+ }
+ 
++// WithManagedEtcd adds the passed etcd to the ClusterBuilder.
++func (c *ClusterBuilder) WithManagedEtcd(t *unstructured.Unstructured) *ClusterBuilder {
++	c.etcd = t
++	return c
++}
++
+ // WithTopology adds the passed Topology object to the ClusterBuilder.
+ func (c *ClusterBuilder) WithTopology(topology *clusterv1.Topology) *ClusterBuilder {
+ 	c.topology = topology
+diff --git a/util/test/builder/etcd.go b/util/test/builder/etcd.go
 new file mode 100644
 index 000000000..9c187575f
 --- /dev/null
-+++ b/internal/test/builder/etcd.go
++++ b/util/test/builder/etcd.go
 @@ -0,0 +1,80 @@
 +/*
 +Copyright 2021 The Kubernetes Authors.
@@ -1195,22 +1276,47 @@ index 000000000..9c187575f
 +func (c *EtcdPlaneBuilder) Build() *unstructured.Unstructured {
 +	return c.obj
 +}
-diff --git a/util/annotations/helpers.go b/util/annotations/helpers.go
-index 964609ac9..49bc263bc 100644
---- a/util/annotations/helpers.go
-+++ b/util/annotations/helpers.go
-@@ -119,6 +119,11 @@ func GetManagedAnnotations(m *clusterv1.Machine, additionalSyncMachineAnnotation
- 	return managedAnnotations
+diff --git a/util/test/builder/zz_generated.deepcopy.go b/util/test/builder/zz_generated.deepcopy.go
+index 426f5dcbb..d69fdd82c 100644
+--- a/util/test/builder/zz_generated.deepcopy.go
++++ b/util/test/builder/zz_generated.deepcopy.go
+@@ -96,6 +96,10 @@ func (in *ClusterBuilder) DeepCopyInto(out *ClusterBuilder) {
+ 		*out = (*in).DeepCopy()
+ 	}
+ 	in.network.DeepCopyInto(&out.network)
++	if in.etcd != nil {
++		in, out := &in.etcd, &out.etcd
++		*out = (*in).DeepCopy()
++	}
  }
  
-+// HasAnnotation returns true if the object has the specified annotation.
-+func HasAnnotation(o metav1.Object, annotation string) bool {
-+	return hasAnnotation(o, annotation)
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterBuilder.
+@@ -282,6 +286,25 @@ func (in *ControlPlaneTemplateBuilder) DeepCopy() *ControlPlaneTemplateBuilder {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *EtcdPlaneBuilder) DeepCopyInto(out *EtcdPlaneBuilder) {
++	*out = *in
++	if in.obj != nil {
++		in, out := &in.obj, &out.obj
++		*out = (*in).DeepCopy()
++	}
 +}
 +
- // hasAnnotation returns true if the object has the specified annotation.
- func hasAnnotation(o metav1.Object, annotation string) bool {
- 	annotations := o.GetAnnotations()
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new EtcdPlaneBuilder.
++func (in *EtcdPlaneBuilder) DeepCopy() *EtcdPlaneBuilder {
++	if in == nil {
++		return nil
++	}
++	out := new(EtcdPlaneBuilder)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *InfrastructureClusterBuilder) DeepCopyInto(out *InfrastructureClusterBuilder) {
+ 	*out = *in
 -- 
-2.49.0
+2.50.1 (Apple Git-155)
 

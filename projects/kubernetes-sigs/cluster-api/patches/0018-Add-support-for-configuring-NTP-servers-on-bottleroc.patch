@@ -1,0 +1,193 @@
+From 8c469c97bc514b35111e80552581a31896a68734 Mon Sep 17 00:00:00 2001
+From: Abhinav <abhinavmpandey08@gmail.com>
+Date: Wed, 1 Feb 2023 16:34:23 -0800
+Subject: [PATCH 18/37] Add support for configuring NTP servers on bottlerocket
+ through CAPI
+
+Signed-off-by: Abhinav <abhinavmpandey08@gmail.com>
+---
+ .../internal/bottlerocket/bootstrap.go        | 10 +++++
+ .../internal/bottlerocket/bootstrap_test.go   | 43 ++++++++++++-------
+ .../internal/bottlerocket/bottlerocket.go     | 11 ++++-
+ .../controllers/kubeadmconfig_controller.go   |  9 ++++
+ 4 files changed, 57 insertions(+), 16 deletions(-)
+
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index 5e8573f09..384328c43 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -96,6 +96,12 @@ password = "{{.RegistryMirrorPassword}}"
+ [settings.kubernetes.node-taints]
+ {{.Taints}}
+ {{- end -}}
++`
++
++	ntpTemplate = `{{ define "ntpSettings" -}}
++[settings.ntp]
++time-servers = [{{stringsJoin .NTPServers ", " }}]
++{{- end -}}
+ `
+ 
+ 	bottlerocketNodeInitSettingsTemplate = `{{template "hostContainerSlice" .}}
+@@ -129,5 +135,9 @@ password = "{{.RegistryMirrorPassword}}"
+ {{- if (ne .Taints "")}}
+ {{template "taintsTemplate" .}}
+ {{- end -}}
++
++{{- if .NTPServers}}
++{{template "ntpSettings" .}}
++{{- end -}}
+ `
+ )
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+index 49c294436..d50b96761 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+@@ -40,10 +40,20 @@ no-proxy = []
+ [settings.pki.registry-mirror-ca]
+ data = "REGISTRYCA"
+ trusted=true
++[[settings.container-registry.credentials]]
++registry = "public.ecr.aws"
++username = "admin"
++password = "pass"
++[[settings.container-registry.credentials]]
++registry = "REGISTRYENDPOINT"
++username = "admin"
++password = "pass"
+ [settings.kubernetes.node-labels]
+ KEY=VAR
+ [settings.kubernetes.node-taints]
+-KEY=VAR`
++KEY=VAR
++[settings.ntp]
++time-servers = ["1.2.3.4", "time-a.capi.com", "time-b.capi.com"]`
+ 
+ const userDataNoAdminImage = `
+ [settings.host-containers.admin]
+@@ -99,24 +109,27 @@ func TestGenerateUserData(t *testing.T) {
+ 				NodeLabels:             "KEY=VAR",
+ 				Taints:                 "KEY=VAR",
+ 				ProviderId:             "PROVIDERID",
++				RegistryMirrorUsername: "admin",
++				RegistryMirrorPassword: "pass",
++				NTPServers: []string{
++					"\"1.2.3.4\"",
++					"\"time-a.capi.com\"",
++					"\"time-b.capi.com\"",
++				},
+ 				HostContainers: []bootstrapv1.BottlerocketHostContainer{
+ 					{
+-						Name:         "admin",
+-						Superpowered: true,
+-						ImageMeta: bootstrapv1.ImageMeta{
+-							ImageRepository: "REPO",
+-							ImageTag:        "TAG",
+-						},
+-						UserData: "B64USERDATA",
++						Name:            "admin",
++						Superpowered:    true,
++						ImageRepository: "REPO",
++						ImageTag:        "TAG",
++						UserData:        "B64USERDATA",
+ 					},
+ 					{
+-						Name:         "kubeadm-bootstrap",
+-						Superpowered: true,
+-						ImageMeta: bootstrapv1.ImageMeta{
+-							ImageRepository: "REPO",
+-							ImageTag:        "TAG",
+-						},
+-						UserData: "B64USERDATA",
++						Name:            "kubeadm-bootstrap",
++						Superpowered:    true,
++						ImageRepository: "REPO",
++						ImageTag:        "TAG",
++						UserData:        "B64USERDATA",
+ 					},
+ 				},
+ 				BootstrapContainers: []bootstrapv1.BottlerocketBootstrapContainer{
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 918216064..0eae347b7 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -33,6 +33,7 @@ type BottlerocketConfig struct {
+ 	Taints                                []corev1.Taint
+ 	BottlerocketCustomHostContainers      []bootstrapv1.BottlerocketHostContainer
+ 	BottlerocketCustomBootstrapContainers []bootstrapv1.BottlerocketBootstrapContainer
++	NTPServers                            []string
+ 	RegistryMirrorCredentials
+ }
+ 
+@@ -49,6 +50,7 @@ type BottlerocketSettingsInput struct {
+ 	RegistryMirrorUsername     string
+ 	RegistryMirrorPassword     string
+ 	NodeLabels                 string
++	NTPServers                 []string
+ 	Taints                     string
+ 	ProviderId                 string
+ 	HostContainers             []bootstrapv1.BottlerocketHostContainer
+@@ -145,6 +147,9 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ 	if _, err := tm.Parse(taintsTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse taints %s template", kind)
+ 	}
++	if _, err := tm.Parse(ntpTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse NTP %s template", kind)
++	}
+ 	t, err := tm.Parse(tpl)
+ 	if err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
+@@ -222,11 +227,15 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 	if config.RegistryMirrorConfiguration.CACert != "" {
+ 		bottlerocketInput.RegistryMirrorCACert = base64.StdEncoding.EncodeToString([]byte(config.RegistryMirrorConfiguration.CACert))
+ 	}
+-
+ 	if config.RegistryMirrorCredentials.Username != "" && config.RegistryMirrorCredentials.Password != "" {
+ 		bottlerocketInput.RegistryMirrorUsername = config.RegistryMirrorCredentials.Username
+ 		bottlerocketInput.RegistryMirrorPassword = config.RegistryMirrorCredentials.Password
+ 	}
++	if len(config.NTPServers) > 0 {
++		for _, ntp := range config.NTPServers {
++			bottlerocketInput.NTPServers = append(bottlerocketInput.NTPServers, strconv.Quote(ntp))
++		}
++	}
+ 
+ 	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
+ 	if err != nil {
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 07028e019..58b1bfe5f 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -594,6 +594,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
+ 			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
+ 		}
++		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
++			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
+@@ -907,6 +910,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
+ 			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
+ 		}
++		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
++			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+@@ -1101,6 +1107,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
+ 			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
+ 		}
++		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
++			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
+-- 
+2.50.1 (Apple Git-155)
+
