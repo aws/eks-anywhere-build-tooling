@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	kubecmd "k8s.io/client-go/tools/clientcmd"
 	kubecmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/yaml"
@@ -54,4 +55,25 @@ func UnmarshalPodDefinition(podDef []byte) (*v1.Pod, error) {
 		return nil, errors.Wrap(err, "Error getting unmarshalling pod spec into structs")
 	}
 	return &pod, nil
+}
+
+// ResolveContainerPort resolves an IntOrString port to an int32 port number.
+// For numeric ports (Type == Int), it returns IntVal directly.
+// For named ports (Type == String), it searches the container's Ports list
+// for a matching name and returns the corresponding ContainerPort.
+func ResolveContainerPort(port intstr.IntOrString, container *v1.Container) (int32, error) {
+	switch port.Type {
+	case intstr.Int:
+		return port.IntVal, nil
+	case intstr.String:
+		portName := port.StrVal
+		for _, p := range container.Ports {
+			if p.Name == portName {
+				return p.ContainerPort, nil
+			}
+		}
+		return 0, fmt.Errorf("named port %q not found in container ports", portName)
+	default:
+		return 0, fmt.Errorf("invalid IntOrString type: %v", port.Type)
+	}
 }

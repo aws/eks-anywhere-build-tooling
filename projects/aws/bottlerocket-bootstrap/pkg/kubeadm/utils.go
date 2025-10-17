@@ -131,7 +131,13 @@ func getLocalApiServerReadinessEndpoint() (string, error) {
 		// Validate if readiness probe exists on the definition
 		if container.ReadinessProbe != nil {
 			readinessProbeHandler := container.ReadinessProbe.HTTPGet
-			url := fmt.Sprintf("%s://%s:%d%s", readinessProbeHandler.Scheme, readinessProbeHandler.Host, readinessProbeHandler.Port.IntVal, readinessProbeHandler.Path)
+
+			port, err := utils.ResolveContainerPort(readinessProbeHandler.Port, &container)
+			if err != nil {
+				return "", errors.Wrap(err, "Error resolving readiness probe port")
+			}
+
+			url := fmt.Sprintf("%s://%s:%d%s", readinessProbeHandler.Scheme, readinessProbeHandler.Host, port, readinessProbeHandler.Path)
 			return url, nil
 		}
 	}
