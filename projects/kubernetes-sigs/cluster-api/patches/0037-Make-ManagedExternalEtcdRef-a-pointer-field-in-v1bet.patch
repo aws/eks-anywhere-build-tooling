@@ -1,10 +1,11 @@
-From c7e02d4669094e1f9d75ab2060f5eff7475c1287 Mon Sep 17 00:00:00 2001
+From c340f3ef55b91236550ddeeab37a721055910260 Mon Sep 17 00:00:00 2001
 From: Pankti <shah.pankti2609@gmail.com>
 Date: Tue, 14 Oct 2025 12:11:10 -0700
 Subject: [PATCH 37/37] Make ManagedExternalEtcdRef a pointer field in v1beta2
- API
+ API. Add ManagedExternalEtcdRef To and From conversion inside v1beta1.
 
 ---
+ api/core/v1beta1/conversion.go                | 16 +++++++++++++++
  api/core/v1beta1/zz_generated.conversion.go   | 20 +++++++++++++++++--
  api/core/v1beta2/cluster_types.go             |  2 +-
  api/core/v1beta2/zz_generated.deepcopy.go     |  6 +++++-
@@ -17,8 +18,42 @@ Subject: [PATCH 37/37] Make ManagedExternalEtcdRef a pointer field in v1beta2
  .../cluster/cluster_controller_phases.go      |  4 ++--
  .../cluster/cluster_controller_test.go        |  2 +-
  .../machine/machine_controller_phases.go      |  2 +-
- 12 files changed, 68 insertions(+), 17 deletions(-)
+ 13 files changed, 84 insertions(+), 17 deletions(-)
 
+diff --git a/api/core/v1beta1/conversion.go b/api/core/v1beta1/conversion.go
+index 03d7a7a9a..23d2c112e 100644
+--- a/api/core/v1beta1/conversion.go
++++ b/api/core/v1beta1/conversion.go
+@@ -67,6 +67,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
+ 		dst.Spec.ControlPlaneRef = controlPlaneRef
+ 	}
+ 
++	if src.Spec.ManagedExternalEtcdRef != nil {
++		etcdRef, err := convertToContractVersionedObjectReference(src.Spec.ManagedExternalEtcdRef)
++		if err != nil {
++			return err
++		}
++		dst.Spec.ManagedExternalEtcdRef = &etcdRef
++	}
++
+ 	restored := &clusterv1.Cluster{}
+ 	ok, err := utilconversion.UnmarshalData(src, restored)
+ 	if err != nil {
+@@ -109,6 +117,14 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error {
+ 		dst.Spec.ControlPlaneRef = controlPlaneRef
+ 	}
+ 
++	if src.Spec.ManagedExternalEtcdRef != nil && src.Spec.ManagedExternalEtcdRef.IsDefined() {
++		etcdRef, err := convertToObjectReference(*src.Spec.ManagedExternalEtcdRef, src.Namespace)
++		if err != nil {
++			return err
++		}
++		dst.Spec.ManagedExternalEtcdRef = etcdRef
++	}
++
+ 	if dst.Spec.ClusterNetwork != nil && dst.Spec.ClusterNetwork.APIServerPort != nil &&
+ 		*dst.Spec.ClusterNetwork.APIServerPort == 0 {
+ 		dst.Spec.ClusterNetwork.APIServerPort = nil
 diff --git a/api/core/v1beta1/zz_generated.conversion.go b/api/core/v1beta1/zz_generated.conversion.go
 index 749d480c5..398fb525e 100644
 --- a/api/core/v1beta1/zz_generated.conversion.go
@@ -272,5 +307,5 @@ index a3789efa9..7a77dabbf 100644
  			if apierrors.IsNotFound(errors.Cause(err)) {
  				return ctrl.Result{}, err
 -- 
-2.50.1 (Apple Git-155)
+2.51.0
 
