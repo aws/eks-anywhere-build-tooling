@@ -1,5 +1,5 @@
 ## **Image Builder Tool**
-![Version](https://img.shields.io/badge/version-v0.6.0-blue)
+![Version](https://img.shields.io/badge/version-v0.7.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiRHQ0UnNzTElaQyt5eDI5OG9XYUhYQW85WXE5RzI3Sjd5YWFwK2d2aHBVb2R4dS8xek5aeUcrVHJFN05JR2JnbWx2aGRURlAxdDZrNFQwMFRaMzY4MWU0PSIsIml2UGFyYW1ldGVyU3BlYyI6InIxUHNId1RQcCs3SzlFWWQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 Image Builder Tool is a cli that builds EKS-A compatible Kubernetes node images. The tool is based on upstream
