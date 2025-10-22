@@ -1,7 +1,7 @@
-From da227c51be49e965f74185a91e793e3a0c6418eb Mon Sep 17 00:00:00 2001
+From aacb3a095704ce4f105ba06167cb2b9a48e0b3c9 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 02/37] Add unstacked etcd support
+Subject: [PATCH 02/36] Add unstacked etcd support
 
 Unstacked etcd: API and config changes
 
@@ -80,7 +80,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  cmd/clusterctl/client/cluster/mover.go        |   5 +-
  .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 207 ++++++++++++++++++
  config/rbac/role.yaml                         |   1 +
- controllers/external/util.go                  |  10 +
+ controllers/external/util.go                  |  20 ++
  controlplane/kubeadm/config/rbac/role.yaml    |   9 +
  .../internal/controllers/controller.go        |  51 ++++-
  internal/api/core/v1alpha3/cluster_types.go   |  14 ++
@@ -105,7 +105,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 39 files changed, 1032 insertions(+), 11 deletions(-)
+ 39 files changed, 1042 insertions(+), 11 deletions(-)
 
 diff --git a/api/core/v1beta1/cluster_types.go b/api/core/v1beta1/cluster_types.go
 index c6ff0853b..276654149 100644
@@ -692,10 +692,27 @@ index af20d5eb5..1d9268488 100644
    resources:
    - '*'
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index d2bc13244..509df4dbb 100644
+index d2bc13244..dbaf275dc 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
-@@ -276,3 +276,13 @@ func IsReady(obj *unstructured.Unstructured) (bool, error) {
+@@ -267,6 +267,16 @@ func FailuresFrom(obj *unstructured.Unstructured) (string, string, error) {
+ 	return failureReason, failureMessage, nil
+ }
+ 
++// IsInitialized returns true if the Status.Initialized field on an external object is true.
++func IsInitialized(obj *unstructured.Unstructured) (bool, error) {
++	initialized, found, err := unstructured.NestedBool(obj.Object, "status", "initialized")
++	if err != nil {
++		return false, errors.Wrapf(err, "failed to determine %v %q initialized",
++			obj.GroupVersionKind(), obj.GetName())
++	}
++	return initialized && found, nil
++}
++
+ // IsReady returns true if the Status.Ready field on an external object is true.
+ func IsReady(obj *unstructured.Unstructured) (bool, error) {
+ 	ready, found, err := unstructured.NestedBool(obj.Object, "status", "ready")
+@@ -276,3 +286,13 @@ func IsReady(obj *unstructured.Unstructured) (bool, error) {
  	}
  	return ready && found, nil
  }
@@ -1265,7 +1282,7 @@ index 7e66695bd..6afbcb58a 100644
  // for Cluster to update when one of its own MachineDeployments gets updated.
  func (r *Reconciler) machineDeploymentToCluster(_ context.Context, o client.Object) []ctrl.Request {
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 531c47001..81a83b43b 100644
+index 531c47001..4717d1479 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -39,6 +39,7 @@ import (
@@ -1377,11 +1394,11 @@ index 531c47001..81a83b43b 100644
 +
 +	// Update cluster.Status.ManagedExternalEtcdClusterInitializedCondition if it hasn't already been set
 +	if !v1beta1conditions.IsTrue(cluster, clusterv1.ManagedExternalEtcdClusterInitializedCondition) {
-+		ready, err := external.IsReady(etcdPlaneConfig)
++		initialized, err := external.IsInitialized(etcdPlaneConfig)
 +		if err != nil {
 +			return ctrl.Result{}, err
 +		}
-+		if !ready {
++		if initialized {
 +			log.Info("reconcileEtcdCluster: Marking etcd cluster initialized setting it to true")
 +			cluster.Status.ManagedExternalEtcdInitialized = true
 +			v1beta1conditions.MarkTrue(cluster, clusterv1.ManagedExternalEtcdClusterInitializedCondition)
@@ -1905,5 +1922,5 @@ index 684ef3d07..3566067a6 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.50.1 (Apple Git-155)
+2.51.0
 

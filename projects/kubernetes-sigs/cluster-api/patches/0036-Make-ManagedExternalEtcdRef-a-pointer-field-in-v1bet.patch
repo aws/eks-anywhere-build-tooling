@@ -1,7 +1,7 @@
-From c340f3ef55b91236550ddeeab37a721055910260 Mon Sep 17 00:00:00 2001
+From 9d1f48423e37d3c9c2bf1c359b997918e4184615 Mon Sep 17 00:00:00 2001
 From: Pankti <shah.pankti2609@gmail.com>
 Date: Tue, 14 Oct 2025 12:11:10 -0700
-Subject: [PATCH 37/37] Make ManagedExternalEtcdRef a pointer field in v1beta2
+Subject: [PATCH 36/36] Make ManagedExternalEtcdRef a pointer field in v1beta2
  API. Add ManagedExternalEtcdRef To and From conversion inside v1beta1.
 
 ---
@@ -135,12 +135,12 @@ index 4e584960a..8b3096dcb 100644
  						},
  					},
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index cf55b784d..3822ae938 100644
+index bb729ee40..8e07423c0 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -501,7 +501,7 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
  				*/
- 				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() && controlPlane.Cluster.Spec.ManagedExternalEtcdRef.Kind == "EtcdadmCluster" {
+ 				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
  					etcdRef := controlPlane.Cluster.Spec.ManagedExternalEtcdRef
 -					externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, controlPlane.Cluster.Namespace)
 +					externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, *etcdRef, controlPlane.Cluster.Namespace)
@@ -246,20 +246,20 @@ index d34a5f8d4..f75e57ce9 100644
  	// WARNING: in.Topology requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.Topology vs *sigs.k8s.io/cluster-api/internal/api/core/v1alpha4.Topology)
  	// WARNING: in.AvailabilityGates requires manual conversion: does not exist in peer-type
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index f9e052d64..ec3314947 100644
+index c66857819..19eef85f6 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
 @@ -461,7 +461,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
  	}
  
- 	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() && cluster.Spec.ManagedExternalEtcdRef.Kind == "EtcdadmCluster" {
+ 	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
 -		obj, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, cluster.Spec.ManagedExternalEtcdRef, cluster.Namespace)
 +		obj, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, *cluster.Spec.ManagedExternalEtcdRef, cluster.Namespace)
  		switch {
  		case apierrors.IsNotFound(errors.Cause(err)):
  			// Etcd cluster has been deleted
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 536862940..4e11f5a73 100644
+index 280c33303..fe9ca7ead 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -375,7 +375,7 @@ func (r *Reconciler) handlePauseControlPlaneWithExternalManagedEtcd(ctx context.
