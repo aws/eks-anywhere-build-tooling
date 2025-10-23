@@ -1,4 +1,4 @@
-From aacb3a095704ce4f105ba06167cb2b9a48e0b3c9 Mon Sep 17 00:00:00 2001
+From 43026f92890adf4ea196633a8c0b9faa1d1db1ce Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/36] Add unstacked etcd support
@@ -73,7 +73,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  api/core/v1beta1/zz_generated.deepcopy.go     |   5 +
  api/core/v1beta1/zz_generated.openapi.go      |  22 ++
  api/core/v1beta2/cluster_types.go             |  14 ++
- api/core/v1beta2/condition_consts.go          |  16 ++
+ api/core/v1beta2/condition_consts.go          |  19 ++
  api/core/v1beta2/machine_types.go             |   3 +
  api/core/v1beta2/zz_generated.deepcopy.go     |   1 +
  api/core/v1beta2/zz_generated.openapi.go      |  23 ++
@@ -95,7 +95,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  .../core/v1alpha4/zz_generated.conversion.go  |   6 +
  .../core/v1alpha4/zz_generated.deepcopy.go    |   5 +
  .../controllers/cluster/cluster_controller.go |  85 ++++++-
- .../cluster/cluster_controller_phases.go      | 106 +++++++++
+ .../cluster/cluster_controller_phases.go      | 116 ++++++++++
  .../cluster/cluster_controller_test.go        | 136 ++++++++++++
  .../machine/machine_controller_noderef.go     |   8 +
  .../machine_controller_noderef_test.go        |  45 ++++
@@ -105,7 +105,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 39 files changed, 1042 insertions(+), 11 deletions(-)
+ 39 files changed, 1055 insertions(+), 11 deletions(-)
 
 diff --git a/api/core/v1beta1/cluster_types.go b/api/core/v1beta1/cluster_types.go
 index c6ff0853b..276654149 100644
@@ -306,10 +306,10 @@ index af0969853..99ac9df03 100644
  	// +optional
  	Deprecated *ClusterDeprecatedStatus `json:"deprecated,omitempty"`
 diff --git a/api/core/v1beta2/condition_consts.go b/api/core/v1beta2/condition_consts.go
-index 23abc6c2b..5d6e6bf97 100644
+index 23abc6c2b..fa7bda307 100644
 --- a/api/core/v1beta2/condition_consts.go
 +++ b/api/core/v1beta2/condition_consts.go
-@@ -213,3 +213,19 @@ const (
+@@ -213,3 +213,22 @@ const (
  	// NotProvisionedReason documents an object or a piece of infrastructure is not provisioned.
  	NotProvisionedReason = "NotProvisioned"
  )
@@ -318,6 +318,9 @@ index 23abc6c2b..5d6e6bf97 100644
 +const (
 +	// ManagedExternalEtcdClusterInitializedCondition is set once the first member of an etcd cluster is provisioned and running
 +	ManagedExternalEtcdClusterInitializedCondition ConditionType = "ManagedEtcdInitialized"
++
++	// ManagedExternalEtcdClusterInitializedReason surfaces when the first member of etcd cluster is initialized
++	ManagedExternalEtcdClusterInitializedReason = "ManagedEtcdInitialized"
 +
 +	// ManagedExternalEtcdClusterReadyCondition indicates if the etcd cluster is ready and all members have passed healthchecks.
 +	ManagedExternalEtcdClusterReadyCondition ConditionType = "ManagedEtcdReady"
@@ -1282,18 +1285,19 @@ index 7e66695bd..6afbcb58a 100644
  // for Cluster to update when one of its own MachineDeployments gets updated.
  func (r *Reconciler) machineDeploymentToCluster(_ context.Context, o client.Object) []ctrl.Request {
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 531c47001..4717d1479 100644
+index 531c47001..6c1674fc7 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
-@@ -39,6 +39,7 @@ import (
+@@ -39,6 +39,8 @@ import (
  	capierrors "sigs.k8s.io/cluster-api/errors"
  	"sigs.k8s.io/cluster-api/internal/contract"
  	"sigs.k8s.io/cluster-api/util"
 +	"sigs.k8s.io/cluster-api/util/annotations"
++	"sigs.k8s.io/cluster-api/util/conditions"
  	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
  	"sigs.k8s.io/cluster-api/util/kubeconfig"
  	"sigs.k8s.io/cluster-api/util/patch"
-@@ -249,6 +250,39 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
+@@ -249,6 +251,39 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
  		return ctrl.Result{}, nil
  	}
  
@@ -1333,7 +1337,7 @@ index 531c47001..4717d1479 100644
  	// Call generic external reconciler.
  	obj, err := r.reconcileExternal(ctx, cluster, cluster.Spec.ControlPlaneRef)
  	if err != nil {
-@@ -342,6 +376,78 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
+@@ -342,6 +377,87 @@ func (r *Reconciler) reconcileControlPlane(ctx context.Context, s *scope) (ctrl.
  	return ctrl.Result{}, nil
  }
  
@@ -1393,7 +1397,7 @@ index 531c47001..4717d1479 100644
 +	)
 +
 +	// Update cluster.Status.ManagedExternalEtcdClusterInitializedCondition if it hasn't already been set
-+	if !v1beta1conditions.IsTrue(cluster, clusterv1.ManagedExternalEtcdClusterInitializedCondition) {
++	if !conditions.IsTrue(cluster, string(clusterv1.ManagedExternalEtcdClusterInitializedCondition)) {
 +		initialized, err := external.IsInitialized(etcdPlaneConfig)
 +		if err != nil {
 +			return ctrl.Result{}, err
@@ -1401,9 +1405,18 @@ index 531c47001..4717d1479 100644
 +		if initialized {
 +			log.Info("reconcileEtcdCluster: Marking etcd cluster initialized setting it to true")
 +			cluster.Status.ManagedExternalEtcdInitialized = true
-+			v1beta1conditions.MarkTrue(cluster, clusterv1.ManagedExternalEtcdClusterInitializedCondition)
++			conditions.Set(cluster, metav1.Condition{
++				Type: string(clusterv1.ManagedExternalEtcdClusterInitializedCondition),
++				Status: metav1.ConditionTrue,
++				Reason: clusterv1.ManagedExternalEtcdClusterInitializedReason,
++			})
 +		} else {
-+			v1beta1conditions.MarkFalse(cluster, clusterv1.ManagedExternalEtcdClusterInitializedCondition, clusterv1.WaitingForEtcdClusterInitializedReason, clusterv1.ConditionSeverityInfo, "Waiting for etcd cluster provider to indicate the etcd has been initialized")
++			conditions.Set(cluster, metav1.Condition{
++				Type: string(clusterv1.ManagedExternalEtcdClusterInitializedCondition),
++				Status: metav1.ConditionFalse,
++				Reason: clusterv1.WaitingForEtcdClusterInitializedReason,
++				Message: "Waiting for etcd cluster provider to indicate the etcd has been initialized",
++			})
 +		}
 +	}
 +	return ctrl.Result{}, nil
@@ -1922,5 +1935,5 @@ index 684ef3d07..3566067a6 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.51.0
+2.49.0
 
