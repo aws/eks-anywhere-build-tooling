@@ -1,15 +1,58 @@
-From 8e1206d581e04198cf4dbe8b168f22a9299da6f5 Mon Sep 17 00:00:00 2001
+From cb67c358070cdbac2b595764456f91e4da1124a4 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Mon, 30 Sep 2024 09:39:48 -0700
 Subject: [PATCH 2/3] Remove additional GCE Dependencies
 
 ---
- cluster-autoscaler/config/autoscaling_options.go | 3 ---
- cluster-autoscaler/config/flags/flags.go         | 2 --
- 2 files changed, 5 deletions(-)
+ .../examples/external-grpc-cloud-provider-service/main.go     | 4 +---
+ cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go    | 4 ++--
+ cluster-autoscaler/config/autoscaling_options.go              | 3 ---
+ cluster-autoscaler/config/flags/flags.go                      | 2 --
+ 4 files changed, 3 insertions(+), 10 deletions(-)
 
+diff --git a/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/main.go b/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/main.go
+index f2742ff72..e6e2beb0a 100644
+--- a/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/main.go
++++ b/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/main.go
+@@ -29,7 +29,6 @@ import (
+ 	cloudBuilder "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/builder"
+ 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/wrapper"
+ 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc/protos"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce/localssdsize"
+ 	"k8s.io/autoscaler/cluster-autoscaler/config"
+ 	kube_flag "k8s.io/component-base/cli/flag"
+ 	klog "k8s.io/klog/v2"
+@@ -122,8 +121,7 @@ func main() {
+ 		NodeGroups:             *nodeGroupsFlag,
+ 		ClusterName:            *clusterName,
+ 		GCEOptions: config.GCEOptions{
+-			ConcurrentRefreshes:      1,
+-			LocalSSDDiskSizeProvider: localssdsize.NewSimpleLocalSSDProvider(),
++			ConcurrentRefreshes: 1,
+ 		},
+ 		UserAgent: "user-agent",
+ 	}
+diff --git a/cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go b/cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go
+index 73d5773e7..b41fc2a64 100644
+--- a/cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go
++++ b/cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go
+@@ -387,12 +387,12 @@ func BuildGCE(opts config.AutoscalingOptions, do cloudprovider.NodeGroupDiscover
+ 		defer config.Close()
+ 	}
+ 
+-	manager, err := CreateGceManager(config, do, opts.GCEOptions.LocalSSDDiskSizeProvider, opts.Regional, opts.GCEOptions.BulkMigInstancesListingEnabled, opts.GCEOptions.ConcurrentRefreshes, opts.UserAgent, opts.GCEOptions.DomainUrl, opts.GCEOptions.MigInstancesMinRefreshWaitTime)
++	manager, err := CreateGceManager(config, do, nil, opts.Regional, opts.GCEOptions.BulkMigInstancesListingEnabled, opts.GCEOptions.ConcurrentRefreshes, opts.UserAgent, opts.GCEOptions.DomainUrl, opts.GCEOptions.MigInstancesMinRefreshWaitTime)
+ 	if err != nil {
+ 		klog.Fatalf("Failed to create GCE Manager: %v", err)
+ 	}
+ 
+-	pricingModel := NewGcePriceModel(NewGcePriceInfo(), opts.GCEOptions.LocalSSDDiskSizeProvider)
++	pricingModel := NewGcePriceModel(NewGcePriceInfo(), nil)
+ 	provider, err := BuildGceCloudProvider(manager, rl, pricingModel)
+ 	if err != nil {
+ 		klog.Fatalf("Failed to create GCE cloud provider: %v", err)
 diff --git a/cluster-autoscaler/config/autoscaling_options.go b/cluster-autoscaler/config/autoscaling_options.go
-index cedc37e71..aca1d6422 100644
+index a14458098..4298cfbf2 100644
 --- a/cluster-autoscaler/config/autoscaling_options.go
 +++ b/cluster-autoscaler/config/autoscaling_options.go
 @@ -19,7 +19,6 @@ package config
@@ -20,7 +63,7 @@ index cedc37e71..aca1d6422 100644
  	kubelet_config "k8s.io/kubernetes/pkg/kubelet/apis/config"
  	scheduler_config "k8s.io/kubernetes/pkg/scheduler/apis/config"
  )
-@@ -64,8 +63,6 @@ type GCEOptions struct {
+@@ -66,8 +65,6 @@ type GCEOptions struct {
  	MigInstancesMinRefreshWaitTime time.Duration
  	// DomainUrl is the GCE url used to make calls to GCE API.
  	DomainUrl string
@@ -30,7 +73,7 @@ index cedc37e71..aca1d6422 100644
  	// Instances of migs having instances in creating or deleting state are re-fetched using igm.ListInstances. Inconsistencies are handled by re-fetching using igm.ListInstances
  	BulkMigInstancesListingEnabled bool
 diff --git a/cluster-autoscaler/config/flags/flags.go b/cluster-autoscaler/config/flags/flags.go
-index 8012fde26..5aaf8b0f9 100644
+index 0f7209ebb..d85199527 100644
 --- a/cluster-autoscaler/config/flags/flags.go
 +++ b/cluster-autoscaler/config/flags/flags.go
 @@ -26,7 +26,6 @@ import (
@@ -41,7 +84,7 @@ index 8012fde26..5aaf8b0f9 100644
  	"k8s.io/autoscaler/cluster-autoscaler/config"
  	"k8s.io/autoscaler/cluster-autoscaler/estimator"
  	"k8s.io/autoscaler/cluster-autoscaler/expander"
-@@ -350,7 +349,6 @@ func createAutoscalingOptions() config.AutoscalingOptions {
+@@ -354,7 +353,6 @@ func createAutoscalingOptions() config.AutoscalingOptions {
  		GCEOptions: config.GCEOptions{
  			ConcurrentRefreshes:            *concurrentGceRefreshes,
  			MigInstancesMinRefreshWaitTime: *gceMigInstancesMinRefreshWaitTime,
@@ -50,5 +93,5 @@ index 8012fde26..5aaf8b0f9 100644
  		},
  		ClusterAPICloudConfigAuthoritative: *clusterAPICloudConfigAuthoritative,
 -- 
-2.48.1
+2.51.0
 
