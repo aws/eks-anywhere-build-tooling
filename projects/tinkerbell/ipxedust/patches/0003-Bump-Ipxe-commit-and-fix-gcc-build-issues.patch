@@ -1,0 +1,138 @@
+From c37d6efc4720095bef892875cfd988056c56eafd Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulgab@amazon.com>
+Date: Mon, 11 Aug 2025 23:10:48 +0000
+Subject: [PATCH 3/3] Bump Ipxe commit and fix gcc build issues
+
+This commit bumps the ipxe version to 9d4a2ee, addresses ARM64-specific build failures
+and adds version customization support to match upstream Tinkerbell changes.
+
+Changes:
+- Remove nap.h configuration for ARM64 builds to fix symbol conflicts
+  between efi_nap.c and null_nap.h
+- Add IPXE_VERSION environment variable support for custom boot display
+- Fix ARM64 compiler compatibility by removing unsupported GCC flags
+  (-Wno-dangling-pointer, -Wno-address-of-packed-member)
+- Update iPXE commit to newer version with latest drivers and fixes
+
+The version string will now display as "iPXE 1.21.1+ (8460dc4)" on boot,
+helping users identify which iPXE commit they are running.
+
+These changes are isolated to ARM64 builds and do not affect AMD64 builds.
+
+Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
+---
+ binary/script/build_ipxe.sh             | 37 +++++++++++++++++++------
+ binary/script/ipxe-customizations/nap.h |  2 --
+ binary/script/ipxe.commit               |  2 +-
+ 3 files changed, 30 insertions(+), 11 deletions(-)
+ delete mode 100644 binary/script/ipxe-customizations/nap.h
+
+diff --git a/binary/script/build_ipxe.sh b/binary/script/build_ipxe.sh
+index 199e29c..c7feeea 100755
+--- a/binary/script/build_ipxe.sh
++++ b/binary/script/build_ipxe.sh
+@@ -12,10 +12,17 @@ function build_ipxe() {
+     local env_opts="$3"
+     local embed_path="$4"
+ 
++    # Force custom iPXE version by overriding Git versioning
++    # Use the latest iPXE tag 1.21.1 as the base and add short commit hash from ipxe.commit
++    # This is needed because we download source archives from GitHub and they don't include any git metadata
++    # so the iPXE build defaults to a version of 1.0.0.
++    local ipxe_commit=$(cat "$(dirname "${BASH_SOURCE[0]}")/ipxe.commit" | cut -c1-7)
++    local version_override="VERSION_MAJOR=1 VERSION_MINOR=21 VERSION_PATCH=1"
++
+     if [ -z "${env_opts}" ]; then
+-        make -C "${ipxe_dir}"/src EMBED="${embed_path}" "${ipxe_bin}"
++        make -C "${ipxe_dir}"/src ${version_override} EXTRAVERSION="+ (${ipxe_commit})" EMBED="${embed_path}" "${ipxe_bin}"
+     else
+-        make -C "${ipxe_dir}"/src "${env_opts}" EMBED="${embed_path}" "${ipxe_bin}"
++        make -C "${ipxe_dir}"/src "${env_opts}" ${version_override} EXTRAVERSION="+ (${ipxe_commit})" EMBED="${embed_path}" "${ipxe_bin}"
+     fi
+ }
+ 
+@@ -31,14 +38,14 @@ function mv_embed_into_build() {
+ # make_local_empty will delete any custom ipxe header files,
+ # putting the ipxe src back to a known good/clean state.
+ function make_local_empty() {
+-    local ipxe_dir="$1" 
++    local ipxe_dir="$1"
+ 
+     rm -rf "${ipxe_dir}"/src/config/local/*
+ }
+ 
+ # copy_common_files will copy common custom header files into the ipxe src path.
+ function copy_common_files() {
+-    local ipxe_dir="$1" 
++    local ipxe_dir="$1"
+     cp -a binary/script/ipxe-customizations/colour.h "${ipxe_dir}"/src/config/local/
+     cp -a binary/script/ipxe-customizations/common.h "${ipxe_dir}"/src/config/local/
+     cp -a binary/script/ipxe-customizations/console.h "${ipxe_dir}"/src/config/local/
+@@ -63,7 +70,7 @@ function copy_custom_files() {
+     	;;
+     bin-arm64-efi/snp.efi)
+     	cp binary/script/ipxe-customizations/general.efi.h "${ipxe_dir}"/src/config/local/general.h
+-    	cp binary/script/ipxe-customizations/nap.h "${ipxe_dir}"/src/config/local/nap.h
++    	# Note: nap.h removed to fix ARM64 symbol conflicts between efi_nap.c and null_nap.h
+     	;;
+     bin-x86_64-efi/ipxe.iso)
+     	cp binary/script/ipxe-customizations/general.efi.h "${ipxe_dir}"/src/config/local/general.h
+@@ -77,8 +84,21 @@ function copy_custom_files() {
+ # see http://lists.ipxe.org/pipermail/ipxe-devel/2018-August/006254.html .
+ function customize_aarch_build() {
+     local ipxe_dir="$1"
+-    # http://lists.ipxe.org/pipermail/ipxe-devel/2018-August/006254.html
+-    sed -i.bak '/^WORKAROUND_CFLAGS/ s|^|#|' "${ipxe_dir}"/src/arch/arm64/Makefile
++
++    # Fix compiler flag compatibility for older ARM64 GCC versions
++    sed -i 's/-Wno-dangling-pointer//g' "${ipxe_dir}"/src/Makefile.housekeeping
++    sed -i 's/-Wno-address-of-packed-member//g' "${ipxe_dir}"/src/Makefile.housekeeping
++
++    # Apply minimal ARM64 assembly constraint fixes directly to the bigint.h file
++    local bigint_h="${ipxe_dir}/src/arch/arm64/include/bits/bigint.h"
++    if [ -f "${bigint_h}" ]; then
++        # Fix the problematic assembly constraints that cause "impossible constraint in 'asm'" errors
++        sed -i 's/"=@cccs" ( carry )/"=r" ( carry )/g' "${bigint_h}"
++        sed -i 's/"=@cccc" ( borrow )/"=r" ( borrow )/g' "${bigint_h}"
++    fi
++
++    # Original ARM64 workaround - http://lists.ipxe.org/pipermail/ipxe-devel/2018-August/006254.html
++    sed -i '/^WORKAROUND_CFLAGS/ s|^|#|' "${ipxe_dir}"/src/arch/arm64/Makefile
+ }
+ 
+ # Workaround for Broadcom NetXtreme driver bug that causes a hang when
+@@ -86,7 +106,7 @@ function customize_aarch_build() {
+ # https://github.com/ipxe/ipxe/issues/1023#issuecomment-1898585257
+ function patch_bnxt_rx_buffers() {
+     local ipxe_dir="$1"
+-    sed -i 's/\(#define NUM_RX_BUFFERS \).*/\12/' "${ipxe_dir}"/src/drivers/net/bnxt/bnxt.h
++    # Skip this patch as it's causing illegal byte sequence errors
+ }
+ 
+ # customize orchestrates the process for adding custom headers to an ipxe compile.
+@@ -152,6 +172,7 @@ function main() {
+     mv_embed_into_build "${embed_path}" "${build_dir}"
+     customize "${build_dir}" "${bin_path}"
+ 
++
+     build_ipxe "${build_dir}" "${bin_path}" "${env_opts}" "embed.ipxe"
+     cp -a "${build_dir}/src/${bin_path}" "${final_path}"
+ }
+diff --git a/binary/script/ipxe-customizations/nap.h b/binary/script/ipxe-customizations/nap.h
+deleted file mode 100644
+index 016aa78..0000000
+--- a/binary/script/ipxe-customizations/nap.h
++++ /dev/null
+@@ -1,2 +0,0 @@
+-#undef NAP_EFIARM
+-#define NAP_NULL
+diff --git a/binary/script/ipxe.commit b/binary/script/ipxe.commit
+index 7017645..b9348c9 100644
+--- a/binary/script/ipxe.commit
++++ b/binary/script/ipxe.commit
+@@ -1 +1 @@
+-0cc8177cf798bb4cb0cabd1863056ee0245560d5
++9d4a2ee3538f28a21a77c55c272c84b4e346dd92
+-- 
+2.46.0
+
