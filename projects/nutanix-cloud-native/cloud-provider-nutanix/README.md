@@ -1,5 +1,5 @@
 ## **Cluster API Provider for Nutanix**
-![Version](https://img.shields.io/badge/version-v0.5.2-blue)
+![Version](https://img.shields.io/badge/version-v0.5.3-blue)
 ![Build Status]()
 
 The [Nutanix Cloud Controller Manager](https://github.com/nutanix-cloud-native/cloud-provider-nutanix) is a the implementation of cloud-controller-manager for Nutanix AHV.
