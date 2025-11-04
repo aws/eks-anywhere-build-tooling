@@ -1,5 +1,5 @@
 ## **CAPAS**
-![Version](https://img.shields.io/badge/version-v0.2.6-blue)
+![Version](https://img.shields.io/badge/version-v0.2.7-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiOTZFc2lQejUvTDFxRWtWUVFCOWRITGtHcmRPUUtWR3FVb3d2aHV6eHM3Q0Q1c1RBMzlzZFpwNHhOMlZGNjFaeFRmU0dFNVk0bWZRTnI0T0s2a3poeEdNPSIsIml2UGFyYW1ldGVyU3BlYyI6InFKOTlCeVppcmI0dEtzWWwiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 *Note: We are not currently building the Snow provider nor are we generating the manifests. For now we are checking in
