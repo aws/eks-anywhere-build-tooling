@@ -83,6 +83,7 @@ type VsphereConfig struct {
 	ExtraPackagesConfig
 	ExtraOverridesConfig
 	AirGappedConfig
+	SshConfig
 }
 
 type BaremetalConfig struct {
@@ -93,6 +94,7 @@ type BaremetalConfig struct {
 	ExtraPackagesConfig
 	ExtraOverridesConfig
 	AirGappedConfig
+	SshConfig
 }
 
 type CloudstackConfig struct {
@@ -103,6 +105,7 @@ type CloudstackConfig struct {
 	ExtraPackagesConfig
 	ExtraOverridesConfig
 	AirGappedConfig
+	SshConfig
 }
 
 type IsoConfig struct {
@@ -191,4 +194,9 @@ type AirGappedConfig struct {
 	ImageBuilderRepoUrl        string `json:"image_builder_repo_url,omitempty"`
 	PrivateServerEksDDomainUrl string `json:"private_artifacts_eksd_fqdn,omitempty"`
 	PrivateServerEksADomainUrl string `json:"private_artifacts_eksa_fqdn,omitempty"`
+}
+
+type SshConfig struct {
+	SshTimeout           string `json:"ssh_timeout,omitempty"`
+	SshHandshakeAttempts string `json:"ssh_handshake_attempts,omitempty"`
 }
