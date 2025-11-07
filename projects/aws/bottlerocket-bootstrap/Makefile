@@ -19,6 +19,7 @@ DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 BOTTLEROCKET_BOOTSTRAP_IMAGE_COMPONENT=bottlerocket-bootstrap
 BOTTLEROCKET_BOOTSTRAP_SNOW_IMAGE_COMPONENT=bottlerocket-bootstrap-snow
+BOTTLEROCKET_BOOTSTRAP_VSPHERE_MULTI_NETWORK_IMAGE_COMPONENT=bottlerocket-bootstrap-vsphere-multi-network
 
 BINARY_TARGET_FILES=bottlerocket-bootstrap bottlerocket-bootstrap-snow
 SOURCE_PATTERNS=. ./pkg/providers/snow
