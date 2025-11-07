@@ -14,20 +14,22 @@ _output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap: ## Build 
 _output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap-snow: ## Build `_output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap-snow`
 
 ##@ Image Targets
-local-images: ## Builds `bottlerocket-bootstrap/images/amd64 bottlerocket-bootstrap-snow/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `bottlerocket-bootstrap/images/push bottlerocket-bootstrap-snow/images/push` to IMAGE_REPO
-bottlerocket-bootstrap/images/amd64: ## Builds/pushes `bottlerocket-bootstrap/images/amd64`
-bottlerocket-bootstrap-snow/images/amd64: ## Builds/pushes `bottlerocket-bootstrap-snow/images/amd64`
+local-images: ## Builds `bottlerocket-bootstrap/images/arm64 bottlerocket-bootstrap-snow/images/arm64 bottlerocket-bootstrap-vsphere-multi-network/images/arm64` as oci tars for presumbit validation
+images: ## Pushes `bottlerocket-bootstrap/images/push bottlerocket-bootstrap-snow/images/push bottlerocket-bootstrap-vsphere-multi-network/images/push` to IMAGE_REPO
+bottlerocket-bootstrap/images/arm64: ## Builds/pushes `bottlerocket-bootstrap/images/arm64`
+bottlerocket-bootstrap-snow/images/arm64: ## Builds/pushes `bottlerocket-bootstrap-snow/images/arm64`
+bottlerocket-bootstrap-vsphere-multi-network/images/arm64: ## Builds/pushes `bottlerocket-bootstrap-vsphere-multi-network/images/arm64`
 bottlerocket-bootstrap/images/push: ## Builds/pushes `bottlerocket-bootstrap/images/push`
 bottlerocket-bootstrap-snow/images/push: ## Builds/pushes `bottlerocket-bootstrap-snow/images/push`
+bottlerocket-bootstrap-vsphere-multi-network/images/push: ## Builds/pushes `bottlerocket-bootstrap-vsphere-multi-network/images/push`
 
 ##@ Fetch Binary Targets
-_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client`
-_output/1-26/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/server`
-_output/1-26/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/server`
-_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
-_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
+_output/1-34/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-34/dependencies/linux-amd64/eksd/kubernetes/client`
+_output/1-34/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-34/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/1-34/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-34/dependencies/linux-amd64/eksd/kubernetes/server`
+_output/1-34/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-34/dependencies/linux-arm64/eksd/kubernetes/server`
+_output/1-34/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-34/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
+_output/1-34/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-34/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
