@@ -31,12 +31,6 @@ for INTERFACE in $INTERFACE_LIST; do
     INDEX=$((INDEX + 1))
 done
 
-# Forward-compatible guard logic
-if [ -d "/.bottlerocket/rootfs/.bottlerocket" ]; then
-    echo "New system detected - OS will handle migration"
-    exit 0
-fi
-
 # Current system - handle reboot ourselves
 touch "$INSTANCE_REBOOTED"
 apiclient reboot
