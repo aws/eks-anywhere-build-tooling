@@ -8,11 +8,8 @@ if [[ -f "$INSTANCE_REBOOTED" ]]; then
     exit 0
 fi
 
-# Place network configuration - dynamically detect network interfaces
-NET_CONFIG_PATH=/.bottlerocket/rootfs/var/lib/netdog/net.toml
-
-# Start with version header
-echo "version = 2" > "$NET_CONFIG_PATH"
+# Build net.toml configuration as a string
+NET_CONFIG="version = 3\n"
 
 # Get list of network interfaces (excluding loopback)
 INTERFACE_LIST=$(ip -o link | grep -v 'lo' | awk '{print $2}' | sed 's/://g')
@@ -20,16 +17,23 @@ INTERFACE_LIST=$(ip -o link | grep -v 'lo' | awk '{print $2}' | sed 's/://g')
 # Configure each interface
 INDEX=0
 for INTERFACE in $INTERFACE_LIST; do
-    echo "[$INTERFACE]" >> "$NET_CONFIG_PATH"
-    echo "dhcp4 = true" >> "$NET_CONFIG_PATH"
+    NET_CONFIG+="[$INTERFACE]\n"
+    NET_CONFIG+="dhcp4 = true\n"
     
     # Set first interface as primary
     if [ $INDEX -eq 0 ]; then
-        echo "primary = true" >> "$NET_CONFIG_PATH"
+        NET_CONFIG+="primary = true\n"
     fi
     
     INDEX=$((INDEX + 1))
 done
+
+# Encode the configuration to base64
+NET_CONFIG_BASE64=$(echo -e "$NET_CONFIG" | base64 -w 0)
+
+# Apply network configuration
+apiclient network configure "base64:$NET_CONFIG_BASE64"
+
 
 # Current system - handle reboot ourselves
 touch "$INSTANCE_REBOOTED"
