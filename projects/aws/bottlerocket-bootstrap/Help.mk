@@ -14,14 +14,14 @@ _output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap: ## Build 
 _output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap-snow: ## Build `_output/bin/bottlerocket-bootstrap/linux-arm64/bottlerocket-bootstrap-snow`
 
 ##@ Image Targets
-local-images: ## Builds `bottlerocket-bootstrap/images/arm64 bottlerocket-bootstrap-snow/images/arm64 bottlerocket-bootstrap-vsphere-multi-network/images/arm64` as oci tars for presumbit validation
-images: ## Pushes `bottlerocket-bootstrap/images/push bottlerocket-bootstrap-snow/images/push bottlerocket-bootstrap-vsphere-multi-network/images/push` to IMAGE_REPO
+local-images: ## Builds `bottlerocket-bootstrap/images/arm64 bottlerocket-bootstrap-snow/images/arm64 bottlerocket-bootstrap-multi-network/images/arm64` as oci tars for presumbit validation
+images: ## Pushes `bottlerocket-bootstrap/images/push bottlerocket-bootstrap-snow/images/push bottlerocket-bootstrap-multi-network/images/push` to IMAGE_REPO
 bottlerocket-bootstrap/images/arm64: ## Builds/pushes `bottlerocket-bootstrap/images/arm64`
 bottlerocket-bootstrap-snow/images/arm64: ## Builds/pushes `bottlerocket-bootstrap-snow/images/arm64`
-bottlerocket-bootstrap-vsphere-multi-network/images/arm64: ## Builds/pushes `bottlerocket-bootstrap-vsphere-multi-network/images/arm64`
+bottlerocket-bootstrap-multi-network/images/arm64: ## Builds/pushes `bottlerocket-bootstrap-multi-network/images/arm64`
 bottlerocket-bootstrap/images/push: ## Builds/pushes `bottlerocket-bootstrap/images/push`
 bottlerocket-bootstrap-snow/images/push: ## Builds/pushes `bottlerocket-bootstrap-snow/images/push`
-bottlerocket-bootstrap-vsphere-multi-network/images/push: ## Builds/pushes `bottlerocket-bootstrap-vsphere-multi-network/images/push`
+bottlerocket-bootstrap-multi-network/images/push: ## Builds/pushes `bottlerocket-bootstrap-multi-network/images/push`
 
 ##@ Fetch Binary Targets
 _output/1-34/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-34/dependencies/linux-amd64/eksd/kubernetes/client`
