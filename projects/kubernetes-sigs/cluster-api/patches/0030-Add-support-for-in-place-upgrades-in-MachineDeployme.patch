@@ -1,0 +1,431 @@
+From ad4762d3a017e9f246961b7dab3ce43c2caaf783 Mon Sep 17 00:00:00 2001
+From: Abhinav Pandey <abhinavmpandey08@gmail.com>
+Date: Wed, 24 Jan 2024 00:00:03 -0800
+Subject: [PATCH 30/39] Add support for in-place upgrades in MachineDeployments
+
+---
+ .../v1beta1/kubeadm_control_plane_types.go    |  18 ++-
+ api/core/v1beta2/machinedeployment_types.go   |  19 ++-
+ api/core/v1beta2/zz_generated.openapi.go      |   2 +-
+ .../cluster.x-k8s.io_clusterclasses.yaml      |   1 +
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  |   1 +
+ .../cluster.x-k8s.io_machinedeployments.yaml  |   9 +-
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |   9 +-
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |   9 +-
+ .../machinedeployment_controller.go           |   4 +
+ .../machinedeployment_inplace.go              |  44 +++++++
+ .../machinedeployment_inplace_test.go         | 115 ++++++++++++++++++
+ .../machinedeployment/mdutil/util.go          |   2 +
+ 12 files changed, 222 insertions(+), 11 deletions(-)
+ create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace.go
+ create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace_test.go
+
+diff --git a/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go b/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
+index b8dd22f19..e58d3a192 100644
+--- a/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
++++ b/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
+@@ -29,13 +29,16 @@ import (
+ )
+ 
+ // RolloutStrategyType defines the rollout strategies for a KubeadmControlPlane.
+-// +kubebuilder:validation:Enum=RollingUpdate
++// +kubebuilder:validation:Enum=RollingUpdate;InPlace
+ type RolloutStrategyType string
+ 
+ const (
+ 	// RollingUpdateStrategyType replaces the old control planes by new one using rolling update
+ 	// i.e. gradually scale up or down the old control planes and scale up or down the new one.
+ 	RollingUpdateStrategyType RolloutStrategyType = "RollingUpdate"
++
++	// InPlaceUpgradeStrategyType updates the node in place by delegating the upgrade to an external entity.
++	InPlaceUpgradeStrategyType RolloutStrategyType = "InPlace"
+ )
+ 
+ const (
+@@ -75,6 +78,11 @@ const (
+ 	// DefaultMinHealthyPeriod defines the default minimum period before we consider a remediation on a
+ 	// machine unrelated from the previous remediation.
+ 	DefaultMinHealthyPeriod = 1 * time.Hour
++
++	// InPlaceUpgradeAnnotation is used to denote that the KCP object needs to be in-place upgraded by an external entity.
++	// This annotation will be added to the KCP object when `rolloutStrategy.type` is set to `InPlace`.
++	// The external upgrader entity should watch for the annotation and trigger an upgrade when it's added.
++	InPlaceUpgradeAnnotation = "controlplane.clusters.x-k8s.io/in-place-upgrade-needed"
+ )
+ 
+ // KubeadmControlPlaneSpec defines the desired state of KubeadmControlPlane.
+@@ -193,8 +201,12 @@ type RolloutBefore struct {
+ // RolloutStrategy describes how to replace existing machines
+ // with new ones.
+ type RolloutStrategy struct {
+-	// type of rollout. Currently the only supported strategy is
+-	// "RollingUpdate".
++	// type of rollout strategy to use.
++	// Supported values:
++	// - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
++	// i.e. gradually scale up or down the old control planes and scale up or down the new one.
++	// - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
++	//
+ 	// Default is RollingUpdate.
+ 	// +optional
+ 	Type RolloutStrategyType `json:"type,omitempty"`
+diff --git a/api/core/v1beta2/machinedeployment_types.go b/api/core/v1beta2/machinedeployment_types.go
+index b7182c278..73bac8de0 100644
+--- a/api/core/v1beta2/machinedeployment_types.go
++++ b/api/core/v1beta2/machinedeployment_types.go
+@@ -32,7 +32,7 @@ const (
+ )
+ 
+ // MachineDeploymentRolloutStrategyType defines the type of MachineDeployment rollout strategies.
+-// +kubebuilder:validation:Enum=RollingUpdate;OnDelete
++// +kubebuilder:validation:Enum=RollingUpdate;OnDelete;InPlace
+ type MachineDeploymentRolloutStrategyType string
+ 
+ const (
+@@ -40,6 +40,9 @@ const (
+ 	// i.e. gradually scale down the old MachineSet and scale up the new one.
+ 	RollingUpdateMachineDeploymentStrategyType MachineDeploymentRolloutStrategyType = "RollingUpdate"
+ 
++	// InPlaceMachineDeploymentStrategyType upgrades the machines within the same MachineSet without rolling out any new nodes.
++	InPlaceMachineDeploymentStrategyType MachineDeploymentRolloutStrategyType = "InPlace"
++
+ 	// OnDeleteMachineDeploymentStrategyType replaces old MachineSets when the deletion of the associated machines are completed.
+ 	OnDeleteMachineDeploymentStrategyType MachineDeploymentRolloutStrategyType = "OnDelete"
+ 
+@@ -56,6 +59,12 @@ const (
+ 	// proportions in case the deployment has surge replicas.
+ 	MaxReplicasAnnotation = "machinedeployment.clusters.x-k8s.io/max-replicas"
+ 
++	// MachineDeploymentInPlaceUpgradeAnnotation is used to denote that the MachineDeployment needs to be in-place upgraded by an external entity.
++	// This annotation will be added to the MD object when `strategy.type` is set to `InPlace`.
++	// The external upgrader entity should watch for the annotation and trigger an upgrade when it's added.
++	// Once the upgrade is complete, the external upgrade implementer is also responsible for removing this annotation.
++	MachineDeploymentInPlaceUpgradeAnnotation = "machinedeployment.clusters.x-k8s.io/in-place-upgrade-needed"
++
+ 	// MachineDeploymentUniqueLabel is used to uniquely identify the Machines of a MachineSet.
+ 	// The MachineDeployment controller will set this label on a MachineSet when it is created.
+ 	// The label is also applied to the Machines of the MachineSet and used in the MachineSet selector.
+@@ -315,7 +324,13 @@ type MachineDeploymentRolloutSpec struct {
+ // with new ones.
+ // +kubebuilder:validation:MinProperties=1
+ type MachineDeploymentRolloutStrategy struct {
+-	// type of rollout. Allowed values are RollingUpdate and OnDelete.
++	// type of rollout strategy to use.
++	// Supported values:
++	// - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++	// i.e. gradually scale down the old MachineSet and scale up the new one.
++	// - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
++	// - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
++	//
+ 	// Default is RollingUpdate.
+ 	// +required
+ 	Type MachineDeploymentRolloutStrategyType `json:"type,omitempty"`
+diff --git a/api/core/v1beta2/zz_generated.openapi.go b/api/core/v1beta2/zz_generated.openapi.go
+index 8d70d7313..4e584960a 100644
+--- a/api/core/v1beta2/zz_generated.openapi.go
++++ b/api/core/v1beta2/zz_generated.openapi.go
+@@ -3327,7 +3327,7 @@ func schema_cluster_api_api_core_v1beta2_MachineDeploymentRolloutStrategy(ref co
+ 				Properties: map[string]spec.Schema{
+ 					"type": {
+ 						SchemaProps: spec.SchemaProps{
+-							Description: "type of rollout. Allowed values are RollingUpdate and OnDelete. Default is RollingUpdate.",
++							Description: "type of rollout strategy to use. Supported values: - `RollingUpdate`: replaces the old MachineSet by new one using rolling update i.e. gradually scale down the old MachineSet and scale up the new one. - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed. - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.\n\nDefault is RollingUpdate.",
+ 							Type:        []string{"string"},
+ 							Format:      "",
+ 						},
+diff --git a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
+index dd3ca76f6..8df5a13f3 100644
+--- a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
++++ b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
+@@ -4453,6 +4453,7 @@ spec:
+                                   enum:
+                                   - RollingUpdate
+                                   - OnDelete
++                                  - InPlace
+                                   type: string
+                               required:
+                               - type
+diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+index 791dceda3..caf74526a 100644
+--- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
++++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+@@ -3445,6 +3445,7 @@ spec:
+                                       enum:
+                                       - RollingUpdate
+                                       - OnDelete
++                                      - InPlace
+                                       type: string
+                                   required:
+                                   - type
+diff --git a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
+index db9491037..86dd138d2 100644
+--- a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
++++ b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
+@@ -2049,11 +2049,18 @@ spec:
+                         type: object
+                       type:
+                         description: |-
+-                          type of rollout. Allowed values are RollingUpdate and OnDelete.
++                          type of rollout strategy to use.
++                          Supported values:
++                          - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++                          i.e. gradually scale down the old MachineSet and scale up the new one.
++                          - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
++                          - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
++
+                           Default is RollingUpdate.
+                         enum:
+                         - RollingUpdate
+                         - OnDelete
++                        - InPlace
+                         type: string
+                     required:
+                     - type
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 3c100593a..d2efe2233 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -9051,11 +9051,16 @@ spec:
+                         type: object
+                       type:
+                         description: |-
+-                          type of rollout. Currently the only supported strategy is
+-                          "RollingUpdate".
++                          type of rollout strategy to use.
++                          Supported values:
++                          - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
++                          i.e. gradually scale up or down the old control planes and scale up or down the new one.
++                          - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
++
+                           Default is RollingUpdate.
+                         enum:
+                         - RollingUpdate
++                        - InPlace
+                         type: string
+                     required:
+                     - type
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 6d43abc3e..85168abc5 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -7423,11 +7423,16 @@ spec:
+                                 type: object
+                               type:
+                                 description: |-
+-                                  type of rollout. Currently the only supported strategy is
+-                                  "RollingUpdate".
++                                  type of rollout strategy to use.
++                                  Supported values:
++                                  - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
++                                  i.e. gradually scale up or down the old control planes and scale up or down the new one.
++                                  - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
++
+                                   Default is RollingUpdate.
+                                 enum:
+                                 - RollingUpdate
++                                - InPlace
+                                 type: string
+                             required:
+                             - type
+diff --git a/internal/controllers/machinedeployment/machinedeployment_controller.go b/internal/controllers/machinedeployment/machinedeployment_controller.go
+index 9e12bcd7a..e0c4c943a 100644
+--- a/internal/controllers/machinedeployment/machinedeployment_controller.go
++++ b/internal/controllers/machinedeployment/machinedeployment_controller.go
+@@ -313,6 +313,10 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
+ 		return r.rolloutOnDelete(ctx, md, s.machineSets, templateExists)
+ 	}
+ 
++	if md.Spec.Rollout.Strategy.Type == clusterv1.InPlaceMachineDeploymentStrategyType {
++		return r.rolloutInPlace(ctx, md, s.machineSets, templateExists)
++	}
++
+ 	return errors.Errorf("unexpected deployment strategy type: %s", md.Spec.Rollout.Strategy.Type)
+ }
+ 
+diff --git a/internal/controllers/machinedeployment/machinedeployment_inplace.go b/internal/controllers/machinedeployment/machinedeployment_inplace.go
+new file mode 100644
+index 000000000..04396d9a7
+--- /dev/null
++++ b/internal/controllers/machinedeployment/machinedeployment_inplace.go
+@@ -0,0 +1,44 @@
++package machinedeployment
++
++import (
++	"context"
++
++	"github.com/pkg/errors"
++	kerrors "k8s.io/apimachinery/pkg/util/errors"
++	ctrl "sigs.k8s.io/controller-runtime"
++
++	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
++	"sigs.k8s.io/cluster-api/util/annotations"
++)
++
++func (r *Reconciler) rolloutInPlace(ctx context.Context, md *clusterv1.MachineDeployment, msList []*clusterv1.MachineSet, templateExists bool) (reterr error) {
++	log := ctrl.LoggerFrom(ctx)
++
++	// For in-place upgrade, we shouldn't try to create a new MachineSet as that would trigger a rollout.
++	// Instead, we should try to get latest MachineSet that matches the MachineDeployment.Spec.Template/
++	// If no such MachineSet exists yet, this means the MachineSet hasn't been in-place upgraded yet.
++	// The external in-place upgrade implementer is responsible for updating the latest MachineSet's template
++	// after in-place upgrade of all worker nodes belonging to the MD is complete.
++	// Once the MachineSet is updated, this function will return the latest MachineSet that matches the
++	// MachineDeployment template and thus we can deduce that the in-place upgrade is complete.
++	newMachineSet, oldMachineSets, err := r.getAllMachineSetsAndSyncRevision(ctx, md, msList, false, templateExists)
++	if err != nil {
++		return err
++	}
++
++	defer func() {
++		allMSs := append(oldMachineSets, newMachineSet)
++
++		// Always attempt to sync the status
++		err := r.syncDeploymentStatus(allMSs, newMachineSet, md)
++		reterr = kerrors.NewAggregate([]error{reterr, err})
++	}()
++
++	if newMachineSet == nil {
++		log.Info("Changes detected, InPlace upgrade strategy detected, adding the annotation")
++		annotations.AddAnnotations(md, map[string]string{clusterv1.MachineDeploymentInPlaceUpgradeAnnotation: "true"})
++		return errors.New("new MachineSet not found. This most likely means that the in-place upgrade hasn't finished yet")
++	}
++
++	return r.sync(ctx, md, msList, templateExists)
++}
+diff --git a/internal/controllers/machinedeployment/machinedeployment_inplace_test.go b/internal/controllers/machinedeployment/machinedeployment_inplace_test.go
+new file mode 100644
+index 000000000..a50adb3f1
+--- /dev/null
++++ b/internal/controllers/machinedeployment/machinedeployment_inplace_test.go
+@@ -0,0 +1,115 @@
++package machinedeployment
++
++import (
++	"testing"
++
++	. "github.com/onsi/gomega"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/client-go/tools/record"
++	"k8s.io/utils/pointer"
++	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
++	"sigs.k8s.io/controller-runtime/pkg/client"
++	"sigs.k8s.io/controller-runtime/pkg/client/fake"
++)
++
++const (
++	mdName     = "my-md"
++	msName     = "my-ms"
++	version128 = "v1.28.0"
++	version129 = "v1.29.0"
++)
++
++func getMachineDeployment(name string, version string, replicas int32) *clusterv1.MachineDeployment {
++	return &clusterv1.MachineDeployment{
++		ObjectMeta: metav1.ObjectMeta{
++			Name: name,
++		},
++		Spec: clusterv1.MachineDeploymentSpec{
++			Rollout: clusterv1.MachineDeploymentRolloutSpec{
++				Strategy: clusterv1.MachineDeploymentRolloutStrategy{
++					Type: clusterv1.InPlaceMachineDeploymentStrategyType,
++				},
++			},
++			Replicas: pointer.Int32(replicas),
++			Template: clusterv1.MachineTemplateSpec{
++				Spec: clusterv1.MachineSpec{
++					ClusterName: "my-cluster",
++					Version:     version,
++				},
++			},
++		},
++	}
++}
++
++func getMachineSet(name string, version string, replicas int32) *clusterv1.MachineSet {
++	return &clusterv1.MachineSet{
++		ObjectMeta: metav1.ObjectMeta{
++			Name: name,
++		},
++		Spec: clusterv1.MachineSetSpec{
++			Replicas: pointer.Int32(replicas),
++			Template: clusterv1.MachineTemplateSpec{
++				Spec: clusterv1.MachineSpec{
++					ClusterName: "my-cluster",
++					Version:     version,
++				},
++			},
++		},
++	}
++}
++
++func TestRolloutInPlace(t *testing.T) {
++	testCases := []struct {
++		name               string
++		machineDeployment  *clusterv1.MachineDeployment
++		msList             []*clusterv1.MachineSet
++		annotationExpected bool
++		expectErr          bool
++		templateExists     bool
++	}{
++		{
++			name:               "MD template matches MS template",
++			machineDeployment:  getMachineDeployment(mdName, version128, 2),
++			msList:             []*clusterv1.MachineSet{getMachineSet(msName, version128, 2)},
++			annotationExpected: false,
++			expectErr:          false,
++			templateExists:     true,
++		},
++		{
++			name:               "MD template doesn't MS template",
++			machineDeployment:  getMachineDeployment(mdName, version128, 2),
++			msList:             []*clusterv1.MachineSet{getMachineSet(msName, version129, 2)},
++			annotationExpected: true,
++			expectErr:          true,
++			templateExists:     false,
++		},
++	}
++
++	for _, tc := range testCases {
++		t.Run(tc.name, func(t *testing.T) {
++			g := NewWithT(t)
++
++			resources := []client.Object{
++				tc.machineDeployment,
++			}
++
++			for key := range tc.msList {
++				resources = append(resources, tc.msList[key])
++			}
++
++			r := &Reconciler{
++				Client:   fake.NewClientBuilder().WithObjects(resources...).Build(),
++				recorder: record.NewFakeRecorder(32),
++			}
++
++			err := r.rolloutInPlace(ctx, tc.machineDeployment, tc.msList, tc.templateExists)
++			if tc.expectErr {
++				g.Expect(err).To(HaveOccurred())
++			}
++
++			_, ok := tc.machineDeployment.Annotations[clusterv1.MachineDeploymentInPlaceUpgradeAnnotation]
++			g.Expect(ok).To(Equal(tc.annotationExpected))
++		})
++	}
++
++}
+diff --git a/internal/controllers/machinedeployment/mdutil/util.go b/internal/controllers/machinedeployment/mdutil/util.go
+index db7c4a24b..5772af6d4 100644
+--- a/internal/controllers/machinedeployment/mdutil/util.go
++++ b/internal/controllers/machinedeployment/mdutil/util.go
+@@ -680,6 +680,8 @@ func NewMSNewReplicas(deployment *clusterv1.MachineDeployment, allMSs []*cluster
+ 		// the desired number of replicas in the MachineDeployment
+ 		scaleUpCount := *(deployment.Spec.Replicas) - currentMachineCount
+ 		return newMSReplicas + scaleUpCount, nil
++	case clusterv1.InPlaceMachineDeploymentStrategyType:
++		return 0, nil
+ 	default:
+ 		return 0, fmt.Errorf("failed to compute replicas: deployment strategy %v isn't supported", deployment.Spec.Rollout.Strategy.Type)
+ 	}
+-- 
+2.48.1
+
