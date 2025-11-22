@@ -1,0 +1,1631 @@
+From 94a6510badcaef4ba2cdbe1c1c6607731baf084a Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Sat, 6 May 2023 14:08:17 -0500
+Subject: [PATCH 23/39] Patch haproxy maxconn value to avoid ulimit issue
+
+EKS-A uses haproxy 2.5 which errors if the maxconn value
+requires more FDs than allowed by the ulimit setting of docker.
+100k maxconn is too high for the default ulimit on an al2 node.
+---
+ api/bootstrap/kubeadm/v1beta1/conversion.go   |  13 ++
+ .../kubeadm/v1beta1/kubeadm_types.go          |  25 ++++
+ .../v1beta1/zz_generated.conversion.go        |  78 +++++++++--
+ .../kubeadm/v1beta1/zz_generated.deepcopy.go  |  61 +++++++++
+ .../kubeadm/v1beta2/kubeadm_types.go          |  17 +++
+ .../kubeadm/v1beta2/zz_generated.deepcopy.go  |  25 ++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 118 +++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 124 ++++++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        |  16 +++
+ .../internal/bottlerocket/bootstrap_test.go   |  55 ++++++++
+ .../internal/bottlerocket/bottlerocket.go     |  14 ++
+ .../controllers/kubeadmconfig_controller.go   |   9 ++
+ .../zz_generated.conversion.go                |   2 +
+ .../zz_generated.conversion.go                |   2 +
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 118 +++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 124 ++++++++++++++++++
+ .../v1alpha3/zz_generated.conversion.go       |   2 +
+ .../kubeadm/v1alpha4/kubeadm_types.go         |  17 +++
+ .../v1alpha4/zz_generated.conversion.go       |  36 +++++
+ .../kubeadm/v1alpha4/zz_generated.deepcopy.go |  25 ++++
+ .../docker/internal/loadbalancer/config.go    |   7 +-
+ 21 files changed, 877 insertions(+), 11 deletions(-)
+
+diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
+index e7938e854..36d32f9bf 100644
+--- a/api/bootstrap/kubeadm/v1beta1/conversion.go
++++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
+@@ -1039,6 +1039,19 @@ func Convert_v1beta2_User_To_v1beta1_User(in *bootstrapv1.User, out *User, s api
+ 	return nil
+ }
+ 
++func Convert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings(in *BottlerocketSettings, out *bootstrapv1.BottlerocketSettings, _ apimachineryconversion.Scope) error {
++	// Copy the Kubernetes field
++	if in.Kubernetes != nil {
++		out.Kubernetes = &bootstrapv1.BottlerocketKubernetesSettings{
++			MaxPods:              in.Kubernetes.MaxPods,
++			AllowedUnsafeSysctls: in.Kubernetes.AllowedUnsafeSysctls,
++			ClusterDNSIPs:        in.Kubernetes.ClusterDNSIPs,
++		}
++	}
++	// Note: v1beta2 has additional fields (Kernel, Boot) that don't exist in v1beta1, so they remain nil
++	return nil
++}
++
+ func Convert_v1beta1_File_To_v1beta2_File(in *File, out *bootstrapv1.File, s apimachineryconversion.Scope) error {
+ 	if err := autoConvert_v1beta1_File_To_v1beta2_File(in, out, s); err != nil {
+ 		return err
+diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
+index 39bc13db7..e51124d21 100644
+--- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
++++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
+@@ -112,6 +112,10 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
+ 
++	// CertBundles holds additional trusted cert bundles.
++	// +optional
++	CertBundles []CertBundle `json:"certBundles,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+@@ -272,6 +276,15 @@ type BottlerocketBootstrapContainer struct {
+ 	UserData string `json:"userData,omitempty"`
+ }
+ 
++// CertBundle holds the cert data.
++type CertBundle struct {
++	// Name is the name of the cert bundle.
++	Name string `json:"name"`
++
++	// Data is the actual cert.
++	Data string `json:"data"`
++}
++
+ // BottlerocketSettings define bottlerocket settings that can be configured on bottlerocket nodes.
+ // This setting is ONLY for bottlerocket nodes.
+ type BottlerocketSettings struct {
+@@ -281,6 +294,9 @@ type BottlerocketSettings struct {
+ 	// KernelSettings contains additional kernel settings for Bottlerocket.
+ 	// +optional
+ 	Kernel *BottlerocketKernelSettings `json:"kernel,omitempty"`
++
++	// Boot holds the boot-related settings for bottlerocket nodes
++	Boot *BottlerocketBootSettings `json:"boot,omitempty"`
+ }
+ 
+ // BottlerocketKubernetesSettings holds the settings for kubernetes on bottlerocket nodes.
+@@ -302,6 +318,11 @@ type BottlerocketKernelSettings struct {
+ 	SysctlSettings map[string]string `json:"sysctlSettings,omitempty"`
+ }
+ 
++// BottlerocketBootSettings holds the boot-related settings for bottlerocket nodes.
++type BottlerocketBootSettings struct {
++	BootKernelParameters map[string][]string `json:"bootKernelParameters,omitempty"`
++}
++
+ // ProxyConfiguration holds the settings for proxying bottlerocket services
+ type ProxyConfiguration struct {
+ 	// HTTPS proxy
+@@ -702,6 +723,10 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
+ 
++	// CertBundles holds additional trusted cert bundles.
++	// +optional
++	CertBundles []CertBundle `json:"certBundles,omitempty"`
++
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+index 92c5fd94c..14f2053b5 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+@@ -70,6 +70,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketBootSettings)(nil), (*v1beta2.BottlerocketBootSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketBootSettings_To_v1beta2_BottlerocketBootSettings(a.(*BottlerocketBootSettings), b.(*v1beta2.BottlerocketBootSettings), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketBootSettings)(nil), (*BottlerocketBootSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketBootSettings_To_v1beta1_BottlerocketBootSettings(a.(*v1beta2.BottlerocketBootSettings), b.(*BottlerocketBootSettings), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketKernelSettings)(nil), (*v1beta2.BottlerocketKernelSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_BottlerocketKernelSettings_To_v1beta2_BottlerocketKernelSettings(a.(*BottlerocketKernelSettings), b.(*v1beta2.BottlerocketKernelSettings), scope)
+ 	}); err != nil {
+@@ -90,8 +100,13 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*BottlerocketSettings)(nil), (*v1beta2.BottlerocketSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings(a.(*BottlerocketSettings), b.(*v1beta2.BottlerocketSettings), scope)
++	if err := s.AddGeneratedConversionFunc((*CertBundle)(nil), (*v1beta2.CertBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_CertBundle_To_v1beta2_CertBundle(a.(*CertBundle), b.(*v1beta2.CertBundle), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta2.CertBundle)(nil), (*CertBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_CertBundle_To_v1beta1_CertBundle(a.(*v1beta2.CertBundle), b.(*CertBundle), scope)
+ 	}); err != nil {
+ 		return err
+ 	}
+@@ -395,6 +410,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*BottlerocketSettings)(nil), (*v1beta2.BottlerocketSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings(a.(*BottlerocketSettings), b.(*v1beta2.BottlerocketSettings), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*ClusterConfiguration)(nil), (*v1beta2.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_ClusterConfiguration_To_v1beta2_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta2.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -763,6 +783,26 @@ func autoConvert_v1beta2_BottlerocketAdmin_To_v1beta1_BottlerocketAdmin(in *v1be
+ 	return nil
+ }
+ 
++func autoConvert_v1beta1_BottlerocketBootSettings_To_v1beta2_BottlerocketBootSettings(in *BottlerocketBootSettings, out *v1beta2.BottlerocketBootSettings, s conversion.Scope) error {
++	out.BootKernelParameters = *(*map[string][]string)(unsafe.Pointer(&in.BootKernelParameters))
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketBootSettings_To_v1beta2_BottlerocketBootSettings is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketBootSettings_To_v1beta2_BottlerocketBootSettings(in *BottlerocketBootSettings, out *v1beta2.BottlerocketBootSettings, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketBootSettings_To_v1beta2_BottlerocketBootSettings(in, out, s)
++}
++
++func autoConvert_v1beta2_BottlerocketBootSettings_To_v1beta1_BottlerocketBootSettings(in *v1beta2.BottlerocketBootSettings, out *BottlerocketBootSettings, s conversion.Scope) error {
++	out.BootKernelParameters = *(*map[string][]string)(unsafe.Pointer(&in.BootKernelParameters))
++	return nil
++}
++
++// Convert_v1beta2_BottlerocketBootSettings_To_v1beta1_BottlerocketBootSettings is an autogenerated conversion function.
++func Convert_v1beta2_BottlerocketBootSettings_To_v1beta1_BottlerocketBootSettings(in *v1beta2.BottlerocketBootSettings, out *BottlerocketBootSettings, s conversion.Scope) error {
++	return autoConvert_v1beta2_BottlerocketBootSettings_To_v1beta1_BottlerocketBootSettings(in, out, s)
++}
++
+ func autoConvert_v1beta1_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta2.BottlerocketBootstrap, s conversion.Scope) error {
+ 	// WARNING: in.ImageMeta requires manual conversion: does not exist in peer-type
+ 	return nil
+@@ -868,21 +908,39 @@ func Convert_v1beta2_BottlerocketKubernetesSettings_To_v1beta1_BottlerocketKuber
+ func autoConvert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings(in *BottlerocketSettings, out *v1beta2.BottlerocketSettings, s conversion.Scope) error {
+ 	out.Kubernetes = (*v1beta2.BottlerocketKubernetesSettings)(unsafe.Pointer(in.Kubernetes))
+ 	out.Kernel = (*v1beta2.BottlerocketKernelSettings)(unsafe.Pointer(in.Kernel))
++	out.Boot = (*v1beta2.BottlerocketBootSettings)(unsafe.Pointer(in.Boot))
+ 	return nil
+ }
+ 
+-// Convert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings is an autogenerated conversion function.
+-func Convert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings(in *BottlerocketSettings, out *v1beta2.BottlerocketSettings, s conversion.Scope) error {
+-	return autoConvert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings(in, out, s)
+-}
+-
+ func autoConvert_v1beta2_BottlerocketSettings_To_v1beta1_BottlerocketSettings(in *v1beta2.BottlerocketSettings, out *BottlerocketSettings, s conversion.Scope) error {
+ 	out.Kubernetes = (*BottlerocketKubernetesSettings)(unsafe.Pointer(in.Kubernetes))
+ 	out.Kernel = (*BottlerocketKernelSettings)(unsafe.Pointer(in.Kernel))
+-	// WARNING: in.Boot requires manual conversion: does not exist in peer-type
++	out.Boot = (*BottlerocketBootSettings)(unsafe.Pointer(in.Boot))
+ 	return nil
+ }
+ 
++func autoConvert_v1beta1_CertBundle_To_v1beta2_CertBundle(in *CertBundle, out *v1beta2.CertBundle, s conversion.Scope) error {
++	out.Name = in.Name
++	out.Data = in.Data
++	return nil
++}
++
++// Convert_v1beta1_CertBundle_To_v1beta2_CertBundle is an autogenerated conversion function.
++func Convert_v1beta1_CertBundle_To_v1beta2_CertBundle(in *CertBundle, out *v1beta2.CertBundle, s conversion.Scope) error {
++	return autoConvert_v1beta1_CertBundle_To_v1beta2_CertBundle(in, out, s)
++}
++
++func autoConvert_v1beta2_CertBundle_To_v1beta1_CertBundle(in *v1beta2.CertBundle, out *CertBundle, s conversion.Scope) error {
++	out.Name = in.Name
++	out.Data = in.Data
++	return nil
++}
++
++// Convert_v1beta2_CertBundle_To_v1beta1_CertBundle is an autogenerated conversion function.
++func Convert_v1beta2_CertBundle_To_v1beta1_CertBundle(in *v1beta2.CertBundle, out *CertBundle, s conversion.Scope) error {
++	return autoConvert_v1beta2_CertBundle_To_v1beta1_CertBundle(in, out, s)
++}
++
+ func autoConvert_v1beta1_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in *ClusterConfiguration, out *v1beta2.ClusterConfiguration, s conversion.Scope) error {
+ 	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta1_Pause_To_v1beta2_Pause(&in.Pause, &out.Pause, s); err != nil {
+@@ -928,6 +986,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in
+ 	} else {
+ 		out.Bottlerocket = nil
+ 	}
++	out.CertBundles = *(*[]v1beta2.CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -1009,6 +1068,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in
+ 	} else {
+ 		out.Bottlerocket = nil
+ 	}
++	out.CertBundles = *(*[]CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	if err := Convert_v1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -1448,6 +1508,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+ 	} else {
+ 		out.Bottlerocket = nil
+ 	}
++	out.CertBundles = *(*[]v1beta2.CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -1507,6 +1568,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+ 	} else {
+ 		out.Bottlerocket = nil
+ 	}
++	out.CertBundles = *(*[]CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
+index 3c864fbe1..33b5f34c5 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
+@@ -158,6 +158,37 @@ func (in *BottlerocketAdmin) DeepCopy() *BottlerocketAdmin {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootSettings) DeepCopyInto(out *BottlerocketBootSettings) {
++	*out = *in
++	if in.BootKernelParameters != nil {
++		in, out := &in.BootKernelParameters, &out.BootKernelParameters
++		*out = make(map[string][]string, len(*in))
++		for key, val := range *in {
++			var outVal []string
++			if val == nil {
++				(*out)[key] = nil
++			} else {
++				inVal := (*in)[key]
++				in, out := &inVal, &outVal
++				*out = make([]string, len(*in))
++				copy(*out, *in)
++			}
++			(*out)[key] = outVal
++		}
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootSettings.
++func (in *BottlerocketBootSettings) DeepCopy() *BottlerocketBootSettings {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootSettings)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
+ 	*out = *in
+@@ -282,6 +313,11 @@ func (in *BottlerocketSettings) DeepCopyInto(out *BottlerocketSettings) {
+ 		*out = new(BottlerocketKernelSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.Boot != nil {
++		in, out := &in.Boot, &out.Boot
++		*out = new(BottlerocketBootSettings)
++		(*in).DeepCopyInto(*out)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketSettings.
+@@ -294,6 +330,21 @@ func (in *BottlerocketSettings) DeepCopy() *BottlerocketSettings {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *CertBundle) DeepCopyInto(out *CertBundle) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new CertBundle.
++func (in *CertBundle) DeepCopy() *CertBundle {
++	if in == nil {
++		return nil
++	}
++	out := new(CertBundle)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+@@ -317,6 +368,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 		*out = new(BottlerocketSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.CertBundles != nil {
++		in, out := &in.CertBundles, &out.CertBundles
++		*out = make([]CertBundle, len(*in))
++		copy(*out, *in)
++	}
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+@@ -796,6 +852,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 		*out = new(BottlerocketSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.CertBundles != nil {
++		in, out := &in.CertBundles, &out.CertBundles
++		*out = make([]CertBundle, len(*in))
++		copy(*out, *in)
++	}
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
+index b14e984c7..d1007c058 100644
+--- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
++++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
+@@ -182,6 +182,10 @@ type ClusterConfiguration struct {
+ 	// +optional
+ 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
+ 
++	// CertBundles holds additional trusted cert bundles.
++	// +optional
++	CertBundles []CertBundle `json:"certBundles,omitempty"`
++
+ 	// etcd holds configuration for etcd.
+ 	// NB: This value defaults to a Local (stacked) etcd
+ 	// +optional
+@@ -876,6 +880,10 @@ type JoinConfiguration struct {
+ 	// +optional
+ 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
+ 
++	// CertBundles holds additional trusted cert bundles.
++	// +optional
++	CertBundles []CertBundle `json:"certBundles,omitempty"`
++
+ 	// nodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
+ 	// When used in the context of control plane nodes, NodeRegistration should remain consistent
+ 	// across both InitConfiguration and JoinConfiguration
+@@ -927,6 +935,15 @@ func (r *JoinConfiguration) IsDefined() bool {
+ 	return !reflect.DeepEqual(r, &JoinConfiguration{})
+ }
+ 
++// CertBundle holds the cert data.
++type CertBundle struct {
++	// Name is the name of the cert bundle.
++	Name string `json:"name"`
++
++	// Data is the actual cert.
++	Data string `json:"data"`
++}
++
+ // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+ type JoinControlPlane struct {
+ 	// localAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
+diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
+index b7096c404..861fc79b9 100644
+--- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
++++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
+@@ -362,6 +362,21 @@ func (in *BottlerocketSettings) DeepCopy() *BottlerocketSettings {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *CertBundle) DeepCopyInto(out *CertBundle) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new CertBundle.
++func (in *CertBundle) DeepCopy() *CertBundle {
++	if in == nil {
++		return nil
++	}
++	out := new(CertBundle)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+@@ -386,6 +401,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 		*out = new(BottlerocketSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.CertBundles != nil {
++		in, out := &in.CertBundles, &out.CertBundles
++		*out = make([]CertBundle, len(*in))
++		copy(*out, *in)
++	}
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+ 	in.ControllerManager.DeepCopyInto(&out.ControllerManager)
+@@ -770,6 +790,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 		*out = new(BottlerocketSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.CertBundles != nil {
++		in, out := &in.CertBundles, &out.CertBundles
++		*out = make([]CertBundle, len(*in))
++		copy(*out, *in)
++	}
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index dda0c90bf..3c0610254 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -1293,6 +1293,22 @@ spec:
+                       - superpowered
+                       type: object
+                     type: array
++                  certBundles:
++                    description: CertBundles holds additional trusted cert bundles.
++                    items:
++                      description: CertBundle holds the cert data.
++                      properties:
++                        data:
++                          description: Data is the actual cert.
++                          type: string
++                        name:
++                          description: Name is the name of the cert bundle.
++                          type: string
++                      required:
++                      - data
++                      - name
++                      type: object
++                    type: array
+                   certificatesDir:
+                     description: |-
+                       certificatesDir specifies where to store or look for all required certificates.
+@@ -2078,6 +2094,22 @@ spec:
+                       secure comunications between node and control-plane.
+                       Defaults to "/etc/kubernetes/pki/ca.crt".
+                     type: string
++                  certBundles:
++                    description: CertBundles holds additional trusted cert bundles.
++                    items:
++                      description: CertBundle holds the cert data.
++                      properties:
++                        data:
++                          description: Data is the actual cert.
++                          type: string
++                        name:
++                          description: Name is the name of the cert bundle.
++                          type: string
++                      required:
++                      - data
++                      - name
++                      type: object
++                    type: array
+                   controlPlane:
+                     description: |-
+                       controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -2704,6 +2736,17 @@ spec:
+                       Bottlerocket holds configuration for certain bottlerocket settings.
+                       This is only for bottlerocket.
+                     properties:
++                      boot:
++                        description: Boot holds the boot-related settings for bottlerocket
++                          nodes
++                        properties:
++                          bootKernelParameters:
++                            additionalProperties:
++                              items:
++                                type: string
++                              type: array
++                            type: object
++                        type: object
+                       kernel:
+                         description: KernelSettings contains additional kernel settings
+                           for Bottlerocket.
+@@ -2889,6 +2932,22 @@ spec:
+                       - superpowered
+                       type: object
+                     type: array
++                  certBundles:
++                    description: CertBundles holds additional trusted cert bundles.
++                    items:
++                      description: CertBundle holds the cert data.
++                      properties:
++                        data:
++                          description: Data is the actual cert.
++                          type: string
++                        name:
++                          description: Name is the name of the cert bundle.
++                          type: string
++                      required:
++                      - data
++                      - name
++                      type: object
++                    type: array
+                   certificatesDir:
+                     description: |-
+                       certificatesDir specifies where to store or look for all required certificates.
+@@ -4058,6 +4117,17 @@ spec:
+                       Bottlerocket holds configuration for certain bottlerocket settings.
+                       This is only for bottlerocket.
+                     properties:
++                      boot:
++                        description: Boot holds the boot-related settings for bottlerocket
++                          nodes
++                        properties:
++                          bootKernelParameters:
++                            additionalProperties:
++                              items:
++                                type: string
++                              type: array
++                            type: object
++                        type: object
+                       kernel:
+                         description: KernelSettings contains additional kernel settings
+                           for Bottlerocket.
+@@ -4251,6 +4321,22 @@ spec:
+                     maxLength: 512
+                     minLength: 1
+                     type: string
++                  certBundles:
++                    description: CertBundles holds additional trusted cert bundles.
++                    items:
++                      description: CertBundle holds the cert data.
++                      properties:
++                        data:
++                          description: Data is the actual cert.
++                          type: string
++                        name:
++                          description: Name is the name of the cert bundle.
++                          type: string
++                      required:
++                      - data
++                      - name
++                      type: object
++                    type: array
+                   controlPlane:
+                     description: |-
+                       controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -5492,6 +5578,22 @@ spec:
+                     maximum: 36500
+                     minimum: 1
+                     type: integer
++                  certBundles:
++                    description: CertBundles holds additional trusted cert bundles.
++                    items:
++                      description: CertBundle holds the cert data.
++                      properties:
++                        data:
++                          description: Data is the actual cert.
++                          type: string
++                        name:
++                          description: Name is the name of the cert bundle.
++                          type: string
++                      required:
++                      - data
++                      - name
++                      type: object
++                    type: array
+                   certificateValidityPeriodDays:
+                     description: |-
+                       certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
+@@ -7009,6 +7111,22 @@ spec:
+                     maxLength: 512
+                     minLength: 1
+                     type: string
++                  certBundles:
++                    description: CertBundles holds additional trusted cert bundles.
++                    items:
++                      description: CertBundle holds the cert data.
++                      properties:
++                        data:
++                          description: Data is the actual cert.
++                          type: string
++                        name:
++                          description: Name is the name of the cert bundle.
++                          type: string
++                      required:
++                      - data
++                      - name
++                      type: object
++                    type: array
+                   controlPlane:
+                     description: |-
+                       controlPlane defines the additional control plane instance to be deployed on the joining node.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 59f80a31b..e11c9971f 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -1258,6 +1258,23 @@ spec:
+                               - superpowered
+                               type: object
+                             type: array
++                          certBundles:
++                            description: CertBundles holds additional trusted cert
++                              bundles.
++                            items:
++                              description: CertBundle holds the cert data.
++                              properties:
++                                data:
++                                  description: Data is the actual cert.
++                                  type: string
++                                name:
++                                  description: Name is the name of the cert bundle.
++                                  type: string
++                              required:
++                              - data
++                              - name
++                              type: object
++                            type: array
+                           certificatesDir:
+                             description: |-
+                               certificatesDir specifies where to store or look for all required certificates.
+@@ -2060,6 +2077,23 @@ spec:
+                               secure comunications between node and control-plane.
+                               Defaults to "/etc/kubernetes/pki/ca.crt".
+                             type: string
++                          certBundles:
++                            description: CertBundles holds additional trusted cert
++                              bundles.
++                            items:
++                              description: CertBundle holds the cert data.
++                              properties:
++                                data:
++                                  description: Data is the actual cert.
++                                  type: string
++                                name:
++                                  description: Name is the name of the cert bundle.
++                                  type: string
++                              required:
++                              - data
++                              - name
++                              type: object
++                            type: array
+                           controlPlane:
+                             description: |-
+                               controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -2665,6 +2699,17 @@ spec:
+                               Bottlerocket holds configuration for certain bottlerocket settings.
+                               This is only for bottlerocket.
+                             properties:
++                              boot:
++                                description: Boot holds the boot-related settings
++                                  for bottlerocket nodes
++                                properties:
++                                  bootKernelParameters:
++                                    additionalProperties:
++                                      items:
++                                        type: string
++                                      type: array
++                                    type: object
++                                type: object
+                               kernel:
+                                 description: KernelSettings contains additional kernel
+                                   settings for Bottlerocket.
+@@ -2852,6 +2897,23 @@ spec:
+                               - superpowered
+                               type: object
+                             type: array
++                          certBundles:
++                            description: CertBundles holds additional trusted cert
++                              bundles.
++                            items:
++                              description: CertBundle holds the cert data.
++                              properties:
++                                data:
++                                  description: Data is the actual cert.
++                                  type: string
++                                name:
++                                  description: Name is the name of the cert bundle.
++                                  type: string
++                              required:
++                              - data
++                              - name
++                              type: object
++                            type: array
+                           certificatesDir:
+                             description: |-
+                               certificatesDir specifies where to store or look for all required certificates.
+@@ -4051,6 +4113,17 @@ spec:
+                               Bottlerocket holds configuration for certain bottlerocket settings.
+                               This is only for bottlerocket.
+                             properties:
++                              boot:
++                                description: Boot holds the boot-related settings
++                                  for bottlerocket nodes
++                                properties:
++                                  bootKernelParameters:
++                                    additionalProperties:
++                                      items:
++                                        type: string
++                                      type: array
++                                    type: object
++                                type: object
+                               kernel:
+                                 description: KernelSettings contains additional kernel
+                                   settings for Bottlerocket.
+@@ -4246,6 +4319,23 @@ spec:
+                             maxLength: 512
+                             minLength: 1
+                             type: string
++                          certBundles:
++                            description: CertBundles holds additional trusted cert
++                              bundles.
++                            items:
++                              description: CertBundle holds the cert data.
++                              properties:
++                                data:
++                                  description: Data is the actual cert.
++                                  type: string
++                                name:
++                                  description: Name is the name of the cert bundle.
++                                  type: string
++                              required:
++                              - data
++                              - name
++                              type: object
++                            type: array
+                           controlPlane:
+                             description: |-
+                               controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -5385,6 +5475,23 @@ spec:
+                             maximum: 36500
+                             minimum: 1
+                             type: integer
++                          certBundles:
++                            description: CertBundles holds additional trusted cert
++                              bundles.
++                            items:
++                              description: CertBundle holds the cert data.
++                              properties:
++                                data:
++                                  description: Data is the actual cert.
++                                  type: string
++                                name:
++                                  description: Name is the name of the cert bundle.
++                                  type: string
++                              required:
++                              - data
++                              - name
++                              type: object
++                            type: array
+                           certificateValidityPeriodDays:
+                             description: |-
+                               certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
+@@ -6933,6 +7040,23 @@ spec:
+                             maxLength: 512
+                             minLength: 1
+                             type: string
++                          certBundles:
++                            description: CertBundles holds additional trusted cert
++                              bundles.
++                            items:
++                              description: CertBundle holds the cert data.
++                              properties:
++                                data:
++                                  description: Data is the actual cert.
++                                  type: string
++                                name:
++                                  description: Name is the name of the cert bundle.
++                                  type: string
++                              required:
++                              - data
++                              - name
++                              type: object
++                            type: array
+                           controlPlane:
+                             description: |-
+                               controlPlane defines the additional control plane instance to be deployed on the joining node.
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index 649912960..b3cf9a03f 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -128,6 +128,18 @@ reboot-to-reconcile = true
+ [settings.boot.kernel-parameters]
+ {{.BootKernel}}
+ {{- end -}}
++`
++	certsTemplate = `{{ define "certsSettings" -}}
++[settings.pki.{{.Name}}]
++data = "{{.Data}}"
++trusted = true
++{{- end -}}
++`
++	certBundlesSliceTemplate = `{{ define "certBundlesSlice" -}}
++{{- range $cBundle := .CertBundles }}
++{{template "certsSettings" $cBundle }}
++{{- end -}}
++{{- end -}}
+ `
+ 
+ 	bottlerocketNodeInitSettingsTemplate = `{{template "hostContainerSlice" .}}
+@@ -172,5 +184,9 @@ reboot-to-reconcile = true
+ {{- if .BootKernel}}
+ {{template "bootSettings" .}}
+ {{- end -}}
++
++{{- if .CertBundles}}
++{{template "certBundlesSlice" .}}
++{{- end -}}
+ `
+ )
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+index 02bb55b5d..7d1f8c6f5 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
+@@ -309,6 +309,35 @@ reboot-to-reconcile = true
+ "abc" = ["def","123"]
+ "foo" = ["bar"]
+ `
++	userDataWithCertBundle = `
++[settings.host-containers.admin]
++enabled = true
++superpowered = true
++source = "ADMIN_REPO:ADMIN_TAG"
++user-data = "CnsKCSJzc2giOiB7CgkJImF1dGhvcml6ZWQta2V5cyI6IFsic3NoLXJzYSBBQUEuLi4iXQoJfQp9"
++[settings.host-containers.kubeadm-bootstrap]
++enabled = true
++superpowered = true
++source = "BOOTSTRAP_REPO:BOOTSTRAP_TAG"
++user-data = "Qk9UVExFUk9DS0VUX0JPT1RTVFJBUF9VU0VSREFUQQ=="
++
++[settings.kubernetes]
++cluster-domain = "cluster.local"
++standalone-mode = true
++authentication-mode = "tls"
++server-tls-bootstrap = false
++pod-infra-container-image = "PAUSE_REPO:PAUSE_TAG"
++provider-id = "PROVIDERID"
++
++[settings.network]
++hostname = "hostname"
++
++[settings.pki.bundle1]
++data = "QUJDREVG"
++trusted = true
++[settings.pki.bundle2]
++data = "MTIzNDU2"
++trusted = true`
+ )
+ 
+ var (
+@@ -596,6 +625,32 @@ func TestGetBottlerocketNodeUserData(t *testing.T) {
+ 			},
+ 			output: BootSettingsUserData,
+ 		},
++		{
++			name: "with custom cert bundle settings",
++			config: &BottlerocketConfig{
++				BottlerocketAdmin:     brAdmin,
++				BottlerocketBootstrap: brBootstrap,
++				Hostname:              hostname,
++				Pause:                 pause,
++				KubeletExtraArgs: []bootstrapv1.Arg{
++					{
++						Name:  "provider-id",
++						Value: stringPtr("PROVIDERID"),
++					},
++				},
++				CertBundle: []bootstrapv1.CertBundle{
++					{
++						Name: "bundle1",
++						Data: "ABCDEF",
++					},
++					{
++						Name: "bundle2",
++						Data: "123456",
++					},
++				},
++			},
++			output: userDataWithCertBundle,
++		},
+ 	}
+ 	for _, testcase := range testcases {
+ 		t.Run(testcase.name, func(t *testing.T) {
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 42b4b3032..858b35790 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -37,6 +37,7 @@ type BottlerocketConfig struct {
+ 	BottlerocketCustomBootstrapContainers []bootstrapv1.BottlerocketBootstrapContainer
+ 	NTPServers                            []string
+ 	Hostname                              string
++	CertBundle                            []bootstrapv1.CertBundle
+ 	RegistryMirrorCredentials
+ }
+ 
+@@ -65,6 +66,7 @@ type BottlerocketSettingsInput struct {
+ 	HostContainers             []bootstrapv1.BottlerocketHostContainer
+ 	BootstrapContainers        []bootstrapv1.BottlerocketBootstrapContainer
+ 	SysctlSettings             string
++	CertBundles                []bootstrapv1.CertBundle
+ }
+ 
+ // HostPath holds the path and type of a host path volume.
+@@ -168,6 +170,12 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ 	if _, err := tm.Parse(bootSettingsTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse boot settings %s template", kind)
+ 	}
++	if _, err := tm.Parse(certsTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse certs %s template", kind)
++	}
++	if _, err := tm.Parse(certBundlesSliceTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse cert bundles %s template", kind)
++	}
+ 	t, err := tm.Parse(tpl)
+ 	if err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
+@@ -274,6 +282,12 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 		}
+ 
+ 	}
++	if config.CertBundle != nil {
++		for _, cert := range config.CertBundle {
++			cert.Data = base64.StdEncoding.EncodeToString([]byte(cert.Data))
++			bottlerocketInput.CertBundles = append(bottlerocketInput.CertBundles, cert)
++		}
++	}
+ 
+ 	return generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
+ }
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 0b45410c8..142ad064a 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -599,6 +599,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
+ 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
+ 		}
++		if scope.Config.Spec.ClusterConfiguration.CertBundles != nil {
++			bottlerocketConfig.CertBundle = scope.Config.Spec.ClusterConfiguration.CertBundles
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
+@@ -922,6 +925,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
+ 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
+ 		}
++		if scope.Config.Spec.JoinConfiguration.CertBundles != nil {
++			bottlerocketConfig.CertBundle = scope.Config.Spec.JoinConfiguration.CertBundles
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+@@ -1126,6 +1132,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
+ 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
+ 		}
++		if scope.Config.Spec.JoinConfiguration.CertBundles != nil {
++			bottlerocketConfig.CertBundle = scope.Config.Spec.JoinConfiguration.CertBundles
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index dc6fba9d6..dcfbb99ef 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -484,6 +484,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
++	// WARNING: in.CertBundles requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -727,6 +728,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
++	// WARNING: in.CertBundles requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+index 8410860d4..ab97aca2d 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+@@ -512,6 +512,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
++	// WARNING: in.CertBundles requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_Etcd_To_upstreamv1beta4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -772,6 +773,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta4_JoinConfiguration(
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
++	// WARNING: in.CertBundles requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 3f741f860..ba8a636af 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -1522,6 +1522,22 @@ spec:
+                           - superpowered
+                           type: object
+                         type: array
++                      certBundles:
++                        description: CertBundles holds additional trusted cert bundles.
++                        items:
++                          description: CertBundle holds the cert data.
++                          properties:
++                            data:
++                              description: Data is the actual cert.
++                              type: string
++                            name:
++                              description: Name is the name of the cert bundle.
++                              type: string
++                          required:
++                          - data
++                          - name
++                          type: object
++                        type: array
+                       certificatesDir:
+                         description: |-
+                           certificatesDir specifies where to store or look for all required certificates.
+@@ -2318,6 +2334,22 @@ spec:
+                           secure comunications between node and control-plane.
+                           Defaults to "/etc/kubernetes/pki/ca.crt".
+                         type: string
++                      certBundles:
++                        description: CertBundles holds additional trusted cert bundles.
++                        items:
++                          description: CertBundle holds the cert data.
++                          properties:
++                            data:
++                              description: Data is the actual cert.
++                              type: string
++                            name:
++                              description: Name is the name of the cert bundle.
++                              type: string
++                          required:
++                          - data
++                          - name
++                          type: object
++                        type: array
+                       controlPlane:
+                         description: |-
+                           controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -3183,6 +3215,17 @@ spec:
+                           Bottlerocket holds configuration for certain bottlerocket settings.
+                           This is only for bottlerocket.
+                         properties:
++                          boot:
++                            description: Boot holds the boot-related settings for
++                              bottlerocket nodes
++                            properties:
++                              bootKernelParameters:
++                                additionalProperties:
++                                  items:
++                                    type: string
++                                  type: array
++                                type: object
++                            type: object
+                           kernel:
+                             description: KernelSettings contains additional kernel
+                               settings for Bottlerocket.
+@@ -3369,6 +3412,22 @@ spec:
+                           - superpowered
+                           type: object
+                         type: array
++                      certBundles:
++                        description: CertBundles holds additional trusted cert bundles.
++                        items:
++                          description: CertBundle holds the cert data.
++                          properties:
++                            data:
++                              description: Data is the actual cert.
++                              type: string
++                            name:
++                              description: Name is the name of the cert bundle.
++                              type: string
++                          required:
++                          - data
++                          - name
++                          type: object
++                        type: array
+                       certificatesDir:
+                         description: |-
+                           certificatesDir specifies where to store or look for all required certificates.
+@@ -4553,6 +4612,17 @@ spec:
+                           Bottlerocket holds configuration for certain bottlerocket settings.
+                           This is only for bottlerocket.
+                         properties:
++                          boot:
++                            description: Boot holds the boot-related settings for
++                              bottlerocket nodes
++                            properties:
++                              bootKernelParameters:
++                                additionalProperties:
++                                  items:
++                                    type: string
++                                  type: array
++                                type: object
++                            type: object
+                           kernel:
+                             description: KernelSettings contains additional kernel
+                               settings for Bottlerocket.
+@@ -4747,6 +4817,22 @@ spec:
+                         maxLength: 512
+                         minLength: 1
+                         type: string
++                      certBundles:
++                        description: CertBundles holds additional trusted cert bundles.
++                        items:
++                          description: CertBundle holds the cert data.
++                          properties:
++                            data:
++                              description: Data is the actual cert.
++                              type: string
++                            name:
++                              description: Name is the name of the cert bundle.
++                              type: string
++                          required:
++                          - data
++                          - name
++                          type: object
++                        type: array
+                       controlPlane:
+                         description: |-
+                           controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -6421,6 +6507,22 @@ spec:
+                         maximum: 36500
+                         minimum: 1
+                         type: integer
++                      certBundles:
++                        description: CertBundles holds additional trusted cert bundles.
++                        items:
++                          description: CertBundle holds the cert data.
++                          properties:
++                            data:
++                              description: Data is the actual cert.
++                              type: string
++                            name:
++                              description: Name is the name of the cert bundle.
++                              type: string
++                          required:
++                          - data
++                          - name
++                          type: object
++                        type: array
+                       certificateValidityPeriodDays:
+                         description: |-
+                           certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
+@@ -7952,6 +8054,22 @@ spec:
+                         maxLength: 512
+                         minLength: 1
+                         type: string
++                      certBundles:
++                        description: CertBundles holds additional trusted cert bundles.
++                        items:
++                          description: CertBundle holds the cert data.
++                          properties:
++                            data:
++                              description: Data is the actual cert.
++                              type: string
++                            name:
++                              description: Name is the name of the cert bundle.
++                              type: string
++                          required:
++                          - data
++                          - name
++                          type: object
++                        type: array
+                       controlPlane:
+                         description: |-
+                           controlPlane defines the additional control plane instance to be deployed on the joining node.
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index e21982f89..e0adc0170 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -315,6 +315,23 @@ spec:
+                                   - superpowered
+                                   type: object
+                                 type: array
++                              certBundles:
++                                description: CertBundles holds additional trusted
++                                  cert bundles.
++                                items:
++                                  description: CertBundle holds the cert data.
++                                  properties:
++                                    data:
++                                      description: Data is the actual cert.
++                                      type: string
++                                    name:
++                                      description: Name is the name of the cert bundle.
++                                      type: string
++                                  required:
++                                  - data
++                                  - name
++                                  type: object
++                                type: array
+                               certificatesDir:
+                                 description: |-
+                                   certificatesDir specifies where to store or look for all required certificates.
+@@ -1127,6 +1144,23 @@ spec:
+                                   secure comunications between node and control-plane.
+                                   Defaults to "/etc/kubernetes/pki/ca.crt".
+                                 type: string
++                              certBundles:
++                                description: CertBundles holds additional trusted
++                                  cert bundles.
++                                items:
++                                  description: CertBundle holds the cert data.
++                                  properties:
++                                    data:
++                                      description: Data is the actual cert.
++                                      type: string
++                                    name:
++                                      description: Name is the name of the cert bundle.
++                                      type: string
++                                  required:
++                                  - data
++                                  - name
++                                  type: object
++                                type: array
+                               controlPlane:
+                                 description: |-
+                                   controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -1884,6 +1918,17 @@ spec:
+                                   Bottlerocket holds configuration for certain bottlerocket settings.
+                                   This is only for bottlerocket.
+                                 properties:
++                                  boot:
++                                    description: Boot holds the boot-related settings
++                                      for bottlerocket nodes
++                                    properties:
++                                      bootKernelParameters:
++                                        additionalProperties:
++                                          items:
++                                            type: string
++                                          type: array
++                                        type: object
++                                    type: object
+                                   kernel:
+                                     description: KernelSettings contains additional
+                                       kernel settings for Bottlerocket.
+@@ -2075,6 +2120,23 @@ spec:
+                                   - superpowered
+                                   type: object
+                                 type: array
++                              certBundles:
++                                description: CertBundles holds additional trusted
++                                  cert bundles.
++                                items:
++                                  description: CertBundle holds the cert data.
++                                  properties:
++                                    data:
++                                      description: Data is the actual cert.
++                                      type: string
++                                    name:
++                                      description: Name is the name of the cert bundle.
++                                      type: string
++                                  required:
++                                  - data
++                                  - name
++                                  type: object
++                                type: array
+                               certificatesDir:
+                                 description: |-
+                                   certificatesDir specifies where to store or look for all required certificates.
+@@ -3288,6 +3350,17 @@ spec:
+                                   Bottlerocket holds configuration for certain bottlerocket settings.
+                                   This is only for bottlerocket.
+                                 properties:
++                                  boot:
++                                    description: Boot holds the boot-related settings
++                                      for bottlerocket nodes
++                                    properties:
++                                      bootKernelParameters:
++                                        additionalProperties:
++                                          items:
++                                            type: string
++                                          type: array
++                                        type: object
++                                    type: object
+                                   kernel:
+                                     description: KernelSettings contains additional
+                                       kernel settings for Bottlerocket.
+@@ -3487,6 +3560,23 @@ spec:
+                                 maxLength: 512
+                                 minLength: 1
+                                 type: string
++                              certBundles:
++                                description: CertBundles holds additional trusted
++                                  cert bundles.
++                                items:
++                                  description: CertBundle holds the cert data.
++                                  properties:
++                                    data:
++                                      description: Data is the actual cert.
++                                      type: string
++                                    name:
++                                      description: Name is the name of the cert bundle.
++                                      type: string
++                                  required:
++                                  - data
++                                  - name
++                                  type: object
++                                type: array
+                               controlPlane:
+                                 description: |-
+                                   controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -4819,6 +4909,23 @@ spec:
+                                 maximum: 36500
+                                 minimum: 1
+                                 type: integer
++                              certBundles:
++                                description: CertBundles holds additional trusted
++                                  cert bundles.
++                                items:
++                                  description: CertBundle holds the cert data.
++                                  properties:
++                                    data:
++                                      description: Data is the actual cert.
++                                      type: string
++                                    name:
++                                      description: Name is the name of the cert bundle.
++                                      type: string
++                                  required:
++                                  - data
++                                  - name
++                                  type: object
++                                type: array
+                               certificateValidityPeriodDays:
+                                 description: |-
+                                   certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
+@@ -6390,6 +6497,23 @@ spec:
+                                 maxLength: 512
+                                 minLength: 1
+                                 type: string
++                              certBundles:
++                                description: CertBundles holds additional trusted
++                                  cert bundles.
++                                items:
++                                  description: CertBundle holds the cert data.
++                                  properties:
++                                    data:
++                                      description: Data is the actual cert.
++                                      type: string
++                                    name:
++                                      description: Name is the name of the cert bundle.
++                                      type: string
++                                  required:
++                                  - data
++                                  - name
++                                  type: object
++                                type: array
+                               controlPlane:
+                                 description: |-
+                                   controlPlane defines the additional control plane instance to be deployed on the joining node.
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
+index 8778a335c..711d81553 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
+@@ -549,6 +549,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(i
+ 	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
++	// WARNING: in.CertBundles requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_Etcd_To_v1alpha3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -902,6 +903,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *v1b
+ 	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
++	// WARNING: in.CertBundles requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1alpha3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+index 242542b16..1530e2c95 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+@@ -171,6 +171,10 @@ type ClusterConfiguration struct {
+ 	// This is only for bottlerocket.
+ 	// +optional
+ 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
++
++	// CertBundles holds additional trusted cert bundles.
++	// +optional
++	CertBundles []CertBundle `json:"certBundles,omitempty"`
+ }
+ 
+ // BottlerocketSettings define bottlerocket settings that can be configured on bottlerocket nodes.
+@@ -518,6 +522,10 @@ type JoinConfiguration struct {
+ 	// This is only for bottlerocket.
+ 	// +optional
+ 	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
++
++	// CertBundles holds additional trusted cert bundles.
++	// +optional
++	CertBundles []CertBundle `json:"certBundles,omitempty"`
+ }
+ 
+ // BottlerocketHostContainer describes a host image for Bottlerocket
+@@ -558,6 +566,15 @@ type BottlerocketBootstrapContainer struct {
+ 	UserData string `json:"userData,omitempty"`
+ }
+ 
++// CertBundle holds the cert data.
++type CertBundle struct {
++	// Name is the name of the cert bundle.
++	Name string `json:"name"`
++
++	// Data is the actual cert.
++	Data string `json:"data"`
++}
++
+ // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+ type JoinControlPlane struct {
+ 	// localAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+index 2e89b7cda..9ff4a7a8f 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+@@ -109,6 +109,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*CertBundle)(nil), (*v1beta2.CertBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1alpha4_CertBundle_To_v1beta2_CertBundle(a.(*CertBundle), b.(*v1beta2.CertBundle), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta2.CertBundle)(nil), (*CertBundle)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_CertBundle_To_v1alpha4_CertBundle(a.(*v1beta2.CertBundle), b.(*CertBundle), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*DiskSetup)(nil), (*v1beta2.DiskSetup)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1alpha4_DiskSetup_To_v1beta2_DiskSetup(a.(*DiskSetup), b.(*v1beta2.DiskSetup), scope)
+ 	}); err != nil {
+@@ -788,6 +798,28 @@ func Convert_v1beta2_BottlerocketSettings_To_v1alpha4_BottlerocketSettings(in *v
+ 	return autoConvert_v1beta2_BottlerocketSettings_To_v1alpha4_BottlerocketSettings(in, out, s)
+ }
+ 
++func autoConvert_v1alpha4_CertBundle_To_v1beta2_CertBundle(in *CertBundle, out *v1beta2.CertBundle, s conversion.Scope) error {
++	out.Name = in.Name
++	out.Data = in.Data
++	return nil
++}
++
++// Convert_v1alpha4_CertBundle_To_v1beta2_CertBundle is an autogenerated conversion function.
++func Convert_v1alpha4_CertBundle_To_v1beta2_CertBundle(in *CertBundle, out *v1beta2.CertBundle, s conversion.Scope) error {
++	return autoConvert_v1alpha4_CertBundle_To_v1beta2_CertBundle(in, out, s)
++}
++
++func autoConvert_v1beta2_CertBundle_To_v1alpha4_CertBundle(in *v1beta2.CertBundle, out *CertBundle, s conversion.Scope) error {
++	out.Name = in.Name
++	out.Data = in.Data
++	return nil
++}
++
++// Convert_v1beta2_CertBundle_To_v1alpha4_CertBundle is an autogenerated conversion function.
++func Convert_v1beta2_CertBundle_To_v1alpha4_CertBundle(in *v1beta2.CertBundle, out *CertBundle, s conversion.Scope) error {
++	return autoConvert_v1beta2_CertBundle_To_v1alpha4_CertBundle(in, out, s)
++}
++
+ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in *ClusterConfiguration, out *v1beta2.ClusterConfiguration, s conversion.Scope) error {
+ 	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1alpha4_Pause_To_v1beta2_Pause(&in.Pause, &out.Pause, s); err != nil {
+@@ -853,6 +885,7 @@ func autoConvert_v1alpha4_ClusterConfiguration_To_v1beta2_ClusterConfiguration(i
+ 		out.BottlerocketCustomBootstrapContainers = nil
+ 	}
+ 	out.Bottlerocket = (*v1beta2.BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
++	out.CertBundles = *(*[]v1beta2.CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	return nil
+ }
+ 
+@@ -898,6 +931,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1alpha4_ClusterConfiguration(i
+ 		out.BottlerocketCustomBootstrapContainers = nil
+ 	}
+ 	out.Bottlerocket = (*BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
++	out.CertBundles = *(*[]CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	if err := Convert_v1beta2_Etcd_To_v1alpha4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -1278,6 +1312,7 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
+ 		out.BottlerocketCustomBootstrapContainers = nil
+ 	}
+ 	out.Bottlerocket = (*v1beta2.BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
++	out.CertBundles = *(*[]v1beta2.CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	return nil
+ }
+ 
+@@ -1323,6 +1358,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+ 		out.BottlerocketCustomBootstrapContainers = nil
+ 	}
+ 	out.Bottlerocket = (*BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
++	out.CertBundles = *(*[]CertBundle)(unsafe.Pointer(&in.CertBundles))
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+index 2370cf392..e64e5d0bf 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
+@@ -330,6 +330,21 @@ func (in *BottlerocketSettings) DeepCopy() *BottlerocketSettings {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *CertBundle) DeepCopyInto(out *CertBundle) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new CertBundle.
++func (in *CertBundle) DeepCopy() *CertBundle {
++	if in == nil {
++		return nil
++	}
++	out := new(CertBundle)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+@@ -368,6 +383,11 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 		*out = new(BottlerocketSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.CertBundles != nil {
++		in, out := &in.CertBundles, &out.CertBundles
++		*out = make([]CertBundle, len(*in))
++		copy(*out, *in)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterConfiguration.
+@@ -716,6 +736,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 		*out = new(BottlerocketSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.CertBundles != nil {
++		in, out := &in.CertBundles, &out.CertBundles
++		*out = make([]CertBundle, len(*in))
++		copy(*out, *in)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new JoinConfiguration.
+diff --git a/test/infrastructure/docker/internal/loadbalancer/config.go b/test/infrastructure/docker/internal/loadbalancer/config.go
+index ada49d6d1..c7dfa01f5 100644
+--- a/test/infrastructure/docker/internal/loadbalancer/config.go
++++ b/test/infrastructure/docker/internal/loadbalancer/config.go
+@@ -44,9 +44,10 @@ global
+   log /dev/log local0
+   log /dev/log local1 notice
+   daemon
+-  # limit memory usage to approximately 18 MB
+-  # (see https://github.com/kubernetes-sigs/kind/pull/3115)
+-  maxconn 100000
++  # EKS-A Change to 10k instead of 100k to avoid needing to raise default
++  # ulimits on al2 nodes and 10k seems like a reasonable default for
++  # our use cases
++  maxconn 10000
+ 
+ resolvers docker
+   nameserver dns 127.0.0.11:53
+-- 
+2.48.1
+

@@ -1,0 +1,148 @@
+From 3590a905f223bdd3fd272d3aac6ed67bef16c068 Mon Sep 17 00:00:00 2001
+From: Vivek Koppuru <koppv@amazon.com>
+Date: Mon, 24 Jan 2022 00:46:44 -0800
+Subject: [PATCH 10/39] Add node labels support for bottlerocket
+
+---
+ .../internal/bottlerocket/bootstrap.go        |  9 +++++
+ .../internal/bottlerocket/bottlerocket.go     | 35 +++++++++++++++++++
+ .../controllers/kubeadmconfig_controller.go   |  9 +++++
+ 3 files changed, 53 insertions(+)
+
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+index 4e1de77db..3ebb9240a 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
+@@ -42,6 +42,11 @@ no-proxy = [{{stringsJoin .NoProxyEndpoints "," }}]
+ data = "{{.RegistryMirrorCACert}}"
+ trusted=true
+ {{- end -}}
++`
++	nodeLabelsTemplate = `{{ define "nodeLabelSettings" -}}
++[settings.kubernetes.node-labels]
++{{.NodeLabels}}
++{{- end -}}
+ `
+ 	bottlerocketNodeInitSettingsTemplate = `{{template "bootstrapHostContainerSettings" .}}
+ 
+@@ -60,5 +65,9 @@ trusted=true
+ {{- if (ne .RegistryMirrorCACert "")}}
+ {{template "registryMirrorCACertSettings" .}}
+ {{- end -}}
++
++{{- if (ne .NodeLabels "")}}
++{{template "nodeLabelSettings" .}}
++{{- end -}}
+ `
+ )
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index 4f7329625..245c3addd 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -27,6 +27,7 @@ type BottlerocketConfig struct {
+ 	BottlerocketBootstrap       bootstrapv1.BottlerocketBootstrap
+ 	ProxyConfiguration          bootstrapv1.ProxyConfiguration
+ 	RegistryMirrorConfiguration bootstrapv1.RegistryMirrorConfiguration
++	KubeletExtraArgs            []bootstrapv1.Arg
+ }
+ 
+ type BottlerocketSettingsInput struct {
+@@ -38,6 +39,7 @@ type BottlerocketSettingsInput struct {
+ 	NoProxyEndpoints           []string
+ 	RegistryMirrorEndpoint     string
+ 	RegistryMirrorCACert       string
++	NodeLabels                 string
+ }
+ 
+ type HostPath struct {
+@@ -100,6 +102,9 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ 	if _, err := tm.Parse(registryMirrorCACertTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse registry mirror ca cert %s template", kind)
+ 	}
++	if _, err := tm.Parse(nodeLabelsTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse node labels %s template", kind)
++	}
+ 	t, err := tm.Parse(tpl)
+ 	if err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
+@@ -134,6 +139,7 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 		PauseContainerSource:       fmt.Sprintf("%s:%s", config.Pause.ImageRepository, config.Pause.ImageTag),
+ 		HTTPSProxyEndpoint:         config.ProxyConfiguration.HTTPSProxy,
+ 		RegistryMirrorEndpoint:     config.RegistryMirrorConfiguration.Endpoint,
++		NodeLabels:                 parseNodeLabels(getArgValue(config.KubeletExtraArgs, "node-labels")), // empty string if it does not exist
+ 	}
+ 	if len(config.ProxyConfiguration.NoProxy) > 0 {
+ 		for _, noProxy := range config.ProxyConfiguration.NoProxy {
+@@ -151,6 +157,35 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 	return bottlerocketNodeUserData, nil
+ }
+ 
++// getArgValue searches for an argument by name in the slice and returns its value.
++// Returns empty string if the argument is not found or if the value is nil.
++func getArgValue(args []bootstrapv1.Arg, name string) string {
++	for _, arg := range args {
++		if arg.Name == name {
++			if arg.Value != nil {
++				return *arg.Value
++			}
++			return ""
++		}
++	}
++	return ""
++}
++
++func parseNodeLabels(nodeLabels string) string {
++	if nodeLabels == "" {
++		return ""
++	}
++	nodeLabelsToml := ""
++	nodeLabelsList := strings.Split(nodeLabels, ",")
++	for _, nodeLabel := range nodeLabelsList {
++		keyVal := strings.Split(nodeLabel, "=")
++		if len(keyVal) == 2 {
++			nodeLabelsToml += fmt.Sprintf("\"%v\" = \"%v\"\n", keyVal[0], keyVal[1])
++		}
++	}
++	return nodeLabelsToml
++}
++
+ // Parses through all the users and return list of all user's authorized ssh keys
+ func getAllAuthorizedKeys(users []bootstrapv1.User) string {
+ 	var sshAuthorizedKeys []string
+diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+index 130a0c4d6..9caa96e23 100644
+--- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
+@@ -572,6 +572,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
+ 		}
++		if scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
+@@ -868,6 +871,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		if scope.Config.Spec.JoinConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
+ 		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+@@ -1045,6 +1051,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
+ 		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
+-- 
+2.48.1
+
