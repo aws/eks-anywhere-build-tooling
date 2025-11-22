@@ -13,12 +13,13 @@ BASE_IMAGE_NAME?=eks-distro-base
 # the images target being the actual action, its version of the set takes prioirty and resets to empty
 # setting it explicitly to empty here takes allows the combine-images override to take proirty
 IMAGE_BUILD_ARGS=
-DOCKERFILE_FOLDER=$(if $(filter bottlerocket-bootstrap-snow,$(IMAGE_NAME)),./docker/linux/snow,./docker/linux)
 
-IMAGE_NAMES=bottlerocket-bootstrap bottlerocket-bootstrap-snow
+IMAGE_NAMES=bottlerocket-bootstrap bottlerocket-bootstrap-snow bottlerocket-bootstrap-vsphere-multi-network
+DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 BOTTLEROCKET_BOOTSTRAP_IMAGE_COMPONENT=bottlerocket-bootstrap
 BOTTLEROCKET_BOOTSTRAP_SNOW_IMAGE_COMPONENT=bottlerocket-bootstrap-snow
+BOTTLEROCKET_BOOTSTRAP_VSPHERE_MULTI_NETWORK_IMAGE_COMPONENT=bottlerocket-bootstrap-vsphere-multi-network
 
 BINARY_TARGET_FILES=bottlerocket-bootstrap bottlerocket-bootstrap-snow
 SOURCE_PATTERNS=. ./pkg/providers/snow
