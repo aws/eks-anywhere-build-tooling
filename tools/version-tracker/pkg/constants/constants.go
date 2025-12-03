@@ -15,6 +15,8 @@ const (
 	ReleaseBranchEnvvar                       = "RELEASE_BRANCH"
 	DefaultCommitAuthorName                   = "EKS Distro PR Bot"
 	DefaultCommitAuthorEmail                  = "aws-model-rocket-bots+eksdistroprbot@amazon.com"
+	PatchApplyGitUserEmail                    = "prow@amazonaws.com"
+	PatchApplyGitUserName                     = "Prow Bot"
 	BuildToolingRepoName                      = "eks-anywhere-build-tooling"
 	EKSDistroBuildToolingRepoName             = "eks-distro-build-tooling"
 	AWSOrgName                                = "aws"

@@ -22,6 +22,7 @@ import (
 	goyamlv3 "gopkg.in/yaml.v3"
 	sigsyaml "sigs.k8s.io/yaml"
 
+	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/commands/fixpatches"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/ecrpublic"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/git"
@@ -378,6 +379,24 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					if !patchApplySucceeded {
 						failedSteps["Patch application"] = err
 						patchesWarningComment = fmt.Sprintf(constants.FailedPatchesCommentBody, appliedPatchesCount, totalPatchCount, failedPatch, applyFailedFiles)
+
+						// Publish EventBridge event for automatic patch fixing
+						if pullRequest != nil {
+							event := fixpatches.PatchFailureEvent{
+								Project:       projectName,
+								PRNumber:      *pullRequest.Number,
+								Branch:        branchName,
+								FailedPatches: []string{failedPatch},
+								Reason:        fmt.Sprintf("Patch failed to apply to files: %s", applyFailedFiles),
+								RepoOwner:     baseRepoOwner,
+								RepoName:      constants.BuildToolingRepoName,
+							}
+
+							if err := fixpatches.PublishPatchFailureEvent(event); err != nil {
+								logger.Info("Failed to publish patch failure event", "error", err)
+								// Don't fail the upgrade if event publishing fails
+							}
+						}
 					}
 				}
 
