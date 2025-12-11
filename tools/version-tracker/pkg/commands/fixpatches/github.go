@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/google/go-github/v53/github"
@@ -122,45 +121,29 @@ func CommitAndPush(projectPath, branchName, commitMessage string) error {
 	}
 
 	// Set git config
-	if err := runGitCommand(projectPath, "config", "user.name", gitUserName); err != nil {
+	if err := GitConfig(projectPath, "user.name", gitUserName); err != nil {
 		return fmt.Errorf("setting git user.name: %v", err)
 	}
 
-	if err := runGitCommand(projectPath, "config", "user.email", gitUserEmail); err != nil {
+	if err := GitConfig(projectPath, "user.email", gitUserEmail); err != nil {
 		return fmt.Errorf("setting git user.email: %v", err)
 	}
 
 	// Stage all changes in patches directory
-	if err := runGitCommand(projectPath, "add", "patches/"); err != nil {
+	if err := GitAdd(projectPath, "patches/"); err != nil {
 		return fmt.Errorf("staging patches: %v", err)
 	}
 
-	// Commit changes
-	if err := runGitCommand(projectPath, "commit", "-m", commitMessage); err != nil {
-		// Check if there's nothing to commit
-		if strings.Contains(err.Error(), "nothing to commit") {
-			logger.Info("No changes to commit")
-			return nil
-		}
+	// Commit changes (GitCommit handles "nothing to commit" case)
+	if err := GitCommit(projectPath, commitMessage); err != nil {
 		return fmt.Errorf("committing changes: %v", err)
 	}
 
 	// Push to remote
-	if err := runGitCommand(projectPath, "push", "origin", branchName); err != nil {
+	if _, err := GitCommand(projectPath, "push", "origin", branchName); err != nil {
 		return fmt.Errorf("pushing to remote: %v", err)
 	}
 
 	logger.Info("Successfully pushed fixed patches", "branch", branchName)
-	return nil
-}
-
-// runGitCommand executes a git command in the specified directory.
-func runGitCommand(dir string, args ...string) error {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git %v failed: %v\nOutput: %s", args, err, string(output))
-	}
 	return nil
 }

@@ -11,7 +11,15 @@ import (
 )
 
 // fixAutoscalerPatches handles the special case for kubernetes/autoscaler project.
-// This project requires removing cloud providers (except CAPI) and running go mod tidy.
+//
+// Unlike other projects, autoscaler patches are regenerated rather than fixed:
+// 1. Remove cloud provider code (keeping only Cluster-API)
+// 2. Run go mod tidy to update dependencies
+// 3. Generate new patches from these changes
+//
+// This hardcoded approach is necessary because autoscaler's patch workflow
+// is fundamentally different from the standard LLM-based patch fixing.
+//
 // See: projects/kubernetes/autoscaler/README.md lines 25-60
 func fixAutoscalerPatches(projectPath string, releaseBranch string) error {
 	logger.Info("Detected kubernetes/autoscaler project - using hardcoded fix")
@@ -50,10 +58,8 @@ func fixAutoscalerPatches(projectPath string, releaseBranch string) error {
 
 	// Step 2: Git add only the builder directory changes (not the entire cloudprovider directory)
 	logger.Info("Step 2: Staging builder directory changes")
-	gitAddCmd := exec.Command("git", "add", "builder")
-	gitAddCmd.Dir = cloudProviderPath
-	if output, err := gitAddCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git add failed: %v\nOutput: %s", err, output)
+	if err := GitAdd(cloudProviderPath, "builder"); err != nil {
+		return fmt.Errorf("git add failed: %v", err)
 	}
 
 	// Step 3: Clean references in builder files
@@ -74,38 +80,27 @@ func fixAutoscalerPatches(projectPath string, releaseBranch string) error {
 
 	// Step 3b: Stage the cleaned builder files
 	logger.Info("Step 3b: Staging cleaned builder files")
-	gitAddCleanedCmd := exec.Command("git", "add", "builder")
-	gitAddCleanedCmd.Dir = cloudProviderPath
-	if output, err := gitAddCleanedCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git add cleaned files failed: %v\nOutput: %s", err, output)
+	if err := GitAdd(cloudProviderPath, "builder"); err != nil {
+		return fmt.Errorf("git add cleaned files failed: %v", err)
 	}
 
 	// Step 4: Commit the cloud provider changes
 	logger.Info("Step 4: Committing cloud provider removal")
 	commitMsg := "Remove Cloud Provider Builders Except Cluster-API"
-	gitCommitCmd := exec.Command("git", "commit", "-m", commitMsg)
-	gitCommitCmd.Dir = buildersPath
-	if output, err := gitCommitCmd.CombinedOutput(); err != nil {
-		// Check if there's nothing to commit
-		if strings.Contains(string(output), "nothing to commit") {
-			logger.Info("No changes to commit for cloud providers")
-		} else {
-			return fmt.Errorf("git commit failed: %v\nOutput: %s", err, output)
-		}
+	if err := GitCommit(buildersPath, commitMsg); err != nil {
+		return fmt.Errorf("git commit failed: %v", err)
 	}
 
 	// Step 5: Generate patch for cloud provider removal
 	logger.Info("Step 5: Generating patch for cloud provider removal")
 	patchesDir := filepath.Join(projectPath, releaseBranch, "patches")
-	gitFormatPatchCmd := exec.Command("git", "format-patch", "-1", "HEAD", "-o", patchesDir)
-	gitFormatPatchCmd.Dir = buildersPath
-	output, err := gitFormatPatchCmd.CombinedOutput()
+	output, err := GitFormatPatch(buildersPath, patchesDir, 1)
 	if err != nil {
-		return fmt.Errorf("git format-patch failed: %v\nOutput: %s", err, output)
+		return fmt.Errorf("git format-patch failed: %v", err)
 	}
 
 	// Extract the generated patch filename from output
-	patchFile1 := strings.TrimSpace(string(output))
+	patchFile1 := strings.TrimSpace(output)
 	logger.Info("Generated cloud provider patch", "file", filepath.Base(patchFile1))
 
 	// Step 5b: Apply any additional patches (like 0002-Remove-additional-GCE-Dependencies.patch)
@@ -122,10 +117,8 @@ func fixAutoscalerPatches(projectPath string, releaseBranch string) error {
 			}
 
 			logger.Info("Applying additional patch", "patch", patchName)
-			applyPatchCmd := exec.Command("git", "apply", patchFile)
-			applyPatchCmd.Dir = autoscalerPath
-			if output, err := applyPatchCmd.CombinedOutput(); err != nil {
-				logger.Info("Warning: failed to apply patch", "patch", patchName, "error", err, "output", string(output))
+			if output, err := GitApply(autoscalerPath, patchFile, false, false); err != nil {
+				logger.Info("Warning: failed to apply patch", "patch", patchName, "error", err, "output", output)
 			} else {
 				// Don't stage the GCE patch changes - they're already in patch 0002
 				// We just apply them so go mod tidy can see the removed imports
@@ -145,29 +138,23 @@ func fixAutoscalerPatches(projectPath string, releaseBranch string) error {
 
 	// Step 7: Check if go.mod or go.sum changed
 	logger.Info("Step 7: Checking for go.mod/go.sum changes")
-	gitStatusCmd := exec.Command("git", "status", "--porcelain", "go.mod", "go.sum")
-	gitStatusCmd.Dir = clusterAutoscalerPath
-	statusOutput, _ := gitStatusCmd.CombinedOutput()
-	hasGoModChanges := len(strings.TrimSpace(string(statusOutput))) > 0
+	statusOutput, _ := GitStatus(clusterAutoscalerPath, true, "go.mod", "go.sum")
+	hasGoModChanges := len(strings.TrimSpace(statusOutput)) > 0
 
 	if hasGoModChanges {
-		logger.Info("go.mod/go.sum have changes", "status", string(statusOutput))
+		logger.Info("go.mod/go.sum have changes", "status", statusOutput)
 
 		// Step 7a: Git add go.mod and go.sum
 		logger.Info("Step 7a: Staging go.mod and go.sum")
-		gitAddModCmd := exec.Command("git", "add", "go.mod", "go.sum")
-		gitAddModCmd.Dir = clusterAutoscalerPath
-		if output, err := gitAddModCmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git add go.mod/go.sum failed: %v\nOutput: %s", err, output)
+		if err := GitAdd(clusterAutoscalerPath, "go.mod", "go.sum"); err != nil {
+			return fmt.Errorf("git add go.mod/go.sum failed: %v", err)
 		}
 
 		// Step 8: Commit go.mod changes
 		logger.Info("Step 8: Committing go.mod changes")
 		commitMsg2 := "Update go.mod Dependencies"
-		gitCommitModCmd := exec.Command("git", "commit", "-m", commitMsg2)
-		gitCommitModCmd.Dir = clusterAutoscalerPath
-		if output, err := gitCommitModCmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git commit go.mod failed: %v\nOutput: %s", err, output)
+		if err := GitCommit(clusterAutoscalerPath, commitMsg2); err != nil {
+			return fmt.Errorf("git commit go.mod failed: %v", err)
 		}
 	} else {
 		logger.Info("No go.mod/go.sum changes detected - skipping commit")
@@ -175,15 +162,13 @@ func fixAutoscalerPatches(projectPath string, releaseBranch string) error {
 
 	// Step 9: Generate patch for go.mod changes
 	logger.Info("Step 9: Generating patch for go.mod changes")
-	gitFormatPatchModCmd := exec.Command("git", "format-patch", "-1", "HEAD", "-o", patchesDir)
-	gitFormatPatchModCmd.Dir = clusterAutoscalerPath
-	output2, err := gitFormatPatchModCmd.CombinedOutput()
+	output2, err := GitFormatPatch(clusterAutoscalerPath, patchesDir, 1)
 	if err != nil {
-		return fmt.Errorf("git format-patch go.mod failed: %v\nOutput: %s", err, output2)
+		return fmt.Errorf("git format-patch go.mod failed: %v", err)
 	}
 
 	// Extract the generated patch filename from output
-	patchFile2 := strings.TrimSpace(string(output2))
+	patchFile2 := strings.TrimSpace(output2)
 	logger.Info("Generated go.mod patch", "file", filepath.Base(patchFile2))
 
 	// Step 10: Rename patches to match expected names

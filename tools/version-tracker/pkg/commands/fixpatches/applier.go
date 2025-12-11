@@ -3,7 +3,6 @@ package fixpatches
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -16,13 +15,10 @@ import (
 func ApplyPatchFix(fix *types.PatchFix, projectPath string) error {
 	logger.Info("Applying LLM-generated patch", "path", projectPath)
 
-	// Get the repo directory (e.g., "trivy" from "projects/aquasecurity/trivy")
-	repoName := filepath.Base(projectPath)
-	repoPath := filepath.Join(projectPath, repoName)
-
-	// Check if repo exists
-	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		return fmt.Errorf("repository not found at %s", repoPath)
+	// Get the repo directory
+	repoPath, err := GetRepoPath(projectPath)
+	if err != nil {
+		return err
 	}
 
 	// Save patch to temporary file
@@ -44,22 +40,17 @@ func ApplyPatchFix(fix *types.PatchFix, projectPath string) error {
 
 	// Apply patch using git apply
 	// Note: We use git apply instead of git am because we're applying to an already-cloned repo
-	cmd := exec.Command("git", "-C", repoPath, "apply", "--whitespace=fix", tmpPatchFile)
-	output, err := cmd.CombinedOutput()
-
+	output, err := GitApplyWithC(repoPath, tmpPatchFile, false, true)
 	if err != nil {
-		outputStr := string(output)
-		logger.Info("git apply failed", "error", err, "output", outputStr)
-		return fmt.Errorf("git apply failed: %v\nOutput: %s", err, outputStr)
+		logger.Info("git apply failed", "error", err, "output", output)
+		return err
 	}
 
 	logger.Info("Patch applied successfully")
 
 	// Stage the changes
-	cmd = exec.Command("git", "-C", repoPath, "add", "-A")
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git add failed: %v\nOutput: %s", err, string(output))
+	if _, err := GitCommandWithC(repoPath, "add", "-A"); err != nil {
+		return err
 	}
 
 	logger.Info("Changes staged successfully")
@@ -73,12 +64,9 @@ func ApplyPatchFixWithReject(patchContent string, projectPath string) ([]string,
 	logger.Info("Applying LLM-generated patch with --reject", "path", projectPath)
 
 	// Get the repo directory
-	repoName := filepath.Base(projectPath)
-	repoPath := filepath.Join(projectPath, repoName)
-
-	// Check if repo exists
-	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		return nil, nil, fmt.Errorf("repository not found at %s", repoPath)
+	repoPath, err := GetRepoPath(projectPath)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// Save patch to temporary file
@@ -91,9 +79,7 @@ func ApplyPatchFixWithReject(patchContent string, projectPath string) ([]string,
 	logger.Info("Saved LLM patch to temporary file", "file", tmpPatchFile)
 
 	// Apply patch with --reject
-	cmd := exec.Command("git", "-C", repoPath, "apply", "--reject", "--whitespace=fix", tmpPatchFile)
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
+	outputStr, err := GitApplyWithC(repoPath, tmpPatchFile, true, true)
 
 	// Parse output for offset information
 	result := &types.PatchApplicationResult{
@@ -148,31 +134,13 @@ func RevertPatchFix(projectPath string) error {
 	logger.Info("Reverting patch changes", "path", projectPath)
 
 	// Get the repo directory
-	repoName := filepath.Base(projectPath)
-	repoPath := filepath.Join(projectPath, repoName)
-
-	// Check if repo exists
-	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		return fmt.Errorf("repository not found at %s", repoPath)
-	}
-
-	// Reset any staged changes
-	cmd := exec.Command("git", "-C", repoPath, "reset", "--hard", "HEAD")
-	output, err := cmd.CombinedOutput()
+	repoPath, err := GetRepoPath(projectPath)
 	if err != nil {
-		return fmt.Errorf("git reset failed: %v\nOutput: %s", err, string(output))
+		return err
 	}
 
-	// Clean any untracked files
-	cmd = exec.Command("git", "-C", repoPath, "clean", "-fd")
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git clean failed: %v\nOutput: %s", err, string(output))
-	}
-
-	logger.Info("Patch changes reverted successfully")
-
-	return nil
+	// Reset to clean state
+	return ResetToCleanStateWithC(repoPath)
 }
 
 // CommitPatchFix commits the successfully applied patch.
@@ -180,27 +148,16 @@ func CommitPatchFix(projectPath string, commitMessage string) error {
 	logger.Info("Committing patch fix", "path", projectPath, "message", commitMessage)
 
 	// Get the repo directory
-	repoName := filepath.Base(projectPath)
-	repoPath := filepath.Join(projectPath, repoName)
-
-	// Check if repo exists
-	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		return fmt.Errorf("repository not found at %s", repoPath)
+	repoPath, err := GetRepoPath(projectPath)
+	if err != nil {
+		return err
 	}
 
-	// Commit the changes
-	cmd := exec.Command("git", "-C", repoPath, "commit", "-m", commitMessage)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Check if there's nothing to commit
-		if strings.Contains(string(output), "nothing to commit") {
-			logger.Info("No changes to commit")
-			return nil
-		}
-		return fmt.Errorf("git commit failed: %v\nOutput: %s", err, string(output))
+	// Commit the changes (GitCommit handles "nothing to commit" case)
+	if err := GitCommit(repoPath, commitMessage); err != nil {
+		return err
 	}
 
 	logger.Info("Patch fix committed successfully")
-
 	return nil
 }
