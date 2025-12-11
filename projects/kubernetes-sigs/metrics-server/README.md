@@ -1,5 +1,5 @@
 ## **Metrics Server**
-![Version](https://img.shields.io/badge/version-v0.7.2-blue)
+![Version](https://img.shields.io/badge/version-v0.8.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiSEFNYVlKSURxN25YRGpuWURwWmZOS05vbkl6YTdHTzNHTFJpdzdHZGJUL001ZlNqS1JhblM0QTl2VytuUzNRQ09WazJwRHVUZnp0dVRCb3dLTUVxb2w4PSIsIml2UGFyYW1ldGVyU3BlYyI6IkJIOGVvTFk2bWVVcnhUTkoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 ([Metrics Server](https://github.com/kubernetes-sigs/metrics-server)) is an AWS supported version of the upstream Metrics Server and is distributed by Amazon EKS add-ons.
