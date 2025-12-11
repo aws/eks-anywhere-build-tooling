@@ -63,7 +63,7 @@ func PublishPatchFailureEvent(event PatchFailureEvent) error {
 	input := &eventbridge.PutEventsInput{
 		Entries: []types.PutEventsRequestEntry{
 			{
-				Source:       aws.String("version-tracker"),
+				Source:       aws.String("eks-anywhere.version-tracker"),
 				DetailType:   aws.String("PatchFailure"),
 				Detail:       aws.String(string(eventDetail)),
 				EventBusName: aws.String(eventBusName),
