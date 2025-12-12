@@ -1,4 +1,4 @@
-From 2fbb944f6705aea7806fc1a689313984dd4d3231 Mon Sep 17 00:00:00 2001
+From 1b2e02f4b1b13f8e7e6e1d7a17a2cef29549d7fd Mon Sep 17 00:00:00 2001
 From: ahreehong <46465244+ahreehong@users.noreply.github.com>
 Date: Tue, 30 Jan 2024 17:10:30 -0800
 Subject: [PATCH] patching_helm_charts_packages
@@ -15,8 +15,8 @@ Subject: [PATCH] patching_helm_charts_packages
  charts/crds/templates/namespace.yaml          |    6 +
  charts/crds/values.yaml                       |   11 +
  charts/emissary-ingress/.gitignore            |    4 -
- .../{Chart.yaml.in => Chart.yaml}             |   33 +-
- charts/emissary-ingress/OWNERS                |   10 -
+ .../{Chart.yaml.in => Chart.yaml}             |   31 +-
+ charts/emissary-ingress/OWNERS                |    8 -
  .../emissary-ingress/ci.in/01-psp-values.yaml |   41 -
  .../emissary-ingress/ci.in/06-hpa-values.yaml |    9 -
  .../ci.in/08-single-namespace-values.yaml     |    9 -
@@ -29,7 +29,7 @@ Subject: [PATCH] patching_helm_charts_packages
  .../ci.in/18-test-progress-deadline.yaml      |    3 -
  .../ci.in/19-test-lifecycle-values.yaml       |   15 -
  .../ci.in/tests/manifests/backend.yaml        |   47 -
- .../tests/manifests/ci-default-values.yaml    |    9 -
+ .../tests/manifests/ci-default-values.yaml    |    8 -
  .../ci.in/tests/manifests/helm-init.yaml      |   18 -
  .../ci.in/tests/manifests/helm2-values.yaml   |    2 -
  .../ci.in/tests/manifests/tls.yaml            |   18 -
@@ -55,7 +55,7 @@ Subject: [PATCH] patching_helm_charts_packages
  .../templates/serviceaccount.yaml             |    2 +-
  .../templates/servicemonitor.yaml             |    4 +-
  .../{values.yaml.in => values.yaml}           |   51 +-
- 51 files changed, 5574 insertions(+), 725 deletions(-)
+ 51 files changed, 5574 insertions(+), 720 deletions(-)
  create mode 100644 charts/crds/.helmignore
  create mode 100644 charts/crds/Chart.yaml
  create mode 100644 charts/crds/README.md
@@ -5690,7 +5690,7 @@ diff --git a/charts/emissary-ingress/Chart.yaml.in b/charts/emissary-ingress/Cha
 similarity index 54%
 rename from charts/emissary-ingress/Chart.yaml.in
 rename to charts/emissary-ingress/Chart.yaml
-index b974e5198..c58248d85 100644
+index 6e54c50c4..c58248d85 100644
 --- a/charts/emissary-ingress/Chart.yaml.in
 +++ b/charts/emissary-ingress/Chart.yaml
 @@ -1,13 +1,8 @@
@@ -5710,7 +5710,7 @@ index b974e5198..c58248d85 100644
  keywords:
  - api gateway
  - ambassador
-@@ -16,12 +11,16 @@ keywords:
+@@ -16,10 +11,16 @@ keywords:
  - emissary
  - emissary ingress
  maintainers:
@@ -5720,8 +5720,6 @@ index b974e5198..c58248d85 100644
 -  email: flynn@datawire.io
 -- name: nbkrause
 -  email: nkrause@datawire.io
--- name: lukeshu
--  email: lukeshu@datawire.io
 -engine: gotpl
 +- email: markus@maga.se
 +  name: flydiverny
@@ -5738,20 +5736,18 @@ index b974e5198..c58248d85 100644
 +version: 3.6.0-d0c301dec3634d263f8957745c8557a39caf8204
 diff --git a/charts/emissary-ingress/OWNERS b/charts/emissary-ingress/OWNERS
 deleted file mode 100644
-index 42543ecf6..000000000
+index a151dd3f2..000000000
 --- a/charts/emissary-ingress/OWNERS
 +++ /dev/null
-@@ -1,10 +0,0 @@
+@@ -1,8 +0,0 @@
 -approvers:
 -- flydiverny
 -- kflynn
 -- nbkrause
--- lukeshu
 -reviewers:
 -- flydiverny
 -- kflynn
 -- nbkrause
--- lukeshu
 diff --git a/charts/emissary-ingress/ci.in/01-psp-values.yaml b/charts/emissary-ingress/ci.in/01-psp-values.yaml
 deleted file mode 100644
 index 163be3e84..000000000
@@ -6004,13 +6000,12 @@ index b2d9205df..000000000
 -            memory: 100Mi
 diff --git a/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml b/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml
 deleted file mode 100644
-index 0a1ec852e..000000000
+index d9daa99b5..000000000
 --- a/charts/emissary-ingress/ci.in/tests/manifests/ci-default-values.yaml
 +++ /dev/null
-@@ -1,9 +0,0 @@
+@@ -1,8 +0,0 @@
 -#env:
 -#  AMBASSADOR_SINGLE_NAMESPACE: true
--#  AMBASSADOR_NO_KUBEWATCH: no_kubewatch
 -
 -deploymentStrategy:
 -  type: Recreate
@@ -6230,7 +6225,7 @@ index 35bb75791..23bd122ef 100644
 +{{- .repository }}@{{ .digest -}}
 +{{- end -}}
 diff --git a/charts/emissary-ingress/templates/admin-service.yaml b/charts/emissary-ingress/templates/admin-service.yaml
-index 77f628459..6b32df2e8 100644
+index 715d42484..100af1e5a 100644
 --- a/charts/emissary-ingress/templates/admin-service.yaml
 +++ b/charts/emissary-ingress/templates/admin-service.yaml
 @@ -3,7 +3,7 @@ apiVersion: v1
@@ -6568,7 +6563,7 @@ index e6e8c2775..17ef7852a 100644
            imagePullPolicy: {{ .Values.image.pullPolicy }}
            ports:
 diff --git a/charts/emissary-ingress/templates/deployment.yaml b/charts/emissary-ingress/templates/deployment.yaml
-index 2c4d17a0a..1a976a852 100644
+index dcfacfb53..68c748864 100644
 --- a/charts/emissary-ingress/templates/deployment.yaml
 +++ b/charts/emissary-ingress/templates/deployment.yaml
 @@ -3,7 +3,7 @@ apiVersion: v1
@@ -6850,7 +6845,7 @@ diff --git a/charts/emissary-ingress/values.yaml.in b/charts/emissary-ingress/va
 similarity index 90%
 rename from charts/emissary-ingress/values.yaml.in
 rename to charts/emissary-ingress/values.yaml
-index abe1dcaa2..cf5939e44 100644
+index aba5dc4b5..0db096b03 100644
 --- a/charts/emissary-ingress/values.yaml.in
 +++ b/charts/emissary-ingress/values.yaml
 @@ -2,11 +2,11 @@
@@ -6886,7 +6881,7 @@ index abe1dcaa2..cf5939e44 100644
    # Pod container image pull policy
    pullPolicy: IfNotPresent
  
-@@ -369,7 +371,6 @@ resolvers: # +doc-gen:break
+@@ -370,7 +372,6 @@ resolvers: # +doc-gen:break
  module:
    diagnostics:
      enabled: false
@@ -6894,7 +6889,7 @@ index abe1dcaa2..cf5939e44 100644
  
  # DEPRECATED: Enabling the prometheus exporter creates a sidecar and configures ambassador to use it
  #
-@@ -405,40 +406,6 @@ prometheusExporter: # +doc-gen:break
+@@ -406,40 +407,6 @@ prometheusExporter: # +doc-gen:break
  # securityContext:
  #   runAsUser: 8888
  
@@ -6902,7 +6897,7 @@ index abe1dcaa2..cf5939e44 100644
 -# Configure the ambassador agent
 -agent:
 -  # If `true`, installs the ambassador-agent Deployment, ServiceAccount and ClusterRole in the ambassador namespace, enabling the Ambassador Cloud connectivity.
--  enabled: true
+-  enabled: false
 -  # API token for reporting snapshots to [Ambassador Cloud](https://app.getambassador.io/cloud/);
 -  # If empty, agent will not report snapshots
 -  cloudConnectToken: ''
@@ -6936,5 +6931,5 @@ index abe1dcaa2..cf5939e44 100644
  
  # configure docker to pull from private registry
 -- 
-2.40.0
+2.50.1 (Apple Git-155)
 
