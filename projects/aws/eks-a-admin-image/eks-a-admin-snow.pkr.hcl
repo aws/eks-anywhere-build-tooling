@@ -8,7 +8,7 @@ packer {
   }
 }
 
-source "amazon-ebs" "amazonlinux2" {
+source "amazon-ebs" "amazonlinux2023" {
   ami_name      = "${local.image_name}"
   instance_type = "t3.xlarge"
   // with t3.micro 48 min
@@ -18,7 +18,7 @@ source "amazon-ebs" "amazonlinux2" {
   region = "us-west-2"
   source_ami_filter {
     filters = {
-      name                = "amzn2-ami-kernel-5.*-hvm-2*"
+      name                = "al2023-ami-2023.*-kernel-6.*-x86_64"
       root-device-type    = "ebs"
       virtualization-type = "hvm"
       architecture        = "x86_64"
@@ -55,11 +55,11 @@ source "amazon-ebs" "amazonlinux2" {
 build {
   name = "eks-a-admin-snow-image"
   sources = [
-    "source.amazon-ebs.amazonlinux2",
+    "source.amazon-ebs.amazonlinux2023",
   ]
 
   provisioner "shell" {
-    script            = "provisioners/al2/upgrade_linux.sh"
+    script            = "provisioners/al2023/upgrade_linux.sh"
     expect_disconnect = true
   }
 
@@ -67,7 +67,11 @@ build {
     environment_vars = [
       "YQ_URL=${var.yq-url}",
     ]
-    script = "provisioners/al2/install_deps.sh"
+    script = "provisioners/al2023/install_deps.sh"
+  }
+
+  provisioner "shell" {
+    script = "provisioners/al2023/install_snow_drivers.sh"
   }
 
   provisioner "shell" {
@@ -75,7 +79,7 @@ build {
       "USER=ec2-user",
     ]
     // wait for reboot before starting
-    pause_before      = "10s"
+    pause_before      = "15s"
     script            = "provisioners/setup_docker.sh"
     expect_disconnect = true
   }
@@ -85,7 +89,7 @@ build {
       "USER=ec2-user",
     ]
     // wait for reboot before starting
-    pause_before = "10s"
+    pause_before = "15s"
     script       = "provisioners/test/install_docker.sh"
   }
 
@@ -104,11 +108,12 @@ build {
       "provisioners/test/install_eksa.sh",
       "provisioners/download_eksa_artifacts.sh",
       "provisioners/test/download_eksa_artifacts.sh",
+      "provisioners/test/install_snow_drivers.sh",
     ]
   }
 
   provisioner "shell" {
-    script = "provisioners/al2/cleanup.sh"
+    script = "provisioners/al2023/cleanup.sh"
   }
 
   post-processor "manifest" {
