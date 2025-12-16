@@ -6,7 +6,7 @@ set -o nounset
 set -o pipefail
 
 # Package cleanup and reset cloud-init
-sudo yum clean all
+sudo dnf clean all
 sudo cloud-init clean
 
 # Remove ssh keys and hosts

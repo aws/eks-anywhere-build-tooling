@@ -6,9 +6,9 @@ set -o nounset
 set -o pipefail
 
 # Install prerequisites
-sudo yum update -y
-sudo amazon-linux-extras enable docker
-sudo yum install -y docker tar
+sudo dnf update -y
+sudo dnf install -y tar wget
+sudo dnf install -y docker
 
 # Install yq
 wget \
