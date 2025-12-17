@@ -71,11 +71,13 @@ $(EXTRA_DOCKER_FILE_TARGETS):
 	mkdir -p $(OUTPUT_DIR)/extra/etc/prometheus
 	cp prometheus/documentation/examples/prometheus.yml $(OUTPUT_DIR)/extra/etc/prometheus/prometheus.yml
 
-	mkdir -p $(OUTPUT_DIR)/extra/usr/share/prometheus/console_libraries
-	cp -r prometheus/console_libraries/* $(OUTPUT_DIR)/extra/usr/share/prometheus/console_libraries/
-
-	mkdir -p $(OUTPUT_DIR)/extra/usr/share/prometheus/consoles
-	cp -r prometheus/consoles/* $(OUTPUT_DIR)/extra/usr/share/prometheus/consoles/
+	# Example console templates and libraries removed in Prometheus v3.0
+	# Console feature still exists - users can supply their own templates via --web.console.* flags
+	# See: CHANGELOG.md #14807 - "Remove example files for the console feature"
+	# mkdir -p $(OUTPUT_DIR)/extra/usr/share/prometheus/console_libraries
+	# cp -r prometheus/console_libraries/* $(OUTPUT_DIR)/extra/usr/share/prometheus/console_libraries/
+	# mkdir -p $(OUTPUT_DIR)/extra/usr/share/prometheus/consoles
+	# cp -r prometheus/consoles/* $(OUTPUT_DIR)/extra/usr/share/prometheus/consoles/
 
 	cp prometheus/npm_licenses.tar.bz2 $(OUTPUT_DIR)/npm_licenses.tar.bz2
 

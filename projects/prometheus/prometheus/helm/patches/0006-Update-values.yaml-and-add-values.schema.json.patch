@@ -1,15 +1,15 @@
-From 27723c033ee4065b6bc3f89cd28ab43bc5aca51b Mon Sep 17 00:00:00 2001
-From: "Ostosh, Ivy" <ivyjin215@gmail.com>
-Date: Fri, 16 Dec 2022 16:31:33 -0600
+From 995ac5f0300621667c22ea18ee6c524397e9a220 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Wed, 17 Dec 2025 21:59:03 -0800
 Subject: [PATCH 6/6] Update values.yaml and add values.schema.json
 
 ---
- charts/prometheus/values.schema.json | 351 ++++++++++++++-------------
- charts/prometheus/values.yaml        |  31 ++-
- 2 files changed, 195 insertions(+), 187 deletions(-)
+ charts/prometheus/values.schema.json | 354 ++++++++++++++-------------
+ charts/prometheus/values.yaml        |  26 +-
+ 2 files changed, 200 insertions(+), 180 deletions(-)
 
 diff --git a/charts/prometheus/values.schema.json b/charts/prometheus/values.schema.json
-index 8a5cd3bb..1e6a67de 100644
+index 3e987921..0a166123 100644
 --- a/charts/prometheus/values.schema.json
 +++ b/charts/prometheus/values.schema.json
 @@ -1,25 +1,134 @@
@@ -94,16 +94,17 @@ index 8a5cd3bb..1e6a67de 100644
                      "properties": {
 -                        "size": {
 +                        "digest": {
-                             "type": "string"
++                            "type": "string"
 +                        },
 +                        "pullPolicy": {
 +                            "type": "string"
 +                        },
 +                        "repository": {
-+                            "type": "string"
-+                        }
-+                    }
-+                },
+                             "type": "string"
+                         }
+                     }
+                 },
+-                "podSecurityContext": {
 +                "name": {
 +                    "type": "string"
 +                },
@@ -115,10 +116,9 @@ index 8a5cd3bb..1e6a67de 100644
 +                    "properties": {
 +                        "labels": {
 +                            "type": "object"
-                         }
-                     }
-                 },
--                "podSecurityContext": {
++                        }
++                    }
++                },
 +                "podAnnotations": {
 +                    "type": "object"
 +                },
@@ -151,7 +151,7 @@ index 8a5cd3bb..1e6a67de 100644
                      "type": "object",
                      "properties": {
                          "fsGroup": {
-@@ -35,139 +144,76 @@
+@@ -35,131 +144,76 @@
                              "type": "integer"
                          }
                      }
@@ -266,14 +266,6 @@ index 8a5cd3bb..1e6a67de 100644
 -                }
 -            }
 -        },
--        "podSecurityPolicy": {
--            "type": "object",
--            "properties": {
--                "enabled": {
--                    "type": "boolean"
--                }
--            }
--        },
 -        "prometheus-node-exporter": {
 -            "type": "object",
 -            "properties": {
@@ -332,7 +324,7 @@ index 8a5cd3bb..1e6a67de 100644
                  }
              }
          },
-@@ -194,15 +240,6 @@
+@@ -186,15 +240,6 @@
                  "baseURL": {
                      "type": "string"
                  },
@@ -348,7 +340,7 @@ index 8a5cd3bb..1e6a67de 100644
                  "configMapOverrideName": {
                      "type": "string"
                  },
-@@ -235,12 +272,12 @@
+@@ -227,12 +272,12 @@
                  "enableServiceLinks": {
                      "type": "boolean"
                  },
@@ -364,7 +356,7 @@ index 8a5cd3bb..1e6a67de 100644
                  "extraArgs": {
                      "type": "object"
                  },
-@@ -262,9 +299,15 @@
+@@ -254,9 +299,15 @@
                  "extraInitContainers": {
                      "type": "array"
                  },
@@ -380,7 +372,7 @@ index 8a5cd3bb..1e6a67de 100644
                  "extraVolumeMounts": {
                      "type": "array"
                  },
-@@ -302,9 +345,6 @@
+@@ -297,9 +348,6 @@
                          },
                          "repository": {
                              "type": "string"
@@ -390,7 +382,7 @@ index 8a5cd3bb..1e6a67de 100644
                          }
                      }
                  },
-@@ -385,9 +425,6 @@
+@@ -380,9 +428,6 @@
                          "size": {
                              "type": "string"
                          },
@@ -400,7 +392,7 @@ index 8a5cd3bb..1e6a67de 100644
                          "subPath": {
                              "type": "string"
                          }
-@@ -396,14 +433,6 @@
+@@ -391,14 +436,6 @@
                  "podAnnotations": {
                      "type": "object"
                  },
@@ -415,7 +407,7 @@ index 8a5cd3bb..1e6a67de 100644
                  "podDisruptionBudget": {
                      "type": "object",
                      "properties": {
-@@ -411,10 +440,7 @@
+@@ -406,18 +443,20 @@
                              "type": "boolean"
                          },
                          "maxUnavailable": {
@@ -427,17 +419,32 @@ index 8a5cd3bb..1e6a67de 100644
                          }
                      }
                  },
-@@ -429,9 +455,6 @@
-                         }
-                     }
+                 "podLabels": {
+                     "type": "object"
                  },
 -                "portName": {
 -                    "type": "string"
--                },
++                "podSecurityPolicy": {
++                    "type": "object",
++                    "properties": {
++                        "annotations": {
++                            "type": "object"
++                        }
++                    }
+                 },
                  "prefixURL": {
                      "type": "string"
+@@ -425,9 +464,6 @@
+                 "priorityClassName": {
+                     "type": "string"
                  },
-@@ -459,9 +482,6 @@
+-                "runtimeClassName": {
+-                    "type": "string"
+-                },
+                 "probeHeaders": {
+                     "type": "array"
+                 },
+@@ -449,9 +485,6 @@
                  "readinessProbeTimeout": {
                      "type": "integer"
                  },
@@ -447,7 +454,7 @@ index 8a5cd3bb..1e6a67de 100644
                  "remoteRead": {
                      "type": "array"
                  },
-@@ -477,12 +497,6 @@
+@@ -467,12 +500,6 @@
                  "retention": {
                      "type": "string"
                  },
@@ -460,7 +467,7 @@ index 8a5cd3bb..1e6a67de 100644
                  "securityContext": {
                      "type": "object",
                      "properties": {
-@@ -503,9 +517,6 @@
+@@ -493,9 +520,6 @@
                  "service": {
                      "type": "object",
                      "properties": {
@@ -470,7 +477,7 @@ index 8a5cd3bb..1e6a67de 100644
                          "annotations": {
                              "type": "object"
                          },
-@@ -622,12 +633,6 @@
+@@ -612,12 +636,6 @@
                          },
                          "podManagementPolicy": {
                              "type": "string"
@@ -483,7 +490,7 @@ index 8a5cd3bb..1e6a67de 100644
                          }
                      }
                  },
-@@ -651,12 +656,6 @@
+@@ -641,12 +659,6 @@
                  "tolerations": {
                      "type": "array"
                  },
@@ -496,7 +503,7 @@ index 8a5cd3bb..1e6a67de 100644
                  "verticalAutoscaler": {
                      "type": "object",
                      "properties": {
-@@ -667,11 +666,9 @@
+@@ -657,11 +669,9 @@
                  }
              }
          },
@@ -509,7 +516,7 @@ index 8a5cd3bb..1e6a67de 100644
              "properties": {
                  "alerting_rules.yml": {
                      "type": "object"
-@@ -726,7 +723,7 @@
+@@ -716,7 +726,7 @@
          "serviceAccounts": {
              "type": "object",
              "properties": {
@@ -518,7 +525,7 @@ index 8a5cd3bb..1e6a67de 100644
                      "type": "object",
                      "properties": {
                          "annotations": {
-@@ -737,13 +734,27 @@
+@@ -727,13 +737,27 @@
                          },
                          "name": {
                              "type": "string"
@@ -546,9 +553,11 @@ index 8a5cd3bb..1e6a67de 100644
 +            "type": "string"
          }
      }
- }
+-}
+\ No newline at end of file
++}
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index cb6bb3b6..4240b98f 100644
+index 6e1f2248..0797f647 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
 @@ -20,7 +20,7 @@ imagePullSecrets: []
@@ -591,16 +600,16 @@ index cb6bb3b6..4240b98f 100644
  
    ## Node labels for node-exporter pod assignment
    ## Ref: https://kubernetes.io/docs/user-guide/node-selection/
-@@ -774,7 +775,7 @@ server:
- 
+@@ -829,7 +830,7 @@ server:
      loadBalancerIP: ""
      loadBalancerSourceRanges: []
+     loadBalancerClass: ""
 -    servicePort: 80
 +    servicePort: 9090
      sessionAffinity: None
      type: ClusterIP
- 
-@@ -813,10 +814,6 @@ server:
+     ## externalTrafficPolicy is applicable to service with externally-facing addresses (NodePorts, ExternalIPs, and LoadBalancer IPs)
+@@ -870,11 +871,6 @@ server:
  ## Prometheus server ConfigMap entries for rule files (allow prometheus labels interpolation)
  ruleFiles: {}
  
@@ -608,36 +617,10 @@ index cb6bb3b6..4240b98f 100644
 -## (allows scrape configs defined in additional files)
 -##
 -scrapeConfigFiles: []
- 
+-
  ## Prometheus server ConfigMap entries
  ##
-@@ -895,7 +892,7 @@ serverFiles:
-           # so this should only be disabled in a controlled environment. You can
-           # disable certificate verification by uncommenting the line below.
-           #
--          insecure_skip_verify: true
-+          insecure_skip_verify: false
-         bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
- 
-         # Keep only the default/kubernetes service endpoints for the https port. This
-@@ -926,7 +923,7 @@ serverFiles:
-           # so this should only be disabled in a controlled environment. You can
-           # disable certificate verification by uncommenting the line below.
-           #
--          insecure_skip_verify: true
-+          insecure_skip_verify: false
-         bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
- 
-         kubernetes_sd_configs:
-@@ -963,7 +960,7 @@ serverFiles:
-           # so this should only be disabled in a controlled environment. You can
-           # disable certificate verification by uncommenting the line below.
-           #
--          insecure_skip_verify: true
-+          insecure_skip_verify: false
-         bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
- 
-         kubernetes_sd_configs:
+ serverFiles:
 -- 
-2.44.0
+2.50.1 (Apple Git-155)
 
