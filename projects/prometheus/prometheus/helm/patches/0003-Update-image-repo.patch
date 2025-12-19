@@ -1,27 +1,26 @@
-From fa85bf847ee671c4dadebcb2281a6c5b7990bbc0 Mon Sep 17 00:00:00 2001
-From: "Ostosh, Ivy" <ivyjin215@gmail.com>
-Date: Mon, 28 Nov 2022 10:38:19 -0600
+From ffef7356b7039e46d9c0ef508e7540dcb3d2cf0d Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Wed, 17 Dec 2025 21:56:33 -0800
 Subject: [PATCH 3/6] Update image repo
 
 ---
  charts/prometheus/templates/deploy.yaml              |  6 +-----
  .../templates/node-exporter/daemonset.yaml           |  2 +-
- charts/prometheus/templates/sts.yaml                 |  6 +-----
  charts/prometheus/values.yaml                        | 12 +++++-------
- 4 files changed, 8 insertions(+), 18 deletions(-)
+ 3 files changed, 7 insertions(+), 13 deletions(-)
 
 diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
-index 7f005fc7..c0076871 100644
+index c5087d01..65951fda 100644
 --- a/charts/prometheus/templates/deploy.yaml
 +++ b/charts/prometheus/templates/deploy.yaml
-@@ -56,11 +56,7 @@ spec:
+@@ -101,11 +101,7 @@ spec:
        {{- end }}
        containers:
          - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
 -          {{- if .Values.server.image.digest }}
--          image: "{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
+-          image: "{{ tpl .Values.server.image.repository . }}@{{ tpl .Values.server.image.digest . }}"
 -          {{- else }}
--          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion}}"
+-          image: "{{ tpl .Values.server.image.repository . }}:{{ tpl .Values.server.image.tag . | default .Chart.AppVersion}}"
 -          {{- end }}
 +          image: "{{ .Values.sourceRegistry }}/{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
            imagePullPolicy: "{{ .Values.server.image.pullPolicy }}"
@@ -40,25 +39,8 @@ index d75f8a1c..f84bf7c1 100644
            imagePullPolicy: "{{ .Values.nodeExporter.image.pullPolicy }}"
            args:
              - --path.procfs=/host/proc
-diff --git a/charts/prometheus/templates/sts.yaml b/charts/prometheus/templates/sts.yaml
-index a800f695..66023293 100644
---- a/charts/prometheus/templates/sts.yaml
-+++ b/charts/prometheus/templates/sts.yaml
-@@ -61,11 +61,7 @@ spec:
-       {{- end }}
-       containers:
-         - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
--          {{- if .Values.server.image.digest }}
--          image: "{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
--          {{- else }}
--          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion }}"
--          {{- end }}
-+          image: "{{ .Values.sourceRegistry }}/{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
-           imagePullPolicy: "{{ .Values.server.image.pullPolicy }}"
-           {{- with .Values.server.command }}
-           command:
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index 701996da..1eccfe9d 100644
+index 134f8f93..b871026f 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
 @@ -9,6 +9,7 @@ rbac:
@@ -95,5 +77,5 @@ index 701996da..1eccfe9d 100644
  
    ## Prometheus server command
 -- 
-2.44.0
+2.50.1 (Apple Git-155)
 
