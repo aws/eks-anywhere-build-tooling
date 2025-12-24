@@ -40,7 +40,6 @@ RUN set -x && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/kubestatus && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/watt && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/agent && \
-    ln -sf /buildroot/busyambassador /newroot/buildroot/apiext && \
     ln -sf /newroot/buildroot/* /usr/local/bin/
 
 FROM $BASE_IMAGE
