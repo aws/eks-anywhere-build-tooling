@@ -1,4 +1,4 @@
-From 1b2e02f4b1b13f8e7e6e1d7a17a2cef29549d7fd Mon Sep 17 00:00:00 2001
+From 6f4c5d76116da1f7e235cb57338f097135cc937d Mon Sep 17 00:00:00 2001
 From: ahreehong <46465244+ahreehong@users.noreply.github.com>
 Date: Tue, 30 Jan 2024 17:10:30 -0800
 Subject: [PATCH] patching_helm_charts_packages
@@ -10,7 +10,7 @@ Subject: [PATCH] patching_helm_charts_packages
  charts/crds/Chart.yaml                        |    6 +
  charts/crds/README.md                         |   11 +
  charts/crds/templates/_helpers.tpl            |    4 +
- charts/crds/templates/apiext.yaml             |  186 +
+ charts/crds/templates/apiext.yaml             |  210 +
  charts/crds/templates/crds.yaml               | 5257 +++++++++++++++++
  charts/crds/templates/namespace.yaml          |    6 +
  charts/crds/values.yaml                       |   11 +
@@ -55,7 +55,7 @@ Subject: [PATCH] patching_helm_charts_packages
  .../templates/serviceaccount.yaml             |    2 +-
  .../templates/servicemonitor.yaml             |    4 +-
  .../{values.yaml.in => values.yaml}           |   51 +-
- 51 files changed, 5574 insertions(+), 720 deletions(-)
+ 51 files changed, 5598 insertions(+), 720 deletions(-)
  create mode 100644 charts/crds/.helmignore
  create mode 100644 charts/crds/Chart.yaml
  create mode 100644 charts/crds/README.md
@@ -192,10 +192,10 @@ index 000000000..084b6db5f
 +{{- end -}}
 diff --git a/charts/crds/templates/apiext.yaml b/charts/crds/templates/apiext.yaml
 new file mode 100644
-index 000000000..cee6c1874
+index 000000000..e6a224052
 --- /dev/null
 +++ b/charts/crds/templates/apiext.yaml
-@@ -0,0 +1,186 @@
+@@ -0,0 +1,210 @@
 +################################################################################
 +# Cluster permissions                                                          #
 +################################################################################
@@ -226,6 +226,24 @@ index 000000000..cee6c1874
 +    verbs: [ "list", "watch" ]
 +  - apiGroups: [ "apiextensions.k8s.io" ]
 +    resources: [ "customresourcedefinitions" ]
++    resourceNames:
++      - authservices.getambassador.io
++      - consulresolvers.getambassador.io
++      - devportals.getambassador.io
++      - hosts.getambassador.io
++      - kubernetesendpointresolvers.getambassador.io
++      - kubernetesserviceresolvers.getambassador.io
++      - listeners.getambassador.io
++      - logservices.getambassador.io
++      - mappings.getambassador.io
++      - modules.getambassador.io
++      - ratelimitservices.getambassador.io
++      - tcpmappings.getambassador.io
++      - tlscontexts.getambassador.io
++      - tracingservices.getambassador.io
++    verbs: [ "update" ]
++  - apiGroups: [ "apiextensions.k8s.io" ]
++    resources: [ "customresourcedefinitions/status" ]
 +    resourceNames:
 +      - authservices.getambassador.io
 +      - consulresolvers.getambassador.io
@@ -278,11 +296,17 @@ index 000000000..cee6c1874
 +rules:
 +  - apiGroups: [""]
 +    resources: ["secrets"]
-+    verbs: ["create"]
++    verbs: ["create", "list", "watch"]
 +  - apiGroups: [""]
 +    resources: ["secrets"]
 +    resourceNames: ["emissary-ingress-webhook-ca"]
 +    verbs: ["get", "update"]
++  - apiGroups: [""]
++    resources: ["events"]
++    verbs: ["create"]
++  - apiGroups: ["coordination.k8s.io"]
++    resources: ["leases"]
++    verbs: ["get", "create", "update"]
 +---
 +apiVersion: rbac.authorization.k8s.io/v1
 +kind: RoleBinding

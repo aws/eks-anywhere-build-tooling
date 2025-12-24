@@ -14,8 +14,8 @@ BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
 SKIP_ON_RELEASE_BRANCH=true
 
-BINARY_TARGET_FILES=busyambassador capabilities_wrapper example-envoy-metrics-sink kat-client kat-server
-SOURCE_PATTERNS=./cmd/busyambassador ./cmd/capabilities_wrapper ./cmd/example-envoy-metrics-sink ./cmd/kat-client ./cmd/kat-server
+BINARY_TARGET_FILES=apiext busyambassador capabilities_wrapper example-envoy-metrics-sink kat-client kat-server
+SOURCE_PATTERNS=./cmd/apiext ./cmd/busyambassador ./cmd/capabilities_wrapper ./cmd/example-envoy-metrics-sink ./cmd/kat-client ./cmd/kat-server
 
 EMISSARY_IMAGE_COMPONENT=emissary-ingress/emissary
 
