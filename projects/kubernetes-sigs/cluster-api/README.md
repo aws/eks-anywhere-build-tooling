@@ -1,5 +1,5 @@
 ## **Cluster API**
-![Version](https://img.shields.io/badge/version-v1.11.1-blue)
+![Version](https://img.shields.io/badge/version-v1.12.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiQVZ3TDBZZVVXZUZiVmtqLzVoOVcrV2FaMmxRRzJXRmJCRlZtQkNodXdWZ0FrNm0zQ3l5UzNqTkdsQXgwdzc0bTBZc1RIcjBhMUVFbEhIK3d2VDVPek1rPSIsIml2UGFyYW1ldGVyU3BlYyI6IkVuOGJxNXBPZEtDek81Q3giLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Cluster API](https://github.com/kubernetes-sigs/cluster-api) is a Kubernetes sub-project focused on providing declarative APIs and tooling to simplify provisioning, upgrading, and operating multiple Kubernetes clusters. It uses Kubernetes-style APIs and patterns to automate cluster lifecycle management for platform operators. The supporting infrastructure, like virtual machines, networks, load balancers, and VPCs, as well as the Kubernetes cluster configuration are all defined in the same way that application developers operate deploying and managing their workloads. This enables consistent and repeatable cluster deployments across a wide variety of infrastructure environments. Cluster API can be extended to support any infrastructure provider (AWS, Azure, vSphere, etc.) or bootstrap provider (kubeadm is default) as required by the customer.
