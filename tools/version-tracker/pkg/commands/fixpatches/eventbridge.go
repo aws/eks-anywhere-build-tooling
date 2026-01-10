@@ -40,6 +40,12 @@ func PublishPatchFailureEvent(event PatchFailureEvent) error {
 		eventBusName = "default" // Use default event bus if not specified
 	}
 
+	// Marshal event to JSON for logging
+	eventDetail, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("marshaling event: %v", err)
+	}
+
 	logger.Info("Publishing patch failure event to EventBridge",
 		"project", event.Project,
 		"pr", event.PRNumber,
@@ -52,12 +58,6 @@ func PublishPatchFailureEvent(event PatchFailureEvent) error {
 	}
 
 	client := eventbridge.NewFromConfig(cfg)
-
-	// Marshal event to JSON
-	eventDetail, err := json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("marshaling event: %v", err)
-	}
 
 	// Put event to EventBridge
 	input := &eventbridge.PutEventsInput{
