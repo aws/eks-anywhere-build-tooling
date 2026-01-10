@@ -379,24 +379,6 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					if !patchApplySucceeded {
 						failedSteps["Patch application"] = err
 						patchesWarningComment = fmt.Sprintf(constants.FailedPatchesCommentBody, appliedPatchesCount, totalPatchCount, failedPatch, applyFailedFiles)
-
-						// Publish EventBridge event for automatic patch fixing
-						if pullRequest != nil {
-							event := fixpatches.PatchFailureEvent{
-								Project:       projectName,
-								PRNumber:      *pullRequest.Number,
-								Branch:        branchName,
-								FailedPatches: []string{failedPatch},
-								Reason:        fmt.Sprintf("Patch failed to apply to files: %s", applyFailedFiles),
-								RepoOwner:     baseRepoOwner,
-								RepoName:      constants.BuildToolingRepoName,
-							}
-
-							if err := fixpatches.PublishPatchFailureEvent(event); err != nil {
-								logger.Info("Failed to publish patch failure event", "error", err)
-								// Don't fail the upgrade if event publishing fails
-							}
-						}
 					}
 				}
 
@@ -529,6 +511,23 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			err = github.AddCommentOnPR(client, baseRepoOwner, failedUpgradeComment, pullRequest)
 			if err != nil {
 				return fmt.Errorf("commenting failed upgrade comment on pull request [%s]: %v", *pullRequest.HTMLURL, err)
+			}
+
+			// Publish EventBridge event for automatic patch fixing if patches failed
+			if _, hasPatchFailure := failedSteps["Patch application"]; hasPatchFailure && pullRequest != nil {
+				event := fixpatches.PatchFailureEvent{
+					Project:       projectName,
+					PRNumber:      *pullRequest.Number,
+					Branch:        headBranchName,
+					FailedPatches: []string{},
+					Reason:        patchesWarningComment,
+					RepoOwner:     baseRepoOwner,
+					RepoName:      constants.BuildToolingRepoName,
+				}
+
+				if err := fixpatches.PublishPatchFailureEvent(event); err != nil {
+					logger.Info("Failed to publish patch failure event", "error", err)
+				}
 			}
 		}
 
