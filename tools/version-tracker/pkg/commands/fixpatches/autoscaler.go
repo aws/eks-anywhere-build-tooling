@@ -47,6 +47,11 @@ func fixAutoscalerPatches(projectPath string, releaseBranch string, prNumber int
 	clusterAutoscalerPath := filepath.Join(autoscalerPath, "cluster-autoscaler")
 	buildersPath := filepath.Join(clusterAutoscalerPath, "cloudprovider", "builder")
 
+	// Configure git user for commits in the autoscaler repo
+	if err := ConfigureGitUser(autoscalerPath); err != nil {
+		logger.Info("Warning: failed to configure git user in autoscaler repo", "error", err)
+	}
+
 	// Step 1: Remove builder files (except CAPI-related ones)
 	// NOTE: We do NOT remove the cloud provider directories here - that's handled by the
 	// REMOVE_CLOUD_PROVIDERS_TARGET in the Makefile during build. The patch only removes builder files.

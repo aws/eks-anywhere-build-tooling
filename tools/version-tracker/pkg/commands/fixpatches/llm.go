@@ -65,10 +65,13 @@ var requestMutex sync.Mutex
 
 // initBedrockClient initializes the Bedrock client once and reuses it.
 func initBedrockClient(model string) (*bedrockruntime.Client, string, error) {
-	// Convert model to profile first to check if we need to reinitialize
+	// Force us-west-2 region for Bedrock API endpoint - matches CodeBuild region.
+	// Note: Cross-region inference (CRIS) may route requests to other regions,
+	// but IAM policy allows all regions for foundation models.
 	cfg, err := config.LoadDefaultConfig(context.Background(),
-		config.WithRetryMaxAttempts(3),              // Increased from 1 to handle connection issues
-		config.WithRetryMode(aws.RetryModeAdaptive), // Use adaptive retry for better handling
+		config.WithRegion("us-west-2"),
+		config.WithRetryMaxAttempts(3),
+		config.WithRetryMode(aws.RetryModeAdaptive),
 	)
 	if err != nil {
 		return nil, "", fmt.Errorf("loading AWS config: %v", err)
@@ -811,19 +814,19 @@ func writeDebugFile(localPath string, content []byte, fileType string, attempt i
 
 	// Upload to S3
 	ctx := context.Background()
-	
+
 	// Allow specifying bucket region via env var to avoid redirect issues
 	// If not set, uses default region from AWS config
 	bucketRegion := os.Getenv("DEBUG_BUCKET_REGION")
 	var cfg aws.Config
 	var err error
-	
+
 	if bucketRegion != "" {
 		cfg, err = config.LoadDefaultConfig(ctx, config.WithRegion(bucketRegion))
 	} else {
 		cfg, err = config.LoadDefaultConfig(ctx)
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("loading AWS config: %v", err)
 	}
