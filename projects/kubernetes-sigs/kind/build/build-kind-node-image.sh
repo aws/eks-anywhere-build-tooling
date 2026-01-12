@@ -91,7 +91,19 @@ function build::kind::load_images(){
     build::kind::validate_versions $CONTAINER_ID
 
     docker cp $ROOT_FS/usr/local/bin/crictl $CONTAINER_ID:/usr/local/bin
-    docker exec --privileged -i $CONTAINER_ID bash -c "nohup containerd > /dev/null 2>&1 & sleep 5"
+    docker exec --privileged -i $CONTAINER_ID bash -c "nohup containerd > /dev/null 2>&1 &"
+    # Wait for containerd socket to be ready (similar to upstream kind's WaitForReady)
+    # This is needed because containerd may take longer to initialize under QEMU emulation
+    docker exec --privileged -i $CONTAINER_ID bash -c '
+for i in $(seq 0 10); do
+  if [ -S /run/containerd/containerd.sock ]; then
+    ctr info > /dev/null 2>&1 && exit 0
+  fi
+  sleep "$i"
+done
+echo "Timed out waiting for containerd socket"
+exit 1
+'
     docker exec --privileged -i $CONTAINER_ID crictl images
 
     # pull local-path-provisioner + al2 helper image
