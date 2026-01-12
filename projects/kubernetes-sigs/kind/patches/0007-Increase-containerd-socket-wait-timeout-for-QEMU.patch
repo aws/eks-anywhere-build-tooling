@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: EKS Anywhere Team <eks-anywhere@amazon.com>
+Date: Mon, 12 Jan 2026 12:00:00 -0800
+Subject: [PATCH] Increase containerd socket wait timeout for QEMU emulation
+
+The default 6-second timeout (0+1+2+3) in WaitForReady() is insufficient
+when building ARM64 images under QEMU emulation. This increases the
+timeout to ~55 seconds (0+1+2+...+10) to handle slower containerd
+startup times.
+
+---
+ pkg/build/nodeimage/imageimporter.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/pkg/build/nodeimage/imageimporter.go b/pkg/build/nodeimage/imageimporter.go
+index d6d82a534..1234567890 100644
+--- a/pkg/build/nodeimage/imageimporter.go
++++ b/pkg/build/nodeimage/imageimporter.go
+@@ -44,7 +44,7 @@ func (c *containerdImporter) WaitForReady() error {
+ 	if err := c.containerCmder.Command(
+ 		"bash", "-c", `set -e
+ # wait for socket to exist
+-for i in {0..3}; do
++for i in {0..10}; do
+   if [ -S /run/containerd/containerd.sock ]; then
+     break
+   fi
