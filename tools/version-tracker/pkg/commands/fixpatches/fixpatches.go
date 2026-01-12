@@ -26,6 +26,12 @@ func Run(opts *types.FixPatchesOptions) error {
 		return fmt.Errorf("getting current working directory: %v", err)
 	}
 
+	// Configure git user for commits (required when using shell git commands)
+	if err := ConfigureGitUser(cwd); err != nil {
+		logger.Info("Warning: failed to configure git user", "error", err)
+		// Don't fail - git config might already be set globally
+	}
+
 	// Extract org and repo from project name
 	projectRepo := strings.Split(opts.ProjectName, "/")[1]
 
@@ -127,7 +133,7 @@ func Run(opts *types.FixPatchesOptions) error {
 		abortCmd.Dir = repoPath
 		abortCmd.Run() // Ignore errors - there might not be an am session
 
-		return fixAutoscalerPatches(projectPath, releaseBranch)
+		return fixAutoscalerPatches(projectPath, releaseBranch, opts.PRNumber)
 	}
 
 	// Check if project has binaries that are release-branched
@@ -647,7 +653,9 @@ func applyPatches(projectPath string, repoName string) error {
 
 	// Ensure the repo is checked out (but don't apply patches)
 	// This creates the marker file $(REPO)/eks-anywhere-checkout-$(GIT_TAG)
+	// CRITICAL: Set CODEBUILD_CI=false to clone from GitHub directly instead of CodeCommit mirrors
 	checkoutCmd := exec.Command("make", "-C", projectPath, checkoutTarget)
+	checkoutCmd.Env = append(os.Environ(), "CODEBUILD_CI=false")
 	checkoutOutput, err := checkoutCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("make %s failed: %v\nOutput: %s", checkoutTarget, err, checkoutOutput)
@@ -854,10 +862,12 @@ func applySinglePatchWithReject(patchFile string, projectPath string, repoName s
 	checkoutTarget := fmt.Sprintf("%s/eks-anywhere-checkout-%s", repoName, gitTag)
 
 	// Ensure the repo is checked out (but don't apply patches)
-	// ALWAYS pass RELEASE_BRANCH to avoid Makefile errors (some projects require it)
+	// CRITICAL: Set CODEBUILD_CI=false to clone from GitHub directly instead of CodeCommit mirrors
+	// The CodeCommit credential helper causes issues with the checkout process
 	checkoutCmd := exec.Command("make", "-C", projectPath, checkoutTarget)
+	checkoutCmd.Env = append(os.Environ(), "CODEBUILD_CI=false")
 	if releaseBranch != "" {
-		checkoutCmd.Env = append(os.Environ(), fmt.Sprintf("RELEASE_BRANCH=%s", releaseBranch))
+		checkoutCmd.Env = append(checkoutCmd.Env, fmt.Sprintf("RELEASE_BRANCH=%s", releaseBranch))
 		logger.Info("Running checkout with RELEASE_BRANCH", "branch", releaseBranch)
 	}
 	checkoutOutput, err := checkoutCmd.CombinedOutput()
