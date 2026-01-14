@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/go-github/v53/github"
@@ -64,18 +65,33 @@ func (g *GitHubClient) CommentOnPR(prNumber int, comment string) error {
 }
 
 // FormatSuccessComment creates a formatted success comment for a PR.
-func FormatSuccessComment(project string, patchesFixed []string) string {
+// llmFixedPatches: patches that were actually fixed by LLM (had conflicts)
+// cleanPatches: patches that applied cleanly without LLM intervention
+func FormatSuccessComment(project string, llmFixedPatches []string, cleanPatches []string) string {
 	var sb strings.Builder
 
 	sb.WriteString("## ✅ Patches Fixed Successfully\n\n")
 	sb.WriteString(fmt.Sprintf("The patch fixer automatically resolved conflicts for **%s**.\n\n", project))
 
-	sb.WriteString("### Fixed Patches\n")
-	for _, patch := range patchesFixed {
-		sb.WriteString(fmt.Sprintf("- ✅ `%s`\n", patch))
+	if len(llmFixedPatches) > 0 {
+		sb.WriteString("### 🔧 Fixed by LLM\n")
+		sb.WriteString("These patches had conflicts that were resolved by the LLM:\n")
+		for _, patch := range llmFixedPatches {
+			sb.WriteString(fmt.Sprintf("- ✅ `%s`\n", patch))
+		}
+		sb.WriteString("\n")
 	}
 
-	sb.WriteString("\n### Next Steps\n")
+	if len(cleanPatches) > 0 {
+		sb.WriteString("### ✓ Applied Cleanly\n")
+		sb.WriteString("These patches applied without conflicts:\n")
+		for _, patch := range cleanPatches {
+			sb.WriteString(fmt.Sprintf("- `%s`\n", patch))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("### Next Steps\n")
 	sb.WriteString("- Review the fixed patches to ensure they match the original intent\n")
 	sb.WriteString("- Run tests to validate the changes\n")
 
@@ -132,6 +148,43 @@ func CommitAndPush(projectPath, branchName, commitMessage string) error {
 	// Stage all changes in patches directory
 	if err := GitAdd(projectPath, "patches/"); err != nil {
 		return fmt.Errorf("staging patches: %v", err)
+	}
+
+	// Stage CHECKSUMS if it exists and was modified
+	// ValidateBuild stages this file, but we need to ensure it's included in the commit
+	checksumsPath := filepath.Join(projectPath, "CHECKSUMS")
+	if _, err := os.Stat(checksumsPath); err == nil {
+		if err := GitAdd(projectPath, "CHECKSUMS"); err != nil {
+			logger.Info("Warning: failed to stage CHECKSUMS", "error", err)
+		}
+	}
+
+	// Stage expected-artifacts if it exists and was modified
+	expectedArtifactsPath := filepath.Join(projectPath, "expected-artifacts")
+	if _, err := os.Stat(expectedArtifactsPath); err == nil {
+		if err := GitAdd(projectPath, "expected-artifacts"); err != nil {
+			logger.Info("Warning: failed to stage expected-artifacts", "error", err)
+		}
+	}
+
+	// Stage ATTRIBUTION files if they exist
+	// These are generated during build and may change when patches are fixed
+	attributionFiles := []string{
+		"ATTRIBUTION.txt",
+		"*_ATTRIBUTION.txt", // e.g., INIT_ATTRIBUTION.txt, SERVICE_ATTRIBUTION.txt
+	}
+	for _, pattern := range attributionFiles {
+		matches, err := filepath.Glob(filepath.Join(projectPath, pattern))
+		if err != nil {
+			logger.Info("Warning: failed to glob attribution files", "pattern", pattern, "error", err)
+			continue
+		}
+		for _, match := range matches {
+			relPath, _ := filepath.Rel(projectPath, match)
+			if err := GitAdd(projectPath, relPath); err != nil {
+				logger.Info("Warning: failed to stage attribution file", "file", relPath, "error", err)
+			}
+		}
 	}
 
 	// Commit changes (GitCommit handles "nothing to commit" case)

@@ -638,6 +638,17 @@ func BuildPrompt(ctx *types.PatchContext, attempt int) string {
 	prompt.WriteString("- **CRITICAL**: DO NOT copy context lines from the original patch - they are from an OLD version\n")
 	prompt.WriteString("- **CRITICAL**: Use ONLY the context lines from the 'Current file state' section above\n\n")
 
+	// Add go.mod/go.sum specific guidance if the patch touches these files
+	if strings.Contains(ctx.OriginalPatch, "go.mod") || strings.Contains(ctx.OriginalPatch, "go.sum") {
+		prompt.WriteString("**⚠️ Special: go.mod and go.sum files**\n")
+		prompt.WriteString("This patch modifies Go module files. Important rules:\n")
+		prompt.WriteString("- go.mod and go.sum are coupled - if the original patch modifies BOTH, your fix MUST modify BOTH\n")
+		prompt.WriteString("- go.sum contains cryptographic hashes that MUST correspond to the versions in go.mod\n")
+		prompt.WriteString("- NEVER drop go.mod changes to make go.sum apply cleanly - this breaks the build\n")
+		prompt.WriteString("- The go.sum hashes in the CURRENT file are correct for the CURRENT go.mod versions\n")
+		prompt.WriteString("- Your patch should update BOTH files to use the NEW versions from the original patch intent\n\n")
+	}
+
 	prompt.WriteString("Output format (unified diff with complete headers):\n")
 	prompt.WriteString("```\n")
 	prompt.WriteString("From <commit-hash> Mon Sep 17 00:00:00 2001\n")
@@ -804,11 +815,12 @@ func writeDebugFile(localPath string, content []byte, fileType string, attempt i
 		return nil // S3 upload not configured, that's fine
 	}
 
-	// Get project and PR from environment (set by Lambda handler)
-	project := os.Getenv("PROJECT_NAME")
+	// Get project and PR from environment (set by buildspec)
+	// Note: buildspec exports PROJECT (not PROJECT_NAME) and PR_NUMBER
+	project := os.Getenv("PROJECT")
 	pr := os.Getenv("PR_NUMBER")
 	if project == "" || pr == "" {
-		logger.Info("Skipping S3 upload: PROJECT_NAME or PR_NUMBER not set")
+		logger.Info("Skipping S3 upload: PROJECT or PR_NUMBER not set")
 		return nil
 	}
 
