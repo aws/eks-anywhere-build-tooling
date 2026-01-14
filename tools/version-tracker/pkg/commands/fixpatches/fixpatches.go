@@ -20,6 +20,20 @@ import (
 func Run(opts *types.FixPatchesOptions) error {
 	logger.Info("Starting patch fixing workflow", "project", opts.ProjectName, "pr", opts.PRNumber)
 
+	// Skip list: projects that should not be auto-fixed
+	// - goharbor/harbor: patches touch swagger-generated files that are auto-generated
+	// - kubernetes-sigs/cluster-api: too many patches, complexity too high for LLM
+	skipProjects := []string{
+		"goharbor/harbor",
+		"kubernetes-sigs/cluster-api",
+	}
+	for _, skipProject := range skipProjects {
+		if opts.ProjectName == skipProject {
+			logger.Info("Project is in skip list - skipping auto-fix (this is expected, not an error)", "project", opts.ProjectName)
+			return nil // Success - skipping is intentional, not a failure
+		}
+	}
+
 	// Get current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -253,8 +267,11 @@ func Run(opts *types.FixPatchesOptions) error {
 
 	logger.Info("Found patch files", "count", len(patchFiles), "files", patchFiles)
 
-	// Track fixed patches for reporting
-	var fixedPatches []string
+	// Track patches for reporting
+	// llmFixedPatches: patches that were actually fixed by LLM (had conflicts)
+	// cleanPatches: patches that applied cleanly without LLM intervention
+	var llmFixedPatches []string
+	var cleanPatches []string
 	var failedPatches []string
 	var lastError error
 
@@ -263,7 +280,8 @@ func Run(opts *types.FixPatchesOptions) error {
 		logger.Info("Processing patch", "index", patchIndex+1, "total", len(patchFiles), "file", filepath.Base(patchFile))
 
 		// Try to fix this specific patch
-		if err := fixSinglePatch(patchFile, projectPath, projectRepo, releaseBranchForMake, opts); err != nil {
+		wasFixedByLLM, err := fixSinglePatch(patchFile, projectPath, projectRepo, releaseBranchForMake, opts)
+		if err != nil {
 			logger.Info("Failed to fix patch", "patch", filepath.Base(patchFile), "error", err)
 			failedPatches = append(failedPatches, filepath.Base(patchFile))
 			lastError = err
@@ -271,13 +289,21 @@ func Run(opts *types.FixPatchesOptions) error {
 			continue
 		}
 
-		logger.Info("Patch processed successfully", "file", filepath.Base(patchFile))
-		fixedPatches = append(fixedPatches, filepath.Base(patchFile))
+		logger.Info("Patch processed successfully", "file", filepath.Base(patchFile), "llm_fixed", wasFixedByLLM)
+		if wasFixedByLLM {
+			llmFixedPatches = append(llmFixedPatches, filepath.Base(patchFile))
+		} else {
+			cleanPatches = append(cleanPatches, filepath.Base(patchFile))
+		}
 	}
 
+	// Combine for build validation check (any successful patch counts)
+	allSuccessfulPatches := append(llmFixedPatches, cleanPatches...)
+
 	// After all patches are processed, run build validation once
-	if len(fixedPatches) > 0 {
-		logger.Info("Running final build validation for all fixed patches", "fixed_count", len(fixedPatches))
+	if len(allSuccessfulPatches) > 0 {
+		logger.Info("Running final build validation for all patches", "llm_fixed", len(llmFixedPatches), "clean", len(cleanPatches))
+
 		if err := ValidateBuild(projectPath, releaseBranchForMake); err != nil {
 			logger.Info("Final build validation failed", "error", err)
 			return fmt.Errorf("build validation failed after fixing patches: %v", err)
@@ -285,14 +311,14 @@ func Run(opts *types.FixPatchesOptions) error {
 		logger.Info("Final build validation passed")
 	}
 
-	// Commit and push if requested
-	if opts.Push && len(fixedPatches) > 0 {
+	// Commit and push if requested (only if LLM actually fixed something)
+	if opts.Push && len(llmFixedPatches) > 0 {
 		if opts.Branch == "" {
 			return fmt.Errorf("--branch is required when using --push")
 		}
 
 		commitMsg := fmt.Sprintf("Auto-fix patches for %s\n\nFixed patches:\n", opts.ProjectName)
-		for _, patch := range fixedPatches {
+		for _, patch := range llmFixedPatches {
 			commitMsg += fmt.Sprintf("- %s\n", patch)
 		}
 
@@ -311,12 +337,16 @@ func Run(opts *types.FixPatchesOptions) error {
 			var comment string
 			if len(failedPatches) > 0 {
 				comment = FormatFailureComment(opts.ProjectName, failedPatches)
-			} else {
-				comment = FormatSuccessComment(opts.ProjectName, fixedPatches)
+			} else if len(llmFixedPatches) > 0 {
+				// Only comment if LLM actually fixed something
+				comment = FormatSuccessComment(opts.ProjectName, llmFixedPatches, cleanPatches)
 			}
+			// If only clean patches (no LLM fixes, no failures), don't comment
 
-			if err := ghClient.CommentOnPR(opts.PRNumber, comment); err != nil {
-				logger.Info("Failed to comment on PR", "error", err)
+			if comment != "" {
+				if err := ghClient.CommentOnPR(opts.PRNumber, comment); err != nil {
+					logger.Info("Failed to comment on PR", "error", err)
+				}
 			}
 		}
 	}
@@ -331,19 +361,20 @@ func Run(opts *types.FixPatchesOptions) error {
 }
 
 // fixSinglePatch processes a single patch file through the fix-validate cycle.
-func fixSinglePatch(patchFile string, projectPath string, projectRepo string, releaseBranch string, opts *types.FixPatchesOptions) error {
+// Returns (wasFixedByLLM, error) where wasFixedByLLM is true only if LLM intervention was needed.
+func fixSinglePatch(patchFile string, projectPath string, projectRepo string, releaseBranch string, opts *types.FixPatchesOptions) (bool, error) {
 	logger.Info("Fixing single patch", "patch", filepath.Base(patchFile))
 
 	// Apply this specific patch with git apply --reject
 	rejFiles, patchResult, err := applySinglePatchWithReject(patchFile, projectPath, projectRepo, releaseBranch)
 	if err != nil {
-		return fmt.Errorf("applying patch with reject: %v", err)
+		return false, fmt.Errorf("applying patch with reject: %v", err)
 	}
 
-	// If no .rej files, patch applied successfully
+	// If no .rej files, patch applied successfully without LLM intervention
 	if len(rejFiles) == 0 {
 		logger.Info("Patch applied successfully without conflicts", "patch", filepath.Base(patchFile))
-		return nil
+		return false, nil // false = no LLM fix needed
 	}
 
 	logger.Info("Patch has conflicts", "patch", filepath.Base(patchFile), "rej_files", len(rejFiles), "offset_files", len(patchResult.OffsetFiles))
@@ -354,7 +385,7 @@ func fixSinglePatch(patchFile string, projectPath string, projectRepo string, re
 	// Rationale: Avoid mixed state where some patches fixed, others need manual work
 	complexity, err := calculateComplexity(rejFiles)
 	if err != nil {
-		return fmt.Errorf("calculating complexity: %v", err)
+		return false, fmt.Errorf("calculating complexity: %v", err)
 	}
 
 	logger.Info("Calculated patch complexity", "score", complexity, "threshold", opts.ComplexityThreshold)
@@ -368,7 +399,7 @@ func fixSinglePatch(patchFile string, projectPath string, projectRepo string, re
 		logger.Info("Complexity exceeds threshold - skipping this patch",
 			"complexity", complexity,
 			"threshold", opts.ComplexityThreshold)
-		return &types.PatchFixError{
+		return false, &types.PatchFixError{
 			Code:    types.ErrorComplexityTooHigh,
 			Message: fmt.Sprintf("Patch %s complexity (%d) exceeds threshold (%d)", filepath.Base(patchFile), complexity, opts.ComplexityThreshold),
 			Details: map[string]interface{}{
@@ -384,7 +415,7 @@ func fixSinglePatch(patchFile string, projectPath string, projectRepo string, re
 	// This context will be reused for all attempts to avoid state pollution
 	baseContext, err := ExtractPatchContext(rejFiles, patchFile, projectPath, 1, patchResult)
 	if err != nil {
-		return fmt.Errorf("extracting patch context: %v", err)
+		return false, fmt.Errorf("extracting patch context: %v", err)
 	}
 
 	logger.Info("Extracted base patch context", "token_count", baseContext.TokenCount, "hunks", len(baseContext.FailedHunks))
@@ -426,7 +457,7 @@ func fixSinglePatch(patchFile string, projectPath string, projectRepo string, re
 
 		// Prune context to target size
 		if err := PruneContext(baseContext, targetContextTokens); err != nil {
-			return fmt.Errorf("pruning context: %v", err)
+			return false, fmt.Errorf("pruning context: %v", err)
 		}
 
 		// Rebuild prompt and verify size
@@ -465,7 +496,7 @@ func fixSinglePatch(patchFile string, projectPath string, projectRepo string, re
 		if err != nil {
 			logger.Info("Bedrock API call failed", "error", err, "attempt", attempt)
 			if attempt == opts.MaxAttempts {
-				return &types.PatchFixError{
+				return false, &types.PatchFixError{
 					Code:    types.ErrorBedrockAPI,
 					Message: fmt.Sprintf("Bedrock API failed for patch %s after %d attempts: %v", filepath.Base(patchFile), opts.MaxAttempts, err),
 					Details: map[string]interface{}{
@@ -553,7 +584,7 @@ func fixSinglePatch(patchFile string, projectPath string, projectRepo string, re
 			// DON'T re-apply original patch - we reuse the base context instead
 
 			if attempt == opts.MaxAttempts {
-				return &types.PatchFixError{
+				return false, &types.PatchFixError{
 					Code:    types.ErrorSemanticDrift,
 					Message: fmt.Sprintf("Semantic validation failed for patch %s after %d attempts", filepath.Base(patchFile), opts.MaxAttempts),
 					Details: map[string]interface{}{
@@ -574,7 +605,7 @@ func fixSinglePatch(patchFile string, projectPath string, projectRepo string, re
 		// Write the fixed patch back to the original patch file
 		logger.Info("Writing fixed patch to file", "file", patchFile, "patch_length", len(fix.Patch))
 		if err := WritePatchToFile(fix.Patch, patchFile); err != nil {
-			return fmt.Errorf("writing fixed patch to file: %v", err)
+			return false, fmt.Errorf("writing fixed patch to file: %v", err)
 		}
 
 		logger.Info("Fixed patch written to file successfully", "file", patchFile)
@@ -615,11 +646,11 @@ func fixSinglePatch(patchFile string, projectPath string, projectRepo string, re
 			os.Remove(rejFile)
 		}
 
-		return nil
+		return true, nil // true = LLM fixed this patch
 	}
 
 	// All attempts exhausted for this patch
-	return &types.PatchFixError{
+	return false, &types.PatchFixError{
 		Code:    types.ErrorMaxAttemptsExceeded,
 		Message: fmt.Sprintf("Failed to fix patch %s after %d attempts", filepath.Base(patchFile), opts.MaxAttempts),
 		Details: map[string]interface{}{
