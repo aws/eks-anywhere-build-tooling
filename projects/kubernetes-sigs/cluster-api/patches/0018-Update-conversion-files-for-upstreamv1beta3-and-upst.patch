@@ -1,20 +1,200 @@
-From 0d11ed186bbc75fff7bd26b3795e004ec0a880fd Mon Sep 17 00:00:00 2001
+From 4ffd444db7aeea53afe4ece7506e5d84f608586c Mon Sep 17 00:00:00 2001
 From: Pankti <shah.pankti2609@gmail.com>
 Date: Tue, 7 Oct 2025 14:21:01 -0700
-Subject: [PATCH 36/39] Update conversion files for upstreamv1beta3 and
+Subject: [PATCH 18/18] Update conversion files for upstreamv1beta3 and
  upstreamv1beta4
 
 ---
+ .../kubeadm/v1beta1/kubeadm_types.go          |   1 -
+ .../v1beta1/zz_generated.conversion.go        |   4 +-
+ .../kubeadm/v1beta2/kubeadm_types.go          |   1 -
+ api/core/v1beta1/conversion.go                |  16 +
+ api/core/v1beta1/zz_generated.conversion.go   |  20 +-
+ api/core/v1beta2/cluster_types.go             |   2 +-
+ api/core/v1beta2/zz_generated.deepcopy.go     |   6 +-
+ api/core/v1beta2/zz_generated.openapi.go      |   1 -
  .../types/upstreamv1beta3/conversion.go       |  58 ++
- .../zz_generated.conversion.go                | 459 +++++++++++++-
+ .../kubeadm/types/upstreamv1beta3/types.go    |   1 -
+ .../zz_generated.conversion.go                | 461 +++++++++++++-
  .../types/upstreamv1beta4/conversion.go       |  70 +++
- .../kubeadm/types/upstreamv1beta4/types.go    |   2 +-
+ .../kubeadm/types/upstreamv1beta4/types.go    |   3 +-
  .../zz_generated.conversion.go                | 579 +++++++++++++++++-
  .../upstreamv1beta4/zz_generated.deepcopy.go  | 235 ++++++-
- 6 files changed, 1346 insertions(+), 57 deletions(-)
+ .../internal/controllers/controller.go        |   4 +-
+ .../internal/controllers/controller_test.go   |   2 +-
+ .../webhooks/kubeadm_control_plane.go         |   8 +-
+ .../kubeadm/v1alpha4/kubeadm_types.go         |   1 -
+ .../v1alpha4/zz_generated.conversion.go       |   4 +-
+ .../core/v1alpha3/zz_generated.conversion.go  |  20 +-
+ .../core/v1alpha4/zz_generated.conversion.go  |  20 +-
+ .../controllers/cluster/cluster_controller.go |   2 +-
+ .../cluster/cluster_controller_phases.go      |   4 +-
+ .../cluster/cluster_controller_test.go        |   2 +-
+ .../machine/machine_controller_phases.go      |   2 +-
+ 26 files changed, 1441 insertions(+), 86 deletions(-)
 
+diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
+index bdfdb9f..fccc2b4 100644
+--- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
++++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
+@@ -437,7 +437,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+index 0656e30..6a75366 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+@@ -2311,7 +2311,7 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
+ func autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]v1beta2.Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+@@ -2323,7 +2323,7 @@ func Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfig
+ func autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
+index d58f50d..12559f9 100644
+--- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
++++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
+@@ -134,7 +134,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
+diff --git a/api/core/v1beta1/conversion.go b/api/core/v1beta1/conversion.go
+index 03d7a7a..23d2c11 100644
+--- a/api/core/v1beta1/conversion.go
++++ b/api/core/v1beta1/conversion.go
+@@ -67,6 +67,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
+ 		dst.Spec.ControlPlaneRef = controlPlaneRef
+ 	}
+ 
++	if src.Spec.ManagedExternalEtcdRef != nil {
++		etcdRef, err := convertToContractVersionedObjectReference(src.Spec.ManagedExternalEtcdRef)
++		if err != nil {
++			return err
++		}
++		dst.Spec.ManagedExternalEtcdRef = &etcdRef
++	}
++
+ 	restored := &clusterv1.Cluster{}
+ 	ok, err := utilconversion.UnmarshalData(src, restored)
+ 	if err != nil {
+@@ -109,6 +117,14 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error {
+ 		dst.Spec.ControlPlaneRef = controlPlaneRef
+ 	}
+ 
++	if src.Spec.ManagedExternalEtcdRef != nil && src.Spec.ManagedExternalEtcdRef.IsDefined() {
++		etcdRef, err := convertToObjectReference(*src.Spec.ManagedExternalEtcdRef, src.Namespace)
++		if err != nil {
++			return err
++		}
++		dst.Spec.ManagedExternalEtcdRef = etcdRef
++	}
++
+ 	if dst.Spec.ClusterNetwork != nil && dst.Spec.ClusterNetwork.APIServerPort != nil &&
+ 		*dst.Spec.ClusterNetwork.APIServerPort == 0 {
+ 		dst.Spec.ClusterNetwork.APIServerPort = nil
+diff --git a/api/core/v1beta1/zz_generated.conversion.go b/api/core/v1beta1/zz_generated.conversion.go
+index 749d480..398fb52 100644
+--- a/api/core/v1beta1/zz_generated.conversion.go
++++ b/api/core/v1beta1/zz_generated.conversion.go
+@@ -1483,7 +1483,15 @@ func autoConvert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, out
+ 		return err
+ 	}
+ 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
+-	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(v1beta2.ContractVersionedObjectReference)
++		if err := Convert_v1_ObjectReference_To_v1beta2_ContractVersionedObjectReference(*in, *out, s); err != nil {
++			return err
++		}
++	} else {
++		out.ManagedExternalEtcdRef = nil
++	}
+ 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
+ 	// WARNING: in.Topology requires manual conversion: inconvertible types (*sigs.k8s.io/cluster-api/api/core/v1beta1.Topology vs sigs.k8s.io/cluster-api/api/core/v1beta2.Topology)
+ 	out.AvailabilityGates = *(*[]v1beta2.ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
+@@ -1499,7 +1507,15 @@ func autoConvert_v1beta2_ClusterSpec_To_v1beta1_ClusterSpec(in *v1beta2.ClusterS
+ 		return err
+ 	}
+ 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
+-	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(corev1.ObjectReference)
++		if err := Convert_v1beta2_ContractVersionedObjectReference_To_v1_ObjectReference(*in, *out, s); err != nil {
++			return err
++		}
++	} else {
++		out.ManagedExternalEtcdRef = nil
++	}
+ 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
+ 	// WARNING: in.Topology requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.Topology vs *sigs.k8s.io/cluster-api/api/core/v1beta1.Topology)
+ 	out.AvailabilityGates = *(*[]ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
+diff --git a/api/core/v1beta2/cluster_types.go b/api/core/v1beta2/cluster_types.go
+index 99ac9df..c7429be 100644
+--- a/api/core/v1beta2/cluster_types.go
++++ b/api/core/v1beta2/cluster_types.go
+@@ -480,7 +480,7 @@ type ClusterSpec struct {
+ 	// ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
+ 	// for provisioning an external etcd cluster
+ 	// +optional
+-	ManagedExternalEtcdRef ContractVersionedObjectReference `json:"managedExternalEtcdRef,omitempty"`
++	ManagedExternalEtcdRef *ContractVersionedObjectReference `json:"managedExternalEtcdRef,omitempty"`
+ 
+ 	// infrastructureRef is a reference to a provider-specific resource that holds the details
+ 	// for provisioning infrastructure for a cluster in said provider.
+diff --git a/api/core/v1beta2/zz_generated.deepcopy.go b/api/core/v1beta2/zz_generated.deepcopy.go
+index a3c8c40..1cf4d55 100644
+--- a/api/core/v1beta2/zz_generated.deepcopy.go
++++ b/api/core/v1beta2/zz_generated.deepcopy.go
+@@ -581,7 +581,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+ 	in.ClusterNetwork.DeepCopyInto(&out.ClusterNetwork)
+ 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
+ 	out.ControlPlaneRef = in.ControlPlaneRef
+-	out.ManagedExternalEtcdRef = in.ManagedExternalEtcdRef
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(ContractVersionedObjectReference)
++		**out = **in
++	}
+ 	out.InfrastructureRef = in.InfrastructureRef
+ 	in.Topology.DeepCopyInto(&out.Topology)
+ 	if in.AvailabilityGates != nil {
+diff --git a/api/core/v1beta2/zz_generated.openapi.go b/api/core/v1beta2/zz_generated.openapi.go
+index 4e58496..8b3096d 100644
+--- a/api/core/v1beta2/zz_generated.openapi.go
++++ b/api/core/v1beta2/zz_generated.openapi.go
+@@ -1169,7 +1169,6 @@ func schema_cluster_api_api_core_v1beta2_ClusterSpec(ref common.ReferenceCallbac
+ 					"managedExternalEtcdRef": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details for provisioning an external etcd cluster",
+-							Default:     map[string]interface{}{},
+ 							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference"),
+ 						},
+ 					},
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
-index bb127f06a..e98fc1888 100644
+index bb127f0..e98fc18 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
 @@ -459,3 +459,61 @@ func Convert_v1beta2_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(
@@ -79,8 +259,20 @@ index bb127f06a..e98fc1888 100644
 +	// Note: Other fields in v1beta2.BottlerocketKubernetesSettings don't exist in upstreamv1beta3 version
 +	return nil
 +}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+index 7d4ccbf..e6c241c 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+@@ -267,7 +267,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index 9f868bd92..fffd0c4ee 100644
+index 9f868bd..242cd73 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -68,6 +68,51 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -671,12 +863,21 @@ index 9f868bd92..fffd0c4ee 100644
  func autoConvert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
  	out.Endpoint = in.Endpoint
  	out.CACert = in.CACert
-+	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]v1beta2.Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+@@ -879,7 +1318,7 @@ func Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirr
+ func autoConvert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]Mirror)(unsafe.Pointer(&in.Mirrors))
  	return nil
  }
  
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
-index a7a2ac664..0b9645117 100644
+index a7a2ac6..0b96451 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
 @@ -539,6 +539,76 @@ func Convert_v1beta2_DNS_To_upstreamv1beta4_DNS(in *bootstrapv1.DNS, out *DNS, _
@@ -757,7 +958,7 @@ index a7a2ac664..0b9645117 100644
  	if in.Local.IsDefined() {
  		out.Local = &LocalEtcd{}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/types.go b/bootstrap/kubeadm/types/upstreamv1beta4/types.go
-index f909ea508..9e2bf420a 100644
+index f909ea5..ca2190b 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/types.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/types.go
 @@ -119,7 +119,7 @@ type ClusterConfiguration struct {
@@ -769,8 +970,16 @@ index f909ea508..9e2bf420a 100644
  
  	// RegistryMirror holds the image registry mirror information
  	// This is only for bottlerocket
+@@ -292,7 +292,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index ab97aca2d..60991f37c 100644
+index ab97aca..12a7933 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -78,6 +78,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -1449,7 +1658,7 @@ index ab97aca2d..60991f37c 100644
 +func autoConvert_upstreamv1beta4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
 +	out.Endpoint = in.Endpoint
 +	out.CACert = in.CACert
-+	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]v1beta2.Mirror)(unsafe.Pointer(&in.Mirrors))
 +	return nil
 +}
 +
@@ -1461,7 +1670,7 @@ index ab97aca2d..60991f37c 100644
 +func autoConvert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta4_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
 +	out.Endpoint = in.Endpoint
 +	out.CACert = in.CACert
-+	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]Mirror)(unsafe.Pointer(&in.Mirrors))
 +	return nil
 +}
 +
@@ -1474,7 +1683,7 @@ index ab97aca2d..60991f37c 100644
  	// WARNING: in.ControlPlaneComponentHealthCheck requires manual conversion: does not exist in peer-type
  	// WARNING: in.KubeletHealthCheck requires manual conversion: does not exist in peer-type
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.deepcopy.go
-index a6de9a218..9487728ae 100644
+index a6de9a2..9487728 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.deepcopy.go
 @@ -151,6 +151,53 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -1754,6 +1963,231 @@ index a6de9a218..9487728ae 100644
  // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
  func (in *Proxy) DeepCopyInto(out *Proxy) {
  	*out = *in
+diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
+index 05f6f0d..08f739d 100644
+--- a/controlplane/kubeadm/internal/controllers/controller.go
++++ b/controlplane/kubeadm/internal/controllers/controller.go
+@@ -501,7 +501,7 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+ 				*/
+ 				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
+ 					etcdRef := controlPlane.Cluster.Spec.ManagedExternalEtcdRef
+-					externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, controlPlane.Cluster.Namespace)
++					externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, *etcdRef, controlPlane.Cluster.Namespace)
+ 					if err != nil {
+ 						return ctrl.Result{}, err
+ 					}
+@@ -1497,7 +1497,7 @@ func (r *KubeadmControlPlaneReconciler) updateManagedExternalEtcdEndpoints(
+ 	}
+ 
+ 	etcdRef := cluster.Spec.ManagedExternalEtcdRef
+-	externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, cluster.Namespace)
++	externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, *etcdRef, cluster.Namespace)
+ 	if err != nil {
+ 		return ctrl.Result{}, err
+ 	}
+diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
+index ea598f3..d000e87 100644
+--- a/controlplane/kubeadm/internal/controllers/controller_test.go
++++ b/controlplane/kubeadm/internal/controllers/controller_test.go
+@@ -3882,7 +3882,7 @@ func TestKubeadmControlPlaneReconciler_updateManagedExternalEtcdEndpoints(t *tes
+ 		unstructured.SetNestedField(managedEtcd.Object, true, "status", "ready")
+ 		unstructured.SetNestedField(managedEtcd.Object, strings.Join(endpoints, ","), "status", "endpoints")
+ 		cluster, kcp, _ := createClusterWithControlPlane(ns)
+-		cluster.Spec.ManagedExternalEtcdRef = clusterv1.ContractVersionedObjectReference{
++		cluster.Spec.ManagedExternalEtcdRef = &clusterv1.ContractVersionedObjectReference{
+ 			APIGroup: managedEtcd.GroupVersionKind().Group,
+ 			Kind:     managedEtcd.GetKind(),
+ 			Name:     managedEtcd.GetName(),
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+index 083dab5..5ca2045 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+@@ -85,8 +85,12 @@ func defaultKubeadmControlPlaneSpec(s *controlplanev1.KubeadmControlPlaneSpec) {
+ 	}
+ 
+ 	// Enforce RollingUpdate strategy and default MaxSurge if not set.
+-	s.Rollout.Strategy.Type = controlplanev1.RollingUpdateStrategyType
+-	s.Rollout.Strategy.RollingUpdate.MaxSurge = intstr.ValueOrDefault(s.Rollout.Strategy.RollingUpdate.MaxSurge, intstr.FromInt32(1))
++	if s.Rollout.Strategy.Type == "" {
++		s.Rollout.Strategy.Type = controlplanev1.RollingUpdateStrategyType
++	}
++	if s.Rollout.Strategy.Type == controlplanev1.RollingUpdateStrategyType {
++		s.Rollout.Strategy.RollingUpdate.MaxSurge = intstr.ValueOrDefault(s.Rollout.Strategy.RollingUpdate.MaxSurge, intstr.FromInt32(1))
++	}
+ }
+ 
+ // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+index a39c61f..a61be28 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+@@ -261,7 +261,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+index e1c6f2c..cd076b4 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+@@ -1936,7 +1936,7 @@ func Convert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1bet
+ func autoConvert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]v1beta2.Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+@@ -1948,7 +1948,7 @@ func Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfi
+ func autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+diff --git a/internal/api/core/v1alpha3/zz_generated.conversion.go b/internal/api/core/v1alpha3/zz_generated.conversion.go
+index 6a47e2c..ee2d31d 100644
+--- a/internal/api/core/v1alpha3/zz_generated.conversion.go
++++ b/internal/api/core/v1alpha3/zz_generated.conversion.go
+@@ -520,7 +520,15 @@ func autoConvert_v1alpha3_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, ou
+ 		return err
+ 	}
+ 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
+-	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(v1beta2.ContractVersionedObjectReference)
++		if err := v1beta1.Convert_v1_ObjectReference_To_v1beta2_ContractVersionedObjectReference(*in, *out, s); err != nil {
++			return err
++		}
++	} else {
++		out.ManagedExternalEtcdRef = nil
++	}
+ 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
+ 	return nil
+ }
+@@ -534,7 +542,15 @@ func autoConvert_v1beta2_ClusterSpec_To_v1alpha3_ClusterSpec(in *v1beta2.Cluster
+ 		return err
+ 	}
+ 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
+-	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(corev1.ObjectReference)
++		if err := v1beta1.Convert_v1beta2_ContractVersionedObjectReference_To_v1_ObjectReference(*in, *out, s); err != nil {
++			return err
++		}
++	} else {
++		out.ManagedExternalEtcdRef = nil
++	}
+ 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
+ 	// WARNING: in.Topology requires manual conversion: does not exist in peer-type
+ 	// WARNING: in.AvailabilityGates requires manual conversion: does not exist in peer-type
+diff --git a/internal/api/core/v1alpha4/zz_generated.conversion.go b/internal/api/core/v1alpha4/zz_generated.conversion.go
+index d34a5f8..f75e57c 100644
+--- a/internal/api/core/v1alpha4/zz_generated.conversion.go
++++ b/internal/api/core/v1alpha4/zz_generated.conversion.go
+@@ -757,7 +757,15 @@ func autoConvert_v1alpha4_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, ou
+ 		return err
+ 	}
+ 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
+-	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(v1beta2.ContractVersionedObjectReference)
++		if err := v1beta1.Convert_v1_ObjectReference_To_v1beta2_ContractVersionedObjectReference(*in, *out, s); err != nil {
++			return err
++		}
++	} else {
++		out.ManagedExternalEtcdRef = nil
++	}
+ 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
+ 	// WARNING: in.Topology requires manual conversion: inconvertible types (*sigs.k8s.io/cluster-api/internal/api/core/v1alpha4.Topology vs sigs.k8s.io/cluster-api/api/core/v1beta2.Topology)
+ 	return nil
+@@ -772,7 +780,15 @@ func autoConvert_v1beta2_ClusterSpec_To_v1alpha4_ClusterSpec(in *v1beta2.Cluster
+ 		return err
+ 	}
+ 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
+-	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(corev1.ObjectReference)
++		if err := v1beta1.Convert_v1beta2_ContractVersionedObjectReference_To_v1_ObjectReference(*in, *out, s); err != nil {
++			return err
++		}
++	} else {
++		out.ManagedExternalEtcdRef = nil
++	}
+ 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
+ 	// WARNING: in.Topology requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.Topology vs *sigs.k8s.io/cluster-api/internal/api/core/v1alpha4.Topology)
+ 	// WARNING: in.AvailabilityGates requires manual conversion: does not exist in peer-type
+diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
+index c668578..19eef85 100644
+--- a/internal/controllers/cluster/cluster_controller.go
++++ b/internal/controllers/cluster/cluster_controller.go
+@@ -461,7 +461,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
+ 	}
+ 
+ 	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
+-		obj, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, cluster.Spec.ManagedExternalEtcdRef, cluster.Namespace)
++		obj, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, *cluster.Spec.ManagedExternalEtcdRef, cluster.Namespace)
+ 		switch {
+ 		case apierrors.IsNotFound(errors.Cause(err)):
+ 			// Etcd cluster has been deleted
+diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
+index ea5a97e..4310a4a 100644
+--- a/internal/controllers/cluster/cluster_controller_phases.go
++++ b/internal/controllers/cluster/cluster_controller_phases.go
+@@ -376,7 +376,7 @@ func (r *Reconciler) handlePauseControlPlaneWithExternalManagedEtcd(ctx context.
+ 	}
+ 
+ 	etcdRef := cluster.Spec.ManagedExternalEtcdRef
+-	externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, etcdRef, cluster.Namespace)
++	externalEtcd, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, *etcdRef, cluster.Namespace)
+ 	if err != nil {
+ 		if apierrors.IsNotFound(errors.Cause(err)) {
+ 			log.Info("Could not find external object for cluster, requeuing", "refGroupVersionKind", etcdRef.GroupKind(), "refName", etcdRef.Name)
+@@ -413,7 +413,7 @@ func (r *Reconciler) reconcileEtcdCluster(ctx context.Context, s *scope) (ctrl.R
+ 		return ctrl.Result{}, nil
+ 	}
+ 	// Call generic external reconciler.
+-	obj, err := r.reconcileExternal(ctx, cluster, cluster.Spec.ManagedExternalEtcdRef)
++	obj, err := r.reconcileExternal(ctx, cluster, *cluster.Spec.ManagedExternalEtcdRef)
+ 	etcdPlaneReconcileResult := external.ReconcileOutput{Result: obj}
+ 	if err != nil {
+ 		return ctrl.Result{}, err
+diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
+index a627b9f..ffe701f 100644
+--- a/internal/controllers/cluster/cluster_controller_test.go
++++ b/internal/controllers/cluster/cluster_controller_test.go
+@@ -931,7 +931,7 @@ func TestFilterOwnedDescendants(t *testing.T) {
+ 			Name: "c",
+ 		},
+ 		Spec: clusterv1.ClusterSpec{
+-			ManagedExternalEtcdRef: clusterv1.ContractVersionedObjectReference{},
++			ManagedExternalEtcdRef: &clusterv1.ContractVersionedObjectReference{},
+ 		},
+ 	}
+ 
+diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
+index a3789ef..7a77dab 100644
+--- a/internal/controllers/machine/machine_controller_phases.go
++++ b/internal/controllers/machine/machine_controller_phases.go
+@@ -343,7 +343,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+ 		// set first node's IP address on EtcdCluster
+ 		// get etcd cluster
+ 		ref := cluster.Spec.ManagedExternalEtcdRef
+-		obj, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, ref, cluster.Namespace)
++		obj, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, *ref, cluster.Namespace)
+ 		if err != nil {
+ 			if apierrors.IsNotFound(errors.Cause(err)) {
+ 				return ctrl.Result{}, err
 -- 
-2.48.1
+2.50.1 (Apple Git-155)
 

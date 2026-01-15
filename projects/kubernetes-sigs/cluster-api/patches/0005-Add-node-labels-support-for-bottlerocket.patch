@@ -1,7 +1,7 @@
-From ffbea0a7bd45b72f953c6816cf5c5487d6379516 Mon Sep 17 00:00:00 2001
-From: danbudris <budris@amazon.com>
-Date: Fri, 18 Feb 2022 09:24:32 -0500
-Subject: [PATCH 12/39] support bottle rocket control plane taints
+From bbfc5db21ffc735eb7c25edc1d6a0970c3b26f98 Mon Sep 17 00:00:00 2001
+From: Vivek Koppuru <koppv@amazon.com>
+Date: Mon, 24 Jan 2022 00:46:44 -0800
+Subject: [PATCH 05/18] Add node labels support for bottlerocket
 
 ---
  api/bootstrap/kubeadm/v1beta1/conversion.go   |  12 ++
@@ -12,9 +12,9 @@ Subject: [PATCH 12/39] support bottle rocket control plane taints
  .../kubeadm/v1beta2/zz_generated.deepcopy.go  |  17 +++
  ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 112 ++++++++++++++++++
  ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 112 ++++++++++++++++++
- .../internal/bottlerocket/bootstrap.go        |  12 ++
- .../internal/bottlerocket/bottlerocket.go     |  10 ++
- .../controllers/kubeadmconfig_controller.go   |   9 ++
+ .../internal/bottlerocket/bootstrap.go        |  32 +++++
+ .../internal/bottlerocket/bottlerocket.go     |  81 +++++++++++++
+ .../controllers/kubeadmconfig_controller.go   |  21 ++++
  .../types/upstreamv1beta3/conversion.go       |  12 ++
  .../kubeadm/types/upstreamv1beta3/types.go    |  17 +++
  .../zz_generated.conversion.go                |  33 ++++++
@@ -30,10 +30,11 @@ Subject: [PATCH 12/39] support bottle rocket control plane taints
  .../kubeadm/v1alpha4/kubeadm_types.go         |  17 +++
  .../v1alpha4/zz_generated.conversion.go       |  33 ++++++
  .../kubeadm/v1alpha4/zz_generated.deepcopy.go |  18 +++
- 26 files changed, 818 insertions(+), 1 deletion(-)
+ .../machine/machine_controller_phases.go      |   2 +-
+ 27 files changed, 922 insertions(+), 2 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index f80cd5477..cab70aaa0 100644
+index f80cd54..cab70aa 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
 @@ -682,6 +682,18 @@ func Convert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *
@@ -56,7 +57,7 @@ index f80cd5477..cab70aaa0 100644
  	if in.Local != nil {
  		if err := Convert_v1beta1_LocalEtcd_To_v1beta2_LocalEtcd(in.Local, &out.Local, s); err != nil {
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 5ae15a6ab..8c9d46d83 100644
+index 5ae15a6..8c9d46d 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 @@ -87,6 +87,11 @@ type ClusterConfiguration struct {
@@ -98,7 +99,7 @@ index 5ae15a6ab..8c9d46d83 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 41aa18437..6dccffc45 100644
+index 41aa184..6dccffc 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -350,6 +350,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -184,7 +185,7 @@ index 41aa18437..6dccffc45 100644
  		return err
  	}
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index 568bdee53..204a72a7c 100644
+index 568bdee..204a72a 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -226,7 +227,7 @@ index 568bdee53..204a72a7c 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index f31154d73..45f332763 100644
+index f31154d..45f3327 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 @@ -147,6 +147,11 @@ type ClusterConfiguration struct {
@@ -281,7 +282,7 @@ index f31154d73..45f332763 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index 33dbb82be..651d5db17 100644
+index 33dbb82..651d5db 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -194,11 +194,27 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -321,7 +322,7 @@ index 33dbb82be..651d5db17 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 4e98062d2..e63416d8d 100644
+index 4e98062..e63416d 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -1128,6 +1128,22 @@ spec:
@@ -479,7 +480,7 @@ index 4e98062d2..e63416d8d 100644
                      description: |-
                        caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index a0be5ab77..4196f29ce 100644
+index a0be5ab..4196f29 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -1091,6 +1091,22 @@ spec:
@@ -637,13 +638,30 @@ index a0be5ab77..4196f29ce 100644
                              description: |-
                                caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index dd769a78d..f8f1b97cb 100644
+index 4e1de77..f8f1b97 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-@@ -53,6 +53,14 @@ trusted=true
- [settings.kubernetes.node-taints]
- {{.Taints}}
+@@ -18,6 +18,7 @@ server-tls-bootstrap = false
+ pod-infra-container-image = "{{.PauseContainerSource}}"
  {{- end -}}
+ `
++
+ 	bootstrapHostContainerTemplate = `{{define "bootstrapHostContainerSettings" -}}
+ [settings.host-containers.kubeadm-bootstrap]
+ enabled = true
+@@ -43,6 +44,25 @@ data = "{{.RegistryMirrorCACert}}"
+ trusted=true
+ {{- end -}}
+ `
++	nodeLabelsTemplate = `{{ define "nodeLabelSettings" -}}
++[settings.kubernetes.node-labels]
++{{.NodeLabels}}
++{{- end -}}
++`
++	taintsTemplate = `{{ define "taintsTemplate" -}}
++[settings.kubernetes.node-taints]
++{{.Taints}}
++{{- end -}}
 +`
 +
 +	controlContainerTemplate = `{{ define "controlContainerSettings" -}}
@@ -652,13 +670,23 @@ index dd769a78d..f8f1b97cb 100644
 +superpowered = false
 +source = "{{.ControlContainerSource}}"
 +{{- end -}}
- `
- 
++`
++
  	bottlerocketNodeInitSettingsTemplate = `{{template "bootstrapHostContainerSettings" .}}
-@@ -80,5 +88,9 @@ trusted=true
- {{- if (ne .Taints "")}}
- {{template "taintsTemplate" .}}
+ 
+ {{template "adminContainerInitSettings" .}}
+@@ -60,5 +80,17 @@ trusted=true
+ {{- if (ne .RegistryMirrorCACert "")}}
+ {{template "registryMirrorCACertSettings" .}}
  {{- end -}}
++
++{{- if (ne .NodeLabels "")}}
++{{template "nodeLabelSettings" .}}
++{{- end -}}
++
++{{- if (ne .Taints "")}}
++{{template "taintsTemplate" .}}
++{{- end -}}
 +
 +{{- if (ne .ControlContainerSource "")}}
 +{{template "controlContainerSettings" .}}
@@ -666,18 +694,21 @@ index dd769a78d..f8f1b97cb 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 6eb8ae6ad..1acdd341f 100644
+index 4f73296..1acdd34 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-@@ -25,6 +25,7 @@ const (
+@@ -25,19 +25,25 @@ const (
  type BottlerocketConfig struct {
  	Pause                       bootstrapv1.Pause
  	BottlerocketBootstrap       bootstrapv1.BottlerocketBootstrap
 +	BottlerocketControl         bootstrapv1.BottlerocketControl
  	ProxyConfiguration          bootstrapv1.ProxyConfiguration
  	RegistryMirrorConfiguration bootstrapv1.RegistryMirrorConfiguration
- 	KubeletExtraArgs            []bootstrapv1.Arg
-@@ -35,6 +36,7 @@ type BottlerocketSettingsInput struct {
++	KubeletExtraArgs            []bootstrapv1.Arg
++	Taints                      []corev1.Taint
+ }
+ 
+ type BottlerocketSettingsInput struct {
  	BootstrapContainerUserData string
  	AdminContainerUserData     string
  	BootstrapContainerSource   string
@@ -685,7 +716,14 @@ index 6eb8ae6ad..1acdd341f 100644
  	PauseContainerSource       string
  	HTTPSProxyEndpoint         string
  	NoProxyEndpoints           []string
-@@ -92,6 +94,9 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ 	RegistryMirrorEndpoint     string
+ 	RegistryMirrorCACert       string
++	NodeLabels                 string
++	Taints                     string
+ }
+ 
+ type HostPath struct {
+@@ -88,6 +94,9 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
  	if _, err := tm.Parse(adminContainerInitTemplate); err != nil {
  		return nil, errors.Wrapf(err, "failed to parse adminContainer %s template", kind)
  	}
@@ -695,9 +733,25 @@ index 6eb8ae6ad..1acdd341f 100644
  	if _, err := tm.Parse(kubernetesInitTemplate); err != nil {
  		return nil, errors.Wrapf(err, "failed to parse kubernetes %s template", kind)
  	}
-@@ -147,6 +152,11 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
- 		NodeLabels:                 parseNodeLabels(getArgValue(config.KubeletExtraArgs, "node-labels")), // empty string if it does not exist
- 		Taints:                     parseTaints(config.Taints),                                           //empty string if it does not exist
+@@ -100,6 +109,12 @@ func generateNodeUserData(kind string, tpl string, data interface{}) ([]byte, er
+ 	if _, err := tm.Parse(registryMirrorCACertTemplate); err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse registry mirror ca cert %s template", kind)
+ 	}
++	if _, err := tm.Parse(nodeLabelsTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse node labels %s template", kind)
++	}
++	if _, err := tm.Parse(taintsTemplate); err != nil {
++		return nil, errors.Wrapf(err, "failed to parse taints %s template", kind)
++	}
+ 	t, err := tm.Parse(tpl)
+ 	if err != nil {
+ 		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
+@@ -134,7 +149,14 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 		PauseContainerSource:       fmt.Sprintf("%s:%s", config.Pause.ImageRepository, config.Pause.ImageTag),
+ 		HTTPSProxyEndpoint:         config.ProxyConfiguration.HTTPSProxy,
+ 		RegistryMirrorEndpoint:     config.RegistryMirrorConfiguration.Endpoint,
++		NodeLabels:                 parseNodeLabels(getArgValue(config.KubeletExtraArgs, "node-labels")), // empty string if it does not exist
++		Taints:                     parseTaints(config.Taints),                                           //empty string if it does not exist
  	}
 +
 +	if config.BottlerocketControl.ImageRepository != "" && config.BottlerocketControl.ImageTag != "" {
@@ -707,8 +761,74 @@ index 6eb8ae6ad..1acdd341f 100644
  	if len(config.ProxyConfiguration.NoProxy) > 0 {
  		for _, noProxy := range config.ProxyConfiguration.NoProxy {
  			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
+@@ -151,6 +173,65 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 	return bottlerocketNodeUserData, nil
+ }
+ 
++// getArgValue searches for an argument by name in the slice and returns its value.
++// Returns empty string if the argument is not found or if the value is nil.
++func getArgValue(args []bootstrapv1.Arg, name string) string {
++	for _, arg := range args {
++		if arg.Name == name {
++			if arg.Value != nil {
++				return *arg.Value
++			}
++			return ""
++		}
++	}
++	return ""
++}
++
++// bottlerocket configuration accepts taints in the format
++// "key" = ["value:Effect", "value2:Effect2"]
++func parseTaints(taints []corev1.Taint) string {
++	if len(taints) == 0 {
++		return ""
++	}
++	taintValueEffectTemplate := "\"%v:%v\""
++	taintsMap := make(map[string][]string)
++	for _, taint := range taints {
++		valueEffectString := fmt.Sprintf(taintValueEffectTemplate, taint.Value, taint.Effect)
++		taintsMap[taint.Key] = append(taintsMap[taint.Key], valueEffectString)
++	}
++
++	var taintsToml strings.Builder
++	for k, v := range taintsMap {
++		// write the taint key and opening bracket: '"key" = ['
++		taintKey := fmt.Sprintf("\"%v\" = [", k)
++		taintsToml.WriteString(taintKey)
++
++		// write the value:effect mappings: '"value1:Effect1", "value2:Effect2"'
++		taintValueEffectMappings := strings.Join(v, ",")
++		taintsToml.WriteString(taintValueEffectMappings)
++
++		// close the brackets and go to a new line
++		taintsToml.WriteString("]")
++		taintsToml.WriteString("\n")
++	}
++	return taintsToml.String()
++}
++
++func parseNodeLabels(nodeLabels string) string {
++	if nodeLabels == "" {
++		return ""
++	}
++	nodeLabelsToml := ""
++	nodeLabelsList := strings.Split(nodeLabels, ",")
++	for _, nodeLabel := range nodeLabelsList {
++		keyVal := strings.Split(nodeLabel, "=")
++		if len(keyVal) == 2 {
++			nodeLabelsToml += fmt.Sprintf("\"%v\" = \"%v\"\n", keyVal[0], keyVal[1])
++		}
++	}
++	return nodeLabelsToml
++}
++
+ // Parses through all the users and return list of all user's authorized ssh keys
+ func getAllAuthorizedKeys(users []bootstrapv1.User) string {
+ 	var sshAuthorizedKeys []string
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 44f361d6c..a3dbac817 100644
+index 130a0c4..a3dbac8 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 @@ -565,6 +565,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
@@ -719,17 +839,20 @@ index 44f361d6c..a3dbac817 100644
  		}
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -575,6 +576,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 		if scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs != nil {
- 			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs
+@@ -572,6 +573,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+ 		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
  		}
++		if scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs
++		}
 +		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
 +			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
 +		}
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
-@@ -864,6 +868,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -861,6 +868,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
  			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
  			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
@@ -737,7 +860,20 @@ index 44f361d6c..a3dbac817 100644
  		}
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -1047,6 +1052,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -868,6 +876,12 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+ 		if scope.Config.Spec.JoinConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
+ 		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
++		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
++			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+@@ -1038,6 +1052,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
  			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
  			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
@@ -745,10 +881,13 @@ index 44f361d6c..a3dbac817 100644
  		}
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -1057,6 +1063,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
- 			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
+@@ -1045,6 +1060,12 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+ 		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
+ 			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
  		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
++			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
++		}
 +		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
 +			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
 +		}
@@ -756,7 +895,7 @@ index 44f361d6c..a3dbac817 100644
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
-index 6096463ee..bb127f06a 100644
+index 6096463..bb127f0 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
 @@ -444,6 +444,18 @@ func Convert_v1beta2_Pause_To_upstreamv1beta3_Pause(in *bootstrapv1.Pause, out *
@@ -779,7 +918,7 @@ index 6096463ee..bb127f06a 100644
  	return autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in, out, s)
  }
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
-index 65371b811..bfc69fabb 100644
+index 65371b8..bfc69fa 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
 @@ -83,6 +83,11 @@ type ClusterConfiguration struct {
@@ -821,7 +960,7 @@ index 65371b811..bfc69fabb 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index 99f0e1a5a..6ad00f074 100644
+index 99f0e1a..6ad00f0 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -143,6 +143,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -907,7 +1046,7 @@ index 99f0e1a5a..6ad00f074 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
-index 68734b74a..60205c135 100644
+index 68734b7..60205c1 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
 @@ -157,12 +157,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -949,7 +1088,7 @@ index 68734b74a..60205c135 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 0c903b837..eabb9d4be 100644
+index 0c903b8..eabb9d4 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -503,6 +503,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
@@ -969,7 +1108,7 @@ index 0c903b837..eabb9d4be 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/utils_test.go b/bootstrap/kubeadm/types/utils_test.go
-index 3bd375477..2c4f0d5cc 100644
+index 3bd3754..2c4f0d5 100644
 --- a/bootstrap/kubeadm/types/utils_test.go
 +++ b/bootstrap/kubeadm/types/utils_test.go
 @@ -152,6 +152,8 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
@@ -1030,7 +1169,7 @@ index 3bd375477..2c4f0d5cc 100644
  		},
  		{
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index cf2e86878..24cfffa8a 100644
+index cf2e868..24cfffa 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -1356,6 +1356,22 @@ spec:
@@ -1188,7 +1327,7 @@ index cf2e86878..24cfffa8a 100644
                          description: |-
                            caCertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 8b8d415ff..cb6f97406 100644
+index 8b8d415..cb6f974 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -144,6 +144,22 @@ spec:
@@ -1346,7 +1485,7 @@ index 8b8d415ff..cb6f97406 100644
                                  description: |-
                                    caCertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
-index 0f0be800a..0fdf78e3a 100644
+index 0f0be80..0fdf78e 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
 @@ -960,6 +960,8 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
@@ -1369,7 +1508,7 @@ index 0f0be800a..0fdf78e3a 100644
  				`),
  		},
 diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
-index c041e914c..8153b3cc4 100644
+index c041e91..8153b3c 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
 @@ -63,6 +63,8 @@ func TestUpdateEtcdExternalInKubeadmConfigMap(t *testing.T) {
@@ -1411,7 +1550,7 @@ index c041e914c..8153b3cc4 100644
  				`),
  		},
 diff --git a/controlplane/kubeadm/internal/workload_cluster_test.go b/controlplane/kubeadm/internal/workload_cluster_test.go
-index 5390ac42f..097d580f1 100644
+index 5390ac4..097d580 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_test.go
 @@ -316,12 +316,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
@@ -1524,7 +1663,7 @@ index 5390ac42f..097d580f1 100644
  				  extraArgs:
  				    bar: baz
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
-index 0effa7124..5100ed463 100644
+index 0effa71..5100ed4 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 @@ -542,6 +542,7 @@ func autoConvert_v1alpha3_ClusterConfiguration_To_v1beta2_ClusterConfiguration(i
@@ -1544,7 +1683,7 @@ index 0effa7124..5100ed463 100644
  	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1alpha3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
-index 68c372963..55f700485 100644
+index 68c3729..55f7004 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
 @@ -71,6 +71,11 @@ type ClusterConfiguration struct {
@@ -1586,7 +1725,7 @@ index 68c372963..55f700485 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-index 02944831d..490ac6cf5 100644
+index 0294483..490ac6c 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 @@ -69,6 +69,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -1665,7 +1804,7 @@ index 02944831d..490ac6cf5 100644
  		return err
  	}
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
-index ed9b9e0cc..168109c1e 100644
+index ed9b9e0..168109c 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
 @@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -1706,6 +1845,26 @@ index ed9b9e0cc..168109c1e 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
+index e823b58..b584f2e 100644
+--- a/internal/controllers/machine/machine_controller_phases.go
++++ b/internal/controllers/machine/machine_controller_phases.go
+@@ -394,7 +394,6 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+ 					if machineIP == "" {
+ 						return ctrl.Result{}, fmt.Errorf("error getting etcd init IP address: %v", err)
+ 					}
+-
+ 					secret := &corev1.Secret{
+ 						ObjectMeta: metav1.ObjectMeta{
+ 							Name:      etcdSecretName,
+@@ -413,6 +412,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+ 						},
+ 						Data: map[string][]byte{
+ 							"address": []byte(machineIP),
++							"clientUrls": []byte(fmt.Sprintf("https://%v:2379", machineIP)),
+ 						},
+ 						Type: clusterv1.ClusterSecretType,
+ 					}
 -- 
-2.48.1
+2.50.1 (Apple Git-155)
 

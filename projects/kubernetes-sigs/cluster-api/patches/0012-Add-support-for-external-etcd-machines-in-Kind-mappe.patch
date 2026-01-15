@@ -1,7 +1,7 @@
-From 23e5886de2cc8ee0bb0efc24cf7b2f321ba237e1 Mon Sep 17 00:00:00 2001
+From a795a2970f33f620b1cb5acd000fae17add31850 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 16 Aug 2023 19:58:01 -0700
-Subject: [PATCH 27/39] Add support for external etcd machines in Kind mapper
+Subject: [PATCH 12/18] Add support for external etcd machines in Kind mapper
 
 ---
  .../client/cluster/objectgraph_test.go        |  2 +-
@@ -11,7 +11,7 @@ Subject: [PATCH 27/39] Add support for external etcd machines in Kind mapper
  4 files changed, 67 insertions(+), 37 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index 28e29eca0..808fe1199 100644
+index 28e29ec..808fe11 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
 @@ -2182,7 +2182,7 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
@@ -24,7 +24,7 @@ index 28e29eca0..808fe1199 100644
  					objs := []client.Object{}
  					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
 diff --git a/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go b/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
-index f01653849..ca3c2d1cc 100644
+index f016538..ca3c2d1 100644
 --- a/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
 +++ b/test/infrastructure/docker/exp/internal/controllers/dockermachinepool_controller_phases.go
 @@ -98,7 +98,7 @@ func createDockerContainer(ctx context.Context, name string, cluster *clusterv1.
@@ -37,7 +37,7 @@ index f01653849..ca3c2d1cc 100644
  	}
  	return nil
 diff --git a/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go b/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
-index df08570e0..ffd19a7f6 100644
+index df08570..ffd19a7 100644
 --- a/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
 +++ b/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
 @@ -197,7 +197,7 @@ func (r *MachineBackendReconciler) ReconcileNormal(ctx context.Context, cluster
@@ -99,7 +99,7 @@ index df08570e0..ffd19a7f6 100644
  	// Set ProviderID so the Cluster API Machine Controller can pull it
  	dockerMachine.Spec.ProviderID = externalMachine.ProviderID()
 diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
-index 4d261813c..14ef9a5a2 100644
+index 4d26181..14ef9a5 100644
 --- a/test/infrastructure/docker/internal/docker/machine.go
 +++ b/test/infrastructure/docker/internal/docker/machine.go
 @@ -48,6 +48,7 @@ import (
@@ -205,5 +205,5 @@ index 4d261813c..14ef9a5a2 100644
  
  	kindMapping := kind.GetMapping(semVer, image)
 -- 
-2.48.1
+2.50.1 (Apple Git-155)
 

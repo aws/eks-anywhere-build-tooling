@@ -1,21 +1,36 @@
-From 78b7a5ebc537aff564bacdc6c5192b4c747e2c8d Mon Sep 17 00:00:00 2001
+From edf8f036763d87a3786dd7c67b350afe6e22a28a Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 16 May 2023 11:03:09 -0500
-Subject: [PATCH 24/39] CAPI Move Cluster Filter
+Subject: [PATCH 11/18] Add cluster filtering to clusterctl move
 
-Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
----
- cmd/clusterctl/client/cluster/mover.go        |  31 +++--
- cmd/clusterctl/client/cluster/mover_test.go   |  20 +--
- cmd/clusterctl/client/cluster/objectgraph.go  |  48 ++++++-
- .../client/cluster/objectgraph_test.go        | 131 +++++++++++++++++-
+This patch adds comprehensive cluster move filtering functionality:
+- Core filtering implementation for cluster selection
+- Support for force-move label on objects without cluster tenants
+
+Objects with force-move label and no cluster tenants are moved
+regardless of cluster filtering. This enables moving external objects
+that don't have explicit cluster ownership.
+ cmd/clusterctl/client/cluster/mover_test.go   |  20 +-
+ cmd/clusterctl/client/cluster/objectgraph.go  |  56 +++++-
+ .../client/cluster/objectgraph_test.go        | 174 +++++++++++++++++-
  cmd/clusterctl/client/move.go                 |  10 +-
  cmd/clusterctl/client/move_test.go            |   8 +-
  cmd/clusterctl/cmd/move.go                    |   4 +
- 7 files changed, 218 insertions(+), 34 deletions(-)
+ 7 files changed, 269 insertions(+), 34 deletions(-)
+---
+ cmd/clusterctl/client/cluster/mover.go        |  31 +++-
+ cmd/clusterctl/client/cluster/mover_test.go   |  20 +-
+ cmd/clusterctl/client/cluster/objectgraph.go  |  56 +++++-
+ .../client/cluster/objectgraph_test.go        | 174 +++++++++++++++++-
+ cmd/clusterctl/client/move.go                 |  10 +-
+ cmd/clusterctl/client/move_test.go            |   8 +-
+ cmd/clusterctl/cmd/move.go                    |   4 +
+ .../webhooks/kubeadm_control_plane.go         |   2 +
+ .../webhooks/kubeadm_control_plane_test.go    |  45 +++++
+ 9 files changed, 316 insertions(+), 34 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index 7a3975073..c8f8a0a0f 100644
+index 7a39750..c8f8a0a 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -52,13 +52,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
@@ -113,7 +128,7 @@ index 7a3975073..c8f8a0a0f 100644
  	}
  
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index e72793011..9472d650b 100644
+index e727930..9472d65 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
 @@ -746,7 +746,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
@@ -207,7 +222,7 @@ index e72793011..9472d650b 100644
  			backoff := wait.Backoff{
  				Steps: 1,
 diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
-index 83bd433c2..512a3e32e 100644
+index 83bd433..5632a05 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph.go
 @@ -43,9 +43,11 @@ import (
@@ -236,7 +251,7 @@ index 83bd433c2..512a3e32e 100644
  	log := logf.Log
  	log.Info("Discovering Cluster API objects")
  
-@@ -559,10 +561,46 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
+@@ -559,10 +561,54 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
  	// Completes the graph by setting for each node the list of tenants the node belongs to.
  	o.setTenants()
  
@@ -271,6 +286,14 @@ index 83bd433c2..512a3e32e 100644
 +				object.identity.Name, strings.Join(clusterTenants, ","))
 +		}
 +
++		// CAPI has a force move label that can be used on CRD to identify objects to be moved CRDs with that label has
++		// `forceMove` set to true. Only move forceMove nodes if and only if they do not have a cluster Tenant.
++		// If an object has `forceMove` and also has a clusterTenant, the object has clear owner ref assigned and can be
++		// dropped if the cluster being filtered is not part of its tenants
++		if len(clusterTenants) == 0 && object.forceMove {
++			continue
++		}
++
 +		if !hasFilterCluster {
 +			if _, ok := o.uidToNode[object.identity.UID]; ok {
 +				delete(o.uidToNode, object.identity.UID)
@@ -284,7 +307,7 @@ index 83bd433c2..512a3e32e 100644
  func (o *objectGraph) fetchRef(ctx context.Context, opts wait.Backoff, ref *corev1.ObjectReference) (*unstructured.Unstructured, error) {
  	if ref == nil {
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index 11418edaa..ea359e9f9 100644
+index 11418ed..28e29ec 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
 @@ -1799,7 +1799,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
@@ -296,7 +319,57 @@ index 11418edaa..ea359e9f9 100644
  			if tt.wantErr {
  				g.Expect(err).To(HaveOccurred())
  				return
-@@ -2195,7 +2195,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+@@ -2179,6 +2179,49 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+ 				},
+ 			},
+ 		},
++		{
++			name: "two clusters with external force object, read only 1 cluster & both external objects",
++			args: args{
++				cluster: "cluster1", // read only from ns1
++				objs: func() []client.Object {
++					objs := []client.Object{}
++					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
++					objs = append(objs, test.NewFakeExternalObject("ns1", "externalObject1").Objs()...)
++					objs = append(objs, test.NewFakeCluster("ns1", "cluster2").Objs()...)
++					objs = append(objs, test.NewFakeExternalObject("ns2", "externalObject2").Objs()...)
++					return objs
++				}(),
++			},
++			want: wantGraph{
++				nodes: map[string]wantGraphItem{
++					"cluster.x-k8s.io/v1beta2, Kind=Cluster, ns1/cluster1": {
++						forceMove:          true,
++						forceMoveHierarchy: true,
++					},
++					"infrastructure.cluster.x-k8s.io/v1beta2, Kind=GenericInfrastructureCluster, ns1/cluster1": {
++						owners: []string{
++							"cluster.x-k8s.io/v1beta2, Kind=Cluster, ns1/cluster1",
++						},
++					},
++					"/v1, Kind=Secret, ns1/cluster1-ca": {
++						softOwners: []string{
++							"cluster.x-k8s.io/v1beta2, Kind=Cluster, ns1/cluster1", // NB. this secret is not linked to the cluster through owner ref
++						},
++					},
++					"/v1, Kind=Secret, ns1/cluster1-kubeconfig": {
++						owners: []string{
++							"cluster.x-k8s.io/v1beta2, Kind=Cluster, ns1/cluster1",
++						},
++					},
++					"external.cluster.x-k8s.io/v1beta2, Kind=GenericExternalObject, ns1/externalObject1": {
++						forceMove: true,
++					},
++					"external.cluster.x-k8s.io/v1beta2, Kind=GenericExternalObject, ns2/externalObject2": {
++						forceMove: true,
++					},
++				},
++			},
++		},
+ 	}
+ 
+ 	for _, tt := range tests {
+@@ -2195,7 +2238,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
@@ -433,7 +506,7 @@ index 11418edaa..ea359e9f9 100644
  				g.Expect(err).To(HaveOccurred())
  				return
 diff --git a/cmd/clusterctl/client/move.go b/cmd/clusterctl/client/move.go
-index 6d5299cc9..977f8b881 100644
+index 6d5299c..977f8b8 100644
 --- a/cmd/clusterctl/client/move.go
 +++ b/cmd/clusterctl/client/move.go
 @@ -39,6 +39,10 @@ type MoveOptions struct {
@@ -475,7 +548,7 @@ index 6d5299cc9..977f8b881 100644
  
  func (c *clusterctlClient) getClusterClient(ctx context.Context, kubeconfig Kubeconfig) (cluster.Client, error) {
 diff --git a/cmd/clusterctl/client/move_test.go b/cmd/clusterctl/client/move_test.go
-index 42998329a..784c93d27 100644
+index 4299832..784c93d 100644
 --- a/cmd/clusterctl/client/move_test.go
 +++ b/cmd/clusterctl/client/move_test.go
 @@ -297,11 +297,11 @@ type fakeObjectMover struct {
@@ -506,7 +579,7 @@ index 42998329a..784c93d27 100644
  	return f.fromDirectoryErr
  }
 diff --git a/cmd/clusterctl/cmd/move.go b/cmd/clusterctl/cmd/move.go
-index 9f0d16693..3e82551d4 100644
+index 9f0d166..3e82551 100644
 --- a/cmd/clusterctl/cmd/move.go
 +++ b/cmd/clusterctl/cmd/move.go
 @@ -38,6 +38,7 @@ type moveOptions struct {
@@ -534,6 +607,103 @@ index 9f0d16693..3e82551d4 100644
  		DryRun:         mo.dryRun,
  	})
  }
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+index e6cb129..b3f5916 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+@@ -163,6 +163,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, controllerManager, "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler, "*"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "registryMirror", "*"},
+ 		{spec, kubeadmConfigSpec, clusterConfiguration, "certificateValidityPeriodDays"},
+ 		// spec.kubeadmConfigSpec.initConfiguration
+ 		{spec, kubeadmConfigSpec, initConfiguration, nodeRegistration},
+@@ -181,6 +182,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketSettings", "*"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "registryMirror", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration},
+ 		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
+index 67312c3..7ce0d42 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
+@@ -359,6 +359,10 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 					},
+ 					CertificateValidityPeriodDays:   100,
+ 					CACertificateValidityPeriodDays: 365,
++					RegistryMirror: bootstrapv1.RegistryMirrorConfiguration{
++						Endpoint: "https://1.1.1.1:1111",
++						CACert:   "test-cert",
++					},
+ 				},
+ 				JoinConfiguration: bootstrapv1.JoinConfiguration{
+ 					NodeRegistration: bootstrapv1.NodeRegistrationOptions{
+@@ -368,6 +372,10 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 						ControlPlaneComponentHealthCheckSeconds: ptr.To[int32](10),
+ 						KubeletHealthCheckSeconds:               ptr.To[int32](40),
+ 					},
++					RegistryMirror: bootstrapv1.RegistryMirrorConfiguration{
++						Endpoint: "https://1.1.1.1:1111",
++						CACert:   "test-cert",
++					},
+ 				},
+ 				PreKubeadmCommands: []string{
+ 					"test", "foo",
+@@ -785,6 +793,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 	validUpdateJoinConfBRCustomBootstrapContainers := before.DeepCopy()
+ 	validUpdateJoinConfBRCustomBootstrapContainers.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketCustomBootstrapContainers = []bootstrapv1.BottlerocketBootstrapContainer{{ImageRepository: "registry.k8s.io/bottlerocketbootstrap", ImageTag: "v1.1.0+new"}}
+ 
++	validUpdateClusterConfigRegistryMirrorCACert := before.DeepCopy()
++	validUpdateClusterConfigRegistryMirrorCACert.Spec.KubeadmConfigSpec.ClusterConfiguration.RegistryMirror.CACert = "foo:bar"
++
++	validUpdateJoinConfigRegistryMirrorCACert := before.DeepCopy()
++	validUpdateJoinConfigRegistryMirrorCACert.Spec.KubeadmConfigSpec.JoinConfiguration.RegistryMirror.CACert = "foo:bar"
++
++	validUpdateClusterConfigRegistryMirrorEndpoint := before.DeepCopy()
++	validUpdateClusterConfigRegistryMirrorEndpoint.Spec.KubeadmConfigSpec.ClusterConfiguration.RegistryMirror.Endpoint = "https://0.0.0.0:6443"
++
++	validUpdateJoinConfigRegistryMirrorEndpoint := before.DeepCopy()
++	validUpdateJoinConfigRegistryMirrorEndpoint.Spec.KubeadmConfigSpec.JoinConfiguration.RegistryMirror.Endpoint = "https://0.0.0.0:6443"
++
+ 	tests := []struct {
+ 		name                  string
+ 		enableIgnitionFeature bool
+@@ -1208,6 +1228,31 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before:    before,
+ 			kcp:       validUpdateJoinConfBRCustomBootstrapContainers,
+ 		},
++		{
++			name:      "should allow changes to join configuration registry mirror caCert",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfigRegistryMirrorCACert,
++		},
++		{
++			name:      "should allow changes to join configuration registry mirror endpoint",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfigRegistryMirrorEndpoint,
++		},
++		{
++			name:      "should allow changes to cluster configuration registry mirror caCert",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfigRegistryMirrorCACert,
++		},
++
++		{
++			name:      "should allow changes to cluster configuration registry mirror endpoint",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfigRegistryMirrorEndpoint,
++		},
+ 	}
+ 
+ 	for _, tt := range tests {
 -- 
-2.48.1
+2.50.1 (Apple Git-155)
 

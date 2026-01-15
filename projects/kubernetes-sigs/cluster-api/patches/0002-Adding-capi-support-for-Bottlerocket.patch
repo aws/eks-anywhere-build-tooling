@@ -1,7 +1,7 @@
-From ac7f0d4dfca8a2213fab16c830891d7def9b3a49 Mon Sep 17 00:00:00 2001
+From 9b299550a551314c8c6d2a785f51f1148c96b511 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Fri, 11 Jun 2021 10:43:09 -0700
-Subject: [PATCH 02/39] Adding capi support for Bottlerocket
+Subject: [PATCH 02/18] Adding capi support for Bottlerocket
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 
@@ -77,7 +77,7 @@ Remove userdata logging for bottlerocket
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/utils.go
 
 diff --git a/.gitignore b/.gitignore
-index 78da1a303..3116e7079 100644
+index 78da1a3..3116e70 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -9,7 +9,7 @@ hack/tools/bin
@@ -90,7 +90,7 @@ index 78da1a303..3116e7079 100644
  test/e2e/data/infrastructure-docker/**/cluster-template*.yaml
  !test/e2e/data/infrastructure-docker/**/clusterclass-quick-start.yaml
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index 3f6bf3eeb..f80cd5477 100644
+index 3f6bf3e..f80cd54 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
 @@ -658,6 +658,30 @@ func Convert_v1beta2_DNS_To_v1beta1_DNS(in *bootstrapv1.DNS, out *DNS, _ apimach
@@ -125,7 +125,7 @@ index 3f6bf3eeb..f80cd5477 100644
  	if in.Local != nil {
  		if err := Convert_v1beta1_LocalEtcd_To_v1beta2_LocalEtcd(in.Local, &out.Local, s); err != nil {
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 97f7dafca..6d1c8f0c5 100644
+index 97f7daf..6d1c8f0 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 @@ -77,6 +77,21 @@ type InitConfiguration struct {
@@ -203,7 +203,7 @@ index 97f7dafca..6d1c8f0c5 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadmconfig_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadmconfig_types.go
-index 98a582479..5c63ca65f 100644
+index 98a5824..5c63ca6 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadmconfig_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadmconfig_types.go
 @@ -27,7 +27,7 @@ import (
@@ -226,7 +226,7 @@ index 98a582479..5c63ca65f 100644
  
  var (
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index bae21feb4..3e8083317 100644
+index bae21fe..3e80833 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -290,6 +290,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -412,7 +412,7 @@ index bae21feb4..3e8083317 100644
  	out.Name = in.Name
  	out.Key = in.Key
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index 0bb852981..d73d37506 100644
+index 0bb8529..d73d375 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -142,10 +142,29 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -499,7 +499,7 @@ index 0bb852981..d73d37506 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index e9f17e19a..14862bfc6 100644
+index e9f17e1..14862bf 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 @@ -128,6 +128,20 @@ func (r *InitConfiguration) IsDefined() bool {
@@ -601,7 +601,7 @@ index e9f17e19a..14862bfc6 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go
-index 1f7d6ef40..be59883cd 100644
+index 1f7d6ef..be59883 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go
 @@ -28,7 +28,7 @@ import (
@@ -624,7 +624,7 @@ index 1f7d6ef40..be59883cd 100644
  
  var (
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index c05400515..33ec37d7c 100644
+index c054005..33ec37d 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -179,9 +179,27 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -708,7 +708,7 @@ index c05400515..33ec37d7c 100644
  func (in *Scheduler) DeepCopyInto(out *Scheduler) {
  	*out = *in
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 13c7c3dfd..d33f51ba0 100644
+index 13c7c3d..d33f51b 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -505,6 +505,7 @@ spec:
@@ -1136,7 +1136,7 @@ index 13c7c3dfd..d33f51ba0 100644
                      description: |-
                        skipPhases is a list of phases to skip during command execution.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 0c742aa79..cab4d6eb5 100644
+index 0c742aa..cab4d6e 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -525,6 +525,7 @@ spec:
@@ -1571,7 +1571,7 @@ index 0c742aa79..cab4d6eb5 100644
                                skipPhases is a list of phases to skip during command execution.
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 new file mode 100644
-index 000000000..e4be8d945
+index 0000000..e4be8d9
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -0,0 +1,45 @@
@@ -1622,7 +1622,7 @@ index 000000000..e4be8d945
 +)
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 new file mode 100644
-index 000000000..18e559cc8
+index 0000000..18e559c
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -0,0 +1,176 @@
@@ -1804,7 +1804,7 @@ index 000000000..18e559cc8
 +}
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket_test.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket_test.go
 new file mode 100644
-index 000000000..fbd4a0abe
+index 0000000..fbd4a0a
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket_test.go
 @@ -0,0 +1,141 @@
@@ -1951,7 +1951,7 @@ index 000000000..fbd4a0abe
 +}
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
 new file mode 100644
-index 000000000..8f9b6e12e
+index 0000000..8f9b6e1
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
 @@ -0,0 +1,47 @@
@@ -2004,7 +2004,7 @@ index 000000000..8f9b6e12e
 +}
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
 new file mode 100644
-index 000000000..b93e1164b
+index 0000000..b93e116
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
 @@ -0,0 +1,30 @@
@@ -2040,7 +2040,7 @@ index 000000000..b93e1164b
 +}
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/files.go b/bootstrap/kubeadm/internal/bottlerocket/files.go
 new file mode 100644
-index 000000000..9be431ba8
+index 0000000..9be431b
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/files.go
 @@ -0,0 +1,18 @@
@@ -2064,7 +2064,7 @@ index 000000000..9be431ba8
 +)
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/node.go b/bootstrap/kubeadm/internal/bottlerocket/node.go
 new file mode 100644
-index 000000000..df52e59d5
+index 0000000..df52e59
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/node.go
 @@ -0,0 +1,32 @@
@@ -2102,7 +2102,7 @@ index 000000000..df52e59d5
 +}
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/users.go b/bootstrap/kubeadm/internal/bottlerocket/users.go
 new file mode 100644
-index 000000000..e5eedcb9f
+index 0000000..e5eedcb
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/users.go
 @@ -0,0 +1,12 @@
@@ -2120,7 +2120,7 @@ index 000000000..e5eedcb9f
 +)
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/utils.go b/bootstrap/kubeadm/internal/bottlerocket/utils.go
 new file mode 100644
-index 000000000..9118e28c4
+index 0000000..9118e28
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/utils.go
 @@ -0,0 +1,18 @@
@@ -2143,7 +2143,7 @@ index 000000000..9118e28c4
 +	return strings.Repeat(" ", i) + strings.Join(split, ident)
 +}
 diff --git a/bootstrap/kubeadm/internal/cloudinit/cloudinit.go b/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
-index c49decd19..ef2a5b4e4 100644
+index c49decd..ef2a5b4 100644
 --- a/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
 +++ b/bootstrap/kubeadm/internal/cloudinit/cloudinit.go
 @@ -57,8 +57,8 @@ type BaseUserData struct {
@@ -2157,7 +2157,7 @@ index c49decd19..ef2a5b4e4 100644
  	input.SentinelFileCommand = sentinelFileCommand
  }
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 837e80b93..086ef1e3b 100644
+index 837e80b..086ef1e 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 @@ -45,6 +45,7 @@ import (
@@ -2268,7 +2268,7 @@ index 837e80b93..086ef1e3b 100644
  		bootstrapJoinData, err = cloudinit.NewJoinControlPlane(controlPlaneJoinInput)
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index ea1aee4b6..8cac4b994 100644
+index ea1aee4..8cac4b9 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -378,6 +378,9 @@ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfigur
@@ -2292,7 +2292,7 @@ index ea1aee4b6..8cac4b994 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
-index e730dac72..a7a2ac664 100644
+index e730dac..a7a2ac6 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
 @@ -519,6 +519,20 @@ func Convert_v1beta2_BootstrapToken_To_upstreamv1beta4_BootstrapToken(in *bootst
@@ -2317,7 +2317,7 @@ index e730dac72..a7a2ac664 100644
  	out.ImageRepository = in.ImageRepository
  	out.ImageTag = in.ImageTag
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/types.go b/bootstrap/kubeadm/types/upstreamv1beta4/types.go
-index 903c8c4b2..ca6ef348b 100644
+index 903c8c4..ca6ef34 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/types.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/types.go
 @@ -28,6 +28,21 @@ import (
@@ -2441,7 +2441,7 @@ index 903c8c4b2..ca6ef348b 100644
  	// +optional
  	DryRun bool `json:"dryRun,omitempty"`
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index b2f95bf25..44ec72229 100644
+index b2f95bf..44ec722 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -78,6 +78,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -2638,7 +2638,7 @@ index b2f95bf25..44ec72229 100644
  	// WARNING: in.ControlPlaneComponentHealthCheck requires manual conversion: does not exist in peer-type
  	// WARNING: in.KubeletHealthCheck requires manual conversion: does not exist in peer-type
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.deepcopy.go
-index c2a9da205..d6903d38c 100644
+index c2a9da2..d6903d3 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.deepcopy.go
 @@ -151,17 +151,34 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -2728,7 +2728,7 @@ index c2a9da205..d6903d38c 100644
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Proxy.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 1f43319a0..2a2d18460 100644
+index 1f43319..2a2d184 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -597,6 +597,7 @@ spec:
@@ -3162,7 +3162,7 @@ index 1f43319a0..2a2d18460 100644
                          description: |-
                            skipPhases is a list of phases to skip during command execution.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index badeef330..9d5b83610 100644
+index badeef3..9d5b836 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -128,6 +128,22 @@ spec:
@@ -3588,7 +3588,7 @@ index badeef330..9d5b83610 100644
                                  description: |-
                                    skipPhases is a list of phases to skip during command execution.
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha3/kubeadmconfig_types.go b/internal/api/bootstrap/kubeadm/v1alpha3/kubeadmconfig_types.go
-index 6f5293562..a43300a20 100644
+index 6f52935..a43300a 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha3/kubeadmconfig_types.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha3/kubeadmconfig_types.go
 @@ -23,12 +23,15 @@ import (
@@ -3609,7 +3609,7 @@ index 6f5293562..a43300a20 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
-index 77b59e6b8..a075d2ca4 100644
+index 77b59e6..a075d2c 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 @@ -540,6 +540,9 @@ func autoConvert_v1alpha3_ClusterConfiguration_To_v1beta2_ClusterConfiguration(i
@@ -3633,7 +3633,7 @@ index 77b59e6b8..a075d2ca4 100644
  		return err
  	}
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/conversion.go
-index 54a1ef93f..944a538ab 100644
+index 54a1ef9..944a538 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/conversion.go
 @@ -697,6 +697,30 @@ func Convert_v1beta2_File_To_v1alpha4_File(in *bootstrapv1.File, out *File, s ap
@@ -3668,7 +3668,7 @@ index 54a1ef93f..944a538ab 100644
  	for i, u := range dst.Users {
  		dropEmptyString(&u.Gecos)
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
-index f17a3b6d4..a147649f1 100644
+index f17a3b6..a147649 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
 @@ -61,6 +61,21 @@ type InitConfiguration struct {
@@ -3746,7 +3746,7 @@ index f17a3b6d4..a147649f1 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
-index 652e45d54..99c79b677 100644
+index 652e45d..99c79b6 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadmconfig_types.go
 @@ -23,12 +23,15 @@ import (
@@ -3767,7 +3767,7 @@ index 652e45d54..99c79b677 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-index 314c9b9e7..c64093b7c 100644
+index 314c9b9..c64093b 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 @@ -209,6 +209,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -3953,7 +3953,7 @@ index 314c9b9e7..c64093b7c 100644
  	out.Name = in.Name
  	out.Key = in.Key
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
-index 0e4b93369..b6a144dbe 100644
+index 0e4b933..b6a144d 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.deepcopy.go
 @@ -142,10 +142,29 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -4040,5 +4040,5 @@ index 0e4b93369..b6a144dbe 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 -- 
-2.48.1
+2.50.1 (Apple Git-155)
 
