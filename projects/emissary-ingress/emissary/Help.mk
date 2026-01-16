@@ -12,17 +12,17 @@ checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
-binaries: ## Build all binaries: `busyambassador capabilities_wrapper example-envoy-metrics-sink k8sregistryctl kat-client kat-server` for `linux/amd64 linux/arm64`
+binaries: ## Build all binaries: `apiext busyambassador capabilities_wrapper example-envoy-metrics-sink kat-client kat-server` for `linux/amd64 linux/arm64`
+_output/bin/emissary/linux-amd64/apiext: ## Build `_output/bin/emissary/linux-amd64/apiext`
 _output/bin/emissary/linux-amd64/busyambassador: ## Build `_output/bin/emissary/linux-amd64/busyambassador`
 _output/bin/emissary/linux-amd64/capabilities_wrapper: ## Build `_output/bin/emissary/linux-amd64/capabilities_wrapper`
 _output/bin/emissary/linux-amd64/example-envoy-metrics-sink: ## Build `_output/bin/emissary/linux-amd64/example-envoy-metrics-sink`
-_output/bin/emissary/linux-amd64/k8sregistryctl: ## Build `_output/bin/emissary/linux-amd64/k8sregistryctl`
 _output/bin/emissary/linux-amd64/kat-client: ## Build `_output/bin/emissary/linux-amd64/kat-client`
 _output/bin/emissary/linux-amd64/kat-server: ## Build `_output/bin/emissary/linux-amd64/kat-server`
+_output/bin/emissary/linux-arm64/apiext: ## Build `_output/bin/emissary/linux-arm64/apiext`
 _output/bin/emissary/linux-arm64/busyambassador: ## Build `_output/bin/emissary/linux-arm64/busyambassador`
 _output/bin/emissary/linux-arm64/capabilities_wrapper: ## Build `_output/bin/emissary/linux-arm64/capabilities_wrapper`
 _output/bin/emissary/linux-arm64/example-envoy-metrics-sink: ## Build `_output/bin/emissary/linux-arm64/example-envoy-metrics-sink`
-_output/bin/emissary/linux-arm64/k8sregistryctl: ## Build `_output/bin/emissary/linux-arm64/k8sregistryctl`
 _output/bin/emissary/linux-arm64/kat-client: ## Build `_output/bin/emissary/linux-arm64/kat-client`
 _output/bin/emissary/linux-arm64/kat-server: ## Build `_output/bin/emissary/linux-arm64/kat-server`
 
@@ -53,16 +53,16 @@ run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
 run-in-docker/emissary/eks-anywhere-go-mod-download: ## Run `emissary/eks-anywhere-go-mod-download` in docker builder container
+run-in-docker/_output/bin/emissary/linux-amd64/apiext: ## Run `_output/bin/emissary/linux-amd64/apiext` in docker builder container
 run-in-docker/_output/bin/emissary/linux-amd64/busyambassador: ## Run `_output/bin/emissary/linux-amd64/busyambassador` in docker builder container
 run-in-docker/_output/bin/emissary/linux-amd64/capabilities_wrapper: ## Run `_output/bin/emissary/linux-amd64/capabilities_wrapper` in docker builder container
 run-in-docker/_output/bin/emissary/linux-amd64/example-envoy-metrics-sink: ## Run `_output/bin/emissary/linux-amd64/example-envoy-metrics-sink` in docker builder container
-run-in-docker/_output/bin/emissary/linux-amd64/k8sregistryctl: ## Run `_output/bin/emissary/linux-amd64/k8sregistryctl` in docker builder container
 run-in-docker/_output/bin/emissary/linux-amd64/kat-client: ## Run `_output/bin/emissary/linux-amd64/kat-client` in docker builder container
 run-in-docker/_output/bin/emissary/linux-amd64/kat-server: ## Run `_output/bin/emissary/linux-amd64/kat-server` in docker builder container
+run-in-docker/_output/bin/emissary/linux-arm64/apiext: ## Run `_output/bin/emissary/linux-arm64/apiext` in docker builder container
 run-in-docker/_output/bin/emissary/linux-arm64/busyambassador: ## Run `_output/bin/emissary/linux-arm64/busyambassador` in docker builder container
 run-in-docker/_output/bin/emissary/linux-arm64/capabilities_wrapper: ## Run `_output/bin/emissary/linux-arm64/capabilities_wrapper` in docker builder container
 run-in-docker/_output/bin/emissary/linux-arm64/example-envoy-metrics-sink: ## Run `_output/bin/emissary/linux-arm64/example-envoy-metrics-sink` in docker builder container
-run-in-docker/_output/bin/emissary/linux-arm64/k8sregistryctl: ## Run `_output/bin/emissary/linux-arm64/k8sregistryctl` in docker builder container
 run-in-docker/_output/bin/emissary/linux-arm64/kat-client: ## Run `_output/bin/emissary/linux-arm64/kat-client` in docker builder container
 run-in-docker/_output/bin/emissary/linux-arm64/kat-server: ## Run `_output/bin/emissary/linux-arm64/kat-server` in docker builder container
 run-in-docker/_output/attribution/go-license.csv: ## Run `_output/attribution/go-license.csv` in docker builder container
