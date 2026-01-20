@@ -1,0 +1,2263 @@
+From 2e0dd90243cf7c16f7b69676d314a99dbca8adf9 Mon Sep 17 00:00:00 2001
+From: Amelia Lu <63176721+peirulu@users.noreply.github.com>
+Date: Mon, 28 Apr 2025 11:59:26 -0700
+Subject: [PATCH] Replace driver gcs with current exist repository and add
+ go.mod and go.sum
+
+---
+ cmd/registry/config-cache.yml           |  12 +-
+ cmd/registry/config-dev.yml             |  45 +-
+ cmd/registry/config-example.yml         |   2 +
+ cmd/registry/main.go                    |  31 +-
+ go.mod                                  | 152 ++++++
+ go.sum                                  | 463 ++++++++++++++++
+ registry/storage/driver/gcs/doc.go      |   3 +-
+ registry/storage/driver/gcs/gcs.go      | 673 ++++++++++++------------
+ registry/storage/driver/gcs/gcs_test.go | 172 +++---
+ vendor.conf                             |  54 --
+ 10 files changed, 1047 insertions(+), 560 deletions(-)
+ create mode 100644 go.mod
+ create mode 100644 go.sum
+ delete mode 100644 vendor.conf
+
+diff --git a/cmd/registry/config-cache.yml b/cmd/registry/config-cache.yml
+index b69a0a7f..421d964f 100644
+--- a/cmd/registry/config-cache.yml
++++ b/cmd/registry/config-cache.yml
+@@ -12,6 +12,8 @@ storage:
+     maintenance:
+         uploadpurging:
+             enabled: false
++    tag:
++      concurrencylimit: 8
+ http:
+     addr: :5000
+     secret: asecretforlocaldevelopment
+@@ -20,12 +22,10 @@ http:
+     headers:
+         X-Content-Type-Options: [nosniff]
+ redis:
+-  addr: localhost:6379
+-  enableTLS: true
+-  pool:
+-    maxidle: 16
+-    maxactive: 64
+-    idletimeout: 300s
++  addrs: [localhost:6379]
++  maxidleconns: 16
++  poolsize: 64
++  connmaxidletime: 300s
+   dialtimeout: 10ms
+   readtimeout: 10ms
+   writetimeout: 10ms
+diff --git a/cmd/registry/config-dev.yml b/cmd/registry/config-dev.yml
+index 9539bae4..68fd83c8 100644
+--- a/cmd/registry/config-dev.yml
++++ b/cmd/registry/config-dev.yml
+@@ -4,30 +4,18 @@ log:
+   fields:
+     service: registry
+     environment: development
+-  hooks:
+-    - type: mail
+-      disabled: true
+-      levels:
+-        - panic
+-      options:
+-        smtp:
+-          addr: mail.example.com:25
+-          username: mailuser
+-          password: password
+-          insecure: true
+-        from: sender@example.com
+-        to:
+-          - errors@example.com
+ storage:
+     delete:
+       enabled: true
+     cache:
+-        blobdescriptor: redis
++        blobdescriptor: inmemory
+     filesystem:
+         rootdirectory: /var/lib/registry
+     maintenance:
+         uploadpurging:
+             enabled: false
++    tag:
++      concurrencylimit: 8
+ http:
+     addr: :5000
+     debug:
+@@ -37,33 +25,6 @@ http:
+             path: /metrics
+     headers:
+         X-Content-Type-Options: [nosniff]
+-redis:
+-  addr: localhost:6379
+-  pool:
+-    maxidle: 16
+-    maxactive: 64
+-    idletimeout: 300s
+-  dialtimeout: 10ms
+-  readtimeout: 10ms
+-  writetimeout: 10ms
+-notifications:
+-    events:
+-        includereferences: true
+-    endpoints:
+-        - name: local-5003
+-          url: http://localhost:5003/callback
+-          headers:
+-             Authorization: [Bearer <an example token>]
+-          timeout: 1s
+-          threshold: 10
+-          backoff: 1s
+-          disabled: true
+-        - name: local-8083
+-          url: http://localhost:8083/callback
+-          timeout: 1s
+-          threshold: 10
+-          backoff: 1s
+-          disabled: true 
+ health:
+   storagedriver:
+     enabled: true
+diff --git a/cmd/registry/config-example.yml b/cmd/registry/config-example.yml
+index c760cd56..2cb40206 100644
+--- a/cmd/registry/config-example.yml
++++ b/cmd/registry/config-example.yml
+@@ -7,6 +7,8 @@ storage:
+     blobdescriptor: inmemory
+   filesystem:
+     rootdirectory: /var/lib/registry
++  tag:
++    concurrencylimit: 8
+ http:
+   addr: :5000
+   headers:
+diff --git a/cmd/registry/main.go b/cmd/registry/main.go
+index 5beaa563..104eb0ec 100644
+--- a/cmd/registry/main.go
++++ b/cmd/registry/main.go
+@@ -3,22 +3,25 @@ package main
+ import (
+ 	_ "net/http/pprof"
+ 
+-	"github.com/docker/distribution/registry"
+-	_ "github.com/docker/distribution/registry/auth/htpasswd"
+-	_ "github.com/docker/distribution/registry/auth/silly"
+-	_ "github.com/docker/distribution/registry/auth/token"
+-	_ "github.com/docker/distribution/registry/proxy"
+-	_ "github.com/docker/distribution/registry/storage/driver/azure"
+-	_ "github.com/docker/distribution/registry/storage/driver/filesystem"
+-	_ "github.com/docker/distribution/registry/storage/driver/gcs"
+-	_ "github.com/docker/distribution/registry/storage/driver/inmemory"
+-	_ "github.com/docker/distribution/registry/storage/driver/middleware/cloudfront"
+-	_ "github.com/docker/distribution/registry/storage/driver/middleware/redirect"
+-	_ "github.com/docker/distribution/registry/storage/driver/oss"
+-	_ "github.com/docker/distribution/registry/storage/driver/s3-aws"
+-	_ "github.com/docker/distribution/registry/storage/driver/swift"
++	"github.com/distribution/distribution/v3/registry"
++	_ "github.com/distribution/distribution/v3/registry/auth/htpasswd"
++	_ "github.com/distribution/distribution/v3/registry/auth/silly"
++	_ "github.com/distribution/distribution/v3/registry/auth/token"
++	_ "github.com/distribution/distribution/v3/registry/proxy"
++	_ "github.com/distribution/distribution/v3/registry/storage/driver/azure"
++	_ "github.com/distribution/distribution/v3/registry/storage/driver/filesystem"
++	_ "github.com/distribution/distribution/v3/registry/storage/driver/gcs"
++	_ "github.com/distribution/distribution/v3/registry/storage/driver/inmemory"
++	_ "github.com/distribution/distribution/v3/registry/storage/driver/middleware/cloudfront"
++	_ "github.com/distribution/distribution/v3/registry/storage/driver/middleware/redirect"
++	_ "github.com/distribution/distribution/v3/registry/storage/driver/middleware/rewrite"
++	_ "github.com/distribution/distribution/v3/registry/storage/driver/s3-aws"
+ )
+ 
+ func main() {
++	// NOTE(milosgajdos): if the only two commands registered
++	// with registry.RootCmd fail they will halt the program
++	// execution and  exit the program with non-zero exit code.
++	// nolint:errcheck
+ 	registry.RootCmd.Execute()
+ }
+diff --git a/go.mod b/go.mod
+new file mode 100644
+index 00000000..3c81f169
+--- /dev/null
++++ b/go.mod
+@@ -0,0 +1,152 @@
++module github.com/goharbor/distribution
++
++go 1.23.8
++
++require (
++	cloud.google.com/go/storage v1.52.0
++	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
++	github.com/FZambia/sentinel v1.1.1
++	github.com/Shopify/logrus-bugsnag v0.0.0-20240507214313-004243a594f4
++	github.com/aws/aws-sdk-go v1.55.7
++	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
++	github.com/bugsnag/bugsnag-go v2.5.1+incompatible
++	github.com/denverdino/aliyungo v0.0.0-20230411124812-ab98a9173ace
++	github.com/distribution/distribution/v3 v3.0.0
++	github.com/distribution/reference v0.6.0
++	github.com/docker/distribution v2.8.3+incompatible
++	github.com/docker/go-metrics v0.0.1
++	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7
++	github.com/gomodule/redigo v1.9.2
++	github.com/gorilla/handlers v1.5.2
++	github.com/gorilla/mux v1.8.1
++	github.com/mitchellh/mapstructure v1.5.0
++	github.com/ncw/swift v1.0.53
++	github.com/opencontainers/go-digest v1.0.0
++	github.com/opencontainers/image-spec v1.1.1
++	github.com/sirupsen/logrus v1.9.3
++	github.com/spf13/cobra v1.9.1
++	github.com/yvasiyarov/gorelic v0.0.7
++	golang.org/x/crypto v0.37.0
++	golang.org/x/oauth2 v0.29.0
++	google.golang.org/api v0.230.0
++	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
++	gopkg.in/yaml.v2 v2.4.0
++	rsc.io/letsencrypt v0.0.3
++)
++
++require (
++	cel.dev/expr v0.20.0 // indirect
++	cloud.google.com/go v0.120.0 // indirect
++	cloud.google.com/go/auth v0.16.0 // indirect
++	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
++	cloud.google.com/go/compute/metadata v0.6.0 // indirect
++	cloud.google.com/go/iam v1.5.0 // indirect
++	cloud.google.com/go/monitoring v1.24.0 // indirect
++	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.1 // indirect
++	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.2 // indirect
++	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
++	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0 // indirect
++	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
++	github.com/Azure/go-autorest/autorest v0.11.30 // indirect
++	github.com/Azure/go-autorest/autorest/adal v0.9.22 // indirect
++	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
++	github.com/Azure/go-autorest/autorest/to v0.4.1 // indirect
++	github.com/Azure/go-autorest/logger v0.2.1 // indirect
++	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
++	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.3 // indirect
++	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.27.0 // indirect
++	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.51.0 // indirect
++	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 // indirect
++	github.com/beorn7/perks v1.0.1 // indirect
++	github.com/bugsnag/bugsnag-go/v2 v2.2.0 // indirect
++	github.com/bugsnag/panicwrap v1.3.4 // indirect
++	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
++	github.com/cespare/xxhash/v2 v2.3.0 // indirect
++	github.com/cncf/xds/go v0.0.0-20250121191232-2f005788dc42 // indirect
++	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
++	github.com/davecgh/go-spew v1.1.1 // indirect
++	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
++	github.com/dnaeon/go-vcr v1.2.0 // indirect
++	github.com/docker/docker-credential-helpers v0.8.2 // indirect
++	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
++	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
++	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
++	github.com/felixge/httpsnoop v1.0.4 // indirect
++	github.com/garyburd/redigo v1.6.4 // indirect
++	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
++	github.com/go-logr/logr v1.4.2 // indirect
++	github.com/go-logr/stdr v1.2.2 // indirect
++	github.com/gofrs/uuid v4.4.0+incompatible // indirect
++	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
++	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
++	github.com/google/s2a-go v0.1.9 // indirect
++	github.com/google/uuid v1.6.0 // indirect
++	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
++	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
++	github.com/grpc-ecosystem/grpc-gateway/v2 v2.23.0 // indirect
++	github.com/hashicorp/golang-lru/arc/v2 v2.0.5 // indirect
++	github.com/hashicorp/golang-lru/v2 v2.0.5 // indirect
++	github.com/inconshreveable/mousetrap v1.1.0 // indirect
++	github.com/jmespath/go-jmespath v0.4.0 // indirect
++	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
++	github.com/klauspost/compress v1.17.11 // indirect
++	github.com/kr/pretty v0.3.1 // indirect
++	github.com/kr/text v0.2.0 // indirect
++	github.com/kylelemons/godebug v1.1.0 // indirect
++	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
++	github.com/opentracing/opentracing-go v1.2.0 // indirect
++	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
++	github.com/pkg/errors v0.9.1 // indirect
++	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
++	github.com/pmezard/go-difflib v1.0.0 // indirect
++	github.com/prometheus/client_golang v1.20.5 // indirect
++	github.com/prometheus/client_model v0.6.1 // indirect
++	github.com/prometheus/common v0.60.1 // indirect
++	github.com/prometheus/procfs v0.15.1 // indirect
++	github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5 // indirect
++	github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 // indirect
++	github.com/redis/go-redis/v9 v9.7.3 // indirect
++	github.com/rogpeppe/go-internal v1.13.1 // indirect
++	github.com/spf13/pflag v1.0.6 // indirect
++	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
++	github.com/stretchr/testify v1.10.0 // indirect
++	github.com/yvasiyarov/go-metrics v0.0.0-20150112132944-c25f46c4b940 // indirect
++	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 // indirect
++	github.com/zeebo/errs v1.4.0 // indirect
++	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
++	go.opentelemetry.io/contrib/bridges/prometheus v0.57.0 // indirect
++	go.opentelemetry.io/contrib/detectors/gcp v1.35.0 // indirect
++	go.opentelemetry.io/contrib/exporters/autoexport v0.57.0 // indirect
++	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
++	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
++	go.opentelemetry.io/otel v1.35.0 // indirect
++	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.8.0 // indirect
++	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.8.0 // indirect
++	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.32.0 // indirect
++	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.32.0 // indirect
++	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.32.0 // indirect
++	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.32.0 // indirect
++	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.32.0 // indirect
++	go.opentelemetry.io/otel/exporters/prometheus v0.54.0 // indirect
++	go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.8.0 // indirect
++	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.35.0 // indirect
++	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.32.0 // indirect
++	go.opentelemetry.io/otel/log v0.8.0 // indirect
++	go.opentelemetry.io/otel/metric v1.35.0 // indirect
++	go.opentelemetry.io/otel/sdk v1.35.0 // indirect
++	go.opentelemetry.io/otel/sdk/log v0.8.0 // indirect
++	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
++	go.opentelemetry.io/otel/trace v1.35.0 // indirect
++	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
++	golang.org/x/net v0.39.0 // indirect
++	golang.org/x/sync v0.13.0 // indirect
++	golang.org/x/sys v0.32.0 // indirect
++	golang.org/x/text v0.24.0 // indirect
++	golang.org/x/time v0.11.0 // indirect
++	google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb // indirect
++	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e // indirect
++	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
++	google.golang.org/grpc v1.72.0 // indirect
++	google.golang.org/protobuf v1.36.6 // indirect
++	gopkg.in/yaml.v3 v3.0.1 // indirect
++)
+diff --git a/go.sum b/go.sum
+new file mode 100644
+index 00000000..1cd6accf
+--- /dev/null
++++ b/go.sum
+@@ -0,0 +1,463 @@
++cel.dev/expr v0.20.0 h1:OunBvVCfvpWlt4dN7zg3FM6TDkzOePe1+foGJ9AXeeI=
++cel.dev/expr v0.20.0/go.mod h1:MrpN08Q+lEBs+bGYdLxxHkZoUSsCp0nSKTs0nTymJgw=
++cloud.google.com/go v0.120.0 h1:wc6bgG9DHyKqF5/vQvX1CiZrtHnxJjBlKUyF9nP6meA=
++cloud.google.com/go v0.120.0/go.mod h1:/beW32s8/pGRuj4IILWQNd4uuebeT4dkOhKmkfit64Q=
++cloud.google.com/go/auth v0.16.0 h1:Pd8P1s9WkcrBE2n/PhAwKsdrR35V3Sg2II9B+ndM3CU=
++cloud.google.com/go/auth v0.16.0/go.mod h1:1howDHJ5IETh/LwYs3ZxvlkXF48aSqqJUM+5o02dNOI=
++cloud.google.com/go/auth/oauth2adapt v0.2.8 h1:keo8NaayQZ6wimpNSmW5OPc283g65QNIiLpZnkHRbnc=
++cloud.google.com/go/auth/oauth2adapt v0.2.8/go.mod h1:XQ9y31RkqZCcwJWNSx2Xvric3RrU88hAYYbjDWYDL+c=
++cloud.google.com/go/compute/metadata v0.6.0 h1:A6hENjEsCDtC1k8byVsgwvVcioamEHvZ4j01OwKxG9I=
++cloud.google.com/go/compute/metadata v0.6.0/go.mod h1:FjyFAW1MW0C203CEOMDTu3Dk1FlqW3Rga40jzHL4hfg=
++cloud.google.com/go/iam v1.5.0 h1:QlLcVMhbLGOjRcGe6VTGGTyQib8dRLK2B/kYNV0+2xs=
++cloud.google.com/go/iam v1.5.0/go.mod h1:U+DOtKQltF/LxPEtcDLoobcsZMilSRwR7mgNL7knOpo=
++cloud.google.com/go/logging v1.13.0 h1:7j0HgAp0B94o1YRDqiqm26w4q1rDMH7XNRU34lJXHYc=
++cloud.google.com/go/logging v1.13.0/go.mod h1:36CoKh6KA/M0PbhPKMq6/qety2DCAErbhXT62TuXALA=
++cloud.google.com/go/longrunning v0.6.6 h1:XJNDo5MUfMM05xK3ewpbSdmt7R2Zw+aQEMbdQR65Rbw=
++cloud.google.com/go/longrunning v0.6.6/go.mod h1:hyeGJUrPHcx0u2Uu1UFSoYZLn4lkMrccJig0t4FI7yw=
++cloud.google.com/go/monitoring v1.24.0 h1:csSKiCJ+WVRgNkRzzz3BPoGjFhjPY23ZTcaenToJxMM=
++cloud.google.com/go/monitoring v1.24.0/go.mod h1:Bd1PRK5bmQBQNnuGwHBfUamAV1ys9049oEPHnn4pcsc=
++cloud.google.com/go/storage v1.52.0 h1:ROpzMW/IwipKtatA69ikxibdzQSiXJrY9f6IgBa9AlA=
++cloud.google.com/go/storage v1.52.0/go.mod h1:4wrBAbAYUvYkbrf19ahGm4I5kDQhESSqN3CGEkMGvOY=
++cloud.google.com/go/trace v1.11.3 h1:c+I4YFjxRQjvAhRmSsmjpASUKq88chOX854ied0K/pE=
++cloud.google.com/go/trace v1.11.3/go.mod h1:pt7zCYiDSQjC9Y2oqCsh9jF4GStB/hmjrYLsxRR27q8=
++github.com/AdaLogics/go-fuzz-headers v0.0.0-20221103172237-443f56ff4ba8 h1:d+pBUmsteW5tM87xmVXHZ4+LibHRFn40SPAoZJOg2ak=
++github.com/AdaLogics/go-fuzz-headers v0.0.0-20221103172237-443f56ff4ba8/go.mod h1:i9fr2JpcEcY/IHEvzCM3qXUZYOQHgR89dt4es1CgMhc=
++github.com/Azure/azure-sdk-for-go v68.0.0+incompatible h1:fcYLmCpyNYRnvJbPerq7U0hS+6+I79yEDJBqVNcqUzU=
++github.com/Azure/azure-sdk-for-go v68.0.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
++github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.1 h1:DSDNVxqkoXJiko6x8a90zidoYqnYYa6c1MTzDKzKkTo=
++github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.1/go.mod h1:zGqV2R4Cr/k8Uye5w+dgQ06WJtEcbQG/8J7BB6hnCr4=
++github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.2 h1:F0gBpfdPLGsw+nsgk6aqqkZS1jiixa5WwFe3fk/T3Ys=
++github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.2/go.mod h1:SqINnQ9lVVdRlyC8cd1lCI0SdX4n2paeABd2K8ggfnE=
++github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache v0.3.2 h1:yz1bePFlP5Vws5+8ez6T3HWXPmwOK7Yvq8QxDBD3SKY=
++github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache v0.3.2/go.mod h1:Pa9ZNPuoNu/GztvBSKk9J1cDJW6vk/n0zLtV4mgd8N8=
++github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 h1:ywEEhmNahHBihViHepv3xPBn1663uRv2t2q/ESv9seY=
++github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0/go.mod h1:iZDifYGJTIgIIkYRNWPENUnqx6bJ2xnSDFI2tjwZNuY=
++github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.6.0 h1:PiSrjRPpkQNjrM8H0WwKMnZUdu1RGMtd/LdGKUrOo+c=
++github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.6.0/go.mod h1:oDrbWx4ewMylP7xHivfgixbfGBT6APAwsSoHRKotnIc=
++github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0 h1:UXT0o77lXQrikd1kgwIPQOUect7EoR/+sbP4wQKdzxM=
++github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0/go.mod h1:cTvi54pg19DoT07ekoeMgE/taAwNtCShVeZqA+Iv2xI=
++github.com/Azure/go-autorest v14.2.0+incompatible h1:V5VMDjClD3GiElqLWO7mz2MxNAK/vTfRHdAubSIPRgs=
++github.com/Azure/go-autorest v14.2.0+incompatible/go.mod h1:r+4oMnoxhatjLLJ6zxSWATqVooLgysK6ZNox3g/xq24=
++github.com/Azure/go-autorest/autorest v0.11.30 h1:iaZ1RGz/ALZtN5eq4Nr1SOFSlf2E4pDI3Tcsl+dZPVE=
++github.com/Azure/go-autorest/autorest v0.11.30/go.mod h1:t1kpPIOpIVX7annvothKvb0stsrXa37i7b+xpmBW8Fs=
++github.com/Azure/go-autorest/autorest/adal v0.9.22 h1:/GblQdIudfEM3AWWZ0mrYJQSd7JS4S/Mbzh6F0ov0Xc=
++github.com/Azure/go-autorest/autorest/adal v0.9.22/go.mod h1:XuAbAEUv2Tta//+voMI038TrJBqjKam0me7qR+L8Cmk=
++github.com/Azure/go-autorest/autorest/date v0.3.0 h1:7gUk1U5M/CQbp9WoqinNzJar+8KY+LPI6wiWrP/myHw=
++github.com/Azure/go-autorest/autorest/date v0.3.0/go.mod h1:BI0uouVdmngYNUzGWeSYnokU+TrmwEsOqdt8Y6sso74=
++github.com/Azure/go-autorest/autorest/mocks v0.4.1/go.mod h1:LTp+uSrOhSkaKrUy935gNZuuIPPVsHlr9DSOxSayd+k=
++github.com/Azure/go-autorest/autorest/mocks v0.4.2 h1:PGN4EDXnuQbojHbU0UWoNvmu9AGVwYHG9/fkDYhtAfw=
++github.com/Azure/go-autorest/autorest/mocks v0.4.2/go.mod h1:Vy7OitM9Kei0i1Oj+LvyAWMXJHeKH1MVlzFugfVrmyU=
++github.com/Azure/go-autorest/autorest/to v0.4.1 h1:CxNHBqdzTr7rLtdrtb5CMjJcDut+WNGCVv7OmS5+lTc=
++github.com/Azure/go-autorest/autorest/to v0.4.1/go.mod h1:EtaofgU4zmtvn1zT2ARsjRFdq9vXx0YWtmElwL+GZ9M=
++github.com/Azure/go-autorest/logger v0.2.1 h1:IG7i4p/mDa2Ce4TRyAO8IHnVhAVF3RFU+ZtXWSmf4Tg=
++github.com/Azure/go-autorest/logger v0.2.1/go.mod h1:T9E3cAhj2VqvPOtCYAvby9aBXkZmbF5NWuPV8+WeEW8=
++github.com/Azure/go-autorest/tracing v0.6.0 h1:TYi4+3m5t6K48TGI9AUdb+IzbnSxvnvUMfuitfgcfuo=
++github.com/Azure/go-autorest/tracing v0.6.0/go.mod h1:+vhtPC754Xsa23ID7GlGsrdKBpUA79WCAKPPZVC2DeU=
++github.com/AzureAD/microsoft-authentication-extensions-for-go/cache v0.1.1 h1:WJTmL004Abzc5wDB5VtZG2PJk5ndYDgVacGqfirKxjM=
++github.com/AzureAD/microsoft-authentication-extensions-for-go/cache v0.1.1/go.mod h1:tCcJZ0uHAmvjsVYzEFivsRTN00oz5BEsRgQHu5JZ9WE=
++github.com/AzureAD/microsoft-authentication-library-for-go v1.3.3 h1:H5xDQaE3XowWfhZRUpnfC+rGZMEVoSiji+b+/HFAPU4=
++github.com/AzureAD/microsoft-authentication-library-for-go v1.3.3/go.mod h1:wP83P5OoQ5p6ip3ScPr0BAq0BvuPAvacpEuSzyouqAI=
++github.com/FZambia/sentinel v1.1.1 h1:0ovTimlR7Ldm+wR15GgO+8C2dt7kkn+tm3PQS+Qk3Ek=
++github.com/FZambia/sentinel v1.1.1/go.mod h1:ytL1Am/RLlAoAXG6Kj5LNuw/TRRQrv2rt2FT26vP5gI=
++github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.27.0 h1:ErKg/3iS1AKcTkf3yixlZ54f9U1rljCkQyEXWUnIUxc=
++github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.27.0/go.mod h1:yAZHSGnqScoU556rBOVkwLze6WP5N+U11RHuWaGVxwY=
++github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.51.0 h1:fYE9p3esPxA/C0rQ0AHhP0drtPXDRhaWiwg1DPqO7IU=
++github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.51.0/go.mod h1:BnBReJLvVYx2CS/UHOgVz2BXKXD9wsQPxZug20nZhd0=
++github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/cloudmock v0.51.0 h1:OqVGm6Ei3x5+yZmSJG1Mh2NwHvpVmZ08CB5qJhT9Nuk=
++github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/cloudmock v0.51.0/go.mod h1:SZiPHWGOOk3bl8tkevxkoiwPgsIl6CwrWcbwjfHZpdM=
++github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 h1:6/0iUd0xrnX7qt+mLNRwg5c0PGv8wpE8K90ryANQwMI=
++github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0/go.mod h1:otE2jQekW/PqXk1Awf5lmfokJx4uwuqcj1ab5SpGeW0=
++github.com/Shopify/logrus-bugsnag v0.0.0-20240507214313-004243a594f4 h1:LL3s7e7AY6I0HxpHx+GSJvrZ2ZrgzARIkM3K/L6+6JQ=
++github.com/Shopify/logrus-bugsnag v0.0.0-20240507214313-004243a594f4/go.mod h1:nBISMsZeFRL0qdZ1pKCSFv0j4veW0nOdVpOa49IMLeI=
++github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
++github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
++github.com/aws/aws-sdk-go v1.55.7 h1:UJrkFq7es5CShfBwlWAC8DA077vp8PyVbQd3lqLiztE=
++github.com/aws/aws-sdk-go v1.55.7/go.mod h1:eRwEWoyTWFMVYVQzKMNHWP5/RV4xIUGMQfXQHfHkpNU=
++github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
++github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
++github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
++github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
++github.com/bitly/go-simplejson v0.5.0 h1:6IH+V8/tVMab511d5bn4M7EwGXZf9Hj6i2xSwkNEM+Y=
++github.com/bitly/go-simplejson v0.5.0/go.mod h1:cXHtHw4XUPsvGaxgjIAn8PhEWG9NfngEKAMDJEczWVA=
++github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869/go.mod h1:Ekp36dRnpXw/yCqJaO+ZrUyxD+3VXMFFr56k5XYrpB4=
++github.com/bshuster-repo/logrus-logstash-hook v1.1.0 h1:o2FzZifLg+z/DN1OFmzTWzZZx/roaqt8IPZCIVco8r4=
++github.com/bshuster-repo/logrus-logstash-hook v1.1.0/go.mod h1:Q2aXOe7rNuPgbBtPCOzYyWDvKX7+FpxE5sRdvcPoui0=
++github.com/bsm/ginkgo/v2 v2.7.0/go.mod h1:AiKlXPm7ItEHNc/2+OkrNG4E0ITzojb9/xWzvQ9XZ9w=
++github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
++github.com/bsm/ginkgo/v2 v2.12.0/go.mod h1:SwYbGRRDovPVboqFv0tPTcG1sN61LM1Z4ARdbAV9g4c=
++github.com/bsm/gomega v1.26.0/go.mod h1:JyEr/xRbxbtgWNi8tIEVPUYZ5Dzef52k01W3YH0H+O0=
++github.com/bsm/gomega v1.27.10 h1:yeMWxP2pV2fG3FgAODIY8EiRE3dy0aeFYt4l7wh6yKA=
++github.com/bsm/gomega v1.27.10/go.mod h1:JyEr/xRbxbtgWNi8tIEVPUYZ5Dzef52k01W3YH0H+O0=
++github.com/bugsnag/bugsnag-go v2.5.1+incompatible h1:fGtvfhm3ZB3RAz/WYJftZX6m0tZP6FEC9voeN3CtLH8=
++github.com/bugsnag/bugsnag-go v2.5.1+incompatible/go.mod h1:2oa8nejYd4cQ/b0hMIopN0lCRxU0bueqREvZLWFrtK8=
++github.com/bugsnag/bugsnag-go/v2 v2.2.0 h1:y4JJ6xNJiK4jbmq/BLXe09MGUNRp/r1Zpye6RKcPJJ8=
++github.com/bugsnag/bugsnag-go/v2 v2.2.0/go.mod h1:Aoi1ax1kGbbkArShzXUQjxp6jM8gMh4qOtHLis/jY1E=
++github.com/bugsnag/panicwrap v1.3.4 h1:A6sXFtDGsgU/4BLf5JT0o5uYg3EeKgGx3Sfs+/uk3pU=
++github.com/bugsnag/panicwrap v1.3.4/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
++github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
++github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
++github.com/cespare/xxhash/v2 v2.2.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
++github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
++github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
++github.com/cncf/xds/go v0.0.0-20250121191232-2f005788dc42 h1:Om6kYQYDUk5wWbT0t0q6pvyM49i9XZAv9dDrkDA7gjk=
++github.com/cncf/xds/go v0.0.0-20250121191232-2f005788dc42/go.mod h1:W+zGtBO5Y1IgJhy4+A9GOqVhqLpfZi+vwmdNXUehLA8=
++github.com/coreos/go-systemd/v22 v22.5.0 h1:RrqgGjYQKalulkV8NGVIfkXQf6YYmOyiJKk8iXXhfZs=
++github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
++github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
++github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
++github.com/cyphar/filepath-securejoin v0.2.4 h1:Ugdm7cg7i6ZK6x3xDF1oEu1nfkyfH53EtKeQYTC3kyg=
++github.com/cyphar/filepath-securejoin v0.2.4/go.mod h1:aPGpWjXOXUn2NCNjFvBE6aRxGGx79pTxQpKOJNYHHl4=
++github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
++github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
++github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
++github.com/denverdino/aliyungo v0.0.0-20230411124812-ab98a9173ace h1:1SnCTPFh2AADpm7ti864EYaugexyiDFt55BW188+d6k=
++github.com/denverdino/aliyungo v0.0.0-20230411124812-ab98a9173ace/go.mod h1:TK05uvk4XXfK2kdvRwfcZ1NaxjDxmm7H3aQLko0mJxA=
++github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=
++github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f/go.mod h1:cuUVRXasLTGF7a8hSLbxyZXjz+1KgoB3wDUb6vlszIc=
++github.com/distribution/distribution/v3 v3.0.0 h1:q4R8wemdRQDClzoNNStftB2ZAfqOiN6UX90KJc4HjyM=
++github.com/distribution/distribution/v3 v3.0.0/go.mod h1:tRNuFoZsUdyRVegq8xGNeds4KLjwLCRin/tTo6i1DhU=
++github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5QvfrDyIgxBk=
++github.com/distribution/reference v0.6.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
++github.com/dnaeon/go-vcr v1.2.0 h1:zHCHvJYTMh1N7xnV7zf1m1GPBF9Ad0Jk/whtQ1663qI=
++github.com/dnaeon/go-vcr v1.2.0/go.mod h1:R4UdLID7HZT3taECzJs4YgbbH6PIGXB6W/sc5OLb6RQ=
++github.com/docker/distribution v2.8.3+incompatible h1:AtKxIZ36LoNK51+Z6RpzLpddBirtxJnzDrHLEKxTAYk=
++github.com/docker/distribution v2.8.3+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
++github.com/docker/docker-credential-helpers v0.8.2 h1:bX3YxiGzFP5sOXWc3bTPEXdEaZSeVMrFgOr3T+zrFAo=
++github.com/docker/docker-credential-helpers v0.8.2/go.mod h1:P3ci7E3lwkZg6XiHdRKft1KckHiO9a2rNtyFbZ/ry9M=
++github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c h1:+pKlWGMw7gf6bQ+oDZB4KHQFypsfjYlq/C4rfL7D3g8=
++github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c/go.mod h1:Uw6UezgYA44ePAFQYUehOuCzmy5zmg/+nl2ZfMWGkpA=
++github.com/docker/go-metrics v0.0.1 h1:AgB/0SvBxihN0X8OR4SjsblXkbMvalQ8cjmtKQ2rQV8=
++github.com/docker/go-metrics v0.0.1/go.mod h1:cG1hvH2utMXtqgqqYE9plW6lDxS3/5ayHzueweSI3Vw=
++github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 h1:UhxFibDNY/bfvqU5CAUmr9zpesgbU6SWc8/B4mflAE4=
++github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7/go.mod h1:cyGadeNEkKy96OOhEzfZl+yxihPEzKnqJwvfuSUqbZE=
++github.com/envoyproxy/go-control-plane v0.13.4 h1:zEqyPVyku6IvWCFwux4x9RxkLOMUL+1vC9xUFv5l2/M=
++github.com/envoyproxy/go-control-plane v0.13.4/go.mod h1:kDfuBlDVsSj2MjrLEtRWtHlsWIFcGyB2RMO44Dc5GZA=
++github.com/envoyproxy/go-control-plane/envoy v1.32.4 h1:jb83lalDRZSpPWW2Z7Mck/8kXZ5CQAFYVjQcdVIr83A=
++github.com/envoyproxy/go-control-plane/envoy v1.32.4/go.mod h1:Gzjc5k8JcJswLjAx1Zm+wSYE20UrLtt7JZMWiWQXQEw=
++github.com/envoyproxy/go-control-plane/ratelimit v0.1.0 h1:/G9QYbddjL25KvtKTv3an9lx6VBE2cnb8wp1vEGNYGI=
++github.com/envoyproxy/go-control-plane/ratelimit v0.1.0/go.mod h1:Wk+tMFAFbCXaJPzVVHnPgRKdUdwW/KdbRt94AzgRee4=
++github.com/envoyproxy/protoc-gen-validate v1.2.1 h1:DEo3O99U8j4hBFwbJfrz9VtgcDfUKS7KJ7spH3d86P8=
++github.com/envoyproxy/protoc-gen-validate v1.2.1/go.mod h1:d/C80l/jxXLdfEIhX1W2TmLfsJ31lvEjwamM4DxlWXU=
++github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
++github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
++github.com/garyburd/redigo v1.6.4 h1:LFu2R3+ZOPgSMWMOL+saa/zXRjw0ID2G8FepO53BGlg=
++github.com/garyburd/redigo v1.6.4/go.mod h1:rTb6epsqigu3kYKBnaF028A7Tf/Aw5s0cqA47doKKqw=
++github.com/go-jose/go-jose/v4 v4.0.5 h1:M6T8+mKZl/+fNNuFHvGIzDz7BTLQPIounk/b9dw3AaE=
++github.com/go-jose/go-jose/v4 v4.0.5/go.mod h1:s3P1lRrkT8igV8D9OjyL4WRyHvjB6a4JSllnOrmmBOA=
++github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
++github.com/go-logfmt/logfmt v0.3.0/go.mod h1:Qt1PoO58o5twSAckw1HlFXLmHsOX5/0LbT9GBnD5lWE=
++github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V4qmtdjCk=
++github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
++github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
++github.com/go-logr/logr v1.4.2/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
++github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
++github.com/go-logr/stdr v1.2.2/go.mod h1:mMo/vtBO5dYbehREoey6XUKy/eSumjCCveDpRre4VKE=
++github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
++github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
++github.com/gofrs/uuid v4.4.0+incompatible h1:3qXRTX8/NbyulANqlc0lchS1gqAVxRgsuW1YrTJupqA=
++github.com/gofrs/uuid v4.4.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
++github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
++github.com/golang-jwt/jwt/v4 v4.0.0/go.mod h1:/xlHOz8bRuivTWchD4jCa+NbatV+wEUSzwAxVc6locg=
++github.com/golang-jwt/jwt/v4 v4.5.0 h1:7cYmW1XlMY7h7ii7UhUyChSgS5wUJEnm9uZVTGqOWzg=
++github.com/golang-jwt/jwt/v4 v4.5.0/go.mod h1:m21LjoU+eqJr34lmDMbreY2eSTRJ1cv77w39/MY0Ch0=
++github.com/golang-jwt/jwt/v5 v5.2.2 h1:Rl4B7itRWVtYIHFrSNd7vhTiz9UpLdi6gZhZ3wEeDy8=
++github.com/golang-jwt/jwt/v5 v5.2.2/go.mod h1:pqrtFR0X4osieyHYxtmOUWsAWrfe1Q5UVIyoH402zdk=
++github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
++github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
++github.com/golang/protobuf v1.3.2/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
++github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
++github.com/golang/protobuf v1.5.2/go.mod h1:XVQd3VNwM+JqD3oG2Ue2ip4fOMUkwXdXDdiuN0vRsmY=
++github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
++github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
++github.com/gomodule/redigo v1.9.2 h1:HrutZBLhSIU8abiSfW8pj8mPhOyMYjZT/wcA4/L9L9s=
++github.com/gomodule/redigo v1.9.2/go.mod h1:KsU3hiK/Ay8U42qpaJk+kuNa3C+spxapWpM+ywhcgtw=
++github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
++github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
++github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
++github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
++github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
++github.com/google/martian/v3 v3.3.3 h1:DIhPTQrbPkgs2yJYdXU/eNACCG5DVQjySNRNlflZ9Fc=
++github.com/google/martian/v3 v3.3.3/go.mod h1:iEPrYcgCF7jA9OtScMFQyAlZZ4YXTKEtJ1E6RWzmBA0=
++github.com/google/s2a-go v0.1.9 h1:LGD7gtMgezd8a/Xak7mEWL0PjoTQFvpRudN895yqKW0=
++github.com/google/s2a-go v0.1.9/go.mod h1:YA0Ei2ZQL3acow2O62kdp9UlnvMmU7kA6Eutn0dXayM=
++github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
++github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
++github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
++github.com/googleapis/enterprise-certificate-proxy v0.3.6 h1:GW/XbdyBFQ8Qe+YAmFU9uHLo7OnF5tL52HFAgMmyrf4=
++github.com/googleapis/enterprise-certificate-proxy v0.3.6/go.mod h1:MkHOF77EYAE7qfSuSS9PU6g4Nt4e11cnsDUowfwewLA=
++github.com/googleapis/gax-go/v2 v2.14.1 h1:hb0FFeiPaQskmvakKu5EbCbpntQn48jyHuvrkurSS/Q=
++github.com/googleapis/gax-go/v2 v2.14.1/go.mod h1:Hb/NubMaVM88SrNkvl8X/o8XWwDJEPqouaLeN2IUxoA=
++github.com/gorilla/handlers v1.5.2 h1:cLTUSsNkgcwhgRqvCNmdbRWG0A3N4F+M2nWKdScwyEE=
++github.com/gorilla/handlers v1.5.2/go.mod h1:dX+xVpaxdSw+q0Qek8SSsl3dfMk3jNddUkMzo0GtH0w=
++github.com/gorilla/mux v1.8.1 h1:TuBL49tXwgrFYWhqrNgrUNEY92u81SPhu7sTdzQEiWY=
++github.com/gorilla/mux v1.8.1/go.mod h1:AKf9I4AEqPTmMytcMc0KkNouC66V3BtZ4qD5fmWSiMQ=
++github.com/grpc-ecosystem/grpc-gateway/v2 v2.23.0 h1:ad0vkEBuk23VJzZR9nkLVG0YAoN9coASF1GusYX6AlU=
++github.com/grpc-ecosystem/grpc-gateway/v2 v2.23.0/go.mod h1:igFoXX2ELCW06bol23DWPB5BEWfZISOzSP5K2sbLea0=
++github.com/hashicorp/golang-lru/arc/v2 v2.0.5 h1:l2zaLDubNhW4XO3LnliVj0GXO3+/CGNJAg1dcN2Fpfw=
++github.com/hashicorp/golang-lru/arc/v2 v2.0.5/go.mod h1:ny6zBSQZi2JxIeYcv7kt2sH2PXJtirBN7RDhRpxPkxU=
++github.com/hashicorp/golang-lru/v2 v2.0.5 h1:wW7h1TG88eUIJ2i69gaE3uNVtEPIagzhGvHgwfx2Vm4=
++github.com/hashicorp/golang-lru/v2 v2.0.5/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
++github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
++github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
++github.com/jmespath/go-jmespath v0.4.0 h1:BEgLn5cpjn8UN1mAw4NjwDrS35OdebyEtFe+9YPoQUg=
++github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
++github.com/jmespath/go-jmespath/internal/testify v1.5.1 h1:shLQSRRSCCPj3f2gpwzGwWFoC7ycTf1rcQZHOlsJ6N8=
++github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfCI6z80xFu9LTZmf1ZRjMHUOPmWr69U=
++github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
++github.com/json-iterator/go v1.1.7/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
++github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
++github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 h1:iQTw/8FWTuc7uiaSepXwyf3o52HaUYcV+Tu66S3F5GA=
++github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0/go.mod h1:1NbS8ALrpOvjt0rHPNLyCIeMtbizbir8U//inJ+zuB8=
++github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6 h1:IsMZxCuZqKuao2vNdfD82fjjgPLfyHLpR41Z88viRWs=
++github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6/go.mod h1:3VeWNIJaW+O5xpRQbPp0Ybqu1vJd/pm7s2F473HRrkw=
++github.com/klauspost/compress v1.17.11 h1:In6xLpyWOi1+C7tXUUWv2ot1QvBjxevKAaI6IXrJmUc=
++github.com/klauspost/compress v1.17.11/go.mod h1:pMDklpSncoRMuLFrf1W9Ss9KT+0rH90U12bZKk7uwG0=
++github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
++github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
++github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
++github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
++github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
++github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
++github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
++github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
++github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
++github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
++github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
++github.com/magiconair/properties v1.8.6/go.mod h1:y3VJvCyxH9uVvJTWEGAELF3aiYNyPKd5NZ3oSwXrF60=
++github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
++github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
++github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
++github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
++github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
++github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
++github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
++github.com/modocache/gover v0.0.0-20171022184752-b58185e213c5/go.mod h1:caMODM3PzxT8aQXRPkAt8xlV/e7d7w8GM5g0fa5F0D8=
++github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
++github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
++github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
++github.com/ncw/swift v1.0.53 h1:luHjjTNtekIEvHg5KdAFIBaH7bWfNkefwFnpDffSIks=
++github.com/ncw/swift v1.0.53/go.mod h1:23YIA4yWVnGwv2dQlN4bB7egfYX6YLn0Yo/S6zZO/ZM=
++github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
++github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
++github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
++github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
++github.com/opentracing/opentracing-go v1.2.0 h1:uEJPy/1a5RIPAJ0Ov+OIO8OxWu77jEv+1B0VhjKrZUs=
++github.com/opentracing/opentracing-go v1.2.0/go.mod h1:GxEUsuufX4nBwe+T+Wl9TAgYrxe9dPLANfrWvHYVTgc=
++github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c h1:+mdjkGKdHQG3305AYmdv1U2eRNDiU2ErMBj1gwrq8eQ=
++github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c/go.mod h1:7rwL4CYBLnjLxUqIJNnCWiEdr3bn6IUYi15bNlnbCCU=
++github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
++github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
++github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
++github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
++github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 h1:GFCKgmp0tecUJ0sJuv4pzYCqS9+RGSn52M3FUwPs+uo=
++github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10/go.mod h1:t/avpk3KcrXxUnYOhZhMXJlSEyie6gQbtLq5NM3loB8=
++github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
++github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
++github.com/prometheus/client_golang v0.9.1/go.mod h1:7SWBe2y4D6OKWSNQJUaRYU/AaXPKyh/dDVn+NZz0KFw=
++github.com/prometheus/client_golang v1.0.0/go.mod h1:db9x61etRT2tGnBNRi70OPL5FsnadC4Ky3P0J6CfImo=
++github.com/prometheus/client_golang v1.1.0/go.mod h1:I1FGZT9+L76gKKOs5djB6ezCbFQP1xR9D75/vuwEF3g=
++github.com/prometheus/client_golang v1.20.5 h1:cxppBPuYhUnsO6yo/aoRol4L7q7UFfdm+bR9r+8l63Y=
++github.com/prometheus/client_golang v1.20.5/go.mod h1:PIEt8X02hGcP8JWbeHyeZ53Y/jReSnHgO035n//V5WE=
++github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910/go.mod h1:MbSGuTsp3dbXC40dX6PRTWyKYBIrTGTE9sqQNg2J8bo=
++github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
++github.com/prometheus/client_model v0.6.1 h1:ZKSh/rekM+n3CeS952MLRAdFwIKqeY8b62p8ais2e9E=
++github.com/prometheus/client_model v0.6.1/go.mod h1:OrxVMOVHjw3lKMa8+x6HeMGkHMQyHDk9E3jmP2AmGiY=
++github.com/prometheus/common v0.4.1/go.mod h1:TNfzLD0ON7rHzMJeJkieUDPYmFC7Snx/y86RQel1bk4=
++github.com/prometheus/common v0.6.0/go.mod h1:eBmuwkDJBwy6iBfxCBob6t6dR6ENT/y+J+Zk0j9GMYc=
++github.com/prometheus/common v0.60.1 h1:FUas6GcOw66yB/73KC+BOZoFJmbo/1pojoILArPAaSc=
++github.com/prometheus/common v0.60.1/go.mod h1:h0LYf1R1deLSKtD4Vdg8gy4RuOvENW2J/h19V5NADQw=
++github.com/prometheus/procfs v0.0.0-20181005140218-185b4288413d/go.mod h1:c3At6R/oaqEKCNdg8wHV1ftS6bRYblBhIjjI8uT2IGk=
++github.com/prometheus/procfs v0.0.2/go.mod h1:TjEm7ze935MbeOT/UhFTIMYKhuLP4wbCsTZCD3I8kEA=
++github.com/prometheus/procfs v0.0.3/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDaekg4FpcdQ=
++github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
++github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
++github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5 h1:EaDatTxkdHG+U3Bk4EUr+DZ7fOGwTfezUiUJMaIcaho=
++github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5/go.mod h1:fyalQWdtzDBECAQFBJuQe5bzQ02jGd5Qcbgb97Flm7U=
++github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb27yVE+gIAfeqp8LUCc=
++github.com/redis/go-redis/extra/redisotel/v9 v9.0.5/go.mod h1:WZjPDy7VNzn77AAfnAfVjZNvfJTYfPetfZk5yoSTLaQ=
++github.com/redis/go-redis/v9 v9.0.5/go.mod h1:WqMKv5vnQbRuZstUwxQI195wHy+t4PuXDOjzMvcuQHk=
++github.com/redis/go-redis/v9 v9.7.3 h1:YpPyAayJV+XErNsatSElgRZZVCwXX9QzkKYNvO7x0wM=
++github.com/redis/go-redis/v9 v9.7.3/go.mod h1:bGUrSggJ9X9GUmZpZNEOQKaANxSGgOEBRltRTZHSvrA=
++github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
++github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
++github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
++github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
++github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
++github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
++github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
++github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
++github.com/spf13/cobra v1.9.1 h1:CXSaggrXdbHK9CF+8ywj8Amf7PBRmPCOJugH954Nnlo=
++github.com/spf13/cobra v1.9.1/go.mod h1:nDyEzZ8ogv936Cinf6g1RU9MRY64Ir93oCnqb9wxYW0=
++github.com/spf13/pflag v1.0.6 h1:jFzHGLGAlb3ruxLB8MhbI6A8+AQX/2eW4qeyNZXNp2o=
++github.com/spf13/pflag v1.0.6/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
++github.com/spiffe/go-spiffe/v2 v2.5.0 h1:N2I01KCUkv1FAjZXJMwh95KK1ZIQLYbPfhaxw8WS0hE=
++github.com/spiffe/go-spiffe/v2 v2.5.0/go.mod h1:P+NxobPc6wXhVtINNtFjNWGBTreew1GBUCwT2wPmb7g=
++github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
++github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
++github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
++github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
++github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
++github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
++github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
++github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
++github.com/uber/jaeger-client-go v2.30.0+incompatible h1:D6wyKGCecFaSRUpo8lCVbaOOb6ThwMmTEbhRwtKR97o=
++github.com/uber/jaeger-client-go v2.30.0+incompatible/go.mod h1:WVhlPFC8FDjOFMMWRy2pZqQJSXxYSwNYOkTr/Z6d3Kk=
++github.com/uber/jaeger-lib v2.4.1+incompatible h1:td4jdvLcExb4cBISKIpHuGoVXh+dVKhn2Um6rjCsSsg=
++github.com/uber/jaeger-lib v2.4.1+incompatible/go.mod h1:ComeNDZlWwrWnDv8aPp0Ba6+uUTzImX/AauajbLI56U=
++github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
++github.com/yvasiyarov/go-metrics v0.0.0-20150112132944-c25f46c4b940 h1:p7OofyZ509h8DmPLh8Hn+EIIZm/xYhdZHJ9GnXHdr6U=
++github.com/yvasiyarov/go-metrics v0.0.0-20150112132944-c25f46c4b940/go.mod h1:aX5oPXxHm3bOH+xeAttToC8pqch2ScQN/JoXYupl6xs=
++github.com/yvasiyarov/gorelic v0.0.7 h1:4DTF1WOM2ZZS/xMOkTFBOcb6XiHu/PKn3rVo6dbewQE=
++github.com/yvasiyarov/gorelic v0.0.7/go.mod h1:NUSPSUX/bi6SeDMUh6brw0nXpxHnc96TguQh0+r/ssA=
++github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 h1:AsFN8kXcCVkUFHyuzp1FtYbzp1nCO/H6+1uPSGEyPzM=
++github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9/go.mod h1:GlGEuHIJweS1mbCqG+7vt2nvWLzLLnRHbXz5JKd/Qbg=
++github.com/zeebo/errs v1.4.0 h1:XNdoD/RRMKP7HD0UhJnIzUy74ISdGGxURlYG8HSWSfM=
++github.com/zeebo/errs v1.4.0/go.mod h1:sgbWHsvVuTPHcqJJGQ1WhI5KbWlHYz+2+2C/LSEtCw4=
++go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
++go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
++go.opentelemetry.io/contrib/bridges/prometheus v0.57.0 h1:UW0+QyeyBVhn+COBec3nGhfnFe5lwB0ic1JBVjzhk0w=
++go.opentelemetry.io/contrib/bridges/prometheus v0.57.0/go.mod h1:ppciCHRLsyCio54qbzQv0E4Jyth/fLWDTJYfvWpcSVk=
++go.opentelemetry.io/contrib/detectors/gcp v1.35.0 h1:bGvFt68+KTiAKFlacHW6AhA56GF2rS0bdD3aJYEnmzA=
++go.opentelemetry.io/contrib/detectors/gcp v1.35.0/go.mod h1:qGWP8/+ILwMRIUf9uIVLloR1uo5ZYAslM4O6OqUi1DA=
++go.opentelemetry.io/contrib/exporters/autoexport v0.57.0 h1:jmTVJ86dP60C01K3slFQa2NQ/Aoi7zA+wy7vMOKD9H4=
++go.opentelemetry.io/contrib/exporters/autoexport v0.57.0/go.mod h1:EJBheUMttD/lABFyLXhce47Wr6DPWYReCzaZiXadH7g=
++go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 h1:x7wzEgXfnzJcHDwStJT+mxOz4etr2EcexjqhBvmoakw=
++go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0/go.mod h1:rg+RlpR5dKwaS95IyyZqj5Wd4E13lk/msnTS0Xl9lJM=
++go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 h1:sbiXRNDSWJOTobXh5HyQKjq6wUC5tNybqjIqDpAY4CU=
++go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0/go.mod h1:69uWxva0WgAA/4bu2Yy70SLDBwZXuQ6PbBpbsa5iZrQ=
++go.opentelemetry.io/otel v1.35.0 h1:xKWKPxrxB6OtMCbmMY021CqC45J+3Onta9MqjhnusiQ=
++go.opentelemetry.io/otel v1.35.0/go.mod h1:UEqy8Zp11hpkUrL73gSlELM0DupHoiq72dR+Zqel/+Y=
++go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.8.0 h1:WzNab7hOOLzdDF/EoWCt4glhrbMPVMOO5JYTmpz36Ls=
++go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.8.0/go.mod h1:hKvJwTzJdp90Vh7p6q/9PAOd55dI6WA6sWj62a/JvSs=
++go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.8.0 h1:S+LdBGiQXtJdowoJoQPEtI52syEP/JYBUpjO49EQhV8=
++go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.8.0/go.mod h1:5KXybFvPGds3QinJWQT7pmXf+TN5YIa7CNYObWRkj50=
++go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.32.0 h1:j7ZSD+5yn+lo3sGV69nW04rRR0jhYnBwjuX3r0HvnK0=
++go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.32.0/go.mod h1:WXbYJTUaZXAbYd8lbgGuvih0yuCfOFC5RJoYnoLcGz8=
++go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.32.0 h1:t/Qur3vKSkUCcDVaSumWF2PKHt85pc7fRvFuoVT8qFU=
++go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.32.0/go.mod h1:Rl61tySSdcOJWoEgYZVtmnKdA0GeKrSqkHC1t+91CH8=
++go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.32.0 h1:IJFEoHiytixx8cMiVAO+GmHR6Frwu+u5Ur8njpFO6Ac=
++go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.32.0/go.mod h1:3rHrKNtLIoS0oZwkY2vxi+oJcwFRWdtUyRII+so45p8=
++go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.32.0 h1:9kV11HXBHZAvuPUZxmMWrH8hZn/6UnHX4K0mu36vNsU=
++go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.32.0/go.mod h1:JyA0FHXe22E1NeNiHmVp7kFHglnexDQ7uRWDiiJ1hKQ=
++go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.32.0 h1:cMyu9O88joYEaI47CnQkxO1XZdpoTF9fEnW2duIddhw=
++go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.32.0/go.mod h1:6Am3rn7P9TVVeXYG+wtcGE7IE1tsQ+bP3AuWcKt/gOI=
++go.opentelemetry.io/otel/exporters/prometheus v0.54.0 h1:rFwzp68QMgtzu9PgP3jm9XaMICI6TsofWWPcBDKwlsU=
++go.opentelemetry.io/otel/exporters/prometheus v0.54.0/go.mod h1:QyjcV9qDP6VeK5qPyKETvNjmaaEc7+gqjh4SS0ZYzDU=
++go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.8.0 h1:CHXNXwfKWfzS65yrlB2PVds1IBZcdsX8Vepy9of0iRU=
++go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.8.0/go.mod h1:zKU4zUgKiaRxrdovSS2amdM5gOc59slmo/zJwGX+YBg=
++go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.35.0 h1:PB3Zrjs1sG1GBX51SXyTSoOTqcDglmsk7nT6tkKPb/k=
++go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.35.0/go.mod h1:U2R3XyVPzn0WX7wOIypPuptulsMcPDPs/oiSVOMVnHY=
++go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.32.0 h1:cC2yDI3IQd0Udsux7Qmq8ToKAx1XCilTQECZ0KDZyTw=
++go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.32.0/go.mod h1:2PD5Ex6z8CFzDbTdOlwyNIUywRr1DN0ospafJM1wJ+s=
++go.opentelemetry.io/otel/log v0.8.0 h1:egZ8vV5atrUWUbnSsHn6vB8R21G2wrKqNiDt3iWertk=
++go.opentelemetry.io/otel/log v0.8.0/go.mod h1:M9qvDdUTRCopJcGRKg57+JSQ9LgLBrwwfC32epk5NX8=
++go.opentelemetry.io/otel/metric v1.35.0 h1:0znxYu2SNyuMSQT4Y9WDWej0VpcsxkuklLa4/siN90M=
++go.opentelemetry.io/otel/metric v1.35.0/go.mod h1:nKVFgxBZ2fReX6IlyW28MgZojkoAkJGaE8CpgeAU3oE=
++go.opentelemetry.io/otel/sdk v1.35.0 h1:iPctf8iprVySXSKJffSS79eOjl9pvxV9ZqOWT0QejKY=
++go.opentelemetry.io/otel/sdk v1.35.0/go.mod h1:+ga1bZliga3DxJ3CQGg3updiaAJoNECOgJREo9KHGQg=
++go.opentelemetry.io/otel/sdk/log v0.8.0 h1:zg7GUYXqxk1jnGF/dTdLPrK06xJdrXgqgFLnI4Crxvs=
++go.opentelemetry.io/otel/sdk/log v0.8.0/go.mod h1:50iXr0UVwQrYS45KbruFrEt4LvAdCaWWgIrsN3ZQggo=
++go.opentelemetry.io/otel/sdk/metric v1.35.0 h1:1RriWBmCKgkeHEhM7a2uMjMUfP7MsOF5JpUCaEqEI9o=
++go.opentelemetry.io/otel/sdk/metric v1.35.0/go.mod h1:is6XYCUMpcKi+ZsOvfluY5YstFnhW0BidkR+gL+qN+w=
++go.opentelemetry.io/otel/trace v1.35.0 h1:dPpEfJu1sDIqruz7BHFG3c7528f6ddfSWfFDVt/xgMs=
++go.opentelemetry.io/otel/trace v1.35.0/go.mod h1:WUk7DtFp1Aw2MkvqGdwiXYDZZNvA/1J8o6xRXLrIkyc=
++go.opentelemetry.io/proto/otlp v1.3.1 h1:TrMUixzpM0yuc/znrFTP9MMRh8trP93mkCiDVeXrui0=
++go.opentelemetry.io/proto/otlp v1.3.1/go.mod h1:0X1WI4de4ZsLrrJNLAQbFeLCm3T7yBkR0XqQ7niQU+8=
++go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
++go.uber.org/atomic v1.9.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
++go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
++go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
++golang.org/x/crypto v0.0.0-20180904163835-0709b304e793/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
++golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
++golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
++golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa/go.mod h1:IxCIyHEi3zRg3s0A5j5BB6A9Jmi73HwBIUl50j+osU4=
++golang.org/x/crypto v0.17.0/go.mod h1:gCAAfMLgwOJRpTjQ2zCCt2OcSfYMTeZVSRtQlPC7Nq4=
++golang.org/x/crypto v0.37.0 h1:kJNSjF/Xp7kU0iB2Z+9viTPMW4EqqsrywMXLJOOsXSE=
++golang.org/x/crypto v0.37.0/go.mod h1:vg+k43peMZ0pUMhYmVAWysMK35e6ioLh3wB8ZCAfbVc=
++golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4/go.mod h1:jJ57K6gSWd91VN4djpZkiMVwK6gcyfeH4XE8wZrZaV4=
++golang.org/x/mod v0.8.0/go.mod h1:iBbtSCu2XBx23ZKBPSOrRkjjQPZFPuis4dIYUhu/chs=
++golang.org/x/net v0.0.0-20181114220301-adae6a3d119a/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
++golang.org/x/net v0.0.0-20190613194153-d28f0bde5980/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
++golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
++golang.org/x/net v0.0.0-20210226172049-e18ecbb05110/go.mod h1:m0MpNAwzfU5UDzcl9v0D8zg8gWTRqZa9RBIspLL5mdg=
++golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
++golang.org/x/net v0.0.0-20220722155237-a158d28d115b/go.mod h1:XRhObCWvk6IyKnWLug+ECip1KBveYUHfp+8e9klMJ9c=
++golang.org/x/net v0.6.0/go.mod h1:2Tu9+aMcznHK/AK1HMvgo6xiTLG5rD5rZLDS+rp2Bjs=
++golang.org/x/net v0.10.0/go.mod h1:0qNGK6F8kojg2nk9dLZ2mShWaEBan6FAoqfSigmmuDg=
++golang.org/x/net v0.39.0 h1:ZCu7HMWDxpXpaiKdhzIfaltL9Lp31x/3fCP11bc6/fY=
++golang.org/x/net v0.39.0/go.mod h1:X7NRbYVEA+ewNkCNyJ513WmMdQ3BineSwVtN2zD/d+E=
++golang.org/x/oauth2 v0.29.0 h1:WdYw2tdTK1S8olAzWHdgeqfy+Mtm9XNhv/xJsY65d98=
++golang.org/x/oauth2 v0.29.0/go.mod h1:onh5ek6nERTohokkhCD/y2cV4Do3fxFHFuAejCkRWT8=
++golang.org/x/sync v0.0.0-20181108010431-42b317875d0f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
++golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
++golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
++golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
++golang.org/x/sync v0.1.0/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
++golang.org/x/sync v0.13.0 h1:AauUjRAJ9OSnvULf/ARrrVywoJDy0YS2AwQ98I37610=
++golang.org/x/sync v0.13.0/go.mod h1:1dzgHSNfp02xaA81J2MS99Qcpr2w7fw1gpm99rleRqA=
++golang.org/x/sys v0.0.0-20180905080454-ebe1bf3edb33/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
++golang.org/x/sys v0.0.0-20181116152217-5ac8a444bdc5/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
++golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
++golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
++golang.org/x/sys v0.0.0-20191026070338-33540a1f6037/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
++golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
++golang.org/x/sys v0.0.0-20210423082822-04245dca01da/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
++golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
++golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
++golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
++golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
++golang.org/x/sys v0.1.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
++golang.org/x/sys v0.5.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
++golang.org/x/sys v0.8.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
++golang.org/x/sys v0.15.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
++golang.org/x/sys v0.32.0 h1:s77OFDvIQeibCmezSnk/q6iAfkdiQaJi4VzroCFrN20=
++golang.org/x/sys v0.32.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
++golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
++golang.org/x/term v0.0.0-20210927222741-03fcf44c2211/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
++golang.org/x/term v0.5.0/go.mod h1:jMB1sMXY+tzblOD4FWmEbocvup2/aLOaQEp7JmGp78k=
++golang.org/x/term v0.8.0/go.mod h1:xPskH00ivmX89bAKVGSKKtLOWNx2+17Eiy94tnKShWo=
++golang.org/x/term v0.15.0/go.mod h1:BDl952bC7+uMoWR75FIrCDx79TPU9oHkTZ9yRbYOrX0=
++golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
++golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
++golang.org/x/text v0.3.6/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
++golang.org/x/text v0.3.7/go.mod h1:u+2+/6zg+i71rQMx5EYifcz6MCKuco9NR6JIITiCfzQ=
++golang.org/x/text v0.7.0/go.mod h1:mrYo+phRRbMaCq/xk9113O4dZlRixOauAjOtrjsXDZ8=
++golang.org/x/text v0.9.0/go.mod h1:e1OnstbJyHTd6l/uOt8jFFHp6TRDWZR/bV3emEE/zU8=
++golang.org/x/text v0.14.0/go.mod h1:18ZOQIKpY8NJVqYksKHtTdi31H5itFRjB5/qKTNYzSU=
++golang.org/x/text v0.24.0 h1:dd5Bzh4yt5KYA8f9CJHCP4FB4D51c2c6JvN37xJJkJ0=
++golang.org/x/text v0.24.0/go.mod h1:L8rBsPeo2pSS+xqN0d5u2ikmjtmoJbDBT1b7nHvFCdU=
++golang.org/x/time v0.11.0 h1:/bpjEDfN9tkoN/ryeYHnv5hcMlc8ncjMcM4XBk5NWV0=
++golang.org/x/time v0.11.0/go.mod h1:CDIdPxbZBQxdj6cxyCIdrNogrJKMJ7pr37NYpMcMDSg=
++golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
++golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
++golang.org/x/tools v0.1.12/go.mod h1:hNGJHUnrk76NpqgfD5Aqm5Crs+Hm0VOH/i9J2+nxYbc=
++golang.org/x/tools v0.6.0/go.mod h1:Xwgl3UAJ/d3gWutnCtw505GrjyAbvKui8lOU390QaIU=
++golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
++golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
++google.golang.org/api v0.230.0 h1:2u1hni3E+UXAXrONrrkfWpi/V6cyKVAbfGVeGtC3OxM=
++google.golang.org/api v0.230.0/go.mod h1:aqvtoMk7YkiXx+6U12arQFExiRV9D/ekvMCwCd/TksQ=
++google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb h1:ITgPrl429bc6+2ZraNSzMDk3I95nmQln2fuPstKwFDE=
++google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb/go.mod h1:sAo5UzpjUwgFBCzupwhcLcxHVDK7vG5IqI30YnwX2eE=
++google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e h1:UdXH7Kzbj+Vzastr5nVfccbmFsmYNygVLSPk1pEfDoY=
++google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e/go.mod h1:085qFyf2+XaZlRdCgKNCIZ3afY2p4HHZdoIRpId8F4A=
++google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e h1:ztQaXfzEXTmCBvbtWYRhJxW+0iJcz2qXfd38/e9l7bA=
++google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e/go.mod h1:qQ0YXyHHx3XkvlzUtpXDkS29lDSafHMZBAZDc03LQ3A=
++google.golang.org/grpc v1.72.0 h1:S7UkcVa60b5AAQTaO6ZKamFp1zMZSU0fGDK2WZLbBnM=
++google.golang.org/grpc v1.72.0/go.mod h1:wH5Aktxcg25y1I3w7H69nHfXdOG3UiadoBtjh3izSDM=
++google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
++google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
++google.golang.org/protobuf v1.36.6 h1:z1NpPI8ku2WgiWnf+t9wTPsn6eP1L7ksHUlkfLvd9xY=
++google.golang.org/protobuf v1.36.6/go.mod h1:jduwjTPXsFjZGTmRluh+L6NjiWu7pchiJ2/5YcXBHnY=
++gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
++gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
++gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
++gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
++gopkg.in/yaml.v2 v2.2.1/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
++gopkg.in/yaml.v2 v2.2.8/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
++gopkg.in/yaml.v2 v2.4.0 h1:D8xgwECY7CYvx+Y2n4sBz93Jn9JRvxdiyyo8CTfuKaY=
++gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
++gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
++gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
++gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
++rsc.io/letsencrypt v0.0.3 h1:H7xDfhkaFFSYEJlKeq38RwX2jYcnTeHuDQyT+mMNMwM=
++rsc.io/letsencrypt v0.0.3/go.mod h1:buyQKZ6IXrRnB7TdkHP0RyEybLx18HHyOSoTyoOLqNY=
+diff --git a/registry/storage/driver/gcs/doc.go b/registry/storage/driver/gcs/doc.go
+index 0f23ea78..30df0589 100644
+--- a/registry/storage/driver/gcs/doc.go
++++ b/registry/storage/driver/gcs/doc.go
+@@ -1,3 +1,2 @@
+-// Package gcs implements the Google Cloud Storage driver backend. Support can be
+-// enabled by including the "include_gcs" build tag.
++// Package gcs implements the Google Cloud Storage driver backend.
+ package gcs
+diff --git a/registry/storage/driver/gcs/gcs.go b/registry/storage/driver/gcs/gcs.go
+index 2a6619f5..968decee 100644
+--- a/registry/storage/driver/gcs/gcs.go
++++ b/registry/storage/driver/gcs/gcs.go
+@@ -1,6 +1,3 @@
+-//go:build include_gcs
+-// +build include_gcs
+-
+ // Package gcs provides a storagedriver.StorageDriver implementation to
+ // store blobs in Google cloud storage.
+ //
+@@ -17,47 +14,53 @@ package gcs
+ import (
+ 	"bytes"
+ 	"context"
++	"crypto/md5"
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
+ 	"io"
+-	"io/ioutil"
+ 	"math/rand"
+ 	"net/http"
+ 	"net/url"
++	"os"
+ 	"reflect"
+ 	"regexp"
+-	"sort"
+ 	"strconv"
+ 	"strings"
+ 	"time"
+ 
+-	storagedriver "github.com/docker/distribution/registry/storage/driver"
+-	"github.com/docker/distribution/registry/storage/driver/base"
+-	"github.com/docker/distribution/registry/storage/driver/factory"
++	"cloud.google.com/go/storage"
++	storagedriver "github.com/distribution/distribution/v3/registry/storage/driver"
++	"github.com/distribution/distribution/v3/registry/storage/driver/base"
++	"github.com/distribution/distribution/v3/registry/storage/driver/factory"
+ 	"github.com/sirupsen/logrus"
+ 	"golang.org/x/oauth2"
+ 	"golang.org/x/oauth2/google"
+ 	"golang.org/x/oauth2/jwt"
+ 	"google.golang.org/api/googleapi"
+-	"google.golang.org/cloud"
+-	"google.golang.org/cloud/storage"
++	"google.golang.org/api/iterator"
++	"google.golang.org/api/option"
+ )
+ 
+ const (
+ 	driverName     = "gcs"
+ 	dummyProjectID = "<unknown>"
+ 
++	minChunkSize          = 256 * 1024
++	defaultChunkSize      = 16 * 1024 * 1024
++	defaultMaxConcurrency = 50
++	minConcurrency        = 25
++
+ 	uploadSessionContentType = "application/x-docker-upload-session"
+-	minChunkSize             = 256 * 1024
+-	defaultChunkSize         = 20 * minChunkSize
+-	defaultMaxConcurrency    = 50
+-	minConcurrency           = 25
++	blobContentType          = "application/octet-stream"
+ 
+ 	maxTries = 5
+ )
+ 
+ var rangeHeader = regexp.MustCompile(`^bytes=([0-9])+-([0-9]+)$`)
+ 
++var _ storagedriver.FileWriter = &writer{}
++
+ // driverParameters is a struct that encapsulates all of the driver parameters after all values have been set
+ type driverParameters struct {
+ 	bucket        string
+@@ -66,6 +69,7 @@ type driverParameters struct {
+ 	client        *http.Client
+ 	rootDirectory string
+ 	chunkSize     int
++	gcs           *storage.Client
+ 
+ 	// maxConcurrency limits the number of concurrent driver operations
+ 	// to GCS, which ultimately increases reliability of many simultaneous
+@@ -82,8 +86,8 @@ func init() {
+ type gcsDriverFactory struct{}
+ 
+ // Create StorageDriver from parameters
+-func (factory *gcsDriverFactory) Create(parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
+-	return FromParameters(parameters)
++func (factory *gcsDriverFactory) Create(ctx context.Context, parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
++	return FromParameters(ctx, parameters)
+ }
+ 
+ var _ storagedriver.StorageDriver = &driver{}
+@@ -92,7 +96,7 @@ var _ storagedriver.StorageDriver = &driver{}
+ // Objects are stored at absolute keys in the provided bucket.
+ type driver struct {
+ 	client        *http.Client
+-	bucket        string
++	bucket        *storage.BucketHandle
+ 	email         string
+ 	privateKey    []byte
+ 	rootDirectory string
+@@ -112,7 +116,7 @@ type baseEmbed struct {
+ // FromParameters constructs a new Driver with a given parameters map
+ // Required parameters:
+ // - bucket
+-func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
++func FromParameters(ctx context.Context, parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
+ 	bucket, ok := parameters["bucket"]
+ 	if !ok || fmt.Sprint(bucket) == "" {
+ 		return nil, fmt.Errorf("No bucket parameter provided")
+@@ -130,7 +134,7 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
+ 		case string:
+ 			vv, err := strconv.Atoi(v)
+ 			if err != nil {
+-				return nil, fmt.Errorf("chunksize parameter must be an integer, %v invalid", chunkSizeParam)
++				return nil, fmt.Errorf("chunksize must be an integer, %v invalid", chunkSizeParam)
+ 			}
+ 			chunkSize = vv
+ 		case int, uint, int32, uint32, uint64, int64:
+@@ -140,7 +144,7 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
+ 		}
+ 
+ 		if chunkSize < minChunkSize {
+-			return nil, fmt.Errorf("The chunksize %#v parameter should be a number that is larger than or equal to %d", chunkSize, minChunkSize)
++			return nil, fmt.Errorf("chunksize %#v must be larger than or equal to %d", chunkSize, minChunkSize)
+ 		}
+ 
+ 		if chunkSize%minChunkSize != 0 {
+@@ -150,8 +154,11 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
+ 
+ 	var ts oauth2.TokenSource
+ 	jwtConf := new(jwt.Config)
++	var err error
++	var gcs *storage.Client
++	var options []option.ClientOption
+ 	if keyfile, ok := parameters["keyfile"]; ok {
+-		jsonKey, err := ioutil.ReadFile(fmt.Sprint(keyfile))
++		jsonKey, err := os.ReadFile(fmt.Sprint(keyfile))
+ 		if err != nil {
+ 			return nil, err
+ 		}
+@@ -159,7 +166,8 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
+ 		if err != nil {
+ 			return nil, err
+ 		}
+-		ts = jwtConf.TokenSource(context.Background())
++		ts = jwtConf.TokenSource(ctx)
++		options = append(options, option.WithCredentialsFile(fmt.Sprint(keyfile)))
+ 	} else if credentials, ok := parameters["credentials"]; ok {
+ 		credentialMap, ok := credentials.(map[interface{}]interface{})
+ 		if !ok {
+@@ -184,15 +192,30 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
+ 		if err != nil {
+ 			return nil, err
+ 		}
+-		ts = jwtConf.TokenSource(context.Background())
++		ts = jwtConf.TokenSource(ctx)
++		options = append(options, option.WithCredentialsJSON(data))
+ 	} else {
+ 		var err error
+-		ts, err = google.DefaultTokenSource(context.Background(), storage.ScopeFullControl)
++		// DefaultTokenSource is a convenience method. It first calls FindDefaultCredentials,
++		// then uses the credentials to construct an http.Client or an oauth2.TokenSource.
++		// https://pkg.go.dev/golang.org/x/oauth2/google#hdr-Credentials
++		ts, err = google.DefaultTokenSource(ctx, storage.ScopeFullControl)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+ 	}
+ 
++	if userAgent, ok := parameters["useragent"]; ok {
++		if ua, ok := userAgent.(string); ok && ua != "" {
++			options = append(options, option.WithUserAgent(ua))
++		}
++	}
++
++	gcs, err = storage.NewClient(ctx, options...)
++	if err != nil {
++		return nil, err
++	}
++
+ 	maxConcurrency, err := base.GetLimitFromParameter(parameters["maxconcurrency"], minConcurrency, defaultMaxConcurrency)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("maxconcurrency config error: %s", err)
+@@ -203,16 +226,17 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
+ 		rootDirectory:  fmt.Sprint(rootDirectory),
+ 		email:          jwtConf.Email,
+ 		privateKey:     jwtConf.PrivateKey,
+-		client:         oauth2.NewClient(context.Background(), ts),
++		client:         oauth2.NewClient(ctx, ts),
+ 		chunkSize:      chunkSize,
+ 		maxConcurrency: maxConcurrency,
++		gcs:            gcs,
+ 	}
+ 
+-	return New(params)
++	return New(ctx, params)
+ }
+ 
+ // New constructs a new driver
+-func New(params driverParameters) (storagedriver.StorageDriver, error) {
++func New(ctx context.Context, params driverParameters) (storagedriver.StorageDriver, error) {
+ 	rootDirectory := strings.Trim(params.rootDirectory, "/")
+ 	if rootDirectory != "" {
+ 		rootDirectory += "/"
+@@ -221,7 +245,7 @@ func New(params driverParameters) (storagedriver.StorageDriver, error) {
+ 		return nil, fmt.Errorf("Invalid chunksize: %d is not a positive multiple of %d", params.chunkSize, minChunkSize)
+ 	}
+ 	d := &driver{
+-		bucket:        params.bucket,
++		bucket:        params.gcs.Bucket(params.bucket),
+ 		rootDirectory: rootDirectory,
+ 		email:         params.email,
+ 		privateKey:    params.privateKey,
+@@ -246,140 +270,112 @@ func (d *driver) Name() string {
+ 
+ // GetContent retrieves the content stored at "path" as a []byte.
+ // This should primarily be used for small objects.
+-func (d *driver) GetContent(context context.Context, path string) ([]byte, error) {
+-	gcsContext := d.context(context)
+-	name := d.pathToKey(path)
+-	var rc io.ReadCloser
+-	err := retry(func() error {
+-		var err error
+-		rc, err = storage.NewReader(gcsContext, d.bucket, name)
+-		return err
+-	})
+-	if err == storage.ErrObjectNotExist {
+-		return nil, storagedriver.PathNotFoundError{Path: path}
+-	}
++func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
++	r, err := d.bucket.Object(d.pathToKey(path)).NewReader(ctx)
+ 	if err != nil {
++		if err == storage.ErrObjectNotExist {
++			return nil, storagedriver.PathNotFoundError{Path: path}
++		}
+ 		return nil, err
+ 	}
+-	defer rc.Close()
++	defer r.Close()
+ 
+-	p, err := ioutil.ReadAll(rc)
+-	if err != nil {
+-		return nil, err
+-	}
+-	return p, nil
++	return io.ReadAll(r)
+ }
+ 
+ // PutContent stores the []byte content at a location designated by "path".
+ // This should primarily be used for small objects.
+-func (d *driver) PutContent(context context.Context, path string, contents []byte) error {
+-	return retry(func() error {
+-		wc := storage.NewWriter(d.context(context), d.bucket, d.pathToKey(path))
+-		wc.ContentType = "application/octet-stream"
+-		return putContentsClose(wc, contents)
+-	})
++func (d *driver) PutContent(ctx context.Context, path string, contents []byte) error {
++	ctx, cancel := context.WithCancel(ctx)
++	defer cancel()
++
++	object := d.bucket.Object(d.pathToKey(path))
++	err := d.putContent(ctx, object, contents, blobContentType, nil)
++	if err != nil {
++		return err
++	}
++	return nil
+ }
+ 
+ // Reader retrieves an io.ReadCloser for the content stored at "path"
+ // with a given byte offset.
+ // May be used to resume reading a stream by providing a nonzero offset.
+-func (d *driver) Reader(context context.Context, path string, offset int64) (io.ReadCloser, error) {
+-	res, err := getObject(d.client, d.bucket, d.pathToKey(path), offset)
++func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
++	obj := d.bucket.Object(d.pathToKey(path))
++	// NOTE(milosgajdos): If length is negative, the object is read until the end
++	// See: https://pkg.go.dev/cloud.google.com/go/storage#ObjectHandle.NewRangeReader
++	r, err := obj.NewRangeReader(ctx, offset, -1)
+ 	if err != nil {
+-		if res != nil {
+-			if res.StatusCode == http.StatusNotFound {
+-				res.Body.Close()
++		if err == storage.ErrObjectNotExist {
++			return nil, storagedriver.PathNotFoundError{Path: path}
++		}
++		var status *googleapi.Error
++		if errors.As(err, &status) {
++			switch status.Code {
++			case http.StatusNotFound:
+ 				return nil, storagedriver.PathNotFoundError{Path: path}
+-			}
+-
+-			if res.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+-				res.Body.Close()
+-				obj, err := storageStatObject(d.context(context), d.bucket, d.pathToKey(path))
++			case http.StatusRequestedRangeNotSatisfiable:
++				attrs, err := obj.Attrs(ctx)
+ 				if err != nil {
+ 					return nil, err
+ 				}
+-				if offset == obj.Size {
+-					return ioutil.NopCloser(bytes.NewReader([]byte{})), nil
++				if offset == attrs.Size {
++					return io.NopCloser(bytes.NewReader([]byte{})), nil
+ 				}
+ 				return nil, storagedriver.InvalidOffsetError{Path: path, Offset: offset}
+ 			}
+ 		}
+ 		return nil, err
+ 	}
+-	if res.Header.Get("Content-Type") == uploadSessionContentType {
+-		defer res.Body.Close()
++	if r.Attrs.ContentType == uploadSessionContentType {
++		r.Close()
+ 		return nil, storagedriver.PathNotFoundError{Path: path}
+ 	}
+-	return res.Body, nil
+-}
+-
+-func getObject(client *http.Client, bucket string, name string, offset int64) (*http.Response, error) {
+-	// copied from google.golang.org/cloud/storage#NewReader :
+-	// to set the additional "Range" header
+-	u := &url.URL{
+-		Scheme: "https",
+-		Host:   "storage.googleapis.com",
+-		Path:   fmt.Sprintf("/%s/%s", bucket, name),
+-	}
+-	req, err := http.NewRequest("GET", u.String(), nil)
+-	if err != nil {
+-		return nil, err
+-	}
+-	if offset > 0 {
+-		req.Header.Set("Range", fmt.Sprintf("bytes=%v-", offset))
+-	}
+-	var res *http.Response
+-	err = retry(func() error {
+-		var err error
+-		res, err = client.Do(req)
+-		return err
+-	})
+-	if err != nil {
+-		return nil, err
+-	}
+-	return res, googleapi.CheckMediaResponse(res)
++	return r, nil
+ }
+ 
+ // Writer returns a FileWriter which will store the content written to it
+ // at the location designated by "path" after the call to Commit.
+-func (d *driver) Writer(context context.Context, path string, append bool) (storagedriver.FileWriter, error) {
+-	writer := &writer{
+-		client: d.client,
+-		bucket: d.bucket,
+-		name:   d.pathToKey(path),
++func (d *driver) Writer(ctx context.Context, path string, appendMode bool) (storagedriver.FileWriter, error) {
++	w := &writer{
++		ctx:    ctx,
++		driver: d,
++		object: d.bucket.Object(d.pathToKey(path)),
+ 		buffer: make([]byte, d.chunkSize),
+ 	}
+ 
+-	if append {
+-		err := writer.init(path)
++	if appendMode {
++		err := w.init(ctx)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+ 	}
+-	return writer, nil
++	return w, nil
+ }
+ 
+ type writer struct {
+-	client     *http.Client
+-	bucket     string
+-	name       string
++	ctx        context.Context
++	object     *storage.ObjectHandle
++	driver     *driver
+ 	size       int64
+ 	offset     int64
+ 	closed     bool
++	cancelled  bool
++	committed  bool
+ 	sessionURI string
+ 	buffer     []byte
+ 	buffSize   int
+ }
+ 
+ // Cancel removes any written content from this FileWriter.
+-func (w *writer) Cancel() error {
++func (w *writer) Cancel(ctx context.Context) error {
+ 	w.closed = true
+-	err := storageDeleteObject(cloud.NewContext(dummyProjectID, w.client), w.bucket, w.name)
++	w.cancelled = true
++
++	err := w.object.Delete(ctx)
+ 	if err != nil {
+-		if status, ok := err.(*googleapi.Error); ok {
+-			if status.Code == http.StatusNotFound {
+-				err = nil
+-			}
++		if err == storage.ErrObjectNotExist {
++			err = nil
+ 		}
+ 	}
+ 	return err
+@@ -391,7 +387,7 @@ func (w *writer) Close() error {
+ 	}
+ 	w.closed = true
+ 
+-	err := w.writeChunk()
++	err := w.writeChunk(w.ctx)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -405,93 +401,88 @@ func (w *writer) Close() error {
+ 	}
+ 
+ 	// commit the writes by updating the upload session
++	metadata := map[string]string{
++		"Session-URI": w.sessionURI,
++		"Offset":      strconv.FormatInt(w.offset, 10),
++	}
+ 	err = retry(func() error {
+-		wc := storage.NewWriter(cloud.NewContext(dummyProjectID, w.client), w.bucket, w.name)
+-		wc.ContentType = uploadSessionContentType
+-		wc.Metadata = map[string]string{
+-			"Session-URI": w.sessionURI,
+-			"Offset":      strconv.FormatInt(w.offset, 10),
++		err := w.driver.putContent(w.ctx, w.object, w.buffer[0:w.buffSize], uploadSessionContentType, metadata)
++		if err != nil {
++			return err
+ 		}
+-		return putContentsClose(wc, w.buffer[0:w.buffSize])
++		w.size = w.offset + int64(w.buffSize)
++		w.buffSize = 0
++		return nil
+ 	})
+-	if err != nil {
+-		return err
+-	}
+-	w.size = w.offset + int64(w.buffSize)
+-	w.buffSize = 0
+-	return nil
++	return err
+ }
+ 
+-func putContentsClose(wc *storage.Writer, contents []byte) error {
+-	size := len(contents)
+-	var nn int
+-	var err error
+-	for nn < size {
+-		n, err := wc.Write(contents[nn:size])
+-		nn += n
+-		if err != nil {
+-			break
+-		}
+-	}
+-	if err != nil {
++func (d *driver) putContent(ctx context.Context, obj *storage.ObjectHandle, content []byte, contentType string, metadata map[string]string) error {
++	wc := obj.NewWriter(ctx)
++	wc.Metadata = metadata
++	wc.ContentType = contentType
++	wc.ChunkSize = d.chunkSize
++
++	if _, err := bytes.NewReader(content).WriteTo(wc); err != nil {
+ 		return err
+ 	}
++	// NOTE(milosgajdos): Apparently it's posisble to to upload 0-byte content to GCS.
++	// Setting MD5 on the Writer helps to prevent presisting that data.
++	// If set, the uploaded data is rejected if its MD5 hash does not match this field.
++	// See: https://pkg.go.dev/cloud.google.com/go/storage#ObjectAttrs
++	h := md5.New()
++	h.Write(content)
++	wc.MD5 = h.Sum(nil)
++
+ 	return wc.Close()
+ }
+ 
+ // Commit flushes all content written to this FileWriter and makes it
+ // available for future calls to StorageDriver.GetContent and
+ // StorageDriver.Reader.
+-func (w *writer) Commit() error {
+-
+-	if err := w.checkClosed(); err != nil {
+-		return err
++func (w *writer) Commit(ctx context.Context) error {
++	if w.closed {
++		return fmt.Errorf("already closed")
+ 	}
+ 	w.closed = true
+ 
+ 	// no session started yet just perform a simple upload
+ 	if w.sessionURI == "" {
+ 		err := retry(func() error {
+-			wc := storage.NewWriter(cloud.NewContext(dummyProjectID, w.client), w.bucket, w.name)
+-			wc.ContentType = "application/octet-stream"
+-			return putContentsClose(wc, w.buffer[0:w.buffSize])
++			err := w.driver.putContent(ctx, w.object, w.buffer[0:w.buffSize], blobContentType, nil)
++			if err != nil {
++				return err
++			}
++			w.committed = true
++			w.size = w.offset + int64(w.buffSize)
++			w.buffSize = 0
++			return nil
+ 		})
+-		if err != nil {
+-			return err
+-		}
+-		w.size = w.offset + int64(w.buffSize)
+-		w.buffSize = 0
+-		return nil
++		return err
+ 	}
+ 	size := w.offset + int64(w.buffSize)
+-	var nn int
++	var written int
+ 	// loop must be performed at least once to ensure the file is committed even when
+ 	// the buffer is empty
+ 	for {
+-		n, err := putChunk(w.client, w.sessionURI, w.buffer[nn:w.buffSize], w.offset, size)
+-		nn += int(n)
++		n, err := w.putChunk(ctx, w.sessionURI, w.buffer[written:w.buffSize], w.offset, size)
++		written += int(n)
+ 		w.offset += n
+ 		w.size = w.offset
+ 		if err != nil {
+-			w.buffSize = copy(w.buffer, w.buffer[nn:w.buffSize])
++			w.buffSize = copy(w.buffer, w.buffer[written:w.buffSize])
+ 			return err
+ 		}
+-		if nn == w.buffSize {
++		if written == w.buffSize {
+ 			break
+ 		}
+ 	}
++	w.committed = true
+ 	w.buffSize = 0
+ 	return nil
+ }
+ 
+-func (w *writer) checkClosed() error {
+-	if w.closed {
+-		return fmt.Errorf("Writer already closed")
+-	}
+-	return nil
+-}
+-
+-func (w *writer) writeChunk() error {
++func (w *writer) writeChunk(ctx context.Context) error {
+ 	var err error
+ 	// chunks can be uploaded only in multiples of minChunkSize
+ 	// chunkSize is a multiple of minChunkSize less than or equal to buffSize
+@@ -501,41 +492,47 @@ func (w *writer) writeChunk() error {
+ 	}
+ 	// if their is no sessionURI yet, obtain one by starting the session
+ 	if w.sessionURI == "" {
+-		w.sessionURI, err = startSession(w.client, w.bucket, w.name)
++		w.sessionURI, err = w.newSession()
+ 	}
+ 	if err != nil {
+ 		return err
+ 	}
+-	nn, err := putChunk(w.client, w.sessionURI, w.buffer[0:chunkSize], w.offset, -1)
+-	w.offset += nn
++	n, err := w.putChunk(ctx, w.sessionURI, w.buffer[0:chunkSize], w.offset, -1)
++	w.offset += n
+ 	if w.offset > w.size {
+ 		w.size = w.offset
+ 	}
+ 	// shift the remaining bytes to the start of the buffer
+-	w.buffSize = copy(w.buffer, w.buffer[int(nn):w.buffSize])
++	w.buffSize = copy(w.buffer, w.buffer[int(n):w.buffSize])
+ 
+ 	return err
+ }
+ 
+ func (w *writer) Write(p []byte) (int, error) {
+-	err := w.checkClosed()
+-	if err != nil {
+-		return 0, err
++	if w.closed {
++		return 0, fmt.Errorf("already closed")
++	} else if w.cancelled {
++		return 0, fmt.Errorf("already cancelled")
+ 	}
+ 
+-	var nn int
+-	for nn < len(p) {
+-		n := copy(w.buffer[w.buffSize:], p[nn:])
++	var (
++		written int
++		err     error
++	)
++
++	for written < len(p) {
++		n := copy(w.buffer[w.buffSize:], p[written:])
+ 		w.buffSize += n
+ 		if w.buffSize == cap(w.buffer) {
+-			err = w.writeChunk()
++			err = w.writeChunk(w.ctx)
+ 			if err != nil {
+ 				break
+ 			}
+ 		}
+-		nn += n
++		written += n
+ 	}
+-	return nn, err
++	w.size = w.offset + int64(w.buffSize)
++	return written, err
+ }
+ 
+ // Size returns the number of bytes written to this FileWriter.
+@@ -543,25 +540,56 @@ func (w *writer) Size() int64 {
+ 	return w.size
+ }
+ 
+-func (w *writer) init(path string) error {
+-	res, err := getObject(w.client, w.bucket, w.name, 0)
++func (w *writer) init(ctx context.Context) error {
++	attrs, err := w.object.Attrs(ctx)
+ 	if err != nil {
+ 		return err
+ 	}
+-	defer res.Body.Close()
+-	if res.Header.Get("Content-Type") != uploadSessionContentType {
+-		return storagedriver.PathNotFoundError{Path: path}
++
++	// NOTE(milosgajdos): when PUSH abruptly finishes by
++	// calling a single commit and then closes the stream
++	// attrs.ContentType ends up being set to application/octet-stream
++	// We must handle this case so the upload can resume.
++	if attrs.ContentType != uploadSessionContentType &&
++		attrs.ContentType != blobContentType {
++		return storagedriver.PathNotFoundError{Path: w.object.ObjectName()}
++	}
++
++	offset := int64(0)
++	// NOTE(milosgajdos): if a client creates an empty blob, then
++	// closes the stream and then attempts to append to it, the offset
++	// will be empty, in which case strconv.ParseInt will return error
++	// See: https://pkg.go.dev/strconv#ParseInt
++	if attrs.Metadata["Offset"] != "" {
++		offset, err = strconv.ParseInt(attrs.Metadata["Offset"], 10, 64)
++		if err != nil {
++			return err
++		}
+ 	}
+-	offset, err := strconv.ParseInt(res.Header.Get("X-Goog-Meta-Offset"), 10, 64)
++
++	r, err := w.object.NewReader(ctx)
+ 	if err != nil {
+ 		return err
+ 	}
+-	buffer, err := ioutil.ReadAll(res.Body)
+-	if err != nil {
++	defer r.Close()
++
++	for err == nil && w.buffSize < len(w.buffer) {
++		var n int
++		n, err = r.Read(w.buffer[w.buffSize:])
++		w.buffSize += n
++	}
++	if err != nil && err != io.EOF {
+ 		return err
+ 	}
+-	w.sessionURI = res.Header.Get("X-Goog-Meta-Session-URI")
+-	w.buffSize = copy(w.buffer, buffer)
++
++	// NOTE(milosgajdos): if a client closes an existing session and then attempts
++	// to append to an existing blob, the session will be empty; recreate it
++	if w.sessionURI = attrs.Metadata["Session-URI"]; w.sessionURI == "" {
++		w.sessionURI, err = w.newSession()
++		if err != nil {
++			return err
++		}
++	}
+ 	w.offset = offset
+ 	w.size = offset + int64(w.buffSize)
+ 	return nil
+@@ -579,7 +607,7 @@ func retry(req request) error {
+ 		}
+ 
+ 		status, ok := err.(*googleapi.Error)
+-		if !ok || (status.Code != 429 && status.Code < http.StatusInternalServerError) {
++		if !ok || (status.Code != http.StatusTooManyRequests && status.Code < http.StatusInternalServerError) {
+ 			return err
+ 		}
+ 
+@@ -593,11 +621,10 @@ func retry(req request) error {
+ 
+ // Stat retrieves the FileInfo for the given path, including the current
+ // size in bytes and the creation time.
+-func (d *driver) Stat(context context.Context, path string) (storagedriver.FileInfo, error) {
++func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
+ 	var fi storagedriver.FileInfoFields
+-	//try to get as file
+-	gcsContext := d.context(context)
+-	obj, err := storageStatObject(gcsContext, d.bucket, d.pathToKey(path))
++	// try to get as file
++	obj, err := d.bucket.Object(d.pathToKey(path)).Attrs(ctx)
+ 	if err == nil {
+ 		if obj.ContentType == uploadSessionContentType {
+ 			return nil, storagedriver.PathNotFoundError{Path: path}
+@@ -610,26 +637,26 @@ func (d *driver) Stat(context context.Context, path string) (storagedriver.FileI
+ 		}
+ 		return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
+ 	}
+-	//try to get as folder
++	// try to get as folder
+ 	dirpath := d.pathToDirKey(path)
+ 
+ 	query := &storage.Query{
+-		Prefix:     dirpath,
+-		MaxResults: 1,
++		Prefix: dirpath,
+ 	}
+ 
+-	objects, err := storageListObjects(gcsContext, d.bucket, query)
++	obj, err = d.bucket.Objects(ctx, query).Next()
+ 	if err != nil {
++		if err == iterator.Done {
++			return nil, storagedriver.PathNotFoundError{Path: path}
++		}
+ 		return nil, err
+ 	}
+-	if len(objects.Results) < 1 {
+-		return nil, storagedriver.PathNotFoundError{Path: path}
+-	}
++
+ 	fi = storagedriver.FileInfoFields{
+ 		Path:  path,
+ 		IsDir: true,
+ 	}
+-	obj = objects.Results[0]
++
+ 	if obj.Name == dirpath {
+ 		fi.Size = obj.Size
+ 		fi.ModTime = obj.Updated
+@@ -639,34 +666,35 @@ func (d *driver) Stat(context context.Context, path string) (storagedriver.FileI
+ 
+ // List returns a list of the objects that are direct descendants of the
+ // given path.
+-func (d *driver) List(context context.Context, path string) ([]string, error) {
++func (d *driver) List(ctx context.Context, path string) ([]string, error) {
+ 	query := &storage.Query{
+ 		Delimiter: "/",
+ 		Prefix:    d.pathToDirKey(path),
+ 	}
++	objects := d.bucket.Objects(ctx, query)
++
+ 	list := make([]string, 0, 64)
+ 	for {
+-		objects, err := storageListObjects(d.context(context), d.bucket, query)
++		object, err := objects.Next()
+ 		if err != nil {
++			if err == iterator.Done {
++				break
++			}
+ 			return nil, err
+ 		}
+-		for _, object := range objects.Results {
+-			// GCS does not guarantee strong consistency between
+-			// DELETE and LIST operations. Check that the object is not deleted,
+-			// and filter out any objects with a non-zero time-deleted
+-			if object.Deleted.IsZero() && object.ContentType != uploadSessionContentType {
+-				list = append(list, d.keyToPath(object.Name))
+-			}
++		// GCS does not guarantee strong consistency between
++		// DELETE and LIST operations. Check that the object is not deleted,
++		// and filter out any objects with a non-zero time-deleted
++		if object.Deleted.IsZero() && object.ContentType != uploadSessionContentType && object.Name != "" {
++			list = append(list, d.keyToPath(object.Name))
+ 		}
+-		for _, subpath := range objects.Prefixes {
+-			subpath = d.keyToPath(subpath)
++
++		if object.Name == "" && object.Prefix != "" {
++			subpath := d.keyToPath(object.Prefix)
+ 			list = append(list, subpath)
+ 		}
+-		query = objects.Next
+-		if query == nil {
+-			break
+-		}
+ 	}
++
+ 	if path != "/" && len(list) == 0 {
+ 		// Treat empty response as missing directory, since we don't actually
+ 		// have directories in Google Cloud Storage.
+@@ -677,65 +705,71 @@ func (d *driver) List(context context.Context, path string) ([]string, error) {
+ 
+ // Move moves an object stored at sourcePath to destPath, removing the
+ // original object.
+-func (d *driver) Move(context context.Context, sourcePath string, destPath string) error {
+-	gcsContext := d.context(context)
+-	_, err := storageCopyObject(gcsContext, d.bucket, d.pathToKey(sourcePath), d.bucket, d.pathToKey(destPath), nil)
++func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
++	srcKey, dstKey := d.pathToKey(sourcePath), d.pathToKey(destPath)
++	src := d.bucket.Object(srcKey)
++	_, err := d.bucket.Object(dstKey).CopierFrom(src).Run(ctx)
+ 	if err != nil {
+-		if status, ok := err.(*googleapi.Error); ok {
++		var status *googleapi.Error
++		if errors.As(err, &status) {
+ 			if status.Code == http.StatusNotFound {
+-				return storagedriver.PathNotFoundError{Path: sourcePath}
++				return storagedriver.PathNotFoundError{Path: srcKey}
+ 			}
+ 		}
+-		return err
++		return fmt.Errorf("move %q to %q: %v", srcKey, dstKey, err)
+ 	}
+-	err = storageDeleteObject(gcsContext, d.bucket, d.pathToKey(sourcePath))
++	err = src.Delete(ctx)
+ 	// if deleting the file fails, log the error, but do not fail; the file was successfully copied,
+ 	// and the original should eventually be cleaned when purging the uploads folder.
+ 	if err != nil {
+-		logrus.Infof("error deleting file: %v due to %v", sourcePath, err)
++		logrus.Infof("error deleting %v: %v", sourcePath, err)
+ 	}
+ 	return nil
+ }
+ 
+ // listAll recursively lists all names of objects stored at "prefix" and its subpaths.
+-func (d *driver) listAll(context context.Context, prefix string) ([]string, error) {
++func (d *driver) listAll(ctx context.Context, prefix string) ([]string, error) {
++	objects := d.bucket.Objects(ctx, &storage.Query{
++		Prefix:   prefix,
++		Versions: false,
++	})
++
+ 	list := make([]string, 0, 64)
+-	query := &storage.Query{}
+-	query.Prefix = prefix
+-	query.Versions = false
+ 	for {
+-		objects, err := storageListObjects(d.context(context), d.bucket, query)
++		object, err := objects.Next()
+ 		if err != nil {
+-			return nil, err
+-		}
+-		for _, obj := range objects.Results {
+-			// GCS does not guarantee strong consistency between
+-			// DELETE and LIST operations. Check that the object is not deleted,
+-			// and filter out any objects with a non-zero time-deleted
+-			if obj.Deleted.IsZero() {
+-				list = append(list, obj.Name)
++			if err == iterator.Done {
++				break
+ 			}
++			return nil, err
+ 		}
+-		query = objects.Next
+-		if query == nil {
+-			break
++		// GCS does not guarantee strong consistency between
++		// DELETE and LIST operations. Check that the object is not deleted,
++		// and filter out any objects with a non-zero time-deleted
++		if object.Deleted.IsZero() {
++			list = append(list, object.Name)
+ 		}
+ 	}
++
+ 	return list, nil
+ }
+ 
+ // Delete recursively deletes all objects stored at "path" and its subpaths.
+-func (d *driver) Delete(context context.Context, path string) error {
++func (d *driver) Delete(ctx context.Context, path string) error {
+ 	prefix := d.pathToDirKey(path)
+-	gcsContext := d.context(context)
+-	keys, err := d.listAll(gcsContext, prefix)
++	keys, err := d.listAll(ctx, prefix)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	if len(keys) > 0 {
+-		sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+-		for _, key := range keys {
+-			err := storageDeleteObject(gcsContext, d.bucket, key)
++		// NOTE(milosgajdos): d.listAll calls (BucketHandle).Objects
++		// See: https://pkg.go.dev/cloud.google.com/go/storage#BucketHandle.Objects
++		// docs: Objects will be iterated over lexicographically by name.
++		// This means we don't have to reverse order the slice; we can
++		// range over the keys slice in reverse order
++		for i := len(keys) - 1; i >= 0; i-- {
++			key := keys[i]
++			err := d.bucket.Object(key).Delete(ctx)
+ 			// GCS only guarantees eventual consistency, so listAll might return
+ 			// paths that no longer exist. If this happens, just ignore any not
+ 			// found error
+@@ -750,110 +784,51 @@ func (d *driver) Delete(context context.Context, path string) error {
+ 		}
+ 		return nil
+ 	}
+-	err = storageDeleteObject(gcsContext, d.bucket, d.pathToKey(path))
+-	if err != nil {
+-		if status, ok := err.(*googleapi.Error); ok {
+-			if status.Code == http.StatusNotFound {
+-				return storagedriver.PathNotFoundError{Path: path}
+-			}
+-		}
++	err = d.bucket.Object(d.pathToKey(path)).Delete(ctx)
++	if err == storage.ErrObjectNotExist {
++		return storagedriver.PathNotFoundError{Path: path}
+ 	}
+ 	return err
+ }
+ 
+-func storageDeleteObject(context context.Context, bucket string, name string) error {
+-	return retry(func() error {
+-		return storage.DeleteObject(context, bucket, name)
+-	})
+-}
+-
+-func storageStatObject(context context.Context, bucket string, name string) (*storage.Object, error) {
+-	var obj *storage.Object
+-	err := retry(func() error {
+-		var err error
+-		obj, err = storage.StatObject(context, bucket, name)
+-		return err
+-	})
+-	return obj, err
+-}
+-
+-func storageListObjects(context context.Context, bucket string, q *storage.Query) (*storage.Objects, error) {
+-	var objs *storage.Objects
+-	err := retry(func() error {
+-		var err error
+-		objs, err = storage.ListObjects(context, bucket, q)
+-		return err
+-	})
+-	return objs, err
+-}
+-
+-func storageCopyObject(context context.Context, srcBucket, srcName string, destBucket, destName string, attrs *storage.ObjectAttrs) (*storage.Object, error) {
+-	var obj *storage.Object
+-	err := retry(func() error {
+-		var err error
+-		obj, err = storage.CopyObject(context, srcBucket, srcName, destBucket, destName, attrs)
+-		return err
+-	})
+-	return obj, err
+-}
+-
+-// URLFor returns a URL which may be used to retrieve the content stored at
++// RedirectURL returns a URL which may be used to retrieve the content stored at
+ // the given path, possibly using the given options.
+-// Returns ErrUnsupportedMethod if this driver has no privateKey
+-func (d *driver) URLFor(context context.Context, path string, options map[string]interface{}) (string, error) {
+-	if d.privateKey == nil {
+-		return "", storagedriver.ErrUnsupportedMethod{}
+-	}
+-
+-	name := d.pathToKey(path)
+-	methodString := "GET"
+-	method, ok := options["method"]
+-	if ok {
+-		methodString, ok = method.(string)
+-		if !ok || (methodString != "GET" && methodString != "HEAD") {
+-			return "", storagedriver.ErrUnsupportedMethod{}
+-		}
+-	}
+-
+-	expiresTime := time.Now().Add(20 * time.Minute)
+-	expires, ok := options["expiry"]
+-	if ok {
+-		et, ok := expires.(time.Time)
+-		if ok {
+-			expiresTime = et
+-		}
++func (d *driver) RedirectURL(r *http.Request, path string) (string, error) {
++	if r.Method != http.MethodGet && r.Method != http.MethodHead {
++		return "", nil
+ 	}
+ 
+ 	opts := &storage.SignedURLOptions{
+ 		GoogleAccessID: d.email,
+ 		PrivateKey:     d.privateKey,
+-		Method:         methodString,
+-		Expires:        expiresTime,
++		Method:         r.Method,
++		Expires:        time.Now().Add(20 * time.Minute),
+ 	}
+-	return storage.SignedURL(d.bucket, name, opts)
++	return d.bucket.SignedURL(d.pathToKey(path), opts)
+ }
+ 
+ // Walk traverses a filesystem defined within driver, starting
+ // from the given path, calling f on each file
+-func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) error {
+-	return storagedriver.WalkFallback(ctx, d, path, f)
++func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn, options ...func(*storagedriver.WalkOptions)) error {
++	return storagedriver.WalkFallback(ctx, d, path, f, options...)
+ }
+ 
+-func startSession(client *http.Client, bucket string, name string) (uri string, err error) {
++func (w *writer) newSession() (uri string, err error) {
+ 	u := &url.URL{
+ 		Scheme:   "https",
+ 		Host:     "www.googleapis.com",
+-		Path:     fmt.Sprintf("/upload/storage/v1/b/%v/o", bucket),
+-		RawQuery: fmt.Sprintf("uploadType=resumable&name=%v", name),
++		Path:     fmt.Sprintf("/upload/storage/v1/b/%v/o", w.object.BucketName()),
++		RawQuery: fmt.Sprintf("uploadType=resumable&name=%v", w.object.ObjectName()),
++	}
++	req, err := http.NewRequestWithContext(w.ctx, http.MethodPost, u.String(), nil)
++	if err != nil {
++		return "", err
+ 	}
++	req.Header.Set("X-Upload-Content-Type", blobContentType)
++	req.Header.Set("Content-Length", "0")
++
+ 	err = retry(func() error {
+-		req, err := http.NewRequest("POST", u.String(), nil)
+-		if err != nil {
+-			return err
+-		}
+-		req.Header.Set("X-Upload-Content-Type", "application/octet-stream")
+-		req.Header.Set("Content-Length", "0")
+-		resp, err := client.Do(req)
++		resp, err := w.driver.client.Do(req)
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -868,33 +843,33 @@ func startSession(client *http.Client, bucket string, name string) (uri string,
+ 	return uri, err
+ }
+ 
+-func putChunk(client *http.Client, sessionURI string, chunk []byte, from int64, totalSize int64) (int64, error) {
+-	bytesPut := int64(0)
+-	err := retry(func() error {
+-		req, err := http.NewRequest("PUT", sessionURI, bytes.NewReader(chunk))
+-		if err != nil {
+-			return err
+-		}
+-		length := int64(len(chunk))
+-		to := from + length - 1
+-		size := "*"
+-		if totalSize >= 0 {
+-			size = strconv.FormatInt(totalSize, 10)
+-		}
+-		req.Header.Set("Content-Type", "application/octet-stream")
+-		if from == to+1 {
+-			req.Header.Set("Content-Range", fmt.Sprintf("bytes */%v", size))
+-		} else {
+-			req.Header.Set("Content-Range", fmt.Sprintf("bytes %v-%v/%v", from, to, size))
+-		}
+-		req.Header.Set("Content-Length", strconv.FormatInt(length, 10))
++func (w *writer) putChunk(ctx context.Context, sessionURI string, chunk []byte, from int64, totalSize int64) (int64, error) {
++	req, err := http.NewRequestWithContext(ctx, http.MethodPut, sessionURI, bytes.NewReader(chunk))
++	if err != nil {
++		return 0, err
++	}
++	length := int64(len(chunk))
++	to := from + length - 1
++	size := "*"
++	if totalSize >= 0 {
++		size = strconv.FormatInt(totalSize, 10)
++	}
++	req.Header.Set("Content-Type", blobContentType)
++	if from == to+1 {
++		req.Header.Set("Content-Range", fmt.Sprintf("bytes */%s", size))
++	} else {
++		req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%s", from, to, size))
++	}
++	req.Header.Set("Content-Length", strconv.FormatInt(length, 10))
+ 
+-		resp, err := client.Do(req)
++	bytesPut := int64(0)
++	err = retry(func() error {
++		resp, err := w.driver.client.Do(req)
+ 		if err != nil {
+ 			return err
+ 		}
+ 		defer resp.Body.Close()
+-		if totalSize < 0 && resp.StatusCode == 308 {
++		if totalSize < 0 && resp.StatusCode == http.StatusPermanentRedirect {
+ 			groups := rangeHeader.FindStringSubmatch(resp.Header.Get("Range"))
+ 			end, err := strconv.ParseInt(groups[2], 10, 64)
+ 			if err != nil {
+@@ -913,10 +888,6 @@ func putChunk(client *http.Client, sessionURI string, chunk []byte, from int64,
+ 	return bytesPut, err
+ }
+ 
+-func (d *driver) context(context context.Context) context.Context {
+-	return cloud.WithContext(context, dummyProjectID, d.client)
+-}
+-
+ func (d *driver) pathToKey(path string) string {
+ 	return strings.TrimSpace(strings.TrimRight(d.rootDirectory+strings.TrimLeft(path, "/"), "/"))
+ }
+diff --git a/registry/storage/driver/gcs/gcs_test.go b/registry/storage/driver/gcs/gcs_test.go
+index ee4a67a8..92611780 100644
+--- a/registry/storage/driver/gcs/gcs_test.go
++++ b/registry/storage/driver/gcs/gcs_test.go
+@@ -1,103 +1,111 @@
+-//go:build include_gcs
+-// +build include_gcs
+-
+ package gcs
+ 
+ import (
++	"context"
+ 	"fmt"
+-	"io/ioutil"
+ 	"os"
+ 	"testing"
+ 
+-	dcontext "github.com/docker/distribution/context"
+-	storagedriver "github.com/docker/distribution/registry/storage/driver"
+-	"github.com/docker/distribution/registry/storage/driver/testsuites"
++	"cloud.google.com/go/storage"
++	"github.com/distribution/distribution/v3/internal/dcontext"
++	storagedriver "github.com/distribution/distribution/v3/registry/storage/driver"
++	"github.com/distribution/distribution/v3/registry/storage/driver/testsuites"
+ 	"golang.org/x/oauth2"
+ 	"golang.org/x/oauth2/google"
+ 	"google.golang.org/api/googleapi"
+-	"google.golang.org/cloud/storage"
+-	"gopkg.in/check.v1"
++	"google.golang.org/api/option"
+ )
+ 
+-// Hook up gocheck into the "go test" runner.
+-func Test(t *testing.T) { check.TestingT(t) }
+-
+-var gcsDriverConstructor func(rootDirectory string) (storagedriver.StorageDriver, error)
+-var skipGCS func() string
++var (
++	gcsDriverConstructor func(rootDirectory string) (storagedriver.StorageDriver, error)
++	skipCheck            func(tb testing.TB)
++)
+ 
+ func init() {
+ 	bucket := os.Getenv("REGISTRY_STORAGE_GCS_BUCKET")
+ 	credentials := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+ 
+ 	// Skip GCS storage driver tests if environment variable parameters are not provided
+-	skipGCS = func() string {
++	skipCheck = func(tb testing.TB) {
++		tb.Helper()
++
+ 		if bucket == "" || credentials == "" {
+-			return "The following environment variables must be set to enable these tests: REGISTRY_STORAGE_GCS_BUCKET, GOOGLE_APPLICATION_CREDENTIALS"
++			tb.Skip("The following environment variables must be set to enable these tests: REGISTRY_STORAGE_GCS_BUCKET, GOOGLE_APPLICATION_CREDENTIALS")
+ 		}
+-		return ""
+ 	}
+ 
+-	if skipGCS() != "" {
+-		return
+-	}
++	gcsDriverConstructor = func(rootDirectory string) (storagedriver.StorageDriver, error) {
++		jsonKey, err := os.ReadFile(credentials)
++		if err != nil {
++			panic(fmt.Sprintf("Error reading JSON key : %v", err))
++		}
+ 
+-	root, err := ioutil.TempDir("", "driver-")
+-	if err != nil {
+-		panic(err)
+-	}
+-	defer os.Remove(root)
+-	var ts oauth2.TokenSource
+-	var email string
+-	var privateKey []byte
++		var ts oauth2.TokenSource
++		var email string
++		var privateKey []byte
+ 
+-	ts, err = google.DefaultTokenSource(dcontext.Background(), storage.ScopeFullControl)
+-	if err != nil {
+-		// Assume that the file contents are within the environment variable since it exists
+-		// but does not contain a valid file path
+-		jwtConfig, err := google.JWTConfigFromJSON([]byte(credentials), storage.ScopeFullControl)
++		ts, err = google.DefaultTokenSource(dcontext.Background(), storage.ScopeFullControl)
+ 		if err != nil {
+-			panic(fmt.Sprintf("Error reading JWT config : %s", err))
+-		}
+-		email = jwtConfig.Email
+-		privateKey = jwtConfig.PrivateKey
+-		if len(privateKey) == 0 {
+-			panic("Error reading JWT config : missing private_key property")
++			// Assume that the file contents are within the environment variable since it exists
++			// but does not contain a valid file path
++			jwtConfig, err := google.JWTConfigFromJSON(jsonKey, storage.ScopeFullControl)
++			if err != nil {
++				panic(fmt.Sprintf("Error reading JWT config : %s", err))
++			}
++			email = jwtConfig.Email
++			privateKey = jwtConfig.PrivateKey
++			if len(privateKey) == 0 {
++				panic("Error reading JWT config : missing private_key property")
++			}
++			if email == "" {
++				panic("Error reading JWT config : missing client_email property")
++			}
++			ts = jwtConfig.TokenSource(dcontext.Background())
+ 		}
+-		if email == "" {
+-			panic("Error reading JWT config : missing client_email property")
++
++		gcs, err := storage.NewClient(dcontext.Background(), option.WithCredentialsJSON(jsonKey))
++		if err != nil {
++			panic(fmt.Sprintf("Error initializing gcs client : %v", err))
+ 		}
+-		ts = jwtConfig.TokenSource(dcontext.Background())
+-	}
+ 
+-	gcsDriverConstructor = func(rootDirectory string) (storagedriver.StorageDriver, error) {
+ 		parameters := driverParameters{
+-			bucket:        bucket,
+-			rootDirectory: root,
+-			email:         email,
+-			privateKey:    privateKey,
+-			client:        oauth2.NewClient(dcontext.Background(), ts),
+-			chunkSize:     defaultChunkSize,
++			bucket:         bucket,
++			rootDirectory:  rootDirectory,
++			email:          email,
++			privateKey:     privateKey,
++			client:         oauth2.NewClient(dcontext.Background(), ts),
++			chunkSize:      defaultChunkSize,
++			gcs:            gcs,
++			maxConcurrency: 8,
+ 		}
+ 
+-		return New(parameters)
++		return New(context.Background(), parameters)
+ 	}
++}
++
++func newDriverConstructor(tb testing.TB) testsuites.DriverConstructor {
++	root := tb.TempDir()
+ 
+-	testsuites.RegisterSuite(func() (storagedriver.StorageDriver, error) {
++	return func() (storagedriver.StorageDriver, error) {
+ 		return gcsDriverConstructor(root)
+-	}, skipGCS)
++	}
++}
++
++func TestGCSDriverSuite(t *testing.T) {
++	skipCheck(t)
++	testsuites.Driver(t, newDriverConstructor(t), false)
++}
++
++func BenchmarkGCSDriverSuite(b *testing.B) {
++	skipCheck(b)
++	testsuites.BenchDriver(b, newDriverConstructor(b))
+ }
+ 
+ // Test Committing a FileWriter without having called Write
+ func TestCommitEmpty(t *testing.T) {
+-	if skipGCS() != "" {
+-		t.Skip(skipGCS())
+-	}
++	skipCheck(t)
+ 
+-	validRoot, err := ioutil.TempDir("", "driver-")
+-	if err != nil {
+-		t.Fatalf("unexpected error creating temporary directory: %v", err)
+-	}
+-	defer os.Remove(validRoot)
++	validRoot := t.TempDir()
+ 
+ 	driver, err := gcsDriverConstructor(validRoot)
+ 	if err != nil {
+@@ -108,11 +116,12 @@ func TestCommitEmpty(t *testing.T) {
+ 	ctx := dcontext.Background()
+ 
+ 	writer, err := driver.Writer(ctx, filename, false)
++	// nolint:errcheck
+ 	defer driver.Delete(ctx, filename)
+ 	if err != nil {
+ 		t.Fatalf("driver.Writer: unexpected error: %v", err)
+ 	}
+-	err = writer.Commit()
++	err = writer.Commit(context.Background())
+ 	if err != nil {
+ 		t.Fatalf("writer.Commit: unexpected error: %v", err)
+ 	}
+@@ -135,15 +144,9 @@ func TestCommitEmpty(t *testing.T) {
+ // Test Committing a FileWriter after having written exactly
+ // defaultChunksize bytes.
+ func TestCommit(t *testing.T) {
+-	if skipGCS() != "" {
+-		t.Skip(skipGCS())
+-	}
++	skipCheck(t)
+ 
+-	validRoot, err := ioutil.TempDir("", "driver-")
+-	if err != nil {
+-		t.Fatalf("unexpected error creating temporary directory: %v", err)
+-	}
+-	defer os.Remove(validRoot)
++	validRoot := t.TempDir()
+ 
+ 	driver, err := gcsDriverConstructor(validRoot)
+ 	if err != nil {
+@@ -155,6 +158,7 @@ func TestCommit(t *testing.T) {
+ 
+ 	contents := make([]byte, defaultChunkSize)
+ 	writer, err := driver.Writer(ctx, filename, false)
++	// nolint:errcheck
+ 	defer driver.Delete(ctx, filename)
+ 	if err != nil {
+ 		t.Fatalf("driver.Writer: unexpected error: %v", err)
+@@ -163,7 +167,7 @@ func TestCommit(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatalf("writer.Write: unexpected error: %v", err)
+ 	}
+-	err = writer.Commit()
++	err = writer.Commit(context.Background())
+ 	if err != nil {
+ 		t.Fatalf("writer.Commit: unexpected error: %v", err)
+ 	}
+@@ -184,9 +188,7 @@ func TestCommit(t *testing.T) {
+ }
+ 
+ func TestRetry(t *testing.T) {
+-	if skipGCS() != "" {
+-		t.Skip(skipGCS())
+-	}
++	skipCheck(t)
+ 
+ 	assertError := func(expected string, observed error) {
+ 		observedMsg := "<nil>"
+@@ -221,15 +223,9 @@ func TestRetry(t *testing.T) {
+ }
+ 
+ func TestEmptyRootList(t *testing.T) {
+-	if skipGCS() != "" {
+-		t.Skip(skipGCS())
+-	}
++	skipCheck(t)
+ 
+-	validRoot, err := ioutil.TempDir("", "driver-")
+-	if err != nil {
+-		t.Fatalf("unexpected error creating temporary directory: %v", err)
+-	}
+-	defer os.Remove(validRoot)
++	validRoot := t.TempDir()
+ 
+ 	rootedDriver, err := gcsDriverConstructor(validRoot)
+ 	if err != nil {
+@@ -282,15 +278,9 @@ func TestEmptyRootList(t *testing.T) {
+ 
+ // TestMoveDirectory checks that moving a directory returns an error.
+ func TestMoveDirectory(t *testing.T) {
+-	if skipGCS() != "" {
+-		t.Skip(skipGCS())
+-	}
++	skipCheck(t)
+ 
+-	validRoot, err := ioutil.TempDir("", "driver-")
+-	if err != nil {
+-		t.Fatalf("unexpected error creating temporary directory: %v", err)
+-	}
+-	defer os.Remove(validRoot)
++	validRoot := t.TempDir()
+ 
+ 	driver, err := gcsDriverConstructor(validRoot)
+ 	if err != nil {
+@@ -313,6 +303,6 @@ func TestMoveDirectory(t *testing.T) {
+ 
+ 	err = driver.Move(ctx, "/parent/dir", "/parent/other")
+ 	if err == nil {
+-		t.Fatalf("Moving directory /parent/dir /parent/other should have return a non-nil error\n")
++		t.Fatal("Moving directory /parent/dir /parent/other should have return a non-nil error")
+ 	}
+ }
+diff --git a/vendor.conf b/vendor.conf
+deleted file mode 100644
+index 4316e785..00000000
+--- a/vendor.conf
++++ /dev/null
+@@ -1,54 +0,0 @@
+-github.com/Azure/azure-sdk-for-go 4650843026a7fdec254a8d9cf893693a254edd0b
+-github.com/Azure/go-autorest eaa7994b2278094c904d31993d26f56324db3052
+-github.com/sirupsen/logrus 3d4380f53a34dcdc95f0c1db702615992b38d9a4
+-github.com/aws/aws-sdk-go f831d5a0822a1ad72420ab18c6269bca1ddaf490
+-github.com/bshuster-repo/logrus-logstash-hook d2c0ecc1836d91814e15e23bb5dc309c3ef51f4a
+-github.com/beorn7/perks 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
+-github.com/bugsnag/bugsnag-go b1d153021fcd90ca3f080db36bec96dc690fb274
+-github.com/bugsnag/osext 0dd3f918b21bec95ace9dc86c7e70266cfc5c702
+-github.com/bugsnag/panicwrap e2c28503fcd0675329da73bf48b33404db873782
+-github.com/denverdino/aliyungo afedced274aa9a7fcdd47ac97018f0f8db4e5de2
+-github.com/dgrijalva/jwt-go 4bbdd8ac624fc7a9ef7aec841c43d99b5fe65a29 https://github.com/golang-jwt/jwt.git # v3.2.2
+-github.com/distribution/reference 49c28499d219290c3226822e9cfcd4ede6d75379 # v0.5.0
+-github.com/docker/go-metrics 399ea8c73916000c64c2c76e8da00ca82f8387ab
+-github.com/docker/libtrust fa567046d9b14f6aa788882a950d69651d230b21
+-github.com/gomodule/redigo a83ebbeea6928a0236f332458532b8e978d51f11
+-github.com/go-ini/ini 2ba15ac2dc9cdf88c110ec2dc0ced7fa45f5678c
+-github.com/golang/protobuf 8d92cf5fc15a4382f8964b08e1f42a75c0591aa3
+-github.com/gorilla/handlers 60c7bfde3e33c201519a200a4507a158cc03a17b
+-github.com/gorilla/mux 599cba5e7b6137d46ddf58fb1765f5d928e69604
+-github.com/inconshreveable/mousetrap 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
+-github.com/jmespath/go-jmespath bd40a432e4c76585ef6b72d3fd96fb9b6dc7b68d
+-github.com/marstr/guid 8bd9a64bf37eb297b492a4101fb28e80ac0b290f
+-github.com/satori/go.uuid f58768cc1a7a7e77a3bd49e98cdd21419399b6a3
+-github.com/matttproud/golang_protobuf_extensions c12348ce28de40eed0136aa2b644d0ee0650e56c
+-github.com/miekg/dns 271c58e0c14f552178ea321a545ff9af38930f39
+-github.com/mitchellh/mapstructure 482a9fd5fa83e8c4e7817413b80f3eb8feec03ef
+-github.com/ncw/swift a0320860b16212c2b59b4912bb6508cda1d7cee6
+-github.com/prometheus/client_golang c332b6f63c0658a65eca15c0e5247ded801cf564
+-github.com/prometheus/client_model 99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c
+-github.com/prometheus/common 89604d197083d4781071d3c65855d24ecfb0a563
+-github.com/prometheus/procfs cb4147076ac75738c9a7d279075a253c0cc5acbd
+-github.com/Shopify/logrus-bugsnag 577dee27f20dd8f1a529f82210094af593be12bd
+-github.com/spf13/cobra 312092086bed4968099259622145a0c9ae280064
+-github.com/spf13/pflag 5644820622454e71517561946e3d94b9f9db6842
+-github.com/xenolf/lego a9d8cec0e6563575e5868a005359ac97911b5985
+-github.com/yvasiyarov/go-metrics 57bccd1ccd43f94bb17fdd8bf3007059b802f85e
+-github.com/yvasiyarov/gorelic a9bba5b9ab508a086f9a12b8c51fab68478e2128
+-github.com/yvasiyarov/newrelic_platform_go b21fdbd4370f3717f3bbd2bf41c223bc273068e6
+-golang.org/x/crypto c10c31b5e94b6f7a0283272dc2bb27163dcea24b
+-golang.org/x/net b225e7ca6dde1ef5a5ae5ce922861bda011cfabd # v0.17.0
+-golang.org/x/text f488e191e67ed95a5b9b7b39024e5a5f5f1ffd02 # v0.13.0
+-golang.org/x/oauth2 045497edb6234273d67dbc25da3f2ddbc4c4cacf
+-golang.org/x/time a4bde12657593d5e90d0533a3e4fd95e635124cb
+-google.golang.org/api 9bf6e6e569ff057f75d9604a46c52928f17d2b54
+-google.golang.org/appengine 12d5545dc1cfa6047a286d5e853841b6471f4c19
+-google.golang.org/cloud 975617b05ea8a58727e6c1a06b6161ff4185a9f2
+-google.golang.org/grpc d3ddb4469d5a1b949fc7a7da7c1d6a0d1b6de994
+-gopkg.in/check.v1 64131543e7896d5bcc6bd5a76287eb75ea96c673
+-gopkg.in/square/go-jose.v1 40d457b439244b546f023d056628e5184136899b
+-gopkg.in/yaml.v2 v2.2.1
+-rsc.io/letsencrypt e770c10b0f1a64775ae91d240407ce00d1a5bdeb https://github.com/dmcgowan/letsencrypt.git
+-github.com/opencontainers/go-digest ea51bea511f75cfa3ef6098cc253c5c3609b037a # v1.0.0
+-github.com/opencontainers/image-spec 67d2d5658fe0476ab9bf414cec164077ebff3920 # v1.0.2
+-github.com/FZambia/sentinel f57c7b5fd3c67c6f12bf1a29d757af6e5add30b4
+-- 
+2.48.1
+
