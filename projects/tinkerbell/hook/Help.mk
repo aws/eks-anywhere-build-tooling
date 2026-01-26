@@ -19,26 +19,24 @@ _output/bin/hook/linux-arm64/hook-bootkit: ## Build `_output/bin/hook/linux-arm6
 _output/bin/hook/linux-arm64/hook-docker: ## Build `_output/bin/hook/linux-arm64/hook-docker`
 
 ##@ Image Targets
-local-images: ## Builds `hook-bootkit/images/amd64 hook-docker/images/amd64 hook-runc/images/amd64 hook-containerd/images/amd64 kernel/images/amd64 hook-dind/images/amd64 hook-embedded/images/amd64 hook-udev/images/amd64 hook-acpid/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `hook-bootkit/images/push hook-docker/images/push hook-runc/images/push hook-containerd/images/push kernel/images/push hook-dind/images/push hook-embedded/images/push hook-udev/images/push hook-acpid/images/push` to IMAGE_REPO
+local-images: ## Builds `hook-bootkit/images/amd64 hook-docker/images/amd64 hook-runc/images/amd64 hook-containerd/images/amd64 kernel/images/amd64 hook-mdev/images/amd64 hook-dind/images/amd64 hook-embedded/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `hook-bootkit/images/push hook-docker/images/push hook-runc/images/push hook-containerd/images/push kernel/images/push hook-mdev/images/push hook-dind/images/push hook-embedded/images/push` to IMAGE_REPO
 hook-bootkit/images/amd64: ## Builds/pushes `hook-bootkit/images/amd64`
 hook-docker/images/amd64: ## Builds/pushes `hook-docker/images/amd64`
 hook-runc/images/amd64: ## Builds/pushes `hook-runc/images/amd64`
 hook-containerd/images/amd64: ## Builds/pushes `hook-containerd/images/amd64`
 kernel/images/amd64: ## Builds/pushes `kernel/images/amd64`
+hook-mdev/images/amd64: ## Builds/pushes `hook-mdev/images/amd64`
 hook-dind/images/amd64: ## Builds/pushes `hook-dind/images/amd64`
 hook-embedded/images/amd64: ## Builds/pushes `hook-embedded/images/amd64`
-hook-udev/images/amd64: ## Builds/pushes `hook-udev/images/amd64`
-hook-acpid/images/amd64: ## Builds/pushes `hook-acpid/images/amd64`
 hook-bootkit/images/push: ## Builds/pushes `hook-bootkit/images/push`
 hook-docker/images/push: ## Builds/pushes `hook-docker/images/push`
 hook-runc/images/push: ## Builds/pushes `hook-runc/images/push`
 hook-containerd/images/push: ## Builds/pushes `hook-containerd/images/push`
 kernel/images/push: ## Builds/pushes `kernel/images/push`
+hook-mdev/images/push: ## Builds/pushes `hook-mdev/images/push`
 hook-dind/images/push: ## Builds/pushes `hook-dind/images/push`
 hook-embedded/images/push: ## Builds/pushes `hook-embedded/images/push`
-hook-udev/images/push: ## Builds/pushes `hook-udev/images/push`
-hook-acpid/images/push: ## Builds/pushes `hook-acpid/images/push`
 
 ##@ Fetch Binary Targets
 _output/dependencies/linux-amd64/eksa/containerd/containerd: ## Fetch `_output/dependencies/linux-amd64/eksa/containerd/containerd`
