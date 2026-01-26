@@ -1,7 +1,7 @@
-From f0887338b8c7e1fe51cd119db51f4ced7615c669 Mon Sep 17 00:00:00 2001
+From 4657712fc9c051a324032348bf812ad68b799edd Mon Sep 17 00:00:00 2001
 From: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 Date: Thu, 19 Sep 2024 16:04:19 -0700
-Subject: [PATCH 10/16] Remove containerd configuration for hosts.toml paths
+Subject: [PATCH 10/17] Remove containerd configuration for hosts.toml paths
 
 In EKS Anywhere, we're still using the older containerd config template (v2), so setting the
 config_path in the containerd config file causes errors like "invalid plugin config: `mirrors`
@@ -10,32 +10,33 @@ change that added the config path.
 
 Signed-off-by: Abhay Krishna Arunachalam <arnchlm@amazon.com>
 ---
- images/capi/ansible/roles/containerd/tasks/main.yml          | 5 -----
- .../roles/containerd/templates/etc/containerd/config.toml    | 2 --
- 2 files changed, 7 deletions(-)
+ images/capi/ansible/roles/containerd/tasks/main.yml         | 6 ------
+ .../roles/containerd/templates/etc/containerd/config.toml   | 2 --
+ 2 files changed, 8 deletions(-)
 
 diff --git a/images/capi/ansible/roles/containerd/tasks/main.yml b/images/capi/ansible/roles/containerd/tasks/main.yml
-index 873b13abf..48c137208 100644
+index cd0368f0b..f2894123f 100644
 --- a/images/capi/ansible/roles/containerd/tasks/main.yml
 +++ b/images/capi/ansible/roles/containerd/tasks/main.yml
-@@ -151,11 +151,6 @@
-     path: /etc/containerd
+@@ -169,12 +169,6 @@
      state: directory
+     mode: "0755"
  
 -- name: Creates containerd certificates directory
 -  ansible.builtin.file:
 -    path: /etc/containerd/certs.d
 -    state: directory
+-    mode: "0755"
 -
  - name: Copy in containerd config file {{ containerd_config_file }}
    vars:
      runtime_versions: "{{ containerd_wasm_shims_runtime_versions | from_json }}"
 diff --git a/images/capi/ansible/roles/containerd/templates/etc/containerd/config.toml b/images/capi/ansible/roles/containerd/templates/etc/containerd/config.toml
-index 0bae3b0d7..2066c4971 100644
+index 2625d6e58..cc31ee17e 100644
 --- a/images/capi/ansible/roles/containerd/templates/etc/containerd/config.toml
 +++ b/images/capi/ansible/roles/containerd/templates/etc/containerd/config.toml
-@@ -11,8 +11,6 @@ imports = ["/etc/containerd/conf.d/*.toml"]
- [plugins]
+@@ -47,8 +47,6 @@ imports = ["/etc/containerd/conf.d/*.toml"]
+ {% else %}
    [plugins."io.containerd.grpc.v1.cri"]
      sandbox_image = "{{ pause_image }}"
 -  [plugins."io.containerd.grpc.v1.cri".registry]
@@ -44,5 +45,5 @@ index 0bae3b0d7..2066c4971 100644
    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
      runtime_type = "io.containerd.runc.v2"
 -- 
-2.49.0
+2.45.2
 

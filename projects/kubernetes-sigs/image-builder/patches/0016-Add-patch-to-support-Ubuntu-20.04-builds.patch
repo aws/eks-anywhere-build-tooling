@@ -1,0 +1,394 @@
+From f7cf8b1950365f6cdc7b8bbb400120d4e9d7f82d Mon Sep 17 00:00:00 2001
+From: Shizhao Liu <lshizhao@amazon.com>
+Date: Fri, 23 Jan 2026 20:16:04 -0800
+Subject: [PATCH 16/17] Add patch to support Ubuntu 20.04 builds
+
+Support Ubuntu 20.04 build for Nutanix, Raw, OVA
+AMI and QEMU.
+
+Signed-off-by: Shizhao Liu <lshizhao@amazon.com>
+---
+ images/capi/Makefile                          | 33 ++++++++++++++++---
+ images/capi/packer/ami/ubuntu-2004.json       | 13 ++++++++
+ images/capi/packer/nutanix/ubuntu-2004.json   |  8 +++++
+ images/capi/packer/ova/ubuntu-2004-efi.json   | 20 +++++++++++
+ images/capi/packer/ova/ubuntu-2004.json       | 18 ++++++++++
+ .../packer/qemu/qemu-ubuntu-2004-efi.json     | 14 ++++++++
+ images/capi/packer/qemu/qemu-ubuntu-2004.json | 13 ++++++++
+ .../capi/packer/raw/raw-ubuntu-2004-efi.json  | 17 ++++++++++
+ images/capi/packer/raw/raw-ubuntu-2004.json   | 16 +++++++++
+ 9 files changed, 147 insertions(+), 5 deletions(-)
+ create mode 100644 images/capi/packer/ami/ubuntu-2004.json
+ create mode 100644 images/capi/packer/nutanix/ubuntu-2004.json
+ create mode 100644 images/capi/packer/ova/ubuntu-2004-efi.json
+ create mode 100644 images/capi/packer/ova/ubuntu-2004.json
+ create mode 100644 images/capi/packer/qemu/qemu-ubuntu-2004-efi.json
+ create mode 100644 images/capi/packer/qemu/qemu-ubuntu-2004.json
+ create mode 100644 images/capi/packer/raw/raw-ubuntu-2004-efi.json
+ create mode 100644 images/capi/packer/raw/raw-ubuntu-2004.json
+
+diff --git a/images/capi/Makefile b/images/capi/Makefile
+index 21b84b3cc..63c39a578 100644
+--- a/images/capi/Makefile
++++ b/images/capi/Makefile
+@@ -46,6 +46,7 @@ version: ## Display version of image-builder
+ 
+ GET_UBUNTU_DOTTED_SEMVER=$(strip \
+ 	$(eval _UBUNTU_SEMVER:=$1) \
++	$(eval _UBUNTU_SEMVER:=$(subst ubuntu-2004,ubuntu-20.04,$(_UBUNTU_SEMVER))) \
+ 	$(eval _UBUNTU_SEMVER:=$(subst ubuntu-2204,ubuntu-22.04,$(_UBUNTU_SEMVER))) \
+ 	$(eval _UBUNTU_SEMVER:=$(subst ubuntu-2404,ubuntu-24.04,$(_UBUNTU_SEMVER))) \
+ 	$(_UBUNTU_SEMVER) \
+@@ -341,7 +342,7 @@ FLATCAR_VERSIONS		:=	flatcar
+ PHOTON_VERSIONS			:=	photon-4 photon-5
+ RHEL_VERSIONS			:=	rhel-8 rhel-9 rhel-9-efi
+ ROCKYLINUX_VERSIONS		:=  rockylinux-8 rockylinux-9
+-UBUNTU_VERSIONS			:=	ubuntu-2204 ubuntu-2204-efi ubuntu-2404 ubuntu-2404-efi
++UBUNTU_VERSIONS			:=	ubuntu-2004 ubuntu-2004-efi ubuntu-2204 ubuntu-2204-efi ubuntu-2404 ubuntu-2404-efi
+ WINDOWS_VERSIONS		:=	windows-2019 windows-2019-efi windows-2022 windows-2022-efi
+ 
+ # Set Flatcar Container Linux channel and version if not supplied
+@@ -367,7 +368,7 @@ NODE_OVA_VSPHERE_BUILD_NAMES		:=	$(addprefix node-ova-vsphere-,$(PLATFORMS_AND_V
+ NODE_OVA_VSPHERE_BASE_BUILD_NAMES		:=	$(addprefix node-ova-vsphere-base-,$(PLATFORMS_AND_VERSIONS))
+ NODE_OVA_VSPHERE_CLONE_BUILD_NAMES		:=	$(addprefix node-ova-vsphere-clone-,$(PLATFORMS_AND_VERSIONS))
+ 
+-AMI_BUILD_NAMES			   ?= ami-ubuntu-2204 ami-ubuntu-2404 ami-amazon-2 ami-amazon-2023 ami-flatcar ami-flatcar-arm64 ami-windows-2019 ami-rockylinux-8 ami-rhel-8
++AMI_BUILD_NAMES			   ?= ami-ubuntu-2004 ami-ubuntu-2204 ami-ubuntu-2404 ami-amazon-2 ami-amazon-2023 ami-flatcar ami-flatcar-arm64 ami-windows-2019 ami-rockylinux-8 ami-rhel-8
+ HUAWEICLOUD_BUILD_NAMES ?= huaweicloud-ubuntu-2204
+ GCE_BUILD_NAMES			   ?= gce-ubuntu-2204 gce-ubuntu-2404 gce-rhel-8
+ 
+@@ -389,15 +390,15 @@ OPENSTACK_BUILD_NAMES		?=	openstack-ubuntu-2204 openstack-ubuntu-2404 openstack-
+ 
+ OSC_BUILD_NAMES 			?=	osc-ubuntu-2204 osc-ubuntu-2404
+ 
+-QEMU_BUILD_NAMES			?=	qemu-ubuntu-2204 qemu-ubuntu-2204-cloudimg qemu-ubuntu-2404 qemu-ubuntu-2404-efi qemu-ubuntu-2204-efi qemu-centos-9 qemu-rhel-8 qemu-rhel-9 qemu-rockylinux-8 qemu-rockylinux-8-cloudimg qemu-rockylinux-9 qemu-rockylinux-9-cloudimg qemu-flatcar
++QEMU_BUILD_NAMES			?=	qemu-ubuntu-2004 qemu-ubuntu-2204 qemu-ubuntu-2204-cloudimg qemu-ubuntu-2404 qemu-ubuntu-2004-efi qemu-ubuntu-2404-efi qemu-ubuntu-2204-efi qemu-centos-9 qemu-rhel-8 qemu-rhel-9 qemu-rockylinux-8 qemu-rockylinux-8-cloudimg qemu-rockylinux-9 qemu-rockylinux-9-cloudimg qemu-flatcar
+ 
+ QEMU_KUBEVIRT_BUILD_NAMES	:= $(addprefix kubevirt-,$(QEMU_BUILD_NAMES))
+ 
+-RAW_BUILD_NAMES				?=	raw-ubuntu-2204 raw-ubuntu-2204-efi raw-ubuntu-2404 raw-ubuntu-2404-efi raw-flatcar raw-rhel-8 raw-rhel-9 raw-rhel-9-efi
++RAW_BUILD_NAMES				?=	raw-ubuntu-2004 raw-ubuntu-2204 raw-ubuntu-2004-efi raw-ubuntu-2204-efi raw-ubuntu-2404 raw-ubuntu-2404-efi raw-flatcar raw-rhel-8 raw-rhel-9 raw-rhel-9-efi
+ 
+ POWERVS_BUILD_NAMES         ?= powervs-centos-8 powervs-centos-9
+ 
+-NUTANIX_BUILD_NAMES ?= nutanix-ubuntu-2204 nutanix-ubuntu-2404 nutanix-rhel-8 nutanix-rhel-9 nutanix-rockylinux-8 nutanix-rockylinux-9 nutanix-flatcar nutanix-windows-2022
++NUTANIX_BUILD_NAMES ?= nutanix-ubuntu-2004 nutanix-ubuntu-2204 nutanix-ubuntu-2404 nutanix-rhel-8 nutanix-rhel-9 nutanix-rockylinux-8 nutanix-rockylinux-9 nutanix-flatcar nutanix-windows-2022
+ 
+ HCLOUD_BUILD_NAMES ?= hcloud-ubuntu-2204 hcloud-ubuntu-2404 hcloud-rockylinux-8 hcloud-rockylinux-9 hcloud-flatcar hcloud-flatcar-arm64
+ 
+@@ -696,6 +697,7 @@ $(RAW_CLEAN_TARGETS):
+ ##@ Builds
+ build-ami-amazon-2: ## Builds Amazon-2 Linux AMI
+ build-ami-amazon-2023: ## Builds Amazon-2023 Linux AMI
++build-ami-ubuntu-2004: ## Builds Ubuntu 20.04 AMI
+ build-ami-ubuntu-2204: ## Builds Ubuntu 22.04 AMI
+ build-ami-ubuntu-2404: ## Builds Ubuntu 24.04 AMI
+ build-ami-rockylinux-8: ## Builds RockyLinux 8 AMI
+@@ -750,6 +752,7 @@ build-node-ova-local-rhel-8: ## Builds RHEL 8 Node OVA w local hypervisor
+ build-node-ova-local-rhel-9: ## Builds RHEL 9 Node OVA w local hypervisor
+ build-node-ova-local-rockylinux-8: ## Builds RockyLinux 8 Node OVA w local hypervisor
+ build-node-ova-local-rockylinux-9: ## Builds RockyLinux 9 Node OVA w local hypervisor
++build-node-ova-local-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA w local hypervisor
+ build-node-ova-local-windows-2019: ## Builds for Windows Server 2019 Node OVA w local hypervisor
+ build-node-ova-local-all: $(NODE_OVA_LOCAL_BUILD_TARGETS) ## Builds all Node OVAs w local hypervisor
+ 
+@@ -761,6 +764,8 @@ build-node-ova-vsphere-rhel-9: ## Builds RHEL 9 Node OVA and template on vSphere
+ build-node-ova-vsphere-rhel-9-efi: ## Builds RHEL 9 Node OVA and template on vSphere that EFI boots
+ build-node-ova-vsphere-rockylinux-8: ## Builds RockyLinux 8 Node OVA and template on vSphere
+ build-node-ova-vsphere-rockylinux-9: ## Builds RockyLinux 9 Node OVA and template on vSphere
++build-node-ova-vsphere-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA and template on vSphere
++build-node-ova-vsphere-ubuntu-2004-efi: ## Builds Ubuntu 20.04 Node OVA and template on vSphere that EFI boots
+ build-node-ova-vsphere-ubuntu-2204: ## Builds Ubuntu 22.04 Node OVA and template on vSphere
+ build-node-ova-vsphere-ubuntu-2204-efi: ## Builds Ubuntu 22.04 Node OVA and template on vSphere that EFI boots
+ build-node-ova-vsphere-ubuntu-2404: ## Builds Ubuntu 24.04 Node OVA and template on vSphere
+@@ -778,6 +783,7 @@ build-node-ova-vsphere-clone-rhel-9: ## Builds RHEL 9 Node OVA and template on v
+ build-node-ova-vsphere-clone-rhel-9-efi: ## Builds RHEL 9 Node OVA and template on vSphere that EFI boots
+ build-node-ova-vsphere-clone-rockylinux-8: ## Builds RockyLinux 8 Node OVA and template on vSphere
+ build-node-ova-vsphere-clone-rockylinux-9: ## Builds RockyLinux 9 Node OVA and template on vSphere
++build-node-ova-vsphere-clone-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA and template on vSphere
+ build-node-ova-vsphere-clone-ubuntu-2204: ## Builds Ubuntu 22.04 Node OVA and template on vSphere
+ build-node-ova-vsphere-clone-ubuntu-2204-efi: ## ## Builds Ubuntu 22.04 Node OVA and template on vSphere that EFI boots
+ build-node-ova-vsphere-clone-ubuntu-2404: ## Builds Ubuntu 24.04 Node OVA and template on vSphere
+@@ -791,6 +797,7 @@ build-node-ova-vsphere-base-rhel-9: ## Builds base RHEL 9 Node OVA and template
+ build-node-ova-vsphere-base-rhel-9-efi: ## Builds base RHEL 9 Node OVA and template on vSphere that EFI boots
+ build-node-ova-vsphere-base-rockylinux-8: ## Builds base RockyLinux 8 Node OVA and template on vSphere
+ build-node-ova-vsphere-base-rockylinux-9: ## Builds base RockyLinux 9 Node OVA and template on vSphere
++build-node-ova-vsphere-base-ubuntu-2004: ## Builds base Ubuntu 20.04 Node OVA and template on vSphere
+ build-node-ova-vsphere-base-ubuntu-2204: ## Builds base Ubuntu 22.04 Node OVA and template on vSphere
+ build-node-ova-vsphere-base-ubuntu-2204-efi: ## Builds Ubuntu 22.04 Node OVA and template on vSphere that EFI boots
+ build-node-ova-vsphere-base-ubuntu-2404: ## Builds base Ubuntu 24.04 Node OVA and template on vSphere
+@@ -803,6 +810,7 @@ build-node-ova-local-vmx-rhel-8: ## Builds RHEL 8 Node OVA from VMX file w local
+ build-node-ova-local-vmx-rhel-9: ## Builds RHEL 9 Node OVA from VMX file w local hypervisor
+ build-node-ova-local-vmx-rockylinux-8: ## Builds RockyLinux 8 Node OVA from VMX file w local hypervisor
+ build-node-ova-local-vmx-rockylinux-9: ## Builds RockyLinux 9 Node OVA from VMX file w local hypervisor
++build-node-ova-local-vmx-ubuntu-2004: ## Builds Ubuntu 20.04 Node OVA from VMX file w local hypervisor
+ 
+ build-node-ova-local-base-photon-4: ## Builds Photon 4 Base Node OVA w local hypervisor
+ build-node-ova-local-base-photon-5: ## Builds Photon 5 Base Node OVA w local hypervisor
+@@ -810,6 +818,7 @@ build-node-ova-local-base-rhel-8: ## Builds RHEL 8 Base Node OVA w local hypervi
+ build-node-ova-local-base-rhel-9: ## Builds RHEL 9 Base Node OVA w local hypervisor
+ build-node-ova-local-base-rockylinux-8: ## Builds RockyLinux 8 Base Node OVA w local hypervisor
+ build-node-ova-local-base-rockylinux-9: ## Builds RockyLinux 9 Base Node OVA w local hypervisor
++build-node-ova-local-base-ubuntu-2004: ## Builds Ubuntu 20.04 Base Node OVA w local hypervisor
+ 
+ build-openstack-ubuntu-2204: ## Builds Ubuntu 22.04 OpenStack image
+ build-openstack-ubuntu-2404: ## Builds Ubuntu 24.04 OpenStack image
+@@ -818,6 +827,8 @@ build-openstack-flatcar: ## Builds Flatcar OpenStack image
+ build-openstack-all: $(OPENSTACK_BUILD_TARGETS)
+ 
+ build-qemu-flatcar: ## Builds Flatcar QEMU image
++build-qemu-ubuntu-2004: ## Builds Ubuntu 20.04 QEMU image
++build-qemu-ubuntu-2004-efi: ## Builds Ubuntu 20.04 QEMU image that EFI boots
+ build-qemu-ubuntu-2204: ## Builds Ubuntu 22.04 QEMU image
+ build-qemu-ubuntu-2204-cloudimg: ## Builds Ubuntu 22.04 QEMU image using cloud image
+ build-qemu-ubuntu-2204-efi: ## Builds Ubuntu 22.04 QEMU image that EFI boots
+@@ -836,6 +847,8 @@ build-maas-ubuntu-2204-efi: ## Builds Ubuntu 22.04 MaaS image that EFI boots
+ build-maas-ubuntu-2404-efi: ## Builds Ubuntu 24.04 MaaS image that EFI boots
+ 
+ build-raw-flatcar: ## Builds Flatcar RAW image
++build-raw-ubuntu-2004: ## Builds Ubuntu 20.04 RAW image
++build-raw-ubuntu-2004-efi: ## Builds Ubuntu 20.04 RAW image that EFI boots
+ build-raw-ubuntu-2204: ## Builds Ubuntu 22.04 RAW image
+ build-raw-ubuntu-2204-efi: ## Builds Ubuntu 22.04 RAW image that EFI boots
+ build-raw-ubuntu-2404: ## Builds Ubuntu 24.04 RAW image
+@@ -856,6 +869,7 @@ build-osc-ubuntu-2204: ## Builds Ubuntu 22.04 Outscale Snapshot
+ build-osc-ubuntu-2404: ## Builds Ubuntu 24.04 Outscale Snapshot
+ build-osc-all: $(OSC_BUILD_TARGETS) ## Builds all Outscale Snapshot
+ 
++build-nutanix-ubuntu-2004: ## Builds the Nutanix ubuntu-2004 image
+ build-nutanix-ubuntu-2204: ## Builds the Nutanix ubuntu-2204 image
+ build-nutanix-ubuntu-2404: ## Builds the Nutanix ubuntu-2404 image
+ build-nutanix-rhel-8: ## Builds the Nutanix RedHat Enterprise Linux 8 image
+@@ -898,6 +912,7 @@ validate-ami-rockylinux-8: ## Validates RockyLinux 8 AMI Packer config
+ validate-ami-rhel-8: ## Validates RHEL-8 AMI Packer config
+ validate-ami-flatcar: ## Validates Flatcar AMI Packer config
+ validate-ami-flatcar-arm64: ## Validates Flatcar arm64 AMI Packer config
++validate-ami-ubuntu-2004: ## Validates Ubuntu 20.04 AMI Packer config
+ validate-ami-ubuntu-2204: ## Validates Ubuntu 22.04 AMI Packer config
+ validate-ami-ubuntu-2404: ## Validates Ubuntu 22.04 AMI Packer config
+ validate-ami-windows-2019: ## Validates Windows Server 2019 AMI Packer config
+@@ -948,6 +963,7 @@ validate-node-ova-local-rhel-8: ## Validates RHEL 8 Node OVA Packer config w loc
+ validate-node-ova-local-rhel-9: ## Validates RHEL 9 Node OVA Packer config w local hypervisor
+ validate-node-ova-local-rockylinux-8: ## Validates RockyLinux 8 Node OVA Packer config w local hypervisor
+ validate-node-ova-local-rockylinux-9: ## Validates RockyLinux 9 Node OVA Packer config w local hypervisor
++validate-node-ova-local-ubuntu-2004: ## Validates Ubuntu 20.04 Node OVA Packer config w local hypervisor
+ validate-node-ova-local-ubuntu-2204: ## Validates Ubuntu 22.04 Node OVA Packer config w local hypervisor
+ validate-node-ova-local-ubuntu-2404: ## Validates Ubuntu 24.04 Node OVA Packer config w local hypervisor
+ validate-node-ova-local-windows-2019: ## Validates Windows Server 2019 Node OVA Packer config w local hypervisor
+@@ -960,6 +976,7 @@ validate-node-ova-local-vmx-rhel-8: ## Validates RHEL 8 Node OVA from VMX file w
+ validate-node-ova-local-vmx-rhel-9: ## Validates RHEL 9 Node OVA from VMX file w local hypervisor
+ validate-node-ova-local-vmx-rockylinux-8: ## Validates RockyLinux 8 Node OVA from VMX file w local hypervisor
+ validate-node-ova-local-vmx-rockylinux-9: ## Validates RockyLinux 9 Node OVA from VMX file w local hypervisor
++validate-node-ova-local-vmx-ubuntu-2004: ## Validates Ubuntu 20.04 Node OVA from VMX file w local hypervisor
+ validate-node-ova-local-vmx-ubuntu-2204: ## Validates Ubuntu 22.04 Node OVA from VMX file w local hypervisor
+ validate-node-ova-local-vmx-ubuntu-2404: ## Validates Ubuntu 24.04 Node OVA from VMX file w local hypervisor
+ 
+@@ -969,10 +986,13 @@ validate-node-ova-local-base-rhel-8: ## Validates RHEL 8 Base Node OVA w local h
+ validate-node-ova-local-base-rhel-9: ## Validates RHEL 9 Base Node OVA w local hypervisor
+ validate-node-ova-local-base-rockylinux-8: ## Validates RockyLinux 8 Base Node OVA w local hypervisor
+ validate-node-ova-local-base-rockylinux-9: ## Validates RockyLinux 9 Base Node OVA w local hypervisor
++validate-node-ova-local-base-ubuntu-2004: ## Validates Ubuntu 20.04 Base Node OVA w local hypervisor
+ validate-node-ova-local-base-ubuntu-2204: ## Validates Ubuntu 22.04 Base Node OVA w local hypervisor
+ validate-node-ova-local-base-ubuntu-2404: ## Validates Ubuntu 24.04 Base Node OVA w local hypervisor
+ 
+ validate-qemu-flatcar: ## Validates Flatcar QEMU image packer config
++validate-qemu-ubuntu-2004: ## Validates Ubuntu 20.04 QEMU image packer config
++validate-qemu-ubuntu-2004-efi: ## Validates Ubuntu 20.04 QEMU EFI image packer config
+ validate-qemu-ubuntu-2204: ## Validates Ubuntu 22.04 QEMU image packer config
+ validate-qemu-ubuntu-2204-cloudimg: ## Validates Ubuntu 22.04 QEMU image packer config using cloud image
+ validate-qemu-ubuntu-2204-efi: ## Validates Ubuntu 22.04 QEMU EFI image packer config
+@@ -987,6 +1007,8 @@ validate-qemu-rockylinux-9-cloudimg: ## Validates Rocky Linux 9 QEMU image packe
+ validate-qemu-all: $(QEMU_VALIDATE_TARGETS) ## Validates all Qemu Packer config
+ 
+ validate-raw-flatcar: ## Validates Flatcar RAW image packer config
++validate-raw-ubuntu-2004: ## Validates Ubuntu 20.04 RAW image packer config
++validate-raw-ubuntu-2004-efi: ## Validates Ubuntu 20.04 RAW EFI image packer config
+ validate-raw-ubuntu-2204: ## Validates Ubuntu 22.04 RAW image packer config
+ validate-raw-ubuntu-2204-efi: ## Validates Ubuntu 22.04 RAW EFI image packer config
+ validate-raw-ubuntu-2404: ## Validates Ubuntu 24.04 RAW image packer config
+@@ -1009,6 +1031,7 @@ validate-powervs-centos-8: ## Validates the PowerVS CentOS 8 image packer config
+ validate-powervs-centos-9: ## Validates the PowerVS CentOS 9 image packer config
+ validate-powervs-all: $(POWERVS_VALIDATE_TARGETS) ## Validates all PowerVS Packer config
+ 
++validate-nutanix-ubuntu-2004: ## Validates Ubuntu 20.04 Nutanix Packer config
+ validate-nutanix-ubuntu-2204: ## Validates Ubuntu 22.04 Nutanix Packer config
+ validate-nutanix-ubuntu-2404: ## Validates Ubuntu 24.04 Nutanix Packer config
+ validate-nutanix-rhel-8: ## Validates RedHat Enterprise Linux 8 Nutanix Packer config
+diff --git a/images/capi/packer/ami/ubuntu-2004.json b/images/capi/packer/ami/ubuntu-2004.json
+new file mode 100644
+index 000000000..adfdc0422
+--- /dev/null
++++ b/images/capi/packer/ami/ubuntu-2004.json
+@@ -0,0 +1,13 @@
++{
++  "ami_filter_arch": "x86_64",
++  "ami_filter_name": "ubuntu/images/*ubuntu-focal-20.04-amd64-server-*",
++  "ami_filter_owners": "099720109477",
++  "arch": "amd64",
++  "build_name": "ubuntu-20.04",
++  "distribution": "Ubuntu",
++  "distribution_release": "focal",
++  "distribution_version": "20.04",
++  "root_device_name": "/dev/sda1",
++  "source_ami": "",
++  "ssh_username": "ubuntu"
++}
+\ No newline at end of file
+diff --git a/images/capi/packer/nutanix/ubuntu-2004.json b/images/capi/packer/nutanix/ubuntu-2004.json
+new file mode 100644
+index 000000000..ac644fe1d
+--- /dev/null
++++ b/images/capi/packer/nutanix/ubuntu-2004.json
+@@ -0,0 +1,8 @@
++{
++  "build_name": "ubuntu-2004",
++  "distro_name": "ubuntu",
++  "guest_os_type": "Linux",
++  "image_url": "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img",
++  "shutdown_command": "shutdown -P now",
++  "user_data": "I2Nsb3VkLWNvbmZpZwp1c2VyczoKICAtIG5hbWU6IGJ1aWxkZXIKICAgIHN1ZG86IFsnQUxMPShBTEwpIE5PUEFTU1dEOkFMTCddCiAgICBzaGVsbDogL2Jpbi9iYXNoCmNocGFzc3dkOgogIGxpc3Q6IHwKICAgIGJ1aWxkZXI6YnVpbGRlcgogIGV4cGlyZTogRmFsc2UKc3NoX3B3YXV0aDogVHJ1ZQo="
++}
+\ No newline at end of file
+diff --git a/images/capi/packer/ova/ubuntu-2004-efi.json b/images/capi/packer/ova/ubuntu-2004-efi.json
+new file mode 100644
+index 000000000..ca58805c9
+--- /dev/null
++++ b/images/capi/packer/ova/ubuntu-2004-efi.json
+@@ -0,0 +1,20 @@
++{
++  "boot_command_prefix": "<esc><wait><esc><wait><enter><wait>linux /install/vmlinuz auto console-setup/ask_detect=false console-setup/layoutcode=us console-setup/modelcode=pc105 debconf/frontend=noninteractive debian-installer=en_US fb=false kbd-chooser/method=us keyboard-configuration/layout=USA keyboard-configuration/variant=USA locale=en_US netcfg/get_domain=local netcfg/get_hostname=localhost ipv6.disable={{ user `boot_disable_ipv6` }} preseed/file=",
++  "boot_command_suffix": "/20.04/preseed-efi.cfg -- <wait><enter>initrd /install/initrd.gz<enter>boot<enter><wait>",
++  "boot_disable_ipv6": "0",
++  "boot_media_path": "/media/HTTP",
++  "build_name": "ubuntu-2004-efi",
++  "cdrom_type": "sata",
++  "distro_arch": "amd64",
++  "distro_name": "ubuntu",
++  "distro_version": "20.04",
++  "firmware": "efi",
++  "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
++  "guest_os_type": "ubuntu-64",
++  "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
++  "iso_checksum_type": "sha256",
++  "iso_url": "http://cdimage.ubuntu.com/ubuntu-legacy-server/releases/20.04/release/ubuntu-20.04.1-legacy-server-amd64.iso",
++  "os_display_name": "Ubuntu 20.04",
++  "shutdown_command": "shutdown -P now",
++  "vsphere_guest_os_type": "ubuntu64Guest"
++}
+\ No newline at end of file
+diff --git a/images/capi/packer/ova/ubuntu-2004.json b/images/capi/packer/ova/ubuntu-2004.json
+new file mode 100644
+index 000000000..4db7dab95
+--- /dev/null
++++ b/images/capi/packer/ova/ubuntu-2004.json
+@@ -0,0 +1,18 @@
++{
++  "boot_command_prefix": "<esc><wait><esc><wait><enter><wait>/install/vmlinuz auto console-setup/ask_detect=false console-setup/layoutcode=us console-setup/modelcode=pc105 debconf/frontend=noninteractive debian-installer=en_US fb=false initrd=/install/initrd.gz kbd-chooser/method=us keyboard-configuration/layout=USA keyboard-configuration/variant=USA locale=en_US netcfg/get_domain=local netcfg/get_hostname=localhost ipv6.disable={{ user `boot_disable_ipv6` }} grub-installer/bootdev=/dev/sda preseed/file=",
++  "boot_command_suffix": "/20.04/preseed.cfg -- <wait><enter><wait>",
++  "boot_disable_ipv6": "0",
++  "boot_media_path": "/media/HTTP",
++  "build_name": "ubuntu-2004",
++  "distro_arch": "amd64",
++  "distro_name": "ubuntu",
++  "distro_version": "20.04",
++  "floppy_dirs": "./packer/ova/linux/{{user `distro_name`}}/http/",
++  "guest_os_type": "ubuntu-64",
++  "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
++  "iso_checksum_type": "sha256",
++  "iso_url": "http://cdimage.ubuntu.com/ubuntu-legacy-server/releases/20.04/release/ubuntu-20.04.1-legacy-server-amd64.iso",
++  "os_display_name": "Ubuntu 20.04",
++  "shutdown_command": "shutdown -P now",
++  "vsphere_guest_os_type": "ubuntu64Guest"
++}
+\ No newline at end of file
+diff --git a/images/capi/packer/qemu/qemu-ubuntu-2004-efi.json b/images/capi/packer/qemu/qemu-ubuntu-2004-efi.json
+new file mode 100644
+index 000000000..fd8c46add
+--- /dev/null
++++ b/images/capi/packer/qemu/qemu-ubuntu-2004-efi.json
+@@ -0,0 +1,14 @@
++{
++  "boot_command_prefix": "<esc><wait><esc><wait><enter><wait>linux /install/vmlinuz auto console-setup/ask_detect=false console-setup/layoutcode=us console-setup/modelcode=pc105 debconf/frontend=noninteractive debian-installer=en_US fb=false kbd-chooser/method=us keyboard-configuration/layout=USA keyboard-configuration/variant=USA locale=en_US netcfg/get_domain=local netcfg/get_hostname=localhost preseed/url=",
++  "boot_command_suffix": "/20.04/preseed-efi.cfg -- <wait><enter>initrd /install/initrd.gz<enter>boot<enter><wait>",
++  "build_name": "ubuntu-2004",
++  "distribution_version": "2004",
++  "distro_name": "ubuntu",
++  "firmware": "OVMF.fd",
++  "guest_os_type": "ubuntu-64",
++  "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
++  "iso_checksum_type": "sha256",
++  "iso_url": "http://cdimage.ubuntu.com/ubuntu-legacy-server/releases/20.04/release/ubuntu-20.04.1-legacy-server-amd64.iso",
++  "os_display_name": "Ubuntu 20.04",
++  "shutdown_command": "shutdown -P now"
++}
+\ No newline at end of file
+diff --git a/images/capi/packer/qemu/qemu-ubuntu-2004.json b/images/capi/packer/qemu/qemu-ubuntu-2004.json
+new file mode 100644
+index 000000000..5b6aaa912
+--- /dev/null
++++ b/images/capi/packer/qemu/qemu-ubuntu-2004.json
+@@ -0,0 +1,13 @@
++{
++  "boot_command_prefix": "<esc><wait><esc><wait><enter><wait>/install/vmlinuz auto console-setup/ask_detect=false console-setup/layoutcode=us console-setup/modelcode=pc105 debconf/frontend=noninteractive debian-installer=en_US fb=false initrd=/install/initrd.gz kbd-chooser/method=us keyboard-configuration/layout=USA keyboard-configuration/variant=USA locale=en_US netcfg/get_domain=local netcfg/get_hostname=localhost grub-installer/bootdev=/dev/sda preseed/url=",
++  "boot_command_suffix": "/20.04/preseed.cfg -- <wait><enter><wait>",
++  "build_name": "ubuntu-2004",
++  "distribution_version": "2004",
++  "distro_name": "ubuntu",
++  "guest_os_type": "ubuntu-64",
++  "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
++  "iso_checksum_type": "sha256",
++  "iso_url": "http://cdimage.ubuntu.com/ubuntu-legacy-server/releases/20.04/release/ubuntu-20.04.1-legacy-server-amd64.iso",
++  "os_display_name": "Ubuntu 20.04",
++  "shutdown_command": "shutdown -P now"
++}
+\ No newline at end of file
+diff --git a/images/capi/packer/raw/raw-ubuntu-2004-efi.json b/images/capi/packer/raw/raw-ubuntu-2004-efi.json
+new file mode 100644
+index 000000000..dd157a408
+--- /dev/null
++++ b/images/capi/packer/raw/raw-ubuntu-2004-efi.json
+@@ -0,0 +1,17 @@
++{
++  "boot_command_prefix": "<esc><wait><esc><wait><enter><wait>linux /install/vmlinuz auto console-setup/ask_detect=false console-setup/layoutcode=us console-setup/modelcode=pc105 debconf/frontend=noninteractive debian-installer=en_US fb=false kbd-chooser/method=us keyboard-configuration/layout=USA keyboard-configuration/variant=USA locale=en_US netcfg/get_domain=local netcfg/get_hostname=localhost preseed/url=",
++  "boot_command_suffix": "/20.04/preseed-efi.cfg -- <wait><enter>initrd /install/initrd.gz<enter>boot<enter><wait>",
++  "build_name": "ubuntu-2004",
++  "build_target": "raw",
++  "distro_arch": "amd64",
++  "distro_name": "ubuntu",
++  "distro_version": "20.04",
++  "distro_version_slug": "2004",
++  "firmware": "OVMF.fd",
++  "guest_os_type": "ubuntu-64",
++  "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
++  "iso_checksum_type": "sha256",
++  "iso_url": "http://cdimage.ubuntu.com/ubuntu-legacy-server/releases/20.04/release/ubuntu-20.04.1-legacy-server-amd64.iso",
++  "os_display_name": "Ubuntu 20.04",
++  "shutdown_command": "shutdown -P now"
++}
+\ No newline at end of file
+diff --git a/images/capi/packer/raw/raw-ubuntu-2004.json b/images/capi/packer/raw/raw-ubuntu-2004.json
+new file mode 100644
+index 000000000..6e4516fb5
+--- /dev/null
++++ b/images/capi/packer/raw/raw-ubuntu-2004.json
+@@ -0,0 +1,16 @@
++{
++  "boot_command_prefix": "<esc><wait><esc><wait><enter><wait>/install/vmlinuz auto console-setup/ask_detect=false console-setup/layoutcode=us console-setup/modelcode=pc105 debconf/frontend=noninteractive debian-installer=en_US fb=false initrd=/install/initrd.gz kbd-chooser/method=us keyboard-configuration/layout=USA keyboard-configuration/variant=USA locale=en_US netcfg/get_domain=local netcfg/get_hostname=localhost grub-installer/bootdev=/dev/sda preseed/url=",
++  "boot_command_suffix": "/20.04/preseed.cfg -- <wait><enter><wait>",
++  "build_name": "ubuntu-2004",
++  "build_target": "raw",
++  "distro_arch": "amd64",
++  "distro_name": "ubuntu",
++  "distro_version": "20.04",
++  "distro_version_slug": "2004",
++  "guest_os_type": "ubuntu-64",
++  "iso_checksum": "f11bda2f2caed8f420802b59f382c25160b114ccc665dbac9c5046e7fceaced2",
++  "iso_checksum_type": "sha256",
++  "iso_url": "http://cdimage.ubuntu.com/ubuntu-legacy-server/releases/20.04/release/ubuntu-20.04.1-legacy-server-amd64.iso",
++  "os_display_name": "Ubuntu 20.04",
++  "shutdown_command": "shutdown -P now"
++}
+\ No newline at end of file
+-- 
+2.45.2
+

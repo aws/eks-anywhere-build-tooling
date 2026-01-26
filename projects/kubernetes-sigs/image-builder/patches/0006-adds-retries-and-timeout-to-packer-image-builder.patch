@@ -1,7 +1,7 @@
-From cfbe0b2dbc1e0cfcf79f780165898d6f99637aee Mon Sep 17 00:00:00 2001
+From 7203a01a5cf723f3c2dcb0974d61d7be5d7af262 Mon Sep 17 00:00:00 2001
 From: Shizhao Liu <lshizhao@amazon.com>
 Date: Wed, 5 Nov 2025 14:02:23 -0800
-Subject: [PATCH 06/16] adds retries and timeout to packer image-builder
+Subject: [PATCH 06/17] adds retries and timeout to packer image-builder
 
 Add retries and timeouts to ansible tasks, also allow user specify
 ssh_timeout and ssh_handshake_attempts through user input.
@@ -17,7 +17,7 @@ Signed-off-by: Shizhao Liu <lshizhao@amazon.com>
  6 files changed, 30 insertions(+), 11 deletions(-)
 
 diff --git a/images/capi/packer/ami/packer.json b/images/capi/packer/ami/packer.json
-index ba9a9000e..e502b4449 100644
+index 6461762a2..18b3582a0 100644
 --- a/images/capi/packer/ami/packer.json
 +++ b/images/capi/packer/ami/packer.json
 @@ -109,7 +109,9 @@
@@ -30,7 +30,7 @@ index ba9a9000e..e502b4449 100644
        "type": "ansible"
      },
      {
-@@ -222,4 +224,4 @@
+@@ -223,4 +225,4 @@
      "volume_type": "gp3",
      "vpc_id": ""
    }
@@ -38,18 +38,18 @@ index ba9a9000e..e502b4449 100644
 \ No newline at end of file
 +}
 diff --git a/images/capi/packer/config/ansible-args.json b/images/capi/packer/config/ansible-args.json
-index b5b5a0112..add66aef5 100644
+index 461e37bac..148046c19 100644
 --- a/images/capi/packer/config/ansible-args.json
 +++ b/images/capi/packer/config/ansible-args.json
 @@ -1,5 +1,5 @@
  {
    "ansible_common_ssh_args": "-o IdentitiesOnly=yes",
--  "ansible_common_vars": "containerd_url={{user `containerd_url`}} containerd_sha256={{user `containerd_sha256`}} pause_image={{user `pause_image`}} containerd_additional_settings={{user `containerd_additional_settings`}} containerd_cri_socket={{user `containerd_cri_socket`}} containerd_version={{user `containerd_version`}} containerd_wasm_shims_url={{user `containerd_wasm_shims_url`}} containerd_wasm_shims_version={{user `containerd_wasm_shims_version`}} containerd_wasm_shims_sha256={{user `containerd_wasm_shims_sha256`}} containerd_wasm_shims_runtimes=\"{{user `containerd_wasm_shims_runtimes`}}\" containerd_wasm_shims_runtime_versions=\"{{user `containerd_wasm_shims_runtime_versions`}}\" crictl_url={{user `crictl_url`}} crictl_sha256={{user `crictl_sha256`}} crictl_source_type={{user `crictl_source_type`}} custom_role_names=\"{{user `custom_role_names`}}\" firstboot_custom_roles_pre=\"{{user `firstboot_custom_roles_pre`}}\" firstboot_custom_roles_post=\"{{user `firstboot_custom_roles_post`}}\" node_custom_roles_pre=\"{{user `node_custom_roles_pre`}}\" node_custom_roles_post=\"{{user `node_custom_roles_post`}}\" node_custom_roles_post_sysprep=\"{{user `node_custom_roles_post_sysprep`}}\" disable_public_repos={{user `disable_public_repos`}} extra_debs=\"{{user `extra_debs`}}\" extra_repos=\"{{user `extra_repos`}}\" extra_rpms=\"{{user `extra_rpms`}}\" http_proxy={{user `http_proxy`}} https_proxy={{user `https_proxy`}} kubeadm_template={{user `kubeadm_template`}} kubernetes_apiserver_port={{user `kubernetes_apiserver_port`}} kubernetes_cni_http_source={{user `kubernetes_cni_http_source`}} kubernetes_cni_http_checksum={{user `kubernetes_cni_http_checksum`}} kubernetes_goarch={{user `kubernetes_goarch`}} kubernetes_http_source={{user `kubernetes_http_source`}} kubernetes_container_registry={{user `kubernetes_container_registry`}} kubernetes_rpm_repo={{user `kubernetes_rpm_repo`}} kubernetes_rpm_gpg_key={{user `kubernetes_rpm_gpg_key`}} kubernetes_rpm_gpg_check={{user `kubernetes_rpm_gpg_check`}} kubernetes_deb_repo={{user `kubernetes_deb_repo`}} kubernetes_deb_gpg_key={{user `kubernetes_deb_gpg_key`}} kubernetes_cni_deb_version={{user `kubernetes_cni_deb_version`}} kubernetes_cni_rpm_version={{user `kubernetes_cni_rpm_version`}} kubernetes_cni_semver={{user `kubernetes_cni_semver`}} kubernetes_cni_source_type={{user `kubernetes_cni_source_type`}} kubernetes_semver={{user `kubernetes_semver`}} kubernetes_source_type={{user `kubernetes_source_type`}} kubernetes_load_additional_imgs={{user `kubernetes_load_additional_imgs`}} kubernetes_deb_version={{user `kubernetes_deb_version`}} kubernetes_rpm_version={{user `kubernetes_rpm_version`}} no_proxy={{user `no_proxy`}} pip_conf_file={{user `pip_conf_file`}} python_path={{user `python_path`}} redhat_epel_rpm={{user `redhat_epel_rpm`}} epel_rpm_gpg_key={{user `epel_rpm_gpg_key`}} reenable_public_repos={{user `reenable_public_repos`}} remove_extra_repos={{user `remove_extra_repos`}} systemd_prefix={{user `systemd_prefix`}} sysusr_prefix={{user `sysusr_prefix`}} sysusrlocal_prefix={{user `sysusrlocal_prefix`}} load_additional_components={{ user `load_additional_components`}} additional_registry_images={{ user `additional_registry_images`}} additional_registry_images_list={{ user `additional_registry_images_list`}} ecr_credential_provider={{ user `ecr_credential_provider` }} additional_url_images={{ user `additional_url_images`}} additional_url_images_list={{ user `additional_url_images_list`}} additional_executables={{ user `additional_executables`}} additional_executables_list={{ user `additional_executables_list`}} additional_executables_destination_path={{ user `additional_executables_destination_path`}} additional_s3={{ user `additional_s3`}} build_target={{ user `build_target`}} amazon_ssm_agent_rpm={{ user `amazon_ssm_agent_rpm` }} enable_containerd_audit={{ user `enable_containerd_audit` }} kubernetes_enable_automatic_resource_sizing={{ user `kubernetes_enable_automatic_resource_sizing` }} debug_tools={{user `debug_tools`}} ubuntu_repo={{user `ubuntu_repo`}} ubuntu_security_repo={{user `ubuntu_security_repo`}} gpu_block_nouveau_loading={{user `block_nouveau_loading`}} netplan_removal_excludes=\"{{user `netplan_removal_excludes`}}\" etcd_http_source={{user `etcd_http_source`}} etcd_version={{user `etcd_version`}} etcdadm_http_source={{user `etcdadm_http_source`}} etcd_sha256={{user `etcd_sha256`}} etcdadm_version={{user `etcdadm_version`}} rhsm_server_hostname={{ user `rhsm_server_hostname` }} rhsm_server_release_version={{ user `rhsm_server_release_version` }} rhsm_server_proxy_hostname={{ user `rhsm_server_proxy_hostname` }} rhsm_server_proxy_port={{ user `rhsm_server_proxy_port` }}",
-+  "ansible_common_vars": "containerd_url={{user `containerd_url`}} containerd_sha256={{user `containerd_sha256`}} pause_image={{user `pause_image`}} containerd_additional_settings={{user `containerd_additional_settings`}} containerd_cri_socket={{user `containerd_cri_socket`}} containerd_version={{user `containerd_version`}} containerd_wasm_shims_url={{user `containerd_wasm_shims_url`}} containerd_wasm_shims_version={{user `containerd_wasm_shims_version`}} containerd_wasm_shims_sha256={{user `containerd_wasm_shims_sha256`}} containerd_wasm_shims_runtimes=\"{{user `containerd_wasm_shims_runtimes`}}\" containerd_wasm_shims_runtime_versions=\"{{user `containerd_wasm_shims_runtime_versions`}}\" crictl_url={{user `crictl_url`}} crictl_sha256={{user `crictl_sha256`}} crictl_source_type={{user `crictl_source_type`}} custom_role_names=\"{{user `custom_role_names`}}\" firstboot_custom_roles_pre=\"{{user `firstboot_custom_roles_pre`}}\" firstboot_custom_roles_post=\"{{user `firstboot_custom_roles_post`}}\" node_custom_roles_pre=\"{{user `node_custom_roles_pre`}}\" node_custom_roles_post=\"{{user `node_custom_roles_post`}}\" node_custom_roles_post_sysprep=\"{{user `node_custom_roles_post_sysprep`}}\" disable_public_repos={{user `disable_public_repos`}} extra_debs=\"{{user `extra_debs`}}\" extra_repos=\"{{user `extra_repos`}}\" extra_rpms=\"{{user `extra_rpms`}}\" http_proxy={{user `http_proxy`}} https_proxy={{user `https_proxy`}} kubeadm_template={{user `kubeadm_template`}} kubernetes_apiserver_port={{user `kubernetes_apiserver_port`}} kubernetes_cni_http_source={{user `kubernetes_cni_http_source`}} kubernetes_cni_http_checksum={{user `kubernetes_cni_http_checksum`}} kubernetes_goarch={{user `kubernetes_goarch`}} kubernetes_http_source={{user `kubernetes_http_source`}} kubernetes_container_registry={{user `kubernetes_container_registry`}} kubernetes_rpm_repo={{user `kubernetes_rpm_repo`}} kubernetes_rpm_gpg_key={{user `kubernetes_rpm_gpg_key`}} kubernetes_rpm_gpg_check={{user `kubernetes_rpm_gpg_check`}} kubernetes_deb_repo={{user `kubernetes_deb_repo`}} kubernetes_deb_gpg_key={{user `kubernetes_deb_gpg_key`}} kubernetes_cni_deb_version={{user `kubernetes_cni_deb_version`}} kubernetes_cni_rpm_version={{user `kubernetes_cni_rpm_version`}} kubernetes_cni_semver={{user `kubernetes_cni_semver`}} kubernetes_cni_source_type={{user `kubernetes_cni_source_type`}} kubernetes_semver={{user `kubernetes_semver`}} kubernetes_source_type={{user `kubernetes_source_type`}} kubernetes_load_additional_imgs={{user `kubernetes_load_additional_imgs`}} kubernetes_deb_version={{user `kubernetes_deb_version`}} kubernetes_rpm_version={{user `kubernetes_rpm_version`}} no_proxy={{user `no_proxy`}} pip_conf_file={{user `pip_conf_file`}} python_path={{user `python_path`}} redhat_epel_rpm={{user `redhat_epel_rpm`}} epel_rpm_gpg_key={{user `epel_rpm_gpg_key`}} reenable_public_repos={{user `reenable_public_repos`}} remove_extra_repos={{user `remove_extra_repos`}} ssh_handshake_attempts={{user `ssh_handshake_attempts`}} ssh_timeout={{user `ssh_timeout`}} systemd_prefix={{user `systemd_prefix`}} sysusr_prefix={{user `sysusr_prefix`}} sysusrlocal_prefix={{user `sysusrlocal_prefix`}} load_additional_components={{ user `load_additional_components`}} additional_registry_images={{ user `additional_registry_images`}} additional_registry_images_list={{ user `additional_registry_images_list`}} ecr_credential_provider={{ user `ecr_credential_provider` }} additional_url_images={{ user `additional_url_images`}} additional_url_images_list={{ user `additional_url_images_list`}} additional_executables={{ user `additional_executables`}} additional_executables_list={{ user `additional_executables_list`}} additional_executables_destination_path={{ user `additional_executables_destination_path`}} additional_s3={{ user `additional_s3`}} build_target={{ user `build_target`}} amazon_ssm_agent_rpm={{ user `amazon_ssm_agent_rpm` }} enable_containerd_audit={{ user `enable_containerd_audit` }} kubernetes_enable_automatic_resource_sizing={{ user `kubernetes_enable_automatic_resource_sizing` }} debug_tools={{user `debug_tools`}} ubuntu_repo={{user `ubuntu_repo`}} ubuntu_security_repo={{user `ubuntu_security_repo`}} gpu_block_nouveau_loading={{user `block_nouveau_loading`}} netplan_removal_excludes=\"{{user `netplan_removal_excludes`}}\" etcd_http_source={{user `etcd_http_source`}} etcd_version={{user `etcd_version`}} etcdadm_http_source={{user `etcdadm_http_source`}} etcd_sha256={{user `etcd_sha256`}} etcdadm_version={{user `etcdadm_version`}} rhsm_server_hostname={{ user `rhsm_server_hostname` }} rhsm_server_release_version={{ user `rhsm_server_release_version` }} rhsm_server_proxy_hostname={{ user `rhsm_server_proxy_hostname` }} rhsm_server_proxy_port={{ user `rhsm_server_proxy_port` }}",
+-  "ansible_common_vars": "containerd_gvisor_runtime={{user `containerd_gvisor_runtime`}} containerd_gvisor_version={{user `containerd_gvisor_version`}} containerd_sha256={{user `containerd_sha256`}} pause_image={{user `pause_image`}} containerd_additional_settings={{user `containerd_additional_settings`}} containerd_cri_socket={{user `containerd_cri_socket`}} containerd_version={{user `containerd_version`}} containerd_wasm_shims_url={{user `containerd_wasm_shims_url`}} containerd_wasm_shims_version={{user `containerd_wasm_shims_version`}} containerd_wasm_shims_sha256={{user `containerd_wasm_shims_sha256`}} containerd_wasm_shims_runtimes=\"{{user `containerd_wasm_shims_runtimes`}}\" containerd_wasm_shims_runtime_versions=\"{{user `containerd_wasm_shims_runtime_versions`}}\" crictl_version={{user `crictl_version`}} crictl_source_type={{user `crictl_source_type`}} custom_role_names=\"{{user `custom_role_names`}}\" firstboot_custom_roles_pre=\"{{user `firstboot_custom_roles_pre`}}\" firstboot_custom_roles_post=\"{{user `firstboot_custom_roles_post`}}\" node_custom_roles_pre=\"{{user `node_custom_roles_pre`}}\" node_custom_roles_post=\"{{user `node_custom_roles_post`}}\" node_custom_roles_post_sysprep=\"{{user `node_custom_roles_post_sysprep`}}\" disable_public_repos={{user `disable_public_repos`}} extra_debs=\"{{user `extra_debs`}}\" extra_repos=\"{{user `extra_repos`}}\" extra_rpms=\"{{user `extra_rpms`}}\" http_proxy={{user `http_proxy`}} https_proxy={{user `https_proxy`}} kubeadm_template={{user `kubeadm_template`}} kubernetes_apiserver_port={{user `kubernetes_apiserver_port`}} kubernetes_cni_http_source={{user `kubernetes_cni_http_source`}} kubernetes_http_source={{user `kubernetes_http_source`}} kubernetes_container_registry={{user `kubernetes_container_registry`}} kubernetes_rpm_repo={{user `kubernetes_rpm_repo`}} kubernetes_rpm_gpg_key={{user `kubernetes_rpm_gpg_key`}} kubernetes_rpm_gpg_check={{user `kubernetes_rpm_gpg_check`}} kubernetes_deb_repo={{user `kubernetes_deb_repo`}} kubernetes_deb_gpg_key={{user `kubernetes_deb_gpg_key`}} kubernetes_cni_deb_version={{user `kubernetes_cni_deb_version`}} kubernetes_cni_rpm_version={{user `kubernetes_cni_rpm_version`}} kubernetes_cni_semver={{user `kubernetes_cni_semver`}} kubernetes_cni_source_type={{user `kubernetes_cni_source_type`}} kubernetes_semver={{user `kubernetes_semver`}} kubernetes_source_type={{user `kubernetes_source_type`}} kubernetes_load_additional_imgs={{user `kubernetes_load_additional_imgs`}} kubernetes_deb_version={{user `kubernetes_deb_version`}} kubernetes_rpm_version={{user `kubernetes_rpm_version`}} no_proxy={{user `no_proxy`}} pip_conf_file={{user `pip_conf_file`}} python_path={{user `python_path`}} redhat_epel_rpm={{user `redhat_epel_rpm`}} epel_rpm_gpg_key={{user `epel_rpm_gpg_key`}} reenable_public_repos={{user `reenable_public_repos`}} remove_extra_repos={{user `remove_extra_repos`}} systemd_prefix={{user `systemd_prefix`}} sysusr_prefix={{user `sysusr_prefix`}} sysusrlocal_prefix={{user `sysusrlocal_prefix`}} load_additional_components={{ user `load_additional_components`}} additional_registry_images={{ user `additional_registry_images`}} additional_registry_images_list={{ user `additional_registry_images_list`}} ecr_credential_provider={{ user `ecr_credential_provider` }} additional_url_images={{ user `additional_url_images`}} additional_url_images_list={{ user `additional_url_images_list`}} additional_executables={{ user `additional_executables`}} additional_executables_list={{ user `additional_executables_list`}} additional_executables_destination_path={{ user `additional_executables_destination_path`}} additional_s3={{ user `additional_s3`}} build_target={{ user `build_target`}} amazon_ssm_agent_rpm={{ user `amazon_ssm_agent_rpm` }} enable_containerd_audit={{ user `enable_containerd_audit` }} kubernetes_enable_automatic_resource_sizing={{ user `kubernetes_enable_automatic_resource_sizing` }} debug_tools={{user `debug_tools`}} ubuntu_repo={{user `ubuntu_repo`}} ubuntu_security_repo={{user `ubuntu_security_repo`}} gpu_block_nouveau_loading={{user `block_nouveau_loading`}} runc_version={{user `runc_version`}} containerd_service_url={{user `containerd_service_url`}} netplan_removal_excludes=\"{{user `netplan_removal_excludes`}}\" etcd_http_source={{user `etcd_http_source`}} etcd_version={{user `etcd_version`}} etcdadm_http_source={{user `etcdadm_http_source`}} etcd_sha256={{user `etcd_sha256`}} etcdadm_version={{user `etcdadm_version`}} rhsm_server_hostname={{ user `rhsm_server_hostname` }} rhsm_server_release_version={{ user `rhsm_server_release_version` }} rhsm_server_proxy_hostname={{ user `rhsm_server_proxy_hostname` }} rhsm_server_proxy_port={{ user `rhsm_server_proxy_port` }}",
++  "ansible_common_vars": "containerd_gvisor_runtime={{user `containerd_gvisor_runtime`}} containerd_gvisor_version={{user `containerd_gvisor_version`}} containerd_sha256={{user `containerd_sha256`}} pause_image={{user `pause_image`}} containerd_additional_settings={{user `containerd_additional_settings`}} containerd_cri_socket={{user `containerd_cri_socket`}} containerd_version={{user `containerd_version`}} containerd_wasm_shims_url={{user `containerd_wasm_shims_url`}} containerd_wasm_shims_version={{user `containerd_wasm_shims_version`}} containerd_wasm_shims_sha256={{user `containerd_wasm_shims_sha256`}} containerd_wasm_shims_runtimes=\"{{user `containerd_wasm_shims_runtimes`}}\" containerd_wasm_shims_runtime_versions=\"{{user `containerd_wasm_shims_runtime_versions`}}\" crictl_version={{user `crictl_version`}} crictl_source_type={{user `crictl_source_type`}} custom_role_names=\"{{user `custom_role_names`}}\" firstboot_custom_roles_pre=\"{{user `firstboot_custom_roles_pre`}}\" firstboot_custom_roles_post=\"{{user `firstboot_custom_roles_post`}}\" node_custom_roles_pre=\"{{user `node_custom_roles_pre`}}\" node_custom_roles_post=\"{{user `node_custom_roles_post`}}\" node_custom_roles_post_sysprep=\"{{user `node_custom_roles_post_sysprep`}}\" disable_public_repos={{user `disable_public_repos`}} extra_debs=\"{{user `extra_debs`}}\" extra_repos=\"{{user `extra_repos`}}\" extra_rpms=\"{{user `extra_rpms`}}\" http_proxy={{user `http_proxy`}} https_proxy={{user `https_proxy`}} kubeadm_template={{user `kubeadm_template`}} kubernetes_apiserver_port={{user `kubernetes_apiserver_port`}} kubernetes_cni_http_source={{user `kubernetes_cni_http_source`}} kubernetes_http_source={{user `kubernetes_http_source`}} kubernetes_container_registry={{user `kubernetes_container_registry`}} kubernetes_rpm_repo={{user `kubernetes_rpm_repo`}} kubernetes_rpm_gpg_key={{user `kubernetes_rpm_gpg_key`}} kubernetes_rpm_gpg_check={{user `kubernetes_rpm_gpg_check`}} kubernetes_deb_repo={{user `kubernetes_deb_repo`}} kubernetes_deb_gpg_key={{user `kubernetes_deb_gpg_key`}} kubernetes_cni_deb_version={{user `kubernetes_cni_deb_version`}} kubernetes_cni_rpm_version={{user `kubernetes_cni_rpm_version`}} kubernetes_cni_semver={{user `kubernetes_cni_semver`}} kubernetes_cni_source_type={{user `kubernetes_cni_source_type`}} kubernetes_semver={{user `kubernetes_semver`}} kubernetes_source_type={{user `kubernetes_source_type`}} kubernetes_load_additional_imgs={{user `kubernetes_load_additional_imgs`}} kubernetes_deb_version={{user `kubernetes_deb_version`}} kubernetes_rpm_version={{user `kubernetes_rpm_version`}} no_proxy={{user `no_proxy`}} pip_conf_file={{user `pip_conf_file`}} python_path={{user `python_path`}} redhat_epel_rpm={{user `redhat_epel_rpm`}} epel_rpm_gpg_key={{user `epel_rpm_gpg_key`}} reenable_public_repos={{user `reenable_public_repos`}} remove_extra_repos={{user `remove_extra_repos`}} systemd_prefix={{user `systemd_prefix`}} sysusr_prefix={{user `sysusr_prefix`}} sysusrlocal_prefix={{user `sysusrlocal_prefix`}} load_additional_components={{ user `load_additional_components`}} additional_registry_images={{ user `additional_registry_images`}} additional_registry_images_list={{ user `additional_registry_images_list`}} ecr_credential_provider={{ user `ecr_credential_provider` }} additional_url_images={{ user `additional_url_images`}} additional_url_images_list={{ user `additional_url_images_list`}} additional_executables={{ user `additional_executables`}} additional_executables_list={{ user `additional_executables_list`}} additional_executables_destination_path={{ user `additional_executables_destination_path`}} additional_s3={{ user `additional_s3`}} build_target={{ user `build_target`}} amazon_ssm_agent_rpm={{ user `amazon_ssm_agent_rpm` }} enable_containerd_audit={{ user `enable_containerd_audit` }} kubernetes_enable_automatic_resource_sizing={{ user `kubernetes_enable_automatic_resource_sizing` }} debug_tools={{user `debug_tools`}} ubuntu_repo={{user `ubuntu_repo`}} ubuntu_security_repo={{user `ubuntu_security_repo`}} gpu_block_nouveau_loading={{user `block_nouveau_loading`}} runc_version={{user `runc_version`}} containerd_service_url={{user `containerd_service_url`}} netplan_removal_excludes=\"{{user `netplan_removal_excludes`}}\" etcd_http_source={{user `etcd_http_source`}} etcd_version={{user `etcd_version`}} etcdadm_http_source={{user `etcdadm_http_source`}} etcd_sha256={{user `etcd_sha256`}} etcdadm_version={{user `etcdadm_version`}} rhsm_server_hostname={{ user `rhsm_server_hostname` }} rhsm_server_release_version={{ user `rhsm_server_release_version` }} rhsm_server_proxy_hostname={{ user `rhsm_server_proxy_hostname` }} rhsm_server_proxy_port={{ user `rhsm_server_proxy_port` }} ssh_handshake_attempts={{user `ssh_handshake_attempts`}} ssh_timeout={{user `ssh_timeout`}}",
    "ansible_scp_extra_args": "{{env `ANSIBLE_SCP_EXTRA_ARGS`}}"
  }
 diff --git a/images/capi/packer/config/common.json b/images/capi/packer/config/common.json
-index f15ecca68..ec4cef2b9 100644
+index e41c23012..a5327fc4f 100644
 --- a/images/capi/packer/config/common.json
 +++ b/images/capi/packer/config/common.json
 @@ -19,6 +19,8 @@
@@ -62,11 +62,11 @@ index f15ecca68..ec4cef2b9 100644
    "ubuntu_security_repo": "http://security.ubuntu.com/ubuntu"
  }
 diff --git a/images/capi/packer/ova/packer-node.json b/images/capi/packer/ova/packer-node.json
-index e2101f927..2d3dfdfa7 100644
+index aee432645..7469e7ce8 100644
 --- a/images/capi/packer/ova/packer-node.json
 +++ b/images/capi/packer/ova/packer-node.json
 @@ -19,8 +19,9 @@
-       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
+       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && rm -f /etc/sudoers.d/90-cloud-init-users && {{user `shutdown_command`}}'",
        "skip_compaction": "{{user `skip_compaction`}}",
        "source_path": "{{ user `source_path`}}",
 +      "ssh_handshake_attempts": "{{user `ssh_handshake_attempts`}}",
@@ -89,7 +89,7 @@ index e2101f927..2d3dfdfa7 100644
        "version": "{{user `vmx_version`}}",
 @@ -116,8 +118,9 @@
        "remote_username": "{{user `remote_username`}}",
-       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
+       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && rm -f /etc/sudoers.d/90-cloud-init-users && {{user `shutdown_command`}}'",
        "skip_compaction": "{{user `skip_compaction`}}",
 +      "ssh_handshake_attempts": "{{user `ssh_handshake_attempts`}}",
        "ssh_password": "{{user `ssh_password`}}",
@@ -98,7 +98,7 @@ index e2101f927..2d3dfdfa7 100644
        "ssh_username": "{{user `ssh_username`}}",
        "type": "vmware-iso",
        "version": "{{user `vmx_version`}}",
-@@ -177,8 +180,9 @@
+@@ -179,8 +182,9 @@
        "resource_pool": "{{user `resource_pool`}}",
        "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c '{{user `shutdown_command`}}'",
        "ssh_clear_authorized_keys": "false",
@@ -109,10 +109,10 @@ index e2101f927..2d3dfdfa7 100644
        "ssh_username": "{{user `ssh_username`}}",
        "storage": [
          {
-@@ -243,10 +247,11 @@
+@@ -245,10 +249,11 @@
        "remove_cdrom": "true",
        "resource_pool": "{{user `resource_pool`}}",
-       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
+       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && rm -f /etc/sudoers.d/90-cloud-init-users && {{user `shutdown_command`}}'",
 +      "ssh_handshake_attempts": "{{user `ssh_handshake_attempts`}}",
        "ssh_password": "{{user `ssh_password`}}",
        "ssh_proxy_host": "{{user `ssh_proxy_host`}}",
@@ -122,10 +122,10 @@ index e2101f927..2d3dfdfa7 100644
        "ssh_username": "{{user `ssh_username`}}",
        "storage": [
          {
-@@ -286,8 +291,9 @@
+@@ -288,8 +293,9 @@
        "password": "{{user `password`}}",
        "resource_pool": "{{user `resource_pool`}}",
-       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && {{user `shutdown_command`}}'",
+       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && rm -f /etc/sudoers.d/90-cloud-init-users && {{user `shutdown_command`}}'",
 +      "ssh_handshake_attempts": "{{user `ssh_handshake_attempts`}}",
        "ssh_password": "{{user `ssh_password`}}",
 -      "ssh_timeout": "4h",
@@ -133,7 +133,7 @@ index e2101f927..2d3dfdfa7 100644
        "ssh_username": "{{user `ssh_username`}}",
        "template": "{{user `template`}}",
        "type": "vsphere-clone",
-@@ -387,7 +393,9 @@
+@@ -389,7 +395,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -143,7 +143,7 @@ index e2101f927..2d3dfdfa7 100644
        "type": "ansible",
        "user": "{{user `ssh_username`}}"
      },
-@@ -420,7 +428,9 @@
+@@ -422,7 +430,9 @@
          "--scp-extra-args",
          "{{user `ansible_scp_extra_args`}}"
        ],
@@ -154,13 +154,13 @@ index e2101f927..2d3dfdfa7 100644
        "user": "{{user `ssh_username`}}"
      },
 diff --git a/images/capi/packer/qemu/packer.json.tmpl b/images/capi/packer/qemu/packer.json.tmpl
-index 0b03e915a..6cac58a7d 100644
+index 575b8aa63..8784bf395 100644
 --- a/images/capi/packer/qemu/packer.json.tmpl
 +++ b/images/capi/packer/qemu/packer.json.tmpl
 @@ -30,8 +30,9 @@
        "output_directory": "{{user `output_directory`}}",
        "qemu_binary": "{{user `qemu_binary`}}",
-       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'usermod -L {{user `ssh_username`}} && {{user `shutdown_command`}}'",
+       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && rm -f /etc/sudoers.d/90-cloud-init-users && {{user `shutdown_command`}}'",
 +      "ssh_handshake_attempts": "{{user `ssh_handshake_attempts`}}",
        "ssh_password": "{{user `ssh_password`}}",
 -      "ssh_timeout": "2h",
@@ -189,13 +189,13 @@ index 0b03e915a..6cac58a7d 100644
        "user": "builder"
      },
 diff --git a/images/capi/packer/raw/packer.json.tmpl b/images/capi/packer/raw/packer.json.tmpl
-index 48c9c35ff..687a0d432 100644
+index 0a9c4247b..ca4a4b6b9 100644
 --- a/images/capi/packer/raw/packer.json.tmpl
 +++ b/images/capi/packer/raw/packer.json.tmpl
 @@ -31,9 +31,9 @@
          ]
        ],
-       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'usermod -L {{user `ssh_username`}} && {{user `shutdown_command`}}'",
+       "shutdown_command": "echo '{{user `ssh_password`}}' | sudo -S -E sh -c 'userdel -f -r {{user `ssh_username`}} && rm -f /etc/sudoers.d/{{user `ssh_username` }} && rm -f /etc/sudoers.d/90-cloud-init-users && {{user `shutdown_command`}}'",
 -      "ssh_handshake_attempts": "100",
 +      "ssh_handshake_attempts": "{{user `ssh_handshake_attempts`}}",
        "ssh_password": "{{user `ssh_password`}}",
@@ -205,5 +205,5 @@ index 48c9c35ff..687a0d432 100644
        "type": "qemu",
        "vm_name": "{{user `vm_name`}}"
 -- 
-2.49.0
+2.45.2
 
