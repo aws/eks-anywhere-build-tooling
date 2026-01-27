@@ -859,6 +859,37 @@ batch:
         variables:
           PROJECT_PATH: projects/tinkerbell/tink
           CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/tinkerbell.tink
+    - identifier: tinkerbell_tinkerbell_linux_amd64
+      env:
+        type: LINUX_CONTAINER
+        compute-type: BUILD_GENERAL1_LARGE
+        variables:
+          PROJECT_PATH: projects/tinkerbell/tinkerbell
+          CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/tinkerbell.tinkerbell
+          IMAGE_PLATFORMS: linux/amd64
+          BINARY_PLATFORMS: linux/amd64
+          IMAGE_TAG_SUFFIX: -amd64
+    - identifier: tinkerbell_tinkerbell_linux_arm64
+      env:
+        type: ARM_CONTAINER
+        compute-type: BUILD_GENERAL1_LARGE
+        variables:
+          PROJECT_PATH: projects/tinkerbell/tinkerbell
+          CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/tinkerbell.tinkerbell
+          IMAGE_PLATFORMS: linux/arm64
+          BINARY_PLATFORMS: linux/arm64
+          IMAGE_TAG_SUFFIX: -arm64
+    - identifier: tinkerbell_tinkerbell_combine_images
+      buildspec: buildspecs/combine-images.yml
+      depend-on:
+        - tinkerbell_tinkerbell_linux_amd64
+        - tinkerbell_tinkerbell_linux_arm64
+      env:
+        type: ARM_CONTAINER
+        compute-type: BUILD_GENERAL1_SMALL
+        variables:
+          PROJECT_PATH: projects/tinkerbell/tinkerbell
+          CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/tinkerbell.tinkerbell
     - identifier: tinkerbell_tinkerbell_crds
       env:
         type: ARM_CONTAINER
