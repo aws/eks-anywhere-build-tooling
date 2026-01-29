@@ -43,6 +43,13 @@ HAS_S3_ARTIFACTS=true
 # we do not want to delete missing files when s3 sync-ing from local to the bucket
 UPLOAD_DO_NOT_DELETE=true
 
+# Helm chart configuration - chart is in the mono-repo at helm/tinkerbell
+HAS_HELM_CHART=true
+HELM_DIRECTORY=helm/tinkerbell
+HELM_SOURCE_REPOSITORY=tinkerbell
+HELM_CHART_NAMES=tinkerbell
+HELM_DESTINATION_REPOSITORY=tinkerbell/tinkerbell
+
 # Exclude from upgrade buildspec until migration is complete
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
