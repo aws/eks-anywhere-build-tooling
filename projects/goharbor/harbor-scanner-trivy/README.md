@@ -1,5 +1,5 @@
 ## **harbor-scanner-trivy**
-![Version](https://img.shields.io/badge/version-v0.33.0--rc.2-blue)
+![Version](https://img.shields.io/badge/version-v0.34.2-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoieEpzUzBranRhT3NMMGdLU0lSVmh1S2RteDcyd1AwRU5LbVZFc2pnNlcvcWpaZHR4blQ3RktjbzllUmhwMmhma0pnZ2RWVEY0UEIzZ2NPc3pYQ2l1RFZvPSIsIml2UGFyYW1ldGVyU3BlYyI6IitiOTg2c2dOVW55cnVQREoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [Harbor Scanner Adapter for Trivy](https://github.com/goharbor/harbor-scanner-trivy) is a service that translates the Harbor scanning API into Trivy commands and allows Harbor to use Trivy for providing vulnerability reports on images stored in Harbor registry as part of its vulnerability scan feature.
