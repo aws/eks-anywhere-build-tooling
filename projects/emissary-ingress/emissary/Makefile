@@ -14,8 +14,8 @@ BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
 SKIP_ON_RELEASE_BRANCH=true
 
-BINARY_TARGET_FILES=busyambassador capabilities_wrapper example-envoy-metrics-sink k8sregistryctl kat-client kat-server
-SOURCE_PATTERNS=./cmd/busyambassador ./cmd/capabilities_wrapper ./cmd/example-envoy-metrics-sink ./cmd/k8sregistryctl ./cmd/kat-client ./cmd/kat-server
+BINARY_TARGET_FILES=apiext busyambassador capabilities_wrapper example-envoy-metrics-sink kat-client kat-server
+SOURCE_PATTERNS=./cmd/apiext ./cmd/busyambassador ./cmd/capabilities_wrapper ./cmd/example-envoy-metrics-sink ./cmd/kat-client ./cmd/kat-server
 
 EMISSARY_IMAGE_COMPONENT=emissary-ingress/emissary
 
@@ -52,7 +52,7 @@ $(GO_MOD_DOWNLOAD_TARGETS): $(AMBASSADOR_VERSION_TARGET)
 
 # do not pass our makeflags down to emissary make since there will be unncessary warnings
 $(AMBASSADOR_VERSION_TARGET): MAKEFLAGS=
-$(AMBASSADOR_VERSION_TARGET): export VERSION=v3.6.0
+$(AMBASSADOR_VERSION_TARGET): export VERSION=v3.10.0
 $(AMBASSADOR_VERSION_TARGET): export CHART_VERSION:=$(CHART_VERSION)
 $(AMBASSADOR_VERSION_TARGET): export GOPATH=/var
 $(AMBASSADOR_VERSION_TARGET): | $$(ENABLE_DOCKER)

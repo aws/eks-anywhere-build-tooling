@@ -1,7 +1,7 @@
-From b552344be966a3fc2d803448d6c760648620def2 Mon Sep 17 00:00:00 2001
+From fa300ba98d0415223af9119cc8f4e9907fbb15a4 Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Tue, 31 Aug 2021 15:56:28 +0000
-Subject: [PATCH 05/38] Make pause and bottlerocket bootstrap images updatable
+Subject: [PATCH 05/36] Make pause and bottlerocket bootstrap images updatable
  in validation webhook
 
 cr: https://code.amazon.com/reviews/CR-56335855
@@ -20,8 +20,8 @@ cr: https://code.amazon.com/reviews/CR-56335855
  .../zz_generated.conversion.go                |  2 +
  ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 84 +++++++++++++++++++
  ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 84 +++++++++++++++++++
- .../webhooks/kubeadm_control_plane.go         |  4 +
- .../webhooks/kubeadm_control_plane_test.go    | 36 ++++++++
+ .../internal/webhooks/kubeadmcontrolplane.go  |  4 +
+ .../webhooks/kubeadmcontrolplane_test.go      | 36 ++++++++
  .../kubeadm/internal/workload_cluster_etcd.go |  2 +-
  .../v1alpha3/zz_generated.conversion.go       |  2 +
  .../kubeadm/v1alpha4/kubeadm_types.go         | 19 +++++
@@ -74,7 +74,7 @@ index 6d1c8f0c5..5ae15a6ab 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 3e8083317..41aa18437 100644
+index 930b5cf70..a750c2fa3 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -300,6 +300,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -114,7 +114,7 @@ index 3e8083317..41aa18437 100644
  	if err := Convert_v1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -1144,6 +1160,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+@@ -1145,6 +1161,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
  	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
@@ -124,7 +124,7 @@ index 3e8083317..41aa18437 100644
  	if err := Convert_v1beta1_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1167,6 +1186,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+@@ -1168,6 +1187,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
  	if err := Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
@@ -134,7 +134,7 @@ index 3e8083317..41aa18437 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1818,6 +1840,28 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
+@@ -1819,6 +1841,28 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
  	return autoConvert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in, out, s)
  }
  
@@ -206,10 +206,10 @@ index d73d37506..568bdee53 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 14862bfc6..f31154d73 100644
+index 2d5a307fe..fcbc40457 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -125,6 +125,15 @@ func (r *InitConfiguration) IsDefined() bool {
+@@ -142,6 +142,15 @@ func (r *InitConfiguration) IsDefined() bool {
  	return !reflect.DeepEqual(r, &InitConfiguration{})
  }
  
@@ -225,7 +225,7 @@ index 14862bfc6..f31154d73 100644
  // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster.
  // +kubebuilder:validation:MinProperties=1
  type ClusterConfiguration struct {
-@@ -142,6 +151,12 @@ type ClusterConfiguration struct {
+@@ -159,6 +168,12 @@ type ClusterConfiguration struct {
  	// This is only for bottlerocket
  	// +optional
  	Proxy ProxyConfiguration `json:"proxy,omitempty"`
@@ -238,7 +238,7 @@ index 14862bfc6..f31154d73 100644
  	// etcd holds configuration for etcd.
  	// NB: This value defaults to a Local (stacked) etcd
  	// +optional
-@@ -669,6 +684,12 @@ type JoinConfiguration struct {
+@@ -692,6 +707,12 @@ type JoinConfiguration struct {
  	// This is only for bottlerocket
  	// +optional
  	Proxy ProxyConfiguration `json:"proxy,omitempty"`
@@ -294,10 +294,10 @@ index 33ec37d7c..33dbb82be 100644
  func (in *Scheduler) DeepCopyInto(out *Scheduler) {
  	*out = *in
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index d33f51ba0..4e98062d2 100644
+index 8c9d7a30a..dd0fa94cc 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -1363,6 +1363,19 @@ spec:
+@@ -1361,6 +1361,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -317,7 +317,7 @@ index d33f51ba0..4e98062d2 100644
                    scheduler:
                      description: scheduler contains extra settings for the scheduler
                        control plane component
-@@ -1924,6 +1937,19 @@ spec:
+@@ -1920,6 +1933,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -337,7 +337,7 @@ index d33f51ba0..4e98062d2 100644
                  type: object
                mounts:
                  description: mounts specifies a list of mount points to be setup.
-@@ -2906,6 +2932,19 @@ spec:
+@@ -3016,6 +3042,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -357,7 +357,7 @@ index d33f51ba0..4e98062d2 100644
                    scheduler:
                      description: scheduler contains extra settings for the scheduler
                        control plane component
-@@ -3946,6 +3985,19 @@ spec:
+@@ -4092,6 +4131,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -377,7 +377,7 @@ index d33f51ba0..4e98062d2 100644
                    skipPhases:
                      description: |-
                        skipPhases is a list of phases to skip during command execution.
-@@ -5168,6 +5220,19 @@ spec:
+@@ -5435,6 +5487,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -397,7 +397,7 @@ index d33f51ba0..4e98062d2 100644
                    scheduler:
                      description: scheduler contains extra settings for the scheduler
                        control plane component
-@@ -6359,6 +6424,19 @@ spec:
+@@ -6662,6 +6727,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -418,10 +418,10 @@ index d33f51ba0..4e98062d2 100644
                      description: |-
                        skipPhases is a list of phases to skip during command execution.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index cab4d6eb5..a0be5ab77 100644
+index a44a47aa6..174bff6e6 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -1331,6 +1331,20 @@ spec:
+@@ -1329,6 +1329,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -442,7 +442,7 @@ index cab4d6eb5..a0be5ab77 100644
                            scheduler:
                              description: scheduler contains extra settings for the
                                scheduler control plane component
-@@ -1905,6 +1919,20 @@ spec:
+@@ -1901,6 +1915,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -463,7 +463,7 @@ index cab4d6eb5..a0be5ab77 100644
                          type: object
                        mounts:
                          description: mounts specifies a list of mount points to be
-@@ -2875,6 +2903,20 @@ spec:
+@@ -2985,6 +3013,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -484,7 +484,7 @@ index cab4d6eb5..a0be5ab77 100644
                            scheduler:
                              description: scheduler contains extra settings for the
                                scheduler control plane component
-@@ -3939,6 +3981,20 @@ spec:
+@@ -4085,6 +4127,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -505,7 +505,7 @@ index cab4d6eb5..a0be5ab77 100644
                            skipPhases:
                              description: |-
                                skipPhases is a list of phases to skip during command execution.
-@@ -5062,6 +5118,20 @@ spec:
+@@ -5329,6 +5385,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -526,7 +526,7 @@ index cab4d6eb5..a0be5ab77 100644
                            scheduler:
                              description: scheduler contains extra settings for the
                                scheduler control plane component
-@@ -6274,6 +6344,20 @@ spec:
+@@ -6577,6 +6647,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -636,10 +636,10 @@ index 18e559cc8..f41f0b23a 100644
  
  	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 086ef1e3b..130a0c4d6 100644
+index 5c971078e..3a072a201 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -569,6 +569,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -551,6 +551,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
  		}
@@ -649,7 +649,7 @@ index 086ef1e3b..130a0c4d6 100644
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
-@@ -862,6 +865,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -844,6 +847,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
  		}
@@ -659,7 +659,7 @@ index 086ef1e3b..130a0c4d6 100644
  		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -1036,6 +1042,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -1018,6 +1024,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
  		}
@@ -670,7 +670,7 @@ index 086ef1e3b..130a0c4d6 100644
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index 8cac4b994..529c988f2 100644
+index c948b069a..5e3fccf68 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -381,6 +381,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
@@ -681,7 +681,7 @@ index 8cac4b994..529c988f2 100644
  	if err := Convert_v1beta2_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -593,6 +594,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+@@ -594,6 +595,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
  	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
  	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
  	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
@@ -690,7 +690,7 @@ index 8cac4b994..529c988f2 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 44ec72229..0c903b837 100644
+index 64080b3ca..9ffa082b0 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -506,6 +506,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
@@ -701,7 +701,7 @@ index 44ec72229..0c903b837 100644
  	if err := Convert_v1beta2_Etcd_To_upstreamv1beta4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -760,6 +761,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta4_JoinConfiguration(
+@@ -761,6 +762,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta4_JoinConfiguration(
  	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
@@ -710,10 +710,10 @@ index 44ec72229..0c903b837 100644
  		return err
  	}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 2a2d18460..cf2e86878 100644
+index 1c2a3db22..35934c42e 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -1594,6 +1594,20 @@ spec:
+@@ -1592,6 +1592,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -734,7 +734,7 @@ index 2a2d18460..cf2e86878 100644
                        scheduler:
                          description: scheduler contains extra settings for the scheduler
                            control plane component
-@@ -2163,6 +2177,20 @@ spec:
+@@ -2159,6 +2173,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -755,7 +755,7 @@ index 2a2d18460..cf2e86878 100644
                      type: object
                    mounts:
                      description: mounts specifies a list of mount points to be setup.
-@@ -3388,6 +3416,20 @@ spec:
+@@ -3498,6 +3526,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -776,7 +776,7 @@ index 2a2d18460..cf2e86878 100644
                        scheduler:
                          description: scheduler contains extra settings for the scheduler
                            control plane component
-@@ -4440,6 +4482,20 @@ spec:
+@@ -4586,6 +4628,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -797,7 +797,7 @@ index 2a2d18460..cf2e86878 100644
                        skipPhases:
                          description: |-
                            skipPhases is a list of phases to skip during command execution.
-@@ -6095,6 +6151,20 @@ spec:
+@@ -6362,6 +6418,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -818,7 +818,7 @@ index 2a2d18460..cf2e86878 100644
                        scheduler:
                          description: scheduler contains extra settings for the scheduler
                            control plane component
-@@ -7295,6 +7365,20 @@ spec:
+@@ -7597,6 +7667,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -840,7 +840,7 @@ index 2a2d18460..cf2e86878 100644
                          description: |-
                            skipPhases is a list of phases to skip during command execution.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 9d5b83610..8b8d415ff 100644
+index d0d971d34..e6765c0c6 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -386,6 +386,20 @@ spec:
@@ -864,7 +864,7 @@ index 9d5b83610..8b8d415ff 100644
                                scheduler:
                                  description: scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -964,6 +978,20 @@ spec:
+@@ -962,6 +976,20 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -885,7 +885,7 @@ index 9d5b83610..8b8d415ff 100644
                              type: object
                            mounts:
                              description: mounts specifies a list of mount points to
-@@ -2094,6 +2122,20 @@ spec:
+@@ -2207,6 +2235,20 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -906,7 +906,7 @@ index 9d5b83610..8b8d415ff 100644
                                scheduler:
                                  description: scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -3165,6 +3207,20 @@ spec:
+@@ -3314,6 +3356,20 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -927,7 +927,7 @@ index 9d5b83610..8b8d415ff 100644
                                skipPhases:
                                  description: |-
                                    skipPhases is a list of phases to skip during command execution.
-@@ -4487,6 +4543,20 @@ spec:
+@@ -4758,6 +4814,20 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -948,7 +948,7 @@ index 9d5b83610..8b8d415ff 100644
                                scheduler:
                                  description: scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -5709,6 +5779,20 @@ spec:
+@@ -6016,6 +6086,20 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -969,10 +969,10 @@ index 9d5b83610..8b8d415ff 100644
                                skipPhases:
                                  description: |-
                                    skipPhases is a list of phases to skip during command execution.
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-index a132bd90f..6fb18f70b 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
+index 390268c57..18f8d58b2 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
 @@ -140,6 +140,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		// metadata
  		{"metadata", "*"},
@@ -982,7 +982,7 @@ index a132bd90f..6fb18f70b 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local"},
-@@ -169,6 +171,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -170,6 +172,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, kubeadmConfigSpec, initConfiguration, timeouts},
  		{spec, kubeadmConfigSpec, initConfiguration, timeouts, "*"},
  		// spec.kubeadmConfigSpec.joinConfiguration
@@ -991,13 +991,13 @@ index a132bd90f..6fb18f70b 100644
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration},
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, patches, directory},
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-index 1d738699d..19d487668 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-@@ -755,6 +755,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
- 		CACertificateValidityPeriodDays: 730,
- 	}
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
+index 27bec1e46..84eef65f9 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
+@@ -759,6 +759,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 	validEncryptionAlgorithm := before.DeepCopy()
+ 	validEncryptionAlgorithm.Spec.KubeadmConfigSpec.ClusterConfiguration.EncryptionAlgorithm = bootstrapv1.EncryptionAlgorithmRSA3072
  
 +	validUpdateClusterConfPauseImage := before.DeepCopy()
 +	validUpdateClusterConfPauseImage.Spec.KubeadmConfigSpec.ClusterConfiguration.Pause = bootstrapv1.Pause{ImageRepository: "registry.k8s.io/pause", ImageTag: "v1.1.0+new"}
@@ -1014,9 +1014,9 @@ index 1d738699d..19d487668 100644
  	tests := []struct {
  		name                  string
  		enableIgnitionFeature bool
-@@ -1118,6 +1130,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
- 			before:    before,
- 			kcp:       invalidUpdateCACertificateValidityPeriodDays,
+@@ -1127,6 +1139,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+ 			before: before,
+ 			kcp:    validEncryptionAlgorithm,
  		},
 +		{
 +			name:      "should allow changes to cluster configuration pause image",
@@ -1059,7 +1059,7 @@ index 6eee63e9c..e70df164a 100644
  		}
  	})
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
-index a075d2ca4..0effa7124 100644
+index 0be1d7b1b..3cc2bb07b 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 @@ -543,6 +543,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(i
@@ -1070,7 +1070,7 @@ index a075d2ca4..0effa7124 100644
  	if err := Convert_v1beta2_Etcd_To_v1alpha3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -890,6 +891,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *v1b
+@@ -891,6 +892,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *v1b
  	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
  	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
  	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
@@ -1123,7 +1123,7 @@ index a147649f1..68c372963 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-index c64093b7c..02944831d 100644
+index 872a2752b..b2f8ba308 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 @@ -219,6 +219,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -1163,7 +1163,7 @@ index c64093b7c..02944831d 100644
  	if err := Convert_v1beta2_Etcd_To_v1alpha4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -938,6 +954,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
+@@ -939,6 +955,9 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
  	if err := Convert_v1alpha4_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
@@ -1173,7 +1173,7 @@ index c64093b7c..02944831d 100644
  	if err := Convert_v1alpha4_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -959,6 +978,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+@@ -960,6 +979,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
  	if err := Convert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
@@ -1183,7 +1183,7 @@ index c64093b7c..02944831d 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1430,6 +1452,28 @@ func Convert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1bet
+@@ -1431,6 +1453,28 @@ func Convert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1bet
  	return autoConvert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in, out, s)
  }
  
@@ -1255,5 +1255,5 @@ index b6a144dbe..ed9b9e0cc 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 -- 
-2.49.0
+2.50.1 (Apple Git-155)
 

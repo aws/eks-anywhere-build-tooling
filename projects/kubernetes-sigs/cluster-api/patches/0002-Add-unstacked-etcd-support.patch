@@ -1,7 +1,7 @@
-From 09393e8260fed338a63bba7c1997fd67e105ea9b Mon Sep 17 00:00:00 2001
+From 1780cfc7760add9bbbb674b8f33a32f1ed67bdf1 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 02/38] Add unstacked etcd support
+Subject: [PATCH 02/36] Add unstacked etcd support
 
 Unstacked etcd: API and config changes
 
@@ -94,7 +94,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  internal/api/core/v1alpha4/machine_types.go   |   3 +
  .../core/v1alpha4/zz_generated.conversion.go  |   6 +
  .../core/v1alpha4/zz_generated.deepcopy.go    |   5 +
- .../controllers/cluster/cluster_controller.go |  85 ++++++-
+ .../controllers/cluster/cluster_controller.go |  84 ++++++-
  .../cluster/cluster_controller_phases.go      | 116 ++++++++++
  .../cluster/cluster_controller_test.go        | 136 ++++++++++++
  .../machine/machine_controller_noderef.go     |   8 +
@@ -105,10 +105,10 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  util/secret/certificates.go                   |   3 +
  util/secret/consts.go                         |   2 +
  util/util.go                                  |   6 +
- 39 files changed, 1055 insertions(+), 11 deletions(-)
+ 39 files changed, 1054 insertions(+), 11 deletions(-)
 
 diff --git a/api/core/v1beta1/cluster_types.go b/api/core/v1beta1/cluster_types.go
-index c6ff0853b..276654149 100644
+index 5d6d69a9b..a6c844333 100644
 --- a/api/core/v1beta1/cluster_types.go
 +++ b/api/core/v1beta1/cluster_types.go
 @@ -477,6 +477,11 @@ type ClusterSpec struct {
@@ -180,10 +180,10 @@ index 9665953dd..8cf242133 100644
  	// search each annotation for during the pre-drain.delete lifecycle hook
  	// to pause reconciliation of deletion. These hooks will prevent removal of
 diff --git a/api/core/v1beta1/zz_generated.conversion.go b/api/core/v1beta1/zz_generated.conversion.go
-index eb54f254d..749d480c5 100644
+index c0514e67d..86fb469b3 100644
 --- a/api/core/v1beta1/zz_generated.conversion.go
 +++ b/api/core/v1beta1/zz_generated.conversion.go
-@@ -1483,6 +1483,7 @@ func autoConvert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, out
+@@ -1485,6 +1485,7 @@ func autoConvert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, out
  		return err
  	}
  	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
@@ -191,7 +191,7 @@ index eb54f254d..749d480c5 100644
  	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
  	// WARNING: in.Topology requires manual conversion: inconvertible types (*sigs.k8s.io/cluster-api/api/core/v1beta1.Topology vs sigs.k8s.io/cluster-api/api/core/v1beta2.Topology)
  	out.AvailabilityGates = *(*[]v1beta2.ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
-@@ -1498,6 +1499,7 @@ func autoConvert_v1beta2_ClusterSpec_To_v1beta1_ClusterSpec(in *v1beta2.ClusterS
+@@ -1500,6 +1501,7 @@ func autoConvert_v1beta2_ClusterSpec_To_v1beta1_ClusterSpec(in *v1beta2.ClusterS
  		return err
  	}
  	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
@@ -199,7 +199,7 @@ index eb54f254d..749d480c5 100644
  	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
  	// WARNING: in.Topology requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.Topology vs *sigs.k8s.io/cluster-api/api/core/v1beta1.Topology)
  	out.AvailabilityGates = *(*[]ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
-@@ -1523,6 +1525,8 @@ func autoConvert_v1beta1_ClusterStatus_To_v1beta2_ClusterStatus(in *ClusterStatu
+@@ -1525,6 +1527,8 @@ func autoConvert_v1beta1_ClusterStatus_To_v1beta2_ClusterStatus(in *ClusterStatu
  		out.Conditions = nil
  	}
  	out.ObservedGeneration = in.ObservedGeneration
@@ -208,7 +208,7 @@ index eb54f254d..749d480c5 100644
  	// WARNING: in.V1Beta2 requires manual conversion: does not exist in peer-type
  	return nil
  }
-@@ -1545,6 +1549,8 @@ func autoConvert_v1beta2_ClusterStatus_To_v1beta1_ClusterStatus(in *v1beta2.Clus
+@@ -1547,6 +1551,8 @@ func autoConvert_v1beta2_ClusterStatus_To_v1beta1_ClusterStatus(in *v1beta2.Clus
  	// WARNING: in.FailureDomains requires manual conversion: inconvertible types ([]sigs.k8s.io/cluster-api/api/core/v1beta2.FailureDomain vs sigs.k8s.io/cluster-api/api/core/v1beta1.FailureDomains)
  	out.Phase = in.Phase
  	out.ObservedGeneration = in.ObservedGeneration
@@ -234,10 +234,10 @@ index a1b090669..9bdcc4aef 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/api/core/v1beta1/zz_generated.openapi.go b/api/core/v1beta1/zz_generated.openapi.go
-index 13a78b237..c7285e46e 100644
+index 723cf5a90..f4c1a062e 100644
 --- a/api/core/v1beta1/zz_generated.openapi.go
 +++ b/api/core/v1beta1/zz_generated.openapi.go
-@@ -967,6 +967,12 @@ func schema_cluster_api_api_core_v1beta1_ClusterSpec(ref common.ReferenceCallbac
+@@ -966,6 +966,12 @@ func schema_cluster_api_api_core_v1beta1_ClusterSpec(ref common.ReferenceCallbac
  							Ref:         ref("k8s.io/api/core/v1.ObjectReference"),
  						},
  					},
@@ -250,7 +250,7 @@ index 13a78b237..c7285e46e 100644
  					"infrastructureRef": {
  						SchemaProps: spec.SchemaProps{
  							Description: "infrastructureRef is a reference to a provider-specific resource that holds the details for provisioning infrastructure for a cluster in said provider.",
-@@ -1089,6 +1095,22 @@ func schema_cluster_api_api_core_v1beta1_ClusterStatus(ref common.ReferenceCallb
+@@ -1088,6 +1094,22 @@ func schema_cluster_api_api_core_v1beta1_ClusterStatus(ref common.ReferenceCallb
  							Format:      "int64",
  						},
  					},
@@ -274,10 +274,10 @@ index 13a78b237..c7285e46e 100644
  						SchemaProps: spec.SchemaProps{
  							Description: "v1beta2 groups all the fields that will be added or modified in Cluster's status with the V1Beta2 version.",
 diff --git a/api/core/v1beta2/cluster_types.go b/api/core/v1beta2/cluster_types.go
-index af0969853..99ac9df03 100644
+index 9666455e9..b980dcb94 100644
 --- a/api/core/v1beta2/cluster_types.go
 +++ b/api/core/v1beta2/cluster_types.go
-@@ -477,6 +477,11 @@ type ClusterSpec struct {
+@@ -496,6 +496,11 @@ type ClusterSpec struct {
  	// +optional
  	ControlPlaneRef ContractVersionedObjectReference `json:"controlPlaneRef,omitempty,omitzero"`
  
@@ -289,7 +289,7 @@ index af0969853..99ac9df03 100644
  	// infrastructureRef is a reference to a provider-specific resource that holds the details
  	// for provisioning infrastructure for a cluster in said provider.
  	// +optional
-@@ -1353,6 +1358,15 @@ type ClusterStatus struct {
+@@ -1392,6 +1397,15 @@ type ClusterStatus struct {
  	// +kubebuilder:validation:Minimum=1
  	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
  
@@ -333,7 +333,7 @@ index 23abc6c2b..fa7bda307 100644
 +	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
 +)
 diff --git a/api/core/v1beta2/machine_types.go b/api/core/v1beta2/machine_types.go
-index a60f736ba..bef57a29f 100644
+index 399d3971c..e480f0773 100644
 --- a/api/core/v1beta2/machine_types.go
 +++ b/api/core/v1beta2/machine_types.go
 @@ -30,6 +30,9 @@ const (
@@ -347,10 +347,10 @@ index a60f736ba..bef57a29f 100644
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
 diff --git a/api/core/v1beta2/zz_generated.deepcopy.go b/api/core/v1beta2/zz_generated.deepcopy.go
-index 49d1f6655..a3c8c400d 100644
+index 5adb8a56c..f3cbddbae 100644
 --- a/api/core/v1beta2/zz_generated.deepcopy.go
 +++ b/api/core/v1beta2/zz_generated.deepcopy.go
-@@ -581,6 +581,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+@@ -618,6 +618,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
  	in.ClusterNetwork.DeepCopyInto(&out.ClusterNetwork)
  	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
  	out.ControlPlaneRef = in.ControlPlaneRef
@@ -359,10 +359,10 @@ index 49d1f6655..a3c8c400d 100644
  	in.Topology.DeepCopyInto(&out.Topology)
  	if in.AvailabilityGates != nil {
 diff --git a/api/core/v1beta2/zz_generated.openapi.go b/api/core/v1beta2/zz_generated.openapi.go
-index 6ada26c78..8d70d7313 100644
+index 6eecc0d32..4a212f40d 100644
 --- a/api/core/v1beta2/zz_generated.openapi.go
 +++ b/api/core/v1beta2/zz_generated.openapi.go
-@@ -1166,6 +1166,13 @@ func schema_cluster_api_api_core_v1beta2_ClusterSpec(ref common.ReferenceCallbac
+@@ -1239,6 +1239,13 @@ func schema_cluster_api_api_core_v1beta2_ClusterSpec(ref common.ReferenceCallbac
  							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference"),
  						},
  					},
@@ -376,7 +376,7 @@ index 6ada26c78..8d70d7313 100644
  					"infrastructureRef": {
  						SchemaProps: spec.SchemaProps{
  							Description: "infrastructureRef is a reference to a provider-specific resource that holds the details for provisioning infrastructure for a cluster in said provider.",
-@@ -1294,6 +1301,22 @@ func schema_cluster_api_api_core_v1beta2_ClusterStatus(ref common.ReferenceCallb
+@@ -1367,6 +1374,22 @@ func schema_cluster_api_api_core_v1beta2_ClusterStatus(ref common.ReferenceCallb
  							Format:      "int64",
  						},
  					},
@@ -400,10 +400,10 @@ index 6ada26c78..8d70d7313 100644
  						SchemaProps: spec.SchemaProps{
  							Description: "deprecated groups all the status fields that are deprecated and will be removed when all the nested field are removed.",
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index 08bf16d5a..7a3975073 100644
+index 51e42d86c..7fccfe674 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
-@@ -272,7 +272,10 @@ func (o *objectMover) checkProvisioningCompleted(ctx context.Context, graph *obj
+@@ -273,7 +273,10 @@ func (o *objectMover) checkProvisioningCompleted(ctx context.Context, graph *obj
  		}
  
  		if !machineObj.Status.NodeRef.IsDefined() {
@@ -416,7 +416,7 @@ index 08bf16d5a..7a3975073 100644
  	}
  
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 6bae359e8..791dceda3 100644
+index 2fc0166c8..8ae016c06 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 @@ -191,6 +191,51 @@ spec:
@@ -555,7 +555,7 @@ index 6bae359e8..791dceda3 100644
                observedGeneration:
                  description: observedGeneration is the latest generation observed
                    by the controller.
-@@ -949,6 +1057,51 @@ spec:
+@@ -946,6 +1054,51 @@ spec:
                      type: string
                  type: object
                  x-kubernetes-map-type: atomic
@@ -607,7 +607,7 @@ index 6bae359e8..791dceda3 100644
                paused:
                  description: paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -1986,6 +2139,15 @@ spec:
+@@ -1983,6 +2136,15 @@ spec:
                  description: infrastructureReady is the state of the infrastructure
                    provider.
                  type: boolean
@@ -623,7 +623,7 @@ index 6bae359e8..791dceda3 100644
                observedGeneration:
                  description: observedGeneration is the latest generation observed
                    by the controller.
-@@ -2423,6 +2585,42 @@ spec:
+@@ -2420,6 +2582,42 @@ spec:
                  - kind
                  - name
                  type: object
@@ -666,7 +666,7 @@ index 6bae359e8..791dceda3 100644
                paused:
                  description: paused can be used to prevent controllers from processing
                    the Cluster and all its associated objects.
-@@ -3705,6 +3903,15 @@ spec:
+@@ -3798,6 +3996,15 @@ spec:
                        The value of this field is never updated after provisioning is completed.
                      type: boolean
                  type: object
@@ -730,12 +730,12 @@ index d2bc13244..dbaf275dc 100644
 +	return endpoints, found, nil
 +}
 diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
-index ba9d19f28..4f91c170f 100644
+index 37f716312..25eeb3256 100644
 --- a/controlplane/kubeadm/config/rbac/role.yaml
 +++ b/controlplane/kubeadm/config/rbac/role.yaml
-@@ -90,3 +90,12 @@ rules:
-   - patch
-   - update
+@@ -107,3 +107,12 @@ rules:
+   - get
+   - list
    - watch
 +- apiGroups:
 +  - etcdcluster.cluster.x-k8s.io
@@ -746,8 +746,9 @@ index ba9d19f28..4f91c170f 100644
 +  - list
 +  - update
 +  - watch
+\ No newline at end of file
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index ec7502a70..c9faf2091 100644
+index 57ede403a..92d9c4301 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -19,6 +19,7 @@ package controllers
@@ -755,18 +756,18 @@ index ec7502a70..c9faf2091 100644
  	"context"
  	"fmt"
 +	"reflect"
+ 	"slices"
  	"sort"
  	"strings"
- 	"time"
 @@ -45,6 +46,7 @@ import (
  	controlplanev1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
  	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
  	"sigs.k8s.io/cluster-api/controllers/clustercache"
 +	"sigs.k8s.io/cluster-api/controllers/external"
  	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
+ 	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
  	"sigs.k8s.io/cluster-api/feature"
- 	"sigs.k8s.io/cluster-api/internal/contract"
-@@ -74,6 +76,7 @@ const (
+@@ -78,6 +80,7 @@ const (
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch;create;update;patch;delete
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machinepools,verbs=get;list;watch
  // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
@@ -774,7 +775,7 @@ index ec7502a70..c9faf2091 100644
  
  // KubeadmControlPlaneReconciler reconciles a KubeadmControlPlane object.
  type KubeadmControlPlaneReconciler struct {
-@@ -197,6 +200,31 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -214,6 +217,31 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  		log.Error(err, "Failed to configure the patch helper")
  		return ctrl.Result{Requeue: true}, nil
  	}
@@ -806,7 +807,7 @@ index ec7502a70..c9faf2091 100644
  
  	if isPaused, requeue, err := paused.EnsurePausedCondition(ctx, r.Client, cluster, kcp); err != nil || isPaused || requeue {
  		return ctrl.Result{}, err
-@@ -584,6 +612,21 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+@@ -630,6 +658,21 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
  	log := ctrl.LoggerFrom(ctx)
  	log.Info("Reconcile KubeadmControlPlane deletion")
  
@@ -828,7 +829,7 @@ index ec7502a70..c9faf2091 100644
  	// If no control plane machines remain, remove the finalizer
  	if len(controlPlane.Machines) == 0 {
  		controlPlane.DeletingReason = controlplanev1.KubeadmControlPlaneDeletingDeletionCompletedReason
-@@ -605,14 +648,6 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+@@ -651,14 +694,6 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
  	// all the machines are deleted in parallel.
  	v1beta1conditions.SetAggregate(controlPlane.KCP, controlplanev1.MachinesReadyV1Beta1Condition, controlPlane.Machines.ConditionGetters(), v1beta1conditions.AddSourceRef())
  
@@ -900,7 +901,7 @@ index 3c0b6195e..c9fd9e27e 100644
 +	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
 +)
 diff --git a/internal/api/core/v1alpha3/conversion.go b/internal/api/core/v1alpha3/conversion.go
-index 8cda6f6a2..00235d4cc 100644
+index 4f08b27ab..e66fc92d9 100644
 --- a/internal/api/core/v1alpha3/conversion.go
 +++ b/internal/api/core/v1alpha3/conversion.go
 @@ -92,6 +92,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
@@ -941,7 +942,7 @@ index 4cf78771f..67f09f688 100644
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
 diff --git a/internal/api/core/v1alpha3/zz_generated.conversion.go b/internal/api/core/v1alpha3/zz_generated.conversion.go
-index 0c9c76283..6a47e2cb2 100644
+index 532cb03ea..3bfa82992 100644
 --- a/internal/api/core/v1alpha3/zz_generated.conversion.go
 +++ b/internal/api/core/v1alpha3/zz_generated.conversion.go
 @@ -520,6 +520,7 @@ func autoConvert_v1alpha3_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, ou
@@ -1065,10 +1066,10 @@ index 9928bfc12..209de02c3 100644
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
 diff --git a/internal/api/core/v1alpha4/zz_generated.conversion.go b/internal/api/core/v1alpha4/zz_generated.conversion.go
-index 308061fec..d34a5f8d4 100644
+index c807a20e0..5c4ad098d 100644
 --- a/internal/api/core/v1alpha4/zz_generated.conversion.go
 +++ b/internal/api/core/v1alpha4/zz_generated.conversion.go
-@@ -757,6 +757,7 @@ func autoConvert_v1alpha4_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, ou
+@@ -759,6 +759,7 @@ func autoConvert_v1alpha4_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, ou
  		return err
  	}
  	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
@@ -1076,7 +1077,7 @@ index 308061fec..d34a5f8d4 100644
  	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
  	// WARNING: in.Topology requires manual conversion: inconvertible types (*sigs.k8s.io/cluster-api/internal/api/core/v1alpha4.Topology vs sigs.k8s.io/cluster-api/api/core/v1beta2.Topology)
  	return nil
-@@ -771,6 +772,7 @@ func autoConvert_v1beta2_ClusterSpec_To_v1alpha4_ClusterSpec(in *v1beta2.Cluster
+@@ -773,6 +774,7 @@ func autoConvert_v1beta2_ClusterSpec_To_v1alpha4_ClusterSpec(in *v1beta2.Cluster
  		return err
  	}
  	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
@@ -1084,7 +1085,7 @@ index 308061fec..d34a5f8d4 100644
  	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
  	// WARNING: in.Topology requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.Topology vs *sigs.k8s.io/cluster-api/internal/api/core/v1alpha4.Topology)
  	// WARNING: in.AvailabilityGates requires manual conversion: does not exist in peer-type
-@@ -796,6 +798,8 @@ func autoConvert_v1alpha4_ClusterStatus_To_v1beta2_ClusterStatus(in *ClusterStat
+@@ -798,6 +800,8 @@ func autoConvert_v1alpha4_ClusterStatus_To_v1beta2_ClusterStatus(in *ClusterStat
  		out.Conditions = nil
  	}
  	out.ObservedGeneration = in.ObservedGeneration
@@ -1093,7 +1094,7 @@ index 308061fec..d34a5f8d4 100644
  	return nil
  }
  
-@@ -817,6 +821,8 @@ func autoConvert_v1beta2_ClusterStatus_To_v1alpha4_ClusterStatus(in *v1beta2.Clu
+@@ -819,6 +823,8 @@ func autoConvert_v1beta2_ClusterStatus_To_v1alpha4_ClusterStatus(in *v1beta2.Clu
  	// WARNING: in.FailureDomains requires manual conversion: inconvertible types ([]sigs.k8s.io/cluster-api/api/core/v1beta2.FailureDomain vs sigs.k8s.io/cluster-api/internal/api/core/v1alpha4.FailureDomains)
  	out.Phase = in.Phase
  	out.ObservedGeneration = in.ObservedGeneration
@@ -1119,7 +1120,7 @@ index 6d3e29cb0..835b14751 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index 7e66695bd..6afbcb58a 100644
+index ff54eca90..8a2689478 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
 @@ -19,6 +19,7 @@ package cluster
@@ -1139,19 +1140,18 @@ index 7e66695bd..6afbcb58a 100644
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status;clusters/finalizers,verbs=get;list;watch;update;patch
  // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
  
-@@ -104,6 +105,11 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
+@@ -103,6 +104,10 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
+ 			&clusterv1.Machine{},
  			handler.EnqueueRequestsFromMapFunc(r.controlPlaneMachineToCluster),
- 			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
  		).
 +		Watches(
 +			&clusterv1.Machine{},
 +			handler.EnqueueRequestsFromMapFunc(r.etcdMachineToCluster),
-+			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
 +		).
  		Watches(
  			&clusterv1.MachineDeployment{},
  			handler.EnqueueRequestsFromMapFunc(r.machineDeploymentToCluster),
-@@ -229,6 +235,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -221,6 +226,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
  		r.reconcileV1Beta1ControlPlaneInitialized,
@@ -1159,7 +1159,7 @@ index 7e66695bd..6afbcb58a 100644
  	)
  	return doReconcile(ctx, reconcileNormal, s)
  }
-@@ -250,6 +257,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+@@ -242,6 +248,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
  			clusterv1.ReadyV1Beta1Condition,
  			clusterv1.ControlPlaneReadyV1Beta1Condition,
  			clusterv1.InfrastructureReadyV1Beta1Condition,
@@ -1167,7 +1167,7 @@ index 7e66695bd..6afbcb58a 100644
  		}},
  		patch.WithOwnedConditions{Conditions: []string{
  			clusterv1.PausedCondition,
-@@ -452,6 +460,37 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
+@@ -444,6 +451,37 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
  		}
  	}
  
@@ -1205,7 +1205,7 @@ index 7e66695bd..6afbcb58a 100644
  	if cluster.Spec.InfrastructureRef.IsDefined() {
  		if s.infraCluster == nil {
  			if !s.infraClusterIsNotFound {
-@@ -509,6 +548,7 @@ type clusterDescendants struct {
+@@ -501,6 +539,7 @@ type clusterDescendants struct {
  	machinesToBeRemediated collections.Machines
  	unhealthyMachines      collections.Machines
  	machinePools           clusterv1.MachinePoolList
@@ -1213,7 +1213,7 @@ index 7e66695bd..6afbcb58a 100644
  }
  
  // objectsPendingDeleteCount returns the number of descendants pending delete.
-@@ -540,6 +580,13 @@ func (c *clusterDescendants) objectsPendingDeleteNames(cluster *clusterv1.Cluste
+@@ -532,6 +571,13 @@ func (c *clusterDescendants) objectsPendingDeleteNames(cluster *clusterv1.Cluste
  			descendants = append(descendants, "Control plane Machines: "+clog.StringListToString(controlPlaneMachineNames))
  		}
  	}
@@ -1227,7 +1227,7 @@ index 7e66695bd..6afbcb58a 100644
  	machineDeploymentNames := make([]string, len(c.machineDeployments.Items))
  	for i, machineDeployment := range c.machineDeployments.Items {
  		machineDeploymentNames[i] = machineDeployment.Name
-@@ -608,7 +655,8 @@ func (r *Reconciler) getDescendants(ctx context.Context, s *scope) (reconcile.Re
+@@ -600,7 +646,8 @@ func (r *Reconciler) getDescendants(ctx context.Context, s *scope) (reconcile.Re
  	// Split machines into control plane and worker machines
  	descendants.allMachines = collections.FromMachineList(&machines)
  	descendants.controlPlaneMachines = descendants.allMachines.Filter(collections.ControlPlaneMachines(cluster.Name))
@@ -1237,7 +1237,7 @@ index 7e66695bd..6afbcb58a 100644
  	descendants.machinesToBeRemediated = descendants.allMachines.Filter(collections.IsUnhealthyAndOwnerRemediated)
  	descendants.unhealthyMachines = descendants.allMachines.Filter(collections.IsUnhealthy)
  
-@@ -654,6 +702,9 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
+@@ -646,6 +693,9 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
  		&c.machineSets,
  		toObjectList(c.workerMachines),
  	}
@@ -1247,7 +1247,7 @@ index 7e66695bd..6afbcb58a 100644
  	if feature.Gates.Enabled(feature.MachinePool) {
  		lists = append([]client.ObjectList{&c.machinePools}, lists...)
  	}
-@@ -744,6 +795,36 @@ func (r *Reconciler) controlPlaneMachineToCluster(ctx context.Context, o client.
+@@ -736,6 +786,36 @@ func (r *Reconciler) controlPlaneMachineToCluster(ctx context.Context, o client.
  	}}
  }
  
@@ -1285,7 +1285,7 @@ index 7e66695bd..6afbcb58a 100644
  // for Cluster to update when one of its own MachineDeployments gets updated.
  func (r *Reconciler) machineDeploymentToCluster(_ context.Context, o client.Object) []ctrl.Request {
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 531c47001..6c1674fc7 100644
+index d63670755..3888903e3 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -39,6 +39,8 @@ import (
@@ -1426,10 +1426,10 @@ index 531c47001..6c1674fc7 100644
  	log := ctrl.LoggerFrom(ctx)
  	cluster := s.cluster
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 645adb591..847023481 100644
+index cca27f177..bd5159f71 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
-@@ -682,6 +682,124 @@ func TestClusterReconcilerNodeRef(t *testing.T) {
+@@ -667,6 +667,124 @@ func TestClusterReconcilerNodeRef(t *testing.T) {
  	})
  }
  
@@ -1554,7 +1554,7 @@ index 645adb591..847023481 100644
  type machineDeploymentBuilder struct {
  	md clusterv1.MachineDeployment
  }
-@@ -761,6 +879,11 @@ func (b *machineBuilder) controlPlane() *machineBuilder {
+@@ -746,6 +864,11 @@ func (b *machineBuilder) controlPlane() *machineBuilder {
  	return b
  }
  
@@ -1566,7 +1566,7 @@ index 645adb591..847023481 100644
  func (b *machineBuilder) build() clusterv1.Machine {
  	return b.m
  }
-@@ -802,6 +925,9 @@ func TestFilterOwnedDescendants(t *testing.T) {
+@@ -783,6 +906,9 @@ func TestFilterOwnedDescendants(t *testing.T) {
  		ObjectMeta: metav1.ObjectMeta{
  			Name: "c",
  		},
@@ -1576,7 +1576,7 @@ index 645adb591..847023481 100644
  	}
  
  	md1NotOwnedByCluster := newMachineDeploymentBuilder().named("md1").build()
-@@ -826,6 +952,9 @@ func TestFilterOwnedDescendants(t *testing.T) {
+@@ -807,6 +933,9 @@ func TestFilterOwnedDescendants(t *testing.T) {
  	mp3NotOwnedByCluster := newMachinePoolBuilder().named("mp3").build()
  	mp4OwnedByCluster := newMachinePoolBuilder().named("mp4").ownedBy(&c).build()
  
@@ -1586,7 +1586,7 @@ index 645adb591..847023481 100644
  	d := clusterDescendants{
  		machineDeployments: clusterv1.MachineDeploymentList{
  			Items: []clusterv1.MachineDeployment{
-@@ -865,6 +994,12 @@ func TestFilterOwnedDescendants(t *testing.T) {
+@@ -846,6 +975,12 @@ func TestFilterOwnedDescendants(t *testing.T) {
  				mp4OwnedByCluster,
  			},
  		},
@@ -1599,7 +1599,7 @@ index 645adb591..847023481 100644
  	}
  
  	t.Run("Without a control plane object", func(t *testing.T) {
-@@ -884,6 +1019,7 @@ func TestFilterOwnedDescendants(t *testing.T) {
+@@ -865,6 +1000,7 @@ func TestFilterOwnedDescendants(t *testing.T) {
  			&m5OwnedByCluster,
  			&m3ControlPlaneOwnedByCluster,
  			&m6ControlPlaneOwnedByCluster,
@@ -1608,10 +1608,10 @@ index 645adb591..847023481 100644
  	})
  
 diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 7d1a62aca..9b824637c 100644
+index 04683f6d6..db9432334 100644
 --- a/internal/controllers/machine/machine_controller_noderef.go
 +++ b/internal/controllers/machine/machine_controller_noderef.go
-@@ -67,6 +67,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
+@@ -68,6 +68,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
  		return ctrl.Result{}, err
  	}
  
@@ -1625,20 +1625,20 @@ index 7d1a62aca..9b824637c 100644
 +
  	// Check that the Machine has a valid ProviderID.
  	if machine.Spec.ProviderID == "" {
- 		log.Info("Waiting for infrastructure provider to report spec.providerID", machine.Spec.InfrastructureRef.Kind, klog.KRef(machine.Namespace, machine.Spec.InfrastructureRef.Name))
+ 		v1beta1conditions.MarkFalse(machine, clusterv1.MachineNodeHealthyV1Beta1Condition, clusterv1.WaitingForNodeRefV1Beta1Reason, clusterv1.ConditionSeverityInfo, "")
 diff --git a/internal/controllers/machine/machine_controller_noderef_test.go b/internal/controllers/machine/machine_controller_noderef_test.go
-index 100cdfc9a..469ccdbb2 100644
+index 716c0f72c..f0288fddd 100644
 --- a/internal/controllers/machine/machine_controller_noderef_test.go
 +++ b/internal/controllers/machine/machine_controller_noderef_test.go
-@@ -41,6 +41,7 @@ import (
- 	"sigs.k8s.io/cluster-api/controllers/remote"
+@@ -44,6 +44,7 @@ import (
  	"sigs.k8s.io/cluster-api/internal/topology/ownerrefs"
+ 	capicontrollerutil "sigs.k8s.io/cluster-api/internal/util/controller"
  	"sigs.k8s.io/cluster-api/util"
 +	"sigs.k8s.io/cluster-api/util/conditions"
  	"sigs.k8s.io/cluster-api/util/kubeconfig"
  	"sigs.k8s.io/cluster-api/util/test/builder"
  )
-@@ -1489,3 +1490,47 @@ func Test_shouldNodeHaveOutdatedTaint(t *testing.T) {
+@@ -1782,3 +1783,47 @@ func Test_propagateMachineTaintsToNode(t *testing.T) {
  		})
  	}
  }
@@ -1687,7 +1687,7 @@ index 100cdfc9a..469ccdbb2 100644
 +	}
 +}
 diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
-index 27380dce1..e823b5831 100644
+index 6cedb6d2a..89ee5fa57 100644
 --- a/internal/controllers/machine/machine_controller_phases.go
 +++ b/internal/controllers/machine/machine_controller_phases.go
 @@ -22,6 +22,7 @@ import (
@@ -1706,7 +1706,7 @@ index 27380dce1..e823b5831 100644
  	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
  	"sigs.k8s.io/controller-runtime/pkg/handler"
  
-@@ -337,6 +339,121 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
+@@ -349,6 +351,121 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
  		m.Status.Addresses = *addresses
  	}
  
@@ -1829,10 +1829,10 @@ index 27380dce1..e823b5831 100644
  	failureDomain, err := contract.InfrastructureMachine().FailureDomain().Get(s.infraMachine)
  	switch {
 diff --git a/internal/controllers/machine/machine_controller_status.go b/internal/controllers/machine/machine_controller_status.go
-index 59c70cac0..a0bc53603 100644
+index d31128893..fbde3fa49 100644
 --- a/internal/controllers/machine/machine_controller_status.go
 +++ b/internal/controllers/machine/machine_controller_status.go
-@@ -818,6 +818,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
+@@ -921,6 +921,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
  	}
  
@@ -1843,14 +1843,14 @@ index 59c70cac0..a0bc53603 100644
 +		}
 +	}
 +
- 	// Set the phase to "deleting" if the deletion timestamp is set.
- 	if !m.DeletionTimestamp.IsZero() {
- 		m.Status.SetTypedPhase(clusterv1.MachinePhaseDeleting)
+ 	if conditions.IsTrue(m, clusterv1.MachineUpdatingCondition) {
+ 		m.Status.SetTypedPhase(clusterv1.MachinePhaseUpdating)
+ 	}
 diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
-index 4f7340622..5961ad44c 100644
+index 4efea929a..fac48c160 100644
 --- a/util/collections/machine_filters.go
 +++ b/util/collections/machine_filters.go
-@@ -122,6 +122,18 @@ func ControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) b
+@@ -123,6 +123,18 @@ func ControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) b
  	}
  }
  
@@ -1869,7 +1869,7 @@ index 4f7340622..5961ad44c 100644
  // AdoptableControlPlaneMachines returns a filter to find all un-controlled control plane machines.
  // Usage: GetFilteredMachinesForCluster(ctx, client, cluster, AdoptableControlPlaneMachines(cluster.Name, controlPlane)).
  func AdoptableControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) bool {
-@@ -271,6 +283,20 @@ func ControlPlaneSelectorForCluster(clusterName string) labels.Selector {
+@@ -272,6 +284,20 @@ func ControlPlaneSelectorForCluster(clusterName string) labels.Selector {
  	)
  }
  
@@ -1891,10 +1891,10 @@ index 4f7340622..5961ad44c 100644
  func MatchesKubernetesVersion(kubernetesVersion string) Func {
  	return func(machine *clusterv1.Machine) bool {
 diff --git a/util/secret/certificates.go b/util/secret/certificates.go
-index 8af1c12ee..3e4306917 100644
+index b8dc6405f..7afc9e96e 100644
 --- a/util/secret/certificates.go
 +++ b/util/secret/certificates.go
-@@ -445,6 +445,9 @@ func (c Certificates) AsFiles() []bootstrapv1.File {
+@@ -454,6 +454,9 @@ func (c Certificates) AsFiles() []bootstrapv1.File {
  	if serviceAccountKey := c.GetByPurpose(ServiceAccount); serviceAccountKey != nil {
  		certFiles = append(certFiles, serviceAccountKey.AsFiles()...)
  	}
@@ -1918,10 +1918,10 @@ index d50062da3..043764325 100644
  
  var (
 diff --git a/util/util.go b/util/util.go
-index 684ef3d07..3566067a6 100644
+index 992d574dd..48aae469c 100644
 --- a/util/util.go
 +++ b/util/util.go
-@@ -145,6 +145,12 @@ func IsNodeReady(node *corev1.Node) bool {
+@@ -146,6 +146,12 @@ func IsNodeReady(node *corev1.Node) bool {
  	return false
  }
  
@@ -1935,5 +1935,5 @@ index 684ef3d07..3566067a6 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.49.0
+2.50.1 (Apple Git-155)
 

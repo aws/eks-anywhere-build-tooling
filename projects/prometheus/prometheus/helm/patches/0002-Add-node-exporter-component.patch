@@ -1,20 +1,19 @@
-From 07b9cb50b5708d550f14b22f0d0e5f8d3e5fb34b Mon Sep 17 00:00:00 2001
-From: Jhaanvi Golani <jhaanvi@amazon.com>
-Date: Fri, 23 Aug 2024 14:07:54 -0700
-Subject: [PATCH] Add node-exporter component
+From 8fed90a379699168b74814a695b58c10214cd603 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Wed, 17 Dec 2025 21:55:28 -0800
+Subject: [PATCH 2/6] Add node-exporter component
 
 ---
- charts/prometheus/templates/NOTES.txt         |  10 +
- charts/prometheus/templates/_helpers.tpl      |  45 ++++
- charts/prometheus/templates/cm.yaml           |   1 -
- .../templates/node-exporter/daemonset.yaml    | 150 +++++++++++
- .../templates/node-exporter/psp.yaml          |  57 +++++
+ charts/prometheus/templates/NOTES.txt         |  10 ++
+ charts/prometheus/templates/_helpers.tpl      |  45 +++++
+ .../templates/node-exporter/daemonset.yaml    | 150 ++++++++++++++++
+ .../templates/node-exporter/psp.yaml          |  57 ++++++
  .../templates/node-exporter/role.yaml         |  17 ++
  .../templates/node-exporter/rolebinding.yaml  |  19 ++
- .../node-exporter/serviceaccount.yaml         |  11 +
- .../templates/node-exporter/svc.yaml          |  47 ++++
- charts/prometheus/values.yaml                 | 241 +++++++++++-------
- 10 files changed, 508 insertions(+), 90 deletions(-)
+ .../node-exporter/serviceaccount.yaml         |  11 ++
+ .../templates/node-exporter/svc.yaml          |  47 +++++
+ charts/prometheus/values.yaml                 | 165 ++++++++++++++++++
+ 9 files changed, 521 insertions(+)
  create mode 100644 charts/prometheus/templates/node-exporter/daemonset.yaml
  create mode 100644 charts/prometheus/templates/node-exporter/psp.yaml
  create mode 100644 charts/prometheus/templates/node-exporter/role.yaml
@@ -23,10 +22,10 @@ Subject: [PATCH] Add node-exporter component
  create mode 100644 charts/prometheus/templates/node-exporter/svc.yaml
 
 diff --git a/charts/prometheus/templates/NOTES.txt b/charts/prometheus/templates/NOTES.txt
-index d9474bc2..003a8fef 100644
+index 5a953118..4802f954 100644
 --- a/charts/prometheus/templates/NOTES.txt
 +++ b/charts/prometheus/templates/NOTES.txt
-@@ -33,5 +33,15 @@ Get the Prometheus server URL by running these commands in the same shell:
+@@ -38,5 +38,15 @@ Get the Prometheus server URL by running these commands in the same shell:
  {{- end }}
  {{- end }}
  
@@ -43,10 +42,10 @@ index d9474bc2..003a8fef 100644
  For more information on running Prometheus, visit:
  https://prometheus.io/
 diff --git a/charts/prometheus/templates/_helpers.tpl b/charts/prometheus/templates/_helpers.tpl
-index b7202480..06850b65 100644
+index ea252283..fc0b0cbf 100644
 --- a/charts/prometheus/templates/_helpers.tpl
 +++ b/charts/prometheus/templates/_helpers.tpl
-@@ -34,6 +34,16 @@ app.kubernetes.io/part-of: {{ include "prometheus.name" . }}
+@@ -40,6 +40,16 @@ app.kubernetes.io/part-of: {{ include "prometheus.name" . }}
  {{- end }}
  {{- end -}}
  
@@ -63,7 +62,7 @@ index b7202480..06850b65 100644
  {{- define "prometheus.server.labels" -}}
  {{ include "prometheus.server.matchLabels" . }}
  {{ include "prometheus.common.metaLabels" . }}
-@@ -61,6 +71,23 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this
+@@ -67,6 +77,23 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this
  {{- end -}}
  {{- end -}}
  
@@ -87,8 +86,8 @@ index b7202480..06850b65 100644
  {{/*
  Create a fully qualified ClusterRole name.
  We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-@@ -104,6 +131,13 @@ Return the appropriate apiVersion for deployment.
- {{- print "apps/v1" -}}
+@@ -103,6 +130,13 @@ Get KubeVersion removing pre-release information.
+   {{- default .Capabilities.KubeVersion.Version (regexFind "v[0-9]+\\.[0-9]+\\.[0-9]+" .Capabilities.KubeVersion.Version) -}}
  {{- end -}}
  
 +{{/*
@@ -101,8 +100,8 @@ index b7202480..06850b65 100644
  {{/*
  Return the appropriate apiVersion for networkpolicy.
  */}}
-@@ -167,6 +201,17 @@ Return if ingress supports pathType.
-   {{- or (eq (include "ingress.isStable" .) "true") (and (eq (include "ingress.apiVersion" .) "networking.k8s.io/v1beta1") (semverCompare ">= 1.18.x" (include "prometheus.kubeVersion" .))) -}}
+@@ -110,6 +144,17 @@ Return the appropriate apiVersion for networkpolicy.
+ {{- print "networking.k8s.io/v1" -}}
  {{- end -}}
  
 +{{/*
@@ -119,15 +118,6 @@ index b7202480..06850b65 100644
  {{/*
  Create the name of the service account to use for the server component
  */}}
-diff --git a/charts/prometheus/templates/cm.yaml b/charts/prometheus/templates/cm.yaml
-index 6ad50cfc..acd5ad21 100644
---- a/charts/prometheus/templates/cm.yaml
-+++ b/charts/prometheus/templates/cm.yaml
-@@ -77,4 +77,3 @@ data:
- {{- end -}}
- {{- end -}}
- {{- end -}}
--{{- end -}}
 diff --git a/charts/prometheus/templates/node-exporter/daemonset.yaml b/charts/prometheus/templates/node-exporter/daemonset.yaml
 new file mode 100644
 index 00000000..d75f8a1c
@@ -466,10 +456,19 @@ index 00000000..dad0130a
 +  type: "{{ .Values.nodeExporter.service.type }}"
 +{{- end -}}
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index ccfcb14d..3b6d495a 100644
+index e4e7c5b0..134f8f93 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
-@@ -15,6 +15,10 @@ imagePullSecrets: []
+@@ -6,12 +6,19 @@
+ rbac:
+   create: true
+ 
++podSecurityPolicy:
++  enabled: false
++
+ imagePullSecrets: []
+ # - name: "image-pull-secret"
+ 
  ## Define serviceAccount names for components. Defaults to component's fully qualified name.
  ##
  serviceAccounts:
@@ -480,102 +479,39 @@ index ccfcb14d..3b6d495a 100644
    server:
      create: true
      name: ""
-@@ -27,104 +31,163 @@ serviceAccounts:
+@@ -24,6 +31,164 @@ serviceAccounts:
  ## Additional labels to attach to all resources
  commonMetaLabels: {}
  
--## Monitors ConfigMap changes and POSTs to a URL
--## Ref: https://github.com/prometheus-operator/prometheus-operator/tree/main/cmd/prometheus-config-reloader
--##
--configmapReload:
--  ## URL for configmap-reload to use for reloads
 +
 +nodeExporter:
 +  ## If false, node-exporter will not be installed
-   ##
--  reloadUrl: ""
++  ##
 +  enabled: true
- 
--  ## env sets environment variables to pass to the container. Can be set as name/value pairs,
--  ## read from secrets or configmaps.
--  env: []
--    # - name: SOMEVAR
--    #   value: somevalue
--    # - name: PASSWORD
--    #   valueFrom:
--    #     secretKeyRef:
--    #       name: mysecret
--    #       key: password
--    #       optional: false
--
--  prometheus:
--    ## If false, the configmap-reload container will not be deployed
--    ##
--    enabled: true
++
 +  ## If true, node-exporter pods share the host network namespace
 +  ##
 +  hostNetwork: true
- 
--    ## configmap-reload container name
--    ##
--    name: configmap-reload
++
 +  ## If true, node-exporter pods share the host PID namespace
 +  ##
 +  hostPID: true
- 
--    ## configmap-reload container image
--    ##
--    image:
--      repository: quay.io/prometheus-operator/prometheus-config-reloader
--      tag: v0.75.2
--      # When digest is set to a non-empty value, images will be pulled by digest (regardless of tag value).
--      digest: ""
--      pullPolicy: IfNotPresent
--
--    ## config-reloader's container port and port name for probes and metrics
--    containerPort: 8080
--    containerPortName: metrics
--
--    ## Additional configmap-reload container arguments
--    ## Set to null for argumentless flags
--    ##
--    extraArgs: {}
++
 +  ## If true, node-exporter pods mounts host / at /host/root
 +  ##
 +  hostRootfs: true
- 
--    ## Additional configmap-reload volume directories
--    ##
--    extraVolumeDirs: []
++
 +  ## node-exporter container name
 +  ##
 +  name: node-exporter
- 
--    ## Additional configmap-reload volume mounts
--    ##
--    extraVolumeMounts: []
++
 +  ## node-exporter container image
 +  ##
 +  image:
 +    repository: quay.io/prometheus/node-exporter
 +    tag: v1.3.1
 +    pullPolicy: IfNotPresent
- 
--    ## Additional configmap-reload mounts
--    ##
--    extraConfigmapMounts: []
--      # - name: prometheus-alerts
--      #   mountPath: /etc/alerts.d
--      #   subPath: ""
--      #   configMap: prometheus-alerts
--      #   readOnly: true
--
--    ## Security context to be added to configmap-reload container
--    containerSecurityContext: {}
--
--    ## Settings for Prometheus reloader's readiness, liveness and startup probes
--    ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
--    ##
++
 +  ## Specify if a Pod Security Policy for node-exporter must be created
 +  ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
 +  ##
@@ -589,32 +525,7 @@ index ccfcb14d..3b6d495a 100644
 +      # seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
 +      # seccomp.security.alpha.kubernetes.io/defaultProfileName: 'docker/default'
 +      # apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
- 
--    livenessProbe:
--      httpGet:
--        path: /healthz
--        port: metrics
--        scheme: HTTP
--      periodSeconds: 10
--      initialDelaySeconds: 2
--
--    readinessProbe:
--      httpGet:
--        path: /healthz
--        port: metrics
--        scheme: HTTP
--      periodSeconds: 10
--
--    startupProbe:
--      enabled: false
--      httpGet:
--        path: /healthz
--        port: metrics
--        scheme: HTTP
--      periodSeconds: 10
--
--    ## configmap-reload resource requests and limits
--    ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
++
 +  ## node-exporter priorityClassName
 +  ##
 +  priorityClassName: ""
@@ -721,8 +632,7 @@ index ccfcb14d..3b6d495a 100644
 +
 +    ## List of IP addresses at which the node-exporter service is available
 +    ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
-     ##
--    resources: {}
++    ##
 +    externalIPs: []
 +
 +    hostPort: 9100
@@ -730,9 +640,10 @@ index ccfcb14d..3b6d495a 100644
 +    loadBalancerSourceRanges: []
 +    servicePort: 9100
 +    type: ClusterIP
- 
++
  server:
    ## Prometheus server container name
+   ##
 -- 
-2.44.0
+2.50.1 (Apple Git-155)
 

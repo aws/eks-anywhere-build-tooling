@@ -1,0 +1,169 @@
+From b7be2e65c1d43dc1b570a4ba13013a397e0e10c0 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Mon, 27 Oct 2025 16:14:56 -0700
+Subject: [PATCH 35/36] Fix missing registryMirror.mirrors field in kcp
+ conversion webhook
+
+---
+ api/bootstrap/kubeadm/v1beta1/kubeadm_types.go                | 1 -
+ api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go      | 4 ++--
+ api/bootstrap/kubeadm/v1beta2/kubeadm_types.go                | 1 -
+ bootstrap/kubeadm/types/upstreamv1beta3/types.go              | 1 -
+ .../kubeadm/types/upstreamv1beta3/zz_generated.conversion.go  | 4 ++--
+ bootstrap/kubeadm/types/upstreamv1beta4/types.go              | 1 -
+ .../kubeadm/types/upstreamv1beta4/zz_generated.conversion.go  | 4 ++--
+ internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go      | 1 -
+ .../api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go | 4 ++--
+ 9 files changed, 8 insertions(+), 13 deletions(-)
+
+diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
+index bdfdb9fbb..fccc2b498 100644
+--- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
++++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
+@@ -437,7 +437,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+index 1265aa3a8..5e6f79039 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+@@ -2312,7 +2312,7 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
+ func autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]v1beta2.Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+@@ -2324,7 +2324,7 @@ func Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfig
+ func autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
+index 73d8c8e21..21d7b5076 100644
+--- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
++++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
+@@ -151,7 +151,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+index 7d4ccbf74..e6c241c68 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+@@ -267,7 +267,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index 6c5cc3d92..078c26875 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -1307,7 +1307,7 @@ func Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(in
+ func autoConvert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]v1beta2.Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+@@ -1319,7 +1319,7 @@ func Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirr
+ func autoConvert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/types.go b/bootstrap/kubeadm/types/upstreamv1beta4/types.go
+index 9e2bf420a..ca2190b12 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta4/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta4/types.go
+@@ -292,7 +292,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+index 24241aecf..937c3a6e7 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+@@ -1466,7 +1466,7 @@ func Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_ProxyConfiguration(in
+ func autoConvert_upstreamv1beta4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]v1beta2.Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+@@ -1478,7 +1478,7 @@ func Convert_upstreamv1beta4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirr
+ func autoConvert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta4_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+index a39c61f4b..a61be287e 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/kubeadm_types.go
+@@ -261,7 +261,6 @@ type RegistryMirrorConfiguration struct {
+ 	CACert string `json:"caCert,omitempty"`
+ 
+ 	// Mirrors defines a list of image registry mirrors.
+-	// +k8s:conversion-gen=false
+ 	// +optional
+ 	Mirrors []Mirror `json:"mirrors,omitempty"`
+ }
+diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+index 8dab56054..a828c7c8f 100644
+--- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
++++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
+@@ -1937,7 +1937,7 @@ func Convert_v1beta2_ProxyConfiguration_To_v1alpha4_ProxyConfiguration(in *v1bet
+ func autoConvert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]v1beta2.Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+@@ -1949,7 +1949,7 @@ func Convert_v1alpha4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfi
+ func autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1alpha4_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
+-	// INFO: in.Mirrors opted out of conversion generation
++	out.Mirrors = *(*[]Mirror)(unsafe.Pointer(&in.Mirrors))
+ 	return nil
+ }
+ 
+-- 
+2.50.1 (Apple Git-155)
+

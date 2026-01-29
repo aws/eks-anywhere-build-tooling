@@ -1,37 +1,18 @@
-From 01b7d91da92bb2ee709d896dc3b10732981273fd Mon Sep 17 00:00:00 2001
-From: "Ostosh, Ivy" <ivyjin215@gmail.com>
-Date: Tue, 29 Nov 2022 17:33:59 -0600
+From 816acce459e8fb4f7258fab754216d4558b5e6a3 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Wed, 17 Dec 2025 21:57:26 -0800
 Subject: [PATCH 5/6] Update pod update strategy due to configmap changes
 
 ---
  charts/prometheus/templates/deploy.yaml | 5 +++--
- charts/prometheus/templates/sts.yaml    | 5 +++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
-index c0076871..b9bd56f1 100644
+index 65951fda..77671cc1 100644
 --- a/charts/prometheus/templates/deploy.yaml
 +++ b/charts/prometheus/templates/deploy.yaml
-@@ -23,10 +23,11 @@ spec:
- {{- end }}
-   template:
-     metadata:
--    {{- if .Values.server.podAnnotations }}
-       annotations:
-+        checksum/config: {{ include (print $.Template.BasePath "/cm.yaml") . | sha256sum }}
-+      {{- if .Values.server.podAnnotations }}
-         {{ toYaml .Values.server.podAnnotations | nindent 8 }}
--    {{- end }}
-+      {{- end }}
-       labels:
-         {{- include "prometheus.server.labels" . | nindent 8 }}
-         {{- if .Values.server.podLabels}}
-diff --git a/charts/prometheus/templates/sts.yaml b/charts/prometheus/templates/sts.yaml
-index 66023293..811b0893 100644
---- a/charts/prometheus/templates/sts.yaml
-+++ b/charts/prometheus/templates/sts.yaml
-@@ -28,10 +28,11 @@ spec:
-   podManagementPolicy: {{ .Values.server.statefulSet.podManagementPolicy }}
+@@ -65,10 +65,11 @@ spec:
+   revisionHistoryLimit: {{ .Values.server.revisionHistoryLimit }}
    template:
      metadata:
 -    {{- if .Values.server.podAnnotations }}
@@ -45,5 +26,5 @@ index 66023293..811b0893 100644
          {{- include "prometheus.server.labels" . | nindent 8 }}
          {{- if .Values.server.podLabels}}
 -- 
-2.44.0
+2.50.1 (Apple Git-155)
 

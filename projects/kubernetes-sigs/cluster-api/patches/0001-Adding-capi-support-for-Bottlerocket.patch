@@ -1,7 +1,7 @@
-From 049bd358bad6dd56214f6a1f1b1f2d698ae360d7 Mon Sep 17 00:00:00 2001
+From e662675c5e9b92492fd92c456aa0a637a621f2ed Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Fri, 11 Jun 2021 10:43:09 -0700
-Subject: [PATCH 01/38] Adding capi support for Bottlerocket
+Subject: [PATCH 01/36] Adding capi support for Bottlerocket
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 
@@ -56,7 +56,7 @@ Remove userdata logging for bottlerocket
  .../kubeadm/types/upstreamv1beta4/types.go    |  85 +++++
  .../zz_generated.conversion.go                | 114 ++++++-
  .../upstreamv1beta4/zz_generated.deepcopy.go  |  45 ++-
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 318 ++++++++++++++++++
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 317 +++++++++++++++++
  ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 317 +++++++++++++++++
  .../kubeadm/v1alpha3/kubeadmconfig_types.go   |   5 +-
  .../v1alpha3/zz_generated.conversion.go       |   6 +
@@ -65,7 +65,7 @@ Remove userdata logging for bottlerocket
  .../kubeadm/v1alpha4/kubeadmconfig_types.go   |   5 +-
  .../v1alpha4/zz_generated.conversion.go       | 110 ++++++
  .../kubeadm/v1alpha4/zz_generated.deepcopy.go |  58 ++++
- 36 files changed, 2765 insertions(+), 8 deletions(-)
+ 36 files changed, 2764 insertions(+), 8 deletions(-)
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bottlerocket_test.go
@@ -77,7 +77,7 @@ Remove userdata logging for bottlerocket
  create mode 100644 bootstrap/kubeadm/internal/bottlerocket/utils.go
 
 diff --git a/.gitignore b/.gitignore
-index 78da1a303..3116e7079 100644
+index 49eabbd2c..5692139a4 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -9,7 +9,7 @@ hack/tools/bin
@@ -88,12 +88,12 @@ index 78da1a303..3116e7079 100644
 +patches
  # E2E test templates
  test/e2e/data/infrastructure-docker/**/cluster-template*.yaml
- !test/e2e/data/infrastructure-docker/**/clusterclass-quick-start.yaml
+ !test/e2e/data/infrastructure-docker/**/clusterclass-quick-start-runtimesdk.yaml
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index 3f6bf3eeb..f80cd5477 100644
+index 8c5d7c57f..5de27f7a4 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
-@@ -658,6 +658,30 @@ func Convert_v1beta2_DNS_To_v1beta1_DNS(in *bootstrapv1.DNS, out *DNS, _ apimach
+@@ -661,6 +661,30 @@ func Convert_v1beta2_DNS_To_v1beta1_DNS(in *bootstrapv1.DNS, out *DNS, _ apimach
  	return nil
  }
  
@@ -226,7 +226,7 @@ index 98a582479..5c63ca65f 100644
  
  var (
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index bae21feb4..3e8083317 100644
+index 16b20da9e..930b5cf70 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -290,6 +290,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -339,7 +339,7 @@ index bae21feb4..3e8083317 100644
  	if err := Convert_v1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -1076,6 +1135,15 @@ func autoConvert_v1beta2_InitConfiguration_To_v1beta1_InitConfiguration(in *v1be
+@@ -1077,6 +1136,15 @@ func autoConvert_v1beta2_InitConfiguration_To_v1beta1_InitConfiguration(in *v1be
  
  func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *JoinConfiguration, out *v1beta2.JoinConfiguration, s conversion.Scope) error {
  	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
@@ -355,7 +355,7 @@ index bae21feb4..3e8083317 100644
  	if err := Convert_v1beta1_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1090,6 +1158,15 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+@@ -1091,6 +1159,15 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
  }
  
  func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1beta2.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -371,7 +371,7 @@ index bae21feb4..3e8083317 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1708,6 +1785,39 @@ func Convert_v1beta2_Patches_To_v1beta1_Patches(in *v1beta2.Patches, out *Patche
+@@ -1709,6 +1786,39 @@ func Convert_v1beta2_Patches_To_v1beta1_Patches(in *v1beta2.Patches, out *Patche
  	return autoConvert_v1beta2_Patches_To_v1beta1_Patches(in, out, s)
  }
  
@@ -499,10 +499,10 @@ index 0bb852981..d73d37506 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index e9f17e19a..14862bfc6 100644
+index 17e3bfc78..2d5a307fe 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -128,6 +128,20 @@ func (r *InitConfiguration) IsDefined() bool {
+@@ -145,6 +145,20 @@ func (r *InitConfiguration) IsDefined() bool {
  // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster.
  // +kubebuilder:validation:MinProperties=1
  type ClusterConfiguration struct {
@@ -523,8 +523,8 @@ index e9f17e19a..14862bfc6 100644
  	// etcd holds configuration for etcd.
  	// NB: This value defaults to a Local (stacked) etcd
  	// +optional
-@@ -210,6 +224,55 @@ type ClusterConfiguration struct {
- 	CACertificateValidityPeriodDays int32 `json:"caCertificateValidityPeriodDays,omitempty"`
+@@ -228,6 +242,55 @@ type ClusterConfiguration struct {
+ 	EncryptionAlgorithm EncryptionAlgorithmType `json:"encryptionAlgorithm,omitempty"`
  }
  
 +// Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
@@ -579,7 +579,7 @@ index e9f17e19a..14862bfc6 100644
  // IsDefined returns true if the ClusterConfiguration is defined.
  func (r *ClusterConfiguration) IsDefined() bool {
  	return !reflect.DeepEqual(r, &ClusterConfiguration{})
-@@ -592,6 +655,20 @@ func (r *ExternalEtcd) IsDefined() bool {
+@@ -615,6 +678,20 @@ func (r *ExternalEtcd) IsDefined() bool {
  // JoinConfiguration contains elements describing a particular node.
  // +kubebuilder:validation:MinProperties=1
  type JoinConfiguration struct {
@@ -708,7 +708,7 @@ index c05400515..33ec37d7c 100644
  func (in *Scheduler) DeepCopyInto(out *Scheduler) {
  	*out = *in
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 13c7c3dfd..d33f51ba0 100644
+index 2902ef5f8..8c9d7a30a 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -505,6 +505,7 @@ spec:
@@ -719,7 +719,7 @@ index 13c7c3dfd..d33f51ba0 100644
                  type: string
                initConfiguration:
                  description: initConfiguration along with ClusterConfiguration are
-@@ -1111,6 +1112,22 @@ spec:
+@@ -1109,6 +1110,22 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -742,7 +742,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    certificatesDir:
                      description: |-
                        certificatesDir specifies where to store or look for all required certificates.
-@@ -1316,6 +1333,36 @@ spec:
+@@ -1314,6 +1331,36 @@ spec:
                            to "10.96.0.0/12" if that's unset.
                          type: string
                      type: object
@@ -779,7 +779,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    scheduler:
                      description: scheduler contains extra settings for the scheduler
                        control plane component
-@@ -1499,6 +1546,7 @@ spec:
+@@ -1497,6 +1544,7 @@ spec:
                  description: format specifies the output format of the bootstrap data
                  enum:
                  - cloud-config
@@ -787,7 +787,7 @@ index 13c7c3dfd..d33f51ba0 100644
                  type: string
                initConfiguration:
                  description: initConfiguration along with ClusterConfiguration are
-@@ -1665,6 +1713,22 @@ spec:
+@@ -1662,6 +1710,22 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -810,7 +810,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    caCertPath:
                      description: |-
                        caCertPath is the path to the SSL certificate authority used to
-@@ -1830,6 +1894,36 @@ spec:
+@@ -1826,6 +1890,36 @@ spec:
                            type: object
                          type: array
                      type: object
@@ -847,7 +847,7 @@ index 13c7c3dfd..d33f51ba0 100644
                  type: object
                mounts:
                  description: mounts specifies a list of mount points to be setup.
-@@ -2249,6 +2343,26 @@ spec:
+@@ -2283,6 +2377,26 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -874,7 +874,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    certificatesDir:
                      description: |-
                        certificatesDir specifies where to store or look for all required certificates.
-@@ -2758,6 +2872,40 @@ spec:
+@@ -2868,6 +2982,40 @@ spec:
                          minLength: 1
                          type: string
                      type: object
@@ -915,7 +915,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    scheduler:
                      description: scheduler contains extra settings for the scheduler
                        control plane component
-@@ -3109,6 +3257,7 @@ spec:
+@@ -3257,6 +3405,7 @@ spec:
                  enum:
                  - cloud-config
                  - ignition
@@ -923,7 +923,7 @@ index 13c7c3dfd..d33f51ba0 100644
                  type: string
                ignition:
                  description: ignition contains Ignition specific configuration.
-@@ -3365,6 +3514,26 @@ spec:
+@@ -3512,6 +3661,26 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -950,7 +950,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    caCertPath:
                      description: |-
                        caCertPath is the path to the SSL certificate authority used to
-@@ -3743,6 +3912,40 @@ spec:
+@@ -3889,6 +4058,40 @@ spec:
                          minLength: 1
                          type: string
                      type: object
@@ -991,7 +991,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    skipPhases:
                      description: |-
                        skipPhases is a list of phases to skip during command execution.
-@@ -4363,6 +4566,26 @@ spec:
+@@ -4547,6 +4750,26 @@ spec:
                          type: array
                          x-kubernetes-list-type: atomic
                      type: object
@@ -1018,7 +1018,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    caCertificateValidityPeriodDays:
                      description: |-
                        caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4911,6 +5134,40 @@ spec:
+@@ -5178,6 +5401,40 @@ spec:
                      maxLength: 512
                      minLength: 1
                      type: string
@@ -1059,7 +1059,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    scheduler:
                      description: scheduler contains extra settings for the scheduler
                        control plane component
-@@ -5302,6 +5559,7 @@ spec:
+@@ -5607,6 +5864,7 @@ spec:
                  enum:
                  - cloud-config
                  - ignition
@@ -1067,7 +1067,7 @@ index 13c7c3dfd..d33f51ba0 100644
                  type: string
                ignition:
                  description: ignition contains Ignition specific configuration.
-@@ -5638,6 +5896,26 @@ spec:
+@@ -5942,6 +6200,26 @@ spec:
                    join command
                  minProperties: 1
                  properties:
@@ -1094,7 +1094,7 @@ index 13c7c3dfd..d33f51ba0 100644
                    caCertPath:
                      description: |-
                        caCertPath is the path to the SSL certificate authority used to
-@@ -6047,6 +6325,40 @@ spec:
+@@ -6350,6 +6628,40 @@ spec:
                          minLength: 1
                          type: string
                      type: object
@@ -1136,7 +1136,7 @@ index 13c7c3dfd..d33f51ba0 100644
                      description: |-
                        skipPhases is a list of phases to skip during command execution.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 0c742aa79..cab4d6eb5 100644
+index 6a458e6de..a44a47aa6 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -525,6 +525,7 @@ spec:
@@ -1147,7 +1147,7 @@ index 0c742aa79..cab4d6eb5 100644
                          type: string
                        initConfiguration:
                          description: initConfiguration along with ClusterConfiguration
-@@ -1074,6 +1075,22 @@ spec:
+@@ -1072,6 +1073,22 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -1170,7 +1170,7 @@ index 0c742aa79..cab4d6eb5 100644
                            certificatesDir:
                              description: |-
                                certificatesDir specifies where to store or look for all required certificates.
-@@ -1283,6 +1300,37 @@ spec:
+@@ -1281,6 +1298,37 @@ spec:
                                    to "10.96.0.0/12" if that's unset.
                                  type: string
                              type: object
@@ -1208,7 +1208,7 @@ index 0c742aa79..cab4d6eb5 100644
                            scheduler:
                              description: scheduler contains extra settings for the
                                scheduler control plane component
-@@ -1474,6 +1522,7 @@ spec:
+@@ -1472,6 +1520,7 @@ spec:
                            data
                          enum:
                          - cloud-config
@@ -1216,7 +1216,7 @@ index 0c742aa79..cab4d6eb5 100644
                          type: string
                        initConfiguration:
                          description: initConfiguration along with ClusterConfiguration
-@@ -1641,6 +1690,22 @@ spec:
+@@ -1638,6 +1687,22 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -1239,7 +1239,7 @@ index 0c742aa79..cab4d6eb5 100644
                            caCertPath:
                              description: |-
                                caCertPath is the path to the SSL certificate authority used to
-@@ -1809,6 +1874,37 @@ spec:
+@@ -1805,6 +1870,37 @@ spec:
                                    type: object
                                  type: array
                              type: object
@@ -1277,7 +1277,7 @@ index 0c742aa79..cab4d6eb5 100644
                          type: object
                        mounts:
                          description: mounts specifies a list of mount points to be
-@@ -2202,6 +2298,26 @@ spec:
+@@ -2236,6 +2332,26 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -1304,7 +1304,7 @@ index 0c742aa79..cab4d6eb5 100644
                            certificatesDir:
                              description: |-
                                certificatesDir specifies where to store or look for all required certificates.
-@@ -2724,6 +2840,41 @@ spec:
+@@ -2834,6 +2950,41 @@ spec:
                                  minLength: 1
                                  type: string
                              type: object
@@ -1346,7 +1346,7 @@ index 0c742aa79..cab4d6eb5 100644
                            scheduler:
                              description: scheduler contains extra settings for the
                                scheduler control plane component
-@@ -3087,6 +3238,7 @@ spec:
+@@ -3235,6 +3386,7 @@ spec:
                          enum:
                          - cloud-config
                          - ignition
@@ -1354,7 +1354,7 @@ index 0c742aa79..cab4d6eb5 100644
                          type: string
                        ignition:
                          description: ignition contains Ignition specific configuration.
-@@ -3346,6 +3498,26 @@ spec:
+@@ -3493,6 +3645,26 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -1381,7 +1381,7 @@ index 0c742aa79..cab4d6eb5 100644
                            caCertPath:
                              description: |-
                                caCertPath is the path to the SSL certificate authority used to
-@@ -3732,6 +3904,41 @@ spec:
+@@ -3878,6 +4050,41 @@ spec:
                                  minLength: 1
                                  type: string
                              type: object
@@ -1423,7 +1423,7 @@ index 0c742aa79..cab4d6eb5 100644
                            skipPhases:
                              description: |-
                                skipPhases is a list of phases to skip during command execution.
-@@ -4238,6 +4445,26 @@ spec:
+@@ -4422,6 +4629,26 @@ spec:
                                  type: array
                                  x-kubernetes-list-type: atomic
                              type: object
@@ -1450,7 +1450,7 @@ index 0c742aa79..cab4d6eb5 100644
                            caCertificateValidityPeriodDays:
                              description: |-
                                caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4800,6 +5027,41 @@ spec:
+@@ -5067,6 +5294,41 @@ spec:
                              maxLength: 512
                              minLength: 1
                              type: string
@@ -1492,7 +1492,7 @@ index 0c742aa79..cab4d6eb5 100644
                            scheduler:
                              description: scheduler contains extra settings for the
                                scheduler control plane component
-@@ -5202,6 +5464,7 @@ spec:
+@@ -5507,6 +5769,7 @@ spec:
                          enum:
                          - cloud-config
                          - ignition
@@ -1500,7 +1500,7 @@ index 0c742aa79..cab4d6eb5 100644
                          type: string
                        ignition:
                          description: ignition contains Ignition specific configuration.
-@@ -5540,6 +5803,26 @@ spec:
+@@ -5844,6 +6107,26 @@ spec:
                            for the join command
                          minProperties: 1
                          properties:
@@ -1527,7 +1527,7 @@ index 0c742aa79..cab4d6eb5 100644
                            caCertPath:
                              description: |-
                                caCertPath is the path to the SSL certificate authority used to
-@@ -5956,6 +6239,41 @@ spec:
+@@ -6259,6 +6542,41 @@ spec:
                                  minLength: 1
                                  type: string
                              type: object
@@ -2157,10 +2157,10 @@ index c49decd19..ef2a5b4e4 100644
  	input.SentinelFileCommand = sentinelFileCommand
  }
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 837e80b93..086ef1e3b 100644
+index d01545898..5c971078e 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -45,6 +45,7 @@ import (
+@@ -44,6 +44,7 @@ import (
  
  	bootstrapv1 "sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2"
  	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -2168,7 +2168,7 @@ index 837e80b93..086ef1e3b 100644
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/cloudinit"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/ignition"
  	"sigs.k8s.io/cluster-api/bootstrap/kubeadm/internal/locking"
-@@ -531,6 +532,45 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -513,6 +514,45 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  
  	additionalData := r.computeClusterConfigurationAndAdditionalData(scope.Cluster, machine, &scope.Config.Spec.ClusterConfiguration, &scope.Config.Spec.InitConfiguration)
  
@@ -2214,7 +2214,7 @@ index 837e80b93..086ef1e3b 100644
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
  	if err != nil {
  		scope.Error(err, "Failed to marshal cluster configuration")
-@@ -643,6 +683,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -625,6 +665,12 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  			ControlPlaneInput: controlPlaneInput,
  			Ignition:          &scope.Config.Spec.Ignition,
  		})
@@ -2227,7 +2227,7 @@ index 837e80b93..086ef1e3b 100644
  	default:
  		bootstrapInitData, err = cloudinit.NewInitControlPlane(controlPlaneInput)
  	}
-@@ -808,6 +854,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -790,6 +836,19 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  			NodeInput: nodeInput,
  			Ignition:  &scope.Config.Spec.Ignition,
  		})
@@ -2247,7 +2247,7 @@ index 837e80b93..086ef1e3b 100644
  	default:
  		bootstrapJoinData, err = cloudinit.NewNode(nodeInput)
  	}
-@@ -969,6 +1028,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -951,6 +1010,19 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  			ControlPlaneJoinInput: controlPlaneJoinInput,
  			Ignition:              &scope.Config.Spec.Ignition,
  		})
@@ -2268,7 +2268,7 @@ index 837e80b93..086ef1e3b 100644
  		bootstrapJoinData, err = cloudinit.NewJoinControlPlane(controlPlaneJoinInput)
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index ea1aee4b6..8cac4b994 100644
+index a0dadb029..c948b069a 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -378,6 +378,9 @@ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfigur
@@ -2281,7 +2281,7 @@ index ea1aee4b6..8cac4b994 100644
  	if err := Convert_v1beta2_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -587,6 +590,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta2_JoinConfiguration(
+@@ -588,6 +591,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta2_JoinConfiguration(
  }
  
  func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(in *v1beta2.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -2292,10 +2292,10 @@ index ea1aee4b6..8cac4b994 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
-index e730dac72..a7a2ac664 100644
+index 410d87c8e..1aa37da1d 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/conversion.go
-@@ -519,6 +519,20 @@ func Convert_v1beta2_BootstrapToken_To_upstreamv1beta4_BootstrapToken(in *bootst
+@@ -518,6 +518,20 @@ func Convert_v1beta2_BootstrapToken_To_upstreamv1beta4_BootstrapToken(in *bootst
  	return nil
  }
  
@@ -2441,7 +2441,7 @@ index 903c8c4b2..ca6ef348b 100644
  	// +optional
  	DryRun bool `json:"dryRun,omitempty"`
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index b2f95bf25..44ec72229 100644
+index 5bb43af37..64080b3ca 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -78,6 +78,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -2566,7 +2566,7 @@ index b2f95bf25..44ec72229 100644
  	if err := Convert_v1beta2_Etcd_To_upstreamv1beta4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -595,6 +664,9 @@ func Convert_v1beta2_HostPathMount_To_upstreamv1beta4_HostPathMount(in *v1beta2.
+@@ -596,6 +665,9 @@ func Convert_v1beta2_HostPathMount_To_upstreamv1beta4_HostPathMount(in *v1beta2.
  
  func autoConvert_upstreamv1beta4_InitConfiguration_To_v1beta2_InitConfiguration(in *InitConfiguration, out *v1beta2.InitConfiguration, s conversion.Scope) error {
  	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
@@ -2576,7 +2576,7 @@ index b2f95bf25..44ec72229 100644
  	if in.BootstrapTokens != nil {
  		in, out := &in.BootstrapTokens, &out.BootstrapTokens
  		*out = make([]v1beta2.BootstrapToken, len(*in))
-@@ -646,6 +718,15 @@ func autoConvert_v1beta2_InitConfiguration_To_upstreamv1beta4_InitConfiguration(
+@@ -647,6 +719,15 @@ func autoConvert_v1beta2_InitConfiguration_To_upstreamv1beta4_InitConfiguration(
  
  func autoConvert_upstreamv1beta4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *JoinConfiguration, out *v1beta2.JoinConfiguration, s conversion.Scope) error {
  	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
@@ -2592,7 +2592,7 @@ index b2f95bf25..44ec72229 100644
  	// WARNING: in.DryRun requires manual conversion: does not exist in peer-type
  	if err := Convert_upstreamv1beta4_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
-@@ -670,6 +751,15 @@ func autoConvert_upstreamv1beta4_JoinConfiguration_To_v1beta2_JoinConfiguration(
+@@ -671,6 +752,15 @@ func autoConvert_upstreamv1beta4_JoinConfiguration_To_v1beta2_JoinConfiguration(
  }
  
  func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta4_JoinConfiguration(in *v1beta2.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -2608,7 +2608,7 @@ index b2f95bf25..44ec72229 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -815,6 +905,28 @@ func Convert_v1beta2_Patches_To_upstreamv1beta4_Patches(in *v1beta2.Patches, out
+@@ -816,6 +906,28 @@ func Convert_v1beta2_Patches_To_upstreamv1beta4_Patches(in *v1beta2.Patches, out
  	return autoConvert_v1beta2_Patches_To_upstreamv1beta4_Patches(in, out, s)
  }
  
@@ -2728,7 +2728,7 @@ index c2a9da205..d6903d38c 100644
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Proxy.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 1f43319a0..2a2d18460 100644
+index 5fc53686c..1c2a3db22 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -597,6 +597,7 @@ spec:
@@ -2739,7 +2739,7 @@ index 1f43319a0..2a2d18460 100644
                      type: string
                    initConfiguration:
                      description: initConfiguration along with ClusterConfiguration
-@@ -1339,6 +1340,22 @@ spec:
+@@ -1337,6 +1338,22 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -2762,7 +2762,7 @@ index 1f43319a0..2a2d18460 100644
                        certificatesDir:
                          description: |-
                            certificatesDir specifies where to store or look for all required certificates.
-@@ -1546,6 +1563,37 @@ spec:
+@@ -1544,6 +1561,37 @@ spec:
                                to "10.96.0.0/12" if that's unset.
                              type: string
                          type: object
@@ -2800,7 +2800,7 @@ index 1f43319a0..2a2d18460 100644
                        scheduler:
                          description: scheduler contains extra settings for the scheduler
                            control plane component
-@@ -1734,6 +1782,7 @@ spec:
+@@ -1732,6 +1780,7 @@ spec:
                        data
                      enum:
                      - cloud-config
@@ -2808,7 +2808,7 @@ index 1f43319a0..2a2d18460 100644
                      type: string
                    initConfiguration:
                      description: initConfiguration along with ClusterConfiguration
-@@ -1901,6 +1950,22 @@ spec:
+@@ -1898,6 +1947,22 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -2831,7 +2831,7 @@ index 1f43319a0..2a2d18460 100644
                        caCertPath:
                          description: |-
                            caCertPath is the path to the SSL certificate authority used to
-@@ -2067,6 +2132,37 @@ spec:
+@@ -2063,6 +2128,37 @@ spec:
                                type: object
                              type: array
                          type: object
@@ -2869,7 +2869,7 @@ index 1f43319a0..2a2d18460 100644
                      type: object
                    mounts:
                      description: mounts specifies a list of mount points to be setup.
-@@ -2722,6 +2818,26 @@ spec:
+@@ -2756,6 +2852,26 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -2896,7 +2896,7 @@ index 1f43319a0..2a2d18460 100644
                        certificatesDir:
                          description: |-
                            certificatesDir specifies where to store or look for all required certificates.
-@@ -3237,6 +3353,41 @@ spec:
+@@ -3347,6 +3463,41 @@ spec:
                              minLength: 1
                              type: string
                          type: object
@@ -2938,7 +2938,7 @@ index 1f43319a0..2a2d18460 100644
                        scheduler:
                          description: scheduler contains extra settings for the scheduler
                            control plane component
-@@ -3594,6 +3745,7 @@ spec:
+@@ -3742,6 +3893,7 @@ spec:
                      enum:
                      - cloud-config
                      - ignition
@@ -2946,7 +2946,7 @@ index 1f43319a0..2a2d18460 100644
                      type: string
                    ignition:
                      description: ignition contains Ignition specific configuration.
-@@ -3851,6 +4003,26 @@ spec:
+@@ -3998,6 +4150,26 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -2973,7 +2973,7 @@ index 1f43319a0..2a2d18460 100644
                        caCertPath:
                          description: |-
                            caCertPath is the path to the SSL certificate authority used to
-@@ -4233,6 +4405,41 @@ spec:
+@@ -4379,6 +4551,41 @@ spec:
                              minLength: 1
                              type: string
                          type: object
@@ -3015,7 +3015,7 @@ index 1f43319a0..2a2d18460 100644
                        skipPhases:
                          description: |-
                            skipPhases is a list of phases to skip during command execution.
-@@ -5279,6 +5486,26 @@ spec:
+@@ -5463,6 +5670,26 @@ spec:
                              type: array
                              x-kubernetes-list-type: atomic
                          type: object
@@ -3042,7 +3042,7 @@ index 1f43319a0..2a2d18460 100644
                        caCertificateValidityPeriodDays:
                          description: |-
                            caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -5833,6 +6060,41 @@ spec:
+@@ -6100,6 +6327,41 @@ spec:
                          maxLength: 512
                          minLength: 1
                          type: string
@@ -3084,7 +3084,7 @@ index 1f43319a0..2a2d18460 100644
                        scheduler:
                          description: scheduler contains extra settings for the scheduler
                            control plane component
-@@ -6229,6 +6491,7 @@ spec:
+@@ -6534,6 +6796,7 @@ spec:
                      enum:
                      - cloud-config
                      - ignition
@@ -3092,7 +3092,7 @@ index 1f43319a0..2a2d18460 100644
                      type: string
                    ignition:
                      description: ignition contains Ignition specific configuration.
-@@ -6565,6 +6828,26 @@ spec:
+@@ -6869,6 +7132,26 @@ spec:
                        the join command
                      minProperties: 1
                      properties:
@@ -3119,7 +3119,7 @@ index 1f43319a0..2a2d18460 100644
                        caCertPath:
                          description: |-
                            caCertPath is the path to the SSL certificate authority used to
-@@ -6977,6 +7260,41 @@ spec:
+@@ -7280,6 +7563,40 @@ spec:
                              minLength: 1
                              type: string
                          type: object
@@ -3152,8 +3152,7 @@ index 1f43319a0..2a2d18460 100644
 +                            description: HTTPS proxy
 +                            type: string
 +                          noProxy:
-+                            description: No proxy, list of ips that should not use
-+                              proxy
++                            description: No proxy, list of ips that should not use proxy
 +                            items:
 +                              type: string
 +                            type: array
@@ -3162,7 +3161,7 @@ index 1f43319a0..2a2d18460 100644
                          description: |-
                            skipPhases is a list of phases to skip during command execution.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index badeef330..9d5b83610 100644
+index 694318b53..d0d971d34 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -128,6 +128,22 @@ spec:
@@ -3234,7 +3233,7 @@ index badeef330..9d5b83610 100644
                              type: string
                            initConfiguration:
                              description: initConfiguration along with ClusterConfiguration
-@@ -701,6 +749,22 @@ spec:
+@@ -700,6 +748,22 @@ spec:
                                    may reject unrecognized values.
                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                                  type: string
@@ -3257,7 +3256,7 @@ index badeef330..9d5b83610 100644
                                caCertPath:
                                  description: |-
                                    caCertPath is the path to the SSL certificate authority used to
-@@ -869,6 +933,37 @@ spec:
+@@ -867,6 +931,37 @@ spec:
                                        type: object
                                      type: array
                                  type: object
@@ -3295,7 +3294,7 @@ index badeef330..9d5b83610 100644
                              type: object
                            mounts:
                              description: mounts specifies a list of mount points to
-@@ -1414,6 +1509,26 @@ spec:
+@@ -1450,6 +1545,26 @@ spec:
                                    may reject unrecognized values.
                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                                  type: string
@@ -3322,7 +3321,7 @@ index badeef330..9d5b83610 100644
                                certificatesDir:
                                  description: |-
                                    certificatesDir specifies where to store or look for all required certificates.
-@@ -1944,6 +2059,41 @@ spec:
+@@ -2057,6 +2172,41 @@ spec:
                                      minLength: 1
                                      type: string
                                  type: object
@@ -3364,7 +3363,7 @@ index badeef330..9d5b83610 100644
                                scheduler:
                                  description: scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -2313,6 +2463,7 @@ spec:
+@@ -2464,6 +2614,7 @@ spec:
                              enum:
                              - cloud-config
                              - ignition
@@ -3372,7 +3371,7 @@ index badeef330..9d5b83610 100644
                              type: string
                            ignition:
                              description: ignition contains Ignition specific configuration.
-@@ -2572,6 +2723,26 @@ spec:
+@@ -2722,6 +2873,26 @@ spec:
                                    may reject unrecognized values.
                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                                  type: string
@@ -3399,7 +3398,7 @@ index badeef330..9d5b83610 100644
                                caCertPath:
                                  description: |-
                                    caCertPath is the path to the SSL certificate authority used to
-@@ -2959,6 +3130,41 @@ spec:
+@@ -3108,6 +3279,41 @@ spec:
                                      minLength: 1
                                      type: string
                                  type: object
@@ -3441,7 +3440,7 @@ index badeef330..9d5b83610 100644
                                skipPhases:
                                  description: |-
                                    skipPhases is a list of phases to skip during command execution.
-@@ -3653,6 +3859,26 @@ spec:
+@@ -3840,6 +4046,26 @@ spec:
                                      type: array
                                      x-kubernetes-list-type: atomic
                                  type: object
@@ -3468,7 +3467,7 @@ index badeef330..9d5b83610 100644
                                caCertificateValidityPeriodDays:
                                  description: |-
                                    caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4226,6 +4452,41 @@ spec:
+@@ -4497,6 +4723,41 @@ spec:
                                  maxLength: 512
                                  minLength: 1
                                  type: string
@@ -3510,7 +3509,7 @@ index badeef330..9d5b83610 100644
                                scheduler:
                                  description: scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -4635,6 +4896,7 @@ spec:
+@@ -4944,6 +5205,7 @@ spec:
                              enum:
                              - cloud-config
                              - ignition
@@ -3518,7 +3517,7 @@ index badeef330..9d5b83610 100644
                              type: string
                            ignition:
                              description: ignition contains Ignition specific configuration.
-@@ -4974,6 +5236,26 @@ spec:
+@@ -5282,6 +5544,26 @@ spec:
                                for the join command
                              minProperties: 1
                              properties:
@@ -3545,7 +3544,7 @@ index badeef330..9d5b83610 100644
                                caCertPath:
                                  description: |-
                                    caCertPath is the path to the SSL certificate authority used to
-@@ -5392,6 +5674,41 @@ spec:
+@@ -5699,6 +5981,41 @@ spec:
                                      minLength: 1
                                      type: string
                                  type: object
@@ -3609,7 +3608,7 @@ index 6f5293562..a43300a20 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
-index 77b59e6b8..a075d2ca4 100644
+index 3c0ad05f9..0be1d7b1b 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 @@ -540,6 +540,9 @@ func autoConvert_v1alpha3_ClusterConfiguration_To_v1beta2_ClusterConfiguration(i
@@ -3622,7 +3621,7 @@ index 77b59e6b8..a075d2ca4 100644
  	if err := Convert_v1beta2_Etcd_To_v1alpha3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -884,6 +887,9 @@ func autoConvert_v1alpha3_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
+@@ -885,6 +888,9 @@ func autoConvert_v1alpha3_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
  }
  
  func autoConvert_v1beta2_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *v1beta2.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -3633,10 +3632,10 @@ index 77b59e6b8..a075d2ca4 100644
  		return err
  	}
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/conversion.go
-index 54a1ef93f..944a538ab 100644
+index 7e9a83310..06ffa6965 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/conversion.go
-@@ -697,6 +697,30 @@ func Convert_v1beta2_File_To_v1alpha4_File(in *bootstrapv1.File, out *File, s ap
+@@ -698,6 +698,30 @@ func Convert_v1beta2_File_To_v1alpha4_File(in *bootstrapv1.File, out *File, s ap
  	return nil
  }
  
@@ -3767,7 +3766,7 @@ index 652e45d54..99c79b677 100644
  
  // KubeadmConfigSpec defines the desired state of KubeadmConfig.
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-index 314c9b9e7..c64093b7c 100644
+index c15764f46..872a2752b 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 @@ -209,6 +209,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -3880,7 +3879,7 @@ index 314c9b9e7..c64093b7c 100644
  	if err := Convert_v1beta2_Etcd_To_v1alpha4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -870,6 +929,15 @@ func autoConvert_v1beta2_InitConfiguration_To_v1alpha4_InitConfiguration(in *v1b
+@@ -871,6 +930,15 @@ func autoConvert_v1beta2_InitConfiguration_To_v1alpha4_InitConfiguration(in *v1b
  
  func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *JoinConfiguration, out *v1beta2.JoinConfiguration, s conversion.Scope) error {
  	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
@@ -3896,7 +3895,7 @@ index 314c9b9e7..c64093b7c 100644
  	if err := Convert_v1alpha4_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -882,6 +950,15 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
+@@ -883,6 +951,15 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
  }
  
  func autoConvert_v1beta2_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1beta2.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -3912,7 +3911,7 @@ index 314c9b9e7..c64093b7c 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1alpha4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1320,6 +1397,39 @@ func Convert_v1beta2_Partition_To_v1alpha4_Partition(in *v1beta2.Partition, out
+@@ -1321,6 +1398,39 @@ func Convert_v1beta2_Partition_To_v1alpha4_Partition(in *v1beta2.Partition, out
  	return autoConvert_v1beta2_Partition_To_v1alpha4_Partition(in, out, s)
  }
  
@@ -4040,5 +4039,5 @@ index 0e4b93369..b6a144dbe 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 -- 
-2.49.0
+2.50.1 (Apple Git-155)
 

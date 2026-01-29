@@ -1,7 +1,7 @@
-From 60baa8e7f5522365507ecd94af3f3d2cc35b37e7 Mon Sep 17 00:00:00 2001
+From d2e210e242a661f714f9f614bc17c4d15f29f251 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
-Subject: [PATCH 03/38] Unstacked etcd and controlplane upgrade
+Subject: [PATCH 03/36] Unstacked etcd and controlplane upgrade
 
 Rename controlplane upgrade annotation variable
 
@@ -86,10 +86,10 @@ index c460c3a80..30c775801 100644
  
  const (
 diff --git a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
-index 95aeb6a5f..acb926355 100644
+index e3622270b..966c33b58 100644
 --- a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
 +++ b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
-@@ -413,6 +413,14 @@ const (
+@@ -409,6 +409,14 @@ const (
  	// KubeadmControlPlaneMachineEtcdMemberDeletingReason surfaces when the machine hosting an etcd member
  	// is being deleted.
  	KubeadmControlPlaneMachineEtcdMemberDeletingReason = "Deleting"
@@ -130,10 +130,10 @@ index 2006bb88c..4b2e4ed71 100644
  
  // MachineSetPreflightCheck defines a valid MachineSet preflight check.
 diff --git a/api/core/v1beta2/common_types.go b/api/core/v1beta2/common_types.go
-index 55c37a288..178b36488 100644
+index 78b064afb..9b6bb0a3b 100644
 --- a/api/core/v1beta2/common_types.go
 +++ b/api/core/v1beta2/common_types.go
-@@ -171,6 +171,9 @@ const (
+@@ -178,6 +178,9 @@ const (
  	// will receive the resulting object.
  	TopologyDryRunAnnotation = "topology.cluster.x-k8s.io/dry-run"
  
@@ -143,7 +143,7 @@ index 55c37a288..178b36488 100644
  	// ReplicasManagedByAnnotation is an annotation that indicates external (non-Cluster API) management of infra scaling.
  	// The practical effect of this is that the capi "replica" count should be passively derived from the number of observed infra machines,
  	// instead of being a source of truth for eventual consistency.
-@@ -210,6 +213,10 @@ const (
+@@ -217,6 +220,10 @@ const (
  	// Note: While the upgrade is blocked changes made to the Cluster Topology will be delayed propagating to the underlying
  	// objects while the object is waiting for upgrade.
  	BeforeClusterUpgradeHookAnnotationPrefix = "before-upgrade.hook.cluster.cluster.x-k8s.io"
@@ -192,10 +192,10 @@ index dbaf275dc..6ffec0737 100644
 +	return unstructured.SetNestedStringMap(externalEtcd.UnstructuredContent(), annotations, "metadata", "annotations")
 +}
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index c9faf2091..bb729ee40 100644
+index 92d9c4301..a9466a242 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
-@@ -25,6 +25,7 @@ import (
+@@ -26,6 +26,7 @@ import (
  	"time"
  
  	"github.com/blang/semver/v4"
@@ -203,7 +203,7 @@ index c9faf2091..bb729ee40 100644
  	"github.com/pkg/errors"
  	"go.uber.org/zap"
  	corev1 "k8s.io/api/core/v1"
-@@ -200,29 +201,13 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -217,29 +218,13 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  		log.Error(err, "Failed to configure the patch helper")
  		return ctrl.Result{Requeue: true}, nil
  	}
@@ -237,11 +237,11 @@ index c9faf2091..bb729ee40 100644
  		}
  	}
  
-@@ -510,6 +495,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+@@ -551,6 +536,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
  		// NOTE: we are checking the condition already exists in order to avoid to set this condition at the first
  		// reconciliation/before a rolling upgrade actually starts.
  		if v1beta1conditions.Has(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateV1Beta1Condition) {
-+			if conditions.IsFalse(controlPlane.KCP, string(controlplanev1.MachinesSpecUpToDateV1Beta1Condition)) {
++			if v1beta1conditions.IsFalse(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateV1Beta1Condition) {
 +				/* Once KCP upgrade has completed, the controller will annotate the external etcd object to indicate that the older KCP machines
 +				are no longer part of the cluster, and so any older out-of-date etcd members and machines can be deleted
 +				*/
@@ -263,7 +263,7 @@ index c9faf2091..bb729ee40 100644
  			v1beta1conditions.MarkTrue(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateV1Beta1Condition)
  		}
  	}
-@@ -618,7 +622,7 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+@@ -664,7 +668,7 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
  		return ctrl.Result{}, err
  	}
  
@@ -272,7 +272,7 @@ index c9faf2091..bb729ee40 100644
  		for _, machine := range allMachines {
  			if util.IsEtcdMachine(machine) {
  				// remove external etcd-only machines from the "allMachines" collection so that the controlplane machines don't wait for etcd to be deleted first
-@@ -1484,3 +1488,76 @@ func (r *KubeadmControlPlaneReconciler) ensureCertificatesOwnerRef(ctx context.C
+@@ -1535,3 +1539,76 @@ func (r *KubeadmControlPlaneReconciler) ensureCertificatesOwnerRef(ctx context.C
  	}
  	return nil
  }
@@ -350,7 +350,7 @@ index c9faf2091..bb729ee40 100644
 +	return len(endpoints) == 0 || len(endpoints) == 1 && endpoints[0] == ""
 +}
 diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
-index 4f2f82002..ea598f3c7 100644
+index 7ee1bc1bc..67897a7b4 100644
 --- a/controlplane/kubeadm/internal/controllers/controller_test.go
 +++ b/controlplane/kubeadm/internal/controllers/controller_test.go
 @@ -25,6 +25,7 @@ import (
@@ -361,7 +361,7 @@ index 4f2f82002..ea598f3c7 100644
  	"sync"
  	"testing"
  	"time"
-@@ -58,6 +59,7 @@ import (
+@@ -60,6 +61,7 @@ import (
  	"sigs.k8s.io/cluster-api/internal/util/ssa"
  	"sigs.k8s.io/cluster-api/internal/webhooks"
  	"sigs.k8s.io/cluster-api/util"
@@ -369,7 +369,7 @@ index 4f2f82002..ea598f3c7 100644
  	"sigs.k8s.io/cluster-api/util/certs"
  	"sigs.k8s.io/cluster-api/util/collections"
  	"sigs.k8s.io/cluster-api/util/conditions"
-@@ -3308,9 +3310,9 @@ func TestKubeadmControlPlaneReconciler_reconcilePreTerminateHook(t *testing.T) {
+@@ -3382,9 +3384,9 @@ func TestKubeadmControlPlaneReconciler_reconcilePreTerminateHook(t *testing.T) {
  				Client: fakeClient,
  			}
  
@@ -381,7 +381,7 @@ index 4f2f82002..ea598f3c7 100644
  			})
  
  			res, err := r.reconcilePreTerminateHook(ctx, tt.controlPlane)
-@@ -3872,6 +3874,214 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
+@@ -3946,6 +3948,214 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
  	})
  }
  
@@ -597,10 +597,10 @@ index 4f2f82002..ea598f3c7 100644
  	c := &clusterv1.Cluster{
  		ObjectMeta: metav1.ObjectMeta{
 diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
-index 80d497b90..2533b7731 100644
+index d4f640166..abc22a37f 100644
 --- a/controlplane/kubeadm/internal/workload_cluster.go
 +++ b/controlplane/kubeadm/internal/workload_cluster.go
-@@ -90,6 +90,7 @@ type WorkloadCluster interface {
+@@ -82,6 +82,7 @@ type WorkloadCluster interface {
  	UpdateImageRepositoryInKubeadmConfigMap(imageRepository string) func(*bootstrapv1.ClusterConfiguration)
  	UpdateFeatureGatesInKubeadmConfigMap(kubeadmConfigSpec bootstrapv1.KubeadmConfigSpec, kubernetesVersion semver.Version) func(*bootstrapv1.ClusterConfiguration)
  	UpdateEtcdLocalInKubeadmConfigMap(localEtcd bootstrapv1.LocalEtcd) func(*bootstrapv1.ClusterConfiguration)
@@ -708,10 +708,10 @@ index 317d6cad5..021cd9ede 100644
 +	ExternalEtcdUndergoingUpgrade = "ExternalEtcdUndergoingUpgrade"
 +)
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index 6afbcb58a..c66857819 100644
+index 8a2689478..3fcefd8ab 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
-@@ -208,6 +208,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -199,6 +199,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  
  	alwaysReconcile := []clusterReconcileFunc{
  		r.reconcileInfrastructure,
@@ -719,7 +719,7 @@ index 6afbcb58a..c66857819 100644
  		r.reconcileControlPlane,
  		r.getDescendants,
  	}
-@@ -235,7 +236,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -226,7 +227,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
  		r.reconcileV1Beta1ControlPlaneInitialized,
@@ -728,7 +728,7 @@ index 6afbcb58a..c66857819 100644
  	return doReconcile(ctx, reconcileNormal, s)
  }
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 6c1674fc7..ea5a97e5f 100644
+index 3888903e3..e26c57575 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -22,6 +22,7 @@ import (
@@ -862,7 +862,7 @@ index 6c1674fc7..ea5a97e5f 100644
  	v1beta1conditions.SetMirror(cluster, clusterv1.ManagedExternalEtcdClusterReadyCondition,
  		v1beta1conditions.UnstructuredGetter(etcdPlaneConfig),
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 847023481..a627b9f97 100644
+index bd5159f71..111b5df9f 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
 @@ -18,23 +18,28 @@ package cluster
@@ -894,7 +894,7 @@ index 847023481..a627b9f97 100644
  	"sigs.k8s.io/cluster-api/util/collections"
  	"sigs.k8s.io/cluster-api/util/conditions"
  	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
-@@ -1131,3 +1136,254 @@ func TestReconcileV1Beta1ControlPlaneInitializedControlPlaneRef(t *testing.T) {
+@@ -1112,3 +1117,254 @@ func TestReconcileV1Beta1ControlPlaneInitializedControlPlaneRef(t *testing.T) {
  	g.Expect(err).ToNot(HaveOccurred())
  	g.Expect(v1beta1conditions.Has(c, clusterv1.ControlPlaneInitializedV1Beta1Condition)).To(BeFalse())
  }
@@ -1166,7 +1166,7 @@ index c378fa298..1a71cfee4 100644
  func hasAnnotation(o metav1.Object, annotation string) bool {
  	annotations := o.GetAnnotations()
 diff --git a/util/test/builder/builders.go b/util/test/builder/builders.go
-index 042b97511..61ed45ce7 100644
+index 5187827d3..58ffff3a3 100644
 --- a/util/test/builder/builders.go
 +++ b/util/test/builder/builders.go
 @@ -40,6 +40,7 @@ type ClusterBuilder struct {
@@ -1277,10 +1277,10 @@ index 000000000..9c187575f
 +	return c.obj
 +}
 diff --git a/util/test/builder/zz_generated.deepcopy.go b/util/test/builder/zz_generated.deepcopy.go
-index 426f5dcbb..d69fdd82c 100644
+index b7c3d3228..76f972a31 100644
 --- a/util/test/builder/zz_generated.deepcopy.go
 +++ b/util/test/builder/zz_generated.deepcopy.go
-@@ -96,6 +96,10 @@ func (in *ClusterBuilder) DeepCopyInto(out *ClusterBuilder) {
+@@ -97,6 +97,10 @@ func (in *ClusterBuilder) DeepCopyInto(out *ClusterBuilder) {
  		*out = (*in).DeepCopy()
  	}
  	in.network.DeepCopyInto(&out.network)
@@ -1291,7 +1291,7 @@ index 426f5dcbb..d69fdd82c 100644
  }
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterBuilder.
-@@ -282,6 +286,25 @@ func (in *ControlPlaneTemplateBuilder) DeepCopy() *ControlPlaneTemplateBuilder {
+@@ -295,6 +299,25 @@ func (in *ControlPlaneTemplateBuilder) DeepCopy() *ControlPlaneTemplateBuilder {
  	return out
  }
  
@@ -1318,5 +1318,5 @@ index 426f5dcbb..d69fdd82c 100644
  func (in *InfrastructureClusterBuilder) DeepCopyInto(out *InfrastructureClusterBuilder) {
  	*out = *in
 -- 
-2.49.0
+2.50.1 (Apple Git-155)
 

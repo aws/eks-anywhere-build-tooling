@@ -22,6 +22,7 @@ import (
 	goyamlv3 "gopkg.in/yaml.v3"
 	sigsyaml "sigs.k8s.io/yaml"
 
+	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/commands/fixpatches"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/constants"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/ecrpublic"
 	"github.com/aws/eks-anywhere-build-tooling/tools/version-tracker/pkg/git"
@@ -510,6 +511,23 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 			err = github.AddCommentOnPR(client, baseRepoOwner, failedUpgradeComment, pullRequest)
 			if err != nil {
 				return fmt.Errorf("commenting failed upgrade comment on pull request [%s]: %v", *pullRequest.HTMLURL, err)
+			}
+
+			// Publish EventBridge event for automatic patch fixing if patches failed
+			if _, hasPatchFailure := failedSteps["Patch application"]; hasPatchFailure && pullRequest != nil {
+				event := fixpatches.PatchFailureEvent{
+					Project:       projectName,
+					PRNumber:      *pullRequest.Number,
+					Branch:        headBranchName,
+					FailedPatches: []string{},
+					Reason:        patchesWarningComment,
+					RepoOwner:     baseRepoOwner,
+					RepoName:      constants.BuildToolingRepoName,
+				}
+
+				if err := fixpatches.PublishPatchFailureEvent(event); err != nil {
+					logger.Info("Failed to publish patch failure event", "error", err)
+				}
 			}
 		}
 

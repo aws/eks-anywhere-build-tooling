@@ -1,6 +1,6 @@
-From 0536b602f61cf291f6a6014eea90efe27083ff83 Mon Sep 17 00:00:00 2001
+From 78773362dbb3a91429d94ece92447bd3c2cbda30 Mon Sep 17 00:00:00 2001
 From: "Ostosh, Ivy" <ivyjin@amazon.com>
-Date: Fri, 27 Jan 2023 14:53:53 -0600
+Date: Wed, 10 Dec 2025 18:05:36 -0800
 Subject: [PATCH 2/3] Add namespace to charts
 
 ---
@@ -11,6 +11,7 @@ Subject: [PATCH 2/3] Add namespace to charts
  charts/opentelemetry-collector/templates/deployment.yaml      | 2 +-
  charts/opentelemetry-collector/templates/hpa.yaml             | 2 +-
  charts/opentelemetry-collector/templates/ingress.yaml         | 2 +-
+ charts/opentelemetry-collector/templates/networkpolicy.yaml   | 2 +-
  charts/opentelemetry-collector/templates/pdb.yaml             | 2 +-
  charts/opentelemetry-collector/templates/podmonitor.yaml      | 2 +-
  charts/opentelemetry-collector/templates/prometheusrule.yaml  | 2 +-
@@ -20,7 +21,7 @@ Subject: [PATCH 2/3] Add namespace to charts
  charts/opentelemetry-collector/templates/statefulset.yaml     | 2 +-
  charts/opentelemetry-collector/values.schema.json             | 4 ++++
  charts/opentelemetry-collector/values.yaml                    | 1 +
- 16 files changed, 19 insertions(+), 14 deletions(-)
+ 17 files changed, 20 insertions(+), 15 deletions(-)
 
 diff --git a/charts/opentelemetry-collector/templates/configmap-agent.yaml b/charts/opentelemetry-collector/templates/configmap-agent.yaml
 index 5e07daae..6dc67aa8 100644
@@ -62,7 +63,7 @@ index c72c50cb..212b5f80 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
  data:
 diff --git a/charts/opentelemetry-collector/templates/daemonset.yaml b/charts/opentelemetry-collector/templates/daemonset.yaml
-index de563e56..9ca4b8a4 100644
+index c081c435..0a4d0a84 100644
 --- a/charts/opentelemetry-collector/templates/daemonset.yaml
 +++ b/charts/opentelemetry-collector/templates/daemonset.yaml
 @@ -3,7 +3,7 @@ apiVersion: apps/v1
@@ -75,7 +76,7 @@ index de563e56..9ca4b8a4 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
    {{- if .Values.annotations }}
 diff --git a/charts/opentelemetry-collector/templates/deployment.yaml b/charts/opentelemetry-collector/templates/deployment.yaml
-index 110130a9..014948ec 100644
+index 8704ae04..093fff56 100644
 --- a/charts/opentelemetry-collector/templates/deployment.yaml
 +++ b/charts/opentelemetry-collector/templates/deployment.yaml
 @@ -3,7 +3,7 @@ apiVersion: apps/v1
@@ -88,7 +89,7 @@ index 110130a9..014948ec 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
    {{- if .Values.annotations }}
 diff --git a/charts/opentelemetry-collector/templates/hpa.yaml b/charts/opentelemetry-collector/templates/hpa.yaml
-index c5d06333..d9ceb5d2 100644
+index 89eaba85..fe115e6e 100644
 --- a/charts/opentelemetry-collector/templates/hpa.yaml
 +++ b/charts/opentelemetry-collector/templates/hpa.yaml
 @@ -3,7 +3,7 @@ apiVersion: autoscaling/v2
@@ -113,6 +114,19 @@ index 0a5a4ef6..be14bacc 100644
    labels:
      {{- include "opentelemetry-collector.labels" $ | nindent 4 }}
      {{- include "opentelemetry-collector.component" $ | nindent 4 }}
+diff --git a/charts/opentelemetry-collector/templates/networkpolicy.yaml b/charts/opentelemetry-collector/templates/networkpolicy.yaml
+index 58d58c9e..d71cad05 100644
+--- a/charts/opentelemetry-collector/templates/networkpolicy.yaml
++++ b/charts/opentelemetry-collector/templates/networkpolicy.yaml
+@@ -3,7 +3,7 @@ kind: NetworkPolicy
+ apiVersion: networking.k8s.io/v1
+ metadata:
+   name: {{ include "opentelemetry-collector.fullname" . }}
+-  namespace: {{ template "opentelemetry-collector.namespace" . }}
++  namespace: {{ .Release.Namespace | default .Values.defaultNamespace | quote }}
+   labels:
+     {{- include "opentelemetry-collector.labels" . | nindent 4 }}
+   {{- if .Values.networkPolicy.annotations }}
 diff --git a/charts/opentelemetry-collector/templates/pdb.yaml b/charts/opentelemetry-collector/templates/pdb.yaml
 index c386a47b..a695f213 100644
 --- a/charts/opentelemetry-collector/templates/pdb.yaml
@@ -140,7 +154,7 @@ index 9bc5465a..e6a97dc9 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
      {{- range $key, $value := .Values.podMonitor.extraLabels }}
 diff --git a/charts/opentelemetry-collector/templates/prometheusrule.yaml b/charts/opentelemetry-collector/templates/prometheusrule.yaml
-index bd522b6a..fb3ce335 100644
+index aa7c287f..5e8a8f44 100644
 --- a/charts/opentelemetry-collector/templates/prometheusrule.yaml
 +++ b/charts/opentelemetry-collector/templates/prometheusrule.yaml
 @@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
@@ -153,7 +167,7 @@ index bd522b6a..fb3ce335 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
      {{- range $key, $value := .Values.prometheusRule.extraLabels }}
 diff --git a/charts/opentelemetry-collector/templates/service.yaml b/charts/opentelemetry-collector/templates/service.yaml
-index c97ad247..41af9844 100644
+index cbf9894a..14fd5990 100644
 --- a/charts/opentelemetry-collector/templates/service.yaml
 +++ b/charts/opentelemetry-collector/templates/service.yaml
 @@ -3,7 +3,7 @@ apiVersion: v1
@@ -192,7 +206,7 @@ index 04fe55b2..6f1c923a 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
      {{- range $key, $value := .Values.serviceMonitor.extraLabels }}
 diff --git a/charts/opentelemetry-collector/templates/statefulset.yaml b/charts/opentelemetry-collector/templates/statefulset.yaml
-index 7a2cb964..e33d20c4 100644
+index a92c53c7..d5431108 100644
 --- a/charts/opentelemetry-collector/templates/statefulset.yaml
 +++ b/charts/opentelemetry-collector/templates/statefulset.yaml
 @@ -3,7 +3,7 @@ apiVersion: apps/v1
@@ -205,7 +219,7 @@ index 7a2cb964..e33d20c4 100644
      {{- include "opentelemetry-collector.labels" . | nindent 4 }}
    {{- if .Values.annotations }}
 diff --git a/charts/opentelemetry-collector/values.schema.json b/charts/opentelemetry-collector/values.schema.json
-index e8bfddc6..f8ad699a 100644
+index c585750d..0a98f503 100644
 --- a/charts/opentelemetry-collector/values.schema.json
 +++ b/charts/opentelemetry-collector/values.schema.json
 @@ -35,6 +35,10 @@
@@ -218,9 +232,9 @@ index e8bfddc6..f8ad699a 100644
 +    },
      "mode": {
        "type": "string",
-       "enum": ["daemonset", "deployment", "statefulset", ""]
+       "enum": [
 diff --git a/charts/opentelemetry-collector/values.yaml b/charts/opentelemetry-collector/values.yaml
-index d8bd5a0e..527d6a6a 100644
+index 952b9643..b50d3be5 100644
 --- a/charts/opentelemetry-collector/values.yaml
 +++ b/charts/opentelemetry-collector/values.yaml
 @@ -5,6 +5,7 @@
@@ -232,5 +246,5 @@ index d8bd5a0e..527d6a6a 100644
  # Valid values are "daemonset", "deployment", and "statefulset".
  mode: ""
 -- 
-2.44.0
+2.50.1 (Apple Git-155)
 

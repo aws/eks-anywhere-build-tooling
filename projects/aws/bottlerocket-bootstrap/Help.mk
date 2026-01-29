@@ -30,6 +30,12 @@ _output/1-34/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/
 _output/1-34/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-34/dependencies/linux-arm64/eksd/kubernetes/server`
 _output/1-34/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-34/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
 _output/1-34/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-34/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
+_output/1-34/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-34/dependencies/linux-amd64/eksd/kubernetes/client`
+_output/1-34/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-34/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/1-34/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-34/dependencies/linux-amd64/eksd/kubernetes/server`
+_output/1-34/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-34/dependencies/linux-arm64/eksd/kubernetes/server`
+_output/1-34/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-34/dependencies/linux-amd64/eksa/kubernetes-sigs/etcdadm`
+_output/1-34/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm: ## Fetch `_output/1-34/dependencies/linux-arm64/eksa/kubernetes-sigs/etcdadm`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.

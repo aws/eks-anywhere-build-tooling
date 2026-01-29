@@ -1,7 +1,7 @@
-From 6a600762e6ce58608f9fd108e5db0d73e97e9658 Mon Sep 17 00:00:00 2001
+From e4707dedf15558d1cc831760fd8477a67cfef3ff Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Sat, 6 May 2023 14:08:17 -0500
-Subject: [PATCH 22/38] Patch haproxy maxconn value to avoid ulimit issue
+Subject: [PATCH 22/36] Patch haproxy maxconn value to avoid ulimit issue
 
 EKS-A uses haproxy 2.5 which errors if the maxconn value
 requires more FDs than allowed by the ulimit setting of docker.
@@ -31,10 +31,10 @@ requires more FDs than allowed by the ulimit setting of docker.
  21 files changed, 877 insertions(+), 11 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index e7938e854..36d32f9bf 100644
+index 1b8aefac6..5dea6bec1 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
-@@ -1039,6 +1039,19 @@ func Convert_v1beta2_User_To_v1beta1_User(in *bootstrapv1.User, out *User, s api
+@@ -1042,6 +1042,19 @@ func Convert_v1beta2_User_To_v1beta1_User(in *bootstrapv1.User, out *User, s api
  	return nil
  }
  
@@ -119,7 +119,7 @@ index 39bc13db7..e51124d21 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 92c5fd94c..14f2053b5 100644
+index 8b14b67c5..7a8448387 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -70,6 +70,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -256,7 +256,7 @@ index 92c5fd94c..14f2053b5 100644
  	if err := Convert_v1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -1448,6 +1508,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+@@ -1449,6 +1509,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
  	} else {
  		out.Bottlerocket = nil
  	}
@@ -264,7 +264,7 @@ index 92c5fd94c..14f2053b5 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1507,6 +1568,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+@@ -1508,6 +1569,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
  	} else {
  		out.Bottlerocket = nil
  	}
@@ -373,10 +373,10 @@ index 3c864fbe1..33b5f34c5 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index b14e984c7..d1007c058 100644
+index 01d403746..288a6144d 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -182,6 +182,10 @@ type ClusterConfiguration struct {
+@@ -199,6 +199,10 @@ type ClusterConfiguration struct {
  	// +optional
  	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
  
@@ -387,7 +387,7 @@ index b14e984c7..d1007c058 100644
  	// etcd holds configuration for etcd.
  	// NB: This value defaults to a Local (stacked) etcd
  	// +optional
-@@ -876,6 +880,10 @@ type JoinConfiguration struct {
+@@ -899,6 +903,10 @@ type JoinConfiguration struct {
  	// +optional
  	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
  
@@ -398,7 +398,7 @@ index b14e984c7..d1007c058 100644
  	// nodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
-@@ -927,6 +935,15 @@ func (r *JoinConfiguration) IsDefined() bool {
+@@ -950,6 +958,15 @@ func (r *JoinConfiguration) IsDefined() bool {
  	return !reflect.DeepEqual(r, &JoinConfiguration{})
  }
  
@@ -465,10 +465,10 @@ index b7096c404..861fc79b9 100644
  	in.Discovery.DeepCopyInto(&out.Discovery)
  	if in.ControlPlane != nil {
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index dda0c90bf..3c0610254 100644
+index e457d2be2..55033256e 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -1293,6 +1293,22 @@ spec:
+@@ -1291,6 +1291,22 @@ spec:
                        - superpowered
                        type: object
                      type: array
@@ -491,7 +491,7 @@ index dda0c90bf..3c0610254 100644
                    certificatesDir:
                      description: |-
                        certificatesDir specifies where to store or look for all required certificates.
-@@ -2078,6 +2094,22 @@ spec:
+@@ -2075,6 +2091,22 @@ spec:
                        secure comunications between node and control-plane.
                        Defaults to "/etc/kubernetes/pki/ca.crt".
                      type: string
@@ -514,7 +514,7 @@ index dda0c90bf..3c0610254 100644
                    controlPlane:
                      description: |-
                        controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -2704,6 +2736,17 @@ spec:
+@@ -2738,6 +2770,17 @@ spec:
                        Bottlerocket holds configuration for certain bottlerocket settings.
                        This is only for bottlerocket.
                      properties:
@@ -532,7 +532,7 @@ index dda0c90bf..3c0610254 100644
                        kernel:
                          description: KernelSettings contains additional kernel settings
                            for Bottlerocket.
-@@ -2889,6 +2932,22 @@ spec:
+@@ -2923,6 +2966,22 @@ spec:
                        - superpowered
                        type: object
                      type: array
@@ -555,7 +555,7 @@ index dda0c90bf..3c0610254 100644
                    certificatesDir:
                      description: |-
                        certificatesDir specifies where to store or look for all required certificates.
-@@ -4058,6 +4117,17 @@ spec:
+@@ -4205,6 +4264,17 @@ spec:
                        Bottlerocket holds configuration for certain bottlerocket settings.
                        This is only for bottlerocket.
                      properties:
@@ -573,7 +573,7 @@ index dda0c90bf..3c0610254 100644
                        kernel:
                          description: KernelSettings contains additional kernel settings
                            for Bottlerocket.
-@@ -4251,6 +4321,22 @@ spec:
+@@ -4398,6 +4468,22 @@ spec:
                      maxLength: 512
                      minLength: 1
                      type: string
@@ -596,7 +596,7 @@ index dda0c90bf..3c0610254 100644
                    controlPlane:
                      description: |-
                        controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -5492,6 +5578,22 @@ spec:
+@@ -5676,6 +5762,22 @@ spec:
                      maximum: 36500
                      minimum: 1
                      type: integer
@@ -619,7 +619,7 @@ index dda0c90bf..3c0610254 100644
                    certificateValidityPeriodDays:
                      description: |-
                        certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
-@@ -7009,6 +7111,22 @@ spec:
+@@ -7313,6 +7415,22 @@ spec:
                      maxLength: 512
                      minLength: 1
                      type: string
@@ -643,10 +643,10 @@ index dda0c90bf..3c0610254 100644
                      description: |-
                        controlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 59f80a31b..e11c9971f 100644
+index fa16c9f49..bf2bf7055 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -1258,6 +1258,23 @@ spec:
+@@ -1256,6 +1256,23 @@ spec:
                                - superpowered
                                type: object
                              type: array
@@ -670,7 +670,7 @@ index 59f80a31b..e11c9971f 100644
                            certificatesDir:
                              description: |-
                                certificatesDir specifies where to store or look for all required certificates.
-@@ -2060,6 +2077,23 @@ spec:
+@@ -2057,6 +2074,23 @@ spec:
                                secure comunications between node and control-plane.
                                Defaults to "/etc/kubernetes/pki/ca.crt".
                              type: string
@@ -694,7 +694,7 @@ index 59f80a31b..e11c9971f 100644
                            controlPlane:
                              description: |-
                                controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -2665,6 +2699,17 @@ spec:
+@@ -2699,6 +2733,17 @@ spec:
                                Bottlerocket holds configuration for certain bottlerocket settings.
                                This is only for bottlerocket.
                              properties:
@@ -712,7 +712,7 @@ index 59f80a31b..e11c9971f 100644
                                kernel:
                                  description: KernelSettings contains additional kernel
                                    settings for Bottlerocket.
-@@ -2852,6 +2897,23 @@ spec:
+@@ -2886,6 +2931,23 @@ spec:
                                - superpowered
                                type: object
                              type: array
@@ -736,7 +736,7 @@ index 59f80a31b..e11c9971f 100644
                            certificatesDir:
                              description: |-
                                certificatesDir specifies where to store or look for all required certificates.
-@@ -4051,6 +4113,17 @@ spec:
+@@ -4198,6 +4260,17 @@ spec:
                                Bottlerocket holds configuration for certain bottlerocket settings.
                                This is only for bottlerocket.
                              properties:
@@ -754,7 +754,7 @@ index 59f80a31b..e11c9971f 100644
                                kernel:
                                  description: KernelSettings contains additional kernel
                                    settings for Bottlerocket.
-@@ -4246,6 +4319,23 @@ spec:
+@@ -4393,6 +4466,23 @@ spec:
                              maxLength: 512
                              minLength: 1
                              type: string
@@ -778,7 +778,7 @@ index 59f80a31b..e11c9971f 100644
                            controlPlane:
                              description: |-
                                controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -5385,6 +5475,23 @@ spec:
+@@ -5569,6 +5659,23 @@ spec:
                              maximum: 36500
                              minimum: 1
                              type: integer
@@ -802,7 +802,7 @@ index 59f80a31b..e11c9971f 100644
                            certificateValidityPeriodDays:
                              description: |-
                                certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
-@@ -6933,6 +7040,23 @@ spec:
+@@ -7237,6 +7344,23 @@ spec:
                              maxLength: 512
                              minLength: 1
                              type: string
@@ -979,10 +979,10 @@ index 42b4b3032..858b35790 100644
  	return generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
  }
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 0b45410c8..142ad064a 100644
+index 80274e834..9b6f9ee03 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -599,6 +599,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+@@ -581,6 +581,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
  		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
  			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
  		}
@@ -992,7 +992,7 @@ index 0b45410c8..142ad064a 100644
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
-@@ -922,6 +925,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -904,6 +907,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
  		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
  			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
  		}
@@ -1002,7 +1002,7 @@ index 0b45410c8..142ad064a 100644
  		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -1126,6 +1132,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -1108,6 +1114,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
  		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
  			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
  		}
@@ -1013,7 +1013,7 @@ index 0b45410c8..142ad064a 100644
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index dc6fba9d6..dcfbb99ef 100644
+index 48f75545f..e978228e7 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -484,6 +484,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
@@ -1024,7 +1024,7 @@ index dc6fba9d6..dcfbb99ef 100644
  	if err := Convert_v1beta2_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -727,6 +728,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+@@ -728,6 +729,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
  	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
  	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
@@ -1033,7 +1033,7 @@ index dc6fba9d6..dcfbb99ef 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 8410860d4..ab97aca2d 100644
+index 2613dc708..768a2f110 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -512,6 +512,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
@@ -1044,7 +1044,7 @@ index 8410860d4..ab97aca2d 100644
  	if err := Convert_v1beta2_Etcd_To_upstreamv1beta4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -772,6 +773,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta4_JoinConfiguration(
+@@ -773,6 +774,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta4_JoinConfiguration(
  	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
  	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
@@ -1053,10 +1053,10 @@ index 8410860d4..ab97aca2d 100644
  		return err
  	}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 3f741f860..ba8a636af 100644
+index 0f751bbdf..7f79e065f 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -1522,6 +1522,22 @@ spec:
+@@ -1520,6 +1520,22 @@ spec:
                            - superpowered
                            type: object
                          type: array
@@ -1079,7 +1079,7 @@ index 3f741f860..ba8a636af 100644
                        certificatesDir:
                          description: |-
                            certificatesDir specifies where to store or look for all required certificates.
-@@ -2318,6 +2334,22 @@ spec:
+@@ -2315,6 +2331,22 @@ spec:
                            secure comunications between node and control-plane.
                            Defaults to "/etc/kubernetes/pki/ca.crt".
                          type: string
@@ -1102,7 +1102,7 @@ index 3f741f860..ba8a636af 100644
                        controlPlane:
                          description: |-
                            controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -3183,6 +3215,17 @@ spec:
+@@ -3217,6 +3249,17 @@ spec:
                            Bottlerocket holds configuration for certain bottlerocket settings.
                            This is only for bottlerocket.
                          properties:
@@ -1120,7 +1120,7 @@ index 3f741f860..ba8a636af 100644
                            kernel:
                              description: KernelSettings contains additional kernel
                                settings for Bottlerocket.
-@@ -3369,6 +3412,22 @@ spec:
+@@ -3403,6 +3446,22 @@ spec:
                            - superpowered
                            type: object
                          type: array
@@ -1143,7 +1143,7 @@ index 3f741f860..ba8a636af 100644
                        certificatesDir:
                          description: |-
                            certificatesDir specifies where to store or look for all required certificates.
-@@ -4553,6 +4612,17 @@ spec:
+@@ -4700,6 +4759,17 @@ spec:
                            Bottlerocket holds configuration for certain bottlerocket settings.
                            This is only for bottlerocket.
                          properties:
@@ -1161,7 +1161,7 @@ index 3f741f860..ba8a636af 100644
                            kernel:
                              description: KernelSettings contains additional kernel
                                settings for Bottlerocket.
-@@ -4747,6 +4817,22 @@ spec:
+@@ -4894,6 +4964,22 @@ spec:
                          maxLength: 512
                          minLength: 1
                          type: string
@@ -1184,7 +1184,7 @@ index 3f741f860..ba8a636af 100644
                        controlPlane:
                          description: |-
                            controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -6421,6 +6507,22 @@ spec:
+@@ -6605,6 +6691,22 @@ spec:
                          maximum: 36500
                          minimum: 1
                          type: integer
@@ -1207,7 +1207,7 @@ index 3f741f860..ba8a636af 100644
                        certificateValidityPeriodDays:
                          description: |-
                            certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
-@@ -7952,6 +8054,22 @@ spec:
+@@ -8256,6 +8358,22 @@ spec:
                          maxLength: 512
                          minLength: 1
                          type: string
@@ -1231,7 +1231,7 @@ index 3f741f860..ba8a636af 100644
                          description: |-
                            controlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index e21982f89..e0adc0170 100644
+index 518447e47..4d9b55dba 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -315,6 +315,23 @@ spec:
@@ -1258,7 +1258,7 @@ index e21982f89..e0adc0170 100644
                                certificatesDir:
                                  description: |-
                                    certificatesDir specifies where to store or look for all required certificates.
-@@ -1127,6 +1144,23 @@ spec:
+@@ -1126,6 +1143,23 @@ spec:
                                    secure comunications between node and control-plane.
                                    Defaults to "/etc/kubernetes/pki/ca.crt".
                                  type: string
@@ -1282,7 +1282,7 @@ index e21982f89..e0adc0170 100644
                                controlPlane:
                                  description: |-
                                    controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -1884,6 +1918,17 @@ spec:
+@@ -1920,6 +1954,17 @@ spec:
                                    Bottlerocket holds configuration for certain bottlerocket settings.
                                    This is only for bottlerocket.
                                  properties:
@@ -1300,7 +1300,7 @@ index e21982f89..e0adc0170 100644
                                    kernel:
                                      description: KernelSettings contains additional
                                        kernel settings for Bottlerocket.
-@@ -2075,6 +2120,23 @@ spec:
+@@ -2111,6 +2156,23 @@ spec:
                                    - superpowered
                                    type: object
                                  type: array
@@ -1324,7 +1324,7 @@ index e21982f89..e0adc0170 100644
                                certificatesDir:
                                  description: |-
                                    certificatesDir specifies where to store or look for all required certificates.
-@@ -3288,6 +3350,17 @@ spec:
+@@ -3438,6 +3500,17 @@ spec:
                                    Bottlerocket holds configuration for certain bottlerocket settings.
                                    This is only for bottlerocket.
                                  properties:
@@ -1342,7 +1342,7 @@ index e21982f89..e0adc0170 100644
                                    kernel:
                                      description: KernelSettings contains additional
                                        kernel settings for Bottlerocket.
-@@ -3487,6 +3560,23 @@ spec:
+@@ -3637,6 +3710,23 @@ spec:
                                  maxLength: 512
                                  minLength: 1
                                  type: string
@@ -1366,7 +1366,7 @@ index e21982f89..e0adc0170 100644
                                controlPlane:
                                  description: |-
                                    controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -4819,6 +4909,23 @@ spec:
+@@ -5006,6 +5096,23 @@ spec:
                                  maximum: 36500
                                  minimum: 1
                                  type: integer
@@ -1390,7 +1390,7 @@ index e21982f89..e0adc0170 100644
                                certificateValidityPeriodDays:
                                  description: |-
                                    certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
-@@ -6390,6 +6497,23 @@ spec:
+@@ -6698,6 +6805,23 @@ spec:
                                  maxLength: 512
                                  minLength: 1
                                  type: string
@@ -1415,7 +1415,7 @@ index e21982f89..e0adc0170 100644
                                  description: |-
                                    controlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
-index 8778a335c..711d81553 100644
+index a35ca2a3d..79f1f1331 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha3/zz_generated.conversion.go
 @@ -549,6 +549,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(i
@@ -1426,7 +1426,7 @@ index 8778a335c..711d81553 100644
  	if err := Convert_v1beta2_Etcd_To_v1alpha3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -902,6 +903,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *v1b
+@@ -903,6 +904,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *v1b
  	// WARNING: in.BottlerocketCustomHostContainers requires manual conversion: does not exist in peer-type
  	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
  	// WARNING: in.Bottlerocket requires manual conversion: does not exist in peer-type
@@ -1477,7 +1477,7 @@ index 242542b16..1530e2c95 100644
  type JoinControlPlane struct {
  	// localAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
 diff --git a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
-index 2e89b7cda..9ff4a7a8f 100644
+index 185a6e765..5c3dcda2e 100644
 --- a/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 +++ b/internal/api/bootstrap/kubeadm/v1alpha4/zz_generated.conversion.go
 @@ -109,6 +109,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -1542,7 +1542,7 @@ index 2e89b7cda..9ff4a7a8f 100644
  	if err := Convert_v1beta2_Etcd_To_v1alpha4_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -1278,6 +1312,7 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
+@@ -1279,6 +1313,7 @@ func autoConvert_v1alpha4_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Joi
  		out.BottlerocketCustomBootstrapContainers = nil
  	}
  	out.Bottlerocket = (*v1beta2.BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
@@ -1550,7 +1550,7 @@ index 2e89b7cda..9ff4a7a8f 100644
  	return nil
  }
  
-@@ -1323,6 +1358,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
+@@ -1324,6 +1359,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1alpha4_JoinConfiguration(in *v1b
  		out.BottlerocketCustomBootstrapContainers = nil
  	}
  	out.Bottlerocket = (*BottlerocketSettings)(unsafe.Pointer(in.Bottlerocket))
@@ -1627,5 +1627,5 @@ index ada49d6d1..c7dfa01f5 100644
  resolvers docker
    nameserver dns 127.0.0.11:53
 -- 
-2.49.0
+2.50.1 (Apple Git-155)
 
