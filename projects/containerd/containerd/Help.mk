@@ -10,25 +10,9 @@
 clone-repo:  ## Clone upstream `containerd`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
-##@ Binary Targets
-binaries: ## Build all binaries: `containerd containerd-shim-runc-v2 ctr containerd-stress` for `linux/amd64 linux/arm64`
-_output/1-34/bin/containerd/linux-amd64/containerd: ## Build `_output/1-34/bin/containerd/linux-amd64/containerd`
-_output/1-34/bin/containerd/linux-amd64/containerd-shim-runc-v2: ## Build `_output/1-34/bin/containerd/linux-amd64/containerd-shim-runc-v2`
-_output/1-34/bin/containerd/linux-amd64/ctr: ## Build `_output/1-34/bin/containerd/linux-amd64/ctr`
-_output/1-34/bin/containerd/linux-amd64/containerd-stress: ## Build `_output/1-34/bin/containerd/linux-amd64/containerd-stress`
-_output/1-34/bin/containerd/linux-arm64/containerd: ## Build `_output/1-34/bin/containerd/linux-arm64/containerd`
-_output/1-34/bin/containerd/linux-arm64/containerd-shim-runc-v2: ## Build `_output/1-34/bin/containerd/linux-arm64/containerd-shim-runc-v2`
-_output/1-34/bin/containerd/linux-arm64/ctr: ## Build `_output/1-34/bin/containerd/linux-arm64/ctr`
-_output/1-34/bin/containerd/linux-arm64/containerd-stress: ## Build `_output/1-34/bin/containerd/linux-arm64/containerd-stress`
-
 ##@ Fetch Binary Targets
-_output/1-34/dependencies/linux-amd64/eksa/opencontainers/runc: ## Fetch `_output/1-34/dependencies/linux-amd64/eksa/opencontainers/runc`
-_output/1-34/dependencies/linux-arm64/eksa/opencontainers/runc: ## Fetch `_output/1-34/dependencies/linux-arm64/eksa/opencontainers/runc`
-
-##@ Checksum Targets
-checksums: ## Update checksums file based on currently built binaries.
-validate-checksums: # Validate checksums of currently built binaries against checksums file.
-all-checksums: ## Update checksums files for all RELEASE_BRANCHes.
+_output/1-26/dependencies/linux-amd64/eksa/opencontainers/runc: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/opencontainers/runc`
+_output/1-26/dependencies/linux-arm64/eksa/opencontainers/runc: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/opencontainers/runc`
 
 ##@ Run in Docker Targets
 run-in-docker/all-attributions: ## Run `all-attributions` in docker builder container
@@ -41,19 +25,6 @@ run-in-docker/checksums: ## Run `checksums` in docker builder container
 run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
-run-in-docker/containerd/eks-anywhere-go-mod-download: ## Run `containerd/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/_output/1-34/bin/containerd/linux-amd64/containerd: ## Run `_output/1-34/bin/containerd/linux-amd64/containerd` in docker builder container
-run-in-docker/_output/1-34/bin/containerd/linux-amd64/containerd-shim-runc-v2: ## Run `_output/1-34/bin/containerd/linux-amd64/containerd-shim-runc-v2` in docker builder container
-run-in-docker/_output/1-34/bin/containerd/linux-amd64/ctr: ## Run `_output/1-34/bin/containerd/linux-amd64/ctr` in docker builder container
-run-in-docker/_output/1-34/bin/containerd/linux-amd64/containerd-stress: ## Run `_output/1-34/bin/containerd/linux-amd64/containerd-stress` in docker builder container
-run-in-docker/_output/1-34/bin/containerd/linux-arm64/containerd: ## Run `_output/1-34/bin/containerd/linux-arm64/containerd` in docker builder container
-run-in-docker/_output/1-34/bin/containerd/linux-arm64/containerd-shim-runc-v2: ## Run `_output/1-34/bin/containerd/linux-arm64/containerd-shim-runc-v2` in docker builder container
-run-in-docker/_output/1-34/bin/containerd/linux-arm64/ctr: ## Run `_output/1-34/bin/containerd/linux-arm64/ctr` in docker builder container
-run-in-docker/_output/1-34/bin/containerd/linux-arm64/containerd-stress: ## Run `_output/1-34/bin/containerd/linux-arm64/containerd-stress` in docker builder container
-run-in-docker/_output/1-34/attribution/go-license.csv: ## Run `_output/1-34/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/1-34/attribution/go-license.csv: ## Run `_output/1-34/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/1-34/attribution/go-license.csv: ## Run `_output/1-34/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/1-34/attribution/go-license.csv: ## Run `_output/1-34/attribution/go-license.csv` in docker builder container
 
 ##@ Artifact Targets
 tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
