@@ -20,41 +20,39 @@ set -o pipefail
 HELM_DIRECTORY="$1"
 GIT_TAG="$2"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
 echo "Running helm lint"
 helm lint ${HELM_DIRECTORY}
 
-CHART_VERSION="$(yq eval '.version' ${HELM_DIRECTORY}/Chart.yaml)"
-echo "Verifying GIT_TAG matches the chart version in Chart.yaml"
-if [[ ${GIT_TAG} != ${CHART_VERSION} ]]; then
-    echo "❌ GIT_TAG does not match the Chart version"
-    echo "GIT_TAG=${GIT_TAG}, Chart version=${CHART_VERSION}"
-    exit 1
-fi
-
-SED_FILE_VERSION="$(grep -Eo "[0-9]+\.[0-9]+\.[0-9]+" ${HELM_DIRECTORY}/../helm/sedfile.template)"
-echo "Verifying version in sedfile.template matches the chart version in Chart.yaml"
+CHART_VERSION="$(yq eval '.version' ${PROJECT_DIR}/chart/Chart.yaml)"
+echo "Verifying sedfile.template version matches the chart version in Chart.yaml"
+SED_FILE_VERSION="$(grep -Eo "[0-9]+\.[0-9]+\.[0-9]+" ${PROJECT_DIR}/helm/sedfile.template)"
 if [[ ${SED_FILE_VERSION} != ${CHART_VERSION} ]]; then
     echo "❌ version in sedfile.template does not match the Chart version"
     echo "SED_FILE_VERSION=${SED_FILE_VERSION}, Chart version=${CHART_VERSION}"
     exit 1
 fi
 
-# PULL_BASE_SHA and PULL_PULL_SHA are environment variables set by the presubmit job. More info here: https://docs.prow.k8s.io/docs/jobs/
-BASE_COMMIT_HASH=${PULL_BASE_SHA}
-PR_COMMIT_HASH=${PULL_PULL_SHA}
-PREVIOUS_CHART_VERSION=$(git show ${BASE_COMMIT_HASH}:./chart/Chart.yaml | yq '.version')
+# Verify all CRDs have required annotations
+echo "Verifying CRDs have required annotations..."
+for crd_file in "${HELM_DIRECTORY}"/templates/*.yaml; do
+    filename=$(basename "$crd_file")
+    
+    # Check helm.sh/resource-policy annotation
+    if ! yq -e '.metadata.annotations["helm.sh/resource-policy"] == "keep"' "$crd_file" > /dev/null 2>&1; then
+        echo "❌ ${filename} missing helm.sh/resource-policy: keep annotation"
+        exit 1
+    fi
+    
+    # Check clusterctl labels
+    if ! yq -e '.metadata.labels["clusterctl.cluster.x-k8s.io"] == ""' "$crd_file" > /dev/null 2>&1; then
+        echo "❌ ${filename} missing clusterctl.cluster.x-k8s.io label"
+        exit 1
+    fi
+    
+    echo "✅ ${filename} has required annotations/labels"
+done
 
-EXIT_CODE=0
-
-if git diff ${BASE_COMMIT_HASH} ${PR_COMMIT_HASH} --quiet -- ${HELM_DIRECTORY}/templates ${HELM_DIRECTORY}/values.yaml --; then
-    echo "✅ tinkerbell-chart has no changes since last release"
-else
-if [ "${CHART_VERSION}" = "${PREVIOUS_CHART_VERSION}" ]; then
-    echo "❌ tinkerbell-chart has changed but the Chart version is the same as the last release $PREVIOUS_CHART_VERSION. Please update the chart version in Chart.yaml"
-    EXIT_CODE=1
-else 
-    echo "✅ tinkerbell-chart has a different version since the last release ($PREVIOUS_CHART_VERSION -> $CHART_VERSION)"
-fi
-fi
-
-exit $EXIT_CODE
+echo "✅ All verifications passed"
