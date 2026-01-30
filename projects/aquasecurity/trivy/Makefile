@@ -14,6 +14,7 @@ EXTRA_GO_LDFLAGS=-X main.version=$(VERSION)
 # Trivy packages need jsonv2 in v0.68.2
 # May remove this in the future when jsonv2 is not in GOEXPERIMENT mode
 # Link for the fix: https://github.com/aquasecurity/trivy/discussions/9646
+# Link for jsonv2: https://go.dev/blog/jsonv2-exp
 export GOEXPERIMENT=jsonv2
 
 HAS_S3_ARTIFACTS=true
