@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: rajeshvenkata <rajesh.venkat.p@gmail.com>
+Date: Wed, 28 Jan 2026 00:00:00 +0000
+Subject: [PATCH 2/3] Auto-patch reboot action to success
+
+During reboot actions, the tink-agent may be terminated before it can
+report the action status back to the server, as the machine reboots
+immediately. This causes the workflow to remain stuck in a running state
+even when the reboot completes successfully.
+
+This patch adds server-side auto-patching for reboot actions:
+- When a reboot action is reported as RUNNING, automatically mark it as
+  SUCCESS since the reboot has already been initiated
+- This ensures workflows proceed correctly after reboot actions
+
+Signed-off-by: rajeshvenkata <rajesh.venkat.p@gmail.com>
+---
+ tink/server/internal/grpc/grpc.go | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/tink/server/internal/grpc/grpc.go b/tink/server/internal/grpc/grpc.go
+--- a/tink/server/internal/grpc/grpc.go
++++ b/tink/server/internal/grpc/grpc.go
+@@ -325,6 +325,17 @@ func (h *Handler) doReportActionStatus(ctx context.Context, req *proto.ActionSta
+ 	if err != nil {
+ 		return nil, errors.Join(ErrBackendRead, status.Errorf(codes.Internal, "error getting workflow: %v", err))
+ 	}
++
++	// Auto-patch reboot action to success if it's in RUNNING state.
++	// During reboot, the tink-agent may be terminated before it can report
++	// the final status, as the machine reboots immediately.
++	if strings.Contains(req.GetActionName(), "reboot") && req.GetActionState() == proto.ActionStatusRequest_RUNNING {
++		h.Logger.Info("Auto-patching reboot action to success state", "actionName", req.GetActionName())
++		req.ActionState = proto.ActionStatusRequest_SUCCESS.Enum()
++		msg := "Auto-patched to success by server (reboot action)"
++		req.Message = &proto.ActionMessage{Message: &msg}
++	}
++
+ 	// 3. Find the Action in the workflow from the request
+ 	for ti, task := range wf.Status.Tasks {
+ 		for ai, action := range task.Actions {
+-- 
+2.40.1
