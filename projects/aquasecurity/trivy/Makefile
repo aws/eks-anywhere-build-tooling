@@ -11,6 +11,8 @@ VERSION=$(shell git -C $(REPO) describe --tags)
 
 EXTRA_GO_LDFLAGS=-X main.version=$(VERSION)
 
+export GOEXPERIMENT=jsonv2
+
 HAS_S3_ARTIFACTS=true
 IMAGE_NAMES=
 
