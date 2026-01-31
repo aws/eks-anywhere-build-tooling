@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: rajeshvenkata <rajesh.venkat.p@gmail.com>
+Date: Fri, 30 Jan 2026 00:00:00 +0000
+Subject: [PATCH 4/6] Disable nix-shell and cross-compile for ipxe build
+
+EKS-A builds iPXE natively on each architecture without nix-shell.
+This patch:
+- Disables the nix-shell requirement check
+- Removes cross-compile flag for ARM64 builds (built natively)
+
+Signed-off-by: EKS-A Build <eks-anywhere@amazon.com>
+---
+ smee/internal/ipxe/binary/file/Makefile             | 2 +-
+ smee/internal/ipxe/binary/file/script/build_ipxe.sh | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/smee/internal/ipxe/binary/file/Makefile b/smee/internal/ipxe/binary/file/Makefile
+index 1111111..2222222 100644
+--- a/smee/internal/ipxe/binary/file/Makefile
++++ b/smee/internal/ipxe/binary/file/Makefile
+@@ -32,7 +32,7 @@ undionly.kpxe: $(ipxe_readme) ## build undionly.kpxe
+ 	+${IPXE_BUILD_SCRIPT} bin/undionly.kpxe "$(ipxe_sha_or_tag)" $@
+ 
+ snp-arm64.efi: $(ipxe_readme) ## build snp-arm64.efi
+-	+${IPXE_BUILD_SCRIPT} bin-arm64-efi/snp.efi "$(ipxe_sha_or_tag)" $@ "CROSS_COMPILE=aarch64-unknown-linux-gnu-"
++	+${IPXE_BUILD_SCRIPT} bin-arm64-efi/snp.efi "$(ipxe_sha_or_tag)" $@
+ 
+ ipxe.iso: $(ipxe_readme) ## build ipxe.iso
+ 	+${IPXE_BUILD_SCRIPT} bin-x86_64-efi/ipxe.iso "$(ipxe_sha_or_tag)" $@
+diff --git a/smee/internal/ipxe/binary/file/script/build_ipxe.sh b/smee/internal/ipxe/binary/file/script/build_ipxe.sh
+index 3333333..4444444 100755
+--- a/smee/internal/ipxe/binary/file/script/build_ipxe.sh
++++ b/smee/internal/ipxe/binary/file/script/build_ipxe.sh
+@@ -153,7 +153,7 @@ function main() {
+     # check for prerequisites
+     hasType
+     hasUname
+     # while nix-shell is not used in this script,
+     # we should be in nix-shell for the iPXE build.
+-    hasNixShell
++    # hasNixShell
+ 
+     local ipxe_src=upstream-${ipxe_sha_or_tag}
+     local build_dir=${ipxe_src}-${final_path##*/}
+-- 
+2.49.0
+

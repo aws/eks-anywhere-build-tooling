@@ -1,0 +1,192 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: rajeshvenkata <rajesh.venkat.p@gmail.com>
+Date: Fri, 30 Jan 2026 00:00:00 +0000
+Subject: [PATCH 5/6] Enhance iPXE boot script with retries and VLAN support
+
+This patch enhances the embedded iPXE boot script with:
+- Better interface detection (check MAC before opening)
+- Retry logic for ifopen, link check, and DHCP
+- Improved VLAN interface handling
+- Better error messages and debugging output
+- Configurable retry limits
+- Increased LINK_WAIT_MS for better stability
+- Conditional serial console (disabled on ARM64)
+
+These improvements help with network environments that have
+slower link negotiation or require multiple DHCP attempts.
+
+Signed-off-by: EKS-A Build <eks-anywhere@amazon.com>
+---
+ smee/internal/ipxe/binary/file/script/embed.ipxe                      | 119 ++++++++++++++----
+ smee/internal/ipxe/binary/file/script/ipxe-customizations/general.efi.h |  14 ++-
+ 2 files changed, 106 insertions(+), 27 deletions(-)
+
+diff --git a/smee/internal/ipxe/binary/file/script/embed.ipxe b/smee/internal/ipxe/binary/file/script/embed.ipxe
+index 1111111..2222222 100644
+--- a/smee/internal/ipxe/binary/file/script/embed.ipxe
++++ b/smee/internal/ipxe/binary/file/script/embed.ipxe
+@@ -1,6 +1,12 @@
+ #!ipxe
+ 
+ set user-class Tinkerbell
++set max-interfaces:int32 50
++set max-open-retries:int32 10
++set max-link-retries:int32 10
++set max-dhcp-retries:int32 10
++set global-dhcp-retries:int32 10
++
+ echo Welcome to Neverland!
+ 
+ # Allow the operator to drop to a shell
+@@ -13,43 +19,102 @@ prompt --key 0x02 --timeout 2000 Press Ctrl-B for the iPXE command line... && sh
+ # This is possible because the DHCP options from the original vendor PXE DHCP request
+ # are available to chainloaded iPXE binaries. See https://github.com/ipxe/ipxe/issues/188
+ set vlan-id ${43.116:string}
+-isset ${vlan-id} && goto boot-with-vlan ||
++isset ${vlan-id} && goto boot-with-vlan || goto iterate-interfaces
+ 
+ :iterate-interfaces
++echo Starting interface loop...
+ set idx:int32 0
+ :interfaces-loop
+-isset ${net${idx}/ip} && goto interfaces-loop-done || iseq ${idx} 50 && goto autoboot || inc idx && goto interfaces-loop
+-
+-:interfaces-loop-done
+-echo Booting from net${idx}...
+-set retry-max:int32 10
+-set count:int32 1
+-:retry-loop1
+-echo trying dhcp ( attempt ${count}/${retry-max} )
+-dhcp net${idx} && goto done1 || iseq ${count} ${retry-max} && goto done1 || inc count && goto retry-loop1
+-:done1
+-autoboot net${idx} || exit
++echo Checking net${idx}
++iseq ${idx} ${max-interfaces} && goto fallback-autoboot || goto continue-interface-check
++
++# First check if the interface exists
++:continue-interface-check
++isset ${net${idx}/mac} && goto open-interface || goto next-interface
++
++# --- Open Interface ---
++:open-interface
++echo [INFO] Found interface net${idx}
++set open-retry:int32 1
++:retry-open
++echo [Open] Attempt ${open-retry}/${max-open-retries} on net${idx}
++ifopen net${idx} && goto check-link || iseq ${open-retry} ${max-open-retries} && goto next-interface || inc open-retry && sleep 2 && goto retry-open
++
++# --- Check Link ---
++:check-link
++set link-retry:int32 1
++:retry-link
++echo [Link] Waiting on net${idx} (${link-retry}/${max-link-retries})
++ifstat net${idx} && isset net${idx}/link && goto dhcp-request || iseq ${link-retry} ${max-link-retries} && goto next-interface || inc link-retry && sleep 2 && goto retry-link
+ 
++# --- DHCP ---
++:dhcp-request
++# Wait 2 seconds to ensure the link is stable
++sleep 2
++
++set dhcp-retry:int32 1
++:retry-dhcp
++echo [DHCP] Attempt ${dhcp-retry}/${max-dhcp-retries} on net${idx}
++dhcp net${idx} && goto autoboot || iseq ${dhcp-retry} ${max-dhcp-retries} && goto next-interface || inc dhcp-retry && goto retry-dhcp
++
++# --- Success Path ---
+ :autoboot
+-set retry-max:int32 10
+-set count:int32 1
+-:retry-loop2
+-echo trying dhcp ( attempt ${count}/${retry-max} )
+-dhcp && goto done2 || iseq ${count} ${retry-max} && goto done2 || inc count && goto retry-loop2
+-:done2
++echo [SUCCESS] Booting from net${idx}...
++autoboot net${idx} || goto next-interface
++
++# === Try Next Interface ===
++:next-interface
++inc idx
++goto interfaces-loop
++
++# === Global Fallback ===
++:fallback-autoboot
++echo [FALLBACK] Trying global DHCP + autoboot...
++set global-retry:int32 1
++:global-dhcp-loop
++echo [Fallback DHCP] Attempt ${global-retry}/${global-dhcp-retries}
++dhcp && goto final-autoboot || iseq ${global-retry} ${global-dhcp-retries} && goto final-autoboot || inc global-retry && goto global-dhcp-loop
++
++:final-autoboot
+ autoboot || exit
+ 
++# === VLAN Handling ===
+ :boot-with-vlan
++echo [VLAN] Detected VLAN ID: ${vlan-id}
++echo [DEBUG] Starting VLAN interface detection
+ set idx:int32 0
+-# Find the interface that is configured with an IP, this will be the iPXE auto created vlan interface.
+-:loop isset ${net${idx}-${vlan-id}/ip} && goto loop_done ||
+-  iseq ${idx} 50 && goto error ||
+-  inc idx && goto loop
+ 
+-:loop_done
+-echo Booting from net${idx}-${vlan-id}...
+-autoboot net${idx}-${vlan-id}
++# Find the VLAN interface
++:vlan-interface-loop
++# Check if the VLAN interface exists
++isset ${net${idx}-${vlan-id}/mac} && goto open-vlan || echo [DEBUG] VLAN interface net${idx}-${vlan-id} not found, trying next && goto next-vlan-interface
++echo [VLAN] Found VLAN interface net${idx}-${vlan-id}
++
++# --- Open VLAN Interface ---
++:open-vlan
++set open-retry:int32 1
++:retry-open-vlan
++echo [Open] Attempt ${open-retry}/${max-open-retries} on net${idx}-${vlan-id}
++ifopen net${idx}-${vlan-id} && goto open-vlan-link || iseq ${open-retry} ${max-open-retries} && goto next-vlan-interface || inc open-retry && goto retry-open-vlan
++
++# --- Check VLAN Link ---
++:open-vlan-link
++set link-retry:int32 1
++:retry-link-vlan
++echo [Link] Waiting on net${idx}-${vlan-id} (${link-retry}/${max-link-retries})
++ifstat net${idx}-${vlan-id} && isset net${idx}-${vlan-id}/link && goto vlan-autoboot || iseq ${link-retry} ${max-link-retries} && goto next-vlan-interface || inc link-retry && sleep 2 && goto retry-link-vlan
++
++# --- Success Path for VLAN ---
++:vlan-autoboot
++echo [SUCCESS] Network configured successfully: ${net${idx}-${vlan-id}/ip}
++echo [SUCCESS] Booting from net${idx}-${vlan-id}...
++autoboot net${idx}-${vlan-id} || goto next-vlan-interface
++
++# Try next interface for VLAN
++:next-vlan-interface
++inc idx
++iseq ${idx} ${max-interfaces} && goto vlan-error || goto vlan-interface-loop
+ 
+-:error
+-echo Failed to find the vlan interface
++:vlan-error
++echo [ERROR] Failed to boot with VLAN interface
+ shell
+diff --git a/smee/internal/ipxe/binary/file/script/ipxe-customizations/general.efi.h b/smee/internal/ipxe/binary/file/script/ipxe-customizations/general.efi.h
+index 3333333..4444444 100644
+--- a/smee/internal/ipxe/binary/file/script/ipxe-customizations/general.efi.h
++++ b/smee/internal/ipxe/binary/file/script/ipxe-customizations/general.efi.h
+@@ -1 +1,14 @@
+ #include "common.h"
++
++#undef LINK_WAIT_MS
++#define LINK_WAIT_MS 15000    // Increased from 5000ms for better stability
++#define NET_PROTO_IPV4
++#define DOWNLOAD_PROTO_TFTP
++#define DOWNLOAD_PROTO_HTTP
++#define IMAGE_EFI
++#define CONSOLE_EFI
++
++// Only enable serial console for x86/x86_64, not for ARM64
++#if !defined(__aarch64__)
++#define CONSOLE_SERIAL
++#endif
+-- 
+2.49.0
+
