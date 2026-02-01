@@ -13,13 +13,13 @@ patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Binary Targets
 binaries: ## Build all binaries: `cluster-autoscaler` for `linux/amd64 linux/arm64`
-_output/1-34/bin/autoscaler/linux-amd64/cluster-autoscaler: ## Build `_output/1-34/bin/autoscaler/linux-amd64/cluster-autoscaler`
-_output/1-34/bin/autoscaler/linux-arm64/cluster-autoscaler: ## Build `_output/1-34/bin/autoscaler/linux-arm64/cluster-autoscaler`
+_output/1-26/bin/autoscaler/linux-amd64/cluster-autoscaler: ## Build `_output/1-26/bin/autoscaler/linux-amd64/cluster-autoscaler`
+_output/1-26/bin/autoscaler/linux-arm64/cluster-autoscaler: ## Build `_output/1-26/bin/autoscaler/linux-arm64/cluster-autoscaler`
 
 ##@ Image Targets
-local-images: ## Builds `autoscaler/images/arm64` as oci tars for presumbit validation
+local-images: ## Builds `autoscaler/images/amd64` as oci tars for presumbit validation
 images: ## Pushes `autoscaler/images/push` to IMAGE_REPO
-autoscaler/images/arm64: ## Builds/pushes `autoscaler/images/arm64`
+autoscaler/images/amd64: ## Builds/pushes `autoscaler/images/amd64`
 autoscaler/images/push: ## Builds/pushes `autoscaler/images/push`
 
 ##@ Helm Targets
@@ -43,9 +43,9 @@ run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
 run-in-docker/autoscaler/cluster-autoscaler/eks-anywhere-go-mod-download: ## Run `autoscaler/cluster-autoscaler/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/_output/1-34/bin/autoscaler/linux-amd64/cluster-autoscaler: ## Run `_output/1-34/bin/autoscaler/linux-amd64/cluster-autoscaler` in docker builder container
-run-in-docker/_output/1-34/bin/autoscaler/linux-arm64/cluster-autoscaler: ## Run `_output/1-34/bin/autoscaler/linux-arm64/cluster-autoscaler` in docker builder container
-run-in-docker/_output/1-34/attribution/go-license.csv: ## Run `_output/1-34/attribution/go-license.csv` in docker builder container
+run-in-docker/_output/1-26/bin/autoscaler/linux-amd64/cluster-autoscaler: ## Run `_output/1-26/bin/autoscaler/linux-amd64/cluster-autoscaler` in docker builder container
+run-in-docker/_output/1-26/bin/autoscaler/linux-arm64/cluster-autoscaler: ## Run `_output/1-26/bin/autoscaler/linux-arm64/cluster-autoscaler` in docker builder container
+run-in-docker/_output/1-26/attribution/go-license.csv: ## Run `_output/1-26/attribution/go-license.csv` in docker builder container
 
 ##@ License Targets
 gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
