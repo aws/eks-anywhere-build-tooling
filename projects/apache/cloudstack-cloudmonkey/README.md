@@ -1,5 +1,5 @@
 ## **CloudMonkey**
-![Version](https://img.shields.io/badge/version-6.4.0-blue)
+![Version](https://img.shields.io/badge/version-6.5.0-blue)
 ![Build Status](https://camo.githubusercontent.com/e659888f1b9d9c9c3046644ef48da811f5b75b28fdff97596401ed5f39e866d5/68747470733a2f2f7472617669732d63692e636f6d2f6170616368652f636c6f7564737461636b2d636c6f75646d6f6e6b65792e7376673f6272616e63683d6d61696e)
 
 `cloudmonkey` is a command line interface (CLI) for
