@@ -1,5 +1,5 @@
 ## **Kustomize Controller**
-![Version](https://img.shields.io/badge/version-v1.7.0-blue)
+![Version](https://img.shields.io/badge/version-v1.7.3-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoibldOWFUyd2ZXOXR1WkNhSVZDZkprbEowWi9nNEZrN2RMcCtRK3EvQW9qbWUzQjcxVEZvTEZ6VUw3M004WHNKQ0M1MGJ4SlU0RUJvVE1YQ0hFT0hzZ21nPSIsIml2UGFyYW1ldGVyU3BlYyI6Ing4cTAwdG9pc1I0Qk81MlQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [kustomize-controller](https://github.com/fluxcd/kustomize-controller) is a Kubernetes operator, specialized in running continuous delivery pipelines for infrastructure and workloads defined with Kubernetes manifests and assembled with Kustomize.
@@ -30,7 +30,7 @@ about changes necessary to eks-anywhere to support the new version and/or automa
 eks-anywhere version reach out to @jiayiwang7 or @danbudris
 1. Update the `GIT_TAG` file to have the new desired version based on the upstream release tags.
 1. Compare the old tag to the new, looking specifically for Makefile changes. 
-ex: [v1.1.1 compared to v1.7.0](https://github.com/fluxcd/kustomize-controller/compare/v1.1.1...v1.2.1). Check the `manager` target for
+ex: [v1.1.1 compared to v1.7.3](https://github.com/fluxcd/kustomize-controller/compare/v1.1.1...v1.2.1). Check the `manager` target for
 any build flag changes, tag changes, dependencies, etc.
 1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.  There is also
 a [dockerfile](https://github.com/fluxcd/kustomize-controller/blob/main/Dockerfile#L5) they use for building which has it defined.
