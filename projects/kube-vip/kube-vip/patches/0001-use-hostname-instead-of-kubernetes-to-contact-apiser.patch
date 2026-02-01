@@ -1,4 +1,4 @@
-From 40e582d35340bda360275af053ea63506e9bbcde Mon Sep 17 00:00:00 2001
+From 40bf11fd0b44f39ad39de8f65eb664a2172ed983 Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 2 Mar 2022 16:40:11 -0800
 Subject: [PATCH] use hostname instead of "kubernetes" to contact apiserver
@@ -9,10 +9,10 @@ Subject: [PATCH] use hostname instead of "kubernetes" to contact apiserver
  2 files changed, 5 insertions(+), 9 deletions(-)
 
 diff --git a/pkg/kubevip/config_generator.go b/pkg/kubevip/config_generator.go
-index 509dcf6..bd487a5 100644
+index 9467f86..b2cad5b 100644
 --- a/pkg/kubevip/config_generator.go
 +++ b/pkg/kubevip/config_generator.go
-@@ -624,13 +624,6 @@ func generatePodSpec(c *Config, imageVersion string, inCluster bool) *corev1.Pod
+@@ -660,13 +660,6 @@ func generatePodSpec(c *Config, image, imageVersion string, inCluster bool) (*co
  			},
  		}
  		newManifest.Spec.Volumes = append(newManifest.Spec.Volumes, adminConfVolume)
@@ -25,12 +25,12 @@ index 509dcf6..bd487a5 100644
 -		newManifest.Spec.HostAliases = append(newManifest.Spec.HostAliases, hostAlias)
  	}
  
- 	return newManifest
+ 	return newManifest, nil
 diff --git a/pkg/manager/manager.go b/pkg/manager/manager.go
-index 29770b4..cf11acb 100644
+index 2c14705..9026c58 100644
 --- a/pkg/manager/manager.go
 +++ b/pkg/manager/manager.go
-@@ -113,8 +113,11 @@ func New(configMap string, config *kubevip.Config) (*Manager, error) {
+@@ -118,8 +118,11 @@ func New(configMap string, config *kubevip.Config) (*Manager, error) {
  			if config.DetectControlPlane {
  				clientConfig, err = k8s.FindWorkingKubernetesAddress(adminConfigPath, false)
  			} else {
@@ -45,5 +45,5 @@ index 29770b4..cf11acb 100644
  		} else {
  			clientConfig, err = k8s.NewRestConfig(adminConfigPath, false, "")
 -- 
-2.39.5 (Apple Git-154)
+2.50.1 (Apple Git-155)
 
