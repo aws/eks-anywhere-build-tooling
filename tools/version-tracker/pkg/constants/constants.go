@@ -160,6 +160,12 @@ var (
 			Extract:                  true,
 			TrimLeadingVersionPrefix: true,
 		},
+		"goharbor/distribution": {
+			AssetName:                "registry_%s_linux_amd64.tar.gz",
+			BinaryName:               "registry",
+			Extract:                  true,
+			TrimLeadingVersionPrefix: true,
+		},
 		"goharbor/harbor-scanner-trivy": {
 			AssetName:                "harbor-scanner-trivy_%s_Linux_x86_64.tar.gz",
 			BinaryName:               "scanner-trivy",
@@ -280,6 +286,10 @@ var (
 			GoVersionSearchString: `ARG GO_VERSION=(1\.\d\d)`,
 		},
 		"fluxcd/source-controller": {
+			SourceOfTruthFile:     "Dockerfile",
+			GoVersionSearchString: `ARG GO_VERSION=(1\.\d\d)`,
+		},
+		"goharbor/distribution": {
 			SourceOfTruthFile:     "Dockerfile",
 			GoVersionSearchString: `ARG GO_VERSION=(1\.\d\d)`,
 		},
@@ -427,6 +437,7 @@ var (
 		"aws-observability/aws-otel-collector",
 		"distribution/distribution",
 		"emissary-ingress/emissary",
+		"goharbor/distribution",
 		"goharbor/harbor",
 		"goharbor/harbor-scanner-trivy",
 		"kubernetes/autoscaler",
