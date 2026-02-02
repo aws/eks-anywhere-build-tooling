@@ -47,7 +47,7 @@ GO_MOD_PATHS=src src src src src src
 TRIVY_VERSION=$(TRIVYVERSION)
 IMAGE_BUILD_ARGS=TRIVY_VERSION
 
-PROJECT_DEPENDENCIES=eksa/distribution/distribution eksa/aquasecurity/trivy eksa/goharbor/harbor-scanner-trivy
+PROJECT_DEPENDENCIES=eksa/goharbor/distribution eksa/aquasecurity/trivy eksa/goharbor/harbor-scanner-trivy
 
 FIX_LICENSES_XEIPUUV_TARGET=$(REPO)/vendor/github.com/xeipuuv/gojsonpointer/LICENSE.txt
 FIX_LICENSES_VOLC_SDK_GOLANG_TARGET=$(REPO)/src/vendor/github.com/volcengine/volc-sdk-golang/service/sts/LICENSE

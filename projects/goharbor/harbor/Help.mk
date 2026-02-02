@@ -55,8 +55,8 @@ helm/build: ## Build helm chart
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Fetch Binary Targets
-_output/dependencies/linux-amd64/eksa/distribution/distribution: ## Fetch `_output/dependencies/linux-amd64/eksa/distribution/distribution`
-_output/dependencies/linux-arm64/eksa/distribution/distribution: ## Fetch `_output/dependencies/linux-arm64/eksa/distribution/distribution`
+_output/dependencies/linux-amd64/eksa/goharbor/distribution: ## Fetch `_output/dependencies/linux-amd64/eksa/goharbor/distribution`
+_output/dependencies/linux-arm64/eksa/goharbor/distribution: ## Fetch `_output/dependencies/linux-arm64/eksa/goharbor/distribution`
 _output/dependencies/linux-amd64/eksa/aquasecurity/trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/aquasecurity/trivy`
 _output/dependencies/linux-arm64/eksa/aquasecurity/trivy: ## Fetch `_output/dependencies/linux-arm64/eksa/aquasecurity/trivy`
 _output/dependencies/linux-amd64/eksa/goharbor/harbor-scanner-trivy: ## Fetch `_output/dependencies/linux-amd64/eksa/goharbor/harbor-scanner-trivy`

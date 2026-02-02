@@ -48,7 +48,8 @@ fluxcd                flux2                            v2.0.0                   
 fluxcd                helm-controller                  v0.35.0                                   v0.36.2                                        
 fluxcd                kustomize-controller             v1.0.0                                    v1.1.1                                         
 fluxcd                notification-controller          v1.0.0                                    v1.1.0                                         
-fluxcd                source-controller                v1.0.0                                    v1.1.2                                         
+fluxcd                source-controller                v1.0.0                                    v1.1.2
+goharbor              distribution                     v2.8.3                                    v2.8.3                                         
 goharbor              harbor                           v2.9.1                                    v2.9.1                                         
 goharbor              harbor-scanner-trivy             v0.30.7                                   v0.30.19                                       
 helm                  helm                             v3.12.1                                   v3.13.2                                        
