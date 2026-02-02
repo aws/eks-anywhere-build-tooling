@@ -1,4 +1,4 @@
-From e4707dedf15558d1cc831760fd8477a67cfef3ff Mon Sep 17 00:00:00 2001
+From fb54bca3df74e1d1784a10a5965a4088e8df2180 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Sat, 6 May 2023 14:08:17 -0500
 Subject: [PATCH 22/36] Patch haproxy maxconn value to avoid ulimit issue
@@ -7,7 +7,7 @@ EKS-A uses haproxy 2.5 which errors if the maxconn value
 requires more FDs than allowed by the ulimit setting of docker.
 100k maxconn is too high for the default ulimit on an al2 node.
 ---
- api/bootstrap/kubeadm/v1beta1/conversion.go   |  13 ++
+ api/bootstrap/kubeadm/v1beta1/conversion.go   |  31 ++++-
  .../kubeadm/v1beta1/kubeadm_types.go          |  25 ++++
  .../v1beta1/zz_generated.conversion.go        |  78 +++++++++--
  .../kubeadm/v1beta1/zz_generated.deepcopy.go  |  61 +++++++++
@@ -28,13 +28,27 @@ requires more FDs than allowed by the ulimit setting of docker.
  .../v1alpha4/zz_generated.conversion.go       |  36 +++++
  .../kubeadm/v1alpha4/zz_generated.deepcopy.go |  25 ++++
  .../docker/internal/loadbalancer/config.go    |   7 +-
- 21 files changed, 877 insertions(+), 11 deletions(-)
+ 21 files changed, 894 insertions(+), 12 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index 1b8aefac6..5dea6bec1 100644
+index 1b8aefac6..cec882957 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
-@@ -1042,6 +1042,19 @@ func Convert_v1beta2_User_To_v1beta1_User(in *bootstrapv1.User, out *User, s api
+@@ -762,7 +762,12 @@ func Convert_v1beta2_BottlerocketSettings_To_v1beta1_BottlerocketSettings(in *bo
+ 			SysctlSettings: in.Kernel.SysctlSettings,
+ 		}
+ 	}
+-	// Note: v1beta2 has additional Boot field that doesn't exist in v1beta1, so it's lost during conversion
++	// Copy the Boot field
++	if in.Boot != nil {
++		out.Boot = &BottlerocketBootSettings{
++			BootKernelParameters: in.Boot.BootKernelParameters,
++		}
++	}
+ 	return nil
+ }
+ 
+@@ -1042,6 +1047,30 @@ func Convert_v1beta2_User_To_v1beta1_User(in *bootstrapv1.User, out *User, s api
  	return nil
  }
  
@@ -47,7 +61,18 @@ index 1b8aefac6..5dea6bec1 100644
 +			ClusterDNSIPs:        in.Kubernetes.ClusterDNSIPs,
 +		}
 +	}
-+	// Note: v1beta2 has additional fields (Kernel, Boot) that don't exist in v1beta1, so they remain nil
++	// Copy the Kernel field
++	if in.Kernel != nil {
++		out.Kernel = &bootstrapv1.BottlerocketKernelSettings{
++			SysctlSettings: in.Kernel.SysctlSettings,
++		}
++	}
++	// Copy the Boot field
++	if in.Boot != nil {
++		out.Boot = &bootstrapv1.BottlerocketBootSettings{
++			BootKernelParameters: in.Boot.BootKernelParameters,
++		}
++	}
 +	return nil
 +}
 +
