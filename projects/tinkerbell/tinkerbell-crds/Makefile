@@ -7,6 +7,9 @@ REPO=tinkerbell
 # Override COMPONENT so MAKE_ROOT points to this project, not the cloned repo
 COMPONENT=tinkerbell/tinkerbell-crds
 
+# Don't clone - we manually clone tinkerbell/tinkerbell mono-repo in pre-helm/build
+REPO_NO_CLONE=true
+
 IMAGE_NAMES=
 BUILD_TARGETS=helm/build
 RELEASE_TARGETS=helm/push
@@ -23,18 +26,23 @@ EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-# Generate the CRDs helm chart before helm/copy (which is the first step in helm/build chain)
-# Depends on checkout-repo to ensure mono-repo is cloned and checked out first
-# Output to $(REPO)/_output/helm-chart so helm_copy.sh can find it
-.PHONY: pre-helm/build
-pre-helm/build: checkout-repo
+# Clone tinkerbell mono-repo from GitHub (bypassing infra CLONE_URL which points to non-existent repo)
+# Uses same pattern as Common.mk: directory rule + checkout/marker rule
+$(REPO):
+	source $(BUILD_LIB)/common.sh && retry git clone https://github.com/$(REPO_OWNER)/$(REPO).git $(REPO)
+
+$(GIT_CHECKOUT_TARGET): | $(REPO)
+	@rm -f $(REPO)/eks-anywhere-*
+	git -C $(REPO) checkout --quiet -f $(GIT_TAG)
+	@touch $@
+
+# Override checkout-repo to use our clone rules + generate CRDs chart
+.PHONY: checkout-repo
+checkout-repo: $(GIT_CHECKOUT_TARGET)
 	scripts/generate-crds-chart.sh $(MAKE_ROOT)/$(REPO) $(MAKE_ROOT)/$(REPO)/_output/helm-chart
 
-# Make helm/copy depend on pre-helm/build to generate chart first
-tinkerbell/tinkerbell-crds/helm/copy: pre-helm/build
-
 .PHONY: verify
-verify: checkout-repo pre-helm/build
+verify: checkout-repo
 	scripts/verify.sh $(MAKE_ROOT)/$(REPO)/_output/helm-chart $(GIT_TAG)
 
 
