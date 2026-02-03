@@ -29,7 +29,7 @@ IMAGE_BUILDER_DIR=$MAKE_ROOT/image-builder/images/capi
 DEPENDENCY_YAML=$MAKE_ROOT/REQUIRED_DEPENDENCY_VERSIONS.yaml
 
 MINIMUM_PYTHON_VERSION="$($SED -n "s/^minimum_python_version=\(\S*\)/\1/p" $IMAGE_BUILDER_DIR/hack/ensure-python.sh)"
-ANSIBLE_VERSION="$($SED -n "s/^_version=\"\(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/hack/ensure-ansible.sh)"
+ANSIBLE_VERSION="$($SED -n "s/^_version_ansible_core=\"\(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/hack/utils.sh)"
 
 PACKER_VERSION="$($SED -n "s/^_version=\"\(\S*\)\"/\1/p" $IMAGE_BUILDER_DIR/hack/ensure-packer.sh)"
 
