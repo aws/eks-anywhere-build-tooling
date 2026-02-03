@@ -1,5 +1,5 @@
 ## **cert-manager**
-![Version](https://img.shields.io/badge/version-v1.18.4-blue)
+![Version](https://img.shields.io/badge/version-v1.18.5-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUkphQkhWTUpOOVE1OFVLU0dHQmVFUXZJV0dJaGVLYmtEZHp0aGtDRnJBQUxtaHVqOWp3S0l6d0NlTytqNWpwc2tNTmF6RnNhMTZ3d1J1RXErR0lWcldZPSIsIml2UGFyYW1ldGVyU3BlYyI6IlQyU2lIcVVtU3ozZVZSVTgiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [cert-manager](https://github.com/cert-manager/cert-manager) is a Kubernetes add-on to automate the management and issuance of TLS certificates from various issuing sources, such as [Let’s Encrypt](https://letsencrypt.org), [HashiCorp Vault](https://www.vaultproject.io), [Venafi](https://www.venafi.com/), a simple signing key pair, or self signed. It periodically ensures that certificates are valid and up-to-date, and attempts to renew certificates at an appropriate time before expiry.
