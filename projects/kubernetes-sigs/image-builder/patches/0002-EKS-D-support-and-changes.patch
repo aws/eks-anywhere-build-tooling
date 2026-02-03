@@ -1,4 +1,4 @@
-From c88c782e1a52135d52243c7c740fef6ae23cc85b Mon Sep 17 00:00:00 2001
+From a066f0e7fe2555ac9b3e7436367d519c5827f4e9 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 18:36:56 -0800
 Subject: [PATCH 02/17] EKS-D support and changes
@@ -12,6 +12,7 @@ Subject: [PATCH 02/17] EKS-D support and changes
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
+ .../roles/kubernetes/defaults/main.yml        |  2 +-
  .../ansible/roles/kubernetes/tasks/url.yml    | 37 ++++++++++++++++++-
  images/capi/packer/ami/packer.json            |  7 +++-
  images/capi/packer/config/ansible-args.json   |  2 +-
@@ -23,8 +24,21 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  images/capi/packer/ova/packer-node.json       |  5 +++
  images/capi/packer/qemu/packer.json.tmpl      |  7 +++-
  images/capi/packer/raw/packer.json.tmpl       |  7 +++-
- 11 files changed, 100 insertions(+), 8 deletions(-)
+ 12 files changed, 101 insertions(+), 9 deletions(-)
 
+diff --git a/images/capi/ansible/roles/kubernetes/defaults/main.yml b/images/capi/ansible/roles/kubernetes/defaults/main.yml
+index 6cf40cf14..e481dda83 100644
+--- a/images/capi/ansible/roles/kubernetes/defaults/main.yml
++++ b/images/capi/ansible/roles/kubernetes/defaults/main.yml
+@@ -39,7 +39,7 @@ kubernetes_load_additional_imgs: false
+ 
+ kubernetes_imgs: "{{ kubernetes_primary_imgs | union(kubernetes_additional_imgs) if kubernetes_load_additional_imgs | bool else kubernetes_primary_imgs }}"
+ 
+-kubernetes_cni_http_checksum: sha256:{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_resolved_arch }}-{{ kubernetes_cni_semver }}.tgz.sha256
++kubernetes_cni_http_checksum: sha256:{{ kubernetes_cni_http_source }}/{{ kubernetes_cni_semver }}/cni-plugins-linux-{{ kubernetes_resolved_arch }}-{{ kubernetes_cni_semver }}.tar.gz.sha256
+ 
+ kubeadm_template: etc/kubeadm.yml
+ 
 diff --git a/images/capi/ansible/roles/kubernetes/tasks/url.yml b/images/capi/ansible/roles/kubernetes/tasks/url.yml
 index afcd5f0a1..465337235 100644
 --- a/images/capi/ansible/roles/kubernetes/tasks/url.yml
