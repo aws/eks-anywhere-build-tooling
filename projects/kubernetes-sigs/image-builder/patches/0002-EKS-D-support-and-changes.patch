@@ -1,4 +1,4 @@
-From a066f0e7fe2555ac9b3e7436367d519c5827f4e9 Mon Sep 17 00:00:00 2001
+From 4dd2649f76f20a9aedfc788d65bf92a3db9b3f88 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 11 Jan 2022 18:36:56 -0800
 Subject: [PATCH 02/17] EKS-D support and changes
@@ -12,6 +12,7 @@ Subject: [PATCH 02/17] EKS-D support and changes
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
+ .../roles/containerd/defaults/main.yml        |  2 +-
  .../roles/kubernetes/defaults/main.yml        |  2 +-
  .../ansible/roles/kubernetes/tasks/url.yml    | 37 ++++++++++++++++++-
  images/capi/packer/ami/packer.json            |  7 +++-
@@ -24,8 +25,21 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  images/capi/packer/ova/packer-node.json       |  5 +++
  images/capi/packer/qemu/packer.json.tmpl      |  7 +++-
  images/capi/packer/raw/packer.json.tmpl       |  7 +++-
- 12 files changed, 101 insertions(+), 9 deletions(-)
+ 13 files changed, 102 insertions(+), 10 deletions(-)
 
+diff --git a/images/capi/ansible/roles/containerd/defaults/main.yml b/images/capi/ansible/roles/containerd/defaults/main.yml
+index d3642188c..b6f5238e1 100644
+--- a/images/capi/ansible/roles/containerd/defaults/main.yml
++++ b/images/capi/ansible/roles/containerd/defaults/main.yml
+@@ -17,7 +17,7 @@ containerd_gvisor_runtime: false
+ containerd_gvisor_version: latest
+ containerd_baseurl: https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}
+ containerd_filename: "containerd-{{ containerd_version }}-{{ system }}-{{ arch }}.tar.gz"
+-containerd_url: "{{ containerd_baseurl }}/{{ containerd_filename }}"
++containerd_url: "{{user `containerd_url`}}"
+ containerd_runc_url: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.{{ arch }}"
+ runc_version: "1.2.3"
+ containerd_runc_checksum_url: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.sha256sum"
 diff --git a/images/capi/ansible/roles/kubernetes/defaults/main.yml b/images/capi/ansible/roles/kubernetes/defaults/main.yml
 index 6cf40cf14..e481dda83 100644
 --- a/images/capi/ansible/roles/kubernetes/defaults/main.yml
