@@ -6,6 +6,10 @@
 # This is added to help document dynamic targets and support shell autocompletion
 
 
+##@ GIT/Repo Targets
+clone-repo:  ## Clone upstream `tinkerbell`
+checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
+
 ##@ Helm Targets
 helm/build: ## Build helm chart
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
@@ -33,6 +37,7 @@ all-attributions-checksums: ## Update attribution and checksums files for all RE
 ##@ Clean Targets
 clean: ## Removes source and _output directory
 clean-go-cache: ## Removes the GOMODCACHE AND GOCACHE folders
+clean-repo: ## Removes source directory
 
 ##@Fetch Binary Targets
 handle-dependencies: ## Download and extract TARs for each dependency listed in PROJECT_DEPENDENCIES
