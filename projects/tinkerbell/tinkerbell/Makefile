@@ -49,6 +49,7 @@ HELM_DIRECTORY=helm/tinkerbell
 HELM_SOURCE_REPOSITORY=tinkerbell
 HELM_CHART_NAMES=tinkerbell
 HELM_DESTINATION_REPOSITORY=tinkerbell/tinkerbell
+HELM_IMAGE_LIST=tinkerbell/tinkerbell/tinkerbell tinkerbell/tinkerbell/tink-agent
 
 # Exclude from upgrade buildspec until migration is complete
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
