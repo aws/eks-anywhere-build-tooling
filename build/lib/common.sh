@@ -418,11 +418,26 @@ function build::common::wait_for_tag() {
   local -r tag=$1
   sleep_interval=20
   for i in {1..60}; do
-    echo "Checking for tag ${tag}..."
-    git rev-parse --verify --quiet "${tag}" && echo "Tag ${tag} exists!" && break
+    echo "Checking for tag/branch ${tag}..."
+    
+    # First try to find it as a tag
+    if git rev-parse --verify --quiet "${tag}" > /dev/null 2>&1; then
+      echo "Tag ${tag} exists!"
+      break
+    fi
+    
+    # If not found as a tag, try as a remote branch
+    if git rev-parse --verify --quiet "origin/${tag}" > /dev/null 2>&1; then
+      echo "Branch ${tag} exists!"
+      break
+    fi
+    
+    # Fetch both tags and branches
     git fetch --tags > /dev/null 2>&1
-    echo "Tag ${tag} does not exist!"
-    echo "Waiting for tag ${tag}..."
+    git fetch origin > /dev/null 2>&1
+    
+    echo "Tag/branch ${tag} does not exist!"
+    echo "Waiting for tag/branch ${tag}..."
     sleep $sleep_interval
     if [ "$i" = "60" ]; then
       exit 1
