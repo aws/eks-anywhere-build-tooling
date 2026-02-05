@@ -44,11 +44,14 @@ HAS_S3_ARTIFACTS=true
 UPLOAD_DO_NOT_DELETE=true
 
 # Helm chart configuration - chart is in the mono-repo at helm/tinkerbell
+# The chart is renamed from "tinkerbell" to "tinkerbell-helm" via sedfile to:
+# 1. Avoid map key collision with the "tinkerbell" container image in release CLI
+# 2. Match the AssetName which must end with "-chart" to be recognized as helm
 HAS_HELM_CHART=true
 HELM_DIRECTORY=helm/tinkerbell
 HELM_SOURCE_REPOSITORY=tinkerbell
-HELM_CHART_NAMES=tinkerbell
-HELM_DESTINATION_REPOSITORY=tinkerbell/tinkerbell/tinkerbell
+HELM_CHART_NAMES=tinkerbell-helm
+HELM_DESTINATION_REPOSITORY=tinkerbell/tinkerbell/tinkerbell-helm
 HELM_IMAGE_LIST=tinkerbell/tinkerbell/tinkerbell tinkerbell/tinkerbell/tink-agent
 
 # Exclude from upgrade buildspec until migration is complete
