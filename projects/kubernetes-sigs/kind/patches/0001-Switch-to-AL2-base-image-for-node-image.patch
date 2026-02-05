@@ -1,15 +1,15 @@
-From dd8f30d177505a75393cd994cfc8980398ce505e Mon Sep 17 00:00:00 2001
+From af841b3f8a820b38ce61fe05efd716c963bff064 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 29 Jun 2023 00:56:53 -0700
-Subject: [PATCH 1/6] Switch to AL2 base image for node image
+Subject: [PATCH 1/7] Switch to AL2 base image for node image
 
 ---
- images/base/Dockerfile                        | 216 ++++++------------
+ images/base/Dockerfile                        | 218 ++++++------------
  images/base/files/usr/local/bin/clean-install |  10 +-
- 2 files changed, 79 insertions(+), 147 deletions(-)
+ 2 files changed, 79 insertions(+), 149 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index 4a1e616f..b3b7e848 100644
+index 0cb1f8f2..b3b7e848 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -17,11 +17,19 @@
@@ -64,7 +64,7 @@ index 4a1e616f..b3b7e848 100644
  
  # NOTE: systemd-binfmt.service will register things into binfmt_misc which is kernel-global
  RUN echo "Enabling / Disabling services ... " \
-@@ -97,144 +110,65 @@ RUN echo "Enabling / Disabling services ... " \
+@@ -97,146 +110,65 @@ RUN echo "Enabling / Disabling services ... " \
  RUN echo "Ensuring /etc/kubernetes/manifests" \
      && mkdir -p /etc/kubernetes/manifests
  
@@ -93,7 +93,7 @@ index 4a1e616f..b3b7e848 100644
 -# stage for building containerd
 -FROM go-build AS build-containerd
 -ARG TARGETARCH GO_VERSION
--ARG CONTAINERD_VERSION="v2.1.1"
+-ARG CONTAINERD_VERSION="v2.2.0"
 -ARG CONTAINERD_CLONE_URL="https://github.com/containerd/containerd"
 -# we don't build with optional snapshotters, we never select any of these
 -# they're not ideal inside kind anyhow, and we save some disk space
@@ -111,7 +111,9 @@ index 4a1e616f..b3b7e848 100644
 -# stage for building runc
 -FROM go-build AS build-runc
 -ARG TARGETARCH GO_VERSION
--ARG RUNC_VERSION="v1.3.0"
+-# TODO: upgrade to 1.3.x to match containerd after resolving:
+-# https://github.com/kubernetes/kubernetes/issues/135214
+-ARG RUNC_VERSION="v1.2.9"
 -ARG RUNC_CLONE_URL="https://github.com/opencontainers/runc"
 -RUN git clone --filter=tree:0 "${RUNC_CLONE_URL}" /runc \
 -    && cd /runc \
@@ -139,7 +141,7 @@ index 4a1e616f..b3b7e848 100644
 -# stage for building cni-plugins
 -FROM go-build AS build-cni
 -ARG TARGETARCH GO_VERSION
--ARG CNI_PLUGINS_VERSION="v1.7.1"
+-ARG CNI_PLUGINS_VERSION="v1.8.0"
 -ARG CNI_PLUGINS_CLONE_URL="https://github.com/containernetworking/plugins"
 -RUN git clone --filter=tree:0 "${CNI_PLUGINS_CLONE_URL}" /cni-plugins \
 -    && cd /cni-plugins \
@@ -160,7 +162,7 @@ index 4a1e616f..b3b7e848 100644
 -# stage for building containerd-fuse-overlayfs
 -FROM go-build AS build-fuse-overlayfs
 -ARG TARGETARCH GO_VERSION
--ARG CONTAINERD_FUSE_OVERLAYFS_VERSION="v2.1.0"
+-ARG CONTAINERD_FUSE_OVERLAYFS_VERSION="v2.1.7"
 -ARG CONTAINERD_FUSE_OVERLAYFS_CLONE_URL="https://github.com/containerd/fuse-overlayfs-snapshotter"
 -RUN git clone --filter=tree:0 "${CONTAINERD_FUSE_OVERLAYFS_CLONE_URL}" /fuse-overlayfs-snapshotter \
 -    && cd /fuse-overlayfs-snapshotter \
@@ -290,5 +292,5 @@ index b0b861c3..f1d714a6 100755
 -   /usr/share/local/*
 +   /usr/share/local/* || true
 -- 
-2.49.0
+2.50.1 (Apple Git-155)
 
