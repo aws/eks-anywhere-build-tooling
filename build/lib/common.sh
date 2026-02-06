@@ -363,8 +363,9 @@ function build::common::get_latest_eksa_asset_url() {
 
   local -r tar_file_prefix=$(MAKEOVERRIDES= MAKEFLAGS= make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
  
-  local specific_uri="projects/$projectwithreleasebranch/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
-  local fallback_latest_uri="projects/$projectwithreleasebranch/latest/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
+  local git_tag_normalized="${git_tag//\//-}"
+  local specific_uri="projects/$projectwithreleasebranch/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag_normalized}.tar.gz"
+  local fallback_latest_uri="projects/$projectwithreleasebranch/latest/$tar_file_prefix-linux-$arch-${git_tag_normalized}.tar.gz"
 
   if [ "$sha" = "true" ]; then
     specific_uri+=".sha256"
