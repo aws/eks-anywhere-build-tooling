@@ -1,0 +1,74 @@
+From 8318e082623a26c094057aaa3b9947901ec615d9 Mon Sep 17 00:00:00 2001
+From: Jhaanvi Golani <jhaanvi4.golani@gmail.com>
+Date: Wed, 19 Jun 2024 10:13:46 -0700
+Subject: [PATCH] migrate to go module
+
+---
+ registry/handlers/app.go |  3 ++-
+ registry/registry.go     | 20 ++++++++------------
+ 2 files changed, 10 insertions(+), 13 deletions(-)
+
+diff --git a/registry/handlers/app.go b/registry/handlers/app.go
+index 72fd62e2..14aef24e 100644
+--- a/registry/handlers/app.go
++++ b/registry/handlers/app.go
+@@ -42,6 +42,7 @@ import (
+ 	"github.com/docker/go-metrics"
+ 	"github.com/docker/libtrust"
+ 	"github.com/gomodule/redigo/redis"
++	gomoduleredis "github.com/gomodule/redigo/redis"
+ 	"github.com/gorilla/mux"
+ 	"github.com/sirupsen/logrus"
+ )
+@@ -522,7 +523,7 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
+ 		sntnl := &sentinel.Sentinel{
+ 			Addrs:      strings.Split(configuration.Redis.Addr, ","),
+ 			MasterName: configuration.Redis.SentinelMasterSet,
+-			Dial: func(addr string) (redis.Conn, error) {
++			Dial: func(addr string) (gomoduleredis.Conn, error) {
+ 				c, err := redis.Dial("tcp", addr,
+ 					redisOptions...)
+ 				if err != nil {
+diff --git a/registry/registry.go b/registry/registry.go
+index 9486d8bb..4b81e4d9 100644
+--- a/registry/registry.go
++++ b/registry/registry.go
+@@ -13,7 +13,8 @@ import (
+ 	"syscall"
+ 	"time"
+ 
+-	"rsc.io/letsencrypt"
++	"golang.org/x/crypto/acme"
++	"golang.org/x/crypto/acme/autocert"
+ 
+ 	logrus_bugsnag "github.com/Shopify/logrus-bugsnag"
+ 
+@@ -246,19 +247,14 @@ func (registry *Registry) ListenAndServe() error {
+ 			if config.HTTP.TLS.Certificate != "" {
+ 				return fmt.Errorf("cannot specify both certificate and Let's Encrypt")
+ 			}
+-			var m letsencrypt.Manager
+-			if err := m.CacheFile(config.HTTP.TLS.LetsEncrypt.CacheFile); err != nil {
+-				return err
+-			}
+-			if !m.Registered() {
+-				if err := m.Register(config.HTTP.TLS.LetsEncrypt.Email, nil); err != nil {
+-					return err
+-				}
+-			}
+-			if len(config.HTTP.TLS.LetsEncrypt.Hosts) > 0 {
+-				m.SetHosts(config.HTTP.TLS.LetsEncrypt.Hosts)
++			m := &autocert.Manager{
++				HostPolicy: autocert.HostWhitelist(config.HTTP.TLS.LetsEncrypt.Hosts...),
++				Cache:      autocert.DirCache(config.HTTP.TLS.LetsEncrypt.CacheFile),
++				Email:      config.HTTP.TLS.LetsEncrypt.Email,
++				Prompt:     autocert.AcceptTOS,
+ 			}
+ 			tlsConf.GetCertificate = m.GetCertificate
++			tlsConf.NextProtos = append(tlsConf.NextProtos, acme.ALPNProto)
+ 		} else {
+ 			tlsConf.Certificates = make([]tls.Certificate, 1)
+ 			tlsConf.Certificates[0], err = tls.LoadX509KeyPair(config.HTTP.TLS.Certificate, config.HTTP.TLS.Key)
+-- 
+2.34.1
+

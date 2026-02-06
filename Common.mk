@@ -91,7 +91,7 @@ BUILDSPEC_2_DEPENDS_ON_OVERRIDE?=$(if $(filter buildspecs/combine-images.yml,$(w
 ####################################################
 
 #################### GIT ###########################
-GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)
+GIT_CHECKOUT_TARGET?=$(REPO)/eks-anywhere-checkout-$(subst /,-,$(GIT_TAG))
 GIT_PATCH_TARGET?=$(REPO)/eks-anywhere-patched
 REPO_NO_CLONE?=false
 PATCHES_DIR=$(or $(wildcard $(PROJECT_ROOT)/patches),$(wildcard $(MAKE_ROOT)/patches))
@@ -223,7 +223,7 @@ HELM_DESTINATION_REPOSITORY?=$(HELM_CHART_NAME)
 HELM_CHART_FOLDER?=.
 HELM_IMAGE_LIST?=$(IMAGE_COMPONENT)
 HELM_IMAGE_TAG_LIST?=$(foreach _,$(HELM_IMAGE_LIST),$(IMAGE_TAG))
-HELM_GIT_CHECKOUT_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-checkout-$(HELM_GIT_TAG)
+HELM_GIT_CHECKOUT_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-checkout-$(subst /,-,$(HELM_GIT_TAG))
 HELM_GIT_PATCH_TARGET?=$(HELM_SOURCE_REPOSITORY)/eks-anywhere-helm-patched
 BUILD_HELM_DEPENDENCIES?=false
 PACKAGE_DEPENDENCIES?=

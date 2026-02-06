@@ -44,6 +44,12 @@ envsubst "\$GIT_TAG:\$IMAGE_OS" \
          < "$EXPECTED_FILES_PATH" \
          > "$EXPECTED_FILES"
 
+# Replace forward slashes with hyphens in the expected files to match actual tarball names
+# When GIT_TAG has '/' inside
+if [[ "$GIT_TAG" == *"/"* ]]; then
+   sed -i 's|/|-|g' "$EXPECTED_FILES"
+fi
+
 if $FAKE_ARM_ARTIFACTS_FOR_VALIDATION; then
     echo "Faking arm64 artifacts"
     sed -i '/arm64/d' "$EXPECTED_FILES"

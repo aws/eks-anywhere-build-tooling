@@ -363,8 +363,9 @@ function build::common::get_latest_eksa_asset_url() {
 
   local -r tar_file_prefix=$(MAKEOVERRIDES= MAKEFLAGS= make --no-print-directory -C $BUILD_ROOT/../../projects/${project} var-value-TAR_FILE_PREFIX)
  
-  local specific_uri="projects/$projectwithreleasebranch/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
-  local fallback_latest_uri="projects/$projectwithreleasebranch/latest/$tar_file_prefix-linux-$arch-${git_tag}.tar.gz"
+  local git_tag_normalized="${git_tag//\//-}"
+  local specific_uri="projects/$projectwithreleasebranch/$s3artifactfolder/$tar_file_prefix-linux-$arch-${git_tag_normalized}.tar.gz"
+  local fallback_latest_uri="projects/$projectwithreleasebranch/latest/$tar_file_prefix-linux-$arch-${git_tag_normalized}.tar.gz"
 
   if [ "$sha" = "true" ]; then
     specific_uri+=".sha256"
@@ -418,11 +419,26 @@ function build::common::wait_for_tag() {
   local -r tag=$1
   sleep_interval=20
   for i in {1..60}; do
-    echo "Checking for tag ${tag}..."
-    git rev-parse --verify --quiet "${tag}" && echo "Tag ${tag} exists!" && break
+    echo "Checking for tag/branch ${tag}..."
+    
+    # First try to find it as a tag
+    if git rev-parse --verify --quiet "${tag}" > /dev/null 2>&1; then
+      echo "Tag ${tag} exists!"
+      break
+    fi
+    
+    # If not found as a tag, try as a remote branch
+    if git rev-parse --verify --quiet "origin/${tag}" > /dev/null 2>&1; then
+      echo "Branch ${tag} exists!"
+      break
+    fi
+    
+    # Fetch both tags and branches
     git fetch --tags > /dev/null 2>&1
-    echo "Tag ${tag} does not exist!"
-    echo "Waiting for tag ${tag}..."
+    git fetch origin > /dev/null 2>&1
+    
+    echo "Tag/branch ${tag} does not exist!"
+    echo "Waiting for tag/branch ${tag}..."
     sleep $sleep_interval
     if [ "$i" = "60" ]; then
       exit 1

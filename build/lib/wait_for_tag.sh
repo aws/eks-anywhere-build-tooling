@@ -18,9 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-TAG="$1"
+TAG_OR_BRANCH="$1"
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_ROOT}/common.sh"
 
-build::common::wait_for_tag $TAG
+build::common::wait_for_tag $TAG_OR_BRANCH
