@@ -37,6 +37,10 @@ fi
 
 # Verify all CRDs have required annotations
 echo "Verifying CRDs have required annotations..."
+
+# CRDs that should NOT have clusterctl labels (to prevent move during cluster migration)
+SKIP_CLUSTERCTL_LABELS="tinkerbell.org_workflows.yaml bmc.tinkerbell.org_jobs.yaml bmc.tinkerbell.org_tasks.yaml"
+
 for crd_file in "${HELM_DIRECTORY}"/templates/*.yaml; do
     filename=$(basename "$crd_file")
     
@@ -46,10 +50,12 @@ for crd_file in "${HELM_DIRECTORY}"/templates/*.yaml; do
         exit 1
     fi
     
-    # Check clusterctl labels
-    if ! yq -e '.metadata.labels["clusterctl.cluster.x-k8s.io"] == ""' "$crd_file" > /dev/null 2>&1; then
-        echo "❌ ${filename} missing clusterctl.cluster.x-k8s.io label"
-        exit 1
+    # Check clusterctl labels (skip for transient CRDs)
+    if [[ ! " ${SKIP_CLUSTERCTL_LABELS} " =~ " ${filename} " ]]; then
+        if ! yq -e '.metadata.labels["clusterctl.cluster.x-k8s.io"] == ""' "$crd_file" > /dev/null 2>&1; then
+            echo "❌ ${filename} missing clusterctl.cluster.x-k8s.io label"
+            exit 1
+        fi
     fi
     
     echo "✅ ${filename} has required annotations/labels"
