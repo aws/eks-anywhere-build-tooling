@@ -39,6 +39,12 @@ cp "${PROJECT_DIR}/chart/Chart.yaml" "${OUTPUT_DIR}/"
 cp "${PROJECT_DIR}/chart/values.yaml" "${OUTPUT_DIR}/"
 cp "${PROJECT_DIR}/chart/.helmignore" "${OUTPUT_DIR}/"
 
+# Transient CRDs that should NOT have clusterctl labels (to prevent move during cluster migration).
+# The move label causes clusterctl to discover and move these resources during cluster move.
+# When moved, they arrive with empty status (clusterctl only moves spec) causing controllers
+# to re-process them
+SKIP_CLUSTERCTL_LABELS="tinkerbell.org_workflows.yaml bmc.tinkerbell.org_jobs.yaml bmc.tinkerbell.org_tasks.yaml"
+
 # Copy all CRDs from mono-repo
 for crd_file in "${REPO_ROOT}"/crd/bases/*.yaml; do
     filename=$(basename "$crd_file")
@@ -51,9 +57,11 @@ for crd_file in "${REPO_ROOT}"/crd/bases/*.yaml; do
     # This prevents Helm from deleting CRDs on uninstall
     yq -i '.metadata.annotations["helm.sh/resource-policy"] = "keep"' "${OUTPUT_DIR}/templates/${filename}"
     
-    # Add clusterctl labels for CAPI move operations
-    yq -i '.metadata.labels["clusterctl.cluster.x-k8s.io"] = ""' "${OUTPUT_DIR}/templates/${filename}"
-    yq -i '.metadata.labels["clusterctl.cluster.x-k8s.io/move"] = ""' "${OUTPUT_DIR}/templates/${filename}"
+    # Add clusterctl labels (skip for transient CRDs)
+    if [[ ! " ${SKIP_CLUSTERCTL_LABELS} " =~ " ${filename} " ]]; then
+        yq -i '.metadata.labels["clusterctl.cluster.x-k8s.io"] = ""' "${OUTPUT_DIR}/templates/${filename}"
+        yq -i '.metadata.labels["clusterctl.cluster.x-k8s.io/move"] = ""' "${OUTPUT_DIR}/templates/${filename}"
+    fi
 done
 
 echo "Generated tinkerbell-crds chart with $(ls -1 "${OUTPUT_DIR}/templates/" | wc -l | tr -d ' ') CRDs"
