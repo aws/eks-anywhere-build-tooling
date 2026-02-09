@@ -23,7 +23,9 @@ HELM_GIT_TAG=$(shell cat ./$(RELEASE_BRANCH)/HELM_GIT_TAG)
 HELM_TAG=$(subst cluster-autoscaler-chart-,,$(HELM_GIT_TAG))-$(subst -,.,$(RELEASE_BRANCH))-$(GIT_HASH)
 HELM_SOURCE_OWNER=kubernetes
 HELM_SOURCE_REPOSITORY=autoscaler
-HELM_DIRECTORY=charts/cluster-autoscaler
+
+# cluster-autoscaler has migrated its chart since v0.55.0
+HELM_DIRECTORY=cluster-autoscaler/charts/cluster-autoscaler
 HELM_IMAGE_LIST=kubernetes/autoscaler
 
 HELM_CHART_NAMES=cluster-autoscaler/charts/cluster-autoscaler
