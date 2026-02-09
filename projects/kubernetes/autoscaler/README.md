@@ -4,7 +4,7 @@
 ![1.28 Version](https://img.shields.io/badge/1--28%20version-cluster--autoscaler--1.28.7-blue)
 ![1.29 Version](https://img.shields.io/badge/1--29%20version-cluster--autoscaler--1.29.5-blue)
 ![1.30 Version](https://img.shields.io/badge/1--30%20version-cluster--autoscaler--1.30.4-blue)
-![1.31 Version](https://img.shields.io/badge/1--31%20version-cluster--autoscaler--1.31.2-blue)
+![1.31 Version](https://img.shields.io/badge/1--31%20version-cluster--autoscaler--1.31.5-blue)
 ![1.32 Version](https://img.shields.io/badge/1--32%20version-cluster--autoscaler--1.32.1-blue)
 ![1.33 Version](https://img.shields.io/badge/1--33%20version-cluster--autoscaler--1.33.0-blue)
 ![1.34 Version](https://img.shields.io/badge/1--33%20version-cluster--autoscaler--1.34.1-blue)
