@@ -1,0 +1,57 @@
+From 7e5ebfc87da453d4be36acf1040e11d860819ff2 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Tue, 10 Feb 2026 16:34:44 -0800
+Subject: [PATCH 8/8] Disable kubelet fail-cgroupv1
+
+kubelet fail-cgroupv1 defaults to true starting k8s 1.35
+Some of our ec2 instances used in e2e and presubmit instances
+use AL2 shipped with cgroup v1.
+
+Temporarily disable this behaviour until we upgrade above instances.
+---
+ pkg/cluster/internal/kubeadm/config.go | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/pkg/cluster/internal/kubeadm/config.go b/pkg/cluster/internal/kubeadm/config.go
+index a6120d32..4ceb3008 100644
+--- a/pkg/cluster/internal/kubeadm/config.go
++++ b/pkg/cluster/internal/kubeadm/config.go
+@@ -245,6 +245,8 @@ nodeRegistration:
+     node-ip: "{{ .NodeAddress }}"
+     provider-id: "kind://{{.NodeProvider}}/{{.ClusterName}}/{{.NodeName}}"
+     node-labels: "{{ .NodeLabels }}"
++    # disable cgroup v1 failure to support nodes with cgroup v1
++    fail-cgroupv1: "false"
+ ---
+ # no-op entry that exists solely so it can be patched
+ apiVersion: kubeadm.k8s.io/v1beta2
+@@ -263,6 +265,8 @@ nodeRegistration:
+     node-ip: "{{ .NodeAddress }}"
+     provider-id: "kind://{{.NodeProvider}}/{{.ClusterName}}/{{.NodeName}}"
+     node-labels: "{{ .NodeLabels }}"
++    # disable cgroup v1 failure to support nodes with cgroup v1
++    fail-cgroupv1: "false"
+ discovery:
+   bootstrapToken:
+     apiServerEndpoint: "{{ .ControlPlaneEndpoint }}"
+@@ -388,6 +392,8 @@ nodeRegistration:
+     node-ip: "{{ .NodeAddress }}"
+     provider-id: "kind://{{.NodeProvider}}/{{.ClusterName}}/{{.NodeName}}"
+     node-labels: "{{ .NodeLabels }}"
++    # disable cgroup v1 failure to support nodes with cgroup v1
++    fail-cgroupv1: "false"
+ {{ if .InitSkipPhases -}}
+ skipPhases:
+   {{- range $phase := .InitSkipPhases }}
+@@ -412,6 +418,8 @@ nodeRegistration:
+     node-ip: "{{ .NodeAddress }}"
+     provider-id: "kind://{{.NodeProvider}}/{{.ClusterName}}/{{.NodeName}}"
+     node-labels: "{{ .NodeLabels }}"
++    # disable cgroup v1 failure to support nodes with cgroup v1
++    fail-cgroupv1: "false"
+ discovery:
+   bootstrapToken:
+     apiServerEndpoint: "{{ .ControlPlaneEndpoint }}"
+-- 
+2.50.1 (Apple Git-155)
+
