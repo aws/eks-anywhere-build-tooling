@@ -1,0 +1,55 @@
+From 310aa1765b50e7d0c18c832928e4e1ef7ecbfe63 Mon Sep 17 00:00:00 2001
+From: rajeshvenkata <eks-anywhere@amazon.com>
+Date: Mon, 16 Feb 2026 14:26:15 -0800
+Subject: [PATCH 5/5] Add Intel ICE E800 series out-of-tree driver support to
+ Hook
+
+---
+ kernel/Dockerfile | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/Dockerfile b/kernel/Dockerfile
+index 4f04a73..f36a6c6 100644
+--- a/kernel/Dockerfile
++++ b/kernel/Dockerfile
+@@ -19,7 +19,7 @@ FROM kernel-source-unpacked-${TARGETARCH} as kernel-source-unpacked
+ 
+ RUN set -x && yum -y update && \
+         yum -y groupinstall "Development Tools" && \
+-        yum -y install --allowerasing bc ncurses-devel openssl-devel gnupg2-full kmod flex bison xz && \
++        yum -y install --allowerasing bc ncurses-devel openssl-devel gnupg2-full kmod flex bison xz which && \
+         yum clean all && \
+         rm -rf /var/cache/yum
+ 
+@@ -89,13 +89,27 @@ RUN set -x && \
+     cp System.map /out
+ 
+ 
++# Intel ICE driver version for E800 series NICs (out-of-tree)
++ARG ICE_VERSION=2.4.5
++
+ # Modules, from lib/modules go into kernel.tar (will be extracted in root filesystem by linuxkit)
++# Also builds and installs out-of-tree Intel ICE driver for E800 series NIC support
+ RUN set -x && \
+     make -s -j"$(getconf _NPROCESSORS_ONLN)" INSTALL_MOD_PATH=/tmp/kernel-modules modules_install && \
++    ( cd /tmp && \
++      curl -sL "https://github.com/intel/ethernet-linux-ice/archive/refs/tags/v${ICE_VERSION}.tar.gz" | tar xz && \
++      cd /tmp/ethernet-linux-ice-${ICE_VERSION}/src && \
++      make KSRC=/linux INSTALL_MOD_PATH=/tmp/kernel-modules && \
++      KVER=$(basename $(find /tmp/kernel-modules/lib/modules/ -mindepth 1 -maxdepth 1)) && \
++      mkdir -p /tmp/kernel-modules/lib/modules/${KVER}/updates/drivers/net/ethernet/intel/ice && \
++      cp ice.ko /tmp/kernel-modules/lib/modules/${KVER}/updates/drivers/net/ethernet/intel/ice/ && \
++      rm -rf /tmp/ethernet-linux-ice-${ICE_VERSION} ) && \
+     ( DVER=$(basename $(find /tmp/kernel-modules/lib/modules/ -mindepth 1 -maxdepth 1)) && \
+       cd /tmp/kernel-modules/lib/modules/$DVER && \
+       rm -f build source ) && \
+-    ( cd /tmp/kernel-modules && tar cf /out/kernel.tar . )
++    ( KVER=$(basename $(find /tmp/kernel-modules/lib/modules/ -mindepth 1 -maxdepth 1)) && \
++      depmod -b /tmp/kernel-modules ${KVER} && \
++      cd /tmp/kernel-modules && tar cf /out/kernel.tar . )
+ 
+ # For arches that have DTB's, eg arm64; they go separately into dtbs.tar; for arches that don't (x86), an empty dtbs.tar is created
+ RUN set -x && \
+-- 
+2.49.0
+
