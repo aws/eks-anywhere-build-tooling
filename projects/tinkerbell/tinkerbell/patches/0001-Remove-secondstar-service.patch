@@ -1,7 +1,7 @@
-From 4152179a9a69f150f2999d061a23025602480f23 Mon Sep 17 00:00:00 2001
+From 20c946a20213274de3bed4422672e72c7cfdbbe6 Mon Sep 17 00:00:00 2001
 From: Rahul Ganesh <rahulgab@amazon.com>
 Date: Thu, 22 Jan 2026 16:46:18 -0800
-Subject: [PATCH 1/3] Remove secondstar service
+Subject: [PATCH 1/5] Remove secondstar service
 
 EKS-A does not use the secondstar (SSH over serial) service. Remove it
 to reduce binary size and dependencies.
@@ -11,14 +11,12 @@ it for machine metadata.
 
 Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
 ---
- cmd/tinkerbell/cmd.go             | 50 ++----------------------
- cmd/tinkerbell/flag/global.go     |  7 ----
- cmd/tinkerbell/flag/secondstar.go | 64 -------------------------------
- 3 files changed, 3 insertions(+), 118 deletions(-)
- delete mode 100644 cmd/tinkerbell/flag/secondstar.go
+ cmd/tinkerbell/cmd.go         | 48 ++---------------------------------
+ cmd/tinkerbell/flag/global.go |  7 -----
+ 2 files changed, 2 insertions(+), 53 deletions(-)
 
 diff --git a/cmd/tinkerbell/cmd.go b/cmd/tinkerbell/cmd.go
-index 565187ec..686c2e24 100644
+index 4b7d3a6a..c9dc0452 100644
 --- a/cmd/tinkerbell/cmd.go
 +++ b/cmd/tinkerbell/cmd.go
 @@ -23,7 +23,6 @@ import (
@@ -29,7 +27,7 @@ index 565187ec..686c2e24 100644
  	"github.com/tinkerbell/tinkerbell/smee"
  	"github.com/tinkerbell/tinkerbell/tink/controller"
  	"github.com/tinkerbell/tinkerbell/tink/server"
-@@ -36,7 +35,6 @@ import (
+@@ -37,7 +36,6 @@ import (
  const (
  	defaultRufioMetricsPort          = 8082
  	defaultRufioProbePort            = 8083
@@ -37,15 +35,15 @@ index 565187ec..686c2e24 100644
  	defaultSmeeHTTPPort              = 7171
  	defaultSmeeHTTPSPort             = 7272
  	defaultTinkControllerMetricsPort = 8080
-@@ -61,7 +59,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+@@ -63,7 +61,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  		EnableTinkServer:     true,
  		EnableTinkController: true,
  		EnableRufio:          true,
 -		EnableSecondStar:     true,
+ 		EnableUI:             true,
  		EnableCRDMigrations:  true,
  		EmbeddedGlobalConfig: flag.EmbeddedGlobalConfig{
- 			EnableKubeAPIServer: (embeddedApiserverExecute != nil),
-@@ -113,14 +110,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+@@ -116,14 +113,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  		Config: rufio.NewConfig(rufioOpts...),
  	}
  
@@ -57,34 +55,34 @@ index 565187ec..686c2e24 100644
 -		},
 -	}
 -
- 	// order here determines the help output.
- 	top := ff.NewFlagSet("smee - DHCP and iPXE service")
- 	if embeddedFlagSet != nil {
-@@ -131,14 +120,12 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+ 	uiOpts := []ui.Option{
+ 		ui.WithURLPrefix("/"),
+ 		ui.WithBindPort(defaultUIPort),
+@@ -142,7 +131,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  	tfs := ff.NewFlagSet("tink server - Workflow service").SetParent(hfs)
  	cfs := ff.NewFlagSet("tink controller - Workflow controller").SetParent(tfs)
  	rfs := ff.NewFlagSet("rufio - BMC controller").SetParent(cfs)
 -	ssfs := ff.NewFlagSet("secondstar - SSH over serial service").SetParent(rfs)
--	gfs := ff.NewFlagSet("globals").SetParent(ssfs)
-+	gfs := ff.NewFlagSet("globals").SetParent(rfs)
+ 	uifs := ff.NewFlagSet("ui - UI service").SetParent(ssfs)
+ 	gfs := ff.NewFlagSet("globals").SetParent(uifs)
  	flag.RegisterSmeeFlags(&flag.Set{FlagSet: sfs}, s)
- 	flag.RegisterTootlesFlags(&flag.Set{FlagSet: hfs}, h)
+@@ -150,7 +138,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  	flag.RegisterTinkServerFlags(&flag.Set{FlagSet: tfs}, ts)
  	flag.RegisterTinkControllerFlags(&flag.Set{FlagSet: cfs}, tc)
  	flag.RegisterRufioFlags(&flag.Set{FlagSet: rfs}, rc)
 -	flag.RegisterSecondStarFlags(&flag.Set{FlagSet: ssfs}, ssc)
+ 	flag.RegisterUIFlags(&flag.Set{FlagSet: uifs}, uic)
  	flag.RegisterGlobal(&flag.Set{FlagSet: gfs}, globals)
  	if embeddedApiserverExecute != nil && embeddedFlagSet != nil {
- 		// This way the embedded flags only show up when the embedded services have been compiled in.
-@@ -170,7 +157,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+@@ -183,7 +170,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  		"tinkServerEnabled", globals.EnableTinkServer,
  		"tinkControllerEnabled", globals.EnableTinkController,
  		"rufioEnabled", globals.EnableRufio,
 -		"secondStarEnabled", globals.EnableSecondStar,
+ 		"uiEnabled", globals.EnableUI,
  		"publicIP", globals.PublicIP,
  		"embeddedKubeAPIServer", globals.EmbeddedGlobalConfig.EnableKubeAPIServer,
- 		"embeddedEtcd", globals.EmbeddedGlobalConfig.EnableETCD,
-@@ -224,14 +210,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+@@ -238,14 +224,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  		rc.Config.ProbeAddr = netip.AddrPortFrom(globals.BindAddr, rc.Config.ProbeAddr.Port())
  	}
  
@@ -96,10 +94,10 @@ index 565187ec..686c2e24 100644
 -		ssc.Config.BindAddr = globals.BindAddr
 -	}
 -
- 	g, ctx := errgroup.WithContext(ctx)
- 	// Etcd server
- 	g.Go(func() error {
-@@ -294,7 +272,7 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+ 	// UI
+ 	uic.Convert(globals.BindAddr, globals.TLS.CertFile, globals.TLS.KeyFile)
+ 
+@@ -311,7 +289,7 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  			cliLog.Info("CRD migrations completed")
  		}
  
@@ -108,7 +106,7 @@ index 565187ec..686c2e24 100644
  		if err != nil {
  			return fmt.Errorf("failed to create kube backend: %w", err)
  		}
-@@ -307,7 +285,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+@@ -324,7 +302,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  		tc.Config.Client = b.ClientConfig
  		tc.Config.DynamicClient = b
  		rc.Config.Client = b.ClientConfig
@@ -116,7 +114,7 @@ index 565187ec..686c2e24 100644
  	case "file":
  		b, err := newFileBackend(ctx, log, globals.BackendFilePath)
  		if err != nil {
-@@ -401,19 +378,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+@@ -418,19 +395,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  		return nil
  	})
  
@@ -127,22 +125,25 @@ index 565187ec..686c2e24 100644
 -			return nil
 -		}
 -		ll := ternary((ssc.LogLevel != 0), ssc.LogLevel, globals.LogLevel)
--		if err := ssc.Config.Start(ctx, defaultLogger(ll).WithName("secondstar")); err != nil {
+-		if err := ssc.Config.Start(ctx, getLogger(ssc.NoLog, ll).WithName("secondstar")); err != nil {
 -			return fmt.Errorf("failed to start secondstar service: %w", err)
 -		}
 -		return nil
 -	})
 -
- 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
- 		return err
- 	}
-@@ -445,13 +409,10 @@ func numEnabled(globals *flag.GlobalConfig) int {
+ 	// UI
+ 	g.Go(func() error {
+ 		if !globals.EnableUI {
+@@ -475,16 +439,13 @@ func numEnabled(globals *flag.GlobalConfig) int {
  	if globals.EnableRufio {
  		n++
  	}
 -	if globals.EnableSecondStar {
 -		n++
 -	}
+ 	if globals.EnableUI {
+ 		n++
+ 	}
  	return n
  }
  
@@ -151,7 +152,7 @@ index 565187ec..686c2e24 100644
  	idxs := make(map[kube.IndexType]kube.Index, 0)
  
  	if smeeEnabled {
-@@ -467,11 +428,6 @@ func enabledIndexes(smeeEnabled, tootlesEnabled, tinkServerEnabled, secondStarEn
+@@ -500,11 +461,6 @@ func enabledIndexes(smeeEnabled, tootlesEnabled, tinkServerEnabled, secondStarEn
  			idxs[k] = v
  		}
  	}
@@ -164,7 +165,7 @@ index 565187ec..686c2e24 100644
  	return idxs
  }
 diff --git a/cmd/tinkerbell/flag/global.go b/cmd/tinkerbell/flag/global.go
-index 9b14383a..6ea5a506 100644
+index 30fba8ec..ce112939 100644
 --- a/cmd/tinkerbell/flag/global.go
 +++ b/cmd/tinkerbell/flag/global.go
 @@ -23,7 +23,6 @@ type GlobalConfig struct {
@@ -172,18 +173,18 @@ index 9b14383a..6ea5a506 100644
  	EnableTinkController bool
  	EnableRufio          bool
 -	EnableSecondStar     bool
+ 	EnableUI             bool
  	EnableCRDMigrations  bool
  	EmbeddedGlobalConfig EmbeddedGlobalConfig
- 	BackendKubeOptions   BackendKubeOptions
-@@ -58,7 +57,6 @@ func RegisterGlobal(fs *Set, gc *GlobalConfig) {
+@@ -59,7 +58,6 @@ func RegisterGlobal(fs *Set, gc *GlobalConfig) {
  	fs.Register(EnableTinkServer, ffval.NewValueDefault(&gc.EnableTinkServer, gc.EnableTinkServer))
  	fs.Register(EnableTinkController, ffval.NewValueDefault(&gc.EnableTinkController, gc.EnableTinkController))
  	fs.Register(EnableRufioController, ffval.NewValueDefault(&gc.EnableRufio, gc.EnableRufio))
 -	fs.Register(EnableSecondStar, ffval.NewValueDefault(&gc.EnableSecondStar, gc.EnableSecondStar))
+ 	fs.Register(EnableUI, ffval.NewValueDefault(&gc.EnableUI, gc.EnableUI))
  	fs.Register(EnableCRDMigrations, ffval.NewValueDefault(&gc.EnableCRDMigrations, gc.EnableCRDMigrations))
  	fs.Register(LogLevelConfig, ffval.NewValueDefault(&gc.LogLevel, gc.LogLevel))
- 	fs.Register(OTELEndpoint, ffval.NewValueDefault(&gc.OTELEndpoint, gc.OTELEndpoint))
-@@ -160,11 +158,6 @@ var EnableRufioController = Config{
+@@ -162,11 +160,6 @@ var EnableRufioController = Config{
  	Usage: "enable Rufio Controller service",
  }
  
@@ -192,79 +193,9 @@ index 9b14383a..6ea5a506 100644
 -	Usage: "enable SecondStar service",
 -}
 -
- var EnableKubeAPIServer = Config{
- 	Name:  "enable-embedded-kube-apiserver",
- 	Usage: "enables the embedded kube-apiserver",
-diff --git a/cmd/tinkerbell/flag/secondstar.go b/cmd/tinkerbell/flag/secondstar.go
-deleted file mode 100644
-index 4b0faecf..00000000
---- a/cmd/tinkerbell/flag/secondstar.go
-+++ /dev/null
-@@ -1,64 +0,0 @@
--package flag
--
--import (
--	"github.com/peterbourgon/ff/v4/ffval"
--	"github.com/tinkerbell/tinkerbell/pkg/backend/kube"
--	"github.com/tinkerbell/tinkerbell/secondstar"
--)
--
--type SecondStarConfig struct {
--	Config      *secondstar.Config
--	HostKeyPath string
--	LogLevel    int
--}
--
--var KubeIndexesSecondStar = map[kube.IndexType]kube.Index{
--	kube.IndexTypeHardwareName: kube.Indexes[kube.IndexTypeHardwareName],
--	kube.IndexTypeMachineName:  kube.Indexes[kube.IndexTypeMachineName],
--}
--
--func RegisterSecondStarFlags(fs *Set, ssc *SecondStarConfig) {
--	fs.Register(SecondStarPort, ffval.NewValueDefault(&ssc.Config.SSHPort, ssc.Config.SSHPort))
--	fs.Register(SecondStarHostKey, ffval.NewValueDefault(&ssc.HostKeyPath, ssc.HostKeyPath))
--	fs.Register(SecondStarIPMIToolPath, ffval.NewValueDefault(&ssc.Config.IPMITOOLPath, ssc.Config.IPMITOOLPath))
--	fs.Register(SecondStarIdleTimeout, ffval.NewValueDefault(&ssc.Config.IdleTimeout, ssc.Config.IdleTimeout))
--	fs.Register(SecondStarLogLevel, ffval.NewValueDefault(&ssc.LogLevel, ssc.LogLevel))
--}
--
--var SecondStarPort = Config{
--	Name:  "secondstar-port",
--	Usage: "Port to listen on for SecondStar",
--}
--
--var SecondStarHostKey = Config{
--	Name:  "secondstar-host-key",
--	Usage: "Path to the host key file for SecondStar",
--}
--
--var SecondStarIPMIToolPath = Config{
--	Name:  "secondstar-ipmitool-path",
--	Usage: "Path to the ipmitool binary",
--}
--
--var SecondStarIdleTimeout = Config{
--	Name:  "secondstar-idle-timeout",
--	Usage: "Idle timeout for SecondStar",
--}
--
--var SecondStarLogLevel = Config{
--	Name:  "secondstar-log-level",
--	Usage: "the higher the number the more verbose, level 0 inherits the global log level",
--}
--
--func (ssc *SecondStarConfig) Convert() error {
--	// convert the host key path to an SSH Signer
--	if ssc.HostKeyPath == "" {
--		return nil
--	}
--	s, err := secondstar.HostKeyFrom(ssc.HostKeyPath)
--	if err != nil {
--		return err
--	}
--	ssc.Config.HostKey = s
--	return nil
--}
+ var EnableUI = Config{
+ 	Name:  "enable-ui",
+ 	Usage: "enable UI service",
 -- 
-2.46.0
+2.49.0
 
