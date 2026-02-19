@@ -118,18 +118,18 @@ if [[ $image_format == "ova" ]]; then
   cat $image_builder_config_file
 
   # Run image-builder CLI
-  retry_image_builder build --hypervisor vsphere --os $image_os $image_os_version_arg --vsphere-config $image_builder_config_file --release-channel $release_channel $firmware_arg
+  retry_image_builder build --hypervisor vsphere --os $image_os $image_os_version_arg --vsphere-config $image_builder_config_file --release-channel $release_channel $firmware_arg --dev true
 elif [[ $image_format == "raw" ]]; then
   echo "Creating Bare metal image-builder config"
   if [[ $image_os == "ubuntu" ]]; then
     # Run image-builder CLI
-    retry_image_builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel
+    retry_image_builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel --dev true
   elif [[ $image_os == "redhat" ]]; then
     image_builder_config_file=$redhat_config_file
     cat $image_builder_config_file
 
     # Run image-builder CLI
-    retry_image_builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel --baremetal-config $image_builder_config_file
+    retry_image_builder build --hypervisor baremetal --os $image_os $image_os_version_arg --release-channel $release_channel --baremetal-config $image_builder_config_file --dev true
   fi
 elif [[ $image_format == "cloudstack" ]]; then
   if [[ $image_os != "redhat" ]]; then
@@ -142,7 +142,7 @@ elif [[ $image_format == "cloudstack" ]]; then
   cat $image_builder_config_file
 
   # Run image-builder CLI
-  retry_image_builder build --hypervisor cloudstack --os $image_os $image_os_version_arg --release-channel $release_channel --cloudstack-config $image_builder_config_file
+  retry_image_builder build --hypervisor cloudstack --os $image_os $image_os_version_arg --release-channel $release_channel --cloudstack-config $image_builder_config_file --dev true
 elif [[ $image_format == "ami" ]]; then
   if [[ $image_os != "ubuntu" ]]; then
     echo "AMI builds do not support any non-ubuntu os"
@@ -157,7 +157,7 @@ elif [[ $image_format == "ami" ]]; then
   cat $image_builder_config_file
 
   # Run image-builder CLI
-  retry_image_builder build --hypervisor ami --os $image_os $image_os_version_arg --release-channel $release_channel --ami-config $image_builder_config_file
+  retry_image_builder build --hypervisor ami --os $image_os $image_os_version_arg --release-channel $release_channel --ami-config $image_builder_config_file --dev true
 elif [[ $image_format == "nutanix" ]]; then
   # Setup nutanix config
   nutanix_config_file="${HOME}/nutanix_config_file"
@@ -197,5 +197,5 @@ elif [[ $image_format == "nutanix" ]]; then
   cat $image_builder_config_file
 
   # Run image-builder CLI
-  retry_image_builder build --hypervisor nutanix --os $image_os $image_os_version_arg --nutanix-config $image_builder_config_file --release-channel $release_channel
+  retry_image_builder build --hypervisor nutanix --os $image_os $image_os_version_arg --nutanix-config $image_builder_config_file --release-channel $release_channel --dev true
 fi

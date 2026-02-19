@@ -21,7 +21,6 @@ var SupportedHypervisors = []string{
 }
 
 var SupportedUbuntuVersions = []string{
-	"20.04",
 	"22.04",
 	"24.04",
 }
@@ -59,6 +58,7 @@ type BuildOptions struct {
 	AnsibleVerbosity   int
 	EKSAReleaseVersion string
 	BuilderType        string
+	Dev                bool
 }
 
 type VsphereConfig struct {
