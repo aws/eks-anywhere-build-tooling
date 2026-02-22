@@ -40,3 +40,10 @@ Note: `secondstar` (SSH over serial) is excluded via patch as EKS-A does not use
 
 - Repository: https://github.com/tinkerbell/tinkerbell
 - The mono-repo consolidates: boots→smee, tink, rufio, hegel→tootles
+
+## GIT_TAG
+
+The `GIT_TAG` file uses a commit SHA from the upstream tinkerbell mono-repo. Since helm
+requires valid semver for chart versions, the Makefile overrides `HELM_TAG` with a `0.0.1-`
+prefix and the sedfile template uses `${HELM_TAG}` for the chart version. The release CLI
+in eks-anywhere uses a matching `"0.0.1-<gitTag>"` format for source image lookup.
