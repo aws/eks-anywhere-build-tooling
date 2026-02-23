@@ -43,7 +43,7 @@ var buildCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().StringVar(&bo.Os, "os", "", "Operating system to use for EKS-A node image")
-	buildCmd.Flags().StringVar(&bo.OsVersion, "os-version", "", "Operating system version to use for EKS-A node image. Can be 20.04, 22.04 or 24.04 for Ubuntu, 8 or 9 for Redhat.")
+	buildCmd.Flags().StringVar(&bo.OsVersion, "os-version", "", "Operating system version to use for EKS-A node image. Can be 22.04 or 24.04 for Ubuntu, 8 or 9 for Redhat.")
 	buildCmd.Flags().StringVar(&bo.Hypervisor, "hypervisor", "", "Target hypervisor for EKS-A node image")
 	buildCmd.Flags().StringVar(&baremetalConfigFile, "baremetal-config", "", "Path to Baremetal Config file")
 	buildCmd.Flags().StringVar(&vSphereConfigFile, "vsphere-config", "", "Path to vSphere Config file")
@@ -51,13 +51,14 @@ func init() {
 	buildCmd.Flags().StringVar(&cloudstackConfigFile, "cloudstack-config", "", "Path to CloudStack Config file")
 	buildCmd.Flags().StringVar(&amiConfigFile, "ami-config", "", "Path to AMI Config file")
 	buildCmd.Flags().StringVar(&additionalFilesConfigFile, "files-config", "", "Path to Config file specifying additional files to be copied into EKS-A node image")
-	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-31", "EKS-D Release channel for node image. Can be 1-28, 1-29, 1-30, 1-31, 1-32, 1-33 or 1-34")
+	buildCmd.Flags().StringVar(&bo.ReleaseChannel, "release-channel", "1-31", "EKS-D Release channel for node image. Can be 1-29, 1-30, 1-31, 1-32, 1-33, 1-34 or 1-35")
 	buildCmd.Flags().BoolVar(&bo.Force, "force", false, "Force flag to clean up leftover files from previous execution")
 	buildCmd.Flags().StringVar(&bo.Firmware, "firmware", "", "Desired firmware for image build. EFI is only supported for Ubuntu OVA & Raw, and Redhat 9 RAW builds.")
 	buildCmd.Flags().StringVar(&bo.EKSAReleaseVersion, "eksa-release", "", "The EKS-A CLI version to build images for")
 	buildCmd.Flags().StringVar(&bo.ManifestTarball, "manifest-tarball", "", "Path to Image Builder built EKS-D/A manifest tarball")
 	buildCmd.Flags().IntVar(&bo.AnsibleVerbosity, "ansible-verbosity", 0, "Verbosity level for the Ansible tasks run during image building, should be in the range 0-6")
 	buildCmd.Flags().BoolVar(&bo.AirGapped, "air-gapped", false, "Flag to instruct image builder to run in air-gapped mode. Requires --manifest-tarball to be set")
+	buildCmd.Flags().BoolVar(&bo.Dev, "dev", false, "Development mode flag. When set to true, unsupported builds such as Ubuntu 20.04 will be enabled")
 	buildCmd.Flags().StringVar(&builderType, "builder", builder.BuilderTypeIso, "Builder type for VSphere. Can be iso or clone")
 	if err := buildCmd.MarkFlagRequired("os"); err != nil {
 		log.Fatalf("Error marking flag as required: %v", err)
@@ -89,7 +90,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 
 	if bo.Os == builder.Ubuntu && bo.OsVersion == "" {
 		// maintain previous default
-		bo.OsVersion = "20.04"
+		bo.OsVersion = "22.04"
 	}
 
 	if bo.Os == builder.RedHat && bo.OsVersion == "" {
@@ -105,7 +106,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 		log.Fatalf("Clone builder is only supported for vSphere hypervisor")
 	}
 
-	if err = validateOSVersion(bo.Os, bo.OsVersion); err != nil {
+	if err = validateOSVersion(bo.Os, bo.OsVersion, bo.Dev); err != nil {
 		log.Fatal(err.Error())
 	}
 
@@ -160,7 +161,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 	bo.Hypervisor = strings.ToLower(bo.Hypervisor)
 
 	if bo.OsVersion != "" {
-		// From this point forward use 2004 instead of 20.04 for Ubuntu versions to upstream image-builder
+		// From this point forward use 2204 instead of 22.04 for Ubuntu versions to upstream image-builder
 		bo.OsVersion = strings.ReplaceAll(bo.OsVersion, ".", "")
 	}
 
@@ -400,13 +401,22 @@ func validateSupportedHypervisors(hypervisor string) error {
 	return fmt.Errorf("%s is not supported yet. Please select one of %s", hypervisor, strings.Join(builder.SupportedHypervisors, ","))
 }
 
-func validateOSVersion(os, osVersion string) error {
+func validateOSVersion(os, osVersion string, dev bool) error {
 	if os != builder.RedHat && os != builder.Ubuntu {
 		return fmt.Errorf("%s is not a supported OS", os)
 	}
 
-	if os == builder.Ubuntu && !builder.SliceContains(builder.SupportedUbuntuVersions, osVersion) {
-		return fmt.Errorf("%s is not a supported version of Ubuntu. Please select one of %s", osVersion, strings.Join(builder.SupportedUbuntuVersions, ","))
+	if os == builder.Ubuntu {
+		// Ubuntu 20.04 only allowed when dev=true
+		if osVersion == "20.04" {
+			if !dev {
+				return fmt.Errorf("%s is not a supported version of Ubuntu. Please select one of %s", osVersion, strings.Join(builder.SupportedUbuntuVersions, ","))
+			}
+		} else {
+			if !builder.SliceContains(builder.SupportedUbuntuVersions, osVersion) {
+				return fmt.Errorf("%s is not a supported version of Ubuntu. Please select one of %s", osVersion, strings.Join(builder.SupportedUbuntuVersions, ","))
+			}
+		}
 	}
 
 	if os == builder.RedHat && !builder.SliceContains(builder.SupportedRedHatVersions, osVersion) {

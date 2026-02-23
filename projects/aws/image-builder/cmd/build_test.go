@@ -104,10 +104,19 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 		wantErr      string
 	}{
 		{
-			testName: "Ubuntu 20.04",
+			testName: "Ubuntu 20.04 without dev flag",
 			buildOptions: builder.BuildOptions{
 				Os:        "ubuntu",
 				OsVersion: "20.04",
+			},
+			wantErr: "20.04 is not a supported version of Ubuntu. Please select one of 22.04,24.04",
+		},
+		{
+			testName: "Ubuntu 20.04 with dev flag",
+			buildOptions: builder.BuildOptions{
+				Os:        "ubuntu",
+				OsVersion: "20.04",
+				Dev:       true,
 			},
 			wantErr: "",
 		},
@@ -133,7 +142,7 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 				Os:        "ubuntu",
 				OsVersion: "26.04",
 			},
-			wantErr: "26.04 is not a supported version of Ubuntu. Please select one of 20.04,22.04,24.04",
+			wantErr: "26.04 is not a supported version of Ubuntu. Please select one of 22.04,24.04",
 		},
 		{
 			testName: "Redhat 8",
@@ -163,7 +172,7 @@ func TestValidateOSVersionCombinations(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.testName, func(t *testing.T) {
-			err := validateOSVersion(tt.buildOptions.Os, tt.buildOptions.OsVersion)
+			err := validateOSVersion(tt.buildOptions.Os, tt.buildOptions.OsVersion, tt.buildOptions.Dev)
 			if tt.wantErr == "" {
 				assert.NoError(t, err)
 			} else {
@@ -324,6 +333,7 @@ func TestValidateInputsFirmwareDefaulting(t *testing.T) {
 				OsVersion:  "20.04",
 				Hypervisor: "baremetal",
 				Firmware:   "",
+				Dev:        true,
 			},
 			wantFirmware: "efi",
 		},
