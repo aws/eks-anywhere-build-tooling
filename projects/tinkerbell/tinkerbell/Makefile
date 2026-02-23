@@ -47,7 +47,7 @@ UPLOAD_DO_NOT_DELETE=true
 # The chart is renamed from "tinkerbell" to "tinkerbell-helm" via sedfile to:
 # 1. Avoid map key collision with the "tinkerbell" container image in release CLI
 # 2. Match the AssetName which must end with "-chart" to be recognized as helm
-HAS_HELM_CHART=true
+HAS_HELM_CHART?=true
 HELM_DIRECTORY=helm/tinkerbell
 HELM_SOURCE_REPOSITORY=tinkerbell
 HELM_CHART_NAMES=tinkerbell-helm
