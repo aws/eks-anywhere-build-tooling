@@ -54,6 +54,11 @@ HELM_CHART_NAMES=tinkerbell-helm
 HELM_DESTINATION_REPOSITORY=tinkerbell/tinkerbell/tinkerbell-helm
 HELM_IMAGE_LIST=tinkerbell/tinkerbell/tinkerbell tinkerbell/tinkerbell/tink-agent
 
+# When GIT_TAG is a commit SHA (not semver), helm package requires a valid semver version.
+# Override HELM_TAG with a semver wrapper: 0.0.1-<commit>-<build-tooling-hash>
+# This must match the NonProdSourceImageTagFormat in eks-anywhere release CLI bundle_release.go
+HELM_TAG=0.0.1-$(GIT_TAG)-$(GIT_HASH)
+
 # Exclude from upgrade buildspec until migration is complete
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
