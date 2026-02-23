@@ -4,7 +4,7 @@ FROM $BASE_IMAGE
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/distribution/distribution/registry _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-registryctl _output/harbor-registryctl _output/LICENSES ATTRIBUTION.txt /
+COPY _output/dependencies/$TARGETOS-$TARGETARCH/eksa/goharbor/distribution/registry _output/bin/harbor/$TARGETOS-$TARGETARCH/harbor-registryctl _output/harbor-registryctl _output/LICENSES ATTRIBUTION.txt /
 
 RUN yum install -y shadow-utils >> /dev/null \
     && yum clean all \
