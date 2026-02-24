@@ -211,6 +211,7 @@ generate-staging-buildspec: | ensure-locale
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "torvalds_linux" "$(BASE_DIRECTORY)/projects/torvalds/linux/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "isc-projects_dhcp" "$(BASE_DIRECTORY)/projects/isc-projects/dhcp/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_hook" "$(BASE_DIRECTORY)/projects/tinkerbell/hook/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_tinkerbell" "$(BASE_DIRECTORY)/projects/tinkerbell/tinkerbell/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_ipxedust" "$(BASE_DIRECTORY)/projects/tinkerbell/ipxedust/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_rufio" "$(BASE_DIRECTORY)/projects/tinkerbell/rufio/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_tink" "$(BASE_DIRECTORY)/projects/tinkerbell/tink/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
