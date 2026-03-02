@@ -18,16 +18,16 @@ upgrader/images/amd64: ## Builds/pushes `upgrader/images/amd64`
 upgrader/images/push: ## Builds/pushes `upgrader/images/push`
 
 ##@ Fetch Binary Targets
-_output/1-33/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-33/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/1-33/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-33/dependencies/linux-arm64/eksd/kubernetes/client`
-_output/1-33/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-33/dependencies/linux-amd64/eksd/kubernetes/server`
-_output/1-33/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-33/dependencies/linux-arm64/eksd/kubernetes/server`
-_output/1-33/dependencies/linux-amd64/eksd/cni-plugins: ## Fetch `_output/1-33/dependencies/linux-amd64/eksd/cni-plugins`
-_output/1-33/dependencies/linux-arm64/eksd/cni-plugins: ## Fetch `_output/1-33/dependencies/linux-arm64/eksd/cni-plugins`
-_output/1-33/dependencies/linux-amd64/eksa/containerd/containerd/1-33: ## Fetch `_output/1-33/dependencies/linux-amd64/eksa/containerd/containerd/1-33`
-_output/1-33/dependencies/linux-arm64/eksa/containerd/containerd/1-33: ## Fetch `_output/1-33/dependencies/linux-arm64/eksa/containerd/containerd/1-33`
-_output/1-33/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-33/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
-_output/1-33/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-33/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
+_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/client`
+_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/1-26/dependencies/linux-amd64/eksd/kubernetes/server: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/kubernetes/server`
+_output/1-26/dependencies/linux-arm64/eksd/kubernetes/server: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/kubernetes/server`
+_output/1-26/dependencies/linux-amd64/eksd/cni-plugins: ## Fetch `_output/1-26/dependencies/linux-amd64/eksd/cni-plugins`
+_output/1-26/dependencies/linux-arm64/eksd/cni-plugins: ## Fetch `_output/1-26/dependencies/linux-arm64/eksd/cni-plugins`
+_output/1-26/dependencies/linux-amd64/eksa/containerd/containerd: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/containerd/containerd`
+_output/1-26/dependencies/linux-arm64/eksa/containerd/containerd: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/containerd/containerd`
+_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-amd64/eksa/kubernetes-sigs/cri-tools`
+_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools: ## Fetch `_output/1-26/dependencies/linux-arm64/eksa/kubernetes-sigs/cri-tools`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
