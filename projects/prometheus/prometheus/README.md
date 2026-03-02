@@ -1,4 +1,4 @@
-![Version](https://img.shields.io/badge/version-v3.8.0-blue)
+![Version](https://img.shields.io/badge/version-v0.310.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiTldscmdZWkd6NzlhUHJBbFJDRzlMc3NmaGxBOFJlYWE1a3BsVG9KcXhldDRCK05PL0lxNmVVUi9odlMzdXZCYXFxWTBCOUZDbS91R21KL1c5VkdQQ004PSIsIml2UGFyYW1ldGVyU3BlYyI6Im94dGM3UFc0MGRDN0pyREIiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 ## **Prometheus**
