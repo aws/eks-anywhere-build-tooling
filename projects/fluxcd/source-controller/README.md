@@ -1,5 +1,5 @@
 ## **Source Controller**
-![Version](https://img.shields.io/badge/version-v1.7.4-blue)
+![Version](https://img.shields.io/badge/version-v1.8.0-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiS1ZJY3BFVGg0a21PUmpDVWM2T0pnc2VxV25uYWt5aGJjQktVSURIVnBsd0VBUmljSlUxTVNyeG5pSzhFbXNaMkdiUGdBRWU5L2plMG9ldVFxcHhrYjd3PSIsIml2UGFyYW1ldGVyU3BlYyI6IjgybDlDK2ZHLzJQVmNZNFoiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 The [source-controller](https://github.com/fluxcd/source-controller) is a Kubernetes operator specialized in artifacts acquisition from external sources such as Git, Helm repositories and S3 buckets. The controller watches for `Source` objects in a cluster and acts on them. It was designed with the goal of offloading the sources' registration, authentication, verification and resource-fetching to a dedicated controller.
@@ -26,7 +26,7 @@ about calling breaking changes and other upgrade gotchas between release. Please
 about changes necessary to eks-anywhere to support the new version and/or automatically update between 
 eks-anywhere version reach out to @jiayiwang7 or @danbudris
 1. Compare the old tag to the new, looking specifically for Makefile changes. 
-ex: [v1.2.2 compared to v1.7.4](https://github.com/fluxcd/source-controller/compare/v1.2.2...v1.2.3). Check the `build` target for
+ex: [v1.2.2 compared to v1.8.0](https://github.com/fluxcd/source-controller/compare/v1.2.2...v1.2.3). Check the `build` target for
 any build flag changes, tag changes, dependencies, etc.
 1. Verify the golang version has not changed. The version specified in `go.mod` seems to be kept up to date.  There is also
 a [dockerfile](https://github.com/fluxcd/source-controller/blob/main/Dockerfile#L2) they use for building which has it defined.
