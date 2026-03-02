@@ -1,5 +1,5 @@
 ## **trivy**
-![Version](https://img.shields.io/badge/version-v0.68.2-blue)
+![Version](https://img.shields.io/badge/version-v0.69.2-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiMVBvZE5FTEtYaVpuWUJ3eGd2Tis1dHAxT0ZKcXBuWkNVUmpjL0pRVnduRUl2Qm1XZ29xbHBENU5wVGM3TzVTTXhFTS83VUtrWGdCVU9lVkVxSmFhUnBFPSIsIml2UGFyYW1ldGVyU3BlYyI6IkQzTU9tSEd0YWZDc0NVYkIiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Trivy](https://github.com/aquasecurity/trivy/) is a simple and comprehensive scanner for vulnerabilities in container images, file systems, and Git repositories, as well as for configuration issues. Trivy detects vulnerabilities of OS packages (Alpine, RHEL, CentOS, etc.) and language-specific packages (Bundler, Composer, npm, yarn, etc.). In addition, Trivy scans Infrastructure as Code (IaC) files such as Terraform, Dockerfile and Kubernetes, to detect potential configuration issues that expose your deployments to the risk of attack. Trivy also scans hardcoded secrets like passwords, API keys and tokens.
