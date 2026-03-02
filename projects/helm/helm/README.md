@@ -1,5 +1,5 @@
 ## **Helm**
-![Version](https://img.shields.io/badge/version-v4.1.0-blue)
+![Version](https://img.shields.io/badge/version-v4.1.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoieVZ2Vm4zalcvTTRlVHk3ODJMLy80a2hqaGw1eUNEMlBEQktYOGxLdkZYQmxMK2tWUTMyUHlxZDVIK2lYak9qM25OZm9IYTFkUGlXZ3dCOEhRb0dHMzBjPSIsIml2UGFyYW1ldGVyU3BlYyI6Im9EemRhdkg1Tll6d1lSaVciLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Helm](https://github.com/helm/helm) is a tool for managing Charts. Charts are packages of pre-configured Kubernetes resources.
