@@ -1,0 +1,78 @@
+From 1c435d594dcc85a3e74c56858ffb224ecd6a3335 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulgab@amazon.com>
+Date: Thu, 5 Mar 2026 15:58:42 -0800
+Subject: [PATCH 6/6] fix: Replace bmclib with fork for iDRAC10 gofish
+ compatibility
+
+Point bmclib to a fork (github.com/rahulbabu95/bmclib) that includes
+gofish v0.20.1+ with iDRAC10 compatibility fixes from gofish PRs #510
+and #511, plus the VirtualMedia System path fallback from bmclib #433.
+The fork adapts bmclib to the new gofish API (schemas package
+restructure), mirroring bmc-toolbox/bmclib#432.
+
+This is a temporary patch until upstream bmclib merges PR #432 and
+tinkerbell bumps to a version that includes it.
+
+Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
+---
+ go.mod | 3 ++-
+ go.sum | 8 ++++----
+ 2 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/go.mod b/go.mod
+index cd60a943..12a6409f 100644
+--- a/go.mod
++++ b/go.mod
+@@ -214,7 +214,7 @@ require (
+ 	github.com/soheilhy/cmux v0.1.5 // indirect
+ 	github.com/spf13/cast v1.7.0 // indirect
+ 	github.com/spf13/cobra v1.9.1 // indirect
+-	github.com/stmcginnis/gofish v0.20.0 // indirect
++	github.com/stmcginnis/gofish v0.20.1-0.20260304143028-a1180d37929a // indirect
+ 	github.com/stoewer/go-strcase v1.3.0 // indirect
+ 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
+ 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+@@ -282,6 +282,7 @@ require (
+ )
+ 
+ replace (
++	github.com/bmc-toolbox/bmclib/v2 => github.com/rahulbabu95/bmclib/v2 v2.0.0-20260305223154-9e7e55bda2fe
+ 	github.com/tinkerbell/tinkerbell/api => ./api
+ 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0
+ 	k8s.io/api => k8s.io/api v0.34.3
+diff --git a/go.sum b/go.sum
+index 56be1b85..2498c5a8 100644
+--- a/go.sum
++++ b/go.sum
+@@ -49,8 +49,6 @@ github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
+ github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
+ github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
+ github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
+-github.com/bmc-toolbox/bmclib/v2 v2.3.5-0.20251010091507-63cb571e5597 h1:V8lDpeWcQXhlarTtD5op6++v5Dh6wO4WTBXq8ugNuj4=
+-github.com/bmc-toolbox/bmclib/v2 v2.3.5-0.20251010091507-63cb571e5597/go.mod h1:2tYJD9JtY1tJxLHhslICrFOZhxE9O4gYMb1nJ5BKI5w=
+ github.com/bmc-toolbox/common v0.0.0-20250112191656-b6de52e8303d h1:5c0jhS9jNLm1t3GVEESsWv+p6recFRLGW90zp8HDIDs=
+ github.com/bmc-toolbox/common v0.0.0-20250112191656-b6de52e8303d/go.mod h1:Cdnkm+edb6C0pVkyCrwh3JTXAe0iUF9diDG/DztPI9I=
+ github.com/bombsimon/logrusr/v2 v2.0.1 h1:1VgxVNQMCvjirZIYaT9JYn6sAVGVEcNtRE0y4mvaOAM=
+@@ -433,6 +431,8 @@ github.com/quic-go/qpack v0.6.0 h1:g7W+BMYynC1LbYLSqRt8PBg5Tgwxn214ZZR34VIOjz8=
+ github.com/quic-go/qpack v0.6.0/go.mod h1:lUpLKChi8njB4ty2bFLX2x4gzDqXwUpaO1DP9qMDZII=
+ github.com/quic-go/quic-go v0.57.0 h1:AsSSrrMs4qI/hLrKlTH/TGQeTMY0ib1pAOX7vA3AdqE=
+ github.com/quic-go/quic-go v0.57.0/go.mod h1:ly4QBAjHA2VhdnxhojRsCUOeJwKYg+taDlos92xb1+s=
++github.com/rahulbabu95/bmclib/v2 v2.0.0-20260305223154-9e7e55bda2fe h1:BncNiKUfitjTVnxh9uJbm/PaCLJp9SVJIQGtf8BWJxk=
++github.com/rahulbabu95/bmclib/v2 v2.0.0-20260305223154-9e7e55bda2fe/go.mod h1:3yBq8jDHT1OVa/iiJ1GKLttDlJB0dzF9Z5IH2hbaKHU=
+ github.com/robfig/cron/v3 v3.0.1 h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=
+ github.com/robfig/cron/v3 v3.0.1/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
+ github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
+@@ -458,8 +458,8 @@ github.com/spf13/cobra v1.9.1/go.mod h1:nDyEzZ8ogv936Cinf6g1RU9MRY64Ir93oCnqb9wx
+ github.com/spf13/pflag v1.0.6/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
+ github.com/spf13/pflag v1.0.10 h1:4EBh2KAYBwaONj6b2Ye1GiHfwjqyROoF4RwYO+vPwFk=
+ github.com/spf13/pflag v1.0.10/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
+-github.com/stmcginnis/gofish v0.20.0 h1:hH2V2Qe898F2wWT1loApnkDUrXXiLKqbSlMaH3Y1n08=
+-github.com/stmcginnis/gofish v0.20.0/go.mod h1:PzF5i8ecRG9A2ol8XT64npKUunyraJ+7t0kYMpQAtqU=
++github.com/stmcginnis/gofish v0.20.1-0.20260304143028-a1180d37929a h1:sgqQv6GMpYzDXI5O938qVzf22U2NT9n+ZwfGqFwj0fM=
++github.com/stmcginnis/gofish v0.20.1-0.20260304143028-a1180d37929a/go.mod h1:PzF5i8ecRG9A2ol8XT64npKUunyraJ+7t0kYMpQAtqU=
+ github.com/stoewer/go-strcase v1.3.0 h1:g0eASXYtp+yvN9fK8sH94oCIk0fau9uV1/ZdJ0AVEzs=
+ github.com/stoewer/go-strcase v1.3.0/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
+ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+-- 
+2.34.1
+
