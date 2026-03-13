@@ -10,23 +10,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.20.1
   labels:
     cluster.x-k8s.io/provider: infrastructure-aws-snow
     cluster.x-k8s.io/v1beta1: v1beta1
   name: awssnowclusters.infrastructure.cluster.x-k8s.io
 spec:
   conversion:
-    strategy: Webhook
-    webhook:
-      clientConfig:
-        caBundle: Cg==
-        service:
-          name: capas-webhook-service
-          namespace: capas-system
-          path: /convert
-      conversionReviewVersions:
-      - v1beta1
+    strategy: None
   group: infrastructure.cluster.x-k8s.io
   names:
     kind: AWSSnowCluster
@@ -38,7 +29,7 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: AWSSnowCluster is the Schema for the awssnowclusters API
+        description: AWSSnowCluster is the Schema for the awssnowclusters API.
         properties:
           apiVersion:
             description: |-
@@ -58,22 +49,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: AWSSnowClusterSpec defines the desired state of AWSSnowCluster
+            description: AWSSnowClusterSpec defines the desired state of AWSSnowCluster.
             properties:
               controlPlaneEndpoint:
                 description: ControlPlaneEndpoint represents the endpoint used to
                   communicate with the control plane.
                 properties:
                   host:
-                    description: The hostname on which the API server is serving.
+                    description: host is the hostname on which the API server is serving.
+                    maxLength: 512
                     type: string
                   port:
-                    description: The port on which the API server is serving.
+                    description: port is the port on which the API server is serving.
                     format: int32
                     type: integer
-                required:
-                - host
-                - port
                 type: object
               identityRef:
                 description: IdentityRef is a reference to a identity to be used when
@@ -141,7 +130,7 @@ spec:
                 type: string
             type: object
           status:
-            description: AWSSnowClusterStatus defines the observed state of AWSSnowCluster
+            description: AWSSnowClusterStatus defines the observed state of AWSSnowCluster.
             properties:
               conditions:
                 description: Bastion        *Instance                `json:"bastion,omitempty"`
@@ -151,27 +140,32 @@ spec:
                   properties:
                     lastTransitionTime:
                       description: |-
-                        Last time the condition transitioned from one status to another.
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
                         This should be when the underlying condition changed. If that is not known, then using the time when
                         the API field changed is acceptable.
                       format: date-time
                       type: string
                     message:
                       description: |-
-                        A human readable message indicating details about the transition.
+                        message is a human readable message indicating details about the transition.
                         This field may be empty.
+                      maxLength: 10240
+                      minLength: 1
                       type: string
                     reason:
                       description: |-
-                        The reason for the condition's last transition in CamelCase.
+                        reason is the reason for the condition's last transition in CamelCase.
                         The specific API may choose whether or not this field is considered a guaranteed API.
                         This field may be empty.
+                      maxLength: 256
+                      minLength: 1
                       type: string
                     severity:
                       description: |-
                         severity provides an explicit classification of Reason code, so the users or machines can immediately
                         understand the current situation and act accordingly.
                         The Severity field MUST be set only when Status=False.
+                      maxLength: 32
                       type: string
                     status:
                       description: status of the condition, one of True, False, Unknown.
@@ -181,6 +175,8 @@ spec:
                         type of condition in CamelCase or in foo.example.com/CamelCase.
                         Many .condition.type values are consistent across resources like Available, but because arbitrary conditions
                         can be useful (see .node.status.conditions), the ability to deconflict is important.
+                      maxLength: 256
+                      minLength: 1
                       type: string
                   required:
                   - lastTransitionTime
@@ -205,7 +201,7 @@ spec:
                         is suitable for use by control plane machines.
                       type: boolean
                   type: object
-                description: Network        Network                  `json:"network,omitempty"`
+                description: Network        `json:"network,omitempty"`
                 type: object
               ready:
                 default: false
@@ -215,45 +211,13 @@ spec:
             type: object
         type: object
     served: true
-    storage: true
+    storage: false
     subresources:
       status: {}
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  annotations:
-    cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
-    controller-gen.kubebuilder.io/version: v0.17.1
-  labels:
-    cluster.x-k8s.io/provider: infrastructure-aws-snow
-    cluster.x-k8s.io/v1beta1: v1beta1
-    clusterctl.cluster.x-k8s.io/move-hierarchy: ""
-  name: awssnowippools.infrastructure.cluster.x-k8s.io
-spec:
-  conversion:
-    strategy: Webhook
-    webhook:
-      clientConfig:
-        caBundle: Cg==
-        service:
-          name: capas-webhook-service
-          namespace: capas-system
-          path: /convert
-      conversionReviewVersions:
-      - v1beta1
-  group: infrastructure.cluster.x-k8s.io
-  names:
-    kind: AWSSnowIPPool
-    listKind: AWSSnowIPPoolList
-    plural: awssnowippools
-    singular: awssnowippool
-  scope: Namespaced
-  versions:
-  - name: v1beta1
+  - name: v1beta2
     schema:
       openAPIV3Schema:
-        description: AWSSnowIPPool is the Schema for the awssnowippools API
+        description: AWSSnowCluster is the Schema for the awssnowclusters API.
         properties:
           apiVersion:
             description: |-
@@ -273,14 +237,218 @@ spec:
           metadata:
             type: object
           spec:
-            description: AWSSnowIPPoolSpec defines the desired state of AWSSnowIPPool
+            description: AWSSnowClusterSpec defines the desired state of AWSSnowCluster.
+            properties:
+              controlPlaneEndpoint:
+                description: ControlPlaneEndpoint represents the endpoint used to
+                  communicate with the control plane.
+                minProperties: 1
+                properties:
+                  host:
+                    description: host is the hostname on which the API server is serving.
+                    maxLength: 512
+                    minLength: 1
+                    type: string
+                  port:
+                    description: port is the port on which the API server is serving.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                type: object
+              identityRef:
+                description: IdentityRef is a reference to a identity to be used when
+                  reconciling this cluster
+                properties:
+                  kind:
+                    description: Kind of the identity.
+                    enum:
+                    - Secret
+                    type: string
+                  name:
+                    description: Name of the identity.
+                    minLength: 1
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              imageLookupBaseOS:
+                description: |-
+                  ImageLookupBaseOS is the name of the base operating system used to look
+                  up machine images when a machine does not specify an AMI. When set, this
+                  will be used for all cluster machines unless a machine specifies a
+                  different ImageLookupBaseOS.
+                type: string
+              imageLookupFormat:
+                description: |-
+                  ImageLookupFormat is the AMI naming format to look up machine images when
+                  a machine does not specify an AMI. When set, this will be used for all
+                  cluster machines unless a machine specifies a different ImageLookupOrg.
+                  Supports substitutions for {{.BaseOS}} and {{.K8sVersion}} with the base
+                  OS and kubernetes version, respectively. The BaseOS will be the value in
+                  ImageLookupBaseOS or ubuntu (the default), and the kubernetes version as
+                  defined by the packages produced by kubernetes/release without v as a
+                  prefix: 1.13.0, 1.12.5-mybuild.1, or 1.17.3. For example, the default
+                  image format of capas-ami-{{.BaseOS}}-.?{{.K8sVersion}}-* will end up
+                  searching for AMIs that match the pattern capa-ami-ubuntu-?1.18.0-* for a
+                  Machine that is targeting kubernetes v1.18.0 and the ubuntu base OS. See
+                  also: https://golang.org/pkg/text/template/
+                type: string
+              imageLookupOrg:
+                description: |-
+                  ImageLookupOrg is the AWS Organization ID to look up machine images when a
+                  machine does not specify an AMI. When set, this will be used for all
+                  cluster machines unless a machine specifies a different ImageLookupOrg.
+                type: string
+              physicalNetworkConnectorType:
+                description: PhysicalNetworkConnectorType is the physical network
+                  connector type to use for creating direct network interfaces. Valid
+                  values are a physical network connector type (SFP_PLUS or QSFP),
+                  or omitted (cluster-api selects a valid physical network interface,
+                  default is SFP_PLUS)
+                enum:
+                - SFP_PLUS
+                - QSFP
+                - RJ45
+                type: string
+              region:
+                description: The AWS Region the cluster lives in.
+                type: string
+              sshKeyName:
+                description: SSHKeyName is the name of the ssh key to attach to the
+                  bastion host. Valid values are empty string (do not use SSH keys),
+                  a valid SSH key name, or omitted (use the default SSH key name)
+                type: string
+            type: object
+          status:
+            description: AWSSnowClusterStatus defines the observed state of AWSSnowCluster.
+            properties:
+              conditions:
+                description: |-
+                  Network        `json:"network,omitempty"`
+                  FailureDomains clusterv1.FailureDomains `json:"failureDomains,omitempty"`
+                  Bastion        *Instance                `json:"bastion,omitempty"`
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              ready:
+                default: false
+                type: boolean
+            required:
+            - ready
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
+    controller-gen.kubebuilder.io/version: v0.20.1
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-aws-snow
+    cluster.x-k8s.io/v1beta1: v1beta1
+    clusterctl.cluster.x-k8s.io/move-hierarchy: ""
+  name: awssnowippools.infrastructure.cluster.x-k8s.io
+spec:
+  conversion:
+    strategy: None
+  group: infrastructure.cluster.x-k8s.io
+  names:
+    kind: AWSSnowIPPool
+    listKind: AWSSnowIPPoolList
+    plural: awssnowippools
+    singular: awssnowippool
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: AWSSnowIPPool is the Schema for the awssnowippools API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AWSSnowIPPoolSpec defines the desired state of AWSSnowIPPool.
             properties:
               pools:
                 description: IPPools defines a range of ip addresses for static IP
                   configurations.
                 items:
                   description: IPPool is the configuration of static ip, it provides
-                    a range of ip addresses
+                    a range of ip addresses.
                   properties:
                     gateway:
                       description: Gateway is the gateway of this subnet. Used for
@@ -300,7 +468,64 @@ spec:
                 type: array
             type: object
           status:
-            description: AWSSnowIPPoolStatus defines the observed state of AWSSnowIPPool
+            description: AWSSnowIPPoolStatus defines the observed state of AWSSnowIPPool.
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+  - name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: AWSSnowIPPool is the Schema for the awssnowippools API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AWSSnowIPPoolSpec defines the desired state of AWSSnowIPPool.
+            properties:
+              pools:
+                description: IPPools defines a range of ip addresses for static IP
+                  configurations.
+                items:
+                  description: IPPool is the configuration of static ip, it provides
+                    a range of ip addresses.
+                  properties:
+                    gateway:
+                      description: Gateway is the gateway of this subnet. Used for
+                        routing purpose
+                      type: string
+                    ipEnd:
+                      description: IPEnd is the end ip address of an ip range
+                      type: string
+                    ipStart:
+                      description: IPStart is the start ip address of an ip range
+                      type: string
+                    subnet:
+                      description: Subnet is customers' network subnet, we can use
+                        it to determine whether an ip is in this subnet
+                      type: string
+                  type: object
+                type: array
+            type: object
+          status:
+            description: AWSSnowIPPoolStatus defines the observed state of AWSSnowIPPool.
             type: object
         type: object
     served: true
@@ -313,23 +538,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.20.1
   labels:
     cluster.x-k8s.io/provider: infrastructure-aws-snow
     cluster.x-k8s.io/v1beta1: v1beta1
   name: awssnowmachines.infrastructure.cluster.x-k8s.io
 spec:
   conversion:
-    strategy: Webhook
-    webhook:
-      clientConfig:
-        caBundle: Cg==
-        service:
-          name: capas-webhook-service
-          namespace: capas-system
-          path: /convert
-      conversionReviewVersions:
-      - v1beta1
+    strategy: None
   group: infrastructure.cluster.x-k8s.io
   names:
     kind: AWSSnowMachine
@@ -341,7 +557,7 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: AWSSnowMachine is the Schema for the awssnowmachines API
+        description: AWSSnowMachine is the Schema for the awssnowmachines API.
         properties:
           apiVersion:
             description: |-
@@ -389,7 +605,7 @@ spec:
                         They are applied according to the rules defined by the AWS API:
                         https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
                       items:
-                        description: Filter is a filter used to identify an AWS resource
+                        description: Filter is a filter used to identify an AWS resource.
                         properties:
                           name:
                             description: Name of the filter. Filter names are case-sensitive.
@@ -423,7 +639,7 @@ spec:
                       They are applied according to the rules defined by the AWS API:
                       https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
                     items:
-                      description: Filter is a filter used to identify an AWS resource
+                      description: Filter is a filter used to identify an AWS resource.
                       properties:
                         name:
                           description: Name of the filter. Filter names are case-sensitive.
@@ -733,7 +949,7 @@ spec:
                       They are applied according to the rules defined by the AWS API:
                       https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
                     items:
-                      description: Filter is a filter used to identify an AWS resource
+                      description: Filter is a filter used to identify an AWS resource.
                       properties:
                         name:
                           description: Name of the filter. Filter names are case-sensitive.
@@ -763,7 +979,7 @@ spec:
             - network
             type: object
           status:
-            description: AWSSnowMachineStatus defines the observed state of AWSSnowMachine
+            description: AWSSnowMachineStatus defines the observed state of AWSSnowMachine.
             properties:
               addresses:
                 description: Addresses contains the AWS instance associated addresses.
@@ -772,11 +988,19 @@ spec:
                     address.
                   properties:
                     address:
-                      description: The machine address.
+                      description: address is the machine address.
+                      maxLength: 256
+                      minLength: 1
                       type: string
                     type:
-                      description: Machine address type, one of Hostname, ExternalIP,
-                        InternalIP, ExternalDNS or InternalDNS.
+                      description: type is the machine address type, one of Hostname,
+                        ExternalIP, InternalIP, ExternalDNS or InternalDNS.
+                      enum:
+                      - Hostname
+                      - ExternalIP
+                      - InternalIP
+                      - ExternalDNS
+                      - InternalDNS
                       type: string
                   required:
                   - address
@@ -791,27 +1015,32 @@ spec:
                   properties:
                     lastTransitionTime:
                       description: |-
-                        Last time the condition transitioned from one status to another.
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
                         This should be when the underlying condition changed. If that is not known, then using the time when
                         the API field changed is acceptable.
                       format: date-time
                       type: string
                     message:
                       description: |-
-                        A human readable message indicating details about the transition.
+                        message is a human readable message indicating details about the transition.
                         This field may be empty.
+                      maxLength: 10240
+                      minLength: 1
                       type: string
                     reason:
                       description: |-
-                        The reason for the condition's last transition in CamelCase.
+                        reason is the reason for the condition's last transition in CamelCase.
                         The specific API may choose whether or not this field is considered a guaranteed API.
                         This field may be empty.
+                      maxLength: 256
+                      minLength: 1
                       type: string
                     severity:
                       description: |-
                         severity provides an explicit classification of Reason code, so the users or machines can immediately
                         understand the current situation and act accordingly.
                         The Severity field MUST be set only when Status=False.
+                      maxLength: 32
                       type: string
                     status:
                       description: status of the condition, one of True, False, Unknown.
@@ -821,9 +1050,572 @@ spec:
                         type of condition in CamelCase or in foo.example.com/CamelCase.
                         Many .condition.type values are consistent across resources like Available, but because arbitrary conditions
                         can be useful (see .node.status.conditions), the ability to deconflict is important.
+                      maxLength: 256
+                      minLength: 1
                       type: string
                   required:
                   - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              failureMessage:
+                description: |-
+                  FailureMessage will be set in the event that there is a terminal problem
+                  reconciling the Machine and will contain a more verbose string suitable
+                  for logging and human consumption.
+
+                  This field should not be set for transitive errors that a controller
+                  faces that are expected to be fixed automatically over
+                  time (like service outages), but instead indicate that something is
+                  fundamentally wrong with the Machine's spec or the configuration of
+                  the controller, and that manual intervention is required. Examples
+                  of terminal errors would be invalid combinations of settings in the
+                  spec, values that are unsupported by the controller, or the
+                  responsible controller itself being critically misconfigured.
+
+                  Any transient errors that occur during the reconciliation of Machines
+                  can be added as events to the Machine object and/or logged in the
+                  controller's output.
+                type: string
+              failureReason:
+                description: |-
+                  FailureReason will be set in the event that there is a terminal problem
+                  reconciling the Machine and will contain a succinct value suitable
+                  for machine interpretation.
+
+                  This field should not be set for transitive errors that a controller
+                  faces that are expected to be fixed automatically over
+                  time (like service outages), but instead indicate that something is
+                  fundamentally wrong with the Machine's spec or the configuration of
+                  the controller, and that manual intervention is required. Examples
+                  of terminal errors would be invalid combinations of settings in the
+                  spec, values that are unsupported by the controller, or the
+                  responsible controller itself being critically misconfigured.
+
+                  Any transient errors that occur during the reconciliation of Machines
+                  can be added as events to the Machine object and/or logged in the
+                  controller's output.
+                type: string
+              instanceState:
+                description: InstanceState is the state of the AWS instance for this
+                  machine.
+                type: string
+              ready:
+                description: Ready is true when the provider resource is ready.
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+  - name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: AWSSnowMachine is the Schema for the awssnowmachines API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          deviceIP:
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              AWSSnowMachineSpec defines the desired state of AWSSnowMachine.
+              Below struct is a full copy of AWSSnowMachineSpec. Fields not needed for now are commented out with TODO added
+              in comments.
+            properties:
+              additionalSecurityGroups:
+                description: |-
+                  AdditionalSecurityGroups is an array of references to security groups that should be applied to the
+                  instance. These security groups would be set in addition to any security groups defined
+                  at the cluster level or in the actuator. It is possible to specify either IDs of Filters. Using Filters
+                  will cause additional requests to AWS API and if tags change the attached security groups might change too.
+                items:
+                  description: |-
+                    AWSResourceReference is a reference to a specific AWS resource by ID, ARN, or filters.
+                    Only one of ID, ARN or Filters may be specified. Specifying more than one will result in
+                    a validation error.
+                  properties:
+                    arn:
+                      description: ARN of resource
+                      type: string
+                    filters:
+                      description: |-
+                        Filters is a set of key/value pairs used to identify a resource
+                        They are applied according to the rules defined by the AWS API:
+                        https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
+                      items:
+                        description: Filter is a filter used to identify an AWS resource.
+                        properties:
+                          name:
+                            description: Name of the filter. Filter names are case-sensitive.
+                            type: string
+                          values:
+                            description: Values includes one or more filter values.
+                              Filter values are case-sensitive.
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - name
+                        - values
+                        type: object
+                      type: array
+                    id:
+                      description: ID of resource
+                      type: string
+                  type: object
+                type: array
+              ami:
+                description: AMI is the reference to the AMI from which to create
+                  the machine instance.
+                properties:
+                  arn:
+                    description: ARN of resource
+                    type: string
+                  filters:
+                    description: |-
+                      Filters is a set of key/value pairs used to identify a resource
+                      They are applied according to the rules defined by the AWS API:
+                      https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
+                    items:
+                      description: Filter is a filter used to identify an AWS resource.
+                      properties:
+                        name:
+                          description: Name of the filter. Filter names are case-sensitive.
+                          type: string
+                        values:
+                          description: Values includes one or more filter values.
+                            Filter values are case-sensitive.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - name
+                      - values
+                      type: object
+                    type: array
+                  id:
+                    description: ID of resource
+                    type: string
+                type: object
+              cloudInit:
+                description: |-
+                  CloudInit defines options related to the bootstrapping systems where
+                  CloudInit is used.
+                properties:
+                  insecureSkipSecretsManager:
+                    description: |-
+                      InsecureSkipSecretsManager, when set to true will not use AWS Secrets Manager
+                      or AWS Systems Manager Parameter Store to ensure privacy of userdata.
+                      By default, a cloud-init boothook shell script is prepended to download
+                      the userdata from Secrets Manager and additionally delete the secret.
+                    type: boolean
+                  secretCount:
+                    description: SecretCount is the number of secrets used to form
+                      the complete secret
+                    format: int32
+                    type: integer
+                  secretPrefix:
+                    description: |-
+                      SecretPrefix is the prefix for the secret name. This is stored
+                      temporarily, and deleted when the machine registers as a node against
+                      the workload cluster.
+                    type: string
+                type: object
+              containersVolume:
+                description: Configuration options for the containers data storage
+                  volumes.
+                properties:
+                  deviceName:
+                    description: Device name
+                    type: string
+                  size:
+                    description: |-
+                      Size specifies size (in Gi) of the storage device.
+                      Must be greater than the image snapshot size or 8 (whichever is greater).
+                    format: int64
+                    minimum: 8
+                    type: integer
+                  type:
+                    description: Type is the type of the volume (sbp1 for capacity-optimized
+                      HDD, sbg1 performance-optimized SSD, default is sbp1)
+                    enum:
+                    - sbp1
+                    - sbg1
+                    type: string
+                required:
+                - size
+                type: object
+              devices:
+                description: Devices is a device ip list which is assigned by customer
+                  to provision machines
+                items:
+                  type: string
+                minItems: 1
+                type: array
+              failureDomain:
+                description: |-
+                  FailureDomain is the failure domain unique identifier this Machine should be attached to, as defined in Cluster API.
+                  For this infrastructure provider, the ID is equivalent to an AWS Availability Zone.
+                  If multiple subnets are matched for the availability zone, the first one returned is picked.
+                type: string
+              iamInstanceProfile:
+                description: IAMInstanceProfile is a name of an IAM instance profile
+                  to assign to the instance
+                type: string
+              imageLookupBaseOS:
+                description: |-
+                  ImageLookupBaseOS is the name of the base operating system to use for
+                  image lookup the AMI is not set.
+                type: string
+              imageLookupFormat:
+                description: |-
+                  ImageLookupFormat is the AMI naming format to look up the image for this
+                  machine It will be ignored if an explicit AMI is set. Supports
+                  substitutions for {{.BaseOS}} and {{.K8sVersion}} with the base OS and
+                  kubernetes version, respectively. The BaseOS will be the value in
+                  ImageLookupBaseOS or ubuntu (the default), and the kubernetes version as
+                  defined by the packages produced by kubernetes/release without v as a
+                  prefix: 1.13.0, 1.12.5-mybuild.1, or 1.17.3. For example, the default
+                  image format of capas-ami-{{.BaseOS}}-.?{{.K8sVersion}}-* will end up
+                  searching for AMIs that match the pattern capa-ami-ubuntu-?1.18.0-* for a
+                  Machine that is targeting kubernetes v1.18.0 and the ubuntu base OS. See
+                  also: https://golang.org/pkg/text/template/
+                type: string
+              imageLookupOrg:
+                description: ImageLookupOrg is the AWS Organization ID to use for
+                  image lookup if AMI is not set.
+                type: string
+              instanceID:
+                description: InstanceID is the EC2 instance ID for this machine.
+                type: string
+              instanceType:
+                description: 'InstanceType is the type of instance to create. Example:
+                  m4.xlarge'
+                type: string
+              network:
+                description: Network is the DNI and ip address settings for this machine
+                properties:
+                  directNetworkInterfaces:
+                    description: DirectNetworkInterfaces is a DNI configuration list
+                      what customers want
+                    items:
+                      description: AWSSnowDirectNetworkInterface is configuration
+                        of DNIs specified by customers.
+                      properties:
+                        dhcp:
+                          description: |-
+                            DHCP shows whether we assign ip using DHCP for this DNI
+                            If DHCP is true, CAPAS will allocate ip address to this DNI using DHCP
+                          type: boolean
+                        index:
+                          description: Index is the index number of DNI, usually starts
+                            from 1 which can clarify DNIs in the list
+                          maximum: 8
+                          minimum: 1
+                          type: integer
+                        ipPool:
+                          description: |-
+                            IPPool is an ip pool which provides a range of ip addresses
+                            If IPPool is not nil, we will allocate an ip address from this pool to this DNI
+                          properties:
+                            apiVersion:
+                              description: API version of the referent.
+                              type: string
+                            fieldPath:
+                              description: |-
+                                If referring to a piece of an object instead of an entire object, this string
+                                should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                For example, if the object reference is to a container within a pod, this would take on a value like:
+                                "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                the event) or if no container name is specified "spec.containers[2]" (container with
+                                index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                referencing a part of an object.
+                              type: string
+                            kind:
+                              description: |-
+                                Kind of the referent.
+                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                              type: string
+                            name:
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            namespace:
+                              description: |-
+                                Namespace of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                              type: string
+                            resourceVersion:
+                              description: |-
+                                Specific resourceVersion to which this reference is made, if any.
+                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                              type: string
+                            uid:
+                              description: |-
+                                UID of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        primary:
+                          description: Primary indicates whether the DNI is primary
+                            or not
+                          type: boolean
+                        vlanID:
+                          description: VlanID is the vlan ID assigned by the user
+                            to this DNI
+                          format: int32
+                          maximum: 4095
+                          minimum: 0
+                          type: integer
+                      type: object
+                    maxItems: 8
+                    minItems: 1
+                    type: array
+                required:
+                - directNetworkInterfaces
+                type: object
+              networkInterfaces:
+                description: |-
+                  NetworkInterfaces is a list of ENIs to associate with the instance.
+                  A maximum of 2 may be specified.
+                items:
+                  type: string
+                maxItems: 2
+                type: array
+              nonRootVolumes:
+                description: Configuration options for the non root storage volumes.
+                items:
+                  description: Volume encapsulates the configuration options for the
+                    storage device
+                  properties:
+                    deviceName:
+                      description: Device name
+                      type: string
+                    size:
+                      description: |-
+                        Size specifies size (in Gi) of the storage device.
+                        Must be greater than the image snapshot size or 8 (whichever is greater).
+                      format: int64
+                      minimum: 8
+                      type: integer
+                    type:
+                      description: Type is the type of the volume (sbp1 for capacity-optimized
+                        HDD, sbg1 performance-optimized SSD, default is sbp1)
+                      enum:
+                      - sbp1
+                      - sbg1
+                      type: string
+                  required:
+                  - size
+                  type: object
+                type: array
+              osFamily:
+                description: OSFamily is the OS flavor which is used as the node instance
+                  OS, currently support ubuntu and bottlerocket
+                enum:
+                - ubuntu
+                - bottlerocket
+                type: string
+              physicalNetworkConnectorType:
+                description: PhysicalNetworkConnectorType is the physical network
+                  connector type to use for creating direct network interfaces. Valid
+                  values are a physical network connector type (SFP_PLUS or QSFP),
+                  or omitted (cluster-api selects a valid physical network interface,
+                  default is SFP_PLUS)
+                enum:
+                - SFP_PLUS
+                - QSFP
+                - RJ45
+                type: string
+              primaryPublicIP:
+                description: PrimaryPublicIP is the primary public ip of machine
+                type: string
+              providerID:
+                description: ProviderID is the unique identifier as specified by the
+                  cloud provider.
+                type: string
+              publicIP:
+                description: |-
+                  PublicIP specifies whether the instance should get a public IP.
+                  Precedence for this setting is as follows:
+                  1. This field if set
+                  2. Cluster/flavor setting
+                  3. Subnet default
+                type: boolean
+              rootVolume:
+                description: RootVolume encapsulates the configuration options for
+                  the root volume
+                properties:
+                  deviceName:
+                    description: Device name
+                    type: string
+                  size:
+                    description: |-
+                      Size specifies size (in Gi) of the storage device.
+                      Must be greater than the image snapshot size or 8 (whichever is greater).
+                    format: int64
+                    minimum: 8
+                    type: integer
+                  type:
+                    description: Type is the type of the volume (sbp1 for capacity-optimized
+                      HDD, sbg1 performance-optimized SSD, default is sbp1)
+                    enum:
+                    - sbp1
+                    - sbg1
+                    type: string
+                required:
+                - size
+                type: object
+              sshKeyName:
+                description: SSHKeyName is the name of the ssh key to attach to the
+                  instance. Valid values are empty string (do not use SSH keys), a
+                  valid SSH key name, or omitted (use the default SSH key name)
+                type: string
+              subnet:
+                description: |-
+                  Subnet is a reference to the subnet to use for this instance. If not specified,
+                  the cluster subnet will be used.
+                properties:
+                  arn:
+                    description: ARN of resource
+                    type: string
+                  filters:
+                    description: |-
+                      Filters is a set of key/value pairs used to identify a resource
+                      They are applied according to the rules defined by the AWS API:
+                      https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
+                    items:
+                      description: Filter is a filter used to identify an AWS resource.
+                      properties:
+                        name:
+                          description: Name of the filter. Filter names are case-sensitive.
+                          type: string
+                        values:
+                          description: Values includes one or more filter values.
+                            Filter values are case-sensitive.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - name
+                      - values
+                      type: object
+                    type: array
+                  id:
+                    description: ID of resource
+                    type: string
+                type: object
+              uncompressedUserData:
+                description: |-
+                  UncompressedUserData specify whether the user data is gzip-compressed before it is sent to ec2 instance.
+                  cloud-init has built-in support for gzip-compressed user data
+                  user data stored in aws secret manager is always gzip-compressed.
+                type: boolean
+            required:
+            - network
+            type: object
+          status:
+            description: AWSSnowMachineStatus defines the observed state of AWSSnowMachine.
+            properties:
+              addresses:
+                description: Addresses contains the AWS instance associated addresses.
+                items:
+                  description: MachineAddress contains information for the node's
+                    address.
+                  properties:
+                    address:
+                      description: address is the machine address.
+                      maxLength: 256
+                      minLength: 1
+                      type: string
+                    type:
+                      description: type is the machine address type, one of Hostname,
+                        ExternalIP, InternalIP, ExternalDNS or InternalDNS.
+                      enum:
+                      - Hostname
+                      - ExternalIP
+                      - InternalIP
+                      - ExternalDNS
+                      - InternalDNS
+                      type: string
+                  required:
+                  - address
+                  - type
+                  type: object
+                type: array
+              conditions:
+                description: Conditions defines current service state of the AWSSnowMachine.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
                   - status
                   - type
                   type: object
@@ -885,23 +1677,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: capas-system/capas-serving-cert
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.20.1
   labels:
     cluster.x-k8s.io/provider: infrastructure-aws-snow
     cluster.x-k8s.io/v1beta1: v1beta1
   name: awssnowmachinetemplates.infrastructure.cluster.x-k8s.io
 spec:
   conversion:
-    strategy: Webhook
-    webhook:
-      clientConfig:
-        caBundle: Cg==
-        service:
-          name: capas-webhook-service
-          namespace: capas-system
-          path: /convert
-      conversionReviewVersions:
-      - v1beta1
+    strategy: None
   group: infrastructure.cluster.x-k8s.io
   names:
     categories:
@@ -917,8 +1700,7 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: AWSSnowMachineTemplate is the Schema for the awssnowmachinetemplates
-          API
+        description: AWSSnowMachineTemplate is the Schema for the awssnowmachinetemplates API.
         properties:
           apiVersion:
             description: |-
@@ -938,11 +1720,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: AWSSnowMachineTemplateSpec defines the desired state of AWSSnowMachineTemplate
+            description: AWSSnowMachineTemplateSpec defines the desired state of AWSSnowMachineTemplate.
             properties:
               template:
-                description: AWSSnowMachineTemplateResource describes the data needed
-                  to create am AWSSnowMachine from a template
+                description: AWSSnowMachineTemplateResource describes the data needed to create am AWSSnowMachine from a template.
                 properties:
                   spec:
                     description: Spec is the specification of the desired behavior
@@ -969,8 +1750,7 @@ spec:
                                 They are applied according to the rules defined by the AWS API:
                                 https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
                               items:
-                                description: Filter is a filter used to identify an
-                                  AWS resource
+                                description: Filter is a filter used to identify an AWS resource.
                                 properties:
                                   name:
                                     description: Name of the filter. Filter names
@@ -1005,8 +1785,7 @@ spec:
                               They are applied according to the rules defined by the AWS API:
                               https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
                             items:
-                              description: Filter is a filter used to identify an
-                                AWS resource
+                              description: Filter is a filter used to identify an AWS resource.
                               properties:
                                 name:
                                   description: Name of the filter. Filter names are
@@ -1324,7 +2103,454 @@ spec:
                               https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
                             items:
                               description: Filter is a filter used to identify an
-                                AWS resource
+                                AWS resource.
+                              properties:
+                                name:
+                                  description: Name of the filter. Filter names are
+                                    case-sensitive.
+                                  type: string
+                                values:
+                                  description: Values includes one or more filter
+                                    values. Filter values are case-sensitive.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - name
+                              - values
+                              type: object
+                            type: array
+                          id:
+                            description: ID of resource
+                            type: string
+                        type: object
+                      uncompressedUserData:
+                        description: |-
+                          UncompressedUserData specify whether the user data is gzip-compressed before it is sent to ec2 instance.
+                          cloud-init has built-in support for gzip-compressed user data
+                          user data stored in aws secret manager is always gzip-compressed.
+                        type: boolean
+                    required:
+                    - network
+                    type: object
+                required:
+                - spec
+                type: object
+            required:
+            - template
+            type: object
+        type: object
+    served: true
+    storage: false
+  - name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: AWSSnowMachineTemplate is the Schema for the awssnowmachinetemplates
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AWSSnowMachineTemplateSpec defines the desired state of AWSSnowMachineTemplate.
+            properties:
+              template:
+                description: AWSSnowMachineTemplateResource describes the data needed
+                  to create am AWSSnowMachine from a template.
+                properties:
+                  spec:
+                    description: Spec is the specification of the desired behavior
+                      of the machine.
+                    properties:
+                      additionalSecurityGroups:
+                        description: |-
+                          AdditionalSecurityGroups is an array of references to security groups that should be applied to the
+                          instance. These security groups would be set in addition to any security groups defined
+                          at the cluster level or in the actuator. It is possible to specify either IDs of Filters. Using Filters
+                          will cause additional requests to AWS API and if tags change the attached security groups might change too.
+                        items:
+                          description: |-
+                            AWSResourceReference is a reference to a specific AWS resource by ID, ARN, or filters.
+                            Only one of ID, ARN or Filters may be specified. Specifying more than one will result in
+                            a validation error.
+                          properties:
+                            arn:
+                              description: ARN of resource
+                              type: string
+                            filters:
+                              description: |-
+                                Filters is a set of key/value pairs used to identify a resource
+                                They are applied according to the rules defined by the AWS API:
+                                https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
+                              items:
+                                description: Filter is a filter used to identify an
+                                  AWS resource.
+                                properties:
+                                  name:
+                                    description: Name of the filter. Filter names
+                                      are case-sensitive.
+                                    type: string
+                                  values:
+                                    description: Values includes one or more filter
+                                      values. Filter values are case-sensitive.
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - name
+                                - values
+                                type: object
+                              type: array
+                            id:
+                              description: ID of resource
+                              type: string
+                          type: object
+                        type: array
+                      ami:
+                        description: AMI is the reference to the AMI from which to
+                          create the machine instance.
+                        properties:
+                          arn:
+                            description: ARN of resource
+                            type: string
+                          filters:
+                            description: |-
+                              Filters is a set of key/value pairs used to identify a resource
+                              They are applied according to the rules defined by the AWS API:
+                              https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
+                            items:
+                              description: Filter is a filter used to identify an
+                                AWS resource.
+                              properties:
+                                name:
+                                  description: Name of the filter. Filter names are
+                                    case-sensitive.
+                                  type: string
+                                values:
+                                  description: Values includes one or more filter
+                                    values. Filter values are case-sensitive.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - name
+                              - values
+                              type: object
+                            type: array
+                          id:
+                            description: ID of resource
+                            type: string
+                        type: object
+                      cloudInit:
+                        description: |-
+                          CloudInit defines options related to the bootstrapping systems where
+                          CloudInit is used.
+                        properties:
+                          insecureSkipSecretsManager:
+                            description: |-
+                              InsecureSkipSecretsManager, when set to true will not use AWS Secrets Manager
+                              or AWS Systems Manager Parameter Store to ensure privacy of userdata.
+                              By default, a cloud-init boothook shell script is prepended to download
+                              the userdata from Secrets Manager and additionally delete the secret.
+                            type: boolean
+                          secretCount:
+                            description: SecretCount is the number of secrets used to form the complete secret
+                            format: int32
+                            type: integer
+                          secretPrefix:
+                            description: |-
+                              SecretPrefix is the prefix for the secret name. This is stored
+                              temporarily, and deleted when the machine registers as a node against
+                              the workload cluster.
+                            type: string
+                        type: object
+                      containersVolume:
+                        description: Configuration options for the containers data storage volumes.
+                        properties:
+                          deviceName:
+                            description: Device name
+                            type: string
+                          size:
+                            description: |-
+                              Size specifies size (in Gi) of the storage device.
+                              Must be greater than the image snapshot size or 8 (whichever is greater).
+                            format: int64
+                            minimum: 8
+                            type: integer
+                          type:
+                            description: Type is the type of the volume (sbp1 for
+                              capacity-optimized HDD, sbg1 performance-optimized SSD,
+                              default is sbp1)
+                            enum:
+                            - sbp1
+                            - sbg1
+                            type: string
+                        required:
+                        - size
+                        type: object
+                      devices:
+                        description: Devices is a device ip list which is assigned
+                          by customer to provision machines
+                        items:
+                          type: string
+                        minItems: 1
+                        type: array
+                      failureDomain:
+                        description: |-
+                          FailureDomain is the failure domain unique identifier this Machine should be attached to, as defined in Cluster API.
+                          For this infrastructure provider, the ID is equivalent to an AWS Availability Zone.
+                          If multiple subnets are matched for the availability zone, the first one returned is picked.
+                        type: string
+                      iamInstanceProfile:
+                        description: IAMInstanceProfile is a name of an IAM instance
+                          profile to assign to the instance
+                        type: string
+                      imageLookupBaseOS:
+                        description: |-
+                          ImageLookupBaseOS is the name of the base operating system to use for
+                          image lookup the AMI is not set.
+                        type: string
+                      imageLookupFormat:
+                        description: |-
+                          ImageLookupFormat is the AMI naming format to look up the image for this
+                          machine It will be ignored if an explicit AMI is set. Supports
+                          substitutions for {{.BaseOS}} and {{.K8sVersion}} with the base OS and
+                          kubernetes version, respectively. The BaseOS will be the value in
+                          ImageLookupBaseOS or ubuntu (the default), and the kubernetes version as
+                          defined by the packages produced by kubernetes/release without v as a
+                          prefix: 1.13.0, 1.12.5-mybuild.1, or 1.17.3. For example, the default
+                          image format of capas-ami-{{.BaseOS}}-.?{{.K8sVersion}}-* will end up
+                          searching for AMIs that match the pattern capa-ami-ubuntu-?1.18.0-* for a
+                          Machine that is targeting kubernetes v1.18.0 and the ubuntu base OS. See
+                          also: https://golang.org/pkg/text/template/
+                        type: string
+                      imageLookupOrg:
+                        description: ImageLookupOrg is the AWS Organization ID to
+                          use for image lookup if AMI is not set.
+                        type: string
+                      instanceID:
+                        description: InstanceID is the EC2 instance ID for this machine.
+                        type: string
+                      instanceType:
+                        description: 'InstanceType is the type of instance to create.
+                          Example: m4.xlarge'
+                        type: string
+                      network:
+                        description: Network is the DNI and ip address settings for
+                          this machine
+                        properties:
+                          directNetworkInterfaces:
+                            description: DirectNetworkInterfaces is a DNI configuration
+                              list what customers want
+                            items:
+                              description: AWSSnowDirectNetworkInterface is configuration
+                                of DNIs specified by customers.
+                              properties:
+                                dhcp:
+                                  description: |-
+                                    DHCP shows whether we assign ip using DHCP for this DNI
+                                    If DHCP is true, CAPAS will allocate ip address to this DNI using DHCP
+                                  type: boolean
+                                index:
+                                  description: Index is the index number of DNI, usually
+                                    starts from 1 which can clarify DNIs in the list
+                                  maximum: 8
+                                  minimum: 1
+                                  type: integer
+                                ipPool:
+                                  description: |-
+                                    IPPool is an ip pool which provides a range of ip addresses
+                                    If IPPool is not nil, we will allocate an ip address from this pool to this DNI
+                                  properties:
+                                    apiVersion:
+                                      description: API version of the referent.
+                                      type: string
+                                    fieldPath:
+                                      description: |-
+                                        If referring to a piece of an object instead of an entire object, this string
+                                        should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                        For example, if the object reference is to a container within a pod, this would take on a value like:
+                                        "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                        the event) or if no container name is specified "spec.containers[2]" (container with
+                                        index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                        referencing a part of an object.
+                                      type: string
+                                    kind:
+                                      description: |-
+                                        Kind of the referent.
+                                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                      type: string
+                                    name:
+                                      description: |-
+                                        Name of the referent.
+                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      type: string
+                                    namespace:
+                                      description: |-
+                                        Namespace of the referent.
+                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                                      type: string
+                                    resourceVersion:
+                                      description: |-
+                                        Specific resourceVersion to which this reference is made, if any.
+                                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                                      type: string
+                                    uid:
+                                      description: |-
+                                        UID of the referent.
+                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                                      type: string
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                primary:
+                                  description: Primary indicates whether the DNI is
+                                    primary or not
+                                  type: boolean
+                                vlanID:
+                                  description: VlanID is the vlan ID assigned by the
+                                    user to this DNI
+                                  format: int32
+                                  maximum: 4095
+                                  minimum: 0
+                                  type: integer
+                              type: object
+                            maxItems: 8
+                            minItems: 1
+                            type: array
+                        required:
+                        - directNetworkInterfaces
+                        type: object
+                      networkInterfaces:
+                        description: |-
+                          NetworkInterfaces is a list of ENIs to associate with the instance.
+                          A maximum of 2 may be specified.
+                        items:
+                          type: string
+                        maxItems: 2
+                        type: array
+                      nonRootVolumes:
+                        description: Configuration options for the non root storage
+                          volumes.
+                        items:
+                          description: Volume encapsulates the configuration options
+                            for the storage device
+                          properties:
+                            deviceName:
+                              description: Device name
+                              type: string
+                            size:
+                              description: |-
+                                Size specifies size (in Gi) of the storage device.
+                                Must be greater than the image snapshot size or 8 (whichever is greater).
+                              format: int64
+                              minimum: 8
+                              type: integer
+                            type:
+                              description: Type is the type of the volume (sbp1 for
+                                capacity-optimized HDD, sbg1 performance-optimized
+                                SSD, default is sbp1)
+                              enum:
+                              - sbp1
+                              - sbg1
+                              type: string
+                          required:
+                          - size
+                          type: object
+                        type: array
+                      osFamily:
+                        description: OSFamily is the OS flavor which is used as the
+                          node instance OS, currently support ubuntu and bottlerocket
+                        enum:
+                        - ubuntu
+                        - bottlerocket
+                        type: string
+                      physicalNetworkConnectorType:
+                        description: PhysicalNetworkConnectorType is the physical
+                          network connector type to use for creating direct network
+                          interfaces. Valid values are a physical network connector
+                          type (SFP_PLUS or QSFP), or omitted (cluster-api selects
+                          a valid physical network interface, default is SFP_PLUS)
+                        enum:
+                        - SFP_PLUS
+                        - QSFP
+                        - RJ45
+                        type: string
+                      primaryPublicIP:
+                        description: PrimaryPublicIP is the primary public ip of machine
+                        type: string
+                      providerID:
+                        description: ProviderID is the unique identifier as specified
+                          by the cloud provider.
+                        type: string
+                      publicIP:
+                        description: |-
+                          PublicIP specifies whether the instance should get a public IP.
+                          Precedence for this setting is as follows:
+                          1. This field if set
+                          2. Cluster/flavor setting
+                          3. Subnet default
+                        type: boolean
+                      rootVolume:
+                        description: RootVolume encapsulates the configuration options
+                          for the root volume
+                        properties:
+                          deviceName:
+                            description: Device name
+                            type: string
+                          size:
+                            description: |-
+                              Size specifies size (in Gi) of the storage device.
+                              Must be greater than the image snapshot size or 8 (whichever is greater).
+                            format: int64
+                            minimum: 8
+                            type: integer
+                          type:
+                            description: Type is the type of the volume (sbp1 for
+                              capacity-optimized HDD, sbg1 performance-optimized SSD,
+                              default is sbp1)
+                            enum:
+                            - sbp1
+                            - sbg1
+                            type: string
+                        required:
+                        - size
+                        type: object
+                      sshKeyName:
+                        description: SSHKeyName is the name of the ssh key to attach
+                          to the instance. Valid values are empty string (do not use
+                          SSH keys), a valid SSH key name, or omitted (use the default
+                          SSH key name)
+                        type: string
+                      subnet:
+                        description: |-
+                          Subnet is a reference to the subnet to use for this instance. If not specified,
+                          the cluster subnet will be used.
+                        properties:
+                          arn:
+                            description: ARN of resource
+                            type: string
+                          filters:
+                            description: |-
+                              Filters is a set of key/value pairs used to identify a resource
+                              They are applied according to the rules defined by the AWS API:
+                              https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Filtering.html
+                            items:
+                              description: Filter is a filter used to identify an
+                                AWS resource.
                               properties:
                                 name:
                                   description: Name of the filter. Filter names are
@@ -1677,12 +2903,13 @@ metadata:
   name: capas-mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
+  - v1beta2
   - v1beta1
   clientConfig:
     service:
       name: capas-webhook-service
       namespace: capas-system
-      path: /mutate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowcluster
+      path: /mutate-infrastructure-cluster-x-k8s-io-v1beta2-awssnowcluster
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: default.awssnowcluster.infrastructure.cluster.x-k8s.io
@@ -1690,7 +2917,7 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1beta1
+    - v1beta2
     operations:
     - CREATE
     - UPDATE
@@ -1698,19 +2925,20 @@ webhooks:
     - awssnowclusters
   sideEffects: None
 - admissionReviewVersions:
+  - v1beta2
   - v1beta1
   clientConfig:
     service:
       name: capas-webhook-service
       namespace: capas-system
-      path: /mutate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowmachine
+      path: /mutate-infrastructure-cluster-x-k8s-io-v1beta2-awssnowmachine
   failurePolicy: Fail
   name: mutation.awssnowmachine.infrastructure.cluster.x-k8s.io
   rules:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1beta1
+    - v1beta2
     operations:
     - CREATE
     - UPDATE
@@ -1728,12 +2956,13 @@ metadata:
   name: capas-validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
+  - v1beta2
   - v1beta1
   clientConfig:
     service:
       name: capas-webhook-service
       namespace: capas-system
-      path: /validate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowcluster
+      path: /validate-infrastructure-cluster-x-k8s-io-v1beta2-awssnowcluster
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.awssnowcluster.infrastructure.cluster.x-k8s.io
@@ -1741,7 +2970,7 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1beta1
+    - v1beta2
     operations:
     - CREATE
     - UPDATE
@@ -1749,12 +2978,13 @@ webhooks:
     - awssnowclusters
   sideEffects: None
 - admissionReviewVersions:
+  - v1beta2
   - v1beta1
   clientConfig:
     service:
       name: capas-webhook-service
       namespace: capas-system
-      path: /validate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowippool
+      path: /validate-infrastructure-cluster-x-k8s-io-v1beta2-awssnowippool
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.awssnowippool.infrastructure.x-k8s.io
@@ -1762,7 +2992,7 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1beta1
+    - v1beta2
     operations:
     - CREATE
     - UPDATE
@@ -1770,12 +3000,13 @@ webhooks:
     - awssnowippools
   sideEffects: None
 - admissionReviewVersions:
+  - v1beta2
   - v1beta1
   clientConfig:
     service:
       name: capas-webhook-service
       namespace: capas-system
-      path: /validate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowmachine
+      path: /validate-infrastructure-cluster-x-k8s-io-v1beta2-awssnowmachine
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.awssnowmachine.infrastructure.cluster.x-k8s.io
@@ -1783,7 +3014,7 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1beta1
+    - v1beta2
     operations:
     - CREATE
     - UPDATE
@@ -1791,12 +3022,13 @@ webhooks:
     - awssnowmachines
   sideEffects: None
 - admissionReviewVersions:
+  - v1beta2
   - v1beta1
   clientConfig:
     service:
       name: capas-webhook-service
       namespace: capas-system
-      path: /validate-infrastructure-cluster-x-k8s-io-v1beta1-awssnowmachinetemplate
+      path: /validate-infrastructure-cluster-x-k8s-io-v1beta2-awssnowmachinetemplate
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.awssnowmachinetemplate.infrastructure.x-k8s.io
@@ -1804,7 +3036,7 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1beta1
+    - v1beta2
     operations:
     - CREATE
     - UPDATE
