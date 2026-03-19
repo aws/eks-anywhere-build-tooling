@@ -382,13 +382,31 @@ batch:
         variables:
           PROJECT_PATH: projects/fluxcd/helm-controller
           CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.helm-controller
-    - identifier: fluxcd_kustomize_controller
+    - identifier: fluxcd_kustomize_controller_linux_amd64
+      env:
+        type: LINUX_CONTAINER
+        compute-type: BUILD_GENERAL1_SMALL
+        variables:
+          PROJECT_PATH: projects/fluxcd/kustomize-controller
+          CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.kustomize-controller
+          IMAGE_PLATFORMS: linux/amd64
+          BINARY_PLATFORMS: linux/amd64
+          IMAGE_TAG_SUFFIX: -amd64
+    - identifier: fluxcd_kustomize_controller_linux_arm64
       env:
         type: ARM_CONTAINER
         compute-type: BUILD_GENERAL1_SMALL
         variables:
           PROJECT_PATH: projects/fluxcd/kustomize-controller
           CLONE_URL: https://git-codecommit.us-west-2.amazonaws.com/v1/repos/fluxcd.kustomize-controller
+          IMAGE_PLATFORMS: linux/arm64
+          BINARY_PLATFORMS: linux/arm64
+          IMAGE_TAG_SUFFIX: -arm64
+    - identifier: fluxcd_kustomize_controller_combine_images
+      buildspec: buildspecs/combine-images.yml
+      depend-on:
+        - fluxcd_kustomize_controller_linux_amd64
+        - fluxcd_kustomize_controller_linux_arm64
     - identifier: fluxcd_notification_controller
       env:
         type: ARM_CONTAINER
