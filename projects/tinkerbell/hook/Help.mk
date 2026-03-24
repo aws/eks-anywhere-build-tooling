@@ -43,8 +43,8 @@ hook-acpid/images/push: ## Builds/pushes `hook-acpid/images/push`
 ##@ Fetch Binary Targets
 _output/dependencies/linux-amd64/eksa/containerd/containerd: ## Fetch `_output/dependencies/linux-amd64/eksa/containerd/containerd`
 _output/dependencies/linux-arm64/eksa/containerd/containerd: ## Fetch `_output/dependencies/linux-arm64/eksa/containerd/containerd`
-_output/dependencies/linux-amd64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/tink`
-_output/dependencies/linux-arm64/eksa/tinkerbell/tink: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/tink`
+_output/dependencies/linux-amd64/eksa/tinkerbell/tinkerbell: ## Fetch `_output/dependencies/linux-amd64/eksa/tinkerbell/tinkerbell`
+_output/dependencies/linux-arm64/eksa/tinkerbell/tinkerbell: ## Fetch `_output/dependencies/linux-arm64/eksa/tinkerbell/tinkerbell`
 _output/dependencies/linux-amd64/eksa/linuxkit/linuxkit: ## Fetch `_output/dependencies/linux-amd64/eksa/linuxkit/linuxkit`
 _output/dependencies/linux-arm64/eksa/linuxkit/linuxkit: ## Fetch `_output/dependencies/linux-arm64/eksa/linuxkit/linuxkit`
 
