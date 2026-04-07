@@ -37,7 +37,7 @@ TAR=$(build::find::gnu_variant_on_mac tar)
 mkdir -p $BIN_FOLDER $TMP_FOLDER
 
 if [ ! -f "$ZIP" ]; then
-    build::common::echo_and_run curl -L https://www.7-zip.org/a/7z2406-$([ "Darwin" = "$(uname -s)" ] && echo mac || echo linux)$([ "Linux" = "$(uname -s)" ] && ([ "x86_64" = "$(uname -m)" ] && echo -x64 || echo -arm64)).tar.xz  | $TAR -xJ -C $BIN_FOLDER 7zz
+    build::common::echo_and_run curl -L https://www.7-zip.org/a/7z2600-$([ "Darwin" = "$(uname -s)" ] && echo mac || echo linux)$([ "Linux" = "$(uname -s)" ] && ([ "x86_64" = "$(uname -m)" ] && echo -x64 || echo -arm64)).tar.xz  | $TAR -xJ -C $BIN_FOLDER 7zz
 fi
 
 VMDK="$($TAR --wildcards -tf $OVA_PATH '*.vmdk')"
