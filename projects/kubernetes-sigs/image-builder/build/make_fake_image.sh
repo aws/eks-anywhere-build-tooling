@@ -30,7 +30,7 @@ ZIP="$BIN_FOLDER/7zz"
 mkdir -p $BIN_FOLDER $TMP_FOLDER
 
 if [ ! -f "$ZIP" ]; then
-    build::common::echo_and_run curl -L https://www.7-zip.org/a/7z2406-linux-$([ "x86_64" = "$(uname -m)" ] && echo x64 || echo arm64).tar.xz  | tar -xJ -C $BIN_FOLDER 7zz
+    build::common::echo_and_run curl -L https://www.7-zip.org/a/7z2600-linux-$([ "x86_64" = "$(uname -m)" ] && echo x64 || echo arm64).tar.xz  | tar -xJ -C $BIN_FOLDER 7zz
 fi
 
 EXPECTED_VERSION="$(jq -r '.kubernetes_semver' $KUBERNETES_PACKER_CONFIG)"
