@@ -40,15 +40,6 @@ include $(BASE_DIRECTORY)/Common.mk
 # a valid branch/tag
 $(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_ADDON_IMAGE_TAG)))
 
-# Copy upstream images from EKS Add-on ECR to destination registry for local testing.
-# Usage: make copy-images IMAGE_REPO=public.ecr.aws/p2x5x2t2
-.PHONY: copy-images
-copy-images:
-	$(foreach image,$(HELM_IMAGE_LIST),\
-		skopeo copy --all \
-			docker://$(HELM_SOURCE_IMAGE_REPO)/$(image):$(IMAGE_TAG) \
-			docker://$(IMAGE_REPO)/cert-manager/$(image):$(IMAGE_TAG) ; \
-	)
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
