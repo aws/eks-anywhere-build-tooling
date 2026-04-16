@@ -1,59 +1,44 @@
-BASE_DIRECTORY:=$(shell git rev-parse --show-toplevel)
-GIT_TAG?=$(shell cat GIT_TAG)
-GOLANG_VERSION=$(shell cat GOLANG_VERSION)
-REPO=cert-manager
+BASE_DIRECTORY:=$(abspath ../../../)
+EKS_ADDON_IMAGE_TAG=$(shell cat EKS_ADDON_IMAGE_TAG)
+GIT_TAG=$(EKS_ADDON_IMAGE_TAG)
+HELM_GIT_TAG=$(shell cat HELM_GIT_TAG)
+
+ # Upstream images are used directly without re-building and re-tagging in build
+ # tooling, so the IMAGE_TAG needs to be overwritten to match upstream ECR tags.
+IMAGE_TAG=$(EKS_ADDON_IMAGE_TAG)
+
 REPO_OWNER=cert-manager
+REPO=cert-manager
 
-BASE_IMAGE_NAME?=eks-distro-minimal-base
-DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
+SIMPLE_CREATE_BINARIES=false
+SIMPLE_CREATE_TARBALLS=false
+HAS_LICENSES=false
+IMAGE_NAMES=
 
-CERT_MANAGER_ACMESOLVER_IMAGE_COMPONENT=cert-manager/cert-manager-acmesolver
-CERT_MANAGER_CAINJECTOR_IMAGE_COMPONENT=cert-manager/cert-manager-cainjector
-CERT_MANAGER_CONTROLLER_IMAGE_COMPONENT=cert-manager/cert-manager-controller
-CERT_MANAGER_WEBHOOK_IMAGE_COMPONENT=cert-manager/cert-manager-webhook
-CERT_MANAGER_STARTUPAPICHECK_IMAGE_COMPONENT=cert-manager/cert-manager-startupapicheck
-
-IMAGE_NAMES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook cert-manager-startupapicheck
-
-BINARY_TARGET_FILES=cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook cert-manager-startupapicheck
-SOURCE_PATTERNS=. . . . .
-GO_MOD_PATHS=cmd/acmesolver cmd/cainjector cmd/controller cmd/webhook cmd/startupapicheck
-
-# by default the first target is assumed to be the primary and will produce a attribution with no prefix
-# for this build we want to prefix all the files
-CERT_MANAGER_ACMESOLVER_ATTRIBUTION_OVERRIDE=cert-manager-acmesolver
+BUILD_TARGETS=helm/build
+RELEASE_TARGETS=helm/push
+EXCLUDE_FROM_STAGING_BUILDSPEC=true
+SKIP_ON_RELEASE_BRANCH=true
 
 HAS_HELM_CHART=true
+
+HELM_SOURCE_IMAGE_REPO=602401143452.dkr.ecr.us-west-2.amazonaws.com
+HELM_SOURCE_OWNER=cert-manager
+HELM_SOURCE_REPOSITORY=cert-manager
 HELM_DIRECTORY=deploy/charts/cert-manager
-HELM_IMAGE_LIST=cert-manager/cert-manager-cainjector cert-manager/cert-manager-controller cert-manager/cert-manager-webhook cert-manager/cert-manager-startupapicheck cert-manager/cert-manager-acmesolver
+HELM_IMAGE_LIST=eks/cert-manager-controller eks/cert-manager-webhook eks/cert-manager-cainjector eks/cert-manager-acmesolver
+HELM_USE_UPSTREAM_IMAGE=true
 
-HAS_S3_ARTIFACTS=true
+HELM_CHART_NAMES=cert-manager/cert-manager
 
-BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
+EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 include $(BASE_DIRECTORY)/Common.mk
 
-$(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-acmesolver-useradd/images/export
-$(call IMAGE_TARGETS_FOR_NAME, cert-manager-cainjector): cert-manager-cainjector-useradd/images/export
-$(call IMAGE_TARGETS_FOR_NAME, cert-manager-acmesolver): cert-manager-controller-useradd/images/export
-$(call IMAGE_TARGETS_FOR_NAME, cert-manager-webhook): cert-manager-webhook-useradd/images/export
-$(call IMAGE_TARGETS_FOR_NAME, cert-manager-startupapicheck): cert-manager-startupapicheck-useradd/images/export
-
-cert-manager-acmesolver-useradd/images/export: IMAGE_USERADD_USER_NAME=acmesolver
-cert-manager-cainjector-useradd/images/export: IMAGE_USERADD_USER_NAME=cainjector
-cert-manager-controller-useradd/images/export: IMAGE_USERADD_USER_NAME=cert-manager
-cert-manager-webhook-useradd/images/export: IMAGE_USERADD_USER_NAME=webhook
-cert-manager-startupapicheck-useradd/images/export: IMAGE_USERADD_USER_NAME=startupapicheck
-
-s3-artifacts: create-manifests
-
-.PHONY: create-manifests
-create-manifests:
-	build/create_manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY) $(GIT_TAG)
-
-.PHONY: update-cert-manager-manifest
-update-cert-manager-manifest:
-	wget -q https://github.com/cert-manager/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O manifests/cert-manager.yaml
+# To avoid issues cloning/checking out the repo, git_tag is set to
+# a valid branch/tag
+$(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_ADDON_IMAGE_TAG)))
 
 
 ########### DO NOT EDIT #############################
