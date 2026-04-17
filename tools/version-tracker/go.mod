@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
 	github.com/aws/eks-distro-build-tooling/release v0.0.0-20240513204929-c69ded04ed10
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-git/go-git/v5 v5.17.1
+	github.com/go-git/go-git/v5 v5.18.0
 	github.com/go-logr/logr v1.2.4
 	github.com/go-logr/zapr v1.2.4
 	github.com/google/go-github/v53 v53.2.0
