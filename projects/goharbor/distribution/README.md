@@ -1,5 +1,5 @@
 ## **distribution**
-![Version](https://img.shields.io/badge/version-086d3c33b3981cf598d0d82336a907fcf5c4c848-blue)
+![Version](https://img.shields.io/badge/version-523791cb5f2b3316a26a44206c2a97d51eb9ef92-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoieGduSTVGQXp1STQ1b2VjY0tiZnJOVStJa1pja2pjbDJYQTdMS2V5R0lyWFJ0R1lya1lYREhuYy9xRE5sMlc2SmZVWXlNRGRJdGhwZXl5V0cwMXB2ck5nPSIsIml2UGFyYW1ldGVyU3BlYyI6IlQwNHZleTBzMzZQMjZ1VCsiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 This [distribution project](https://github.com/goharbor/distribution)'s main product is the Open Source Registry implementation for storing and distributing container images using the [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec). The goal of this project is to provide a simple, secure, and scalable base for building a large scale registry solution or running a simple private registry. It is a core library for many registry operators including Docker Hub, GitHub Container Registry, GitLab Container Registry and DigitalOcean Container Registry, as well as the CNCF Harbor Project, and VMware Harbor Registry.
