@@ -149,9 +149,21 @@ env_and_envsubst '$EKSD_NAME' \
 
 # This is the IP address that Packer will create the server on to host the local
 # directory containing the kickstart config
+# For OVA: required for redhat or ubuntu (non-2004) builds
+# For raw: required for redhat or ubuntu (non-2004) builds
+REQUIRES_HTTP_IP_REPLACEMENT=false
+
 if [ "$IMAGE_FORMAT" = "ova" ] && \
     ( [ "$IMAGE_OS" = "redhat" ] || ( [ "$IMAGE_OS" = "ubuntu" ] && [ "$IMAGE_OS_VERSION" != "2004" ] )  ); then
-    
+    REQUIRES_HTTP_IP_REPLACEMENT=true
+fi
+
+if [ "$IMAGE_FORMAT" = "raw" ] && \
+    ( [ "$IMAGE_OS" = "redhat" ] || ( [ "$IMAGE_OS" = "ubuntu" ] && [ "$IMAGE_OS_VERSION" != "2004" ] ) ); then
+    REQUIRES_HTTP_IP_REPLACEMENT=true
+fi
+
+if [ "$REQUIRES_HTTP_IP_REPLACEMENT" = "true" ]; then
     # Get Packer HTTP server IP from env var if set
     PACKER_HTTP_SERVER_IP=${PACKER_HTTP_SERVER_IP:-}
     if [ -z $PACKER_HTTP_SERVER_IP ]; then
@@ -233,8 +245,16 @@ if [ "$IMAGE_FORMAT" = "ova" ] && \
     if [ "$(uname -s)" = "Darwin" ]; then
       SED=gsed
     fi
-    find ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova -type f -name '*.json' | xargs $SED -i "s/{{ .HTTPIP }}/$PACKER_HTTP_SERVER_IP/g"
-    echo "Packer HTTP server ip has been replaced with $PACKER_HTTP_SERVER_IP"
+
+    if [ "$IMAGE_FORMAT" = "ova" ]; then
+        find ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/ova -type f -name '*.json' | xargs $SED -i "s/{{ .HTTPIP }}/$PACKER_HTTP_SERVER_IP/g"
+        echo "Packer HTTP server ip has been replaced with $PACKER_HTTP_SERVER_IP in OVA packer configs"
+    fi
+
+    if [ "$IMAGE_FORMAT" = "raw" ]; then
+        find ${MAKE_ROOT}/${IMAGE_BUILDER_DIR}/packer/raw -type f \( -name '*.json' -o -name '*.json.tmpl' \) | xargs $SED -i "s/{{ .HTTPIP }}/$PACKER_HTTP_SERVER_IP/g"
+        echo "Packer HTTP server ip has been replaced with $PACKER_HTTP_SERVER_IP in raw packer configs"
+    fi
 fi
 
 # If the image format is AMI and our Packer config specifies a non-gp3 volume, then
