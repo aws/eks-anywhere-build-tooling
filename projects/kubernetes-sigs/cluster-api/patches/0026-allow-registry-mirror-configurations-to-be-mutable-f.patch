@@ -1,31 +1,33 @@
 From 9b2bfb08deaa41e12994e969b1470819a5c55850 Mon Sep 17 00:00:00 2001
 From: Cavaughn Browne <cxbrowne@amazon.com>
 Date: Thu, 20 Jul 2023 11:05:49 -0500
-Subject: [PATCH 26/39] allow registry mirror configurations to be mutable for
- BR
+Subject: [PATCH 26/39] allow registry mirror and certBundles configurations to
+ be mutable for BR
 
 ---
- .../webhooks/kubeadm_control_plane.go         |  2 +
- .../webhooks/kubeadm_control_plane_test.go    | 45 +++++++++++++++++++
- 2 files changed, 47 insertions(+)
+ .../webhooks/kubeadm_control_plane.go         |  4 +
+ .../webhooks/kubeadm_control_plane_test.go    | 72 +++++++++++++++++++
+ 2 files changed, 76 insertions(+)
 
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
 index e6cb129d0..b3f591608 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane.go
-@@ -163,6 +163,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -163,6 +163,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, kubeadmConfigSpec, clusterConfiguration, controllerManager, "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler},
  		{spec, kubeadmConfigSpec, clusterConfiguration, scheduler, "*"},
 +		{spec, kubeadmConfigSpec, clusterConfiguration, "registryMirror", "*"},
++		{spec, kubeadmConfigSpec, clusterConfiguration, "certBundles"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "certificateValidityPeriodDays"},
  		// spec.kubeadmConfigSpec.initConfiguration
  		{spec, kubeadmConfigSpec, initConfiguration, nodeRegistration},
-@@ -181,6 +182,7 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
+@@ -181,6 +183,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldObj, ne
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketControl", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketCustomBootstrapContainers"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocket", "*"},
 +		{spec, kubeadmConfigSpec, joinConfiguration, "registryMirror", "*"},
++		{spec, kubeadmConfigSpec, joinConfiguration, "certBundles"},
  		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration},
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
@@ -33,7 +35,7 @@ diff --git a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.g
 index 67312c38b..7ce0d42d6 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadm_control_plane_test.go
-@@ -359,6 +359,10 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -359,6 +359,13 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  					},
  					CertificateValidityPeriodDays:   100,
  					CACertificateValidityPeriodDays: 365,
@@ -41,10 +43,13 @@ index 67312c38b..7ce0d42d6 100644
 +						Endpoint: "https://1.1.1.1:1111",
 +						CACert:   "test-cert",
 +					},
++					CertBundles: []bootstrapv1.CertBundle{
++						{Name: "test-bundle", Data: "test-data"},
++					},
  				},
  				JoinConfiguration: bootstrapv1.JoinConfiguration{
  					NodeRegistration: bootstrapv1.NodeRegistrationOptions{
-@@ -368,6 +372,10 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -368,6 +375,13 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  						ControlPlaneComponentHealthCheckSeconds: ptr.To[int32](10),
  						KubeletHealthCheckSeconds:               ptr.To[int32](40),
  					},
@@ -52,10 +57,13 @@ index 67312c38b..7ce0d42d6 100644
 +						Endpoint: "https://1.1.1.1:1111",
 +						CACert:   "test-cert",
 +					},
++					CertBundles: []bootstrapv1.CertBundle{
++						{Name: "test-bundle", Data: "test-data"},
++					},
  				},
  				PreKubeadmCommands: []string{
  					"test", "foo",
-@@ -785,6 +793,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -785,6 +799,28 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	validUpdateJoinConfBRCustomBootstrapContainers := before.DeepCopy()
  	validUpdateJoinConfBRCustomBootstrapContainers.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketCustomBootstrapContainers = []bootstrapv1.BottlerocketBootstrapContainer{{ImageRepository: "registry.k8s.io/bottlerocketbootstrap", ImageTag: "v1.1.0+new"}}
  
@@ -71,10 +79,20 @@ index 67312c38b..7ce0d42d6 100644
 +	validUpdateJoinConfigRegistryMirrorEndpoint := before.DeepCopy()
 +	validUpdateJoinConfigRegistryMirrorEndpoint.Spec.KubeadmConfigSpec.JoinConfiguration.RegistryMirror.Endpoint = "https://0.0.0.0:6443"
 +
++	validUpdateClusterConfigCertBundles := before.DeepCopy()
++	validUpdateClusterConfigCertBundles.Spec.KubeadmConfigSpec.ClusterConfiguration.CertBundles = []bootstrapv1.CertBundle{
++		{Name: "new-bundle", Data: "new-data"},
++	}
++
++	validUpdateJoinConfigCertBundles := before.DeepCopy()
++	validUpdateJoinConfigCertBundles.Spec.KubeadmConfigSpec.JoinConfiguration.CertBundles = []bootstrapv1.CertBundle{
++		{Name: "new-bundle", Data: "new-data"},
++	}
++
  	tests := []struct {
  		name                  string
  		enableIgnitionFeature bool
-@@ -1208,6 +1228,31 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1208,6 +1244,42 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateJoinConfBRCustomBootstrapContainers,
  		},
@@ -96,16 +114,26 @@ index 67312c38b..7ce0d42d6 100644
 +			before:    before,
 +			kcp:       validUpdateClusterConfigRegistryMirrorCACert,
 +		},
-+
 +		{
 +			name:      "should allow changes to cluster configuration registry mirror endpoint",
 +			expectErr: false,
 +			before:    before,
 +			kcp:       validUpdateClusterConfigRegistryMirrorEndpoint,
 +		},
++		{
++			name:      "should allow changes to cluster configuration certBundles",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateClusterConfigCertBundles,
++		},
++		{
++			name:      "should allow changes to join configuration certBundles",
++			expectErr: false,
++			before:    before,
++			kcp:       validUpdateJoinConfigCertBundles,
++		},
  	}
  
  	for _, tt := range tests {
 -- 
 2.48.1
-
