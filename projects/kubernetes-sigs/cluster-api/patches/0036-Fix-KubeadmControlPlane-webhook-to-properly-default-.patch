@@ -1,0 +1,32 @@
+From c6b19c4c58ff423a9a834d9afe238dd9fc0bc7fd Mon Sep 17 00:00:00 2001
+From: rajeshvenkata <rajesh.venkat.p@gmail.com>
+Date: Thu, 30 Oct 2025 14:51:59 -0700
+Subject: [PATCH] Fix KubeadmControlPlane webhook to properly default rollout
+ strategy
+
+---
+ .../kubeadm/internal/webhooks/kubeadmcontrolplane.go      | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
+index 26b91e6ea..5e486d67f 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
+@@ -72,8 +72,12 @@ func (webhook *KubeadmControlPlane) Default(_ context.Context, k *controlplanev1
+ 	}
+ 
+ 	// Enforce RollingUpdate strategy and default MaxSurge if not set.
+-	k.Spec.Rollout.Strategy.Type = controlplanev1.RollingUpdateStrategyType
+-	k.Spec.Rollout.Strategy.RollingUpdate.MaxSurge = intstr.ValueOrDefault(k.Spec.Rollout.Strategy.RollingUpdate.MaxSurge, intstr.FromInt32(1))
++	if k.Spec.Rollout.Strategy.Type == "" {
++		k.Spec.Rollout.Strategy.Type = controlplanev1.RollingUpdateStrategyType
++	}
++	if k.Spec.Rollout.Strategy.Type == controlplanev1.RollingUpdateStrategyType {
++		k.Spec.Rollout.Strategy.RollingUpdate.MaxSurge = intstr.ValueOrDefault(k.Spec.Rollout.Strategy.RollingUpdate.MaxSurge, intstr.FromInt32(1))
++	}
+ 	return nil
+ }
+ 
+-- 
+2.48.1
+
