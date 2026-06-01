@@ -1,0 +1,95 @@
+From 6caff026eeb12c857e61c4de34bbf97ae330ca39 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Mon, 30 Sep 2024 09:39:48 -0700
+Subject: [PATCH] Remove additional GCE Dependencies
+
+---
+ .../examples/external-grpc-cloud-provider-service/main.go     | 2 --
+ cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go    | 4 ++--
+ cluster-autoscaler/config/autoscaling_options.go              | 3 ---
+ cluster-autoscaler/config/flags/flags.go                      | 2 --
+ 4 files changed, 2 insertions(+), 9 deletions(-)
+
+diff --git a/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/main.go b/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/main.go
+index bf29963a1..f73021b7e 100644
+--- a/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/main.go
++++ b/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/main.go
+@@ -29,7 +29,6 @@ import (
+ 	cloudBuilder "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/builder"
+ 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc/examples/external-grpc-cloud-provider-service/wrapper"
+ 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc/protos"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce/localssdsize"
+ 	"k8s.io/autoscaler/cluster-autoscaler/config"
+ 	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+ 	kube_flag "k8s.io/component-base/cli/flag"
+@@ -125,7 +124,6 @@ func main() {
+ 			ClusterName:            *clusterName,
+ 			GCEOptions: config.GCEOptions{
+ 				ConcurrentRefreshes:      1,
+-				LocalSSDDiskSizeProvider: localssdsize.NewSimpleLocalSSDProvider(),
+ 			},
+ 			UserAgent: "user-agent",
+ 		},
+diff --git a/cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go b/cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go
+index 7a7b4350e..6c3141ead 100644
+--- a/cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go
++++ b/cluster-autoscaler/cloudprovider/gce/gce_cloud_provider.go
+@@ -399,12 +399,12 @@ func BuildGCE(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDis
+ 		defer config.Close()
+ 	}
+ 
+-	manager, err := CreateGceManager(config, do, opts.GCEOptions.LocalSSDDiskSizeProvider, opts.Regional, opts.GCEOptions.BulkMigInstancesListingEnabled, opts.GCEOptions.ConcurrentRefreshes, opts.UserAgent, opts.GCEOptions.DomainUrl, opts.GCEOptions.MigInstancesMinRefreshWaitTime)
++	manager, err := CreateGceManager(config, do, nil, opts.Regional, opts.GCEOptions.BulkMigInstancesListingEnabled, opts.GCEOptions.ConcurrentRefreshes, opts.UserAgent, opts.GCEOptions.DomainUrl, opts.GCEOptions.MigInstancesMinRefreshWaitTime)
+ 	if err != nil {
+ 		klog.Fatalf("Failed to create GCE Manager: %v", err)
+ 	}
+ 
+-	pricingModel := NewGcePriceModel(NewGcePriceInfo(), opts.GCEOptions.LocalSSDDiskSizeProvider)
++	pricingModel := NewGcePriceModel(NewGcePriceInfo(), nil)
+ 	provider, err := BuildGceCloudProvider(manager, rl, pricingModel)
+ 	if err != nil {
+ 		klog.Fatalf("Failed to create GCE cloud provider: %v", err)
+diff --git a/cluster-autoscaler/config/autoscaling_options.go b/cluster-autoscaler/config/autoscaling_options.go
+index ce04da8ad..35b307c6f 100644
+--- a/cluster-autoscaler/config/autoscaling_options.go
++++ b/cluster-autoscaler/config/autoscaling_options.go
+@@ -19,7 +19,6 @@ package config
+ import (
+ 	"time"
+ 
+-	gce_localssdsize "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce/localssdsize"
+ 	kubelet_config "k8s.io/kubernetes/pkg/kubelet/apis/config"
+ 	scheduler_config "k8s.io/kubernetes/pkg/scheduler/apis/config"
+ )
+@@ -68,8 +67,6 @@ type GCEOptions struct {
+ 	MigInstancesMinRefreshWaitTime time.Duration
+ 	// DomainUrl is the GCE url used to make calls to GCE API.
+ 	DomainUrl string
+-	// LocalSSDDiskSizeProvider provides local ssd disk size based on machine type
+-	LocalSSDDiskSizeProvider gce_localssdsize.LocalSSDSizeProvider
+ 	// BulkMigInstancesListingEnabled means that cluster instances should be listed in bulk instead of per mig.
+ 	// Instances of migs having instances in creating or deleting state are re-fetched using igm.ListInstances. Inconsistencies are handled by re-fetching using igm.ListInstances
+ 	BulkMigInstancesListingEnabled bool
+diff --git a/cluster-autoscaler/config/flags/flags.go b/cluster-autoscaler/config/flags/flags.go
+index aab6b0e50..de6e8e1a1 100644
+--- a/cluster-autoscaler/config/flags/flags.go
++++ b/cluster-autoscaler/config/flags/flags.go
+@@ -26,7 +26,6 @@ import (
+ 	"github.com/spf13/pflag"
+ 
+ 	cloudBuilder "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/builder"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce/localssdsize"
+ 	"k8s.io/autoscaler/cluster-autoscaler/config"
+ 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
+ 	"k8s.io/autoscaler/cluster-autoscaler/expander"
+@@ -377,7 +376,6 @@ func createAutoscalingOptions() config.AutoscalingOptions {
+ 		GCEOptions: config.GCEOptions{
+ 			ConcurrentRefreshes:            *concurrentGceRefreshes,
+ 			MigInstancesMinRefreshWaitTime: *gceMigInstancesMinRefreshWaitTime,
+-			LocalSSDDiskSizeProvider:       localssdsize.NewSimpleLocalSSDProvider(),
+ 			BulkMigInstancesListingEnabled: *bulkGceMigInstancesListingEnabled,
+ 		},
+ 		ClusterAPICloudConfigAuthoritative: *clusterAPICloudConfigAuthoritative,
+-- 
+2.34.1
+

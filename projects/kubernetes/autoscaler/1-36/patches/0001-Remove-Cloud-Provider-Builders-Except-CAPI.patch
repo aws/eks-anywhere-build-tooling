@@ -1,0 +1,1773 @@
+From 9ebbf60412b9f4b3f14338b59b6ce9b5d4d465cd Mon Sep 17 00:00:00 2001
+From: panktishah26 <shah.pankti2609@gmail.com>
+Date: Fri, 24 Oct 2025 11:37:40 -0700
+Subject: [PATCH] Remove-Cloud-Provider-Builders-Except-CAPI
+
+---
+ .../cloudprovider/builder/builder_alicloud.go |  44 -------
+ .../cloudprovider/builder/builder_all.go      | 122 +-----------------
+ .../cloudprovider/builder/builder_aws.go      |  44 -------
+ .../cloudprovider/builder/builder_azure.go    |  44 -------
+ .../builder/builder_baiducloud.go             |  44 -------
+ .../builder/builder_bizflycloud.go            |  44 -------
+ .../builder/builder_brightbox.go              |  44 -------
+ .../cloudprovider/builder/builder_cherry.go   |  44 -------
+ .../cloudprovider/builder/builder_civo.go     |  44 -------
+ .../builder/builder_cloudstack.go             |  44 -------
+ .../builder/builder_coreweave.go              |  39 ------
+ .../builder/builder_digitalocean.go           |  44 -------
+ .../builder/builder_equinixmetal.go           |  45 -------
+ .../cloudprovider/builder/builder_exoscale.go |  44 -------
+ .../builder/builder_externalgrpc.go           |  44 -------
+ .../cloudprovider/builder/builder_gce.go      |  44 -------
+ .../cloudprovider/builder/builder_hetzner.go  |  44 -------
+ .../builder/builder_huaweicloud.go            |  44 -------
+ .../builder/builder_ionoscloud.go             |  44 -------
+ .../cloudprovider/builder/builder_kamatera.go |  44 -------
+ .../cloudprovider/builder/builder_kubemark.go |  44 -------
+ .../cloudprovider/builder/builder_kwok.go     |  45 -------
+ .../cloudprovider/builder/builder_linode.go   |  44 -------
+ .../cloudprovider/builder/builder_magnum.go   |  44 -------
+ .../cloudprovider/builder/builder_oci.go      |  44 -------
+ .../cloudprovider/builder/builder_ovhcloud.go |  44 -------
+ .../cloudprovider/builder/builder_rancher.go  |  44 -------
+ .../cloudprovider/builder/builder_scaleway.go |  44 -------
+ .../builder/builder_tencentcloud.go           |  44 -------
+ .../cloudprovider/builder/builder_utho.go     |  44 -------
+ .../builder/builder_volcengine.go             |  44 -------
+ .../cloudprovider/builder/builder_vultr.go    |  44 -------
+ 32 files changed, 1 insertion(+), 1482 deletions(-)
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_alicloud.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_aws.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_azure.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_baiducloud.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_bizflycloud.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_brightbox.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_cherry.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_civo.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_cloudstack.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_coreweave.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_digitalocean.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_equinixmetal.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_exoscale.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_externalgrpc.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_gce.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_hetzner.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_huaweicloud.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_ionoscloud.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_kamatera.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_kubemark.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_kwok.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_linode.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_magnum.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_oci.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_ovhcloud.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_rancher.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_scaleway.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_tencentcloud.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_utho.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_volcengine.go
+ delete mode 100644 cluster-autoscaler/cloudprovider/builder/builder_vultr.go
+
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_alicloud.go b/cluster-autoscaler/cloudprovider/builder/builder_alicloud.go
+deleted file mode 100644
+index 693ad3310..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_alicloud.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build alicloud
+-// +build alicloud
+-
+-/*
+-Copyright 2018 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/alicloud"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.AlicloudProviderName,
+-}
+-
+-// DefaultCloudProvider for alicloud-only build is alicloud.
+-const DefaultCloudProvider = cloudprovider.AlicloudProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.AlicloudProviderName:
+-		return alicloud.BuildAlicloud(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_all.go b/cluster-autoscaler/cloudprovider/builder/builder_all.go
+index e98cdc62f..fdfd1da93 100644
+--- a/cluster-autoscaler/cloudprovider/builder/builder_all.go
++++ b/cluster-autoscaler/cloudprovider/builder/builder_all.go
+@@ -21,146 +21,26 @@ package builder
+ 
+ import (
+ 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/alicloud"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/aws"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/azure"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/baiducloud"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/bizflycloud"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/brightbox"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/cherryservers"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/civo"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/cloudstack"
+ 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/clusterapi"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/coreweave"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/digitalocean"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/equinixmetal"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/exoscale"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/hetzner"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/huaweicloud"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ionoscloud"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/kamatera"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/kwok"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/linode"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum"
+-	oci "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/oci/instancepools"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ovhcloud"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/rancher"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/scaleway"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/tencentcloud"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/utho"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/volcengine"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vultr"
+ 	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+ 	"k8s.io/client-go/informers"
+ )
+ 
+ // AvailableCloudProviders supported by the cloud provider builder.
+ var AvailableCloudProviders = []string{
+-	cloudprovider.AwsProviderName,
+-	cloudprovider.AzureProviderName,
+-	cloudprovider.GceProviderName,
+-	cloudprovider.AlicloudProviderName,
+-	cloudprovider.CherryServersProviderName,
+-	cloudprovider.CloudStackProviderName,
+-	cloudprovider.BaiducloudProviderName,
+-	cloudprovider.MagnumProviderName,
+-	cloudprovider.DigitalOceanProviderName,
+-	cloudprovider.ExoscaleProviderName,
+-	cloudprovider.ExternalGrpcProviderName,
+-	cloudprovider.HuaweicloudProviderName,
+-	cloudprovider.HetznerProviderName,
+-	cloudprovider.OracleCloudProviderName,
+-	cloudprovider.OVHcloudProviderName,
+ 	cloudprovider.ClusterAPIProviderName,
+-	cloudprovider.IonoscloudProviderName,
+-	cloudprovider.KamateraProviderName,
+-	cloudprovider.KwokProviderName,
+-	cloudprovider.LinodeProviderName,
+-	cloudprovider.BizflyCloudProviderName,
+-	cloudprovider.BrightboxProviderName,
+-	cloudprovider.EquinixMetalProviderName,
+-	cloudprovider.VultrProviderName,
+-	cloudprovider.TencentcloudProviderName,
+-	cloudprovider.CivoProviderName,
+-	cloudprovider.ScalewayProviderName,
+-	cloudprovider.RancherProviderName,
+-	cloudprovider.VolcengineProviderName,
+-	cloudprovider.UthoProviderName,
+-	cloudprovider.CoreWeaveProviderName,
+ }
+ 
+ // DefaultCloudProvider is GCE.
+-const DefaultCloudProvider = cloudprovider.GceProviderName
++const DefaultCloudProvider = cloudprovider.ClusterAPIProviderName
+ 
+ func buildCloudProvider(opts *coreoptions.AutoscalerOptions,
+ 	do cloudprovider.NodeGroupDiscoveryOptions,
+ 	rl *cloudprovider.ResourceLimiter,
+ 	informerFactory informers.SharedInformerFactory) cloudprovider.CloudProvider {
+ 	switch opts.CloudProviderName {
+-	case cloudprovider.BizflyCloudProviderName:
+-		return bizflycloud.BuildBizflyCloud(opts, do, rl)
+-	case cloudprovider.GceProviderName:
+-		return gce.BuildGCE(opts, do, rl)
+-	case cloudprovider.AwsProviderName:
+-		return aws.BuildAWS(opts, do, rl)
+-	case cloudprovider.AzureProviderName:
+-		return azure.BuildAzure(opts, do, rl)
+-	case cloudprovider.AlicloudProviderName:
+-		return alicloud.BuildAlicloud(opts, do, rl)
+-	case cloudprovider.CherryServersProviderName:
+-		return cherryservers.BuildCherry(opts, do, rl)
+-	case cloudprovider.CloudStackProviderName:
+-		return cloudstack.BuildCloudStack(opts, do, rl)
+-	case cloudprovider.BaiducloudProviderName:
+-		return baiducloud.BuildBaiducloud(opts, do, rl)
+-	case cloudprovider.BrightboxProviderName:
+-		return brightbox.BuildBrightbox(opts, do, rl)
+-	case cloudprovider.DigitalOceanProviderName:
+-		return digitalocean.BuildDigitalOcean(opts, do, rl)
+-	case cloudprovider.ExoscaleProviderName:
+-		return exoscale.BuildExoscale(opts, do, rl)
+-	case cloudprovider.ExternalGrpcProviderName:
+-		return externalgrpc.BuildExternalGrpc(opts, do, rl)
+-	case cloudprovider.MagnumProviderName:
+-		return magnum.BuildMagnum(opts, do, rl)
+-	case cloudprovider.HuaweicloudProviderName:
+-		return huaweicloud.BuildHuaweiCloud(opts, do, rl)
+-	case cloudprovider.OVHcloudProviderName:
+-		return ovhcloud.BuildOVHcloud(opts, do, rl)
+-	case cloudprovider.HetznerProviderName:
+-		return hetzner.BuildHetzner(opts, do, rl)
+-	case cloudprovider.PacketProviderName, cloudprovider.EquinixMetalProviderName:
+-		return equinixmetal.BuildCloudProvider(opts, do, rl)
+ 	case cloudprovider.ClusterAPIProviderName:
+ 		return clusterapi.BuildClusterAPI(opts, do, rl)
+-	case cloudprovider.IonoscloudProviderName:
+-		return ionoscloud.BuildIonosCloud(opts, do, rl)
+-	case cloudprovider.KamateraProviderName:
+-		return kamatera.BuildKamatera(opts, do, rl)
+-	case cloudprovider.KwokProviderName:
+-		return kwok.BuildKwok(opts, do, rl, informerFactory)
+-	case cloudprovider.LinodeProviderName:
+-		return linode.BuildLinode(opts, do, rl)
+-	case cloudprovider.OracleCloudProviderName:
+-		return oci.BuildOCI(opts, do, rl)
+-	case cloudprovider.VultrProviderName:
+-		return vultr.BuildVultr(opts, do, rl)
+-	case cloudprovider.TencentcloudProviderName:
+-		return tencentcloud.BuildTencentcloud(opts, do, rl)
+-	case cloudprovider.CivoProviderName:
+-		return civo.BuildCivo(opts, do, rl)
+-	case cloudprovider.ScalewayProviderName:
+-		return scaleway.BuildScaleway(opts, do, rl)
+-	case cloudprovider.RancherProviderName:
+-		return rancher.BuildRancher(opts, do, rl)
+-	case cloudprovider.VolcengineProviderName:
+-		return volcengine.BuildVolcengine(opts, do, rl)
+-	case cloudprovider.UthoProviderName:
+-		return utho.BuildUtho(opts, do, rl)
+-	case cloudprovider.CoreWeaveProviderName:
+-		return coreweave.BuildCoreWeave(opts, do, rl)
+ 	}
+ 	return nil
+ }
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_aws.go b/cluster-autoscaler/cloudprovider/builder/builder_aws.go
+deleted file mode 100644
+index db734278f..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_aws.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build aws
+-// +build aws
+-
+-/*
+-Copyright 2018 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/aws"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.AwsProviderName,
+-}
+-
+-// DefaultCloudProvider for AWS-only build is AWS.
+-const DefaultCloudProvider = cloudprovider.AwsProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.AwsProviderName:
+-		return aws.BuildAWS(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_azure.go b/cluster-autoscaler/cloudprovider/builder/builder_azure.go
+deleted file mode 100644
+index fca5ff0df..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_azure.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build azure
+-// +build azure
+-
+-/*
+-Copyright 2018 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/azure"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.AzureProviderName,
+-}
+-
+-// DefaultCloudProvider on Azure-only build is Azure.
+-const DefaultCloudProvider = cloudprovider.AzureProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.AzureProviderName:
+-		return azure.BuildAzure(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_baiducloud.go b/cluster-autoscaler/cloudprovider/builder/builder_baiducloud.go
+deleted file mode 100644
+index 2076973c2..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_baiducloud.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build baiducloud
+-// +build baiducloud
+-
+-/*
+-Copyright 2018 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/baiducloud"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.BaiducloudProviderName,
+-}
+-
+-// DefaultCloudProvider for baiducloud-only build is baiducloud.
+-const DefaultCloudProvider = cloudprovider.BaiducloudProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.BaiducloudProviderName:
+-		return baiducloud.BuildBaiducloud(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_bizflycloud.go b/cluster-autoscaler/cloudprovider/builder/builder_bizflycloud.go
+deleted file mode 100644
+index ad74c89cd..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_bizflycloud.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build bizflycloud
+-// +build bizflycloud
+-
+-/*
+-Copyright 2021 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/bizflycloud"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the Bizflycloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.BizflyCloudProviderName,
+-}
+-
+-// DefaultCloudProvider for Bizflycloud-only build is Bizflycloud.
+-const DefaultCloudProvider = cloudprovider.BizflyCloudProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.BizflyCloudProviderName:
+-		return bizflycloud.BuildBizflyCloud(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_brightbox.go b/cluster-autoscaler/cloudprovider/builder/builder_brightbox.go
+deleted file mode 100644
+index cc98e195c..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_brightbox.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build brightbox
+-// +build brightbox
+-
+-/*
+-Copyright 2019 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/brightbox"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the brightbox cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.BrightboxProviderName,
+-}
+-
+-// DefaultCloudProvider for Brightbox-only build is Brightbox.
+-const DefaultCloudProvider = cloudprovider.BrightboxProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.BrightboxProviderName:
+-		return brightbox.BuildBrightbox(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_cherry.go b/cluster-autoscaler/cloudprovider/builder/builder_cherry.go
+deleted file mode 100644
+index 97053b858..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_cherry.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build cherry
+-// +build cherry
+-
+-/*
+-Copyright 2022 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	cherry "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/cherryservers"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cherry.ProviderName,
+-}
+-
+-// DefaultCloudProvider for Cherry-only build is Cherry.
+-const DefaultCloudProvider = cherry.ProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cherry.ProviderName:
+-		return cherry.BuildCherry(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_civo.go b/cluster-autoscaler/cloudprovider/builder/builder_civo.go
+deleted file mode 100644
+index 9a086b846..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_civo.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build civo
+-// +build civo
+-
+-/*
+-Copyright 2022 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/civo"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the digtalocean cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.CivoProviderName,
+-}
+-
+-// DefaultCloudProvider for Civo-only build is Civo.
+-const DefaultCloudProvider = cloudprovider.CivoProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.CivoProviderName:
+-		return civo.BuildCivo(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_cloudstack.go b/cluster-autoscaler/cloudprovider/builder/builder_cloudstack.go
+deleted file mode 100644
+index e8cef9aa3..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_cloudstack.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build cloudstack
+-// +build cloudstack
+-
+-/*
+-Copyright 2020 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/cloudstack"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.CloudStackProviderName,
+-}
+-
+-// DefaultCloudProvider for cloudstack-only build is cloudstack.
+-const DefaultCloudProvider = cloudprovider.CloudStackProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.CloudStackProviderName:
+-		return cloudstack.BuildCloudStack(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_coreweave.go b/cluster-autoscaler/cloudprovider/builder/builder_coreweave.go
+deleted file mode 100644
+index d0e7cbb72..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_coreweave.go
++++ /dev/null
+@@ -1,39 +0,0 @@
+-//go:build coreweave
+-// +build coreweave
+-
+-/*
+-Copyright 2025 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/coreweave"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.CoreWeaveProviderName,
+-}
+-
+-// DefaultCloudProvider for coreweave-only build is coreweave.
+-const DefaultCloudProvider = cloudprovider.CoreWeaveProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	return coreweave.BuildCoreWeave(opts, do, rl)
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_digitalocean.go b/cluster-autoscaler/cloudprovider/builder/builder_digitalocean.go
+deleted file mode 100644
+index 7152b082c..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_digitalocean.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build digitalocean
+-// +build digitalocean
+-
+-/*
+-Copyright 2019 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/digitalocean"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the DigitalOcean cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.DigitalOceanProviderName,
+-}
+-
+-// DefaultCloudProvider for DigitalOcean-only build is DigitalOcean.
+-const DefaultCloudProvider = cloudprovider.DigitalOceanProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.DigitalOceanProviderName:
+-		return digitalocean.BuildDigitalOcean(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_equinixmetal.go b/cluster-autoscaler/cloudprovider/builder/builder_equinixmetal.go
+deleted file mode 100644
+index 7f018ef29..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_equinixmetal.go
++++ /dev/null
+@@ -1,45 +0,0 @@
+-//go:build equinixmetal
+-// +build equinixmetal
+-
+-/*
+-Copyright 2019 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/equinixmetal"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.PacketProviderName,
+-	cloudprovider.EquinixMetalProviderName,
+-}
+-
+-// DefaultCloudProvider for Packet or Equinix Metal-only build is Equinix Metal.
+-const DefaultCloudProvider = cloudprovider.EquinixMetalProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.PacketProviderName, cloudprovider.EquinixMetalProviderName:
+-		return equinixmetal.BuildCloudProvider(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_exoscale.go b/cluster-autoscaler/cloudprovider/builder/builder_exoscale.go
+deleted file mode 100644
+index 4ad225649..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_exoscale.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build exoscale
+-// +build exoscale
+-
+-/*
+-Copyright 2021 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/exoscale"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the Exoscale cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.ExoscaleProviderName,
+-}
+-
+-// DefaultCloudProvider for Exoscale-only build is Exoscale.
+-const DefaultCloudProvider = cloudprovider.ExoscaleProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.ExoscaleProviderName:
+-		return exoscale.BuildExoscale(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_externalgrpc.go b/cluster-autoscaler/cloudprovider/builder/builder_externalgrpc.go
+deleted file mode 100644
+index 81bf3b273..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_externalgrpc.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build externalgrpc
+-// +build externalgrpc
+-
+-/*
+-Copyright 2022 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.ExternalGrpcProviderName,
+-}
+-
+-// DefaultCloudProvider for externalgrpc-only build is externalgrpc.
+-const DefaultCloudProvider = cloudprovider.ExternalGrpcProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.ExternalGrpcProviderName:
+-		return externalgrpc.BuildExternalGrpc(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_gce.go b/cluster-autoscaler/cloudprovider/builder/builder_gce.go
+deleted file mode 100644
+index 15b4016ca..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_gce.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build gce
+-// +build gce
+-
+-/*
+-Copyright 2018 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/gce"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.GceProviderName,
+-}
+-
+-// DefaultCloudProvider for GCE-only build is GCE.
+-const DefaultCloudProvider = cloudprovider.GceProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.GceProviderName:
+-		return gce.BuildGCE(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_hetzner.go b/cluster-autoscaler/cloudprovider/builder/builder_hetzner.go
+deleted file mode 100644
+index 1119cafb6..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_hetzner.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build hetzner
+-// +build hetzner
+-
+-/*
+-Copyright 2020 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/hetzner"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the Hetzner cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.HetznerProviderName,
+-}
+-
+-// DefaultCloudProvider for Hetzner-only build is Hetzner.
+-const DefaultCloudProvider = cloudprovider.HetznerProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.HetznerProviderName:
+-		return hetzner.BuildHetzner(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_huaweicloud.go b/cluster-autoscaler/cloudprovider/builder/builder_huaweicloud.go
+deleted file mode 100644
+index e9ba1181d..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_huaweicloud.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build huaweicloud
+-// +build huaweicloud
+-
+-/*
+-Copyright 2020 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/huaweicloud"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.HuaweicloudProviderName,
+-}
+-
+-// DefaultCloudProvider for huaweicloud-only build is huaweicloud.
+-const DefaultCloudProvider = cloudprovider.HuaweicloudProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.HuaweicloudProviderName:
+-		return huaweicloud.BuildHuaweiCloud(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_ionoscloud.go b/cluster-autoscaler/cloudprovider/builder/builder_ionoscloud.go
+deleted file mode 100644
+index 9e28d8f99..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_ionoscloud.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build ionoscloud
+-// +build ionoscloud
+-
+-/*
+-Copyright 2020 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ionoscloud"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.IonoscloudProviderName,
+-}
+-
+-// DefaultCloudProvider for IonosCloud-only build is IonosCloud.
+-const DefaultCloudProvider = cloudprovider.IonoscloudProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.IonoscloudProviderName:
+-		return ionoscloud.BuildIonosCloud(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_kamatera.go b/cluster-autoscaler/cloudprovider/builder/builder_kamatera.go
+deleted file mode 100644
+index 2f4f3fee1..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_kamatera.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build kamatera
+-// +build kamatera
+-
+-/*
+-Copyright 2020 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/kamatera"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the Kamaterea cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.KamateraProviderName,
+-}
+-
+-// DefaultCloudProvider for Kamatera-only build is Kamatera.
+-const DefaultCloudProvider = cloudprovider.KamateraProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.KamateraProviderName:
+-		return kamatera.BuildKamatera(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_kubemark.go b/cluster-autoscaler/cloudprovider/builder/builder_kubemark.go
+deleted file mode 100644
+index 70e44d825..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_kubemark.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build kubemark
+-// +build kubemark
+-
+-/*
+-Copyright 2018 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/kubemark"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.KubemarkProviderName,
+-}
+-
+-// DefaultCloudProvider for Kubemark-only build is Kubemark.
+-const DefaultCloudProvider = cloudprovider.KubemarkProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.KubemarkProviderName:
+-		return kubemark.BuildKubemark(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_kwok.go b/cluster-autoscaler/cloudprovider/builder/builder_kwok.go
+deleted file mode 100644
+index 1f1e0e8d1..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_kwok.go
++++ /dev/null
+@@ -1,45 +0,0 @@
+-//go:build kwok
+-// +build kwok
+-
+-/*
+-Copyright 2023 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/kwok"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.KwokProviderName,
+-}
+-
+-// DefaultCloudProvider for Kwok-only build is Kwok.
+-const DefaultCloudProvider = cloudprovider.KwokProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, informerFactory informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.KwokProviderName:
+-		return kwok.BuildKwok(opts, do, rl, informerFactory)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_linode.go b/cluster-autoscaler/cloudprovider/builder/builder_linode.go
+deleted file mode 100644
+index a53105fba..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_linode.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build linode
+-// +build linode
+-
+-/*
+-Copyright 2018 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/linode"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.LinodeProviderName,
+-}
+-
+-// DefaultCloudProvider for linode-only build is linode.
+-const DefaultCloudProvider = cloudprovider.LinodeProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.LinodeProviderName:
+-		return linode.BuildLinode(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_magnum.go b/cluster-autoscaler/cloudprovider/builder/builder_magnum.go
+deleted file mode 100644
+index e4a0432f3..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_magnum.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build magnum
+-// +build magnum
+-
+-/*
+-Copyright 2019 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/magnum"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.MagnumProviderName,
+-}
+-
+-// DefaultCloudProvider for Magnum-only build is Magnum.
+-const DefaultCloudProvider = cloudprovider.MagnumProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.MagnumProviderName:
+-		return magnum.BuildMagnum(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_oci.go b/cluster-autoscaler/cloudprovider/builder/builder_oci.go
+deleted file mode 100644
+index d5017ef04..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_oci.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build oci
+-// +build oci
+-
+-/*
+-Copyright 2020 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	oci "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/oci/instancepools"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.OracleCloudProviderName,
+-}
+-
+-// DefaultCloudProvider for oci-only build is oci.
+-const DefaultCloudProvider = cloudprovider.OracleCloudProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.OracleCloudProviderName:
+-		return oci.BuildOCI(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_ovhcloud.go b/cluster-autoscaler/cloudprovider/builder/builder_ovhcloud.go
+deleted file mode 100644
+index b25dd522a..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_ovhcloud.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build ovhcloud
+-// +build ovhcloud
+-
+-/*
+-Copyright 2020 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/ovhcloud"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the OVHcloud cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.OVHcloudProviderName,
+-}
+-
+-// DefaultCloudProvider for OVHcloud-only build is OVHcloud.
+-const DefaultCloudProvider = cloudprovider.OVHcloudProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.OVHcloudProviderName:
+-		return ovhcloud.BuildOVHcloud(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_rancher.go b/cluster-autoscaler/cloudprovider/builder/builder_rancher.go
+deleted file mode 100644
+index aa0ff1e42..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_rancher.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build rancher
+-// +build rancher
+-
+-/*
+-Copyright 2018 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/rancher"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.RancherProviderName,
+-}
+-
+-// DefaultCloudProvider for rancher-only build is rancher.
+-const DefaultCloudProvider = cloudprovider.RancherProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.RancherProviderName:
+-		return rancher.BuildRancher(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_scaleway.go b/cluster-autoscaler/cloudprovider/builder/builder_scaleway.go
+deleted file mode 100644
+index eb1ad9f05..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_scaleway.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build scaleway
+-// +build scaleway
+-
+-/*
+-Copyright 2022 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/scaleway"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the scaleway cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.ScalewayProviderName,
+-}
+-
+-// DefaultCloudProvider for Scaleway-only build is Scaleway.
+-const DefaultCloudProvider = cloudprovider.ScalewayProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.ScalewayProviderName:
+-		return scaleway.BuildScaleway(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_tencentcloud.go b/cluster-autoscaler/cloudprovider/builder/builder_tencentcloud.go
+deleted file mode 100644
+index 3600efc78..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_tencentcloud.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build tencentcloud
+-// +build tencentcloud
+-
+-/*
+-Copyright 2021 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/tencentcloud"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.TencentcloudProviderName,
+-}
+-
+-// DefaultCloudProvider for Tencent-only build is Tencent.
+-const DefaultCloudProvider = cloudprovider.TencentcloudProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.TencentcloudProviderName:
+-		return tencentcloud.BuildTencentcloud(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_utho.go b/cluster-autoscaler/cloudprovider/builder/builder_utho.go
+deleted file mode 100644
+index 032bdcf3b..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_utho.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build utho
+-// +build utho
+-
+-/*
+-Copyright 2022 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/utho"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.UthoProviderName,
+-}
+-
+-// DefaultCloudProvider for utho-only build is utho.
+-const DefaultCloudProvider = cloudprovider.UthoProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.UthoProviderName:
+-		return utho.BuildUtho(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_volcengine.go b/cluster-autoscaler/cloudprovider/builder/builder_volcengine.go
+deleted file mode 100644
+index f369162d9..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_volcengine.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build volcengine
+-// +build volcengine
+-
+-/*
+-Copyright 2023 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/volcengine"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.VolcengineProviderName,
+-}
+-
+-// DefaultCloudProvider for volcengine-only build is volcengine.
+-const DefaultCloudProvider = cloudprovider.VolcengineProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.VolcengineProviderName:
+-		return volcengine.BuildVolcengine(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+diff --git a/cluster-autoscaler/cloudprovider/builder/builder_vultr.go b/cluster-autoscaler/cloudprovider/builder/builder_vultr.go
+deleted file mode 100644
+index 500e42dcf..000000000
+--- a/cluster-autoscaler/cloudprovider/builder/builder_vultr.go
++++ /dev/null
+@@ -1,44 +0,0 @@
+-//go:build vultr
+-// +build vultr
+-
+-/*
+-Copyright 2022 The Kubernetes Authors.
+-
+-Licensed under the Apache License, Version 2.0 (the "License");
+-you may not use this file except in compliance with the License.
+-You may obtain a copy of the License at
+-
+-    http://www.apache.org/licenses/LICENSE-2.0
+-
+-Unless required by applicable law or agreed to in writing, software
+-distributed under the License is distributed on an "AS IS" BASIS,
+-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-See the License for the specific language governing permissions and
+-limitations under the License.
+-*/
+-
+-package builder
+-
+-import (
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
+-	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider/vultr"
+-	coreoptions "k8s.io/autoscaler/cluster-autoscaler/core/options"
+-	"k8s.io/client-go/informers"
+-)
+-
+-// AvailableCloudProviders supported by the cloud provider builder.
+-var AvailableCloudProviders = []string{
+-	cloudprovider.VultrProviderName,
+-}
+-
+-// DefaultCloudProvider for vultr-only build is vultr.
+-const DefaultCloudProvider = cloudprovider.VultrProviderName
+-
+-func buildCloudProvider(opts *coreoptions.AutoscalerOptions, do cloudprovider.NodeGroupDiscoveryOptions, rl *cloudprovider.ResourceLimiter, _ informers.SharedInformerFactory) cloudprovider.CloudProvider {
+-	switch opts.CloudProviderName {
+-	case cloudprovider.VultrProviderName:
+-		return vultr.BuildVultr(opts, do, rl)
+-	}
+-
+-	return nil
+-}
+-- 
+2.34.1
+
