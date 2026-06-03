@@ -1,0 +1,44 @@
+From a6882305aff4c0d79d446ee896f58e0adfc9a055 Mon Sep 17 00:00:00 2001
+From: Prow Bot <prow@amazonaws.com>
+Date: Mon, 1 Jun 2026 15:28:29 -0700
+Subject: [PATCH] Use pg_isready for harbor-db healthcheck
+
+Replace psql SELECT 1 query with pg_isready for the harbor-db
+container healthcheck. The psql query occasionally takes longer
+than the default 1s Docker healthcheck timeout under load,
+causing unnecessary container restarts. pg_isready only checks
+if PostgreSQL is accepting connections without executing a query,
+making it significantly faster and more reliable.
+---
+ make/photon/db/docker-healthcheck.sh | 15 +--------------
+ 1 file changed, 1 insertion(+), 14 deletions(-)
+
+diff --git a/make/photon/db/docker-healthcheck.sh b/make/photon/db/docker-healthcheck.sh
+index c80542754..6aca02ea2 100644
+--- a/make/photon/db/docker-healthcheck.sh
++++ b/make/photon/db/docker-healthcheck.sh
+@@ -4,18 +4,5 @@ set -eo pipefail
+ host="localhost"
+ user="${POSTGRES_USER:-postgres}"
+ db="${POSTGRES_DB:-$POSTGRES_USER}"
+-export PGPASSWORD="${POSTGRES_PASSWORD:-}"
+ 
+-args=(
+-	# force postgres to not use the local unix socket (test "external" connectibility)
+-	--host "$host"
+-	--username "$user"
+-	--dbname "$db"
+-	--quiet --no-align --tuples-only
+-)
+-
+-if select="$(echo 'SELECT 1' | psql "${args[@]}")" && [ "$select" = '1' ]; then
+-	exit 0
+-fi
+-
+-exit 1
+\ No newline at end of file
++pg_isready -h "$host" -U "$user" -d "$db"
+\ No newline at end of file
+-- 
+2.50.1 (Apple Git-155)
+
