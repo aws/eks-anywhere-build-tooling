@@ -15,12 +15,13 @@ SIMPLE_CREATE_TARBALLS=false
 HAS_LICENSES=false
 IMAGE_NAMES=
 
-BUILD_TARGETS=helm/build
-RELEASE_TARGETS=helm/push
+BUILD_TARGETS=helm/build upload-artifacts
+RELEASE_TARGETS=helm/push upload-artifacts
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
 SKIP_ON_RELEASE_BRANCH=true
 
 HAS_HELM_CHART=true
+HAS_S3_ARTIFACTS=true
 
 HELM_SOURCE_IMAGE_REPO=602401143452.dkr.ecr.us-west-2.amazonaws.com
 HELM_SOURCE_OWNER=cert-manager
@@ -39,6 +40,13 @@ include $(BASE_DIRECTORY)/Common.mk
 # To avoid issues cloning/checking out the repo, git_tag is set to
 # a valid branch/tag
 $(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_ADDON_IMAGE_TAG)))
+
+
+s3-artifacts: create-manifests
+
+.PHONY: create-manifests
+create-manifests:
+	build/create-manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY) $(GIT_TAG)
 
 
 ########### DO NOT EDIT #############################
