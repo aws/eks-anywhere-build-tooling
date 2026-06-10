@@ -12,7 +12,6 @@ EXTRA_GO_LDFLAGS=$(shell $(BUILD_LIB)/version.sh $(REPO) sigs.k8s.io/cluster-api
 
 HAS_S3_ARTIFACTS=true
 
-FIX_LICENSES_STORAGE_GO_CLIENT_TARGET=$(REPO)/vendor/github.com/nutanix/ntnx-api-golang-clients/storage-go-client/v4/LICENSE.txt
 
 TOOLS_BIN_DIR := $(shell pwd)/hack/tools/bin
 CONTROLLER_GEN := $(TOOLS_BIN_DIR)/controller-gen
@@ -20,13 +19,6 @@ GO_BIN_PATH=$(shell source $(BUILD_LIB)/common.sh && build::common::get_go_path 
 GO=$(GO_BIN_PATH)/go
 
 include $(BASE_DIRECTORY)/Common.mk
-
-$(GATHER_LICENSES_TARGETS): $(FIX_LICENSES_STORAGE_GO_CLIENT_TARGET)
-
-.PHONY: $(FIX_LICENSES_STORAGE_GO_CLIENT_TARGET)
-$(FIX_LICENSES_STORAGE_GO_CLIENT_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)	
-	wget -q --retry-connrefused https://raw.githubusercontent.com/nutanix/ntnx-api-golang-clients/refs/heads/main/LICENSE.md -O \
-		$(REPO)/vendor/github.com/nutanix/ntnx-api-golang-clients/storage-go-client/v4/LICENSE.txt; \
 
 s3-artifacts: create-manifests
 
