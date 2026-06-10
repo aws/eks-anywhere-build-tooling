@@ -54,9 +54,7 @@ function build::simple::binaries(){
   for platform in "${SUPPORTED_PLATFORMS[@]}"; do
     OS="$(cut -d '/' -f1 <<< ${platform})"
     ARCH="$(cut -d '/' -f2 <<< ${platform})"
-    if [ $CGO_ENABLED = 1 ] && [ "$ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then
-      export CC=aarch64-linux-gnu-gcc
-    fi
+    
     if [ $CGO_ENABLED = 1 ]; then
       export CGO_LDFLAGS="$CGO_LDFLAGS,-L$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/lib64"
       export CGO_CFLAGS="-I$PROJECT_ROOT/_output/source/$OS-$ARCH/usr/include"
