@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Amelia Lu <peirulu@amazon.com>
+Date: Thu, 05 Mar 2026 13:54:00 -0800
+Subject: [PATCH 4/4] Authorize Infrastructure Machine Templates for Scale from
+ Zero
+
+Cluster Autoscaler 1.35 introduced changes that require RBAC permissions
+to access infrastructure machine templates (e.g., vspheremachinetemplates)
+for the scale-from-zero feature. Without these permissions, the autoscaler
+fails with:
+
+  "vspheremachinetemplates.infrastructure.cluster.x-k8s.io is forbidden"
+
+This is documented in the upstream CAPI provider README:
+https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/cloudprovider/clusterapi/README.md#rbac-changes-for-scaling-from-zero
+---
+ .../cluster-autoscaler/templates/clusterrole.yaml | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/cluster-autoscaler/charts/cluster-autoscaler/templates/clusterrole.yaml b/cluster-autoscaler/charts/cluster-autoscaler/templates/clusterrole.yaml
+index 1a6f68cdc..2b3c89f01 100644
+--- a/cluster-autoscaler/charts/cluster-autoscaler/templates/clusterrole.yaml
++++ b/cluster-autoscaler/charts/cluster-autoscaler/templates/clusterrole.yaml
+@@ -175,6 +175,14 @@ rules:
+     - get
+     - patch
+     - update
++  - apiGroups:
++    - infrastructure.cluster.x-k8s.io
++    resources:
++    - '*'
++    verbs:
++    - get
++    - list
++    - watch
+ {{- end }}
+ {{- if .Values.rbac.additionalRules }}
+ {{ toYaml .Values.rbac.additionalRules | indent 2 }}
+-- 
+2.34.1
