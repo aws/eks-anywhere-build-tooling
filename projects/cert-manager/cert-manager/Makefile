@@ -1,6 +1,6 @@
 BASE_DIRECTORY:=$(abspath ../../../)
 EKS_ADDON_IMAGE_TAG=$(shell cat EKS_ADDON_IMAGE_TAG)
-GIT_TAG=$(EKS_ADDON_IMAGE_TAG)
+GIT_TAG=$(shell cat GIT_TAG)
 HELM_GIT_TAG=$(shell cat HELM_GIT_TAG)
 
  # Upstream images are used directly without re-building and re-tagging in build
@@ -47,6 +47,10 @@ s3-artifacts: create-manifests
 .PHONY: create-manifests
 create-manifests:
 	build/create-manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY) $(GIT_TAG)
+
+.PHONY: update-cert-manager-manifest
+update-cert-manager-manifest:  
+	wget -q https://github.com/cert-manager/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O manifests/cert-manager.yaml
 
 
 ########### DO NOT EDIT #############################
