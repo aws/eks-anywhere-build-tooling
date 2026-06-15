@@ -1,4 +1,4 @@
-ARG BASE_IMAGE 
+ARG BASE_IMAGE
 ARG BUILDER_IMAGE
 ARG COMPILER_IMAGE
 ARG APPMESH_VERSION
@@ -17,34 +17,52 @@ ARG TARGETARCH
 ARG TARGETOS
 
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot/bin:/newroot/buildroot
+ENV UV_PYTHON_INSTALL_DIR=/opt/python
 
-COPY emissary/python _output/bin/emissary/${TARGETOS}-${TARGETARCH} emissary/manifests/emissary/emissary-crds.yaml.in /newroot/buildroot
+# Copy python code, binaries, pyproject.toml, LICENSE, and CRDs
+COPY emissary/python /newroot/buildroot/python
+COPY emissary/pyproject.toml emissary/LICENSE /newroot/buildroot/
+COPY _output/bin/emissary/${TARGETOS}-${TARGETARCH} /newroot/buildroot
+COPY emissary/pkg/api/getambassador.io/crds.yaml /newroot/buildroot/
 COPY --from=envoy /usr/bin/envoy /THIRD-PARTY-LICENSES.txt /
 
 WORKDIR /newroot/buildroot
 
 RUN set -x && \
-    mkdir -p /newroot/ambassador/sidecars /newroot/usr/lib/python3.11/site-packages /newroot/usr/local/bin /ambassador /buildroot && \
-    time pip3 install --user --no-cache-dir --no-deps -e . && \
-    pip3 install --user --no-cache-dir pip-tools==6.12.1 PyYAML==6.0 orjson==3.8.10 && \ 
-    python3 setup.py install --user && \
+    pip3 install --no-cache-dir uv && \
+    uv python install 3.13.5 && \
+    mkdir -p /newroot/ambassador/sidecars /newroot/usr/local/bin /ambassador && \
+    # Create venv with Python 3.13.5 and build/install wheels
+    uv venv /newroot/opt/ambassador/emissary --python 3.13.5 && \
+    . /newroot/opt/ambassador/emissary/bin/activate && \
+    cd python/ambassador && uv build --wheel --out-dir /tmp/wheels && \
+    cd ../ambassador-diag && uv build --wheel --out-dir /tmp/wheels && \
+    cd /tmp && \
+    uv pip install /tmp/wheels/*.whl && \
+    deactivate && \
+    # Fix venv paths: replace /newroot prefix in shebangs and pyvenv.cfg
+    find /newroot/opt/ambassador/emissary/bin -type f -exec sed -i 's|/newroot/opt|/opt|g' {} + && \
+    sed -i 's|/newroot/opt|/opt|g' /newroot/opt/ambassador/emissary/pyvenv.cfg && \
+    # Create diagd entry point (uv pip install doesn't generate console_scripts from wheels)
+    printf '#!/opt/ambassador/emissary/bin/python3\nfrom ambassador_diag.diagd import main\nmain()\n' > /newroot/opt/ambassador/emissary/bin/diagd && \
+    chmod +x /newroot/opt/ambassador/emissary/bin/diagd && \
+    # Copy Python runtime into newroot for final image
+    cp -r /opt/python /newroot/opt/python && \
+    # Set up binaries
     mv /envoy /newroot/usr/local/bin/envoy && \
     mv /THIRD-PARTY-LICENSES.txt /newroot/ENVOY_LICENSES.txt && \
-    cp -r /root/.local/lib/python3.11/site-packages /newroot/usr/lib/python3.11 && \
-    cp -r /root/.local/bin /newroot/usr/bin && \
     mkdir -p /newroot/buildroot/manifests/emissary && \
-    mv emissary-crds.yaml.in /newroot/buildroot/manifests/emissary/emissary-crds.yaml && \
-    ln -sf /buildroot/post_update.py /newroot/ambassador/post_update.py && \
-    ln -sf /buildroot/watch_hook.py /newroot/ambassador/watch_hook.py && \
-    ln -sf /buildroot/kubewatch.py /newroot/ambassador/kubewatch.py && \
+    mv /newroot/buildroot/crds.yaml /newroot/buildroot/manifests/emissary/emissary-crds.yaml && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/kubestatus && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/watt && \
     ln -sf /buildroot/busyambassador /newroot/buildroot/agent && \
+    ln -sf /opt/ambassador/emissary/bin/diagd /newroot/usr/local/bin/diagd && \
     ln -sf /newroot/buildroot/* /usr/local/bin/
 
 FROM $BASE_IMAGE
 
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/buildroot HOME=/tmp/ambassador
+ENV PATH=/opt/ambassador/emissary/bin:/opt/python/cpython-3.13.5-linux-${TARGETARCH}-gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/buildroot
+ENV HOME=/tmp/ambassador
 
 COPY --from=yum-installer /newroot /
 COPY --from=emissary-builder /newroot /
@@ -62,4 +80,4 @@ WORKDIR /ambassador
 
 COPY ATTRIBUTION.txt _output/LICENSES /
 
-ENTRYPOINT [ "bash", "/buildroot/entrypoint.sh" ]
+ENTRYPOINT [ "bash", "/buildroot/python/entrypoint.sh" ]
