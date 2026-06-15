@@ -1,21 +1,21 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From edaefaf7f7b79278bf528e79ee6788a399e0153f Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Thu, 6 Oct 2022 12:55:27 -0700
 Subject: [PATCH 1/4] Use-sourceRegistry-and-digest-in-chart
 
 ---
- deploy/charts/cert-manager/Chart.yaml                        | 20 ++++++++++++++++++++
- deploy/charts/cert-manager/templates/cainjector-deployment.yaml |  2 +-
- deploy/charts/cert-manager/templates/deployment.yaml            |  2 +-
- deploy/charts/cert-manager/templates/startupapicheck-job.yaml   |  2 +-
- deploy/charts/cert-manager/templates/webhook-deployment.yaml    |  2 +-
- deploy/charts/cert-manager/values.yaml                          | 30 +++++++++++++++++-------------
- 6 files changed, 42 insertions(+), 16 deletions(-)
+ deploy/charts/cert-manager/Chart.yaml         | 20 +++++++++++++++++++
+ .../templates/cainjector-deployment.yaml      |  2 +-
+ .../cert-manager/templates/deployment.yaml    |  2 +-
+ .../templates/startupapicheck-job.yaml        |  2 +-
+ .../templates/webhook-deployment.yaml         |  2 +-
+ deploy/charts/cert-manager/values.yaml        | 18 +++++++++++------
+ 6 files changed, 36 insertions(+), 10 deletions(-)
  create mode 100644 deploy/charts/cert-manager/Chart.yaml
 
 diff --git a/deploy/charts/cert-manager/Chart.yaml b/deploy/charts/cert-manager/Chart.yaml
 new file mode 100644
-index 000000000..167c9462a
+index 000000000..438ce5d82
 --- /dev/null
 +++ b/deploy/charts/cert-manager/Chart.yaml
 @@ -0,0 +1,20 @@
@@ -40,59 +40,59 @@ index 000000000..167c9462a
 +    email: cert-manager-maintainers@googlegroups.com
 +    url: https://cert-manager.io
 diff --git a/deploy/charts/cert-manager/templates/cainjector-deployment.yaml b/deploy/charts/cert-manager/templates/cainjector-deployment.yaml
-index 000000001..000000002 100644
+index 89f6afe8d..695d3b520 100644
 --- a/deploy/charts/cert-manager/templates/cainjector-deployment.yaml
 +++ b/deploy/charts/cert-manager/templates/cainjector-deployment.yaml
 @@ -76,7 +76,7 @@ spec:
        {{- end }}
        containers:
          - name: {{ .Chart.Name }}-cainjector
--          image: "{{ template "image" (tuple .Values.cainjector.image $.Chart.AppVersion) }}"
+-          image: "{{ template "image" (tuple .Values.cainjector.image .Values.imageRegistry .Values.imageNamespace (printf ":%s" .Chart.AppVersion)) }}"
 +          image: "{{ .Values.sourceRegistry }}/{{ .Values.cainjector.image.repository }}@{{ .Values.cainjector.image.digest }}"
            imagePullPolicy: {{ .Values.cainjector.image.pullPolicy }}
            args:
            {{- /* The if statement below is equivalent to {{- if $value }} but will also return true for 0. */ -}}
 diff --git a/deploy/charts/cert-manager/templates/deployment.yaml b/deploy/charts/cert-manager/templates/deployment.yaml
-index 000000003..000000004 100644
+index c4d267a24..79718b2be 100644
 --- a/deploy/charts/cert-manager/templates/deployment.yaml
 +++ b/deploy/charts/cert-manager/templates/deployment.yaml
 @@ -86,7 +86,7 @@ spec:
        {{- end }}
        containers:
          - name: {{ .Chart.Name }}-controller
--          image: "{{ template "image" (tuple .Values.image $.Chart.AppVersion) }}"
+-          image: "{{ template "image" (tuple .Values.image .Values.imageRegistry .Values.imageNamespace (printf ":%s" .Chart.AppVersion)) }}"
 +          image: "{{ .Values.sourceRegistry }}/{{ .Values.image.repository }}@{{ .Values.image.digest }}"
            imagePullPolicy: {{ .Values.image.pullPolicy }}
            args:
            {{- /* The if statement below is equivalent to {{- if $value }} but will also return true for 0. */ -}}
 diff --git a/deploy/charts/cert-manager/templates/startupapicheck-job.yaml b/deploy/charts/cert-manager/templates/startupapicheck-job.yaml
-index 000000005..000000006 100644
+index 7f1b0ff8d..9f80327ad 100644
 --- a/deploy/charts/cert-manager/templates/startupapicheck-job.yaml
 +++ b/deploy/charts/cert-manager/templates/startupapicheck-job.yaml
-@@ -50,7 +50,7 @@ spec:
+@@ -54,7 +54,7 @@ spec:
        {{- end }}
        containers:
          - name: {{ .Chart.Name }}-startupapicheck
--          image: "{{ template "image" (tuple .Values.startupapicheck.image $.Chart.AppVersion) }}"
+-          image: "{{ template "image" (tuple .Values.startupapicheck.image .Values.imageRegistry .Values.imageNamespace (printf ":%s" .Chart.AppVersion)) }}"
 +          image: "{{ .Values.sourceRegistry }}/{{ .Values.startupapicheck.image.repository }}@{{ .Values.startupapicheck.image.digest }}"
            imagePullPolicy: {{ .Values.startupapicheck.image.pullPolicy }}
            args:
            - check
 diff --git a/deploy/charts/cert-manager/templates/webhook-deployment.yaml b/deploy/charts/cert-manager/templates/webhook-deployment.yaml
-index 000000007..000000008 100644
+index 66d6ead04..319b5da8e 100644
 --- a/deploy/charts/cert-manager/templates/webhook-deployment.yaml
 +++ b/deploy/charts/cert-manager/templates/webhook-deployment.yaml
 @@ -81,7 +81,7 @@ spec:
        {{- end }}
        containers:
          - name: {{ .Chart.Name }}-webhook
--          image: "{{ template "image" (tuple .Values.webhook.image $.Chart.AppVersion) }}"
+-          image: "{{ template "image" (tuple .Values.webhook.image .Values.imageRegistry .Values.imageNamespace (printf ":%s" .Chart.AppVersion)) }}"
 +          image: "{{ .Values.sourceRegistry }}/{{ .Values.webhook.image.repository }}@{{ .Values.webhook.image.digest }}"
            imagePullPolicy: {{ .Values.webhook.image.pullPolicy }}
            args:
            {{- /* The if statement below is equivalent to {{- if $value }} but will also return true for 0. */ -}}
 diff --git a/deploy/charts/cert-manager/values.yaml b/deploy/charts/cert-manager/values.yaml
-index 000000009..000000010 100644
+index 4bd3ebf5f..60159d42f 100644
 --- a/deploy/charts/cert-manager/values.yaml
 +++ b/deploy/charts/cert-manager/values.yaml
 @@ -3,6 +3,8 @@
@@ -104,16 +104,16 @@ index 000000009..000000010 100644
  global:
    # Reference to one or more secrets to be used when pulling images.
    # For more information, see [Pull an Image from a Private Registry](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
-@@ -167,7 +169,7 @@
- 
-   # The container image for the cert-manager controller.
+@@ -199,7 +201,7 @@ image:
+   # Full repository override (takes precedence over `imageRegistry`, `imageNamespace`, and `image.name`).
+   # Example: quay.io/jetstack/cert-manager-controller
    # +docs:property
--  repository: quay.io/jetstack/cert-manager-controller
+-  repository: ""
 +  repository: cert-manager/eks/cert-manager-controller
  
    # Override the image tag to deploy by setting this variable.
    # If no value is set, the chart's appVersion is used.
-@@ -179,6 +181,7 @@
+@@ -212,6 +214,7 @@ image:
    # digest: sha256:0e072dddd1f7f8fc8909a2ca6f65e76c5f0d2fcfb8be47935ae3457e8bbceb20
  
    # Kubernetes imagePullPolicy on Deployment.
@@ -121,16 +121,16 @@ index 000000009..000000010 100644
    pullPolicy: IfNotPresent
  
  # Override the namespace used to store DNS provider credentials etc. for ClusterIssuer
-@@ -902,7 +905,7 @@
+@@ -1027,7 +1030,7 @@ webhook:
  
-     # The container image for the cert-manager webhook
+     # Full repository override (takes precedence over `imageRegistry`, `imageNamespace`, and `webhook.image.name`).
      # +docs:property
--    repository: quay.io/jetstack/cert-manager-webhook
+-    repository: ""
 +    repository: cert-manager/eks/cert-manager-webhook
  
      # Override the image tag to deploy by setting this variable.
      # If no value is set, the chart's appVersion will be used.
-@@ -914,6 +917,7 @@
+@@ -1040,6 +1043,7 @@ webhook:
      # digest: sha256:0e072dddd1f7f8fc8909a2ca6f65e76c5f0d2fcfb8be47935ae3457e8bbceb20
  
      # Kubernetes imagePullPolicy on Deployment.
@@ -138,16 +138,16 @@ index 000000009..000000010 100644
      pullPolicy: IfNotPresent
  
    serviceAccount:
-@@ -1215,7 +1219,7 @@
+@@ -1406,7 +1410,7 @@ cainjector:
  
-     # The container image for the cert-manager cainjector
+     # Full repository override (takes precedence over `imageRegistry`, `imageNamespace`, and `cainjector.image.name`).
      # +docs:property
--    repository: quay.io/jetstack/cert-manager-cainjector
+-    repository: ""
 +    repository: cert-manager/eks/cert-manager-cainjector
  
      # Override the image tag to deploy by setting this variable.
      # If no value is set, the chart's appVersion will be used.
-@@ -1227,6 +1231,7 @@
+@@ -1419,6 +1423,7 @@ cainjector:
      # digest: sha256:0e072dddd1f7f8fc8909a2ca6f65e76c5f0d2fcfb8be47935ae3457e8bbceb20
  
      # Kubernetes imagePullPolicy on Deployment.
@@ -155,16 +155,16 @@ index 000000009..000000010 100644
      pullPolicy: IfNotPresent
  
    serviceAccount:
-@@ -1274,7 +1279,7 @@
+@@ -1477,7 +1482,7 @@ acmesolver:
  
-     # The container image for the cert-manager acmesolver.
+     # Full repository override (takes precedence over `imageRegistry`, `imageNamespace`, and `acmesolver.image.name`).
      # +docs:property
--    repository: quay.io/jetstack/cert-manager-acmesolver
+-    repository: ""
 +    repository: cert-manager/eks/cert-manager-acmesolver
  
      # Override the image tag to deploy by setting this variable.
      # If no value is set, the chart's appVersion is used.
-@@ -1286,6 +1291,7 @@
+@@ -1490,6 +1495,7 @@ acmesolver:
      # digest: sha256:0e072dddd1f7f8fc8909a2ca6f65e76c5f0d2fcfb8be47935ae3457e8bbceb20
  
      # Kubernetes imagePullPolicy on Deployment.
@@ -172,7 +172,7 @@ index 000000009..000000010 100644
      pullPolicy: IfNotPresent
  
  # +docs:section=Startup API Check
-@@ -1299,7 +1305,7 @@
+@@ -1503,7 +1509,7 @@ acmesolver:
  
  startupapicheck:
    # Enables the startup api check.
@@ -181,14 +181,15 @@ index 000000009..000000010 100644
  
    # Pod Security Context to be set on the startupapicheck component Pod.
    # For more information, see [Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/).
-@@ -1407,7 +1413,7 @@
+@@ -1622,7 +1628,7 @@ startupapicheck:
  
-     # The container image for the cert-manager startupapicheck.
+     # Full repository override (takes precedence over `imageRegistry`, `imageNamespace`, and `startupapicheck.image.name`).
      # +docs:property
--    repository: quay.io/jetstack/cert-manager-startupapicheck
+-    repository: ""
 +    repository: cert-manager/cert-manager-startupapicheck
  
      # Override the image tag to deploy by setting this variable.
      # If no value is set, the chart's appVersion is used.
 -- 
-2.34.1
+2.48.1
+
