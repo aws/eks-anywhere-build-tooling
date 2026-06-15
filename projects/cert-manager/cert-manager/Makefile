@@ -48,6 +48,12 @@ s3-artifacts: create-manifests
 create-manifests:
 	build/create-manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY) $(GIT_TAG)
 
+# Get the upstream manifest yaml file for cert-manager used by management cluster
+.PHONY: update-cert-manager-manifest
+update-cert-manager-manifest: GIT_TAG=$(word 1,$(subst -, ,$(EKS_ADDON_IMAGE_TAG)))
+update-cert-manager-manifest:
+	wget -q https://github.com/cert-manager/cert-manager/releases/download/$(GIT_TAG)/cert-manager.yaml -O manifests/cert-manager.yaml
+
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
