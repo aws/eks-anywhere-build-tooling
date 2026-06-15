@@ -1,15 +1,15 @@
-From af841b3f8a820b38ce61fe05efd716c963bff064 Mon Sep 17 00:00:00 2001
+From 861ff8a347c80cd7efa0ba74444f94bf739698c9 Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Thu, 29 Jun 2023 00:56:53 -0700
-Subject: [PATCH 1/7] Switch to AL2 base image for node image
+Subject: [PATCH 1/6] Switch to AL2 base image for node image
 
 ---
- images/base/Dockerfile                        | 218 ++++++------------
+ images/base/Dockerfile                        | 229 ++++++------------
  images/base/files/usr/local/bin/clean-install |  10 +-
- 2 files changed, 79 insertions(+), 149 deletions(-)
+ 2 files changed, 81 insertions(+), 158 deletions(-)
 
 diff --git a/images/base/Dockerfile b/images/base/Dockerfile
-index 0cb1f8f2..b3b7e848 100644
+index 192e1ac..e7e73fe 100644
 --- a/images/base/Dockerfile
 +++ b/images/base/Dockerfile
 @@ -17,11 +17,19 @@
@@ -17,10 +17,10 @@ index 0cb1f8f2..b3b7e848 100644
  # https://systemd.io/CONTAINER_INTERFACE/
  
 -# start from debian slim, this image is reasonably small as a starting point
-+# start from ubuntu, this image is reasonably small as a starting point
++# start from AL2023 base image
  # for a kubernetes node image, it doesn't contain much (anything?) we don't need
 -# this stage will install basic files and packages
--ARG BASE_IMAGE=debian:bookworm-slim
+-ARG BASE_IMAGE=debian:trixie-slim
 -FROM $BASE_IMAGE AS base
 +ARG BASE_IMAGE
 +ARG BUILDER_IMAGE
@@ -36,13 +36,45 @@ index 0cb1f8f2..b3b7e848 100644
  
  # copy in static files
  # all scripts and directories are 0755 (rwx r-x r-x)
-@@ -73,10 +81,11 @@ RUN chmod 755 /kind/bin && \
+@@ -41,28 +49,20 @@ COPY --chmod=0644 files/etc/sysctl.d/* /etc/sysctl.d/
+ COPY --chmod=0644 files/etc/systemd/system/* /etc/systemd/system/
+ COPY --chmod=0644 files/etc/systemd/system/kubelet.service.d/* /etc/systemd/system/kubelet.service.d/
+ 
+-# Install dependencies, first from apt, then from release tarballs.
++# Install dependencies, first from yum, then from release tarballs.
+ # NOTE: we use one RUN to minimize layers.
+ #
+-# The base image already has a basic userspace + apt but we need to install more packages.
++# The base image already has a basic userspace + yum but we need to install more packages.
+ # Packages installed are broken down into (each on a line):
+ # - packages needed to run services (systemd)
+ # - packages needed for kubernetes components
+ # - packages needed for networked backed storage with kubernetes
+-# - packages used by kubernetes storage e2e tests
+ # - packages needed by the container runtime
+ # - misc packages kind uses itself
+-# - packages that provide semi-core kubernetes functionality
+ # After installing packages we cleanup by:
+ # - removing unwanted systemd services
+ # - disabling kmsg in journald (these log entries would be confusing)
+ #
+-# Then we install containerd from our nightly build infrastructure, as this
+-# build for multiple architectures and allows us to upgrade to patched releases
+-# more quickly.
+-#
+-# Next we download and extract crictl and CNI plugin binaries from upstream.
+-#
+ # Next we ensure the /etc/kubernetes/manifests directory exists. Normally
+ # a kubeadm debian / rpm package would ensure that this exists but we install
+ # freshly built binaries directly when we build the node image.
+@@ -74,11 +74,11 @@ RUN chmod 755 /kind /kind/bin && \
      echo "Installing Packages ..." \
      && DEBIAN_FRONTEND=noninteractive clean-install \
        systemd \
 -      conntrack iptables nftables iproute2 ethtool util-linux mount kmod \
 -      libseccomp2 pigz fuse-overlayfs \
 -      nfs-common open-iscsi \
+-      e2fsprogs \
 +      conntrack iptables nftables iproute ethtool util-linux kmod \
 +      libseccomp pigz \
 +      nfs-utils \
@@ -51,11 +83,11 @@ index 0cb1f8f2..b3b7e848 100644
      && find /lib/systemd/system/sysinit.target.wants/ -name "systemd-tmpfiles-setup.service" -delete \
      && rm -f /lib/systemd/system/multi-user.target.wants/* \
      && rm -f /etc/systemd/system/*.wants/* \
-@@ -85,7 +94,11 @@ RUN chmod 755 /kind/bin && \
+@@ -87,7 +87,11 @@ RUN chmod 755 /kind /kind/bin && \
      && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
      && rm -f /lib/systemd/system/basic.target.wants/* \
      && echo "ReadKMsg=no" >> /etc/systemd/journald.conf \
--    && ln -s "$(which systemd)" /sbin/init
+-    && ln -s /usr/lib/systemd/systemd /sbin/init
 +    # already set on al23
 +    # && ln -s "$(which systemd)" /sbin/init
 +    # avoid runaway agetty processes most likely due to al2 being based on older centos 7
@@ -64,7 +96,7 @@ index 0cb1f8f2..b3b7e848 100644
  
  # NOTE: systemd-binfmt.service will register things into binfmt_misc which is kernel-global
  RUN echo "Enabling / Disabling services ... " \
-@@ -97,146 +110,65 @@ RUN echo "Enabling / Disabling services ... " \
+@@ -99,144 +103,65 @@ RUN echo "Enabling / Disabling services ... " \
  RUN echo "Ensuring /etc/kubernetes/manifests" \
      && mkdir -p /etc/kubernetes/manifests
  
@@ -81,7 +113,7 @@ index 0cb1f8f2..b3b7e848 100644
 -# first ensure we can install packages for both architectures
 -RUN dpkg --add-architecture arm64 && dpkg --add-architecture amd64 \
 -    && clean-install bash ca-certificates curl git make pkg-config \
--    crossbuild-essential-amd64 crossbuild-essential-arm64 \
+-    build-essential crossbuild-essential-amd64 crossbuild-essential-arm64 \
 -    libseccomp-dev:amd64 libseccomp-dev:arm64
 -# set by makefile to .go-version
 -ARG GO_VERSION
@@ -93,7 +125,7 @@ index 0cb1f8f2..b3b7e848 100644
 -# stage for building containerd
 -FROM go-build AS build-containerd
 -ARG TARGETARCH GO_VERSION
--ARG CONTAINERD_VERSION="v2.2.0"
+-ARG CONTAINERD_VERSION="v2.3.1"
 -ARG CONTAINERD_CLONE_URL="https://github.com/containerd/containerd"
 -# we don't build with optional snapshotters, we never select any of these
 -# they're not ideal inside kind anyhow, and we save some disk space
@@ -111,9 +143,7 @@ index 0cb1f8f2..b3b7e848 100644
 -# stage for building runc
 -FROM go-build AS build-runc
 -ARG TARGETARCH GO_VERSION
--# TODO: upgrade to 1.3.x to match containerd after resolving:
--# https://github.com/kubernetes/kubernetes/issues/135214
--ARG RUNC_VERSION="v1.2.9"
+-ARG RUNC_VERSION="v1.4.2"
 -ARG RUNC_CLONE_URL="https://github.com/opencontainers/runc"
 -RUN git clone --filter=tree:0 "${RUNC_CLONE_URL}" /runc \
 -    && cd /runc \
@@ -128,20 +158,20 @@ index 0cb1f8f2..b3b7e848 100644
 -FROM go-build AS build-crictl
 -ARG TARGETARCH GO_VERSION
 -ARG CRI_TOOLS_CLONE_URL="https://github.com/kubernetes-sigs/cri-tools"
--ARG CRICTL_VERSION="v1.33.0"
+-ARG CRICTL_VERSION="v1.36.0"
 -RUN git clone --filter=tree:0 "${CRI_TOOLS_CLONE_URL}" /cri-tools \
 -    && cd /cri-tools \
 -    && git checkout "${CRICTL_VERSION}" \
 -    && eval "$(gimme "${GO_VERSION}")" \
 -    && export GOTOOLCHAIN="go${GO_VERSION}" \
--    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=1 \
+-    && export GOARCH=$TARGETARCH && export CC=$(target-cc) && export CGO_ENABLED=0 \
 -    && make BUILD_BIN_PATH=./build crictl \
 -    && GOARCH=$TARGETARCH go-licenses save --save_path=/_LICENSES ./cmd/crictl
 -
 -# stage for building cni-plugins
 -FROM go-build AS build-cni
 -ARG TARGETARCH GO_VERSION
--ARG CNI_PLUGINS_VERSION="v1.8.0"
+-ARG CNI_PLUGINS_VERSION="v1.9.1"
 -ARG CNI_PLUGINS_CLONE_URL="https://github.com/containernetworking/plugins"
 -RUN git clone --filter=tree:0 "${CNI_PLUGINS_CLONE_URL}" /cni-plugins \
 -    && cd /cni-plugins \
@@ -266,7 +296,7 @@ index 0cb1f8f2..b3b7e848 100644
  # https://systemd.io/CONTAINER_INTERFACE/
  ENV container=docker
 diff --git a/images/base/files/usr/local/bin/clean-install b/images/base/files/usr/local/bin/clean-install
-index b0b861c3..f1d714a6 100755
+index b0b861c..f1d714a 100755
 --- a/images/base/files/usr/local/bin/clean-install
 +++ b/images/base/files/usr/local/bin/clean-install
 @@ -24,12 +24,10 @@ if [ $# = 0 ]; then
@@ -292,5 +322,5 @@ index b0b861c3..f1d714a6 100755
 -   /usr/share/local/*
 +   /usr/share/local/* || true
 -- 
-2.50.1 (Apple Git-155)
+2.48.1
 

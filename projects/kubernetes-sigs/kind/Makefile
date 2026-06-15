@@ -15,7 +15,6 @@ BINARIES_ARE_RELEASE_BRANCHED=false
 PROJECT_ROOT=$(MAKE_ROOT)
 
 MINIMAL_BASE_IPTABLES_IMAGE_NAME?=eks-distro-minimal-base-iptables
-MINIMAL_BASE_HAPROXY_IMAGE_NAME?=eks-distro-minimal-base-haproxy
 MINIMAL_BASE_KIND_IMAGE_NAME?=eks-distro-minimal-base-kind
 MINIMAL_BASE_KIND_IMAGE_NAME_OS_VERSION=al2023
 
@@ -23,7 +22,6 @@ KIND_BASE_IMAGE_COMPONENT=kubernetes-sigs/kind/base
 KIND_BASE_VERSIONED_IMAGE_COMPONENT=kubernetes-sigs/kind/base
 KIND_NODE_IMAGE_COMPONENT=kubernetes-sigs/kind/node
 KINDNETD_IMAGE_COMPONENT=kubernetes-sigs/kind/kindnetd
-HAPROXY_IMAGE_COMPONENT=kubernetes-sigs/kind/haproxy
 
 KIND_BASE_IMAGE_BUILD_ARGS=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/kind-base-image-build-args
 KIND_BASE_KUBEADM_OVERRIDE=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base/files/usr/local/bin/kubeadm
@@ -46,9 +44,7 @@ ARM_ENV_CONF_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/rootfs/etc
 KIND_NODE_BUILD_AMD64_TARGET=$(BINARY_DEPS_DIR)/linux-amd64/files/io.containerd.metadata.v1.bolt/meta.db
 KIND_NODE_BUILD_ARM64_TARGET=$(BINARY_DEPS_DIR)/linux-arm64/files/io.containerd.metadata.v1.bolt/meta.db
 
-HAPROXY_CFG=$(OUTPUT_DIR)/files/haproxy/usr/local/etc/haproxy/haproxy.cfg
-
-IMAGE_NAMES?=haproxy kindnetd kind-base 
+IMAGE_NAMES?=kindnetd kind-base
 
 FIX_LICENSES_KINDNETD_TARGET=$(REPO)/images/kindnetd/LICENSE
 
@@ -126,14 +122,6 @@ images: kind-base-versioned/images/push kind-node/images/push
 create-ecr-repos: kind-node/create-ecr-repo
 
 $(OUTPUT_BIN_DIR)/%/kind: EXTRA_GO_LDFLAGS=-X=sigs.k8s.io/kind/pkg/cmd/kind/version.gitCommit=$(shell git -C $(REPO) rev-list -n 1  "${GIT_TAG}")
-
-# haproxy
-haproxy/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_HAPROXY_IMAGE_NAME)
-$(call IMAGE_TARGETS_FOR_NAME, haproxy): $(HAPROXY_CFG)
-
-$(HAPROXY_CFG): $(GIT_PATCH_TARGET)
-	@mkdir -p $(@D)
-	cp $(REPO)/images/haproxy/haproxy.cfg $@
 
 # Kindnetd
 kindnetd/images/%: BASE_IMAGE_NAME=$(MINIMAL_BASE_IPTABLES_IMAGE_NAME)
