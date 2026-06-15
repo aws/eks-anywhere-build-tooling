@@ -1,19 +1,19 @@
-From ab4825bade9e5c3a027d32761817a59b148809f5 Mon Sep 17 00:00:00 2001
+From a4b9a1f9db3f1130d819f1ec018b3789fdbd0453 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 17 Dec 2025 21:52:18 -0800
 Subject: [PATCH 1/6] Remove prometheus chart dependencies
 
 ---
  charts/prometheus/Chart.yaml             |  17 ---
- charts/prometheus/templates/NOTES.txt    |  76 ----------
- charts/prometheus/templates/_helpers.tpl |  11 --
- charts/prometheus/templates/cm.yaml      |  26 +---
+ charts/prometheus/templates/NOTES.txt    |  74 ----------
+ charts/prometheus/templates/_helpers.tpl |  24 ---
+ charts/prometheus/templates/cm.yaml      |  29 +---
  charts/prometheus/templates/deploy.yaml  |  88 -----------
  charts/prometheus/values.yaml            | 178 -----------------------
- 6 files changed, 1 insertion(+), 395 deletions(-)
+ 6 files changed, 4 insertions(+), 406 deletions(-)
 
 diff --git a/charts/prometheus/Chart.yaml b/charts/prometheus/Chart.yaml
-index a8d3a2a3..7ce819ba 100644
+index 92d776c8..9ac7e3aa 100644
 --- a/charts/prometheus/Chart.yaml
 +++ b/charts/prometheus/Chart.yaml
 @@ -30,23 +30,6 @@ maintainers:
@@ -22,15 +22,15 @@ index a8d3a2a3..7ce819ba 100644
  type: application
 -dependencies:
 -  - name: alertmanager
--    version: "1.29.*"
+-    version: "1.39.*"
 -    repository: https://prometheus-community.github.io/helm-charts
 -    condition: alertmanager.enabled
 -  - name: kube-state-metrics
--    version: "6.4.*"
+-    version: "7.4.*"
 -    repository: https://prometheus-community.github.io/helm-charts
 -    condition: kube-state-metrics.enabled
 -  - name: prometheus-node-exporter
--    version: "4.49.*"
+-    version: "4.55.*"
 -    repository: https://prometheus-community.github.io/helm-charts
 -    condition: prometheus-node-exporter.enabled
 -  - name: prometheus-pushgateway
@@ -41,35 +41,39 @@ index a8d3a2a3..7ce819ba 100644
    - monitoring
    - prometheus
 diff --git a/charts/prometheus/templates/NOTES.txt b/charts/prometheus/templates/NOTES.txt
-index b0401f63..5a953118 100644
+index a46798f0..193edeb3 100644
 --- a/charts/prometheus/templates/NOTES.txt
 +++ b/charts/prometheus/templates/NOTES.txt
-@@ -38,81 +38,5 @@ Get the Prometheus server URL by running these commands in the same shell:
+@@ -37,79 +37,5 @@ Get the Prometheus server URL by running these commands in the same shell:
  {{- end }}
  {{- end }}
  
--{{ if .Values.alertmanager.enabled }}
--The Prometheus alertmanager can be accessed via port {{ .Values.alertmanager.service.port }} on the following DNS name from within your cluster:
+-{{ if (index .Values "alertmanager" "enabled") }}
+-{{- $am := .Values.alertmanager | default dict -}}
+-{{- $amSvc := default dict $am.service -}}
+-{{- $amSvcType := default "" $amSvc.type -}}
+-{{- $amIngress := default dict $am.ingress -}}
+-Prometheus alertmanager can be accessed via port {{ default 9093 $amSvc.port }} on the following DNS name from within your cluster:
 -{{ template "prometheus.alertmanager.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
 -
--{{ if .Values.alertmanager.ingress.enabled -}}
+-{{ if $amIngress.enabled -}}
 -From outside the cluster, the alertmanager URL(s) are:
--{{- range .Values.alertmanager.ingress.hosts }}
+-{{- range $amIngress.hosts }}
 -http://{{ . }}
 -{{- end }}
 -{{- else }}
 -Get the Alertmanager URL by running these commands in the same shell:
--{{- if contains "NodePort" .Values.alertmanager.service.type }}
+-{{- if contains "NodePort" $amSvcType }}
 -  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "prometheus.alertmanager.fullname" . }})
 -  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
 -  echo http://$NODE_IP:$NODE_PORT
--{{- else if contains "LoadBalancer" .Values.alertmanager.service.type }}
+-{{- else if contains "LoadBalancer" $amSvcType }}
 -  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
 -        You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ template "prometheus.alertmanager.fullname" . }}'
 -
 -  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "prometheus.alertmanager.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
--  echo http://$SERVICE_IP:{{ .Values.alertmanager.service.servicePort }}
--{{- else if contains "ClusterIP"  .Values.alertmanager.service.type }}
+-  echo http://$SERVICE_IP:{{ default 9093 $amSvc.port }}
+-{{- else if contains "ClusterIP"  $amSvcType }}
 -  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "alertmanager.name" .Subcharts.alertmanager }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
 -  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 9093
 -{{- end }}
@@ -79,46 +83,40 @@ index b0401f63..5a953118 100644
 -{{- else }}
 -#################################################################################
 -######   WARNING: Persistence is disabled!!! You will lose your data when   #####
--######            the AlertManager pod is terminated.                       #####
+-######            the Alertmanager pod is terminated.                       #####
 -#################################################################################
 -{{- end }}
--{{- end }}
--
--{{- if (index .Values "prometheus-node-exporter" "enabled") }}
--#################################################################################
--######   WARNING: Pod Security Policy has been disabled by default since    #####
--######            it deprecated after k8s 1.25+. use                        #####
--######            (index .Values "prometheus-node-exporter" "rbac"          #####
--###### .          "pspEnabled") with (index .Values                         #####
--######            "prometheus-node-exporter" "rbac" "pspAnnotations")       #####
--######            in case you still need it.                                #####
--#################################################################################
 -{{- end }}
 -
 -{{ if (index .Values "prometheus-pushgateway" "enabled") }}
--The Prometheus PushGateway can be accessed via port {{ index .Values "prometheus-pushgateway" "service" "port" }} on the following DNS name from within your cluster:
--{{ include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") }}.{{ .Release.Namespace }}.svc.cluster.local
+-{{- $pg := (index .Values "prometheus-pushgateway") | default dict -}}
+-{{- $pgSvc := default dict $pg.service -}}
+-{{- $pgSvcType := default "" $pgSvc.type -}}
+-{{- $pgIngress := default dict $pg.ingress -}}
+-{{- $pgFullname := include "prometheus.pushgateway.fullname" . -}}
+-Prometheus Pushgateway can be accessed via port {{ default 9091 $pgSvc.port }} on the following DNS name from within your cluster:
+-{{ $pgFullname }}.{{ .Release.Namespace }}.svc.cluster.local
 -
--{{ if (index .Values "prometheus-pushgateway" "ingress" "enabled") -}}
+-{{ if $pgIngress.enabled -}}
 -From outside the cluster, the pushgateway URL(s) are:
--{{- range (index .Values "prometheus-pushgateway" "ingress" "hosts") }}
+-{{- range $pgIngress.hosts }}
 -http://{{ . }}
 -{{- end }}
 -{{- else }}
--Get the PushGateway URL by running these commands in the same shell:
--{{- $pushgateway_svc_type := index .Values "prometheus-pushgateway" "service" "type" -}}
--{{- if contains "NodePort" $pushgateway_svc_type }}
--  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") }})
+-Get the Pushgateway URL by running these commands in the same shell:
+-{{- if contains "NodePort" $pgSvcType }}
+-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ $pgFullname }})
 -  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
 -  echo http://$NODE_IP:$NODE_PORT
--{{- else if contains "LoadBalancer" $pushgateway_svc_type }}
+-{{- else if contains "LoadBalancer" $pgSvcType }}
 -  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
--        You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") }}'
+-        You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ $pgFullname }}'
 -
--  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
--  echo http://$SERVICE_IP:{{ index .Values "prometheus-pushgateway" "service" "port" }}
--{{- else if contains "ClusterIP" $pushgateway_svc_type }}
--  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app={{ include "prometheus.name" (index .Subcharts "prometheus-pushgateway") }},component=pushgateway" -o jsonpath="{.items[0].metadata.name}")
+-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ $pgFullname }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+-  echo http://$SERVICE_IP:{{ default 9091 $pgSvc.port }}
+-{{- else if contains "ClusterIP" $pgSvcType }}
+-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include
+-  "prometheus-pushgateway.name" (index .Subcharts "prometheus-pushgateway") }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
 -  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 9091
 -{{- end }}
 -{{- end }}
@@ -127,21 +125,34 @@ index b0401f63..5a953118 100644
  For more information on running Prometheus, visit:
  https://prometheus.io/
 diff --git a/charts/prometheus/templates/_helpers.tpl b/charts/prometheus/templates/_helpers.tpl
-index 29c89a1d..ea252283 100644
+index 66a732f4..ea252283 100644
 --- a/charts/prometheus/templates/_helpers.tpl
 +++ b/charts/prometheus/templates/_helpers.tpl
-@@ -79,17 +79,6 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this
+@@ -79,30 +79,6 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this
  {{- end -}}
  {{- end -}}
  
 -{{/*
--Create a fully qualified alertmanager name for communicating and check to ensure that `alertmanager` exists before trying to use it with the user via NOTES.txt
+-Create a fully qualified alertmanager name to use even when the subchart is not available
+-from the charts directory
 -*/}}
 -{{- define "prometheus.alertmanager.fullname" -}}
--{{- if .Subcharts.alertmanager -}}
--{{- template "alertmanager.fullname" .Subcharts.alertmanager -}}
+-{{- if (index .Subcharts "alertmanager") -}}
+-{{- include "alertmanager.fullname" (index .Subcharts "alertmanager") -}}
 -{{- else -}}
--{{- "alertmanager not found" -}}
+-{{- printf "%s-%s" .Release.Name "alertmanager" | trunc 63 | trimSuffix "-" -}}
+-{{- end -}}
+-{{- end -}}
+-
+-{{/*
+-Create a fully qualified pushgateway name that works even when the dependency
+-charts are not downloaded locally.
+-*/}}
+-{{- define "prometheus.pushgateway.fullname" -}}
+-{{- if (index .Subcharts "prometheus-pushgateway") -}}
+-{{- include "prometheus-pushgateway.fullname" (index .Subcharts "prometheus-pushgateway") -}}
+-{{- else -}}
+-{{- printf "%s-%s" .Release.Name "prometheus-pushgateway" | trunc 63 | trimSuffix "-" -}}
 -{{- end -}}
 -{{- end -}}
 -
@@ -149,14 +160,17 @@ index 29c89a1d..ea252283 100644
  Create a fully qualified Prometheus server name.
  We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 diff --git a/charts/prometheus/templates/cm.yaml b/charts/prometheus/templates/cm.yaml
-index f1506570..dd5c0ceb 100644
+index db66cf9f..6f4aec8b 100644
 --- a/charts/prometheus/templates/cm.yaml
 +++ b/charts/prometheus/templates/cm.yaml
-@@ -70,37 +70,13 @@ data:
- {{- if $root.Values.extraScrapeConfigs }}
- {{ tpl $root.Values.extraScrapeConfigs $root | indent 4 }}
- {{- end -}}
+@@ -87,37 +87,16 @@ data:
+ {{ toYaml $value | default "{}" | indent 4 }}
+ {{- end }}
+ {{- if eq $key "prometheus.yml" -}}
 -{{- if or ($root.Values.alertmanager.enabled) ($root.Values.server.alertmanagers) }}
++{{- if $root.Values.extraScrapeConfigs }}
++{{ tpl $root.Values.extraScrapeConfigs $root | indent 4 }}
++{{- end -}}
 +{{- if $root.Values.server.alertmanagers }}
      alerting:
  {{- if $root.Values.alertRelabelConfigs }}
@@ -192,7 +206,7 @@ index f1506570..dd5c0ceb 100644
  {{- end -}}
  {{- end -}}
 diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
-index 79bdb7dc..c5087d01 100644
+index 9b984c1b..e8569a26 100644
 --- a/charts/prometheus/templates/deploy.yaml
 +++ b/charts/prometheus/templates/deploy.yaml
 @@ -100,81 +100,6 @@ spec:
@@ -305,7 +319,7 @@ index 79bdb7dc..c5087d01 100644
  {{ toYaml .Values.server.extraVolumes | indent 8}}
  {{- end }}
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index d2c5074d..e4e7c5b0 100644
+index 50f276a3..e7dff7ac 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
 @@ -24,105 +24,6 @@ serviceAccounts:
@@ -345,7 +359,7 @@ index d2c5074d..e4e7c5b0 100644
 -    ##
 -    image:
 -      repository: quay.io/prometheus-operator/prometheus-config-reloader
--      tag: v0.87.1
+-      tag: v0.91.0
 -      # When digest is set to a non-empty value, images will be pulled by digest (regardless of tag value).
 -      digest: ""
 -      pullPolicy: IfNotPresent
@@ -414,7 +428,7 @@ index d2c5074d..e4e7c5b0 100644
  server:
    ## Prometheus server container name
    ##
-@@ -1300,82 +1201,3 @@ extraManifests: []
+@@ -1170,82 +1071,3 @@ extraManifests: []
    #     name: prometheus-extra
    #   data:
    #     extra-data: "value"
