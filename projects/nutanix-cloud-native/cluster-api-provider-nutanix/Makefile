@@ -26,7 +26,7 @@ $(TOOLS_BIN_DIR):
 	@mkdir -p $(TOOLS_BIN_DIR)
 
 $(CONTROLLER_GEN): $(TOOLS_BIN_DIR)
-	GOBIN=$(TOOLS_BIN_DIR) $(GO) install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0
+	GOBIN=$(TOOLS_BIN_DIR) $(GO) install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.19.0
 
 .PHONY: create-manifests
 create-manifests: export PATH:=$(TOOLS_BIN_DIR):$(MAKE_ROOT)/$(OUTPUT_DIR):$(PATH)
