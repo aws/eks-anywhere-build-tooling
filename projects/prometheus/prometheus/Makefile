@@ -48,7 +48,7 @@ include $(BASE_DIRECTORY)/Common.mk
 # Example: standard-abc123.2 → standard-abc123.2023
 CURRENT_BUILDER_BASE_TAG := $(firstword $(subst ., ,$(CURRENT_BUILDER_BASE_TAG))).2023
 
-# Before running GO_MOD_DOWNLOAD_TARGETS, we need to generate web UI related 
+# Before running GO_MOD_DOWNLOAD_TARGETS, we need to generate web UI related
 # resources.
 $(GO_MOD_DOWNLOAD_TARGETS): $(WEB_UI_TARGETS)
 

@@ -1,16 +1,16 @@
-From ffef7356b7039e46d9c0ef508e7540dcb3d2cf0d Mon Sep 17 00:00:00 2001
+From 491a9c6d4ee14cb2373ecbc0b8e091ecef0b9b54 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 17 Dec 2025 21:56:33 -0800
 Subject: [PATCH 3/6] Update image repo
 
 ---
- charts/prometheus/templates/deploy.yaml              |  6 +-----
- .../templates/node-exporter/daemonset.yaml           |  2 +-
- charts/prometheus/values.yaml                        | 12 +++++-------
- 3 files changed, 7 insertions(+), 13 deletions(-)
+ charts/prometheus/templates/deploy.yaml          |  6 +-----
+ .../templates/node-exporter/daemonset.yaml       |  2 +-
+ charts/prometheus/values.yaml                    | 16 +++++-----------
+ 3 files changed, 7 insertions(+), 17 deletions(-)
 
 diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
-index c5087d01..65951fda 100644
+index e8569a26..65951fda 100644
 --- a/charts/prometheus/templates/deploy.yaml
 +++ b/charts/prometheus/templates/deploy.yaml
 @@ -101,11 +101,7 @@ spec:
@@ -20,7 +20,7 @@ index c5087d01..65951fda 100644
 -          {{- if .Values.server.image.digest }}
 -          image: "{{ tpl .Values.server.image.repository . }}@{{ tpl .Values.server.image.digest . }}"
 -          {{- else }}
--          image: "{{ tpl .Values.server.image.repository . }}:{{ tpl .Values.server.image.tag . | default .Chart.AppVersion}}"
+-          image: "{{ tpl .Values.server.image.repository . }}:{{ tpl .Values.server.image.tag . | default .Chart.AppVersion}}{{ if .Values.server.image.distroless }}-distroless{{ end }}"
 -          {{- end }}
 +          image: "{{ .Values.sourceRegistry }}/{{ .Values.server.image.repository }}@{{ .Values.server.image.digest }}"
            imagePullPolicy: "{{ .Values.server.image.pullPolicy }}"
@@ -40,7 +40,7 @@ index d75f8a1c..f84bf7c1 100644
            args:
              - --path.procfs=/host/proc
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index 134f8f93..b871026f 100644
+index 224b3530..89e8baf8 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
 @@ -9,6 +9,7 @@ rbac:
@@ -62,20 +62,24 @@ index 134f8f93..b871026f 100644
      pullPolicy: IfNotPresent
  
    ## Specify if a Pod Security Policy for node-exporter must be created
-@@ -256,11 +257,8 @@ server:
+@@ -258,15 +259,8 @@ server:
    ## Prometheus server container image
    ##
    image:
 -    repository: quay.io/prometheus/prometheus
--    # if not set appVersion field from Chart.yaml is used
+-    # If not set appVersion field from Chart.yaml is used. Supports templating.
 -    tag: ""
 -    # When digest is set to a non-empty value, images will be pulled by digest (regardless of tag value).
 -    digest: ""
+-    # Use the distroless image variant.
+-    distroless: false
+-    pullPolicy: IfNotPresent
+-
 +    repository: prometheus/prometheus
 +    digest: {{prometheus/prometheus}}
-     pullPolicy: IfNotPresent
- 
    ## Prometheus server command
+   ##
+   command: []
 -- 
 2.50.1 (Apple Git-155)
 
