@@ -121,8 +121,26 @@ function build::kind::load_images(){
             ctr --namespace=k8s.io images import --all-platforms --no-unpack - < $IMAGES_FOLDER/$image_id.tar
     done
 
+    # Tag the EKS-D pause image as what kubeadm expects.
+    # kubeadm constructs <imageRepository>/pause:<PauseVersion> (e.g. pause:3.10.2 for k8s 1.36)
+    # and the EKS-D image is published at a different tag. Without this alias kubeadm's
+    # preflight image pull fails with "not found".
+    # We extract the pause tag kubeadm expects from its default image list, then construct
+    # the full ref using the EKS-D image repository.
+    KUBEADM_PAUSE_TAG=$(docker exec --privileged -i $CONTAINER_ID \
+        /usr/bin/kubeadm config images list 2>/dev/null | grep "/pause:" | sed 's/.*pause://')
+    if [ -n "$KUBEADM_PAUSE_TAG" ]; then
+        EKSD_PAUSE_REPO=$(echo "$PAUSE_IMAGE_TAG_OVERRIDE" | sed 's/:[^:]*$//')
+        KUBEADM_PAUSE_REF="${EKSD_PAUSE_REPO}:${KUBEADM_PAUSE_TAG}"
+        if [ "$KUBEADM_PAUSE_REF" != "$PAUSE_IMAGE_TAG_OVERRIDE" ]; then
+            echo "Tagging EKS-D pause image as kubeadm-expected ref: $KUBEADM_PAUSE_REF"
+            docker exec --privileged -i $CONTAINER_ID \
+                ctr --namespace=k8s.io images tag "$PAUSE_IMAGE_TAG_OVERRIDE" "$KUBEADM_PAUSE_REF"
+        fi
+    fi
+
     docker exec --privileged -i $CONTAINER_ID crictl images
-    
+
     # Validate all images in the image are from public.ecr
     EXPECTED_FINAL_IMAGES=("amazonlinux/amazonlinux" "kind/kindnetd" "rancher/local-path-provisioner" \
         "kubernetes/kube-apiserver" "kubernetes/kube-controller-manager" "kubernetes/kube-proxy" \
