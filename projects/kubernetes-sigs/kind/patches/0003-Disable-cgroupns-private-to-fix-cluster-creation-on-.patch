@@ -1,0 +1,34 @@
+From 17d4d9f32d68fbf07fafdf52f309b873725106e2 Mon Sep 17 00:00:00 2001
+From: Jackson West <jgw@amazon.com>
+Date: Sat, 19 Aug 2023 09:21:55 -0500
+Subject: [PATCH 3/6] Disable cgroupns=private to fix cluster creation on AL2
+
+On AL2 hosts (cgroup v1), passing --cgroupns=private to docker run causes
+the kind node container's API server to fail during kubeadm init. The
+kubeadm process times out waiting for the control plane to become ready,
+specifically when trying to create the bootstrap ClusterRoleBinding.
+
+This flag is only meaningful on cgroup v2 hosts where it is already the
+default Docker behavior, so removing it on cgroup v1 hosts is safe.
+
+---
+ pkg/cluster/internal/providers/docker/provision.go | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/pkg/cluster/internal/providers/docker/provision.go b/pkg/cluster/internal/providers/docker/provision.go
+index 047c961..1f394cd 100644
+--- a/pkg/cluster/internal/providers/docker/provision.go
++++ b/pkg/cluster/internal/providers/docker/provision.go
+@@ -171,7 +171,8 @@ func commonArgs(cluster string, cfg *config.Cluster, networkName string, nodeNam
+ 		// this is the default with cgroups v2 but not with cgroups v1, unless
+ 		// overridden in the daemon --default-cgroupns-mode
+ 		// https://github.com/docker/cli/pull/3699#issuecomment-1191675788
+-		"--cgroupns=private",
++		// AWS: Causes kubeadm init timeout on AL2 (cgroup v1) hosts
++		//"--cgroupns=private",
+ 	}
+
+ 	// enable IPv6 if necessary
+--
+2.48.1
+
