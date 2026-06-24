@@ -31,11 +31,13 @@ $(FIX_LICENSES_GO_SPIN_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # to pick up
 	wget --retry-connrefused https://raw.githubusercontent.com/tj/go-spin/master/LICENSE -O $@
 
-$(FIX_LICENSES_SEGMENTIO_ASM_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
+$(FIX_LICENSES_SEGMENTIO_ASM_TARGET): FORCE | $(GO_MOD_DOWNLOAD_TARGETS)
 # The segmentio/asm dependency uses an MIT-0 (MIT No Attribution) license which
 # go-licenses cannot classify at the 0.9 confidence threshold. The upstream license
 # is more permissive than standard MIT so we place a standard MIT license here
 # to allow go-licenses to identify it. The actual upstream license is MIT-0.
+# FORCE is needed because go mod vendor creates this file with the original MIT-0
+# content, causing Make to skip the overwrite.
 	printf '%s\n' \
 		'The MIT License' \
 		'' \
@@ -60,6 +62,9 @@ $(FIX_LICENSES_SEGMENTIO_ASM_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 		'TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE' \
 		'SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.' > $@
 
+
+.PHONY: FORCE
+FORCE:
 
 ########### DO NOT EDIT #############################
 # To update call: make add-generated-help-block
