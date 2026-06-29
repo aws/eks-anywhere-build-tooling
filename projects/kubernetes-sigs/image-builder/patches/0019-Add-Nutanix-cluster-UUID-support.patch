@@ -1,0 +1,37 @@
+From fc2315f1adf6718a450f1ffd22ec9e3c28f28603 Mon Sep 17 00:00:00 2001
+From: Amelia Lu <peirulu@amazon.com>
+Date: Mon, 29 Jun 2026 00:31:52 -0700
+Subject: [PATCH] Add Nutanix cluster UUID support
+
+When multiple clusters share the same name (e.g. Prism Central and
+Prism Element both named "nutanix-ci-cluster"), the Packer Nutanix
+plugin may resolve to the wrong cluster. Adding cluster_uuid allows
+unambiguous cluster targeting. The plugin gives cluster_uuid precedence
+over cluster_name when both are set.
+---
+ images/capi/packer/nutanix/packer.json.tmpl | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/images/capi/packer/nutanix/packer.json.tmpl b/images/capi/packer/nutanix/packer.json.tmpl
+index 0353122c8..7efd0dd52 100644
+--- a/images/capi/packer/nutanix/packer.json.tmpl
++++ b/images/capi/packer/nutanix/packer.json.tmpl
+@@ -3,6 +3,7 @@
+     {
+       "boot_type": "{{user `boot_type`}}",
+       "cluster_name": "{{user `nutanix_cluster_name`}}",
++      "cluster_uuid": "{{user `nutanix_cluster_uuid`}}",
+       "cpu": "{{user `cpus`}}",
+       "force_deregister": "{{user `force_deregister`}}",
+       "image_delete": "{{user `image_delete`}}",
+@@ -154,6 +155,7 @@
+     "machine_id_mode": "444",
+     "memory": "2048",
+     "nutanix_cluster_name": "{{env `NUTANIX_CLUSTER_NAME`}}",
++    "nutanix_cluster_uuid": "",
+     "nutanix_endpoint": "{{env `NUTANIX_ENDPOINT`}}",
+     "nutanix_insecure": "{{env `NUTANIX_INSECURE`}}",
+     "nutanix_password": "{{env `NUTANIX_PASSWORD`}}",
+-- 
+2.48.1
+
