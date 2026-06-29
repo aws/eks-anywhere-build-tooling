@@ -123,6 +123,7 @@ type RhelConfig struct {
 
 type NutanixConfig struct {
 	ClusterName       string `json:"nutanix_cluster_name"`
+	ClusterUUID       string `json:"nutanix_cluster_uuid,omitempty"`
 	ImageName         string `json:"image_name"`
 	ImageSizeGb       string `json:"image_size_gb,omitempty"`
 	ImageUrl          string `json:"image_url,omitempty"`
