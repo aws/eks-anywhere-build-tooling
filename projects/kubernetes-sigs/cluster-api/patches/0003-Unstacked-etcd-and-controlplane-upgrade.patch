@@ -1,7 +1,7 @@
-From 432a6149ad0f24ec885a19c052615b9954ac07e8 Mon Sep 17 00:00:00 2001
+From 5a11592fa77b5cf2e75eb5ab0811edfac44c7b1b Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
-Subject: [PATCH] Unstacked etcd and controlplane upgrade
+Subject: [PATCH 03/37] Unstacked etcd and controlplane upgrade
 
 Rename controlplane upgrade annotation variable
 
@@ -40,7 +40,7 @@ Signed-off-by: Rajashree Mandaogane <mandaor@amazon.com>
  create mode 100644 util/test/builder/etcd.go
 
 diff --git a/api/controlplane/kubeadm/v1beta1/condition_consts.go b/api/controlplane/kubeadm/v1beta1/condition_consts.go
-index c460c3a80..30c775801 100644
+index c460c3a..30c7758 100644
 --- a/api/controlplane/kubeadm/v1beta1/condition_consts.go
 +++ b/api/controlplane/kubeadm/v1beta1/condition_consts.go
 @@ -56,6 +56,14 @@ const (
@@ -59,7 +59,7 @@ index c460c3a80..30c775801 100644
  
  const (
 diff --git a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
-index d85ea87a3..1c52a473e 100644
+index d85ea87..1c52a47 100644
 --- a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
 +++ b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
 @@ -413,6 +413,14 @@ const (
@@ -78,7 +78,7 @@ index d85ea87a3..1c52a473e 100644
  
  // NodeKubeadmLabelsAndTaintsSet condition and corresponding reasons that will be used for KubeadmControlPlane controlled machines in v1Beta2 API version.
 diff --git a/api/core/v1beta1/common_types.go b/api/core/v1beta1/common_types.go
-index 66af86b77..056d7bb00 100644
+index 66af86b..056d7bb 100644
 --- a/api/core/v1beta1/common_types.go
 +++ b/api/core/v1beta1/common_types.go
 @@ -171,6 +171,9 @@ const (
@@ -103,7 +103,7 @@ index 66af86b77..056d7bb00 100644
  
  // MachineSetPreflightCheck defines a valid MachineSet preflight check.
 diff --git a/api/core/v1beta2/common_types.go b/api/core/v1beta2/common_types.go
-index 368b9dade..cf2d30d74 100644
+index 368b9da..cf2d30d 100644
 --- a/api/core/v1beta2/common_types.go
 +++ b/api/core/v1beta2/common_types.go
 @@ -178,6 +178,9 @@ const (
@@ -128,7 +128,7 @@ index 368b9dade..cf2d30d74 100644
  
  // MachineSetPreflightCheck defines a valid MachineSet preflight check.
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index dbaf275dc..6ffec0737 100644
+index dbaf275..6ffec07 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
 @@ -296,3 +296,32 @@ func GetExternalEtcdEndpoints(externalEtcd *unstructured.Unstructured) (string,
@@ -165,7 +165,7 @@ index dbaf275dc..6ffec0737 100644
 +	return unstructured.SetNestedStringMap(externalEtcd.UnstructuredContent(), annotations, "metadata", "annotations")
 +}
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index a0a3bb403..d0333451c 100644
+index a0a3bb4..d033345 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -26,6 +26,7 @@ import (
@@ -312,7 +312,7 @@ index a0a3bb403..d0333451c 100644
 +	return len(endpoints) == 0 || len(endpoints) == 1 && endpoints[0] == ""
 +}
 diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
-index 0e0bfe1a7..a2bedaa90 100644
+index 0e0bfe1..a2bedaa 100644
 --- a/controlplane/kubeadm/internal/controllers/controller_test.go
 +++ b/controlplane/kubeadm/internal/controllers/controller_test.go
 @@ -25,6 +25,7 @@ import (
@@ -559,7 +559,7 @@ index 0e0bfe1a7..a2bedaa90 100644
  	c := &clusterv1.Cluster{
  		ObjectMeta: metav1.ObjectMeta{
 diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
-index c4957e03b..730a55058 100644
+index c4957e0..730a550 100644
 --- a/controlplane/kubeadm/internal/workload_cluster.go
 +++ b/controlplane/kubeadm/internal/workload_cluster.go
 @@ -71,6 +71,7 @@ type WorkloadCluster interface {
@@ -571,7 +571,7 @@ index c4957e03b..730a55058 100644
  	UpdateAPIServerInKubeadmConfigMap(apiServer bootstrapv1.APIServer) func(*bootstrapv1.ClusterConfiguration)
  	UpdateControllerManagerInKubeadmConfigMap(controllerManager bootstrapv1.ControllerManager) func(*bootstrapv1.ClusterConfiguration)
 diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd.go b/controlplane/kubeadm/internal/workload_cluster_etcd.go
-index c1785a87b..80724ca3a 100644
+index c1785a8..80724ca 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_etcd.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_etcd.go
 @@ -19,6 +19,7 @@ package internal
@@ -598,7 +598,7 @@ index c1785a87b..80724ca3a 100644
  // Removing the last remaining member of the cluster is not supported.
  // Note: It is a responsibility of the caller to check if this operation doesn't lead to quorum loss.
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index fe5ac869b..b33aeefe0 100644
+index fe5ac86..b33aeef 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
 @@ -199,6 +199,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
@@ -618,7 +618,7 @@ index fe5ac869b..b33aeefe0 100644
  	return doReconcile(ctx, reconcileNormal, s)
  }
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 1ea45a107..d593d2b68 100644
+index 1ea45a1..d593d2b 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -22,6 +22,7 @@ import (
@@ -752,7 +752,7 @@ index 1ea45a107..d593d2b68 100644
  	v1beta1conditions.SetMirror(cluster, clusterv1.ManagedExternalEtcdClusterReadyCondition,
  		v1beta1conditions.UnstructuredGetter(etcdPlaneConfig),
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 40d749290..022420170 100644
+index 40d7492..0224201 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
 @@ -18,23 +18,28 @@ package cluster
@@ -1040,7 +1040,7 @@ index 40d749290..022420170 100644
 +	})
 +}
 diff --git a/util/annotations/helpers.go b/util/annotations/helpers.go
-index c378fa298..1a71cfee4 100644
+index c378fa2..1a71cfe 100644
 --- a/util/annotations/helpers.go
 +++ b/util/annotations/helpers.go
 @@ -120,6 +120,11 @@ func GetManagedAnnotations(m *clusterv1.Machine, additionalSyncMachineAnnotation
@@ -1056,7 +1056,7 @@ index c378fa298..1a71cfee4 100644
  func hasAnnotation(o metav1.Object, annotation string) bool {
  	annotations := o.GetAnnotations()
 diff --git a/util/test/builder/builders.go b/util/test/builder/builders.go
-index ab73c20f1..8be32151c 100644
+index ab73c20..8be3215 100644
 --- a/util/test/builder/builders.go
 +++ b/util/test/builder/builders.go
 @@ -40,6 +40,7 @@ type ClusterBuilder struct {
@@ -1082,7 +1082,7 @@ index ab73c20f1..8be32151c 100644
  	c.topology = topology
 diff --git a/util/test/builder/etcd.go b/util/test/builder/etcd.go
 new file mode 100644
-index 000000000..9c187575f
+index 0000000..9c18757
 --- /dev/null
 +++ b/util/test/builder/etcd.go
 @@ -0,0 +1,80 @@
@@ -1167,7 +1167,7 @@ index 000000000..9c187575f
 +	return c.obj
 +}
 diff --git a/util/test/builder/zz_generated.deepcopy.go b/util/test/builder/zz_generated.deepcopy.go
-index 821fa49ba..9e6a641c8 100644
+index 821fa49..9e6a641 100644
 --- a/util/test/builder/zz_generated.deepcopy.go
 +++ b/util/test/builder/zz_generated.deepcopy.go
 @@ -97,6 +97,10 @@ func (in *ClusterBuilder) DeepCopyInto(out *ClusterBuilder) {

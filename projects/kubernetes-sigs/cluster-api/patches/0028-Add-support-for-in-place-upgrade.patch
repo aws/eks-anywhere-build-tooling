@@ -1,7 +1,7 @@
-From bc67367e413d5f47f8181e5a0436c9b865273e7f Mon Sep 17 00:00:00 2001
+From 793c2461e3436a928919a0d39eb2a7036e8b8cda Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 17 Jan 2024 09:28:18 -0800
-Subject: [PATCH] Add support for in-place upgrade
+Subject: [PATCH 28/37] Add support for in-place upgrade
 
 ---
  .../v1beta1/kubeadm_control_plane_types.go    |  18 +-
@@ -28,7 +28,7 @@ Subject: [PATCH] Add support for in-place upgrade
  create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace_test.go
 
 diff --git a/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go b/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
-index 1aa38a59d..8fa1432ba 100644
+index 1aa38a5..8fa1432 100644
 --- a/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
 +++ b/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
 @@ -29,13 +29,16 @@ import (
@@ -77,7 +77,7 @@ index 1aa38a59d..8fa1432ba 100644
  	// +optional
  	Type RolloutStrategyType `json:"type,omitempty"`
 diff --git a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
-index 1c52a473e..668faa26a 100644
+index 1c52a47..668faa2 100644
 --- a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
 +++ b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
 @@ -26,13 +26,16 @@ import (
@@ -126,7 +126,7 @@ index 1c52a473e..668faa26a 100644
  	// +required
  	Type KubeadmControlPlaneRolloutStrategyType `json:"type,omitempty"`
 diff --git a/api/core/v1beta2/machinedeployment_types.go b/api/core/v1beta2/machinedeployment_types.go
-index b7182c278..73bac8de0 100644
+index b7182c2..73bac8d 100644
 --- a/api/core/v1beta2/machinedeployment_types.go
 +++ b/api/core/v1beta2/machinedeployment_types.go
 @@ -32,7 +32,7 @@ const (
@@ -177,7 +177,7 @@ index b7182c278..73bac8de0 100644
  	// +required
  	Type MachineDeploymentRolloutStrategyType `json:"type,omitempty"`
 diff --git a/api/core/v1beta2/zz_generated.openapi.go b/api/core/v1beta2/zz_generated.openapi.go
-index 6302867a9..cec393843 100644
+index 6302867..cec3938 100644
 --- a/api/core/v1beta2/zz_generated.openapi.go
 +++ b/api/core/v1beta2/zz_generated.openapi.go
 @@ -3373,7 +3373,7 @@ func schema_cluster_api_api_core_v1beta2_MachineDeploymentClassRolloutStrategy(r
@@ -190,7 +190,7 @@ index 6302867a9..cec393843 100644
  							Format:      "",
  						},
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-index e04f1fa55..7342af7d9 100644
+index e04f1fa..7342af7 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
 @@ -4559,6 +4559,7 @@ spec:
@@ -202,7 +202,7 @@ index e04f1fa55..7342af7d9 100644
                                required:
                                - type
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index c777418bf..4eeb125d7 100644
+index c777418..4eeb125 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 @@ -3217,6 +3217,7 @@ spec:
@@ -214,7 +214,7 @@ index c777418bf..4eeb125d7 100644
                                    required:
                                    - type
 diff --git a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-index 272f00ad0..5e6adb0e8 100644
+index 272f00a..5e6adb0 100644
 --- a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
 @@ -1075,11 +1075,18 @@ spec:
@@ -238,7 +238,7 @@ index 272f00ad0..5e6adb0e8 100644
                      required:
                      - type
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index bff1d2d50..31e1f9f6a 100644
+index bff1d2d..31e1f9f 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -2992,11 +2992,16 @@ spec:
@@ -280,7 +280,7 @@ index bff1d2d50..31e1f9f6a 100644
                      required:
                      - type
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index d14e7537e..13ade8ebd 100644
+index d14e753..13ade8e 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -2941,11 +2941,16 @@ spec:
@@ -322,7 +322,7 @@ index d14e7537e..13ade8ebd 100644
                              required:
                              - type
 diff --git a/controlplane/kubeadm/internal/controllers/update.go b/controlplane/kubeadm/internal/controllers/update.go
-index 8795b2739..838a5a97d 100644
+index 8795b27..838a5a9 100644
 --- a/controlplane/kubeadm/internal/controllers/update.go
 +++ b/controlplane/kubeadm/internal/controllers/update.go
 @@ -18,6 +18,7 @@ package controllers
@@ -356,7 +356,7 @@ index 8795b2739..838a5a97d 100644
  	}
  }
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-index 75778b4bf..26b91e6ea 100644
+index 75778b4..26b91e6 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
 @@ -355,12 +355,12 @@ func validateRolloutAndCertValidityFields(rolloutSpec controlplanev1.KubeadmCont
@@ -375,7 +375,7 @@ index 75778b4bf..26b91e6ea 100644
  		)
  	}
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-index 896a143aa..4c3981de3 100644
+index 896a143..4c3981d 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
 @@ -41,39 +41,143 @@ var (
@@ -551,7 +551,7 @@ index 896a143aa..4c3981de3 100644
  
  func TestKubeadmControlPlaneValidateCreate(t *testing.T) {
 diff --git a/internal/controllers/machinedeployment/machinedeployment_controller.go b/internal/controllers/machinedeployment/machinedeployment_controller.go
-index 933551c09..e6cbf40b3 100644
+index 933551c..e6cbf40 100644
 --- a/internal/controllers/machinedeployment/machinedeployment_controller.go
 +++ b/internal/controllers/machinedeployment/machinedeployment_controller.go
 @@ -326,6 +326,10 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
@@ -566,7 +566,7 @@ index 933551c09..e6cbf40b3 100644
  }
  
 diff --git a/internal/controllers/machinedeployment/machinedeployment_controller_test.go b/internal/controllers/machinedeployment/machinedeployment_controller_test.go
-index 0bf8c6059..1d095fc82 100644
+index 0bf8c60..1d095fc 100644
 --- a/internal/controllers/machinedeployment/machinedeployment_controller_test.go
 +++ b/internal/controllers/machinedeployment/machinedeployment_controller_test.go
 @@ -29,6 +29,7 @@ import (
@@ -997,7 +997,7 @@ index 0bf8c6059..1d095fc82 100644
  		"some": "labelselector",
 diff --git a/internal/controllers/machinedeployment/machinedeployment_inplace.go b/internal/controllers/machinedeployment/machinedeployment_inplace.go
 new file mode 100644
-index 000000000..0c1a18e83
+index 0000000..0c1a18e
 --- /dev/null
 +++ b/internal/controllers/machinedeployment/machinedeployment_inplace.go
 @@ -0,0 +1,70 @@
@@ -1073,7 +1073,7 @@ index 000000000..0c1a18e83
 +}
 diff --git a/internal/controllers/machinedeployment/machinedeployment_inplace_helper.go b/internal/controllers/machinedeployment/machinedeployment_inplace_helper.go
 new file mode 100644
-index 000000000..d602bffdc
+index 0000000..d602bff
 --- /dev/null
 +++ b/internal/controllers/machinedeployment/machinedeployment_inplace_helper.go
 @@ -0,0 +1,115 @@
@@ -1194,7 +1194,7 @@ index 000000000..d602bffdc
 +}
 diff --git a/internal/controllers/machinedeployment/machinedeployment_inplace_test.go b/internal/controllers/machinedeployment/machinedeployment_inplace_test.go
 new file mode 100644
-index 000000000..5c5f34290
+index 0000000..5c5f342
 --- /dev/null
 +++ b/internal/controllers/machinedeployment/machinedeployment_inplace_test.go
 @@ -0,0 +1,114 @@
@@ -1313,7 +1313,7 @@ index 000000000..5c5f34290
 +
 +}
 diff --git a/internal/controllers/machinedeployment/mdutil/util.go b/internal/controllers/machinedeployment/mdutil/util.go
-index 3b348af99..fec413236 100644
+index 3b348af..fec4132 100644
 --- a/internal/controllers/machinedeployment/mdutil/util.go
 +++ b/internal/controllers/machinedeployment/mdutil/util.go
 @@ -682,7 +682,7 @@ func NewMSNewReplicas(deployment *clusterv1.MachineDeployment, allMSs []*cluster

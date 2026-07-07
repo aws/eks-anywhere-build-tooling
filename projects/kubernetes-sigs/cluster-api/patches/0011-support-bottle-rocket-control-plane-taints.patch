@@ -1,7 +1,7 @@
-From 888c7b19617a38caada82465e85a0d5490c0532b Mon Sep 17 00:00:00 2001
+From de413a47933c4fbd9e2de1469e89fb13bb0196cd Mon Sep 17 00:00:00 2001
 From: danbudris <budris@amazon.com>
 Date: Fri, 18 Feb 2022 09:24:32 -0500
-Subject: [PATCH] support bottle rocket control plane taints
+Subject: [PATCH 11/37] support bottle rocket control plane taints
 
 ---
  api/bootstrap/kubeadm/v1beta1/conversion.go   | 12 ++++
@@ -29,7 +29,7 @@ Subject: [PATCH] support bottle rocket control plane taints
  22 files changed, 588 insertions(+), 1 deletion(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index a4c2d7a21..25dbea9b5 100644
+index a4c2d7a..25dbea9 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
 @@ -676,6 +676,18 @@ func Convert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *
@@ -52,7 +52,7 @@ index a4c2d7a21..25dbea9b5 100644
  	if in.Local != nil {
  		if err := Convert_v1beta1_LocalEtcd_To_v1beta2_LocalEtcd(in.Local, &out.Local, s); err != nil {
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 4a4297512..2484e65fc 100644
+index 4a42975..2484e65 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 @@ -104,6 +104,11 @@ type ClusterConfiguration struct {
@@ -94,7 +94,7 @@ index 4a4297512..2484e65fc 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index ad933129c..eeb3cd593 100644
+index ad93312..eeb3cd5 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -360,6 +360,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -180,7 +180,7 @@ index ad933129c..eeb3cd593 100644
  		return err
  	}
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index e7c8792cd..50d699279 100644
+index e7c8792..50d6992 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -222,7 +222,7 @@ index e7c8792cd..50d699279 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index fcbc40457..1300e12c5 100644
+index fcbc404..1300e12 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 @@ -164,6 +164,11 @@ type ClusterConfiguration struct {
@@ -277,7 +277,7 @@ index fcbc40457..1300e12c5 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index c4881a0d4..5089f42fa 100644
+index c4881a0..5089f42 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -194,11 +194,27 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -317,7 +317,7 @@ index c4881a0d4..5089f42fa 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 82ea07872..1c2180925 100644
+index 82ea078..1c21809 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -314,6 +314,22 @@ spec:
@@ -421,7 +421,7 @@ index 82ea07872..1c2180925 100644
                      description: |-
                        caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 373cd2c4d..54fc03c0d 100644
+index 373cd2c..54fc03c 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -347,6 +347,22 @@ spec:
@@ -525,7 +525,7 @@ index 373cd2c4d..54fc03c0d 100644
                              description: |-
                                caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index dd769a78d..f8f1b97cb 100644
+index dd769a7..f8f1b97 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -53,6 +53,14 @@ trusted=true
@@ -554,7 +554,7 @@ index dd769a78d..f8f1b97cb 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 6eb8ae6ad..1acdd341f 100644
+index 6eb8ae6..1acdd34 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -25,6 +25,7 @@ const (
@@ -596,7 +596,7 @@ index 6eb8ae6ad..1acdd341f 100644
  		for _, noProxy := range config.ProxyConfiguration.NoProxy {
  			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index ac774b701..52e6d1087 100644
+index ac774b7..52e6d10 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 @@ -546,6 +546,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
@@ -644,7 +644,7 @@ index ac774b701..52e6d1087 100644
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
-index 6096463ee..bb127f06a 100644
+index 6096463..bb127f0 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
 @@ -444,6 +444,18 @@ func Convert_v1beta2_Pause_To_upstreamv1beta3_Pause(in *bootstrapv1.Pause, out *
@@ -667,7 +667,7 @@ index 6096463ee..bb127f06a 100644
  	return autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in, out, s)
  }
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
-index 65371b811..bfc69fabb 100644
+index 65371b8..bfc69fa 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
 @@ -83,6 +83,11 @@ type ClusterConfiguration struct {
@@ -709,7 +709,7 @@ index 65371b811..bfc69fabb 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index c5696436c..9ac9c8033 100644
+index c569643..9ac9c80 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -143,6 +143,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -795,7 +795,7 @@ index c5696436c..9ac9c8033 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
-index 68734b74a..60205c135 100644
+index 68734b7..60205c1 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
 @@ -157,12 +157,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -837,7 +837,7 @@ index 68734b74a..60205c135 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 9ffa082b0..2c60ebc7d 100644
+index 9ffa082..2c60ebc 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -503,6 +503,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
@@ -857,7 +857,7 @@ index 9ffa082b0..2c60ebc7d 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/utils_test.go b/bootstrap/kubeadm/types/utils_test.go
-index 3bd375477..2c4f0d5cc 100644
+index 3bd3754..2c4f0d5 100644
 --- a/bootstrap/kubeadm/types/utils_test.go
 +++ b/bootstrap/kubeadm/types/utils_test.go
 @@ -152,6 +152,8 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
@@ -918,7 +918,7 @@ index 3bd375477..2c4f0d5cc 100644
  		},
  		{
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index ad10647a5..d2dee32d0 100644
+index ad10647..d2dee32 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -360,6 +360,22 @@ spec:
@@ -1022,7 +1022,7 @@ index ad10647a5..d2dee32d0 100644
                          description: |-
                            caCertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index d6ceedd02..14e2a3831 100644
+index d6ceedd..14e2a38 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -355,6 +355,22 @@ spec:
@@ -1126,7 +1126,7 @@ index d6ceedd02..14e2a3831 100644
                                  description: |-
                                    caCertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
-index 57396f9e0..cc0c05bb0 100644
+index 57396f9..cc0c05b 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
 @@ -956,6 +956,8 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
@@ -1149,7 +1149,7 @@ index 57396f9e0..cc0c05bb0 100644
  				`),
  		},
 diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
-index ad476b7a5..d91f39b47 100644
+index ad476b7..d91f39b 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
 @@ -63,6 +63,8 @@ func TestUpdateEtcdExternalInKubeadmConfigMap(t *testing.T) {
@@ -1191,7 +1191,7 @@ index ad476b7a5..d91f39b47 100644
  				`),
  		},
 diff --git a/controlplane/kubeadm/internal/workload_cluster_test.go b/controlplane/kubeadm/internal/workload_cluster_test.go
-index 0d4d7d61f..e092258ea 100644
+index 0d4d7d6..e092258 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_test.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_test.go
 @@ -317,12 +317,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {

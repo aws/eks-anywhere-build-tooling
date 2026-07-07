@@ -1,7 +1,7 @@
-From 32c199fd2f23af0579fc7e3901beddee491c48bb Mon Sep 17 00:00:00 2001
+From 26536650390286643144e727f45fa9c8195e669c Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Wed, 23 Nov 2022 09:26:28 -0500
-Subject: [PATCH] Support configuring bottlerocket admin container image
+Subject: [PATCH 14/37] Support configuring bottlerocket admin container image
 
 ---
  api/bootstrap/kubeadm/v1beta1/conversion.go   | 12 ++++
@@ -21,7 +21,7 @@ Subject: [PATCH] Support configuring bottlerocket admin container image
  14 files changed, 426 insertions(+), 3 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index 5e3ffc386..c1391b884 100644
+index 5e3ffc3..c1391b8 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
 @@ -726,6 +726,18 @@ func Convert_v1beta2_BottlerocketBootstrapContainer_To_v1beta1_BottlerocketBoots
@@ -44,7 +44,7 @@ index 5e3ffc386..c1391b884 100644
  	if in.Local != nil {
  		if err := Convert_v1beta1_LocalEtcd_To_v1beta2_LocalEtcd(in.Local, &out.Local, s); err != nil {
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index e2f5572e7..11855daf2 100644
+index e2f5572..11855da 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 @@ -104,6 +104,11 @@ type ClusterConfiguration struct {
@@ -86,7 +86,7 @@ index e2f5572e7..11855daf2 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 92617e466..2ae08daff 100644
+index 92617e4..2ae08da 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -355,6 +355,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -172,7 +172,7 @@ index 92617e466..2ae08daff 100644
  		return err
  	}
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index c39346285..f846209e3 100644
+index c393462..f846209 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -142,6 +142,22 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -215,7 +215,7 @@ index c39346285..f846209e3 100644
  	if in.BottlerocketHostContainers != nil {
  		in, out := &in.BottlerocketHostContainers, &out.BottlerocketHostContainers
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 6569b5f9c..f7fa976a9 100644
+index 6569b5f..f7fa976 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 @@ -164,6 +164,11 @@ type ClusterConfiguration struct {
@@ -268,7 +268,7 @@ index 6569b5f9c..f7fa976a9 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index 61aed60e7..a03bc2e27 100644
+index 61aed60..a03bc2e 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -179,6 +179,21 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -310,7 +310,7 @@ index 61aed60e7..a03bc2e27 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index f73ebf93a..d9b935550 100644
+index f73ebf9..d9b9355 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -298,6 +298,22 @@ spec:
@@ -414,7 +414,7 @@ index f73ebf93a..d9b935550 100644
                      description: |-
                        BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 58f08f356..daa578c9d 100644
+index 58f08f3..daa578c 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -331,6 +331,22 @@ spec:
@@ -518,7 +518,7 @@ index 58f08f356..daa578c9d 100644
                              description: |-
                                BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 473050b6d..bf484f182 100644
+index 473050b..bf484f1 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -25,6 +25,7 @@ const (
@@ -545,7 +545,7 @@ index 473050b6d..bf484f182 100644
  		{
  			Name:            "kubeadm-bootstrap",
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 311f9bcc5..b2beeab81 100644
+index 311f9bc..b2beeab 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 @@ -546,6 +546,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
@@ -573,7 +573,7 @@ index 311f9bcc5..b2beeab81 100644
  			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
  			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index c62ca3c2b..c101c876d 100644
+index c62ca3c..c101c87 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -471,6 +471,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
@@ -593,7 +593,7 @@ index c62ca3c2b..c101c876d 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 322e7d74b..4fcb970d3 100644
+index 322e7d7..4fcb970 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -503,6 +503,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
@@ -613,7 +613,7 @@ index 322e7d74b..4fcb970d3 100644
  	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index da4690261..a4ff1cf29 100644
+index da46902..a4ff1cf 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -344,6 +344,22 @@ spec:
@@ -717,7 +717,7 @@ index da4690261..a4ff1cf29 100644
                          description: |-
                            BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 2c5e1bfd0..1771126e5 100644
+index 2c5e1bf..1771126 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -339,6 +339,22 @@ spec:

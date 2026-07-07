@@ -1,7 +1,7 @@
-From 30ef0cbf3f35198341faf4db8177f9b3e4b070d0 Mon Sep 17 00:00:00 2001
+From 915aef1ea11685f6f07194624cb423de7ffef3cf Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Wed, 8 Jun 2022 10:27:26 -0700
-Subject: [PATCH] Parse provider-id from kubelet extra args
+Subject: [PATCH 13/37] Parse provider-id from kubelet extra args
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
@@ -23,7 +23,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  15 files changed, 1938 insertions(+), 59 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index 25dbea9b5..5e3ffc386 100644
+index 25dbea9..5e3ffc3 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
 @@ -688,6 +688,44 @@ func Convert_v1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(in *boot
@@ -72,7 +72,7 @@ index 25dbea9b5..5e3ffc386 100644
  	if in.Local != nil {
  		if err := Convert_v1beta1_LocalEtcd_To_v1beta2_LocalEtcd(in.Local, &out.Local, s); err != nil {
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 2484e65fc..e2f5572e7 100644
+index 2484e65..e2f5572 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 @@ -109,6 +109,16 @@ type ClusterConfiguration struct {
@@ -155,7 +155,7 @@ index 2484e65fc..e2f5572e7 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index eeb3cd593..92617e466 100644
+index eeb3cd5..92617e4 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -355,6 +355,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -353,7 +353,7 @@ index eeb3cd593..92617e466 100644
  		return err
  	}
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index 50d699279..c39346285 100644
+index 50d6992..c393462 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -158,6 +158,22 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -437,7 +437,7 @@ index 50d699279..c39346285 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 1300e12c5..6569b5f9c 100644
+index 1300e12..6569b5f 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 @@ -179,6 +179,16 @@ type ClusterConfiguration struct {
@@ -541,7 +541,7 @@ index 1300e12c5..6569b5f9c 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index 5089f42fa..61aed60e7 100644
+index 5089f42..61aed60 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -194,6 +194,21 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -623,7 +623,7 @@ index 5089f42fa..61aed60e7 100644
  	in.Discovery.DeepCopyInto(&out.Discovery)
  	if in.ControlPlane != nil {
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 1c2180925..f73ebf93a 100644
+index 1c21809..f73ebf9 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -348,6 +348,90 @@ spec:
@@ -1001,7 +1001,7 @@ index 1c2180925..f73ebf93a 100644
                      description: |-
                        caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 54fc03c0d..58f08f356 100644
+index 54fc03c..58f08f3 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -381,6 +381,90 @@ spec:
@@ -1382,7 +1382,7 @@ index 54fc03c0d..58f08f356 100644
                              description: |-
                                caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index f8f1b97cb..04fb96221 100644
+index f8f1b97..04fb962 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -3,12 +3,6 @@
@@ -1493,7 +1493,7 @@ index f8f1b97cb..04fb96221 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 1acdd341f..473050b6d 100644
+index 1acdd34..473050b 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -23,13 +23,15 @@ const (
@@ -1622,7 +1622,7 @@ index 1acdd341f..473050b6d 100644
  
  	if len(config.ProxyConfiguration.NoProxy) > 0 {
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 52e6d1087..311f9bcc5 100644
+index 52e6d10..311f9bc 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 @@ -544,9 +544,11 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
@@ -1671,7 +1671,7 @@ index 52e6d1087..311f9bcc5 100644
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index 9ac9c8033..c62ca3c2b 100644
+index 9ac9c80..c62ca3c 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -480,6 +480,8 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
@@ -1693,7 +1693,7 @@ index 9ac9c8033..c62ca3c2b 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 2c60ebc7d..322e7d74b 100644
+index 2c60ebc..322e7d7 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -508,6 +508,8 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
@@ -1715,7 +1715,7 @@ index 2c60ebc7d..322e7d74b 100644
  		return err
  	}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index d2dee32d0..da4690261 100644
+index d2dee32..da46902 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -394,6 +394,90 @@ spec:
@@ -2096,7 +2096,7 @@ index d2dee32d0..da4690261 100644
                          description: |-
                            caCertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 14e2a3831..2c5e1bfd0 100644
+index 14e2a38..2c5e1bf 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -389,6 +389,90 @@ spec:

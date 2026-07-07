@@ -1,8 +1,8 @@
-From 2e3f00f72cdcefec085f8f0ce2eddb5c5291e998 Mon Sep 17 00:00:00 2001
+From 080ab1f0d94dd5cbfb040a1885827fe2768a3e72 Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Tue, 31 Aug 2021 15:56:28 +0000
-Subject: [PATCH] Make pause and bottlerocket bootstrap images updatable in
- validation webhook
+Subject: [PATCH 05/37] Make pause and bottlerocket bootstrap images updatable
+ in validation webhook
 
 cr: https://code.amazon.com/reviews/CR-56335855
 ---
@@ -25,7 +25,7 @@ cr: https://code.amazon.com/reviews/CR-56335855
  16 files changed, 426 insertions(+), 4 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 6cb79314a..4a4297512 100644
+index 6cb7931..4a42975 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 @@ -109,6 +109,11 @@ type ClusterConfiguration struct {
@@ -69,7 +69,7 @@ index 6cb79314a..4a4297512 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 80727d988..ad933129c 100644
+index 80727d9..ad93312 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -310,6 +310,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -159,7 +159,7 @@ index 80727d988..ad933129c 100644
  	out.Name = in.Name
  	out.Key = in.Key
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index a51569957..e7c8792cd 100644
+index a515699..e7c8792 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -165,6 +165,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
@@ -201,7 +201,7 @@ index a51569957..e7c8792cd 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 2d5a307fe..fcbc40457 100644
+index 2d5a307..fcbc404 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 @@ -142,6 +142,15 @@ func (r *InitConfiguration) IsDefined() bool {
@@ -247,7 +247,7 @@ index 2d5a307fe..fcbc40457 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index 880b661af..c4881a0d4 100644
+index 880b661..c4881a0 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -200,6 +200,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
@@ -289,7 +289,7 @@ index 880b661af..c4881a0d4 100644
  func (in *Scheduler) DeepCopyInto(out *Scheduler) {
  	*out = *in
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 407f6a94b..82ea07872 100644
+index 407f6a9..82ea078 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 @@ -967,6 +967,19 @@ spec:
@@ -373,7 +373,7 @@ index 407f6a94b..82ea07872 100644
                      description: |-
                        skipPhases is a list of phases to skip during command execution.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 1b9d4d6b4..373cd2c4d 100644
+index 1b9d4d6..373cd2c 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 @@ -1014,6 +1014,20 @@ spec:
@@ -461,7 +461,7 @@ index 1b9d4d6b4..373cd2c4d 100644
                              description: |-
                                skipPhases is a list of phases to skip during command execution.
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index e4be8d945..886af6d87 100644
+index e4be8d9..886af6d 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -31,6 +31,17 @@ user-data = "{{.BootstrapContainerUserData}}"
@@ -497,7 +497,7 @@ index e4be8d945..886af6d87 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 18e559cc8..f41f0b23a 100644
+index 18e559c..f41f0b2 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -22,9 +22,10 @@ const (
@@ -549,7 +549,7 @@ index 18e559cc8..f41f0b23a 100644
  
  	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 27c6a80f1..3e97900e2 100644
+index 27c6a80..3e97900 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 @@ -550,6 +550,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
@@ -583,7 +583,7 @@ index 27c6a80f1..3e97900e2 100644
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index c948b069a..5e3fccf68 100644
+index c948b06..5e3fccf 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -381,6 +381,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
@@ -603,7 +603,7 @@ index c948b069a..5e3fccf68 100644
  		return err
  	}
 diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 64080b3ca..9ffa082b0 100644
+index 64080b3..9ffa082 100644
 --- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 +++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -506,6 +506,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
@@ -623,7 +623,7 @@ index 64080b3ca..9ffa082b0 100644
  		return err
  	}
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 849ed0a5a..ad10647a5 100644
+index 849ed0a..ad10647 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 @@ -1020,6 +1020,20 @@ spec:
@@ -711,7 +711,7 @@ index 849ed0a5a..ad10647a5 100644
                          description: |-
                            skipPhases is a list of phases to skip during command execution.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 82a2b6b26..d6ceedd02 100644
+index 82a2b6b..d6ceedd 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 @@ -1031,6 +1031,20 @@ spec:
@@ -799,7 +799,7 @@ index 82a2b6b26..d6ceedd02 100644
                                  description: |-
                                    skipPhases is a list of phases to skip during command execution.
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-index 06eabdef8..8d44b1839 100644
+index 06eabde..8d44b18 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
 @@ -123,6 +123,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
@@ -821,7 +821,7 @@ index 06eabdef8..8d44b1839 100644
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, patches, directory},
 diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-index 02a28be98..40f670dc8 100644
+index 02a28be..40f670d 100644
 --- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
 +++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
 @@ -760,6 +760,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {

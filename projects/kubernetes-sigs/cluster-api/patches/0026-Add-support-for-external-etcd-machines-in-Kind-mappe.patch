@@ -1,7 +1,7 @@
-From df3ed665de011c19688f0b6dbc54febfa040992f Mon Sep 17 00:00:00 2001
+From 2c2c756811c98b8c54ef4d3c28ff33e59910151a Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 16 Aug 2023 19:58:01 -0700
-Subject: [PATCH] Add support for external etcd machines in Kind mapper
+Subject: [PATCH 26/37] Add support for external etcd machines in Kind mapper
 
 ---
  .../client/cluster/objectgraph_test.go        |  2 +-
@@ -12,7 +12,7 @@ Subject: [PATCH] Add support for external etcd machines in Kind mapper
  5 files changed, 67 insertions(+), 38 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index 28e29eca0..808fe1199 100644
+index 28e29ec..808fe11 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
 @@ -2182,7 +2182,7 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
@@ -25,7 +25,7 @@ index 28e29eca0..808fe1199 100644
  					objs := []client.Object{}
  					objs = append(objs, test.NewFakeCluster("ns1", "cluster1").Objs()...)
 diff --git a/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go b/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
-index 4cdbddc4e..9c9131301 100644
+index 4cdbddc..9c91313 100644
 --- a/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
 +++ b/test/infrastructure/docker/internal/controllers/backends/docker/dockermachine_backend.go
 @@ -205,7 +205,7 @@ func (r *MachineBackendReconciler) ReconcileNormal(ctx context.Context, cluster
@@ -87,7 +87,7 @@ index 4cdbddc4e..9c9131301 100644
  	// Set ProviderID so the Cluster API Machine Controller can pull it
  	dockerMachine.Spec.ProviderID = externalMachine.ProviderID()
 diff --git a/test/infrastructure/docker/internal/controllers/backends/docker/dockermachinepool_backend.go b/test/infrastructure/docker/internal/controllers/backends/docker/dockermachinepool_backend.go
-index 03c0d5689..ff57faad7 100644
+index 03c0d56..ff57faa 100644
 --- a/test/infrastructure/docker/internal/controllers/backends/docker/dockermachinepool_backend.go
 +++ b/test/infrastructure/docker/internal/controllers/backends/docker/dockermachinepool_backend.go
 @@ -549,7 +549,7 @@ func createDockerContainer(ctx context.Context, name string, cluster *clusterv1.
@@ -100,7 +100,7 @@ index 03c0d5689..ff57faad7 100644
  	}
  	return nil
 diff --git a/test/infrastructure/docker/internal/controllers/dockermachinepool_controller_phases.go b/test/infrastructure/docker/internal/controllers/dockermachinepool_controller_phases.go
-index 52f450809..0ec1a2703 100644
+index 52f4508..0ec1a27 100644
 --- a/test/infrastructure/docker/internal/controllers/dockermachinepool_controller_phases.go
 +++ b/test/infrastructure/docker/internal/controllers/dockermachinepool_controller_phases.go
 @@ -105,7 +105,7 @@ func createDockerContainer(ctx context.Context, name string, cluster *clusterv1.
@@ -113,7 +113,7 @@ index 52f450809..0ec1a2703 100644
  	}
  	return nil
 diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
-index 14e7d9f4a..259a482d0 100644
+index 14e7d9f..259a482 100644
 --- a/test/infrastructure/docker/internal/docker/machine.go
 +++ b/test/infrastructure/docker/internal/docker/machine.go
 @@ -211,23 +211,36 @@ func (m *Machine) ContainerImage() string {

@@ -1,7 +1,7 @@
-From 686829a3fd51da16c1e422becf1b33df33d576f5 Mon Sep 17 00:00:00 2001
+From ac605739a90ba5c8a7844bfcd228b73cded1cca1 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 16 May 2023 11:03:09 -0500
-Subject: [PATCH] CAPI Move Cluster Filter
+Subject: [PATCH 23/37] CAPI Move Cluster Filter
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
 ---
@@ -15,7 +15,7 @@ Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
  7 files changed, 218 insertions(+), 34 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index aaaabcdf8..44b62f443 100644
+index aaaabcd..44b62f4 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -53,13 +53,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
@@ -113,7 +113,7 @@ index aaaabcdf8..44b62f443 100644
  	}
  
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index a7f48f29e..19dd8f684 100644
+index a7f48f2..19dd8f6 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
 @@ -780,7 +780,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
@@ -207,7 +207,7 @@ index a7f48f29e..19dd8f684 100644
  			backoff := wait.Backoff{
  				Steps: 1,
 diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
-index 83bd433c2..512a3e32e 100644
+index 83bd433..512a3e3 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph.go
 @@ -43,9 +43,11 @@ import (
@@ -284,7 +284,7 @@ index 83bd433c2..512a3e32e 100644
  func (o *objectGraph) fetchRef(ctx context.Context, opts wait.Backoff, ref *corev1.ObjectReference) (*unstructured.Unstructured, error) {
  	if ref == nil {
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index 11418edaa..ea359e9f9 100644
+index 11418ed..ea359e9 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
 @@ -1799,7 +1799,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
@@ -433,7 +433,7 @@ index 11418edaa..ea359e9f9 100644
  				g.Expect(err).To(HaveOccurred())
  				return
 diff --git a/cmd/clusterctl/client/move.go b/cmd/clusterctl/client/move.go
-index 6d5299cc9..977f8b881 100644
+index 6d5299c..977f8b8 100644
 --- a/cmd/clusterctl/client/move.go
 +++ b/cmd/clusterctl/client/move.go
 @@ -39,6 +39,10 @@ type MoveOptions struct {
@@ -475,7 +475,7 @@ index 6d5299cc9..977f8b881 100644
  
  func (c *clusterctlClient) getClusterClient(ctx context.Context, kubeconfig Kubeconfig) (cluster.Client, error) {
 diff --git a/cmd/clusterctl/client/move_test.go b/cmd/clusterctl/client/move_test.go
-index 42998329a..784c93d27 100644
+index 4299832..784c93d 100644
 --- a/cmd/clusterctl/client/move_test.go
 +++ b/cmd/clusterctl/client/move_test.go
 @@ -297,11 +297,11 @@ type fakeObjectMover struct {
@@ -506,7 +506,7 @@ index 42998329a..784c93d27 100644
  	return f.fromDirectoryErr
  }
 diff --git a/cmd/clusterctl/cmd/move.go b/cmd/clusterctl/cmd/move.go
-index 9f0d16693..3e82551d4 100644
+index 9f0d166..3e82551 100644
 --- a/cmd/clusterctl/cmd/move.go
 +++ b/cmd/clusterctl/cmd/move.go
 @@ -38,6 +38,7 @@ type moveOptions struct {

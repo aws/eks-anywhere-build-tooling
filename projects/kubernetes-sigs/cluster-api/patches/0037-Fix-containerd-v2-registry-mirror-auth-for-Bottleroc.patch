@@ -1,0 +1,149 @@
+From c086b2a41d3fdb44d5fded9a54772999d16752b8 Mon Sep 17 00:00:00 2001
+From: Amelia Lu <63176721+peirulu@users.noreply.github.com>
+Date: Tue, 7 Jul 2026 00:10:49 -0700
+Subject: [PATCH 37/37] Fix containerd v2 registry mirror auth for Bottlerocket
+
+Containerd 2.x does not read credentials.toml files from the certs.d
+directory in the CRI image pull path. This causes ImagePullBackOff with
+"authorization failed: no basic auth credentials" on Bottlerocket
+k8s-1.33+ variants using containerd 2.1.7.
+
+Add registryMirrorHostsTomlFile() that generates a write_files entry for
+the bootstrap container's cloud-config. This writes hosts.toml with
+inline authorization headers to /etc/containerd/certs.d/public.ecr.aws/.
+The bootstrap container is superpowered and writes to the rootfs before
+kubelet starts pulling images.
+
+This approach works on all Bottlerocket variants (k8s 1.30-1.36) since
+it uses the existing write_files mechanism, not settings.configuration-
+files or settings.bootstrap-commands.
+
+Verified:
+- containerd 1.7 (k8s-1.32): hosts.toml with header field is harmless
+- containerd 2.1 (k8s-1.34): hosts.toml with header fixes image pulls
+
+Signed-off-by: peirulu <peirulu@amazon.com>
+---
+ .../internal/bottlerocket/bottlerocket.go     | 47 +++++++++++++++++++
+ .../bottlerocket/controlplane_init.go         |  3 ++
+ .../bottlerocket/controlplane_join.go         |  3 ++
+ .../kubeadm/internal/bottlerocket/node.go     |  3 ++
+ 4 files changed, 56 insertions(+)
+
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+index ece510d..341b138 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
+@@ -55,6 +55,7 @@ type SettingsInput struct {
+ 	RegistryMirrorCACert            string
+ 	RegistryMirrorUsername          string
+ 	RegistryMirrorPassword          string
++	RegistryMirrorCredentialEncoded string
+ 	NodeLabels                      string
+ 	NTPServers                      []string
+ 	Taints                          string
+@@ -325,6 +326,8 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+ 	if config.RegistryMirrorCredentials.Username != "" && config.RegistryMirrorCredentials.Password != "" {
+ 		bottlerocketInput.RegistryMirrorUsername = config.RegistryMirrorCredentials.Username
+ 		bottlerocketInput.RegistryMirrorPassword = config.RegistryMirrorCredentials.Password
++		bottlerocketInput.RegistryMirrorCredentialEncoded = base64.StdEncoding.EncodeToString(
++			[]byte(fmt.Sprintf("%s:%s", config.RegistryMirrorCredentials.Username, config.RegistryMirrorCredentials.Password)))
+ 	}
+ 	if len(config.NTPServers) > 0 {
+ 		for _, ntp := range config.NTPServers {
+@@ -440,6 +443,50 @@ func parseTaints(taints []corev1.Taint) string {
+ 	return taintsToml.String()
+ }
+ 
++// registryMirrorHostsTomlFile generates a write_files entry for the bootstrap
++// container cloud-config that writes hosts.toml with inline authorization headers.
++// This is needed because containerd v2 does not read credentials.toml from certs.d.
++// Returns nil if no credentials are configured.
++func registryMirrorHostsTomlFile(config *BottlerocketConfig) *bootstrapv1.File {
++	if config.RegistryMirrorCredentials.Username == "" || config.RegistryMirrorCredentials.Password == "" {
++		return nil
++	}
++	if config.RegistryMirrorConfiguration.Endpoint == "" && len(config.RegistryMirrorConfiguration.Mirrors) == 0 {
++		return nil
++	}
++
++	credEncoded := base64.StdEncoding.EncodeToString(
++		[]byte(fmt.Sprintf("%s:%s", config.RegistryMirrorCredentials.Username, config.RegistryMirrorCredentials.Password)))
++
++	var content strings.Builder
++	content.WriteString("server = \"https://public.ecr.aws\"\n")
++
++	endpoint := config.RegistryMirrorConfiguration.Endpoint
++	if len(config.RegistryMirrorConfiguration.Mirrors) > 0 {
++		for _, mirror := range config.RegistryMirrorConfiguration.Mirrors {
++			for _, ep := range mirror.Endpoints {
++				content.WriteString(fmt.Sprintf("\n[host.\"%s\"]\n", ep))
++				content.WriteString("  capabilities = [\"pull\", \"resolve\"]\n")
++				content.WriteString(fmt.Sprintf("\n[host.\"%s\".header]\n", ep))
++				content.WriteString(fmt.Sprintf("  authorization = \"Basic %s\"\n", credEncoded))
++			}
++		}
++	} else if endpoint != "" {
++		content.WriteString(fmt.Sprintf("\n[host.\"https://%s\"]\n", endpoint))
++		content.WriteString("  capabilities = [\"pull\", \"resolve\"]\n")
++		content.WriteString(fmt.Sprintf("\n[host.\"https://%s\".header]\n", endpoint))
++		content.WriteString(fmt.Sprintf("  authorization = \"Basic %s\"\n", credEncoded))
++	}
++
++	permissions := "0644"
++	return &bootstrapv1.File{
++		Path:        "/etc/containerd/certs.d/public.ecr.aws/hosts.toml",
++		Owner:       "root:root",
++		Permissions: permissions,
++		Content:     content.String(),
++	}
++}
++
+ func parseNodeLabels(nodeLabels string) string {
+ 	if nodeLabels == "" {
+ 		return ""
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+index 8f9b6e1..1029a5a 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_init.go
+@@ -38,6 +38,9 @@ func NewInitControlPlane(input *cloudinit.ControlPlaneInput, config *Bottlerocke
+ 	if err != nil {
+ 		return nil, errors.Wrap(err, "Failed to patch kube-vip manifest file")
+ 	}
++	if hostsTomlFile := registryMirrorHostsTomlFile(config); hostsTomlFile != nil {
++		input.WriteFiles = append(input.WriteFiles, *hostsTomlFile)
++	}
+ 	bootstrapContainerUserData, err := generateBootstrapContainerUserData("InitBootstrapContainer", controlPlaneBootstrapContainerTemplate, input)
+ 	if err != nil {
+ 		return nil, err
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go b/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
+index aecbda8..979c706 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/controlplane_join.go
+@@ -26,6 +26,9 @@ func NewJoinControlPlane(input *cloudinit.ControlPlaneJoinInput, config *Bottler
+ 	if err != nil {
+ 		return nil, errors.Wrap(err, "failed to patch kube-vip manifest file for control plane join")
+ 	}
++	if hostsTomlFile := registryMirrorHostsTomlFile(config); hostsTomlFile != nil {
++		input.WriteFiles = append(input.WriteFiles, *hostsTomlFile)
++	}
+ 
+ 	bootstrapContainerUserData, err := generateBootstrapContainerUserData("JoinControlplane", controlPlaneJoinBottlerocketInit, input)
+ 	if err != nil {
+diff --git a/bootstrap/kubeadm/internal/bottlerocket/node.go b/bootstrap/kubeadm/internal/bottlerocket/node.go
+index df52e59..87f67f4 100644
+--- a/bootstrap/kubeadm/internal/bottlerocket/node.go
++++ b/bootstrap/kubeadm/internal/bottlerocket/node.go
+@@ -23,6 +23,9 @@ runcmd: "WorkerJoin"
+ func NewNode(input *cloudinit.NodeInput, config *BottlerocketConfig) ([]byte, error) {
+ 	input.KubeadmCommand = fmt.Sprintf(standardJoinCommand, input.KubeadmVerbosity)
+ 	input.WriteFiles = append(input.WriteFiles, input.AdditionalFiles...)
++	if hostsTomlFile := registryMirrorHostsTomlFile(config); hostsTomlFile != nil {
++		input.WriteFiles = append(input.WriteFiles, *hostsTomlFile)
++	}
+ 	bootstrapContainerUserData, err := generateBootstrapContainerUserData("Node", nodeBottleRocketInit, input)
+ 	if err != nil {
+ 		return nil, err
+-- 
+2.48.1
+

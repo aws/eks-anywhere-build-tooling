@@ -1,7 +1,7 @@
-From e514fae852fcc1ae12e6ae3b2900bf0fe6bc6b95 Mon Sep 17 00:00:00 2001
+From 6cbb43a863165d0c0e8f5844aa85296186330d23 Mon Sep 17 00:00:00 2001
 From: Abhinav <abhinavmpandey08@gmail.com>
 Date: Wed, 1 Feb 2023 16:34:23 -0800
-Subject: [PATCH] Add support for configuring NTP servers on bottlerocket
+Subject: [PATCH 18/37] Add support for configuring NTP servers on bottlerocket
  through CAPI
 
 Signed-off-by: Abhinav <abhinavmpandey08@gmail.com>
@@ -13,7 +13,7 @@ Signed-off-by: Abhinav <abhinavmpandey08@gmail.com>
  4 files changed, 57 insertions(+), 16 deletions(-)
 
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index 5e8573f09..384328c43 100644
+index 5e8573f..384328c 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -96,6 +96,12 @@ password = "{{.RegistryMirrorPassword}}"
@@ -40,7 +40,7 @@ index 5e8573f09..384328c43 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
-index 49c294436..d50b96761 100644
+index 49c2944..d50b967 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 @@ -40,10 +40,20 @@ no-proxy = []
@@ -108,7 +108,7 @@ index 49c294436..d50b96761 100644
  				},
  				BootstrapContainers: []bootstrapv1.BottlerocketBootstrapContainer{
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 096b47ffc..05cd01b8a 100644
+index 096b47f..05cd01b 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -33,6 +33,7 @@ type BottlerocketConfig struct {
@@ -155,7 +155,7 @@ index 096b47ffc..05cd01b8a 100644
  	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
  	if err != nil {
 diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index b758ffec6..714289bc0 100644
+index b758ffe..714289b 100644
 --- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 +++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
 @@ -575,6 +575,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex

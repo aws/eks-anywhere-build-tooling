@@ -1,7 +1,7 @@
-From d8651f92b4fb5b82b1e4c45e0e089ec56a38edcf Mon Sep 17 00:00:00 2001
+From 3b79fedd6e19c63c5e216dfb2959b77c1e0ab902 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 03/37] Add unstacked etcd support
+Subject: [PATCH 02/37] Add unstacked etcd support
 
 Unstacked etcd: API and config changes
 
@@ -96,7 +96,7 @@ commits on the new 1.0.1 branch. This commit adds back the permission.
  27 files changed, 1126 insertions(+), 11 deletions(-)
 
 diff --git a/api/core/v1beta1/cluster_types.go b/api/core/v1beta1/cluster_types.go
-index ab232262d..6d2c76eed 100644
+index ab23226..6d2c76e 100644
 --- a/api/core/v1beta1/cluster_types.go
 +++ b/api/core/v1beta1/cluster_types.go
 @@ -477,6 +477,11 @@ type ClusterSpec struct {
@@ -128,7 +128,7 @@ index ab232262d..6d2c76eed 100644
  	// +optional
  	V1Beta2 *ClusterV1Beta2Status `json:"v1beta2,omitempty"`
 diff --git a/api/core/v1beta1/condition_consts.go b/api/core/v1beta1/condition_consts.go
-index 8e36313c7..a0568c262 100644
+index 8e36313..a0568c2 100644
 --- a/api/core/v1beta1/condition_consts.go
 +++ b/api/core/v1beta1/condition_consts.go
 @@ -282,6 +282,22 @@ const (
@@ -155,7 +155,7 @@ index 8e36313c7..a0568c262 100644
  const (
  	// TopologyReconciledCondition provides evidence about the reconciliation of a Cluster topology into
 diff --git a/api/core/v1beta1/machine_types.go b/api/core/v1beta1/machine_types.go
-index 5ec584c23..3281d23b5 100644
+index 5ec584c..3281d23 100644
 --- a/api/core/v1beta1/machine_types.go
 +++ b/api/core/v1beta1/machine_types.go
 @@ -51,6 +51,8 @@ const (
@@ -168,7 +168,7 @@ index 5ec584c23..3281d23b5 100644
  	// search each annotation for during the pre-drain.delete lifecycle hook
  	// to pause reconciliation of deletion. These hooks will prevent removal of
 diff --git a/api/core/v1beta1/zz_generated.conversion.go b/api/core/v1beta1/zz_generated.conversion.go
-index 4bd292dce..35f221f57 100644
+index 4bd292d..35f221f 100644
 --- a/api/core/v1beta1/zz_generated.conversion.go
 +++ b/api/core/v1beta1/zz_generated.conversion.go
 @@ -1595,6 +1595,7 @@ func autoConvert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, out
@@ -206,7 +206,7 @@ index 4bd292dce..35f221f57 100644
  	return nil
  }
 diff --git a/api/core/v1beta1/zz_generated.deepcopy.go b/api/core/v1beta1/zz_generated.deepcopy.go
-index 973774e85..b1a186dd1 100644
+index 973774e..b1a186d 100644
 --- a/api/core/v1beta1/zz_generated.deepcopy.go
 +++ b/api/core/v1beta1/zz_generated.deepcopy.go
 @@ -538,6 +538,16 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
@@ -227,7 +227,7 @@ index 973774e85..b1a186dd1 100644
  		in, out := &in.InfrastructureRef, &out.InfrastructureRef
  		*out = new(v1.ObjectReference)
 diff --git a/api/core/v1beta2/cluster_types.go b/api/core/v1beta2/cluster_types.go
-index 9348ce5f5..70554603a 100644
+index 9348ce5..7055460 100644
 --- a/api/core/v1beta2/cluster_types.go
 +++ b/api/core/v1beta2/cluster_types.go
 @@ -496,6 +496,11 @@ type ClusterSpec struct {
@@ -259,7 +259,7 @@ index 9348ce5f5..70554603a 100644
  	// +optional
  	Deprecated *ClusterDeprecatedStatus `json:"deprecated,omitempty"`
 diff --git a/api/core/v1beta2/condition_consts.go b/api/core/v1beta2/condition_consts.go
-index 23abc6c2b..fa7bda307 100644
+index 23abc6c..fa7bda3 100644
 --- a/api/core/v1beta2/condition_consts.go
 +++ b/api/core/v1beta2/condition_consts.go
 @@ -213,3 +213,22 @@ const (
@@ -286,7 +286,7 @@ index 23abc6c2b..fa7bda307 100644
 +	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
 +)
 diff --git a/api/core/v1beta2/machine_types.go b/api/core/v1beta2/machine_types.go
-index 77606a632..c53e5c3ff 100644
+index 77606a6..c53e5c3 100644
 --- a/api/core/v1beta2/machine_types.go
 +++ b/api/core/v1beta2/machine_types.go
 @@ -30,6 +30,9 @@ const (
@@ -300,7 +300,7 @@ index 77606a632..c53e5c3ff 100644
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
 diff --git a/api/core/v1beta2/zz_generated.deepcopy.go b/api/core/v1beta2/zz_generated.deepcopy.go
-index 4a7c37c12..19b436dbc 100644
+index 4a7c37c..19b436d 100644
 --- a/api/core/v1beta2/zz_generated.deepcopy.go
 +++ b/api/core/v1beta2/zz_generated.deepcopy.go
 @@ -618,6 +618,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
@@ -312,7 +312,7 @@ index 4a7c37c12..19b436dbc 100644
  	in.Topology.DeepCopyInto(&out.Topology)
  	if in.AvailabilityGates != nil {
 diff --git a/api/core/v1beta2/zz_generated.openapi.go b/api/core/v1beta2/zz_generated.openapi.go
-index 717fbf090..6302867a9 100644
+index 717fbf0..6302867 100644
 --- a/api/core/v1beta2/zz_generated.openapi.go
 +++ b/api/core/v1beta2/zz_generated.openapi.go
 @@ -713,6 +713,22 @@ func schema_cluster_api_api_core_v1beta2_ClusterClassStatus(ref common.Reference
@@ -376,7 +376,7 @@ index 717fbf090..6302867a9 100644
  						SchemaProps: spec.SchemaProps{
  							Description: "deprecated groups all the status fields that are deprecated and will be removed when all the nested field are removed.",
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index b479535f4..aaaabcdf8 100644
+index b479535..aaaabcd 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -272,7 +272,10 @@ func (o *objectMover) checkProvisioningCompleted(ctx context.Context, graph *obj
@@ -392,7 +392,7 @@ index b479535f4..aaaabcdf8 100644
  	}
  
 diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 9f0b51e70..c777418bf 100644
+index 9f0b51e..c777418 100644
 --- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 +++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
 @@ -250,6 +250,96 @@ spec:
@@ -604,7 +604,7 @@ index 9f0b51e70..c777418bf 100644
                  description: observedGeneration is the latest generation observed
                    by the controller.
 diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
-index af20d5eb5..1d9268488 100644
+index af20d5e..1d92684 100644
 --- a/config/rbac/role.yaml
 +++ b/config/rbac/role.yaml
 @@ -54,6 +54,7 @@ rules:
@@ -616,7 +616,7 @@ index af20d5eb5..1d9268488 100644
    resources:
    - '*'
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index d2bc13244..dbaf275dc 100644
+index d2bc132..dbaf275 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
 @@ -267,6 +267,16 @@ func FailuresFrom(obj *unstructured.Unstructured) (string, string, error) {
@@ -651,7 +651,7 @@ index d2bc13244..dbaf275dc 100644
 +	return endpoints, found, nil
 +}
 diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
-index 37f716312..25eeb3256 100644
+index 37f7163..25eeb32 100644
 --- a/controlplane/kubeadm/config/rbac/role.yaml
 +++ b/controlplane/kubeadm/config/rbac/role.yaml
 @@ -107,3 +107,12 @@ rules:
@@ -669,7 +669,7 @@ index 37f716312..25eeb3256 100644
 +  - watch
 \ No newline at end of file
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index 6361e1055..a0a3bb403 100644
+index 6361e10..a0a3bb4 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -46,6 +46,7 @@ import (
@@ -758,7 +758,7 @@ index 6361e1055..a0a3bb403 100644
  	// Get all machine pools.
  	if feature.Gates.Enabled(feature.MachinePool) {
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index 7ae57aa13..fe5ac869b 100644
+index 7ae57aa..fe5ac86 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
 @@ -19,6 +19,7 @@ package cluster
@@ -954,7 +954,7 @@ index 7ae57aa13..fe5ac869b 100644
  // for Cluster to update when one of its own MachineDeployments gets updated.
  func (r *Reconciler) machineDeploymentToCluster(_ context.Context, o client.Object) []ctrl.Request {
 diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 0b539fe1e..1ea45a107 100644
+index 0b539fe..1ea45a1 100644
 --- a/internal/controllers/cluster/cluster_controller_phases.go
 +++ b/internal/controllers/cluster/cluster_controller_phases.go
 @@ -39,6 +39,8 @@ import (
@@ -1095,7 +1095,7 @@ index 0b539fe1e..1ea45a107 100644
  	log := ctrl.LoggerFrom(ctx)
  	cluster := s.cluster
 diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 866af4711..40d749290 100644
+index 866af47..40d7492 100644
 --- a/internal/controllers/cluster/cluster_controller_test.go
 +++ b/internal/controllers/cluster/cluster_controller_test.go
 @@ -667,6 +667,242 @@ func TestClusterReconcilerNodeRef(t *testing.T) {
@@ -1400,7 +1400,7 @@ index 866af4711..40d749290 100644
  	})
  
 diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 04683f6d6..db9432334 100644
+index 04683f6..db94323 100644
 --- a/internal/controllers/machine/machine_controller_noderef.go
 +++ b/internal/controllers/machine/machine_controller_noderef.go
 @@ -68,6 +68,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
@@ -1419,7 +1419,7 @@ index 04683f6d6..db9432334 100644
  	if machine.Spec.ProviderID == "" {
  		v1beta1conditions.MarkFalse(machine, clusterv1.MachineNodeHealthyV1Beta1Condition, clusterv1.WaitingForNodeRefV1Beta1Reason, clusterv1.ConditionSeverityInfo, "")
 diff --git a/internal/controllers/machine/machine_controller_noderef_test.go b/internal/controllers/machine/machine_controller_noderef_test.go
-index 2081da474..f0413cfe3 100644
+index 2081da4..f0413cf 100644
 --- a/internal/controllers/machine/machine_controller_noderef_test.go
 +++ b/internal/controllers/machine/machine_controller_noderef_test.go
 @@ -38,6 +38,7 @@ import (
@@ -1523,7 +1523,7 @@ index 2081da474..f0413cfe3 100644
 +	}
 +}
 diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
-index b3094348f..9f9931b9d 100644
+index b309434..9f9931b 100644
 --- a/internal/controllers/machine/machine_controller_phases.go
 +++ b/internal/controllers/machine/machine_controller_phases.go
 @@ -22,6 +22,7 @@ import (
@@ -1665,7 +1665,7 @@ index b3094348f..9f9931b9d 100644
  	deprecatedFailureDomain, err := contract.InfrastructureMachine().DeprecatedFailureDomain().Get(s.infraMachine)
  	switch {
 diff --git a/internal/controllers/machine/machine_controller_status.go b/internal/controllers/machine/machine_controller_status.go
-index 8f2ef002a..61243c6ab 100644
+index 8f2ef00..61243c6 100644
 --- a/internal/controllers/machine/machine_controller_status.go
 +++ b/internal/controllers/machine/machine_controller_status.go
 @@ -919,6 +919,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
@@ -1683,7 +1683,7 @@ index 8f2ef002a..61243c6ab 100644
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseUpdating)
  	}
 diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
-index 4efea929a..fac48c160 100644
+index 4efea92..fac48c1 100644
 --- a/util/collections/machine_filters.go
 +++ b/util/collections/machine_filters.go
 @@ -123,6 +123,18 @@ func ControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) b
@@ -1727,7 +1727,7 @@ index 4efea929a..fac48c160 100644
  func MatchesKubernetesVersion(kubernetesVersion string) Func {
  	return func(machine *clusterv1.Machine) bool {
 diff --git a/util/secret/certificates.go b/util/secret/certificates.go
-index b8dc6405f..7afc9e96e 100644
+index b8dc640..7afc9e9 100644
 --- a/util/secret/certificates.go
 +++ b/util/secret/certificates.go
 @@ -454,6 +454,9 @@ func (c Certificates) AsFiles() []bootstrapv1.File {
@@ -1741,7 +1741,7 @@ index b8dc6405f..7afc9e96e 100644
  	// these will only exist if external etcd was defined and supplied by the user
  	if apiserverEtcdClientCert := c.GetByPurpose(APIServerEtcdClient); apiserverEtcdClientCert != nil {
 diff --git a/util/secret/consts.go b/util/secret/consts.go
-index 5c67c9cce..37409a8d9 100644
+index 5c67c9c..37409a8 100644
 --- a/util/secret/consts.go
 +++ b/util/secret/consts.go
 @@ -50,6 +50,8 @@ const (
@@ -1754,7 +1754,7 @@ index 5c67c9cce..37409a8d9 100644
  
  var (
 diff --git a/util/util.go b/util/util.go
-index 992d574dd..48aae469c 100644
+index 992d574..48aae46 100644
 --- a/util/util.go
 +++ b/util/util.go
 @@ -146,6 +146,12 @@ func IsNodeReady(node *corev1.Node) bool {
