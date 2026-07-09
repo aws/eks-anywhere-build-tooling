@@ -148,8 +148,17 @@ func WriteUserDataFiles(userData *UserData) error {
 			return errors.Wrap(err, "Error converting string to int for permissions")
 		}
 
-		if err := files.Write(file.Path, []byte(file.Content), fs.FileMode(perm)); err != nil {
-			return errors.Wrapf(err, "Error writing file: %s", file.Path)
+		// For containerd certs.d files, write to the rootfs path directly.
+		// thar-be-registries atomically swaps the certs.d directory, so writes
+		// to the container-visible path may land in the old (swapped-out) directory.
+		writePath := file.Path
+		if strings.HasPrefix(file.Path, "/etc/containerd/certs.d/") {
+			writePath = "/.bottlerocket/rootfs" + file.Path
+			fmt.Printf("Writing containerd certs.d file to rootfs path: %s\n", writePath)
+		}
+
+		if err := files.Write(writePath, []byte(file.Content), fs.FileMode(perm)); err != nil {
+			return errors.Wrapf(err, "Error writing file: %s", writePath)
 		}
 		// get owner
 		owners := strings.Split(file.Owner, ":")
@@ -160,7 +169,7 @@ func WriteUserDataFiles(userData *UserData) error {
 		}
 		uid, _ := strconv.Atoi(userDetails.Uid)
 		gid, _ := strconv.Atoi(userDetails.Gid)
-		err = syscall.Chown(file.Path, uid, gid)
+		err = syscall.Chown(writePath, uid, gid)
 		if err != nil {
 			return errors.Wrap(err, "Error running chown to set owners/groups")
 		}
