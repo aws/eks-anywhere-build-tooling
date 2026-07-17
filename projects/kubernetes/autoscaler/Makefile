@@ -44,7 +44,7 @@ attributions: $(REMOVE_CLOUD_PROVIDERS_TARGET)
 
 $(REMOVE_CLOUD_PROVIDERS_TARGET): $(GIT_PATCH_TARGET)
 	@echo "Remove cloud providers"
-	cd ./autoscaler/cluster-autoscaler/cloudprovider && ls . | grep -v -e builder -e clusterapi -e mocks -e test -e .go | xargs rm -rf
+	cd ./autoscaler/cluster-autoscaler/cloudprovider && ls . | grep -v -e builder -e router -e clusterapi -e mocks -e test -e .go | xargs rm -rf
 	touch $@
 
 
