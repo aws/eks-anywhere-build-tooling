@@ -119,6 +119,23 @@ type RhelConfig struct {
 	RhelPassword string `json:"rhel_password"`
 
 	RhsmConfig
+	EpelConfig
+}
+
+// EpelConfig controls the EPEL repository used during RHEL image builds.
+//
+// These are pointers so that "not set" can be told apart from an explicit empty
+// string. An empty string disables EPEL: the upstream RHEL setup tasks skip the
+// gpg key import and the epel-release install when either value is empty, which
+// is what builds in networks that cannot reach the Fedora EPEL mirrors need.
+//
+// A plain string with omitempty would drop that explicit empty value and leave
+// the upstream default in effect, and a plain string without omitempty would
+// emit an empty value for every build that never mentioned EPEL at all,
+// disabling it fleet-wide.
+type EpelConfig struct {
+	RedhatEpelRpm *string `json:"redhat_epel_rpm,omitempty"`
+	EpelRpmGpgKey *string `json:"epel_rpm_gpg_key,omitempty"`
 }
 
 type NutanixConfig struct {
