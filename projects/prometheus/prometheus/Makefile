@@ -47,6 +47,7 @@ include $(BASE_DIRECTORY)/Common.mk
 # Strip any existing suffix (e.g., .2) and append .2023
 # Example: standard-abc123.2 → standard-abc123.2023
 CURRENT_BUILDER_BASE_TAG := $(firstword $(subst ., ,$(CURRENT_BUILDER_BASE_TAG))).2023
+CHECKSUMS_BUILDSPEC_IMAGE=$(BASE_IMAGE_REPO)/builder-base:$(CURRENT_BUILDER_BASE_TAG)
 
 # Before running GO_MOD_DOWNLOAD_TARGETS, we need to generate web UI related
 # resources.
