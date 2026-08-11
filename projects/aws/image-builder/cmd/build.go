@@ -186,6 +186,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = json.Unmarshal(config, &bo.VsphereConfig); err != nil {
 				return err
 			}
+			builder.WarnOnUnknownConfigKeys(config, bo.VsphereConfig, "vsphere-config")
 			if bo.Os == builder.RedHat {
 				isoUrl := bo.VsphereConfig.IsoUrl
 				if bo.BuilderType == builder.BuilderTypeClone {
@@ -213,6 +214,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = json.Unmarshal(config, &bo.BaremetalConfig); err != nil {
 				return err
 			}
+			builder.WarnOnUnknownConfigKeys(config, bo.BaremetalConfig, "baremetal-config")
 			if bo.Os == builder.RedHat {
 				if err = validateRedhat(&bo.BaremetalConfig.RhelConfig, bo.BaremetalConfig.IsoUrl); err != nil {
 					return err
@@ -241,6 +243,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = json.Unmarshal(config, &bo.NutanixConfig); err != nil {
 				return err
 			}
+			builder.WarnOnUnknownConfigKeys(config, bo.NutanixConfig, "nutanix-config")
 
 			if bo.Os == builder.RedHat {
 				if err = validateRedhat(&bo.NutanixConfig.RhelConfig, "Don't check IsoUrl Param"); err != nil {
@@ -273,6 +276,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = json.Unmarshal(config, &bo.CloudstackConfig); err != nil {
 				return err
 			}
+			builder.WarnOnUnknownConfigKeys(config, bo.CloudstackConfig, "cloudstack-config")
 			if bo.Os == builder.RedHat {
 				if err = validateRedhat(&bo.CloudstackConfig.RhelConfig, bo.CloudstackConfig.IsoUrl); err != nil {
 					return err
@@ -313,6 +317,7 @@ func ValidateInputs(bo *builder.BuildOptions) error {
 			if err = json.Unmarshal(config, amiConfig); err != nil {
 				return err
 			}
+			builder.WarnOnUnknownConfigKeys(config, amiConfig, "ami-config")
 
 			bo.AMIConfig = amiConfig
 			bo.FilesConfig = &builder.AdditionalFilesConfig{
