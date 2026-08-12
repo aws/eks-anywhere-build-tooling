@@ -1,4 +1,4 @@
-From 01d9a08aa40af7a534cfedca74f046ee59b0334c Mon Sep 17 00:00:00 2001
+From 481e04f9a0787ba6565de16dc77360ec07847718 Mon Sep 17 00:00:00 2001
 From: Viacheslav Biriukov <v.v.biriukov@gmail.com>
 Date: Wed, 24 Jun 2026 19:24:01 +0100
 Subject: [PATCH 7/7] Adds first-class IPv6 and DHCPv6 support to Smee.
@@ -14,30 +14,30 @@ The network must provide a stable way for Tinkerbell to identify client MAC addr
 
 Signed-off-by: Viacheslav Biriukov <v.v.biriukov@gmail.com>
 ---
- Makefile                                      |   22 +
- cmd/tinkerbell/cmd.go                         |   26 +-
- cmd/tinkerbell/defaults.go                    |  112 +-
- cmd/tinkerbell/defaults_test.go               |   72 +
- cmd/tinkerbell/flag/global.go                 |   14 +
- cmd/tinkerbell/flag/global_test.go            |   59 +
- cmd/tinkerbell/flag/smee.go                   |  262 ++-
- cmd/tinkerbell/flag/smee_test.go              |  152 ++
- cmd/tinkerbell/flag/tink_server_test.go       |   22 +
+ Makefile                                      |   21 +
+ cmd/tinkerbell/cmd.go                         |   24 +-
+ cmd/tinkerbell/defaults.go                    |  119 +-
+ cmd/tinkerbell/defaults_test.go               |  100 ++
+ cmd/tinkerbell/flag/global.go                 |   11 +-
+ cmd/tinkerbell/flag/global_test.go            |   21 +-
+ cmd/tinkerbell/flag/smee.go                   |  266 ++-
+ cmd/tinkerbell/flag/smee_test.go              |  166 +-
+ cmd/tinkerbell/flag/tink_server_test.go       |   27 +
  cmd/tinkerbell/http.go                        |    4 +-
- docs/technical/DHCP_BOOT_MODES.md             |   77 +-
- docs/technical/PORTS_AND_ENDPOINTS.md         |   65 +-
- helm/tinkerbell/README.md                     |  105 +-
- helm/tinkerbell/templates/deployment.yaml     |   76 +
+ docs/technical/DHCP_BOOT_MODES.md             |   79 +-
+ docs/technical/PORTS_AND_ENDPOINTS.md         |   69 +-
+ helm/tinkerbell/README.md                     |  106 +-
+ helm/tinkerbell/templates/deployment.yaml     |   74 +
  .../templates/migration/from-0.6.2.yaml       |   28 +-
  helm/tinkerbell/templates/osie/_functions.tpl |   50 +-
  .../templates/osie/nginx-configmap.yaml       |    3 +
- helm/tinkerbell/templates/osie/service.yaml   |   49 +-
- helm/tinkerbell/templates/service.yaml        |   38 +-
- helm/tinkerbell/values.yaml                   |   40 +-
+ helm/tinkerbell/templates/osie/service.yaml   |   51 +-
+ helm/tinkerbell/templates/service.yaml        |   39 +-
+ helm/tinkerbell/values.yaml                   |   39 +-
  pkg/http/server/server.go                     |    6 +-
  pkg/http/server/server_test.go                |   71 +-
  secondstar/secondstar.go                      |   13 +-
- secondstar/secondstar_test.go                 |   37 +
+ secondstar/secondstar_test.go                 |   42 +
  smee/internal/dhcp/dhcp.go                    |   82 +-
  smee/internal/dhcp/dhcpv6/dhcpv6.go           |  709 ++++++++
  smee/internal/dhcp/dhcpv6/dhcpv6_test.go      |  446 +++++
@@ -51,18 +51,15 @@ Signed-off-by: Viacheslav Biriukov <v.v.biriukov@gmail.com>
  .../dhcp/handler/reservation/handler_test.go  |   30 +
  smee/internal/ipxe/script/auto_test.go        |   38 +
  smee/internal/ipxe/script/hook.go             |   16 +-
- smee/internal/ipxe/script/ipxe.go             |   63 +-
- smee/internal/ipxe/script/ipxe_test.go        |  170 +-
+ smee/internal/ipxe/script/ipxe.go             |   62 +-
+ smee/internal/ipxe/script/ipxe_test.go        |  172 +-
  smee/internal/ipxe/script/static.go           |    4 +-
  smee/internal/syslog/receiver.go              |    4 +-
  smee/internal/syslog/receiver_test.go         |   15 +
  smee/smee.go                                  |  383 +++-
- smee/smee_test.go                             |  546 ++++++
- 44 files changed, 7531 insertions(+), 191 deletions(-)
+ smee/smee_test.go                             |  560 ++++++
+ 44 files changed, 7566 insertions(+), 197 deletions(-)
  create mode 100644 cmd/tinkerbell/defaults_test.go
- create mode 100644 cmd/tinkerbell/flag/global_test.go
- create mode 100644 cmd/tinkerbell/flag/smee_test.go
- create mode 100644 cmd/tinkerbell/flag/tink_server_test.go
  create mode 100644 smee/internal/dhcp/dhcpv6/dhcpv6.go
  create mode 100644 smee/internal/dhcp/dhcpv6/dhcpv6_test.go
  create mode 100644 smee/internal/dhcp/dhcpv6/handler/reservation/reservation.go
@@ -71,20 +68,15 @@ Signed-off-by: Viacheslav Biriukov <v.v.biriukov@gmail.com>
  create mode 100644 smee/internal/dhcp/dhcpv6/handler/stateless/stateless_test.go
  create mode 100644 smee/internal/dhcp/dhcpv6/server/dhcpv6.go
  create mode 100644 smee/internal/dhcp/dhcpv6/server/dhcpv6_test.go
- create mode 100644 smee/smee_test.go
 
 diff --git a/Makefile b/Makefile
-index bcbcbaf3..09328645 100644
+index 58007b7d..9d0b2392 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -238,10 +238,32 @@ helm-publish: out/helm/tinkerbell-$(VERSION).tgz ## Publish the Helm chart
+@@ -238,11 +238,32 @@ helm-publish: out/helm/tinkerbell-$(VERSION).tgz ## Publish the Helm chart
  .PHONY: helm-lint
  helm-lint: ## Lint the Helm chart
  	helm lint helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set "artifactsFileServer=http://2.2.2.2"
-+	! helm lint helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=2001:db8::15" --set "artifactsFileServer=http://2.2.2.2"
-+	! helm lint helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set 'artifactsFileServer=http://[2001:db8:100::102]:717'
-+	! helm lint helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=1.1.1.1" --set 'artifactsFileServerV6=http://[2001:db8:100::102]:717'
-+	! helm lint helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set "artifactsFileServerV6=http://2.2.2.2:717"
 +	helm lint helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set 'artifactsFileServerV6=http://[2001:db8:100::102]:717'
 +	helm lint helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set "artifactsFileServerV6=http://artifacts-v6.example.com:717" --set "optional.osie.service.loadBalancerIP=2001:db8:100::102"
 +	helm lint helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set "deployment.envs.smee.ipxeHttpScriptOsieURLv6=http://[2001:db8::20]/hook" --set "artifactsFileServer=http://2.2.2.2"
@@ -92,15 +84,19 @@ index bcbcbaf3..09328645 100644
  .PHONY: helm-template
  helm-template: ## Helm template for Tinkerbell
  	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set "artifactsFileServer=http://2.2.2.2" 2>&1 >/dev/null
+ 	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set "artifactsFileServer=http://2.2.2.2" --set "deployment.envs.globals.bindAddr=192.0.2.10" | grep -A1 "name: TINKERBELL_BIND_ADDRESS" | grep -F -q 'value: "192.0.2.10"'
 +	! helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=2001:db8::15" --set "artifactsFileServer=http://2.2.2.2" 2>&1 >/dev/null
 +	! helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set 'artifactsFileServer=http://[2001:db8:100::102]:717' 2>&1 >/dev/null
 +	! helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=1.1.1.1" --set 'artifactsFileServerV6=http://[2001:db8:100::102]:717' 2>&1 >/dev/null
 +	! helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set "artifactsFileServerV6=http://2.2.2.2:717" 2>&1 >/dev/null
 +	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set "artifactsFileServer=http://2.2.2.2" | grep -F -q 'kube-vip.io/loadbalancerIPs: "1.1.1.1"'
++	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set "service.loadBalancerIP=1.1.1.2" --set "artifactsFileServer=http://2.2.2.2" | grep -F -q 'kube-vip.io/loadbalancerIPs: "1.1.1.2"'
 +	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set "artifactsFileServer=http://2.2.2.2" | grep -F -q 'kube-vip.io/loadbalancerIPs: "2001:db8::15"'
 +	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set "publicIPv6=2001:db8::15" --set "artifactsFileServer=http://2.2.2.2" | grep -F -q 'kube-vip.io/loadbalancerIPs: "1.1.1.1,2001:db8::15"'
 +	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "deployment.envs.globals.publicIPv6=2001:db8::15" --set "artifactsFileServer=http://2.2.2.2" | grep -F -q 'kube-vip.io/loadbalancerIPs: "2001:db8::15"'
 +	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIP=1.1.1.1" --set "artifactsFileServer=http://2.2.2.2:7173" --set 'artifactsFileServerV6=http://[2001:db8:100::102]:7173' | grep -F -q 'kube-vip.io/loadbalancerIPs: "2.2.2.2,2001:db8:100::102"'
++	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "artifactsFileServer=http://2.2.2.2:7173" --set 'optional.hookos.service.annotations.kube-vip\.io/loadbalancerIPs=2.2.2.3' | grep -F -q '2.2.2.3'
++	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "artifactsFileServer=http://2.2.2.2:7173" --set 'optional.hookos.service.annotations.kube-vip\.io/loadbalancerIPs=2.2.2.3' | grep -F -c 'kube-vip.io/loadbalancerIPs:' | grep -x -q '1'
 +	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set 'artifactsFileServerV6=http://[2001:db8:100::102]:717' | grep -A1 "name: TINKERBELL_IPXE_HTTP_SCRIPT_OSIE_URL_V6" | grep -F -q 'value: "http://[2001:db8:100::102]:717"'
 +	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set "artifactsFileServerV6=http://artifacts-v6.example.com:717" --set "optional.osie.service.loadBalancerIP=2001:db8:100::102" | grep -A1 "name: TINKERBELL_IPXE_HTTP_SCRIPT_OSIE_URL_V6" | grep -F -q 'value: "http://artifacts-v6.example.com:717"'
 +	helm template test helm/tinkerbell --set "trustedProxies={127.0.0.1/24}" --set "publicIPv6=2001:db8::15" --set "deployment.envs.smee.ipxeHttpScriptOsieURLv6=http://[2001:db8::20]/hook" --set "artifactsFileServer=http://2.2.2.2" | grep -A1 "name: TINKERBELL_PUBLIC_IPV6" | grep -F -q 'value: "2001:db8::15"'
@@ -111,7 +107,7 @@ index bcbcbaf3..09328645 100644
  ######### Helm charts - end   #########
  
 diff --git a/cmd/tinkerbell/cmd.go b/cmd/tinkerbell/cmd.go
-index 93f22ca3..175360d4 100644
+index 37a9575f..b7005bbb 100644
 --- a/cmd/tinkerbell/cmd.go
 +++ b/cmd/tinkerbell/cmd.go
 @@ -6,7 +6,6 @@ import (
@@ -122,7 +118,7 @@ index 93f22ca3..175360d4 100644
  	"time"
  
  	"github.com/avast/retry-go/v4"
-@@ -36,9 +35,13 @@ var (
+@@ -39,9 +38,13 @@ var (
  
  func Execute(ctx context.Context, cancel context.CancelFunc, args []string) error { //nolint:cyclop // Will need to look into reducing the cyclomatic complexity.
  	startTime := time.Now() // used in the HTTP healthcheck handler to report uptime.
@@ -138,7 +134,7 @@ index 93f22ca3..175360d4 100644
  		EnableSmee:           true,
  		EnableTootles:        true,
  		EnableTinkServer:     true,
-@@ -48,12 +51,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+@@ -51,12 +54,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  		EnableCRDMigrations:  true,
  		HTTPPort:             defaultHTTPPort,
  		HTTPSPort:            defaultHTTPSPort,
@@ -151,40 +147,24 @@ index 93f22ca3..175360d4 100644
  		EmbeddedGlobalConfig: flag.EmbeddedGlobalConfig{
  			EnableKubeAPIServer: (embeddedApiserverExecute != nil),
  			EnableETCD:          (embeddedEtcdExecute != nil),
-@@ -65,7 +62,7 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 	}
- 
- 	s := &flag.SmeeConfig{
--		Config: smee.NewConfig(smee.Config{}, detectPublicIPv4()),
-+		Config: smee.NewConfig(smee.Config{}, defaultBindAddr(publicIP, publicIPv6, false)),
- 	}
- 
- 	h := &flag.TootlesConfig{
-@@ -73,7 +70,7 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 	}
- 	ts := &flag.TinkServerConfig{
- 		Config:   server.NewConfig(server.WithAutoDiscoveryNamespace("default")),
--		BindAddr: detectPublicIPv4(),
-+		BindAddr: defaultBindAddr(publicIP, publicIPv6, false),
- 		BindPort: defaultTinkServerPort,
- 	}
- 	controllerOpts := []controller.Option{
-@@ -138,6 +135,9 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+@@ -140,6 +137,12 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  
  		return e
  	}
++	if err := validatePublicAddressFamilies(globals.PublicIP, globals.PublicIPv6); err != nil {
++		return err
++	}
 +	if !globals.BindAddr.IsValid() {
-+		globals.BindAddr = defaultBindAddr(globals.PublicIP, globals.PublicIPv6, globals.DualStack)
++		globals.BindAddr = defaultBindAddr(publicIP, publicIPv6)
 +	}
  
  	log := getLogger(globals.LogLevel)
- 	cliLog := log.WithName("cli")
-@@ -150,13 +150,15 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
+ 
+@@ -174,13 +177,14 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
  		"rufioEnabled", globals.EnableRufio,
  		"uiEnabled", globals.EnableUI,
  		"publicIP", globals.PublicIP,
 +		"publicIPv6", globals.PublicIPv6,
-+		"dualStack", globals.DualStack,
  		"embeddedKubeAPIServer", globals.EmbeddedGlobalConfig.EnableKubeAPIServer,
  		"embeddedEtcd", globals.EmbeddedGlobalConfig.EnableETCD,
  		"globalBindAddress", globals.BindAddr,
@@ -197,7 +177,7 @@ index 93f22ca3..175360d4 100644
  		s.DHCPIPXEBinary.Port = globals.HTTPPort
  	}
 diff --git a/cmd/tinkerbell/defaults.go b/cmd/tinkerbell/defaults.go
-index 9fc6c861..fc7d599c 100644
+index 9fc6c861..dba89899 100644
 --- a/cmd/tinkerbell/defaults.go
 +++ b/cmd/tinkerbell/defaults.go
 @@ -22,7 +22,7 @@ const (
@@ -234,7 +214,7 @@ index 9fc6c861..fc7d599c 100644
  		}
  	}
  
-@@ -124,6 +127,105 @@ func autoDetectPublicIpv4WithDefaultGateway() (netip.Addr, error) {
+@@ -124,6 +127,112 @@ func autoDetectPublicIpv4WithDefaultGateway() (netip.Addr, error) {
  	return netip.Addr{}, fmt.Errorf("no default gateway found")
  }
  
@@ -321,20 +301,27 @@ index 9fc6c861..fc7d599c 100644
 +	return netip.Addr{}, fmt.Errorf("no IPv6 default gateway found")
 +}
 +
-+func defaultBindAddr(publicIP, publicIPv6 netip.Addr, dualStack bool) netip.Addr {
-+	hasIPv4 := publicIP.IsValid() && !publicIP.IsUnspecified()
-+	hasIPv6 := publicIPv6.IsValid() && !publicIPv6.IsUnspecified()
-+
-+	if dualStack && hasIPv4 && hasIPv6 {
-+		return netip.IPv6Unspecified()
++// defaultBindAddr chooses an IPv4-first bind address from addresses detected
++// on the local host. Configured public addresses are advertised addresses and
++// must not be used here because they may belong to a load balancer.
++func defaultBindAddr(detectedIPv4, detectedIPv6 netip.Addr) netip.Addr {
++	if detectedIPv4.Is4() && !detectedIPv4.IsUnspecified() {
++		return detectedIPv4
 +	}
-+	if hasIPv4 {
-+		return publicIP
-+	}
-+	if hasIPv6 {
++	if detectedIPv6.Is6() && !detectedIPv6.Is4In6() && !detectedIPv6.IsUnspecified() {
 +		return netip.IPv6Unspecified()
 +	}
 +	return netip.MustParseAddr("0.0.0.0")
++}
++
++func validatePublicAddressFamilies(publicIP, publicIPv6 netip.Addr) error {
++	if publicIP.IsValid() && !publicIP.Is4() {
++		return fmt.Errorf("public IPv4 address %q is not IPv4", publicIP)
++	}
++	if publicIPv6.IsValid() && (!publicIPv6.Is6() || publicIPv6.Is4In6()) {
++		return fmt.Errorf("public IPv6 address %q is not IPv6", publicIPv6)
++	}
++	return nil
 +}
 +
  func kubeConfig() string {
@@ -342,10 +329,10 @@ index 9fc6c861..fc7d599c 100644
  	if err != nil {
 diff --git a/cmd/tinkerbell/defaults_test.go b/cmd/tinkerbell/defaults_test.go
 new file mode 100644
-index 00000000..e7ce39ad
+index 00000000..85d16107
 --- /dev/null
 +++ b/cmd/tinkerbell/defaults_test.go
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,100 @@
 +package main
 +
 +import (
@@ -383,19 +370,12 @@ index 00000000..e7ce39ad
 +	tests := map[string]struct {
 +		publicIP   netip.Addr
 +		publicIPv6 netip.Addr
-+		dualStack  bool
 +		want       netip.Addr
 +	}{
-+		"dual stack without opt-in binds public ipv4": {
++		"ipv4 is preferred when both addresses are available": {
 +			publicIP:   netip.MustParseAddr("192.0.2.10"),
 +			publicIPv6: netip.MustParseAddr("2001:db8::10"),
 +			want:       netip.MustParseAddr("192.0.2.10"),
-+		},
-+		"dual stack opt-in binds wildcard v6": {
-+			publicIP:   netip.MustParseAddr("192.0.2.10"),
-+			publicIPv6: netip.MustParseAddr("2001:db8::10"),
-+			dualStack:  true,
-+			want:       netip.IPv6Unspecified(),
 +		},
 +		"ipv6 only binds wildcard v6": {
 +			publicIPv6: netip.MustParseAddr("2001:db8::10"),
@@ -412,82 +392,112 @@ index 00000000..e7ce39ad
 +
 +	for name, tt := range tests {
 +		t.Run(name, func(t *testing.T) {
-+			if got := defaultBindAddr(tt.publicIP, tt.publicIPv6, tt.dualStack); got != tt.want {
-+				t.Fatalf("defaultBindAddr(%v, %v, %v) = %v, want %v", tt.publicIP, tt.publicIPv6, tt.dualStack, got, tt.want)
++			if got := defaultBindAddr(tt.publicIP, tt.publicIPv6); got != tt.want {
++				t.Fatalf("defaultBindAddr(%v, %v) = %v, want %v", tt.publicIP, tt.publicIPv6, got, tt.want)
++			}
++		})
++	}
++}
++
++func TestValidatePublicAddressFamilies(t *testing.T) {
++	tests := map[string]struct {
++		publicIP   netip.Addr
++		publicIPv6 netip.Addr
++		wantErr    bool
++	}{
++		"valid addresses": {
++			publicIP:   netip.MustParseAddr("192.0.2.10"),
++			publicIPv6: netip.MustParseAddr("2001:db8::10"),
++		},
++		"unset addresses": {},
++		"IPv6 in IPv4 field": {
++			publicIP: netip.MustParseAddr("2001:db8::10"),
++			wantErr:  true,
++		},
++		"IPv4 in IPv6 field": {
++			publicIPv6: netip.MustParseAddr("192.0.2.10"),
++			wantErr:    true,
++		},
++		"IPv4-mapped address in IPv6 field": {
++			publicIPv6: netip.MustParseAddr("::ffff:192.0.2.10"),
++			wantErr:    true,
++		},
++	}
++
++	for name, tt := range tests {
++		t.Run(name, func(t *testing.T) {
++			err := validatePublicAddressFamilies(tt.publicIP, tt.publicIPv6)
++			if (err != nil) != tt.wantErr {
++				t.Fatalf("validatePublicAddressFamilies(%v, %v) error = %v, wantErr %v", tt.publicIP, tt.publicIPv6, err, tt.wantErr)
 +			}
 +		})
 +	}
 +}
 diff --git a/cmd/tinkerbell/flag/global.go b/cmd/tinkerbell/flag/global.go
-index d7da6c75..4b7b68f0 100644
+index d7da6c75..e254a444 100644
 --- a/cmd/tinkerbell/flag/global.go
 +++ b/cmd/tinkerbell/flag/global.go
-@@ -17,6 +17,8 @@ type GlobalConfig struct {
+@@ -17,6 +17,7 @@ type GlobalConfig struct {
  	OTELInsecure         bool
  	TrustedProxies       []netip.Prefix
  	PublicIP             netip.Addr
 +	PublicIPv6           netip.Addr
-+	DualStack            bool
  	BindAddr             netip.Addr
  	HTTPPort             int
  	HTTPSPort            int
-@@ -69,6 +71,8 @@ func RegisterGlobal(fs *Set, gc *GlobalConfig) {
+@@ -69,6 +70,7 @@ func RegisterGlobal(fs *Set, gc *GlobalConfig) {
  	fs.Register(OTELEndpoint, ffval.NewValueDefault(&gc.OTELEndpoint, gc.OTELEndpoint))
  	fs.Register(OTELInsecure, ffval.NewValueDefault(&gc.OTELInsecure, gc.OTELInsecure))
  	fs.Register(PublicIP, &ntip.Addr{Addr: &gc.PublicIP})
 +	fs.Register(PublicIPv6, &ntip.Addr{Addr: &gc.PublicIPv6})
-+	fs.Register(DualStack, ffval.NewValueDefault(&gc.DualStack, gc.DualStack))
  	fs.Register(TLSCertFile, ffval.NewValueDefault(&gc.TLS.CertFile, gc.TLS.CertFile))
  	fs.Register(TLSKeyFile, ffval.NewValueDefault(&gc.TLS.KeyFile, gc.TLS.KeyFile))
  	fs.Register(DisableHTTPToHTTPSRedirect, ffval.NewValueDefault(&gc.TLS.DisableHTTPToHTTPSRedirect, gc.TLS.DisableHTTPToHTTPSRedirect))
-@@ -141,6 +145,16 @@ var PublicIP = Config{
- 	Usage: "public IPv4 address to use for all enabled services",
- }
+@@ -138,7 +140,12 @@ var TrustedProxies = Config{
  
+ var PublicIP = Config{
+ 	Name:  "public-ipv4",
+-	Usage: "public IPv4 address to use for all enabled services",
++	Usage: "public IPv4 address to advertise to clients",
++}
++
 +var PublicIPv6 = Config{
 +	Name:  "public-ipv6",
-+	Usage: "public IPv6 address to use for all enabled services",
-+}
-+
-+var DualStack = Config{
-+	Name:  "dual-stack",
-+	Usage: "bind shared services to the IPv6 wildcard when both public IPv4 and IPv6 are available",
-+}
-+
++	Usage: "public IPv6 address to advertise to clients",
+ }
+ 
  var EnableSmee = Config{
- 	Name:  "enable-smee",
- 	Usage: "enable Smee service",
+@@ -188,7 +195,7 @@ var EnableCRDMigrations = Config{
+ 
+ var BindAddr = Config{
+ 	Name:  "bind-address",
+-	Usage: "IP address to which to bind all services",
++	Usage: "default IP address to which to bind shared services",
+ }
+ 
+ // TLS flags
 diff --git a/cmd/tinkerbell/flag/global_test.go b/cmd/tinkerbell/flag/global_test.go
-new file mode 100644
-index 00000000..bb161c83
---- /dev/null
+index 50ef10f3..f0cdf5fc 100644
+--- a/cmd/tinkerbell/flag/global_test.go
 +++ b/cmd/tinkerbell/flag/global_test.go
-@@ -0,0 +1,59 @@
-+package flag
-+
-+import (
-+	"net/netip"
-+	"testing"
-+
-+	"github.com/peterbourgon/ff/v4"
-+)
-+
-+func TestRegisterGlobalBindAddressEnv(t *testing.T) {
+@@ -8,7 +8,7 @@ import (
+ )
+ 
+ func TestRegisterGlobalBindAddressEnv(t *testing.T) {
+-	t.Setenv("TINKERBELL_BIND_ADDRESS", "192.0.2.10")
 +	t.Setenv("TINKERBELL_BIND_ADDRESS", "::")
-+
-+	cfg := &GlobalConfig{}
-+	fs := ff.NewFlagSet("test")
-+	RegisterGlobal(&Set{FlagSet: fs}, cfg)
-+	cmd := &ff.Command{Name: "test", Flags: fs}
-+
-+	if err := cmd.Parse(nil, ff.WithEnvVarPrefix("TINKERBELL")); err != nil {
-+		t.Fatal(err)
-+	}
-+
+ 
+ 	cfg := &GlobalConfig{}
+ 	fs := ff.NewFlagSet("test")
+@@ -19,7 +19,24 @@ func TestRegisterGlobalBindAddressEnv(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 
+-	if got, want := cfg.BindAddr, netip.MustParseAddr("192.0.2.10"); got != want {
 +	if got, want := cfg.BindAddr, netip.MustParseAddr("::"); got != want {
-+		t.Errorf("BindAddr = %v, want %v", got, want)
-+	}
-+}
+ 		t.Errorf("BindAddr = %v, want %v", got, want)
+ 	}
+ }
 +
 +func TestRegisterGlobalPublicIPv6Env(t *testing.T) {
 +	t.Setenv("TINKERBELL_PUBLIC_IPV6", "2001:db8::15")
@@ -505,25 +515,8 @@ index 00000000..bb161c83
 +		t.Errorf("PublicIPv6 = %v, want %v", got, want)
 +	}
 +}
-+
-+func TestRegisterGlobalDualStackEnv(t *testing.T) {
-+	t.Setenv("TINKERBELL_DUAL_STACK", "true")
-+
-+	cfg := &GlobalConfig{}
-+	fs := ff.NewFlagSet("test")
-+	RegisterGlobal(&Set{FlagSet: fs}, cfg)
-+	cmd := &ff.Command{Name: "test", Flags: fs}
-+
-+	if err := cmd.Parse(nil, ff.WithEnvVarPrefix("TINKERBELL")); err != nil {
-+		t.Fatal(err)
-+	}
-+
-+	if !cfg.DualStack {
-+		t.Error("DualStack = false, want true")
-+	}
-+}
 diff --git a/cmd/tinkerbell/flag/smee.go b/cmd/tinkerbell/flag/smee.go
-index 4481ac15..d88774a6 100644
+index 5229f031..331ad075 100644
 --- a/cmd/tinkerbell/flag/smee.go
 +++ b/cmd/tinkerbell/flag/smee.go
 @@ -2,6 +2,7 @@ package flag
@@ -593,7 +586,7 @@ index 4481ac15..d88774a6 100644
  	fs.Register(TinkServerUseTLS, ffval.NewValueDefault(&sc.Config.TinkServer.UseTLS, sc.Config.TinkServer.UseTLS))
  	fs.Register(TinkServerInsecureTLS, ffval.NewValueDefault(&sc.Config.TinkServer.InsecureTLS, sc.Config.TinkServer.InsecureTLS))
  
-@@ -142,78 +172,93 @@ func RegisterSmeeFlags(fs *Set, sc *SmeeConfig) {
+@@ -147,80 +177,95 @@ func RegisterSmeeFlags(fs *Set, sc *SmeeConfig) {
  }
  
  // Convert CLI specific fields to smee.Config fields.
@@ -614,15 +607,25 @@ index 4481ac15..d88774a6 100644
 +		s.Config.DHCPv6.IPXEHTTPBinaryURL.Host = s.advertisedHost(s.DHCPv6IPXEBinary, publicIPv6, defaultPort)
 +	}
 +
++	// Service-specific bind addresses take precedence over the global bind address.
++	if bindAddr.IsValid() {
++		if !s.Config.Syslog.BindAddr.IsValid() {
++			s.Config.Syslog.BindAddr = bindAddr
+ 		}
+-		// CLI flag
+-		if s.DHCPIPXEScript.Host != "" {
+-			addr = s.DHCPIPXEScript.Host
++		if !s.Config.TFTP.BindAddr.IsValid() {
++			s.Config.TFTP.BindAddr = bindAddr
++		}
++	}
++
 +	// publicIP is used to set IPForPacket, SyslogIP, TFTPIP, IPXEHTTPBinaryURL.Host, IPXEHTTPScript.URL.Host, and TinkServer.AddrPort.
 +	if publicIP.IsValid() && !publicIP.IsUnspecified() {
 +		// the order of precedence is: CLI flag, publicIP, default.
 +		if s.Config.DHCP.IPForPacket.IsUnspecified() || !s.Config.DHCP.IPForPacket.IsValid() {
 +			s.Config.DHCP.IPForPacket = publicIP
- 		}
--		// CLI flag
--		if s.DHCPIPXEScript.Host != "" {
--			addr = s.DHCPIPXEScript.Host
++		}
 +		if s.Config.DHCP.SyslogIP.IsUnspecified() || !s.Config.DHCP.SyslogIP.IsValid() {
 +			s.Config.DHCP.SyslogIP = publicIP
  		}
@@ -662,14 +665,6 @@ index 4481ac15..d88774a6 100644
 +			return joinHostPort(publicIPv6.String(), port)
 +		}()
 +	}
-+
-+	// Set bind addresses if bindAddr is specified.
-+	if bindAddr.IsValid() {
-+		// syslog server
-+		s.Config.Syslog.BindAddr = bindAddr
-+		// TFTP server
-+		s.Config.TFTP.BindAddr = bindAddr
-+	}
 +}
  
 -	s.Config.DHCP.IPXEHTTPBinaryURL.Host = func() string {
@@ -700,6 +695,16 @@ index 4481ac15..d88774a6 100644
  	}()
 +}
  
+-	// Service-specific bind addresses take precedence over the global bind address.
+-	if bindAddr.IsValid() {
+-		if !s.Config.Syslog.BindAddr.IsValid() {
+-			s.Config.Syslog.BindAddr = bindAddr
+-		}
+-		if !s.Config.TFTP.BindAddr.IsValid() {
+-			s.Config.TFTP.BindAddr = bindAddr
+-		}
+-	}
+-
 -	// publicIP is used to set IPForPacket, SyslogIP, TFTPIP, IPXEHTTPBinaryURL.Host, IPXEHTTPScript.URL.Host, and TinkServer.AddrPort.
 -	if publicIP.IsUnspecified() || !publicIP.IsValid() {
 -		return
@@ -707,7 +712,10 @@ index 4481ac15..d88774a6 100644
 -	// the order of precedence is: CLI flag, publicIP, default.
 -	if s.Config.DHCP.IPForPacket.IsUnspecified() || !s.Config.DHCP.IPForPacket.IsValid() {
 -		s.Config.DHCP.IPForPacket = publicIP
--	}
++func joinHostPort(host, port string) string {
++	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
++		host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+ 	}
 -	if s.Config.DHCP.SyslogIP.IsUnspecified() || !s.Config.DHCP.SyslogIP.IsValid() {
 -		s.Config.DHCP.SyslogIP = publicIP
 -	}
@@ -722,22 +730,11 @@ index 4481ac15..d88774a6 100644
 -		}
 -		return fmt.Sprintf("%s:%s", publicIP.String(), port)
 -	}()
--
--	// Set bind addresses if bindAddr is specified.
--	if bindAddr.IsValid() {
--		// syslog server
--		s.Config.Syslog.BindAddr = bindAddr
--		// TFTP server
--		s.Config.TFTP.BindAddr = bindAddr
-+func joinHostPort(host, port string) string {
-+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
-+		host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
- 	}
 +	return net.JoinHostPort(host, port)
  }
  
  func macAddrFormatParser(s string) (constant.MACFormat, error) {
-@@ -244,6 +289,111 @@ var DHCPModeFlag = Config{
+@@ -251,6 +296,111 @@ var DHCPModeFlag = Config{
  	Usage: fmt.Sprintf("[dhcp] DHCP mode (%s, %s, %s)", smee.DHCPModeReservation, smee.DHCPModeProxy, smee.DHCPModeAutoProxy),
  }
  
@@ -849,7 +846,7 @@ index 4481ac15..d88774a6 100644
  var DHCPBindAddr = Config{
  	Name:  "dhcp-bind-addr",
  	Usage: "[dhcp] DHCP server bind address",
-@@ -350,6 +500,11 @@ var IPXEHTTPScriptOSIEURL = Config{
+@@ -357,6 +507,11 @@ var IPXEHTTPScriptOSIEURL = Config{
  	Usage: "[ipxe] URL where OSIE (HookOS) images are located",
  }
  
@@ -861,7 +858,7 @@ index 4481ac15..d88774a6 100644
  var IPXEHTTPScriptRetries = Config{
  	Name:  "ipxe-http-script-retries",
  	Usage: "[ipxe] number of retries to attempt when fetching kernel and initrd files in the iPXE script",
-@@ -456,6 +611,11 @@ var TinkServerAddrPort = Config{
+@@ -479,6 +634,11 @@ var TinkServerAddrPort = Config{
  	Usage: "[ipxe] Tink server address and port",
  }
  
@@ -874,26 +871,36 @@ index 4481ac15..d88774a6 100644
  	Name:  "ipxe-script-tink-server-use-tls",
  	Usage: "[ipxe] Use TLS to connect to the Tink server",
 diff --git a/cmd/tinkerbell/flag/smee_test.go b/cmd/tinkerbell/flag/smee_test.go
-new file mode 100644
-index 00000000..ec8b8468
---- /dev/null
+index 37d292f7..ad40a7e2 100644
+--- a/cmd/tinkerbell/flag/smee_test.go
 +++ b/cmd/tinkerbell/flag/smee_test.go
-@@ -0,0 +1,152 @@
-+package flag
-+
-+import (
-+	"net/netip"
-+	"testing"
-+
+@@ -4,6 +4,7 @@ import (
+ 	"net/netip"
+ 	"testing"
+ 
 +	"github.com/peterbourgon/ff/v4"
-+	"github.com/tinkerbell/tinkerbell/smee"
-+)
+ 	"github.com/tinkerbell/tinkerbell/smee"
+ )
+ 
+@@ -52,7 +53,7 @@ func TestSmeeConvertBindAddressPrecedence(t *testing.T) {
+ 				TFTP:   smee.TFTP{BindAddr: tt.tftpAddr},
+ 			})}
+ 
+-			cfg.Convert(nil, netip.Addr{}, globalBindAddr, 8080)
++			cfg.Convert(nil, netip.Addr{}, netip.Addr{}, globalBindAddr, 8080)
+ 
+ 			if got := cfg.Config.Syslog.BindAddr; got != tt.wantSyslog {
+ 				t.Errorf("Syslog.BindAddr = %v, want %v", got, tt.wantSyslog)
+@@ -63,3 +64,166 @@ func TestSmeeConvertBindAddressPrecedence(t *testing.T) {
+ 		})
+ 	}
+ }
 +
 +func TestSmeeConvertAdvertisedEndpoints(t *testing.T) {
 +	publicIP := netip.MustParseAddr("10.0.2.15")
 +	publicIPv6 := netip.MustParseAddr("2001:db8::15")
 +	cfg := &SmeeConfig{
-+		Config: smee.NewConfig(smee.Config{}, publicIP),
++		Config: smee.NewConfig(smee.Config{}),
 +	}
 +
 +	cfg.Convert(nil, publicIP, publicIPv6, netip.Addr{}, 7080)
@@ -938,7 +945,7 @@ index 00000000..ec8b8468
 +	publicIPv6 := netip.MustParseAddr("2001:db8::15")
 +	bindAddr := netip.IPv6Unspecified()
 +	cfg := &SmeeConfig{
-+		Config: smee.NewConfig(smee.Config{}, bindAddr),
++		Config: smee.NewConfig(smee.Config{}),
 +	}
 +
 +	cfg.Convert(nil, publicIP, publicIPv6, bindAddr, 7080)
@@ -957,10 +964,30 @@ index 00000000..ec8b8468
 +	}
 +}
 +
++func TestSmeeConvertPreservesExplicitServiceBindAddresses(t *testing.T) {
++	globalBindAddr := netip.IPv6Unspecified()
++	syslogBindAddr := netip.MustParseAddr("192.0.2.20")
++	tftpBindAddr := netip.MustParseAddr("192.0.2.21")
++	cfg := &SmeeConfig{
++		Config: smee.NewConfig(smee.Config{}),
++	}
++	cfg.Config.Syslog.BindAddr = syslogBindAddr
++	cfg.Config.TFTP.BindAddr = tftpBindAddr
++
++	cfg.Convert(nil, netip.Addr{}, netip.Addr{}, globalBindAddr, 7080)
++
++	if got := cfg.Config.Syslog.BindAddr; got != syslogBindAddr {
++		t.Errorf("Syslog.BindAddr = %q, want %q", got, syslogBindAddr)
++	}
++	if got := cfg.Config.TFTP.BindAddr; got != tftpBindAddr {
++		t.Errorf("TFTP.BindAddr = %q, want %q", got, tftpBindAddr)
++	}
++}
++
 +func TestSmeeConvertKeepsV6DefaultsWithoutPublicIPv6(t *testing.T) {
 +	publicIP := netip.MustParseAddr("10.0.2.15")
 +	cfg := &SmeeConfig{
-+		Config: smee.NewConfig(smee.Config{}, publicIP),
++		Config: smee.NewConfig(smee.Config{}),
 +	}
 +
 +	cfg.Convert(nil, publicIP, netip.Addr{}, netip.Addr{}, 7080)
@@ -990,7 +1017,7 @@ index 00000000..ec8b8468
 +
 +func TestRegisterSmeeFlagsV6(t *testing.T) {
 +	cfg := &SmeeConfig{
-+		Config: smee.NewConfig(smee.Config{}, netip.Addr{}),
++		Config: smee.NewConfig(smee.Config{}),
 +	}
 +	fs := ff.NewFlagSet("test")
 +	RegisterSmeeFlags(&Set{FlagSet: fs}, cfg)
@@ -1032,24 +1059,17 @@ index 00000000..ec8b8468
 +	}
 +}
 diff --git a/cmd/tinkerbell/flag/tink_server_test.go b/cmd/tinkerbell/flag/tink_server_test.go
-new file mode 100644
-index 00000000..01c99bbe
---- /dev/null
+index f004290c..3d55a48e 100644
+--- a/cmd/tinkerbell/flag/tink_server_test.go
 +++ b/cmd/tinkerbell/flag/tink_server_test.go
-@@ -0,0 +1,22 @@
-+package flag
+@@ -43,3 +43,30 @@ func TestTinkServerConvertBindAddressPrecedence(t *testing.T) {
+ 		})
+ 	}
+ }
 +
-+import (
-+	"net/netip"
-+	"testing"
-+
-+	"github.com/tinkerbell/tinkerbell/tink/server"
-+)
-+
-+func TestTinkServerConvertIPv6BindAddr(t *testing.T) {
++func TestTinkServerConvertUsesGlobalBindAddrByDefault(t *testing.T) {
 +	cfg := &TinkServerConfig{
 +		Config:   server.NewConfig(),
-+		BindAddr: netip.MustParseAddr("10.0.2.15"),
 +		BindPort: 42113,
 +	}
 +
@@ -1059,8 +1079,22 @@ index 00000000..01c99bbe
 +		t.Errorf("BindAddrPort = %q, want %q", got, want)
 +	}
 +}
++
++func TestTinkServerConvertPreservesExplicitBindAddr(t *testing.T) {
++	cfg := &TinkServerConfig{
++		Config:   server.NewConfig(),
++		BindAddr: netip.MustParseAddr("10.0.2.15"),
++		BindPort: 42113,
++	}
++
++	cfg.Convert(netip.MustParseAddr("2001:db8::15"))
++
++	if got, want := cfg.Config.BindAddrPort.String(), "10.0.2.15:42113"; got != want {
++		t.Errorf("BindAddrPort = %q, want %q", got, want)
++	}
++}
 diff --git a/cmd/tinkerbell/http.go b/cmd/tinkerbell/http.go
-index 62439671..9b2e5396 100644
+index 73658bb7..922376ad 100644
 --- a/cmd/tinkerbell/http.go
 +++ b/cmd/tinkerbell/http.go
 @@ -3,8 +3,10 @@ package main
@@ -1074,7 +1108,7 @@ index 62439671..9b2e5396 100644
  	"strings"
  	"time"
  
-@@ -190,7 +192,7 @@ func startHTTPServer(ctx context.Context, globals *flag.GlobalConfig, s *flag.Sm
+@@ -196,7 +198,7 @@ func startHTTPServer(ctx context.Context, globals *flag.GlobalConfig, s *flag.Sm
  	srv := httpserver.NewConfig(opts...)
  
  	kvs := []any{
@@ -1084,7 +1118,7 @@ index 62439671..9b2e5396 100644
  			schemes := []string{"http"}
  			if httpsHandler != nil {
 diff --git a/docs/technical/DHCP_BOOT_MODES.md b/docs/technical/DHCP_BOOT_MODES.md
-index f69d64f5..8d28280b 100644
+index f69d64f5..54be7468 100644
 --- a/docs/technical/DHCP_BOOT_MODES.md
 +++ b/docs/technical/DHCP_BOOT_MODES.md
 @@ -27,7 +27,7 @@ To enable this mode set the CLI flag `--dhcp-mode=proxy` or the environment vari
@@ -1096,7 +1130,7 @@ index f69d64f5..8d28280b 100644
  
  #### Auto Proxy DHCP Configuration
  
-@@ -44,3 +44,78 @@ To enable this mode set the CLI flag `--dhcp-enabled=false` or the environment v
+@@ -44,3 +44,80 @@ To enable this mode set the CLI flag `--dhcp-enabled=false` or the environment v
  ## Interoperability with other DHCP servers
  
  When a DHCP server exists on the network, Tinkerbell should be set to run `proxy` or `auto-proxy` mode. This will allow Tinkerbell to provide the next boot information to clients that request it and the existing DHCP server will provide IP address information. Layer 2 access to machines or a DHCP relay agent that will forward the DHCP requests to Tinkerbell is required.
@@ -1107,18 +1141,20 @@ index f69d64f5..8d28280b 100644
 +
 +## DHCPv6 Client Identification
 +
-+Tinkerbell DHCPv6 mode requires a reliable way to identify the client MAC address.
++All Tinkerbell DHCPv6 modes require a reliable client MAC address.
 +
-+For direct client traffic, Tinkerbell can identify the client when at least one of the following is true:
++For direct client traffic, Tinkerbell can identify the client from either:
 +
-+* the client source IPv6 address is derived from the MAC address using EUI-64;
-+* the client DUID exposes a link-layer address, for example DUID-LL or DUID-LLT;
++* a DUID-LL or DUID-LLT client identifier that contains a link-layer address; or
++* the client's source address when it is a link-local, EUI-64-derived IPv6 address.
 +
-+For relayed traffic, the relay should include DHCPv6 Option 79, Client Link-Layer Address, in the Relay-Forward message. If Option 79 is not available, Tinkerbell may only infer the MAC address from the peer address when that address is link-local and EUI-64-derived.
++For relayed traffic, Tinkerbell checks the innermost relay and client message in this order:
 +
-+Clients are ignored when Tinkerbell cannot determine a stable client MAC address. This includes clients that use opaque or privacy-style IPv6 addresses, use a DUID that does not expose a link-layer address, and are not relayed with Option 79 or another trusted identity mapping.
++1. DHCPv6 Option 79, Client Link-Layer Address, in the Relay-Forward message;
++2. an EUI-64-derived relay `peer-address`; or
++3. a DUID-LL or DUID-LLT client identifier in the encapsulated client message.
 +
-+Without a client MAC address, Tinkerbell cannot reliably match the request to Hardware data, inject the MAC into boot URLs, or route the client to the correct fallback script.
++Tinkerbell ignores a DHCPv6 request when none of these sources provides a MAC address. For example, a client using an opaque or privacy-style IPv6 address and a DUID that does not contain a link-layer address requires a relay that supplies Option 79 or an EUI-64-derived `peer-address`. Without a client MAC address, Tinkerbell cannot reliably find Hardware data, derive an address, inject the MAC into boot URLs, or select the correct fallback script.
 +
 +## DHCPv6 Modes
 +
@@ -1156,7 +1192,7 @@ index f69d64f5..8d28280b 100644
 +
 +Derived mode has no lease database and does not track Duplicate Address Detection (DAD) failures. If a client receives a derived address, detects a duplicate address, and sends a DHCPv6 Decline, Tinkerbell replies according to the DHCPv6 Decline flow but does not mark the address as unusable or choose a replacement. Because derived addresses are deterministic from the client MAC address and selected prefix, the same client will receive the same derived address again until the duplicate is removed or the derived prefix configuration changes.
 +
-+Direct client requests use `--dhcpv6-derived-direct-address-pool` / `TINKERBELL_DHCPV6_DERIVED_DIRECT_ADDRESS_POOL`. The prefix must be a usable IPv6 unicast prefix between `/1` and `/64`; `/65` through `/128` are rejected because they do not leave enough host bits for stateless MAC-based derivation, and unusable ranges such as unspecified, IPv4-mapped, link-local, or multicast prefixes are rejected. If no direct pool is configured, derived mode ignores direct requests that do not already have a Hardware IPv6 reservation.
++Direct client requests use `--dhcpv6-derived-direct-address-pool` / `TINKERBELL_DHCPV6_DERIVED_DIRECT_ADDRESS_POOL`. The prefix must be a usable IPv6 unicast prefix between `/1` and `/64`; `/65` through `/128` are rejected because they do not leave enough host bits for stateless MAC-based derivation, and unusable ranges such as unspecified, IPv4-mapped, link-local, or multicast prefixes are rejected. The prefix must also be on-link and routable on the provisioning segment, and should normally come from the prefix advertised by Router Advertisements on that segment. Tinkerbell does not manage Router Advertisements or install routes; using a different, unadvertised prefix can make the boot-time address unreachable and cause netboot, including TFTP, to fail. If no direct pool is configured, derived mode ignores direct requests that do not already have a Hardware IPv6 reservation.
 +
 +Relayed requests use the relay-forward `link-address` as the source prefix and `--dhcpv6-derived-relay-address-prefix` / `TINKERBELL_DHCPV6_DERIVED_RELAY_ADDRESS_PREFIX` as the prefix length. The relay prefix length defaults to `/64` and must be between `/1` and `/64`; `/0` and `/65` through `/128` are rejected. The relay must set a usable IPv6 link-address for the client link.
 +
@@ -1176,7 +1212,7 @@ index f69d64f5..8d28280b 100644
 +
 +Hardware-specific netboot and OSIE URL overrides are used as supplied. Tinkerbell does not rewrite or validate these URLs against the client's IP stack. Callers are responsible for configuring override URLs that are reachable by the intended boot path. For example, IPv6-only boot flows need Hardware override URLs that are IPv6-reachable, while IPv4-only boot flows need IPv4-reachable URLs.
 diff --git a/docs/technical/PORTS_AND_ENDPOINTS.md b/docs/technical/PORTS_AND_ENDPOINTS.md
-index 1fd3ecad..c2da9b2b 100644
+index 0e0cf207..5d71d0d2 100644
 --- a/docs/technical/PORTS_AND_ENDPOINTS.md
 +++ b/docs/technical/PORTS_AND_ENDPOINTS.md
 @@ -15,6 +15,7 @@ variables.
@@ -1184,12 +1220,12 @@ index 1fd3ecad..c2da9b2b 100644
  | **42113** | TCP (gRPC) | Tink Server | Workflow service for tink-agent | `--enable-tink-server=false` |
  | **67** | UDP | Smee DHCP | PXE boot: offers next-server, iPXE script URL, and IP configuration | `--enable-smee=false` |
 +| **547** | UDP | Smee DHCPv6 | IPv6 netboot: DHCPv6 stateless data, boot file URL, reservation, and derived address support | `--dhcpv6-enabled=false` |
- | **69** | UDP | Smee TFTP | Serves iPXE firmware binaries to PXE-booting machines | `--enable-smee=false` |
+ | **69** | UDP | Smee TFTP | Serves iPXE firmware binaries, and (optionally) PXELinux configs, Raspberry Pi netboot firmware, and arbitrary disk assets to PXE-booting machines | `--enable-smee=false` |
  | **514** | UDP | Smee Syslog | Collects boot-time syslog messages from provisioning machines | `--enable-smee=false` |
  | **2222** | TCP (SSH) | SecondStar | SSH-to-serial bridge for out-of-band hardware management via BMC | `--enable-secondstar=false` |
-@@ -22,6 +23,37 @@ variables.
- > **Note:** The HTTP and HTTPS ports are configurable via `--http-port` and
- > `--https-port`. The gRPC port is configurable via `--tink-server-bind-port`.
+@@ -29,6 +30,40 @@ variables.
+ > prefix it mounts under is set with `--pxe-http-path-prefix` (default
+ > `/tftp/`).
  
 +Shared listeners support IPv4 and IPv6 bind addresses through
 +`--bind-address`. Use `--public-ipv4` and `--public-ipv6` to advertise the
@@ -1198,43 +1234,46 @@ index 1fd3ecad..c2da9b2b 100644
 +### Bind Address Selection
 +
 +When `--bind-address` is set, Tinkerbell uses that address for shared services
-+such as HTTP, Tink Server gRPC, TFTP, syslog, and SecondStar.
++such as HTTP, Tink Server gRPC, TFTP, syslog, and SecondStar. A service-specific
++bind address, where available, takes precedence over the global address.
 +
-+When `--bind-address` is not set, Tinkerbell chooses a default from the detected
-+or configured public addresses:
++When `--bind-address` is not set, Tinkerbell chooses an IPv4-compatible default
++from addresses detected on the local host:
 +
-+| Public IPv4 | Public IPv6 | `--dual-stack` | Default bind address |
-+|-------------|-------------|----------------|----------------------|
-+| yes | no | either | public IPv4 |
-+| no | yes | either | `::` |
-+| yes | yes | false | public IPv4 |
-+| yes | yes | true | `::` |
-+| no | no | either | `0.0.0.0` |
++| Detected IPv4 | Detected IPv6 | Default bind address |
++|---------------|---------------|----------------------|
++| yes | either | detected IPv4 |
++| no | yes | `::` |
++| no | no | `0.0.0.0` |
 +
-+The `--dual-stack` flag only changes the default when both public IPv4 and
-+public IPv6 are available. It opts shared services into binding the IPv6
-+wildcard address. Whether an IPv6 wildcard socket also accepts IPv4 traffic is
-+platform dependent; on Linux it depends on `IPV6_V6ONLY` and
-+`net.ipv6.bindv6only`, and container or Kubernetes networking may impose
-+additional behavior.
++The `--public-ipv4` and `--public-ipv6` values are advertised addresses and do
++not change the automatically selected bind address. This allows an external,
++NAT, or load-balancer address to be advertised without requiring that address
++to exist on a local interface.
++
++Use `--bind-address=::` to explicitly select the IPv6 wildcard for shared
++services. Whether an IPv6 wildcard socket also accepts IPv4 traffic is platform
++dependent; on Linux it depends on `IPV6_V6ONLY` and `net.ipv6.bindv6only`, and
++container or Kubernetes networking may impose additional behavior.
 +
 +The DHCPv6 listener has its own `--dhcpv6-bind-addr` setting and defaults to
-+`::` independently of `--dual-stack`. `--dhcpv6-bind-interface` can be set to
-+one interface or a comma-separated list of interfaces.
++`::`. The DHCPv4 and DHCPv6 listeners are enabled independently with
++`--dhcp-enabled` and `--dhcpv6-enabled`. `--dhcpv6-bind-interface` can be set
++to one interface or a comma-separated list of interfaces.
 +
  ---
  
  ## HTTP / HTTPS Endpoints
-@@ -60,7 +92,7 @@ per-service scraping. A combined endpoint gathers from all registries.
+@@ -67,7 +102,7 @@ per-service scraping. A combined endpoint gathers from all registries.
  | Route | Method | HTTPS | Redirect | Description |
  |-------|--------|-------|----------|-------------|
- | `/ipxe/binary/` | GET | | | Serves architecture-specific iPXE firmware binaries (e.g. `snp.efi`, `undionly.kpxe`). DHCP option 67 points machines here. |
+ | `/ipxe/binary/` | GET, HEAD | | | Serves architecture-specific iPXE firmware binaries (e.g. `snp.efi`, `undionly.kpxe`) from the embedded file set. DHCP option 67 points machines here. |
 -| `/ipxe/script/` | GET | | | Serves auto-generated iPXE boot scripts. Supports MAC-address injection in the URL path (e.g. `/ipxe/script/aa:bb:cc:dd:ee:ff/auto.ipxe`). |
 +| `/ipxe/script/` | GET | | | Serves auto-generated iPXE boot scripts. Supports MAC-address injection in the URL path (e.g. `/ipxe/script/aa:bb:cc:dd:ee:ff/auto.ipxe` for IPv4 and `/ipxe/script/aa:bb:cc:dd:ee:ff/auto6.ipxe` for IPv6). |
  | `/iso/` | GET | ✅ | | Serves dynamically-patched ISO images with per-machine kernel parameters baked in. Enabled via `--smee-iso-enabled`. |
  
- ### EC2-Compatible Metadata (Tootles)
-@@ -145,6 +177,37 @@ Key DHCP options set:
+ ### PXE over HTTP (Smee)
+@@ -264,6 +299,37 @@ Key DHCP options set:
  - **Option 67** (Bootfile Name): iPXE binary filename or HTTP URL
  - **Option 7** (Log Server): Syslog IP for boot logging
  
@@ -1271,9 +1310,17 @@ index 1fd3ecad..c2da9b2b 100644
 +
  ### TFTP (UDP :69)
  
- Serves iPXE firmware binaries for initial PXE boot. Machines chain-load from
+ Serves boot files for initial PXE boot; see the [TFTP Endpoints](#tftp-endpoints)
+@@ -336,6 +402,7 @@ When deployed via Helm, the Kubernetes Service exposes:
+ | 7443 | 7443 | TCP | TLS configured |
+ | 42113 | 42113 | TCP | `enableTinkServer` |
+ | 67 | 67 | UDP | `enableSmee` |
++| 547 | 547 | UDP | `enableSmee` and `dhcpv6Enabled` |
+ | 69 | 69 | UDP | `enableSmee` |
+ | 514 | 514 | UDP | `enableSmee` |
+ | 2222 | 2222 | TCP | `enableSecondstar` |
 diff --git a/helm/tinkerbell/README.md b/helm/tinkerbell/README.md
-index 512d1e51..19b9f5d9 100644
+index 512d1e51..6439c713 100644
 --- a/helm/tinkerbell/README.md
 +++ b/helm/tinkerbell/README.md
 @@ -15,23 +15,32 @@ This Helm chart deploys Tinkerbell, the bare metal provisioning engine that supp
@@ -1349,7 +1396,7 @@ index 512d1e51..19b9f5d9 100644
  ### Optional Components
  
  #### HookOS
-@@ -88,13 +106,58 @@ optional:
+@@ -88,13 +106,59 @@ optional:
      image: ghcr.io/kube-vip/kube-vip:v0.9.1
  ```
  
@@ -1388,27 +1435,28 @@ index 512d1e51..19b9f5d9 100644
 +## Bind Address Behavior
 +
 +When `deployment.envs.globals.bindAddr` is set, the Tinkerbell binary binds
-+shared services to that address. When it is not set, the default bind address is
-+chosen from the configured or detected public addresses:
++shared services to that address. A service-specific bind address, where
++available, takes precedence. When the global value is not set, Tinkerbell uses
++an IPv4-compatible default selected from addresses detected inside the
++container or host:
 +
-+| Public IPv4 | Public IPv6 | `deployment.envs.globals.dualStack` | Default bind address |
-+|-------------|-------------|--------------------------------------|----------------------|
-+| yes | no | either | public IPv4 |
-+| no | yes | either | `::` |
-+| yes | yes | false | public IPv4 |
-+| yes | yes | true | `::` |
-+| no | no | either | `0.0.0.0` |
++| Detected IPv4 | Detected IPv6 | Default bind address |
++|---------------|---------------|----------------------|
++| yes | either | detected IPv4 |
++| no | yes | `::` |
++| no | no | `0.0.0.0` |
 +
-+Set `deployment.envs.globals.dualStack=true` only when the Kubernetes and node
-+networking environment should use an IPv6 wildcard listener for shared services.
-+Whether that listener also accepts IPv4 traffic is platform dependent; on Linux
-+it depends on `IPV6_V6ONLY` and `net.ipv6.bindv6only`, and Kubernetes networking
-+may add its own behavior. DHCPv6 uses its own bind setting,
-+`deployment.envs.smee.dhcpv6BindAddr`, and defaults to `::` independently.
++The configured public IPv4 and IPv6 values are advertised addresses and do not
++change this default. Set `deployment.envs.globals.bindAddr: "::"` to explicitly
++select the IPv6 wildcard for shared services. Whether that listener also accepts
++IPv4 traffic is platform dependent; on Linux it depends on `IPV6_V6ONLY` and
++`net.ipv6.bindv6only`, and Kubernetes networking may add its own behavior.
++DHCPv6 uses its own bind setting, `deployment.envs.smee.dhcpv6BindAddr`, and
++defaults to `::`.
  
  ## Additional RBAC Rules
  
-@@ -167,6 +230,34 @@ helm install tinkerbell . \
+@@ -167,6 +231,34 @@ helm install tinkerbell . \
    --set deployment.envs.smee.dhcpMode=auto-proxy
  ```
  
@@ -1444,7 +1492,7 @@ index 512d1e51..19b9f5d9 100644
  
  > [!IMPORTANT]
 diff --git a/helm/tinkerbell/templates/deployment.yaml b/helm/tinkerbell/templates/deployment.yaml
-index 1e47d8b8..67c6cd0c 100644
+index 4cbdb2e9..da83bb70 100644
 --- a/helm/tinkerbell/templates/deployment.yaml
 +++ b/helm/tinkerbell/templates/deployment.yaml
 @@ -1,7 +1,28 @@
@@ -1476,7 +1524,7 @@ index 1e47d8b8..67c6cd0c 100644
  {{- if .Values.deployment.daemonSet.enabled }}
  apiVersion: apps/v1
  kind: DaemonSet
-@@ -109,8 +130,50 @@ spec:
+@@ -131,8 +152,50 @@ spec:
            # SMEE
              - name: TINKERBELL_DHCP_ENABLED
                value: {{ .Values.deployment.envs.smee.dhcpEnabled | quote }}
@@ -1527,7 +1575,7 @@ index 1e47d8b8..67c6cd0c 100644
              - name: TINKERBELL_DHCP_BIND_ADDR
                value: {{ .Values.deployment.envs.smee.dhcpBindAddr | quote }}
              - name: TINKERBELL_DHCP_BIND_INTERFACE
-@@ -163,10 +226,14 @@ spec:
+@@ -185,10 +248,14 @@ spec:
                value: {{ .Values.deployment.envs.smee.ipxeHttpScriptRetryDelay | quote }}
              - name: TINKERBELL_IPXE_HTTP_SCRIPT_OSIE_URL
                value: {{ coalesce .Values.artifactsFileServer .Values.deployment.envs.smee.ipxeHttpScriptOsieURL | quote }}
@@ -1542,16 +1590,7 @@ index 1e47d8b8..67c6cd0c 100644
              - name: TINKERBELL_IPXE_SCRIPT_TINK_SERVER_USE_TLS
                value: {{ .Values.deployment.envs.smee.ipxeScriptTinkServerUseTLS | quote }}
              - name: TINKERBELL_IPXE_SCRIPT_TINK_SERVER_INSECURE_TLS
-@@ -236,6 +303,8 @@ spec:
-               value: {{ .Values.deployment.envs.globals.backendKubeQPS | quote }}
-             - name: TINKERBELL_BIND_ADDR
-               value: {{ .Values.deployment.envs.globals.bindAddr | quote }}
-+            - name: TINKERBELL_DUAL_STACK
-+              value: {{ .Values.deployment.envs.globals.dualStack | quote }}
-             - name: TINKERBELL_OTEL_ENDPOINT
-               value: {{ .Values.deployment.envs.globals.otelEndpoint | quote }}
-             - name: TINKERBELL_OTEL_INSECURE
-@@ -244,6 +313,8 @@ spec:
+@@ -272,6 +339,8 @@ spec:
                value: {{ ( join "," $trustedProxies ) | quote }}
              - name: TINKERBELL_PUBLIC_IPV4
                value: {{ (coalesce .Values.deployment.envs.globals.publicIpv4 $publicIP) | quote }}
@@ -1560,7 +1599,7 @@ index 1e47d8b8..67c6cd0c 100644
              - name: TINKERBELL_ENABLE_SMEE
                value: {{ .Values.deployment.envs.globals.enableSmee | quote }}
              - name: TINKERBELL_ENABLE_TOOTLES
-@@ -289,6 +360,11 @@ spec:
+@@ -317,6 +386,11 @@ spec:
                name: {{ .name }}
                protocol: {{ .protocol }}
              {{- end }}
@@ -1701,7 +1740,7 @@ index dba8fbb6..4e635d06 100644
            sendfile           on;
            sendfile_max_chunk 1m;
 diff --git a/helm/tinkerbell/templates/osie/service.yaml b/helm/tinkerbell/templates/osie/service.yaml
-index 2b3dcdbe..12c35b7a 100644
+index 2b3dcdbe..99d1ac41 100644
 --- a/helm/tinkerbell/templates/osie/service.yaml
 +++ b/helm/tinkerbell/templates/osie/service.yaml
 @@ -1,11 +1,40 @@
@@ -1749,17 +1788,22 @@ index 2b3dcdbe..12c35b7a 100644
  ---
  apiVersion: v1
  kind: Service
-@@ -22,6 +51,9 @@ metadata:
+@@ -19,9 +48,14 @@ metadata:
+   namespace: {{ .Release.Namespace | quote }}
+   annotations:
+     {{- $annotations := include "tinkerbell.osie.service.annotations" . }}
++    {{- $hasKubeVIPLoadBalancerIPsAnnotation := false }}
      {{- if $annotations }}
++    {{- $hasKubeVIPLoadBalancerIPsAnnotation = hasKey ($annotations | fromYaml) "kube-vip.io/loadbalancerIPs" }}
      {{- $annotations | nindent 4 }}
      {{- end }}
-+    {{- if and (eq (include "tinkerbell.osie.service.type" .) "LoadBalancer") (not (empty $loadBalancerIPs)) }}
++    {{- if and (eq (include "tinkerbell.osie.service.type" .) "LoadBalancer") (not (empty $loadBalancerIPs)) (not $hasKubeVIPLoadBalancerIPsAnnotation) }}
 +    kube-vip.io/loadbalancerIPs: {{ join "," $loadBalancerIPs | quote }}
 +    {{- end }}
  spec:
    type: {{ include "tinkerbell.osie.service.type" . }}
    {{- if eq (include "tinkerbell.osie.service.type" .) "LoadBalancer" }}
-@@ -29,7 +61,12 @@ spec:
+@@ -29,7 +63,12 @@ spec:
    {{- if $lbClass }}
    loadBalancerClass: {{ $lbClass }}
    {{- end }}
@@ -1773,7 +1817,7 @@ index 2b3dcdbe..12c35b7a 100644
    externalTrafficPolicy: Local
    {{- end }}
    ports:
-@@ -40,4 +77,4 @@ spec:
+@@ -40,4 +79,4 @@ spec:
      {{- include "tinkerbell.osie.selector" . | nindent 4 }}
  {{- end }}
  {{- end }}
@@ -1781,10 +1825,10 @@ index 2b3dcdbe..12c35b7a 100644
 \ No newline at end of file
 +{{- end }}
 diff --git a/helm/tinkerbell/templates/service.yaml b/helm/tinkerbell/templates/service.yaml
-index bfffa748..67ab6d35 100644
+index bfffa748..746a1478 100644
 --- a/helm/tinkerbell/templates/service.yaml
 +++ b/helm/tinkerbell/templates/service.yaml
-@@ -1,4 +1,24 @@
+@@ -1,4 +1,25 @@
  {{- if .Values.service.enabled }}
 +{{- $loadBalancerIPs := list }}
 +{{- $publicIP := coalesce .Values.deployment.envs.globals.publicIpv4 .Values.deployment.envs.globals.publicIPv4 .Values.publicIP }}
@@ -1795,21 +1839,22 @@ index bfffa748..67ab6d35 100644
 +{{- if and $publicIPv6 (include "tinkerbell.isIPv4Address" $publicIPv6) }}
 +  {{- fail "publicIPv6 must be an IPv6 address; use publicIP for IPv4 addresses" }}
 +{{- end }}
++{{- if .Values.service.loadBalancerIP }}
++{{- $loadBalancerIPs = append $loadBalancerIPs .Values.service.loadBalancerIP }}
++{{- else }}
 +{{- if $publicIP }}
 +{{- $loadBalancerIPs = append $loadBalancerIPs $publicIP }}
 +{{- end }}
 +{{- if $publicIPv6 }}
 +{{- $loadBalancerIPs = append $loadBalancerIPs $publicIPv6 }}
 +{{- end }}
-+{{- if .Values.service.loadBalancerIP }}
-+{{- $loadBalancerIPs = append $loadBalancerIPs .Values.service.loadBalancerIP }}
 +{{- end }}
 +{{- $loadBalancerIPs = uniq $loadBalancerIPs }}
 +{{- $hasKubeVIPLoadBalancerIPsAnnotation := hasKey (default dict .Values.service.annotations) "kube-vip.io/loadbalancerIPs" }}
  apiVersion: v1
  kind: Service
  metadata:
-@@ -6,6 +26,9 @@ metadata:
+@@ -6,6 +27,9 @@ metadata:
      {{- with .Values.service.annotations }}
      {{- toYaml . | nindent 4 }}
      {{- end }}
@@ -1819,7 +1864,7 @@ index bfffa748..67ab6d35 100644
    labels:
      {{- with .Values.service.labels }}
      {{- toYaml . | nindent 4 }}
-@@ -18,15 +41,28 @@ spec:
+@@ -18,15 +42,28 @@ spec:
    {{- if .Values.service.lbClass }}
    loadBalancerClass: {{ .Values.service.lbClass }}
    {{- end }}
@@ -1850,7 +1895,7 @@ index bfffa748..67ab6d35 100644
      targetPort: {{ .Values.service.ports.tftp.name }}
      protocol: {{ .Values.service.ports.tftp.protocol }}
 diff --git a/helm/tinkerbell/values.yaml b/helm/tinkerbell/values.yaml
-index 6afe41e6..8fe09c83 100644
+index 0b50f6ba..5a522778 100644
 --- a/helm/tinkerbell/values.yaml
 +++ b/helm/tinkerbell/values.yaml
 @@ -1,9 +1,11 @@
@@ -1867,15 +1912,7 @@ index 6afe41e6..8fe09c83 100644
  deployment:
    additionalEnvs: []
    # - name: MY_ENV_VAR
-@@ -27,6 +29,7 @@ deployment:
-       backendKubeNamespace: ""
-       backendKubeQPS: 100
-       bindAddr: ""
-+      dualStack: false
-       enableCRDMigrations: true
-       enableRufioController: true
-       enableSecondstar: true
-@@ -41,6 +44,7 @@ deployment:
+@@ -41,6 +43,7 @@ deployment:
        otelEndpoint: ""
        otelInsecure: false
        publicIpv4: ""
@@ -1883,7 +1920,7 @@ index 6afe41e6..8fe09c83 100644
        tlsCertFile: ""
        tlsKeyFile: ""
        trustedProxies: ""
-@@ -75,6 +79,27 @@ deployment:
+@@ -75,6 +78,27 @@ deployment:
        dhcpSyslogIP: ""
        dhcpTftpIP: ""
        dhcpTftpPort: 69
@@ -1911,7 +1948,7 @@ index 6afe41e6..8fe09c83 100644
        ipxeBinaryInjectMacAddrFormat: "" # one of colon, dot, dash, no-delimiter, empty. defaults to colon when empty.
        ipxeEmbeddedScriptPatch: ""
        ipxeHttpBinaryEnabled: true
-@@ -84,10 +109,12 @@ deployment:
+@@ -84,10 +108,12 @@ deployment:
        ipxeHttpScriptInitrdName: "initramfs" # name of the initrd file to fetch in the iPXE script, defaults to initramfs, which becomes initramfs-<arch> in the script
        ipxeHttpScriptTrustedProxies: ""
        ipxeHttpScriptOsieURL: ""
@@ -1924,7 +1961,7 @@ index 6afe41e6..8fe09c83 100644
        ipxeScriptTinkServerInsecureTLS: false
        ipxeScriptTinkServerUseTLS: false
        isoEnabled: true
-@@ -173,6 +200,7 @@ deployment:
+@@ -176,6 +202,7 @@ deployment:
    #   readOnly: true
  name: tinkerbell
  publicIP:
@@ -1932,7 +1969,7 @@ index 6afe41e6..8fe09c83 100644
  rbac:
    additionalRoleRules: []
    # Resource-based rule example:
-@@ -192,6 +220,8 @@ service:
+@@ -195,6 +222,8 @@ service:
    annotations: {}
    labels:
      app: tinkerbell
@@ -1941,7 +1978,7 @@ index 6afe41e6..8fe09c83 100644
    lbClass: "kube-vip.io/kube-vip-class"
    loadBalancerIP: ""
    name: tinkerbell
-@@ -200,6 +230,10 @@ service:
+@@ -203,6 +232,10 @@ service:
        name: dhcp
        port: 67
        protocol: UDP
@@ -1952,7 +1989,7 @@ index 6afe41e6..8fe09c83 100644
      grpc:
        name: grpc
        port: 42113
-@@ -306,7 +340,7 @@ optional:
+@@ -309,7 +342,7 @@ optional:
      service:
        annotations: {}
        lbClass:
@@ -2119,7 +2156,7 @@ index 2f80f3d8..d41e96bf 100644
  	// Start an in-flight request.
  	type result struct {
 diff --git a/secondstar/secondstar.go b/secondstar/secondstar.go
-index 6353e1dd..386f7604 100644
+index 6353e1dd..2f04baaa 100644
 --- a/secondstar/secondstar.go
 +++ b/secondstar/secondstar.go
 @@ -29,10 +29,7 @@ type Config struct {
@@ -2140,7 +2177,7 @@ index 6353e1dd..386f7604 100644
  
 +func sshAddrPort(addr netip.Addr, port int) string {
 +	addrPort := fmt.Sprintf(":%d", port)
-+	if addr.IsValid() && !addr.IsUnspecified() && port >= 0 && port <= 65535 {
++	if addr.IsValid() && (!addr.Is4() || !addr.IsUnspecified()) && port >= 0 && port <= 65535 {
 +		addrPort = netip.AddrPortFrom(addr, uint16(port)).String()
 +	}
 +	return addrPort
@@ -2150,10 +2187,10 @@ index 6353e1dd..386f7604 100644
  func HostKeyFrom(filePath string) (ssh.Signer, error) {
  	hostKey, err := os.ReadFile(filePath)
 diff --git a/secondstar/secondstar_test.go b/secondstar/secondstar_test.go
-index b682a77d..6adbb9db 100644
+index b682a77d..01edced4 100644
 --- a/secondstar/secondstar_test.go
 +++ b/secondstar/secondstar_test.go
-@@ -5,10 +5,47 @@ import (
+@@ -5,10 +5,52 @@ import (
  	"crypto/rsa"
  	"crypto/x509"
  	"encoding/pem"
@@ -2172,10 +2209,15 @@ index b682a77d..6adbb9db 100644
 +			port: 2222,
 +			want: ":2222",
 +		},
-+		"unspecified address": {
++		"unspecified ipv4 address": {
 +			addr: netip.IPv4Unspecified(),
 +			port: 2222,
 +			want: ":2222",
++		},
++		"unspecified ipv6 address": {
++			addr: netip.IPv6Unspecified(),
++			port: 2222,
++			want: "[::]:2222",
 +		},
 +		"ipv4": {
 +			addr: netip.MustParseAddr("10.0.2.15"),
@@ -7495,12 +7537,12 @@ index f876c7e1..44c592f5 100644
 +	return "syslog"
 +}
 diff --git a/smee/internal/ipxe/script/ipxe.go b/smee/internal/ipxe/script/ipxe.go
-index 2439b46f..f3cea918 100644
+index a9aab3f7..0b80fbde 100644
 --- a/smee/internal/ipxe/script/ipxe.go
 +++ b/smee/internal/ipxe/script/ipxe.go
-@@ -29,11 +29,14 @@ type Handler struct {
+@@ -21,11 +21,14 @@ type Handler struct {
  	Logger                logr.Logger
- 	Backend               BackendReader
+ 	Backend               hardware.BackendReader
  	OSIEURL               string
 +	OSIEURLv6             string
  	ExtraKernelParams     []string
@@ -7513,7 +7555,7 @@ index 2439b46f..f3cea918 100644
  	IPXEScriptRetries     int
  	IPXEScriptRetryDelay  int
  	StaticIPXEEnabled     bool
-@@ -138,10 +141,14 @@ func getByIP(ctx context.Context, ip net.IP, br BackendReader) (info, error) {
+@@ -34,10 +37,14 @@ type Handler struct {
  }
  
  // HandlerFunc returns a http.HandlerFunc that serves the ipxe script.
@@ -7530,13 +7572,13 @@ index 2439b46f..f3cea918 100644
  			h.Logger.Info("URL path not supported", "path", r.URL.Path)
  			w.WriteHeader(http.StatusNotFound)
  
-@@ -165,11 +172,11 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
+@@ -61,11 +68,11 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
  		// without a tink workflow present.
  
  		// Try to get the MAC address from the URL path, if not available get the source IP address.
 -		if ha, err := getMAC(r.URL.Path); err == nil {
 +		if ha, err := getMAC(scriptPath); err == nil {
- 			hw, err := getByMac(ctx, ha, h.Backend)
+ 			hw, err := hardware.GetByMac(ctx, ha, h.Backend)
  			if err != nil && h.StaticIPXEEnabled {
  				h.Logger.Info("serving static ipxe script", "mac", ha.String(), "reasonForStaticScript", err)
 -				h.serveStaticIPXEScript(w)
@@ -7544,7 +7586,7 @@ index 2439b46f..f3cea918 100644
  				return
  			}
  			if err != nil || !hw.AllowNetboot {
-@@ -178,14 +185,14 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
+@@ -74,14 +81,14 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
  
  				return
  			}
@@ -7553,7 +7595,7 @@ index 2439b46f..f3cea918 100644
  			return
  		}
  		if ip, err := getIP(r.RemoteAddr); err == nil {
- 			hw, err := getByIP(ctx, ip, h.Backend)
+ 			hw, err := hardware.GetByIP(ctx, ip, h.Backend)
  			if err != nil && h.StaticIPXEEnabled {
  				h.Logger.Info("serving static ipxe script", "client", r.RemoteAddr, "error", err)
 -				h.serveStaticIPXEScript(w)
@@ -7561,7 +7603,7 @@ index 2439b46f..f3cea918 100644
  				return
  			}
  			if err != nil || !hw.AllowNetboot {
-@@ -194,7 +201,7 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
+@@ -90,7 +97,7 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
  
  				return
  			}
@@ -7570,7 +7612,7 @@ index 2439b46f..f3cea918 100644
  			return
  		}
  
-@@ -204,14 +211,24 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
+@@ -100,14 +107,24 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
  	}
  }
  
@@ -7599,16 +7641,16 @@ index 2439b46f..f3cea918 100644
  		Retries:           h.IPXEScriptRetries,
  		RetryDelay:        h.IPXEScriptRetryDelay,
  		KernelName:        h.KernelName,
-@@ -250,7 +267,7 @@ func getMAC(urlPath string) (net.HardwareAddr, error) {
+@@ -146,7 +163,7 @@ func getMAC(urlPath string) (net.HardwareAddr, error) {
  	return ha, nil
  }
  
--func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, name string, hw info) {
-+func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, name string, hw info, isIPv6 bool) {
+-func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, name string, hw hardware.Info) {
++func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, name string, hw hardware.Info, isIPv6 bool) {
  	span := trace.SpanFromContext(ctx)
  	span.SetAttributes(attribute.String("smee.script_name", name))
  	var script []byte
-@@ -259,8 +276,8 @@ func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, na
+@@ -155,8 +172,8 @@ func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, na
  		name = "custom.ipxe"
  	}
  	switch name {
@@ -7619,12 +7661,12 @@ index 2439b46f..f3cea918 100644
  		if err != nil {
  			w.WriteHeader(http.StatusInternalServerError)
  			h.Logger.Error(err, "error with default ipxe script", "script", name)
-@@ -297,7 +314,17 @@ func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, na
+@@ -193,7 +210,16 @@ func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, na
  	}
  }
  
--func (h *Handler) defaultScript(span trace.Span, hw info) (string, error) {
-+func (h *Handler) defaultScript(span trace.Span, hw info, isIPv6 bool) (string, error) {
+-func (h *Handler) defaultScript(span trace.Span, hw hardware.Info) (string, error) {
++func (h *Handler) defaultScript(span trace.Span, hw hardware.Info, isIPv6 bool) (string, error) {
 +	syslogHost := h.PublicSyslogFQDN
 +	downloadURL := h.OSIEURL
 +	tinkServerGRPCAddr := h.TinkServerGRPCAddr
@@ -7634,17 +7676,16 @@ index 2439b46f..f3cea918 100644
 +		downloadURL = h.OSIEURLv6
 +		tinkServerGRPCAddr = h.TinkServerGRPCAddrV6
 +	}
-+
  	mac := hw.MACAddress
  	arch := hw.Arch
  	if arch == "" {
-@@ -312,14 +339,14 @@ func (h *Handler) defaultScript(span trace.Span, hw info) (string, error) {
+@@ -212,14 +238,14 @@ func (h *Handler) defaultScript(span trace.Span, hw hardware.Info) (string, erro
  	auto := Hook{
  		Arch:                  arch,
  		Console:               "",
 -		DownloadURL:           h.OSIEURL,
 +		DownloadURL:           downloadURL,
- 		ExtraKernelParams:     h.ExtraKernelParams,
+ 		ExtraKernelParams:     extraKernelParams,
  		Facility:              hw.Facility,
  		HWAddr:                mac.String(),
 -		SyslogHost:            h.PublicSyslogFQDN,
@@ -7657,10 +7698,10 @@ index 2439b46f..f3cea918 100644
  		WorkerID:              wID,
  		Retries:               h.IPXEScriptRetries,
 diff --git a/smee/internal/ipxe/script/ipxe_test.go b/smee/internal/ipxe/script/ipxe_test.go
-index ad445171..9508fa9b 100644
+index 4033f810..7475e2b0 100644
 --- a/smee/internal/ipxe/script/ipxe_test.go
 +++ b/smee/internal/ipxe/script/ipxe_test.go
-@@ -3,16 +3,28 @@ package script
+@@ -3,17 +3,29 @@ package script
  import (
  	"context"
  	"net"
@@ -7674,6 +7715,7 @@ index ad445171..9508fa9b 100644
 +	"github.com/prometheus/client_golang/prometheus"
 +	"github.com/tinkerbell/tinkerbell/api/v1alpha1/tinkerbell"
 +	"github.com/tinkerbell/tinkerbell/pkg/data"
+ 	"github.com/tinkerbell/tinkerbell/smee/internal/hardware"
  	"github.com/tinkerbell/tinkerbell/smee/internal/metric"
  	"go.opentelemetry.io/otel/trace"
  )
@@ -7689,7 +7731,7 @@ index ad445171..9508fa9b 100644
  func TestCustomScript(t *testing.T) {
  	tests := map[string]struct {
  		ipxeURL    string
-@@ -158,7 +170,7 @@ exit
+@@ -159,7 +171,7 @@ exit
  				InitrdName:            "initramfs",
  			}
  			sp := trace.SpanFromContext(context.Background())
@@ -7698,7 +7740,7 @@ index ad445171..9508fa9b 100644
  			if err != nil {
  				t.Fatal(err)
  			}
-@@ -248,7 +260,7 @@ func TestDefaultScriptCustomKernelInitrd(t *testing.T) {
+@@ -249,7 +261,7 @@ func TestDefaultScriptCustomKernelInitrd(t *testing.T) {
  	for name, tt := range tests {
  		t.Run(name, func(t *testing.T) {
  			sp := trace.SpanFromContext(context.Background())
@@ -7707,7 +7749,16 @@ index ad445171..9508fa9b 100644
  			if err != nil {
  				t.Fatal(err)
  			}
-@@ -346,3 +358,157 @@ exit
+@@ -282,7 +294,7 @@ func TestDefaultScriptKernelParams(t *testing.T) {
+ 	}
+ 
+ 	sp := trace.SpanFromContext(context.Background())
+-	got, err := h.defaultScript(sp, hw)
++	got, err := h.defaultScript(sp, hw, false)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -383,3 +395,157 @@ exit
  		t.Fatalf("expected custom script, got %s", diff)
  	}
  }
@@ -7881,7 +7932,7 @@ index 8669112a..58dc0b93 100644
  
  set arch ${buildarch}
 diff --git a/smee/internal/syslog/receiver.go b/smee/internal/syslog/receiver.go
-index 0ec20808..f9171ac3 100644
+index 5cbabbca..9ff7afb0 100644
 --- a/smee/internal/syslog/receiver.go
 +++ b/smee/internal/syslog/receiver.go
 @@ -31,12 +31,12 @@ func StartReceiver(ctx context.Context, logger logr.Logger, laddr string, parser
@@ -7891,16 +7942,16 @@ index 0ec20808..f9171ac3 100644
 -	addr, err := net.ResolveUDPAddr("udp4", laddr)
 +	addr, err := net.ResolveUDPAddr("udp", laddr)
  	if err != nil {
- 		return fmt.Errorf("resolve syslog udp listen address: %w", err)
+ 		return nil, fmt.Errorf("resolve syslog udp listen address: %w", err)
  	}
  
 -	c, err := net.ListenUDP("udp4", addr)
 +	c, err := net.ListenUDP("udp", addr)
  	if err != nil {
- 		return fmt.Errorf("listen on syslog udp address: %w", err)
+ 		return nil, fmt.Errorf("listen on syslog udp address: %w", err)
  	}
 diff --git a/smee/internal/syslog/receiver_test.go b/smee/internal/syslog/receiver_test.go
-index f2bda079..40ea06b3 100644
+index 277a7fdf..fe24f2a4 100644
 --- a/smee/internal/syslog/receiver_test.go
 +++ b/smee/internal/syslog/receiver_test.go
 @@ -78,6 +78,21 @@ func TestStartReceiver_AddressInUse(t *testing.T) {
@@ -7917,7 +7968,7 @@ index f2bda079..40ea06b3 100644
 +	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 +	defer cancel()
 +
-+	if err := StartReceiver(ctx, logr.Discard(), "[::1]:0", 1); err != nil {
++	if _, err := StartReceiver(ctx, logr.Discard(), "[::1]:0", 1); err != nil {
 +		t.Fatalf("StartReceiver() unexpected error for IPv6 address = %v", err)
 +	}
 +}
@@ -7926,7 +7977,7 @@ index f2bda079..40ea06b3 100644
  	// Start a receiver on a random port
  	ctx, cancel := context.WithCancel(context.Background())
 diff --git a/smee/smee.go b/smee/smee.go
-index 4b022af8..dd214718 100644
+index 64e2976f..0d92f5b9 100644
 --- a/smee/smee.go
 +++ b/smee/smee.go
 @@ -2,7 +2,9 @@ package smee
@@ -7956,7 +8007,7 @@ index 4b022af8..dd214718 100644
  	"github.com/tinkerbell/tinkerbell/smee/internal/dhcp/handler/proxy"
  	"github.com/tinkerbell/tinkerbell/smee/internal/dhcp/handler/reservation"
  	"github.com/tinkerbell/tinkerbell/smee/internal/dhcp/server"
-@@ -46,9 +53,13 @@ type BackendReader interface {
+@@ -47,9 +54,13 @@ type BackendReader interface {
  }
  
  const (
@@ -7973,7 +8024,7 @@ index 4b022af8..dd214718 100644
  	// isoMagicString comes from the HookOS repo and is used to patch the HookOS ISO image.
  	// ref: https://github.com/tinkerbell/hook/blob/main/linuxkit-templates/hook.template.yaml
  	isoMagicString = `464vn90e7rbj08xbwdjejmdf4it17c5zfzjyfhthbh19eij201hjgit021bmpdb9ctrc87x2ymc8e7icu4ffi15x1hah9iyaiz38ckyap8hwx2vt5rm44ixv4hau8iw718q5yd019um5dt2xpqqa2rjtdypzr5v1gun8un110hhwp8cex7pqrh2ivh0ynpm4zkkwc8wcn367zyethzy7q8hzudyeyzx3cgmxqbkh825gcak7kxzjbgjajwizryv7ec1xm2h0hh7pz29qmvtgfjj1vphpgq1zcbiiehv52wrjy9yq473d9t1rvryy6929nk435hfx55du3ih05kn5tju3vijreru1p6knc988d4gfdz28eragvryq5x8aibe5trxd0t6t7jwxkde34v6pj1khmp50k6qqj3nzgcfzabtgqkmeqhdedbvwf3byfdma4nkv3rcxugaj2d0ru30pa2fqadjqrtjnv8bu52xzxv7irbhyvygygxu1nt5z4fh9w1vwbdcmagep26d298zknykf2e88kumt59ab7nq79d8amnhhvbexgh48e8qc61vq2e9qkihzt1twk1ijfgw70nwizai15iqyted2dt9gfmf2gg7amzufre79hwqkddc1cd935ywacnkrnak6r7xzcz7zbmq3kt04u2hg1iuupid8rt4nyrju51e6uejb2ruu36g9aibmz3hnmvazptu8x5tyxk820g2cdpxjdij766bt2n3djur7v623a2v44juyfgz80ekgfb9hkibpxh3zgknw8a34t4jifhf116x15cei9hwch0fye3xyq0acuym8uhitu5evc4rag3ui0fny3qg4kju7zkfyy8hwh537urd5uixkzwu5bdvafz4jmv7imypj543xg5em8jk8cgk7c4504xdd5e4e71ihaumt6u5u2t1w7um92fepzae8p0vq93wdrd1756npu1pziiur1payc7kmdwyxg3hj5n4phxbc29x0tcddamjrwt260b0w`
-@@ -65,8 +76,16 @@ const (
+@@ -68,8 +79,16 @@ const (
  	IPXEBinaryURI = "/ipxe/binary/"
  	IPXEScriptURI = "/ipxe/script/"
  	ISOURI        = "/iso/"
@@ -7990,7 +8041,7 @@ index 4b022af8..dd214718 100644
  type DHCPMode string
  
  func (d DHCPMode) String() string {
-@@ -87,12 +106,35 @@ func (d *DHCPMode) Type() string {
+@@ -90,12 +109,35 @@ func (d *DHCPMode) Type() string {
  	return "dhcp-mode"
  }
  
@@ -8026,7 +8077,7 @@ index 4b022af8..dd214718 100644
  	// IPXE is the configuration for the iPXE service.
  	IPXE IPXE
  	// ISO is the configuration for the ISO service.
-@@ -147,10 +189,13 @@ type IPXEHTTPBinaryServer struct {
+@@ -166,10 +208,13 @@ type IPXEHTTPBinaryServer struct {
  }
  
  type IPXEHTTPScriptServer struct {
@@ -8044,7 +8095,7 @@ index 4b022af8..dd214718 100644
  	TrustedProxies  []string
  	ExtraKernelArgs []string
  	KernelName      string
-@@ -184,6 +229,39 @@ type DHCP struct {
+@@ -203,6 +248,39 @@ type DHCP struct {
  	IPXEHTTPScript IPXEHTTPScript
  }
  
@@ -8084,7 +8135,7 @@ index 4b022af8..dd214718 100644
  type IPXEHTTPBinary struct {
  	// InjectMacAddrFormat is the format to use when injecting the mac address into the iPXE binary URL.
  	// Valid values are "colon", "dot", "dash", "no-delimiter", and "empty".
-@@ -216,7 +294,10 @@ type ISO struct {
+@@ -235,7 +313,10 @@ type ISO struct {
  type TinkServer struct {
  	UseTLS      bool
  	InsecureTLS bool
@@ -8096,7 +8147,7 @@ index 4b022af8..dd214718 100644
  }
  
  type TLS struct {
-@@ -247,6 +328,27 @@ func NewConfig(c Config, publicIP netip.Addr) *Config {
+@@ -267,6 +348,27 @@ func NewConfig(c Config) *Config {
  			},
  			TFTPPort: DefaultTFFTPPort,
  		},
@@ -8124,7 +8175,7 @@ index 4b022af8..dd214718 100644
  		IPXE: IPXE{
  			EmbeddedScriptPatch: "",
  			HTTPBinaryServer: IPXEHTTPBinaryServer{
-@@ -257,6 +359,7 @@ func NewConfig(c Config, publicIP netip.Addr) *Config {
+@@ -277,6 +379,7 @@ func NewConfig(c Config) *Config {
  				Retries:         1,
  				RetryDelay:      1,
  				OSIEURL:         &url.URL{},
@@ -8132,7 +8183,7 @@ index 4b022af8..dd214718 100644
  				TrustedProxies:  []string{},
  				ExtraKernelArgs: []string{},
  			},
-@@ -326,14 +429,17 @@ func (c *Config) ScriptHandler(log logr.Logger) http.Handler {
+@@ -372,14 +475,17 @@ func (c *Config) ScriptHandler(log logr.Logger) http.Handler {
  		Logger:                log,
  		Backend:               c.Backend,
  		OSIEURL:               c.IPXE.HTTPScriptServer.OSIEURL.String(),
@@ -8151,7 +8202,7 @@ index 4b022af8..dd214718 100644
  		KernelName:            c.IPXE.HTTPScriptServer.KernelName,
  		InitrdName:            c.IPXE.HTTPScriptServer.InitrdName,
  	}
-@@ -380,7 +486,7 @@ func (c *Config) Start(ctx context.Context, log logr.Logger) error {
+@@ -443,7 +549,7 @@ func (c *Config) Start(ctx context.Context, log logr.Logger) error {
  		return errors.New("no backend provided")
  	}
  	if c.noServicesEnabled() {
@@ -8160,7 +8211,7 @@ index 4b022af8..dd214718 100644
  	}
  
  	g, ctx := errgroup.WithContext(ctx)
-@@ -446,6 +552,27 @@ func (c *Config) Start(ctx context.Context, log logr.Logger) error {
+@@ -512,6 +618,27 @@ func (c *Config) Start(ctx context.Context, log logr.Logger) error {
  		})
  	}
  
@@ -8188,7 +8239,7 @@ index 4b022af8..dd214718 100644
  	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
  		return fmt.Errorf("failed running all Smee services: %w", err)
  	}
-@@ -453,6 +580,26 @@ func (c *Config) Start(ctx context.Context, log logr.Logger) error {
+@@ -519,6 +646,26 @@ func (c *Config) Start(ctx context.Context, log logr.Logger) error {
  	return nil
  }
  
@@ -8215,7 +8266,7 @@ index 4b022af8..dd214718 100644
  func (c *Config) dhcpHandler(log logr.Logger) (server.Handler, error) {
  	// 1. create the handler
  	// 2. create the backend
-@@ -464,24 +611,9 @@ func (c *Config) dhcpHandler(log logr.Logger) (server.Handler, error) {
+@@ -530,24 +677,9 @@ func (c *Config) dhcpHandler(log logr.Logger) (server.Handler, error) {
  
  	httpBinaryURL := *c.DHCP.IPXEHTTPBinaryURL
  
@@ -8243,7 +8294,7 @@ index 4b022af8..dd214718 100644
  	}
  
  	switch c.DHCP.Mode {
-@@ -541,6 +673,199 @@ func (c *Config) dhcpHandler(log logr.Logger) (server.Handler, error) {
+@@ -607,6 +739,199 @@ func (c *Config) dhcpHandler(log logr.Logger) (server.Handler, error) {
  	return nil, errors.New("invalid dhcp mode")
  }
  
@@ -8443,36 +8494,43 @@ index 4b022af8..dd214718 100644
  // Transformer for merging the netip.IPPort and logr.Logger structs.
  func (c *Config) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
  	var zeroUint16 uint16
-@@ -613,5 +938,5 @@ func (c *Config) Transformer(typ reflect.Type) func(dst, src reflect.Value) erro
+@@ -679,5 +1004,5 @@ func (c *Config) Transformer(typ reflect.Type) func(dst, src reflect.Value) erro
  }
  
  func (c *Config) noServicesEnabled() bool {
--	return !c.DHCP.Enabled && !c.TFTP.Enabled && !c.Syslog.Enabled && !c.ISO.Enabled && !c.IPXE.HTTPBinaryServer.Enabled && !c.IPXE.HTTPScriptServer.Enabled
-+	return !c.DHCP.Enabled && !c.DHCPv6.Enabled && !c.TFTP.Enabled && !c.Syslog.Enabled && !c.ISO.Enabled && !c.IPXE.HTTPBinaryServer.Enabled && !c.IPXE.HTTPScriptServer.Enabled
+-	return !c.DHCP.Enabled && !c.TFTP.Enabled && !c.Syslog.Enabled && !c.ISO.Enabled && !c.IPXE.HTTPBinaryServer.Enabled && !c.IPXE.HTTPScriptServer.Enabled && !c.PXEHTTP.Enabled
++	return !c.DHCP.Enabled && !c.DHCPv6.Enabled && !c.TFTP.Enabled && !c.Syslog.Enabled && !c.ISO.Enabled && !c.IPXE.HTTPBinaryServer.Enabled && !c.IPXE.HTTPScriptServer.Enabled && !c.PXEHTTP.Enabled
  }
 diff --git a/smee/smee_test.go b/smee/smee_test.go
-new file mode 100644
-index 00000000..a976375d
---- /dev/null
+index d3a370aa..e58728e2 100644
+--- a/smee/smee_test.go
 +++ b/smee/smee_test.go
-@@ -0,0 +1,546 @@
-+package smee
-+
-+import (
+@@ -2,11 +2,21 @@ package smee
+ 
+ import (
+ 	"context"
 +	"crypto/sha256"
+ 	"net"
 +	"net/http"
 +	"net/http/httptest"
 +	"net/netip"
 +	"strings"
-+	"testing"
-+
-+	"github.com/go-logr/logr"
+ 	"testing"
+ 	"time"
+ 
+ 	"github.com/go-logr/logr"
 +	"github.com/google/go-cmp/cmp"
 +	"github.com/insomniacslk/dhcp/dhcpv6"
 +	reservationv6 "github.com/tinkerbell/tinkerbell/smee/internal/dhcp/dhcpv6/handler/reservation"
 +	statelessv6 "github.com/tinkerbell/tinkerbell/smee/internal/dhcp/dhcpv6/handler/stateless"
 +	"github.com/tinkerbell/tinkerbell/smee/internal/metric"
-+)
+ )
+ 
+ func TestRunSyslogServer(t *testing.T) {
+@@ -46,3 +56,553 @@ func TestRunSyslogServer_startError(t *testing.T) {
+ 		t.Error("runSyslogServer() expected error for invalid bind address, got nil")
+ 	}
+ }
 +
 +func TestDHCPv6BindInterfaces(t *testing.T) {
 +	tests := []struct {
@@ -8517,7 +8575,7 @@ index 00000000..a976375d
 +}
 +
 +func TestNewConfigDHCPv6Defaults(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.Addr{})
++	cfg := NewConfig(Config{})
 +
 +	if cfg.DHCPv6.Enabled {
 +		t.Fatal("DHCPv6 should be disabled by default")
@@ -8542,6 +8600,27 @@ index 00000000..a976375d
 +	}
 +	if cfg.IPXE.HTTPScriptServer.OSIEURLv6 == cfg.IPXE.HTTPScriptServer.OSIEURL {
 +		t.Fatal("OSIEURLv6 should be independent from OSIEURL")
++	}
++	if cfg.Syslog.BindAddr.IsValid() {
++		t.Fatalf("Syslog bind address should be unset by default: got %q", cfg.Syslog.BindAddr)
++	}
++	if cfg.TFTP.BindAddr.IsValid() {
++		t.Fatalf("TFTP bind address should be unset by default: got %q", cfg.TFTP.BindAddr)
++	}
++}
++
++func TestNewConfigServiceBindAddresses(t *testing.T) {
++	bindAddr := netip.MustParseAddr("192.0.2.1")
++	cfg := NewConfig(Config{
++		Syslog: Syslog{BindAddr: bindAddr},
++		TFTP:   TFTP{BindAddr: bindAddr},
++	})
++
++	if got := cfg.Syslog.BindAddr; got != bindAddr {
++		t.Fatalf("unexpected Syslog bind address: got %q want %q", got, bindAddr)
++	}
++	if got := cfg.TFTP.BindAddr; got != bindAddr {
++		t.Fatalf("unexpected TFTP bind address: got %q want %q", got, bindAddr)
 +	}
 +}
 +
@@ -8595,7 +8674,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerAutoStatelessEnabled(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.Mode = DHCPv6ModeAutoStateless
 +	cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
 +	cfg.DHCPv6.IPXEHTTPBinaryURL.Host = "boot.example"
@@ -8627,7 +8706,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerNetbootDisabled(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.EnableNetbootOptions = false
 +	cfg.DHCPv6.TFTPIP = netip.Addr{}
 +	cfg.DHCPv6.IPXEHTTPBinaryURL.Host = ""
@@ -8658,7 +8737,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerNetbootEnabledRequiresTFTPAddress(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.EnableNetbootOptions = true
 +	cfg.DHCPv6.TFTPIP = netip.Addr{}
 +	cfg.DHCPv6.IPXEHTTPBinaryURL.Host = "boot.example"
@@ -8670,7 +8749,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerReservation(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.Mode = DHCPv6ModeReservation
 +	cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
 +	cfg.DHCPv6.IPXEHTTPBinaryURL.Host = "boot.example"
@@ -8702,7 +8781,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerDerived(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.Mode = DHCPv6ModeDerived
 +	cfg.DHCPv6.DerivedDirectAddressPool = netip.MustParsePrefix("2001:db8:abcd::/64")
 +	cfg.DHCPv6.DerivedRelayAddressPrefix = 56
@@ -8732,7 +8811,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerRejectsIPv4DerivedDirectPool(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.Mode = DHCPv6ModeDerived
 +	cfg.DHCPv6.DerivedDirectAddressPool = netip.MustParsePrefix("192.0.2.0/24")
 +	cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
@@ -8746,7 +8825,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerRejectsNarrowDerivedDirectPool(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.Mode = DHCPv6ModeDerived
 +	cfg.DHCPv6.DerivedDirectAddressPool = netip.MustParsePrefix("2001:db8:abcd::/65")
 +	cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
@@ -8770,7 +8849,7 @@ index 00000000..a976375d
 +		{name: "IPv4 mapped", pool: netip.MustParsePrefix("::ffff:0:0/96")},
 +	} {
 +		t.Run(tc.name, func(t *testing.T) {
-+			cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++			cfg := NewConfig(Config{})
 +			cfg.DHCPv6.Mode = DHCPv6ModeDerived
 +			cfg.DHCPv6.DerivedDirectAddressPool = tc.pool
 +			cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
@@ -8786,7 +8865,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerRejectsInvalidDerivedRelayPrefix(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.Mode = DHCPv6ModeDerived
 +	cfg.DHCPv6.DerivedRelayAddressPrefix = 129
 +	cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
@@ -8800,7 +8879,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerRejectsNarrowDerivedRelayPrefix(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.Mode = DHCPv6ModeDerived
 +	cfg.DHCPv6.DerivedRelayAddressPrefix = 65
 +	cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
@@ -8814,7 +8893,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerRejectsZeroDerivedRelayPrefix(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.Mode = DHCPv6ModeDerived
 +	cfg.DHCPv6.DerivedRelayAddressPrefix = 0
 +	cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
@@ -8834,7 +8913,7 @@ index 00000000..a976375d
 +		DHCPv6ModeReservation,
 +	} {
 +		t.Run(string(mode), func(t *testing.T) {
-+			cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++			cfg := NewConfig(Config{})
 +			cfg.DHCPv6.Mode = mode
 +			cfg.DHCPv6.DerivedDirectAddressPool = netip.MustParsePrefix("::/0")
 +			cfg.DHCPv6.DerivedRelayAddressPrefix = 0
@@ -8851,7 +8930,7 @@ index 00000000..a976375d
 +}
 +
 +func TestDHCPv6HandlerRejectsInvalidServerDUID(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCPv6.ServerDUID = "not-hex"
 +	cfg.DHCPv6.TFTPIP = netip.MustParseAddr("2001:db8::10")
 +	cfg.DHCPv6.IPXEHTTPBinaryURL.Host = "boot.example"
@@ -8949,7 +9028,7 @@ index 00000000..a976375d
 +
 +func TestScriptHandlerUsesStaticIPXEForDHCPv6AutoStateless(t *testing.T) {
 +	metric.Init()
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.DHCP.Mode = DHCPModeReservation
 +	cfg.DHCPv6.Enabled = true
 +	cfg.DHCPv6.Mode = DHCPv6ModeAutoStateless
@@ -8978,7 +9057,7 @@ index 00000000..a976375d
 +}
 +
 +func TestScriptHandlerIgnoresAutoModesWhenDHCPDisabled(t *testing.T) {
-+	cfg := NewConfig(Config{}, netip.MustParseAddr("192.0.2.1"))
++	cfg := NewConfig(Config{})
 +	cfg.Backend = nil
 +	cfg.DHCP.Enabled = false
 +	cfg.DHCP.Mode = DHCPModeAutoProxy
@@ -9004,4 +9083,3 @@ index 00000000..a976375d
 +}
 -- 
 2.46.0
-
