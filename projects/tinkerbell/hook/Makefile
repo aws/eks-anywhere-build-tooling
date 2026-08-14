@@ -73,6 +73,11 @@ EMBEDDED_IMAGES=$(foreach platform,$(HOOK_PLATFORMS),$(OUTPUT_DIR)/hook-embedded
 LINUXKIT_VERSION=$(shell cat $(MAKE_ROOT)/../../linuxkit/linuxkit/GIT_TAG | cut -c2-)
 LINUXKIT_CACHE_FILE=$(REPO)/cache/linuxkit-linux-$(BUILDER_PLATFORM_ARCH)-$(LINUXKIT_VERSION)
 LINUXKIT_IMAGE_REPO?=$(IMAGE_REPO)
+HOOK_LINUXKIT_IMAGE_NAMES=init ca-certificates firmware rngd sysctl sysfs modprobe dhcpcd openntpd getty
+USE_REMOTE_HOOK_BUILDX?=$(if $(and $(filter presubmit,$(JOB_TYPE)),$(filter false,$(DOCKER_AVAILABLE))),true,false)
+BUILD_HOOK_ISO?=$(if $(filter true,$(USE_REMOTE_HOOK_BUILDX)),false,true)
+HOOK_BUILDX_BUILDER?=eksa-hook-presubmit
+HOOK_BUILDKIT_HOST?=unix:///run/buildkit/buildkitd.sock
 
 # we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
 # it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
@@ -152,10 +157,8 @@ $(LINUXKIT_CACHE_FILE): $(PROJECT_DEPENDENCIES_TARGETS)
 # After the images are replaced in the hook.template.yaml
 # Using sed they are pulled back out so that we can run cache pull with retries since we tend to see
 # issues from time to time pulling from ecr
-# We skip ENABLE_DOCKER here because for some of the image builds in linuxkit such as the ISO
-# linuxkit pulls in the base image and does a docker run.
-# Since the docker daemon isn't running on the build container this would not work.
-# We build on host to circumvent the above problem, this wouldn't ever occur on our CI builds.
+# The LinuxKit ISO output helper requires Docker. CodeBuild provides Docker and produces the real
+# ISO, while Prow presubmits use BuildKit without a Docker daemon and skip ISO assembly.
 $(CREATE_HOOK_FILES_PATTERN)-%: BUILD_ARCH=$(if $(findstring x86_64,$*),amd64,arm64)
 $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION); \
@@ -166,21 +169,39 @@ $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 		if [[ "$$image" == *"sshd"* ]]; then continue; fi; \
 		images+=($$image); \
 	done < <(sed -n 's/.*\($(subst /,\/,$(LINUXKIT_IMAGE_REPO)).*$$\)/\1/p' $(REPO)/linuxkit-templates/hook.template.yaml); \
+	for image in $(HOOK_LINUXKIT_IMAGE_NAMES); do \
+		images+=($(LINUXKIT_IMAGE_REPO)/linuxkit/$$image:$(LATEST_TAG)); \
+	done; \
 	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-embedded hook-acpid hook-udev; do \
 		images+=($(IMAGE_REPO)/tinkerbell/$$image:$(LATEST_TAG)$(IMAGE_TAG_SUFFIX)); \
 	done; \
 	for image in "$${images[@]}"; do build::common::echo_and_run retry $(LINUXKIT_CACHE_FILE) cache pull --cache $(REPO)/cache/linuxkit $$image; done; \
+	if [[ "$(USE_REMOTE_HOOK_BUILDX)" == "true" ]]; then \
+		if ! docker buildx inspect $(HOOK_BUILDX_BUILDER) >/dev/null 2>&1; then \
+			build::common::echo_and_run docker buildx create --name $(HOOK_BUILDX_BUILDER) --driver remote $(HOOK_BUILDKIT_HOST); \
+		fi; \
+		build::common::echo_and_run docker buildx use $(HOOK_BUILDX_BUILDER); \
+		build::common::echo_and_run docker buildx inspect $(HOOK_BUILDX_BUILDER); \
+	fi; \
 	cd $(REPO); \
+	if [[ "$(BUILD_HOOK_ISO)" == "true" ]]; then \
+		DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
+			HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
+			EKS_A_LINUXKIT_OCI_BASE=$(LINUXKIT_IMAGE_REPO)/linuxkit/ \
+			EKS_A_LINUXKIT_OCI_VERSION=$(LATEST_TAG) \
+			HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
+			HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
+			HOOK_LK_CONTAINERS_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
+			EKS_A_BUILD_ISO_EFI_IMAGE=$(IMAGE_REPO)/$(MKIMAGE_ISO_EFI_INITRD_IMAGE_COMPONENT):$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
+			LINUXKIT_ISO=true \
+			./build.sh build hook-default-$(BUILD_ARCH); \
+	else \
+		echo "Skipping Hook ISO build because Docker is unavailable in presubmit"; \
+	fi; \
 	DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
 		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
-		HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
-		HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
-		HOOK_LK_CONTAINERS_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
-		EKS_A_BUILD_ISO_EFI_IMAGE=$(IMAGE_REPO)/$(MKIMAGE_ISO_EFI_INITRD_IMAGE_COMPONENT):$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
-		LINUXKIT_ISO=true \
-		./build.sh build hook-default-$(BUILD_ARCH); \
-	DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
-		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
+		EKS_A_LINUXKIT_OCI_BASE=$(LINUXKIT_IMAGE_REPO)/linuxkit/ \
+		EKS_A_LINUXKIT_OCI_VERSION=$(LATEST_TAG) \
 		HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
 		HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
 		HOOK_LK_CONTAINERS_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
@@ -189,7 +210,12 @@ $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 	mkdir -p $(OUTPUT_DIR)/hook/$(GIT_TAG); \
 	cp $(REPO)/out/hook/vmlinuz-$* $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
 	cp $(REPO)/out/hook/initramfs-$* $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
-	cp $(REPO)/out/hook-$*-efi-initrd.iso $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
+	if [[ "$(BUILD_HOOK_ISO)" == "true" ]]; then \
+		cp $(REPO)/out/hook-$*-efi-initrd.iso $(OUTPUT_DIR)/hook/$(GIT_TAG)/; \
+	else \
+		echo "Creating empty Hook ISO placeholder for presubmit artifact validation"; \
+		touch $(OUTPUT_DIR)/hook/$(GIT_TAG)/hook-$*-efi-initrd.iso; \
+	fi; \
 	mkdir -p $(ARTIFACTS_PATH); \
 	cp -rf $(OUTPUT_DIR)/hook/* $(ARTIFACTS_PATH)
 

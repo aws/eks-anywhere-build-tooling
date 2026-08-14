@@ -11,13 +11,13 @@ Subject: [PATCH 1/5] patches build.sh flow for linuxkit
 Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
 ---
  bash/common.sh                        | 12 +++--
- bash/hook-lk-containers.sh            |  7 +++
+ bash/hook-lk-containers.sh            | 11 ++++++
  bash/kernel/kernel_default.sh         | 24 +++++----
  bash/linuxkit.sh                      | 70 ++++++++++++++-------------
  build.sh                              |  7 +--
  images/hook-docker/main.go            |  6 ++-
  linuxkit-templates/hook.template.yaml |  5 +-
- 7 files changed, 76 insertions(+), 55 deletions(-)
+ 7 files changed, 80 insertions(+), 55 deletions(-)
 
 diff --git a/bash/common.sh b/bash/common.sh
 index 2b80e41..235f34e 100644
@@ -50,15 +50,19 @@ index 2b80e41..235f34e 100644
  
  	# eval it into the inventory_dict dict
 diff --git a/bash/hook-lk-containers.sh b/bash/hook-lk-containers.sh
-index e9d63f0..2a7e4b7 100644
+index e9d63f0..7006abe 100644
 --- a/bash/hook-lk-containers.sh
 +++ b/bash/hook-lk-containers.sh
-@@ -28,9 +28,16 @@ function build_hook_linuxkit_container() {
+@@ -28,9 +28,20 @@ function build_hook_linuxkit_container() {
  	declare container_files_hash_short="${container_files_hash:0:8}"
  
  	declare container_oci_ref="${HOOK_LK_CONTAINERS_OCI_BASE}${container_dir}:${container_files_hash_short}-${DOCKER_ARCH}"
-+	# eks-a - allow tag to be overridden via var
-+	if [ -n "${HOOK_LK_CONTAINERS_OCI_VERSION}" ]; then
++	# eks-a - reuse LinuxKit images already built by EKS-A for upstream proxy entries
++	if [[ "${container_dir}" == hook-linuxkit-* ]] && [[ -n "${EKS_A_LINUXKIT_OCI_BASE:-}" ]]; then
++		declare linuxkit_image="${container_dir#hook-linuxkit-}"
++		linuxkit_image="${linuxkit_image//_/-}"
++		container_oci_ref="${EKS_A_LINUXKIT_OCI_BASE}${linuxkit_image}:${EKS_A_LINUXKIT_OCI_VERSION}"
++	elif [ -n "${HOOK_LK_CONTAINERS_OCI_VERSION}" ]; then
 +		container_oci_ref="${HOOK_LK_CONTAINERS_OCI_BASE}${container_dir}:${HOOK_LK_CONTAINERS_OCI_VERSION}"
 +	fi
  	log info "Consider building LK container ${container_oci_ref} from ${container_base_dir}/${container_dir} for platform ${DOCKER_ARCH}"
@@ -266,4 +270,3 @@ index 6d88398..70dfc93 100644
        echo 4 > /proc/sys/kernel/printk
 -- 
 2.49.0
-
