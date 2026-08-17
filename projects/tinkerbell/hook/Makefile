@@ -52,7 +52,9 @@ HOOK_PLATFORMS=$(call IF_OVERRIDE_VARIABLE,IMAGE_PLATFORMS,linux/$(BUILDER_PLATF
 CREATE_HOOK_FILES=$(foreach platform,$(HOOK_PLATFORMS),$(CREATE_HOOK_FILES_PATTERN)-$(if $(findstring amd64,$(platform)),x86_64,aarch64))
 HOOK_IMAGE_FILES=$(OUTPUT_DIR)/kernel/config-patches $(OUTPUT_DIR)/kernel/keys.asc $(OUTPUT_DIR)/kernel/configs/generic-$(KERNEL_MAJOR_MINOR).y-aarch64 $(OUTPUT_DIR)/kernel/configs/generic-$(KERNEL_MAJOR_MINOR).y-x86_64 $(OUTPUT_DIR)/kernel/download.sh
 
-HAS_S3_ARTIFACTS=true
+# Hook artifact assembly requires Docker for ISO creation and initramfs compression.
+# Prow presubmits use BuildKit without Docker; CodeBuild builds and validates the artifacts.
+HAS_S3_ARTIFACTS=$(if $(and $(filter presubmit,$(JOB_TYPE)),$(filter false,$(DOCKER_AVAILABLE))),false,true)
 SIMPLE_CREATE_TARBALLS=false
 
 FIX_LICENSES_HOOK_BOOTKIT_TARGET=$(REPO)/images/hook-bootkit/LICENSE
@@ -73,6 +75,7 @@ EMBEDDED_IMAGES=$(foreach platform,$(HOOK_PLATFORMS),$(OUTPUT_DIR)/hook-embedded
 LINUXKIT_VERSION=$(shell cat $(MAKE_ROOT)/../../linuxkit/linuxkit/GIT_TAG | cut -c2-)
 LINUXKIT_CACHE_FILE=$(REPO)/cache/linuxkit-linux-$(BUILDER_PLATFORM_ARCH)-$(LINUXKIT_VERSION)
 LINUXKIT_IMAGE_REPO?=$(IMAGE_REPO)
+HOOK_LINUXKIT_IMAGE_NAMES=init ca-certificates firmware rngd sysctl sysfs modprobe dhcpcd openntpd getty
 
 # we need to set IMAGE_BUILD_ARGS here even though its the same as the default. 
 # it is set in Common.mk on the images target (https://github.com/aws/eks-anywhere-build-tooling/blob/8b6d6d66974e881b22e3c9c8ea29adc26f7df5fd/Common.mk#L799)
@@ -152,10 +155,6 @@ $(LINUXKIT_CACHE_FILE): $(PROJECT_DEPENDENCIES_TARGETS)
 # After the images are replaced in the hook.template.yaml
 # Using sed they are pulled back out so that we can run cache pull with retries since we tend to see
 # issues from time to time pulling from ecr
-# We skip ENABLE_DOCKER here because for some of the image builds in linuxkit such as the ISO
-# linuxkit pulls in the base image and does a docker run.
-# Since the docker daemon isn't running on the build container this would not work.
-# We build on host to circumvent the above problem, this wouldn't ever occur on our CI builds.
 $(CREATE_HOOK_FILES_PATTERN)-%: BUILD_ARCH=$(if $(findstring x86_64,$*),amd64,arm64)
 $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 	@source $(BUILD_LIB)/common.sh && build::common::use_go_version $(GOLANG_VERSION); \
@@ -166,6 +165,9 @@ $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 		if [[ "$$image" == *"sshd"* ]]; then continue; fi; \
 		images+=($$image); \
 	done < <(sed -n 's/.*\($(subst /,\/,$(LINUXKIT_IMAGE_REPO)).*$$\)/\1/p' $(REPO)/linuxkit-templates/hook.template.yaml); \
+	for image in $(HOOK_LINUXKIT_IMAGE_NAMES); do \
+		images+=($(LINUXKIT_IMAGE_REPO)/linuxkit/$$image:$(LATEST_TAG)); \
+	done; \
 	for image in hook-bootkit hook-docker hook-runc hook-containerd hook-kernel hook-embedded hook-acpid hook-udev; do \
 		images+=($(IMAGE_REPO)/tinkerbell/$$image:$(LATEST_TAG)$(IMAGE_TAG_SUFFIX)); \
 	done; \
@@ -173,6 +175,8 @@ $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 	cd $(REPO); \
 	DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
 		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
+		EKS_A_LINUXKIT_OCI_BASE=$(LINUXKIT_IMAGE_REPO)/linuxkit/ \
+		EKS_A_LINUXKIT_OCI_VERSION=$(LATEST_TAG) \
 		HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
 		HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
 		HOOK_LK_CONTAINERS_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
@@ -181,6 +185,8 @@ $(CREATE_HOOK_FILES_PATTERN)-%: $(LINUXKIT_CACHE_FILE)
 		./build.sh build hook-default-$(BUILD_ARCH); \
 	DEBUG=yes LINUXKIT_VERSION_DEFAULT=$(LINUXKIT_VERSION) HOOK_KERNEL_OCI_BASE=$(IMAGE_REPO)/$(KERNEL_IMAGE_COMPONENT) \
 		HOOK_LK_CONTAINERS_OCI_BASE=$(IMAGE_REPO)/tinkerbell/ \
+		EKS_A_LINUXKIT_OCI_BASE=$(LINUXKIT_IMAGE_REPO)/linuxkit/ \
+		EKS_A_LINUXKIT_OCI_VERSION=$(LATEST_TAG) \
 		HOOK_KERNEL_POINT_RELEASE=$(lastword $(subst ., ,$(KERNEL_VERSION))) \
 		HOOK_KERNEL_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
 		HOOK_LK_CONTAINERS_OCI_VERSION=$(LATEST_TAG)$(IMAGE_TAG_SUFFIX) \
