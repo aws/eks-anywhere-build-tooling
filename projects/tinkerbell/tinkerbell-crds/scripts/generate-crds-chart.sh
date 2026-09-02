@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # This script generates the tinkerbell-crds helm chart from the mono-repo CRDs.
-# It copies CRDs from crd/bases/ and adds required annotations/labels.
+# It copies v1alpha1 CRDs and adds required annotations/labels.
 
 set -o errexit
 set -o pipefail
@@ -26,8 +26,10 @@ OUTPUT_DIR="$2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+CRD_SOURCE_DIR="${REPO_ROOT}/crd/bases/v1alpha1"
+
 echo "Generating tinkerbell-crds helm chart..."
-echo "  Source: ${REPO_ROOT}/crd/bases/"
+echo "  Source: ${CRD_SOURCE_DIR}"
 echo "  Output: ${OUTPUT_DIR}"
 
 # Clean and create output directory
@@ -45,8 +47,8 @@ cp "${PROJECT_DIR}/chart/.helmignore" "${OUTPUT_DIR}/"
 # to re-process them
 SKIP_CLUSTERCTL_LABELS="tinkerbell.org_workflows.yaml bmc.tinkerbell.org_jobs.yaml bmc.tinkerbell.org_tasks.yaml"
 
-# Copy all CRDs from mono-repo
-for crd_file in "${REPO_ROOT}"/crd/bases/*.yaml; do
+# Copy all v1alpha1 CRDs from mono-repo
+for crd_file in "${CRD_SOURCE_DIR}"/*.yaml; do
     filename=$(basename "$crd_file")
     echo "  Processing: ${filename}"
     
