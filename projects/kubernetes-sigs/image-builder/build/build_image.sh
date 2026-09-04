@@ -76,7 +76,9 @@ function retry_image_builder() {
       local retry="false"
       local message=""
       for key in "${!retryable_messages[@]}"; do
-        if grep -q "$key" "$log_file"; then
+        # -i: packer's casing varies between versions and builders, e.g. it emits
+        # "timeout waiting for IP address" while the key below reads "Timeout waiting for IP."
+        if grep -qi "$key" "$log_file"; then
           message="${retryable_messages[$key]}"
           retry="true"
           break
