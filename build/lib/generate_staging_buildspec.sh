@@ -197,6 +197,19 @@ for project in "${PROJECTS[@]}"; do
             BUILDSPEC_COMPUTE_TYPE=$(make_var $PROJECT_PATH BUILDSPEC_COMPUTE_TYPE)
         fi
 
+        BUILDSPEC_IMAGE=""
+        if [[ "$BUILDSPECS_VAR" == "CHECKSUMS_BUILDSPECS" ]]; then
+            BUILDSPEC_IMAGE=$(make_var $PROJECT_PATH CHECKSUMS_BUILDSPEC_$((( $i + 1 )))_IMAGE)
+            if [[ -z "$BUILDSPEC_IMAGE" ]]; then
+                BUILDSPEC_IMAGE=$(make_var $PROJECT_PATH CHECKSUMS_BUILDSPEC_IMAGE)
+            fi
+        fi
+
+        IMAGE_OVERRIDE=""
+        if [[ -n "$BUILDSPEC_IMAGE" ]]; then
+            IMAGE_OVERRIDE="\"image\":\"$BUILDSPEC_IMAGE\","
+        fi
+
         ARCH_TYPE="\"type\":\"$BUILDSPEC_PLATFORM\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
 
         BUILDSPEC_VARS_VALUES=""
@@ -279,7 +292,7 @@ for project in "${PROJECTS[@]}"; do
                     ALL_PROJECT_IDS+="\"$IDENTIFIER_WITH_VAL\","
                     PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER_WITH_VAL "
                     yq eval -i -P \
-                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"$EXTRA_VARS}}}]" \
+                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE$IMAGE_OVERRIDE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"$EXTRA_VARS}}}]" \
                         $STAGING_BUILDSPEC_FILE
 
                 done
@@ -312,7 +325,7 @@ for project in "${PROJECTS[@]}"; do
                         ALL_PROJECT_IDS+="\"$IDENTIFIER_WITH_VAL\","
                         PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER_WITH_VAL "
                         yq eval -i -P \
-                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"$EXTRA_VARS}}}]" \
+                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE$IMAGE_OVERRIDE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"$EXTRA_VARS}}}]" \
                             $STAGING_BUILDSPEC_FILE
                     done
                 done
@@ -321,7 +334,7 @@ for project in "${PROJECTS[@]}"; do
             ALL_PROJECT_IDS+="\"$IDENTIFIER\","
             PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER "
             yq eval -i -P \
-                ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL}}}]" \
+                ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE$IMAGE_OVERRIDE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL}}}]" \
                 $STAGING_BUILDSPEC_FILE
         fi
     done
