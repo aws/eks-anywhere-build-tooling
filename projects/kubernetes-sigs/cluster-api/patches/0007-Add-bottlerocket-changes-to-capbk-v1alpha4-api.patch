@@ -1,0 +1,483 @@
+From 2e6f9a956c1e41ed0a12b0e665b70c6dbe965036 Mon Sep 17 00:00:00 2001
+From: Rajashree Mandaogane <mandaor@amazon.com>
+Date: Sun, 21 Nov 2021 20:59:58 -0800
+Subject: [PATCH 07/36] Add bottlerocket changes to capbk v1alpha4 api
+
+---
+ .../types/upstreamv1beta3/conversion.go       |  24 +++
+ .../kubeadm/types/upstreamv1beta3/types.go    |  72 ++++++++
+ .../zz_generated.conversion.go                | 162 +++++++++++++++++-
+ .../upstreamv1beta3/zz_generated.deepcopy.go  |  75 ++++++++
+ 4 files changed, 325 insertions(+), 8 deletions(-)
+
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
+index bfa179c32..6096463ee 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
+@@ -420,6 +420,30 @@ func (src *ClusterConfiguration) GetAdditionalData(data *upstream.AdditionalData
+ 	}
+ }
+ 
++func Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(in *BottlerocketBootstrap, out *bootstrapv1.BottlerocketBootstrap, s apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(in *bootstrapv1.BottlerocketBootstrap, out *BottlerocketBootstrap, s apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_upstreamv1beta3_Pause_To_v1beta2_Pause(in *Pause, out *bootstrapv1.Pause, s apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_v1beta2_Pause_To_upstreamv1beta3_Pause(in *bootstrapv1.Pause, out *Pause, s apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
+ func Convert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in *bootstrapv1.ClusterConfiguration, out *ClusterConfiguration, s apimachineryconversion.Scope) error {
+ 	return autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in, out, s)
+ }
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+index c251870a1..65371b811 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+@@ -73,6 +73,26 @@ type InitConfiguration struct {
+ type ClusterConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// Etcd holds configuration for etcd.
+ 	// +optional
+ 	Etcd Etcd `json:"etcd,omitempty"`
+@@ -135,6 +155,38 @@ type ClusterConfiguration struct {
+ 	ClusterName string `json:"clusterName,omitempty"`
+ }
+ 
++// Pause defines the pause image repo and tag that should be run on the bootstrapped nodes.
++// This setting is ONLY for bottlerocket nodes, as this needs to be set pre-boot time along with user-data
++type Pause struct {
++	// ImageMeta allows to customize the image used for the Pause component
++	ImageMeta `json:",inline"`
++}
++
++// BottlerocketBootstrap holds the settings of kubeadm bootstrap container for bottlerocket nodes
++// This setting is ONLY for bottlerocket nodes.
++type BottlerocketBootstrap struct {
++	// ImageMeta allows to customize the image used for the BottlerocketBootstrap component
++	ImageMeta `json:",inline"`
++}
++
++// ProxyConfiguration holds the settings for proxying bottlerocket services
++type ProxyConfiguration struct {
++	// HTTPS proxy
++	HTTPSProxy string `json:"httpsProxy,omitempty"`
++
++	// No proxy, list of ips that should not use proxy
++	NoProxy []string `json:"noProxy,omitempty"`
++}
++
++// RegistryMirrorConfiguration holds the settings for image registry mirror
++type RegistryMirrorConfiguration struct {
++	// Endpoint defines the registry mirror endpoint to use for pulling images
++	Endpoint string `json:"endpoint,omitempty"`
++
++	// CACert defines the CA cert for the registry mirror
++	CACert string `json:"caCert,omitempty"`
++}
++
+ // ControlPlaneComponent holds settings common to control plane component of the cluster.
+ type ControlPlaneComponent struct {
+ 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+@@ -334,6 +386,26 @@ type ExternalEtcd struct {
+ type JoinConfiguration struct {
+ 	metav1.TypeMeta `json:",inline"`
+ 
++	// Pause holds the image source for pause container
++	// This is only for bottlerocket
++	// +optional
++	Pause Pause `json:"pause,omitempty"`
++
++	// BottlerocketBootstrap holds the image source for kubeadm bootstrap container
++	// This is only for bottlerocket
++	// +optional
++	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
++
++	// Proxy holds the https and no proxy information
++	// This is only for bottlerocket
++	// +optional
++	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++
++	// RegistryMirror holds the image registry mirror information
++	// This is only for bottlerocket
++	// +optional
++	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
++
+ 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
+ 	// +optional
+ 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+index 5e3fccf68..c5696436c 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -108,6 +108,26 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*ProxyConfiguration)(nil), (*v1beta2.ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration(a.(*ProxyConfiguration), b.(*v1beta2.ProxyConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta2.ProxyConfiguration)(nil), (*ProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(a.(*v1beta2.ProxyConfiguration), b.(*ProxyConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*RegistryMirrorConfiguration)(nil), (*v1beta2.RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(a.(*RegistryMirrorConfiguration), b.(*v1beta2.RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta2.RegistryMirrorConfiguration)(nil), (*RegistryMirrorConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(a.(*v1beta2.RegistryMirrorConfiguration), b.(*RegistryMirrorConfiguration), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*APIServer)(nil), (*v1beta2.APIServer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_APIServer_To_v1beta2_APIServer(a.(*APIServer), b.(*v1beta2.APIServer), scope)
+ 	}); err != nil {
+@@ -118,6 +138,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*BottlerocketBootstrap)(nil), (*v1beta2.BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(a.(*BottlerocketBootstrap), b.(*v1beta2.BottlerocketBootstrap), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*ClusterConfiguration)(nil), (*v1beta2.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta2.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -173,6 +198,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*Pause)(nil), (*v1beta2.Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_Pause_To_v1beta2_Pause(a.(*Pause), b.(*v1beta2.Pause), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.APIServer)(nil), (*APIServer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_APIServer_To_upstreamv1beta3_APIServer(a.(*v1beta2.APIServer), b.(*APIServer), scope)
+ 	}); err != nil {
+@@ -183,6 +213,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketBootstrap)(nil), (*BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(a.(*v1beta2.BottlerocketBootstrap), b.(*BottlerocketBootstrap), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(a.(*v1beta2.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -233,6 +268,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta2.Pause)(nil), (*Pause)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_Pause_To_upstreamv1beta3_Pause(a.(*v1beta2.Pause), b.(*Pause), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.Scheduler)(nil), (*ControlPlaneComponent)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_Scheduler_To_upstreamv1beta3_ControlPlaneComponent(a.(*v1beta2.Scheduler), b.(*ControlPlaneComponent), scope)
+ 	}); err != nil {
+@@ -350,8 +390,31 @@ func Convert_v1beta2_BootstrapTokenString_To_upstreamv1beta3_BootstrapTokenStrin
+ 	return autoConvert_v1beta2_BootstrapTokenString_To_upstreamv1beta3_BootstrapTokenString(in, out, s)
+ }
+ 
++func autoConvert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(in *BottlerocketBootstrap, out *v1beta2.BottlerocketBootstrap, s conversion.Scope) error {
++	// WARNING: in.ImageMeta requires manual conversion: does not exist in peer-type
++	return nil
++}
++
++func autoConvert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(in *v1beta2.BottlerocketBootstrap, out *BottlerocketBootstrap, s conversion.Scope) error {
++	// WARNING: in.ImageRepository requires manual conversion: does not exist in peer-type
++	// WARNING: in.ImageTag requires manual conversion: does not exist in peer-type
++	return nil
++}
++
+ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in *ClusterConfiguration, out *v1beta2.ClusterConfiguration, s conversion.Scope) error {
+ 	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
++	if err := Convert_upstreamv1beta3_Pause_To_v1beta2_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta3_Etcd_To_v1beta2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -378,10 +441,18 @@ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfigur
+ }
+ 
+ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in *v1beta2.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+-	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+-	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+-	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
+-	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
++	if err := Convert_v1beta2_Pause_To_upstreamv1beta3_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_Etcd_To_upstreamv1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+ 		return err
+ 	}
+@@ -570,6 +641,18 @@ func autoConvert_v1beta2_InitConfiguration_To_upstreamv1beta3_InitConfiguration(
+ 
+ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta2_JoinConfiguration(in *JoinConfiguration, out *v1beta2.JoinConfiguration, s conversion.Scope) error {
+ 	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
++	if err := Convert_upstreamv1beta3_Pause_To_v1beta2_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta3_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -592,10 +675,18 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta2_JoinConfiguration(
+ }
+ 
+ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(in *v1beta2.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+-	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
+-	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
+-	// WARNING: in.Proxy requires manual conversion: does not exist in peer-type
+-	// WARNING: in.RegistryMirror requires manual conversion: does not exist in peer-type
++	if err := Convert_v1beta2_Pause_To_upstreamv1beta3_Pause(&in.Pause, &out.Pause, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++		return err
++	}
++	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+ 		return err
+ 	}
+@@ -698,3 +789,58 @@ func autoConvert_v1beta2_Patches_To_upstreamv1beta3_Patches(in *v1beta2.Patches,
+ func Convert_v1beta2_Patches_To_upstreamv1beta3_Patches(in *v1beta2.Patches, out *Patches, s conversion.Scope) error {
+ 	return autoConvert_v1beta2_Patches_To_upstreamv1beta3_Patches(in, out, s)
+ }
++
++func autoConvert_upstreamv1beta3_Pause_To_v1beta2_Pause(in *Pause, out *v1beta2.Pause, s conversion.Scope) error {
++	// WARNING: in.ImageMeta requires manual conversion: does not exist in peer-type
++	return nil
++}
++
++func autoConvert_v1beta2_Pause_To_upstreamv1beta3_Pause(in *v1beta2.Pause, out *Pause, s conversion.Scope) error {
++	// WARNING: in.ImageRepository requires manual conversion: does not exist in peer-type
++	// WARNING: in.ImageTag requires manual conversion: does not exist in peer-type
++	return nil
++}
++
++func autoConvert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration(in *ProxyConfiguration, out *v1beta2.ProxyConfiguration, s conversion.Scope) error {
++	out.HTTPSProxy = in.HTTPSProxy
++	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
++	return nil
++}
++
++// Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration is an autogenerated conversion function.
++func Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration(in *ProxyConfiguration, out *v1beta2.ProxyConfiguration, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(in *v1beta2.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
++	out.HTTPSProxy = in.HTTPSProxy
++	out.NoProxy = *(*[]string)(unsafe.Pointer(&in.NoProxy))
++	return nil
++}
++
++// Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration is an autogenerated conversion function.
++func Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(in *v1beta2.ProxyConfiguration, out *ProxyConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(in, out, s)
++}
++
++func autoConvert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in, out, s)
++}
++
++func autoConvert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	out.Endpoint = in.Endpoint
++	out.CACert = in.CACert
++	return nil
++}
++
++// Convert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration is an autogenerated conversion function.
++func Convert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
++	return autoConvert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in, out, s)
++}
+diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
+index ded9eea14..68734b74a 100644
+--- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
+@@ -141,10 +141,30 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootstrap.
++func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootstrap)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+ 	out.Networking = in.Networking
+ 	in.APIServer.DeepCopyInto(&out.APIServer)
+@@ -388,6 +408,10 @@ func (in *InitConfiguration) DeepCopyObject() runtime.Object {
+ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
++	out.Pause = in.Pause
++	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	in.Proxy.DeepCopyInto(&out.Proxy)
++	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+ 	in.Discovery.DeepCopyInto(&out.Discovery)
+ 	if in.ControlPlane != nil {
+@@ -537,3 +561,54 @@ func (in *Patches) DeepCopy() *Patches {
+ 	in.DeepCopyInto(out)
+ 	return out
+ }
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *Pause) DeepCopyInto(out *Pause) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Pause.
++func (in *Pause) DeepCopy() *Pause {
++	if in == nil {
++		return nil
++	}
++	out := new(Pause)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *ProxyConfiguration) DeepCopyInto(out *ProxyConfiguration) {
++	*out = *in
++	if in.NoProxy != nil {
++		in, out := &in.NoProxy, &out.NoProxy
++		*out = make([]string, len(*in))
++		copy(*out, *in)
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ProxyConfiguration.
++func (in *ProxyConfiguration) DeepCopy() *ProxyConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(ProxyConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
++
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *RegistryMirrorConfiguration) DeepCopyInto(out *RegistryMirrorConfiguration) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
++func (in *RegistryMirrorConfiguration) DeepCopy() *RegistryMirrorConfiguration {
++	if in == nil {
++		return nil
++	}
++	out := new(RegistryMirrorConfiguration)
++	in.DeepCopyInto(out)
++	return out
++}
+-- 
+2.50.1 (Apple Git-155)
+

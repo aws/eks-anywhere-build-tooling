@@ -1,0 +1,32 @@
+From 21f1d930ec22d4fbe1f427aef9f0c0c0f5bedd65 Mon Sep 17 00:00:00 2001
+From: rajeshvenkata <rajesh.venkat.p@gmail.com>
+Date: Thu, 30 Oct 2025 14:51:59 -0700
+Subject: [PATCH 36/36] Fix KubeadmControlPlane webhook to properly default
+ rollout strategy
+
+---
+ .../kubeadm/internal/webhooks/kubeadmcontrolplane.go      | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
+index 3023fa3af..609786a30 100644
+--- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
++++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
+@@ -85,8 +85,12 @@ func defaultKubeadmControlPlaneSpec(s *controlplanev1.KubeadmControlPlaneSpec) {
+ 	}
+ 
+ 	// Enforce RollingUpdate strategy and default MaxSurge if not set.
+-	s.Rollout.Strategy.Type = controlplanev1.RollingUpdateStrategyType
+-	s.Rollout.Strategy.RollingUpdate.MaxSurge = intstr.ValueOrDefault(s.Rollout.Strategy.RollingUpdate.MaxSurge, intstr.FromInt32(1))
++	if s.Rollout.Strategy.Type == "" {
++		s.Rollout.Strategy.Type = controlplanev1.RollingUpdateStrategyType
++	}
++	if s.Rollout.Strategy.Type == controlplanev1.RollingUpdateStrategyType {
++		s.Rollout.Strategy.RollingUpdate.MaxSurge = intstr.ValueOrDefault(s.Rollout.Strategy.RollingUpdate.MaxSurge, intstr.FromInt32(1))
++	}
+ }
+ 
+ // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
+-- 
+2.50.1 (Apple Git-155)
+
