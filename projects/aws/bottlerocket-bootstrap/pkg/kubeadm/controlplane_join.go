@@ -36,12 +36,17 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error waiting for worker join files")
 	}
 
+	kubeletAPIServer, err := utils.GetApiServerFromKubeConfig(bootstrapKubeletConfigPath)
+	if err != nil {
+		return errors.Wrap(err, "Error getting kubelet api server")
+	}
+
 	dns, err := getDNSFromJoinConfig(kubeletConfigFile)
 	if err != nil {
 		return errors.Wrap(err, "Error getting api server")
 	}
 
-	apiServer, token, err := getBootstrapFromJoinConfig(kubeadmJoinFile)
+	discoveryAPIServer, token, err := getBootstrapFromJoinConfig(kubeadmJoinFile)
 	if err != nil {
 		return errors.Wrap(err, "Error getting api server")
 	}
@@ -54,7 +59,7 @@ func controlPlaneJoin() error {
 
 	args := []string{
 		"set",
-		"kubernetes.api-server=" + apiServer,
+		"kubernetes.api-server=" + kubeletAPIServer,
 		"kubernetes.cluster-certificate=" + b64CA,
 		"kubernetes.cluster-dns-ip=" + dns,
 		"kubernetes.bootstrap-token=" + token,
@@ -121,7 +126,7 @@ func controlPlaneJoin() error {
 		return err
 	}
 
-	err = utils.WaitFor200(string(apiServer)+"/healthz", 30*time.Second)
+	err = utils.WaitFor200(discoveryAPIServer+"/healthz", 30*time.Second)
 	if err != nil {
 		return err
 	}
