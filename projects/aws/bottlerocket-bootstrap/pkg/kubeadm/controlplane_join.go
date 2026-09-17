@@ -57,6 +57,31 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error reading the ca data")
 	}
 
+	kubeadmVersion, err := getKubeadmVersion()
+	if err != nil {
+		return errors.Wrapf(err, "getting kubeadm version")
+	}
+
+	isEtcdExternal, err := isClusterWithExternalEtcd(kubeconfigPath)
+	if err != nil {
+		return err
+	}
+
+	var kubeadmEtcdJoinCmd *exec.Cmd
+	if !isEtcdExternal {
+		kubeadmEtcdJoinCmd, err = joinLocalEtcd(kubeadmVersion)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Make the control plane manifests available before starting a kubelet that
+	// is configured to use the local API server.
+	podDefinitions, err := utils.EnableStaticPods(staticPodManifestsPath)
+	if err != nil {
+		return errors.Wrap(err, "Error enabling static pods")
+	}
+
 	args := []string{
 		"set",
 		"kubernetes.api-server=" + kubeletAPIServer,
@@ -83,32 +108,7 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error waiting for kubelet to come up")
 	}
 
-	kubeadmVersion, err := getKubeadmVersion()
-	if err != nil {
-		return errors.Wrapf(err, "getting kubeadm version")
-	}
-
-	isEtcdExternal, err := isClusterWithExternalEtcd(kubeconfigPath)
-	if err != nil {
-		return err
-	}
-
-	var kubeadmEtcdJoinCmd *exec.Cmd
-	if !isEtcdExternal {
-		kubeadmEtcdJoinCmd, err = joinLocalEtcd(kubeadmVersion)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Migrate all static pods from this host-container to the bottlerocket host using the apiclient
-	// now that etcd manifest is also created
-	podDefinitions, err := utils.EnableStaticPods(staticPodManifestsPath)
-	if err != nil {
-		return errors.Wrap(err, "Error enabling static pods")
-	}
-
-	// Now that etcd is up and running, check for other pod liveness
+	// Now that kubelet is running, check static pod liveness.
 	err = utils.WaitForPods(podDefinitions)
 	if err != nil {
 		return errors.Wrapf(err, "Error waiting for static pods to be up")
@@ -153,8 +153,8 @@ func controlPlaneJoin() error {
 		checkEbsInit(ebsInitControl)
 	}
 
-	// For Kubernetes >= v1.33, we no longer kill the kubeadm process inside joinLocalEtcd. 
-	// Therefore, we explicitly wait for kubeadm to complete here 
+	// For Kubernetes >= v1.33, we no longer kill the kubeadm process inside joinLocalEtcd.
+	// Therefore, we explicitly wait for kubeadm to complete here
 	// to ensure the control plane join phase (including etcd promotion) finishes successfully.
 	if kubeadmEtcdJoinCmd != nil {
 		fmt.Println("⏳ Waiting for kubeadm to finish...")
@@ -189,7 +189,7 @@ func joinLocalEtcd(version *versionutil.Version) (*exec.Cmd, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrapf(err, "Error running command: %v", cmd)
 	}
-	
+
 	k8s133Compare, err := version.Compare("1.33.0")
 	if err != nil {
 		return nil, errors.Wrap(err, "error comparing kubeadm version with v1.33.0")
@@ -199,7 +199,7 @@ func joinLocalEtcd(version *versionutil.Version) (*exec.Cmd, error) {
 	// In v1.33.0 and above, kubeadm includes logic to promote the etcd learner to a voting member
 	// after the static pod is up, so we must allow kubeadm to continue running.
 	// Killing it early would prevent learner promotion and result in an incomplete etcd join.
-	shouldKill := k8s133Compare == -1 
+	shouldKill := k8s133Compare == -1
 
 	// Get kubeadm to write out the manifest for etcd.
 	// It will wait for etcd to start, which won't succeed because we need to set the static-pods in the BR api.
