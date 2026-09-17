@@ -75,11 +75,27 @@ func controlPlaneJoin() error {
 		}
 	}
 
-	// Make the control plane manifests available before starting a kubelet that
-	// is configured to use the local API server.
+	// Start the control plane while kubelet is still in standalone mode. The
+	// local API server must be ready before kubelet begins TLS bootstrap against it.
 	podDefinitions, err := utils.EnableStaticPods(staticPodManifestsPath)
 	if err != nil {
 		return errors.Wrap(err, "Error enabling static pods")
+	}
+
+	err = utils.WaitForPods(podDefinitions)
+	if err != nil {
+		return errors.Wrapf(err, "Error waiting for static pods to be up")
+	}
+
+	localApiServerReadinessEndpoint, err := getLocalApiServerReadinessEndpoint()
+	if err != nil {
+		fmt.Printf("unable to get local apiserver readiness endpoint, falling back to localhost:6443. caused by: %s", err.Error())
+		localApiServerReadinessEndpoint = "https://localhost:6443/healthz"
+	}
+
+	err = utils.WaitFor200(localApiServerReadinessEndpoint, 30*time.Second)
+	if err != nil {
+		return err
 	}
 
 	args := []string{
@@ -106,24 +122,6 @@ func controlPlaneJoin() error {
 	err = waitForActiveKubelet()
 	if err != nil {
 		return errors.Wrap(err, "Error waiting for kubelet to come up")
-	}
-
-	// Now that kubelet is running, check static pod liveness.
-	err = utils.WaitForPods(podDefinitions)
-	if err != nil {
-		return errors.Wrapf(err, "Error waiting for static pods to be up")
-	}
-
-	// Wait for Kubernetes API server to come up.
-	localApiServerReadinessEndpoint, err := getLocalApiServerReadinessEndpoint()
-	if err != nil {
-		fmt.Printf("unable to get local apiserver readiness endpoint, falling back to localhost:6443. caused by: %s", err.Error())
-		localApiServerReadinessEndpoint = "https://localhost:6443/healthz"
-	}
-
-	err = utils.WaitFor200(localApiServerReadinessEndpoint, 30*time.Second)
-	if err != nil {
-		return err
 	}
 
 	err = utils.WaitFor200(discoveryAPIServer+"/healthz", 30*time.Second)
