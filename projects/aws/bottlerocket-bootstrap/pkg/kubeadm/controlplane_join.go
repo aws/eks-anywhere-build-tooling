@@ -36,12 +36,17 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error waiting for worker join files")
 	}
 
+	kubeletAPIServer, err := utils.GetApiServerFromKubeConfig(bootstrapKubeletConfigPath)
+	if err != nil {
+		return errors.Wrap(err, "Error getting kubelet api server")
+	}
+
 	dns, err := getDNSFromJoinConfig(kubeletConfigFile)
 	if err != nil {
 		return errors.Wrap(err, "Error getting api server")
 	}
 
-	apiServer, token, err := getBootstrapFromJoinConfig(kubeadmJoinFile)
+	discoveryAPIServer, token, err := getBootstrapFromJoinConfig(kubeadmJoinFile)
 	if err != nil {
 		return errors.Wrap(err, "Error getting api server")
 	}
@@ -52,9 +57,50 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error reading the ca data")
 	}
 
+	kubeadmVersion, err := getKubeadmVersion()
+	if err != nil {
+		return errors.Wrapf(err, "getting kubeadm version")
+	}
+
+	isEtcdExternal, err := isClusterWithExternalEtcd(kubeconfigPath)
+	if err != nil {
+		return err
+	}
+
+	var kubeadmEtcdJoinCmd *exec.Cmd
+	if !isEtcdExternal {
+		kubeadmEtcdJoinCmd, err = joinLocalEtcd(kubeadmVersion)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Start the control plane while kubelet is still in standalone mode. The
+	// local API server must be ready before kubelet begins TLS bootstrap against it.
+	podDefinitions, err := utils.EnableStaticPods(staticPodManifestsPath)
+	if err != nil {
+		return errors.Wrap(err, "Error enabling static pods")
+	}
+
+	err = utils.WaitForPods(podDefinitions)
+	if err != nil {
+		return errors.Wrapf(err, "Error waiting for static pods to be up")
+	}
+
+	localApiServerReadinessEndpoint, err := getLocalApiServerReadinessEndpoint()
+	if err != nil {
+		fmt.Printf("unable to get local apiserver readiness endpoint, falling back to localhost:6443. caused by: %s", err.Error())
+		localApiServerReadinessEndpoint = "https://localhost:6443/healthz"
+	}
+
+	err = utils.WaitFor200(localApiServerReadinessEndpoint, 30*time.Second)
+	if err != nil {
+		return err
+	}
+
 	args := []string{
 		"set",
-		"kubernetes.api-server=" + apiServer,
+		"kubernetes.api-server=" + kubeletAPIServer,
 		"kubernetes.cluster-certificate=" + b64CA,
 		"kubernetes.cluster-dns-ip=" + dns,
 		"kubernetes.bootstrap-token=" + token,
@@ -78,50 +124,7 @@ func controlPlaneJoin() error {
 		return errors.Wrap(err, "Error waiting for kubelet to come up")
 	}
 
-	kubeadmVersion, err := getKubeadmVersion()
-	if err != nil {
-		return errors.Wrapf(err, "getting kubeadm version")
-	}
-
-	isEtcdExternal, err := isClusterWithExternalEtcd(kubeconfigPath)
-	if err != nil {
-		return err
-	}
-
-	var kubeadmEtcdJoinCmd *exec.Cmd
-	if !isEtcdExternal {
-		kubeadmEtcdJoinCmd, err = joinLocalEtcd(kubeadmVersion)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Migrate all static pods from this host-container to the bottlerocket host using the apiclient
-	// now that etcd manifest is also created
-	podDefinitions, err := utils.EnableStaticPods(staticPodManifestsPath)
-	if err != nil {
-		return errors.Wrap(err, "Error enabling static pods")
-	}
-
-	// Now that etcd is up and running, check for other pod liveness
-	err = utils.WaitForPods(podDefinitions)
-	if err != nil {
-		return errors.Wrapf(err, "Error waiting for static pods to be up")
-	}
-
-	// Wait for Kubernetes API server to come up.
-	localApiServerReadinessEndpoint, err := getLocalApiServerReadinessEndpoint()
-	if err != nil {
-		fmt.Printf("unable to get local apiserver readiness endpoint, falling back to localhost:6443. caused by: %s", err.Error())
-		localApiServerReadinessEndpoint = "https://localhost:6443/healthz"
-	}
-
-	err = utils.WaitFor200(localApiServerReadinessEndpoint, 30*time.Second)
-	if err != nil {
-		return err
-	}
-
-	err = utils.WaitFor200(string(apiServer)+"/healthz", 30*time.Second)
+	err = utils.WaitFor200(discoveryAPIServer+"/healthz", 30*time.Second)
 	if err != nil {
 		return err
 	}
@@ -148,8 +151,8 @@ func controlPlaneJoin() error {
 		checkEbsInit(ebsInitControl)
 	}
 
-	// For Kubernetes >= v1.33, we no longer kill the kubeadm process inside joinLocalEtcd. 
-	// Therefore, we explicitly wait for kubeadm to complete here 
+	// For Kubernetes >= v1.33, we no longer kill the kubeadm process inside joinLocalEtcd.
+	// Therefore, we explicitly wait for kubeadm to complete here
 	// to ensure the control plane join phase (including etcd promotion) finishes successfully.
 	if kubeadmEtcdJoinCmd != nil {
 		fmt.Println("⏳ Waiting for kubeadm to finish...")
@@ -184,7 +187,7 @@ func joinLocalEtcd(version *versionutil.Version) (*exec.Cmd, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, errors.Wrapf(err, "Error running command: %v", cmd)
 	}
-	
+
 	k8s133Compare, err := version.Compare("1.33.0")
 	if err != nil {
 		return nil, errors.Wrap(err, "error comparing kubeadm version with v1.33.0")
@@ -194,7 +197,7 @@ func joinLocalEtcd(version *versionutil.Version) (*exec.Cmd, error) {
 	// In v1.33.0 and above, kubeadm includes logic to promote the etcd learner to a voting member
 	// after the static pod is up, so we must allow kubeadm to continue running.
 	// Killing it early would prevent learner promotion and result in an incomplete etcd join.
-	shouldKill := k8s133Compare == -1 
+	shouldKill := k8s133Compare == -1
 
 	// Get kubeadm to write out the manifest for etcd.
 	// It will wait for etcd to start, which won't succeed because we need to set the static-pods in the BR api.
