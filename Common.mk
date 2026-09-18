@@ -301,6 +301,10 @@ BINARY_TARGETS_FROM_FILES_PLATFORMS=$(foreach platform, $(2), $(foreach target, 
 # $2 - repo
 GET_CLONE_URL=$(shell source $(BUILD_LIB)/common.sh && build::common::get_clone_url $(1) $(2) $(AWS_REGION) $(CODEBUILD_CI))
 
+# True when GIT_TAG pins a raw commit SHA rather than a tag or branch, which selects
+# the clone path used below.
+GIT_TAG_IS_COMMIT_SHA=$(shell printf '%s' '$(GIT_TAG)' | grep -qE '^[0-9a-f]{40}$$' && echo true || echo false)
+
 # $1 - binary file name
 # $2 - go mod path for binary
 # returns full target path for given binary + go mod path
@@ -594,8 +598,20 @@ ifneq ($(REPO_SPARSE_CHECKOUT),)
 	source $(BUILD_LIB)/common.sh && retry git clone --quiet --depth 1 --filter=blob:none --sparse -b $(GIT_TAG) $(CLONE_URL) $(REPO)
 	git -C $(REPO) sparse-checkout set $(REPO_SPARSE_CHECKOUT) --cone --skip-checks
 else
+# `git clone -b` takes a tag or branch but not a raw commit SHA. A bare commit can be
+# fetched shallowly, but that brings across no tags, and `git describe` then falls back
+# to a plain SHA instead of a tag-based string, so SHA-pinned projects keep a full clone.
+ifeq ($(GIT_TAG_IS_COMMIT_SHA),true)
 	source $(BUILD_LIB)/common.sh && retry git clone --quiet $(CLONE_URL) $(REPO)
+else
+	source $(BUILD_LIB)/common.sh && retry git clone --quiet --depth 1 -b $(GIT_TAG) $(CLONE_URL) $(REPO)
 endif
+endif
+# Pin the abbreviated SHA length. Git otherwise scales it to the object count, so the
+# same commit abbreviates differently in a shallow clone than a full one, and projects
+# that feed `rev-parse --short` or `describe --long` into -X ldflags would build
+# different binaries depending on clone depth.
+	git -C $(REPO) config core.abbrev 12
 	@echo -e $(call TARGET_END_LOG)
 endif
 
