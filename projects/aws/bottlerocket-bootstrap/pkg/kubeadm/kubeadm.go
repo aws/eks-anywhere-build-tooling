@@ -15,6 +15,7 @@ const (
 	kubectl                          = "/opt/bin/kubectl"
 	kubeadmBinary                    = "/opt/bin/kubeadm"
 	kubeconfigPath                   = "/etc/kubernetes/admin.conf"
+	bootstrapKubeletConfigPath       = "/etc/kubernetes/bootstrap-kubelet.conf"
 	kubeadmJoinFile                  = "/tmp/kubeadm-join-config.yaml"
 	kubeletConfigFile                = "/var/lib/kubelet/config.yaml"
 	staticPodManifestsPath           = "/etc/kubernetes/manifests"

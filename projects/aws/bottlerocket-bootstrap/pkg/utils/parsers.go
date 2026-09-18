@@ -35,17 +35,32 @@ func GetApiServerFromKubeConfig(path string) (string, error) {
 		return "", errors.Wrap(err, "Error getting kubeconfig parsed into raw config")
 	}
 
-	// Get the server from auth information
-	var server string
-	if len(rawConfig.Clusters) != 1 {
-		return "", errors.Wrap(err, "More than one cluster found in control-plane init admin.conf")
+	return getCurrentContextAPIServer(rawConfig)
+}
+
+func getCurrentContextAPIServer(rawConfig kubecmdapi.Config) (string, error) {
+	currentContextName := rawConfig.CurrentContext
+	if currentContextName == "" {
+		return "", errors.New("current context is empty in kubeconfig")
 	}
-	fmt.Printf("\n%+v\n", rawConfig.Clusters)
-	for _, clusterInfo := range rawConfig.Clusters {
-		server = clusterInfo.Server
-		break
+
+	currentContext, ok := rawConfig.Contexts[currentContextName]
+	if !ok || currentContext == nil {
+		return "", errors.Errorf("current context %q not found in kubeconfig", currentContextName)
 	}
-	return server, nil
+	if currentContext.Cluster == "" {
+		return "", errors.Errorf("cluster name is empty for current context %q", currentContextName)
+	}
+
+	cluster, ok := rawConfig.Clusters[currentContext.Cluster]
+	if !ok || cluster == nil {
+		return "", errors.Errorf("cluster %q referenced by current context %q not found in kubeconfig", currentContext.Cluster, currentContextName)
+	}
+	if cluster.Server == "" {
+		return "", errors.Errorf("API server is empty for cluster %q", currentContext.Cluster)
+	}
+
+	return cluster.Server, nil
 }
 
 func UnmarshalPodDefinition(podDef []byte) (*v1.Pod, error) {
