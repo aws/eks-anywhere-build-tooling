@@ -205,7 +205,34 @@ vmware                govmomi
 
 The `upgrade` subcommand is used to upgrade the Git revision of a particular project. This command takes in a project name as input and updates the various version files pertaining to the project, such as Git tag, Go version, checksums, etc. Then it creates a PR with these changes from a fork of the build-tooling repository. The PR can then be reviewed and merged by a repository maintainer.
 
-When patches fail to apply during an upgrade, the command can optionally publish an event to AWS EventBridge (if `ENABLE_AUTO_PATCH_FIX=true`) for downstream automation.
+When patches fail to apply, the upgrade can run a bounded Go agent in the same
+project build. The agent receives the exact checkout, revisions, failed patch,
+and `git am` error. It uses Amazon Bedrock Converse tool calls to edit an
+isolated clone through constrained tools, then Git generates the candidate
+patch.
+
+Projects with a registered deterministic repair strategy bypass the model
+entirely. Kubernetes autoscaler regenerates its cloud-provider and dependency
+patches from the current upstream source without making a model call.
+
+The upgrade replaces the failed patch only after the complete patch series
+applies successfully. Existing checksum, attribution, commit, and PR creation
+steps then run normally. A rejected candidate is discarded and the original
+patch is restored.
+
+Structured requests, results, and candidate patches are written under
+`patch-fixer-runs/`. The agent is compiled into `version-tracker`, so upgrades
+do not bootstrap a second language runtime.
+
+Configuration:
+
+```bash
+export PATCH_FIXER_ENABLED=true
+export PATCH_FIXER_AGENT_TIMEOUT=10m
+export PATCH_FIXER_MODEL_ID=global.anthropic.claude-sonnet-4-6
+```
+
+Set `PATCH_FIXER_ENABLED=false` or leave it unset to disable agent patch fixing.
 
 #### Usage
 
@@ -237,92 +264,4 @@ Updating Git tag and Go version in upstream projects tracker file
 Updating project checksums and attribution files
 Updating project readme
 Creating pull request with updated files
-```
-
-### The `fix-patches` subcommand
-
-The `fix-patches` subcommand is used to automatically fix patches that fail to apply during version upgrades. This command uses AI (AWS Bedrock with Claude) to analyze patch failures, understand the context, and generate corrected patches.
-
-#### How it works
-
-1. **Analyzes patch failures** - Extracts information about which patches failed and why
-2. **Gathers context** - Fetches relevant code from GitHub (PR diff, failed files, patch content)
-3. **Generates fixes** - Uses Claude AI to understand the changes and create corrected patches
-4. **Validates fixes** - Applies patches and runs builds to ensure they work
-5. **Updates metadata** - Regenerates checksums and attribution files
-6. **Pushes changes** - Commits and pushes fixed patches back to the PR
-
-#### Usage
-
-```
-$ version-tracker fix-patches --help
-Automatically fix patches that fail to apply during version upgrades
-
-Usage:
-  version-tracker fix-patches --project <project name> --pr <pr number> [flags]
-
-Flags:
-  -h, --help                help for fix-patches
-      --max-attempts int    Maximum number of fix attempts per patch (default 3)
-      --pr int              PR number where patches failed
-      --project string      Project name (e.g., kubernetes-sigs/image-builder)
-
-Global Flags:
-  -v, --verbosity int   Set the logging verbosity level
-```
-
-#### Required Environment Variables
-
-```bash
-# GitHub access
-export GITHUB_TOKEN=<your-github-token>
-
-# AWS Bedrock for AI-powered patch fixing
-export AWS_BEDROCK_REGION=us-west-2
-export BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
-```
-
-#### Sample output
-
-```
-$ version-tracker fix-patches --project kubernetes-sigs/image-builder --pr 5005
-Starting patch fixing workflow  {"project": "kubernetes-sigs/image-builder", "pr": 5005}
-Analyzing patch failures...
-Found 1 failed patch: 0001-EKS-A-AMI-changes.patch
-Extracting context from GitHub PR #5005...
-Fetching PR diff (2847 lines)...
-Fetching failed files content...
-Building prompt for LLM (estimated 45000 tokens)...
-Calling Claude to generate patch fix...
-Received fix from LLM (3421 tokens)
-Applying fixed patch...
-Patch applied successfully!
-Running build validation...
-Build succeeded!
-Updating checksums...
-Updating attribution files...
-Committing changes...
-Pushing to PR branch...
-Successfully fixed patches for kubernetes-sigs/image-builder PR #5005
-```
-
-#### Special Cases
-
-Some projects require special handling:
-
-- **kubernetes/autoscaler**: Patches are in `projects/kubernetes/autoscaler/patches/` and need to be regenerated using `git format-patch` after fixes are applied to the source code.
-
-#### Running Locally
-
-Run `fix-patches` manually when you see a PR with patch failures:
-
-```bash
-# Set up environment
-export GITHUB_TOKEN=$(gh auth token)
-export AWS_BEDROCK_REGION=us-west-2
-export BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
-
-# Run from the repository root
-cd /path/to/eks-anywhere-build-tooling
-version-tracker fix-patches --project fluxcd/source-controller --pr 4883
 ```

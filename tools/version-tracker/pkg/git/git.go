@@ -96,7 +96,14 @@ func Checkout(worktree *git.Worktree, branch string, create bool) error {
 func Add(worktree *git.Worktree, paths []string) error {
 	logger.V(6).Info("Adding updated files to index")
 	for _, path := range paths {
-		_, err := worktree.Add(path)
+		var err error
+		if _, statErr := worktree.Filesystem.Lstat(path); os.IsNotExist(statErr) {
+			_, err = worktree.Remove(path)
+		} else if statErr != nil {
+			err = statErr
+		} else {
+			_, err = worktree.Add(path)
+		}
 		if err != nil {
 			return fmt.Errorf("adding file [%s] to the index: %v", path, err)
 		}

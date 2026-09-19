@@ -1,6 +1,9 @@
 version: 0.2
 
 env:
+  variables:
+    PATCH_FIXER_ENABLED: "true"
+    PATCH_FIXER_AGENT_TIMEOUT: "10m"
   secrets-manager:
     GITHUB_TOKEN: "github-eks-distro-pr-bot:github-token"
 
@@ -13,4 +16,27 @@ phases:
     commands:
     - echo "CHECKSUMS -text merge=union" > .gitattributes
     - PROJECT_NAME=${PROJECT_PATH#"projects/"}
+    - export PATCH_FIXER_RESULT_DIR="${CODEBUILD_SRC_DIR}/patch-fixer-runs"
     - make upgrade -C tools/version-tracker PROJECT=$PROJECT_NAME VERBOSITY=6
+    finally:
+    - |
+      if [[ -d patch-fixer-runs && -n "${ARTIFACTS_BUCKET:-}" ]]; then
+        diagnostic_includes=()
+        if [[ "${DRY_RUN:-false}" == "true" && "${PATCH_FIXER_DIAGNOSTICS:-off}" == "full" ]]; then
+          diagnostic_includes=(
+            --include "*/request.json"
+            --include "*/model-request.json"
+            --include "*/model-response.json"
+            --include "*/trace.jsonl"
+            --include "*/incomplete.diff"
+          )
+        fi
+        aws s3 cp --recursive patch-fixer-runs "${ARTIFACTS_BUCKET}/patch-fixer-runs/${CODEBUILD_BUILD_ID}/" \
+          --exclude "*" \
+          --include "*/result.json" \
+          --include "*/candidate.patch" \
+          --include "*/manifest.json" \
+          --include "*/patches/*.patch" \
+          "${diagnostic_includes[@]}" ||
+          echo "WARNING: failed to upload patch fixer results"
+      fi

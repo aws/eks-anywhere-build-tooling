@@ -12,6 +12,11 @@ VERBOSITY?=0
 build:
 	CGO_ENABLED=0 $(GO) build -o $(BINARY_PATH) main.go
 
+.PHONY: test
+test:
+	$(GO) test . ./cmd ./pkg/...
+	python3 -m unittest discover -s ../../projects/kubernetes/autoscaler -p 'test_*.py'
+
 upgrade: build
 	$(BINARY_PATH) upgrade --project $(PROJECT) --dry-run=$(DRY_RUN) --verbosity $(VERBOSITY)
 
