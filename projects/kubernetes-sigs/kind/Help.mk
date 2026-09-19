@@ -19,12 +19,10 @@ _output/bin/kind/linux-arm64/kind: ## Build `_output/bin/kind/linux-arm64/kind`
 _output/bin/kind/linux-arm64/kindnetd: ## Build `_output/bin/kind/linux-arm64/kindnetd`
 
 ##@ Image Targets
-local-images: ## Builds `haproxy/images/amd64 kindnetd/images/amd64 kind-base/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `haproxy/images/push kindnetd/images/push kind-base/images/push` to IMAGE_REPO
-haproxy/images/amd64: ## Builds/pushes `haproxy/images/amd64`
+local-images: ## Builds `kindnetd/images/amd64 kind-base/images/amd64` as oci tars for presumbit validation
+images: ## Pushes `kindnetd/images/push kind-base/images/push` to IMAGE_REPO
 kindnetd/images/amd64: ## Builds/pushes `kindnetd/images/amd64`
 kind-base/images/amd64: ## Builds/pushes `kind-base/images/amd64`
-haproxy/images/push: ## Builds/pushes `haproxy/images/push`
 kindnetd/images/push: ## Builds/pushes `kindnetd/images/push`
 kind-base/images/push: ## Builds/pushes `kind-base/images/push`
 
