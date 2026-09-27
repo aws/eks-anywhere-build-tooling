@@ -119,9 +119,10 @@ index 096b47ffc..05cd01b8a 100644
  	RegistryMirrorCredentials
  }
  
-@@ -49,6 +50,7 @@ type BottlerocketSettingsInput struct {
+@@ -49,7 +50,8 @@ type BottlerocketSettingsInput struct {
  	RegistryMirrorUsername     string
  	RegistryMirrorPassword     string
+ 	RegistryMirrorCredentialHost string
  	NodeLabels                 string
 +	NTPServers                 []string
  	Taints                     string
@@ -137,14 +138,15 @@ index 096b47ffc..05cd01b8a 100644
  	t, err := tm.Parse(tpl)
  	if err != nil {
  		return nil, errors.Wrapf(err, "failed to parse %s template", kind)
-@@ -222,11 +227,15 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+@@ -232,12 +237,17 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
  	if config.RegistryMirrorConfiguration.CACert != "" {
  		bottlerocketInput.RegistryMirrorCACert = base64.StdEncoding.EncodeToString([]byte(config.RegistryMirrorConfiguration.CACert))
  	}
--
+ 
  	if config.RegistryMirrorCredentials.Username != "" && config.RegistryMirrorCredentials.Password != "" {
  		bottlerocketInput.RegistryMirrorUsername = config.RegistryMirrorCredentials.Username
  		bottlerocketInput.RegistryMirrorPassword = config.RegistryMirrorCredentials.Password
+ 		bottlerocketInput.RegistryMirrorCredentialHost = registryHost(config.RegistryMirrorConfiguration.Endpoint)
  	}
 +	if len(config.NTPServers) > 0 {
 +		for _, ntp := range config.NTPServers {
