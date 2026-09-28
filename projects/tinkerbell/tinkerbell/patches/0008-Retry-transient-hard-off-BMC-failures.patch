@@ -1,4 +1,4 @@
-From 1d37f27032ff9a8664d0b4887c6870275327981e Mon Sep 17 00:00:00 2001
+From 8d31c837438e3ec6921f5a2c9968786351fb7fcd Mon Sep 17 00:00:00 2001
 From: howard-junec <junecao@amazon.com>
 Date: Mon, 28 Sep 2026 10:23:19 -0700
 Subject: [PATCH 8/8] Retry transient hard-off BMC failures
@@ -7,13 +7,15 @@ Keep hard-off tasks pending across transient BMC connection and power operation 
 
 Signed-off-by: howard-junec <junecao@amazon.com>
 ---
- rufio/internal/controller/helpers_test.go |  12 +
- rufio/internal/controller/task.go         | 304 +++++++++++++++++++---
- rufio/internal/controller/task_test.go    | 304 +++++++++++++++++++++-
- 3 files changed, 578 insertions(+), 42 deletions(-)
+ rufio/internal/controller/helpers_test.go     |   6 +
+ rufio/internal/controller/task.go             | 317 ++++++++++++++++--
+ .../internal/controller/task_internal_test.go |  85 +++++
+ rufio/internal/controller/task_test.go        | 302 ++++++++++++++++-
+ 4 files changed, 670 insertions(+), 40 deletions(-)
+ create mode 100644 rufio/internal/controller/task_internal_test.go
 
 diff --git a/rufio/internal/controller/helpers_test.go b/rufio/internal/controller/helpers_test.go
-index 7a01bf00753b..7ebdde34685c 100644
+index 7a01bf00753b..81ec455eeef1 100644
 --- a/rufio/internal/controller/helpers_test.go
 +++ b/rufio/internal/controller/helpers_test.go
 @@ -89,6 +89,7 @@ type testProvider struct {
@@ -24,33 +26,15 @@ index 7a01bf00753b..7ebdde34685c 100644
  	PowerSetOK            bool
  	BootdeviceOK          bool
  	VirtualMediaOK        bool
-@@ -98,6 +99,10 @@ type testProvider struct {
+@@ -98,6 +99,7 @@ type testProvider struct {
  	ErrPowerStateSet      error
  	ErrBootDeviceSet      error
  	ErrVirtualMediaInsert error
-+	OpenCalls             int
-+	CloseCalls            int
-+	PowerStateGetCalls    int
 +	PowerSetCalls         int
  }
  
  func (t *testProvider) Name() string {
-@@ -124,18 +129,25 @@ func (t *testProvider) Features() registrar.Features {
- }
- 
- func (t *testProvider) Open(_ context.Context) error {
-+	t.OpenCalls++
- 	return t.ErrOpen
- }
- 
- func (t *testProvider) Close(_ context.Context) error {
-+	t.CloseCalls++
- 	return t.ErrClose
- }
- 
- func (t *testProvider) PowerStateGet(_ context.Context) (string, error) {
-+	t.PowerStateGetCalls++
- 	return t.Powerstate, t.ErrPowerStateGet
+@@ -136,6 +138,10 @@ func (t *testProvider) PowerStateGet(_ context.Context) (string, error) {
  }
  
  func (t *testProvider) PowerSet(_ context.Context, _ string) (ok bool, err error) {
@@ -62,7 +46,7 @@ index 7a01bf00753b..7ebdde34685c 100644
  }
  
 diff --git a/rufio/internal/controller/task.go b/rufio/internal/controller/task.go
-index 16ee98809cd8..88482e8b974c 100644
+index 16ee98809cd8..00f49c8799c2 100644
 --- a/rufio/internal/controller/task.go
 +++ b/rufio/internal/controller/task.go
 @@ -17,6 +17,7 @@ import (
@@ -73,13 +57,14 @@ index 16ee98809cd8..88482e8b974c 100644
  	"time"
  
  	bmclib "github.com/bmc-toolbox/bmclib/v2"
-@@ -26,11 +27,23 @@ import (
+@@ -26,11 +27,24 @@ import (
  	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
  	utilerrors "k8s.io/apimachinery/pkg/util/errors"
  	ctrl "sigs.k8s.io/controller-runtime"
 +	"sigs.k8s.io/controller-runtime/pkg/builder"
  	"sigs.k8s.io/controller-runtime/pkg/client"
  	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
++	"sigs.k8s.io/controller-runtime/pkg/event"
 +	"sigs.k8s.io/controller-runtime/pkg/predicate"
  )
  
@@ -98,7 +83,7 @@ index 16ee98809cd8..88482e8b974c 100644
  
  // TaskReconciler reconciles a Task object.
  type TaskReconciler struct {
-@@ -84,31 +97,17 @@ func (r *TaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
+@@ -84,31 +98,17 @@ func (r *TaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
  	taskPatch := client.MergeFrom(task.DeepCopy())
  	logger = logger.WithValues("action", task.Spec.Task, "host", task.Spec.Connection.Host)
  
@@ -137,7 +122,7 @@ index 16ee98809cd8..88482e8b974c 100644
  	}
  
  	// Initializing BMC Client
-@@ -123,17 +122,7 @@ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPa
+@@ -123,17 +123,7 @@ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPa
  
  		return ctrl.Result{}, err
  	}
@@ -156,14 +141,10 @@ index 16ee98809cd8..88482e8b974c 100644
  
  	// Task has StartTime, we check the status.
  	// Requeue if actions did not complete.
-@@ -196,7 +185,170 @@ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPa
- 		return ctrl.Result{}, err
- 	}
+@@ -199,6 +189,169 @@ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPa
+ 	return ctrl.Result{}, nil
+ }
  
--	return ctrl.Result{}, nil
-+	return ctrl.Result{RequeueAfter: powerActionRequeueAfter}, nil
-+}
-+
 +func (r *TaskReconciler) reconcilePowerHardOff(ctx context.Context, task *bmc.Task, taskPatch client.Patch, logger logr.Logger) (ctrl.Result, error) {
 +	hadStartTime := task.Status.StartTime != nil && !task.Status.StartTime.IsZero()
 +	if !hadStartTime {
@@ -325,10 +306,12 @@ index 16ee98809cd8..88482e8b974c 100644
 +	}
 +	md := bmcClient.GetMetadata()
 +	logger.Info("BMC connection closed", "successfulCloseConns", md.SuccessfulCloseConns, "providersAttempted", md.ProvidersAttempted, "successfulProvider", md.SuccessfulProvider)
- }
- 
++}
++
  // runTask executes the defined Task in a Task.
-@@ -293,10 +445,92 @@ func (r *TaskReconciler) patchStatus(ctx context.Context, task *bmc.Task, patch
+ func (r *TaskReconciler) runTask(ctx context.Context, logger logr.Logger, task bmc.Action, bmcClient *bmclib.Client) error {
+ 	if task.PowerAction != nil {
+@@ -293,10 +446,106 @@ func (r *TaskReconciler) patchStatus(ctx context.Context, task *bmc.Task, patch
  	return nil
  }
  
@@ -414,16 +397,121 @@ index 16ee98809cd8..88482e8b974c 100644
 +	return false
 +}
 +
++func taskEventPredicate() predicate.Predicate {
++	return predicate.Funcs{
++		UpdateFunc: func(e event.UpdateEvent) bool {
++			oldTask, oldOK := e.ObjectOld.(*bmc.Task)
++			newTask, newOK := e.ObjectNew.(*bmc.Task)
++			if !oldOK || !newOK || !isPowerHardOff(newTask.Spec.Task) {
++				return true
++			}
++
++			return oldTask.Generation != newTask.Generation
++		},
++	}
++}
++
  // SetupWithManager sets up the controller with the Manager.
  func (r *TaskReconciler) SetupWithManager(mgr ctrl.Manager, opts ctrlcontroller.Options) error {
  	return ctrl.NewControllerManagedBy(mgr).
  		WithOptions(opts).
 -		For(&bmc.Task{}).
-+		For(&bmc.Task{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
++		For(&bmc.Task{}, builder.WithPredicates(taskEventPredicate())).
  		Complete(r)
  }
+diff --git a/rufio/internal/controller/task_internal_test.go b/rufio/internal/controller/task_internal_test.go
+new file mode 100644
+index 000000000000..e1699fef0d3f
+--- /dev/null
++++ b/rufio/internal/controller/task_internal_test.go
+@@ -0,0 +1,85 @@
++/*
++Copyright 2026 Tinkerbell.
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++    http://www.apache.org/licenses/LICENSE-2.0
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package controller
++
++import (
++	"testing"
++
++	"github.com/tinkerbell/tinkerbell/api/v1alpha1/bmc"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"sigs.k8s.io/controller-runtime/pkg/event"
++)
++
++func TestTaskEventPredicate(t *testing.T) {
++	hardOff := bmc.PowerHardOff
++	powerOn := bmc.PowerOn
++
++	tests := map[string]struct {
++		oldTask *bmc.Task
++		newTask *bmc.Task
++		want    bool
++	}{
++		"hard-off status update is filtered": {
++			oldTask: taskForPredicate(1, hardOff),
++			newTask: taskForPredicate(1, hardOff),
++			want:    false,
++		},
++		"hard-off annotation update is filtered": {
++			oldTask: taskForPredicate(1, hardOff),
++			newTask: func() *bmc.Task {
++				task := taskForPredicate(1, hardOff)
++				task.Annotations = map[string]string{"example": "value"}
++				return task
++			}(),
++			want: false,
++		},
++		"hard-off spec update is accepted": {
++			oldTask: taskForPredicate(1, hardOff),
++			newTask: taskForPredicate(2, hardOff),
++			want:    true,
++		},
++		"other action status update is accepted": {
++			oldTask: taskForPredicate(1, powerOn),
++			newTask: taskForPredicate(1, powerOn),
++			want:    true,
++		},
++		"action change to hard-off is accepted": {
++			oldTask: taskForPredicate(1, powerOn),
++			newTask: taskForPredicate(2, hardOff),
++			want:    true,
++		},
++	}
++
++	predicate := taskEventPredicate()
++	for name, tt := range tests {
++		t.Run(name, func(t *testing.T) {
++			got := predicate.Update(event.UpdateEvent{
++				ObjectOld: tt.oldTask,
++				ObjectNew: tt.newTask,
++			})
++			if got != tt.want {
++				t.Fatalf("expected predicate result %t, got %t", tt.want, got)
++			}
++		})
++	}
++}
++
++func taskForPredicate(generation int64, powerAction bmc.PowerAction) *bmc.Task {
++	return &bmc.Task{
++		ObjectMeta: metav1.ObjectMeta{Generation: generation},
++		Spec: bmc.TaskSpec{
++			Task: bmc.Action{PowerAction: &powerAction},
++		},
++	}
++}
 diff --git a/rufio/internal/controller/task_test.go b/rufio/internal/controller/task_test.go
-index 245947fa8585..8f2d571c7e00 100644
+index 245947fa8585..266f852d435a 100644
 --- a/rufio/internal/controller/task_test.go
 +++ b/rufio/internal/controller/task_test.go
 @@ -3,6 +3,7 @@ package controller_test
@@ -454,15 +542,6 @@ index 245947fa8585..8f2d571c7e00 100644
  		"success soft off": {
  			taskName: "SoftOff",
  			action:   getAction("SoftOff"),
-@@ -189,7 +186,7 @@ func TestTaskReconcile(t *testing.T) {
- 			if tt.shouldErr {
- 				return
- 			}
--			if diff := cmp.Diff(result, ctrl.Result{}); diff != "" {
-+			if diff := cmp.Diff(result, ctrl.Result{RequeueAfter: 3 * time.Second}); diff != "" {
- 				t.Fatalf("expected no diff, got: %v", diff)
- 			}
- 
 @@ -223,7 +220,7 @@ func TestTaskReconcile(t *testing.T) {
  				return
  			}
@@ -774,3 +853,4 @@ index 245947fa8585..8f2d571c7e00 100644
  		TypeMeta: metav1.TypeMeta{
 -- 
 2.54.0 (Apple Git-157)
+
