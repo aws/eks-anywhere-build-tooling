@@ -1,0 +1,776 @@
+From 1d37f27032ff9a8664d0b4887c6870275327981e Mon Sep 17 00:00:00 2001
+From: howard-junec <junecao@amazon.com>
+Date: Mon, 28 Sep 2026 10:23:19 -0700
+Subject: [PATCH 8/8] Retry transient hard-off BMC failures
+
+Keep hard-off tasks pending across transient BMC connection and power operation failures. Observe power state before acting, persist the command observation window, and retry with capped backoff instead of marking the task failed.
+
+Signed-off-by: howard-junec <junecao@amazon.com>
+---
+ rufio/internal/controller/helpers_test.go |  12 +
+ rufio/internal/controller/task.go         | 304 +++++++++++++++++++---
+ rufio/internal/controller/task_test.go    | 304 +++++++++++++++++++++-
+ 3 files changed, 578 insertions(+), 42 deletions(-)
+
+diff --git a/rufio/internal/controller/helpers_test.go b/rufio/internal/controller/helpers_test.go
+index 7a01bf00753b..7ebdde34685c 100644
+--- a/rufio/internal/controller/helpers_test.go
++++ b/rufio/internal/controller/helpers_test.go
+@@ -89,6 +89,7 @@ type testProvider struct {
+ 	PName                 string
+ 	Proto                 string
+ 	Powerstate            string
++	PowerstateAfterSet    string
+ 	PowerSetOK            bool
+ 	BootdeviceOK          bool
+ 	VirtualMediaOK        bool
+@@ -98,6 +99,10 @@ type testProvider struct {
+ 	ErrPowerStateSet      error
+ 	ErrBootDeviceSet      error
+ 	ErrVirtualMediaInsert error
++	OpenCalls             int
++	CloseCalls            int
++	PowerStateGetCalls    int
++	PowerSetCalls         int
+ }
+ 
+ func (t *testProvider) Name() string {
+@@ -124,18 +129,25 @@ func (t *testProvider) Features() registrar.Features {
+ }
+ 
+ func (t *testProvider) Open(_ context.Context) error {
++	t.OpenCalls++
+ 	return t.ErrOpen
+ }
+ 
+ func (t *testProvider) Close(_ context.Context) error {
++	t.CloseCalls++
+ 	return t.ErrClose
+ }
+ 
+ func (t *testProvider) PowerStateGet(_ context.Context) (string, error) {
++	t.PowerStateGetCalls++
+ 	return t.Powerstate, t.ErrPowerStateGet
+ }
+ 
+ func (t *testProvider) PowerSet(_ context.Context, _ string) (ok bool, err error) {
++	t.PowerSetCalls++
++	if t.ErrPowerStateSet == nil && t.PowerSetOK && t.PowerstateAfterSet != "" {
++		t.Powerstate = t.PowerstateAfterSet
++	}
+ 	return t.PowerSetOK, t.ErrPowerStateSet
+ }
+ 
+diff --git a/rufio/internal/controller/task.go b/rufio/internal/controller/task.go
+index 16ee98809cd8..88482e8b974c 100644
+--- a/rufio/internal/controller/task.go
++++ b/rufio/internal/controller/task.go
+@@ -17,6 +17,7 @@ import (
+ 	"context"
+ 	"errors"
+ 	"fmt"
++	"hash/fnv"
+ 	"time"
+ 
+ 	bmclib "github.com/bmc-toolbox/bmclib/v2"
+@@ -26,11 +27,23 @@ import (
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+ 	ctrl "sigs.k8s.io/controller-runtime"
++	"sigs.k8s.io/controller-runtime/pkg/builder"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+ 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
++	"sigs.k8s.io/controller-runtime/pkg/predicate"
+ )
+ 
+-const powerActionRequeueAfter = 3 * time.Second
++const (
++	powerActionRequeueAfter         = 3 * time.Second
++	hardOffActionObservationWindow  = time.Minute
++	hardOffOperationTimeout         = time.Minute
++	hardOffRetryInitialInterval     = 30 * time.Second
++	hardOffRetryMaxInterval         = 5 * time.Minute
++	hardOffRetryStepInterval        = 2 * time.Minute
++	hardOffRetryJitter              = 10 * time.Second
++	hardOffActionIssuedAtAnnotation = "bmc.tinkerbell.org/hard-off-action-issued-at"
++	taskRetryingCondition           = bmc.TaskConditionType("Retrying")
++)
+ 
+ // TaskReconciler reconciles a Task object.
+ type TaskReconciler struct {
+@@ -84,31 +97,17 @@ func (r *TaskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
+ 	taskPatch := client.MergeFrom(task.DeepCopy())
+ 	logger = logger.WithValues("action", task.Spec.Task, "host", task.Spec.Connection.Host)
+ 
++	if isPowerHardOff(task.Spec.Task) {
++		return r.reconcilePowerHardOff(ctx, task, taskPatch, logger)
++	}
++
+ 	return r.doReconcile(ctx, task, taskPatch, logger)
+ }
+ 
+ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPatch client.Patch, logger logr.Logger) (ctrl.Result, error) {
+-	var username, password string
+-	opts := &BMCOptions{
+-		ProviderOptions: task.Spec.Connection.ProviderOptions,
+-	}
+-	if task.Spec.Connection.ProviderOptions != nil && task.Spec.Connection.ProviderOptions.RPC != nil {
+-		opts.ProviderOptions = task.Spec.Connection.ProviderOptions
+-		if task.Spec.Connection.ProviderOptions.RPC.HMAC != nil && len(task.Spec.Connection.ProviderOptions.RPC.HMAC.Secrets) > 0 {
+-			se, err := retrieveHMACSecrets(ctx, r.client, task.Spec.Connection.ProviderOptions.RPC.HMAC.Secrets)
+-			if err != nil {
+-				return ctrl.Result{}, fmt.Errorf("unable to get hmac secrets: %w", err)
+-			}
+-			opts.rpcSecrets = se
+-		}
+-	} else {
+-		// Fetching username, password from SecretReference in Connection.
+-		// Requeue if error fetching secret
+-		var err error
+-		username, password, err = resolveAuthSecretRef(ctx, r.client, task.Spec.Connection.AuthSecretRef)
+-		if err != nil {
+-			return ctrl.Result{}, fmt.Errorf("resolving connection secret for task %s/%s: %w", task.Namespace, task.Name, err)
+-		}
++	username, password, opts, err := r.resolveConnectionOptions(ctx, task)
++	if err != nil {
++		return ctrl.Result{}, err
+ 	}
+ 
+ 	// Initializing BMC Client
+@@ -123,17 +122,7 @@ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPa
+ 
+ 		return ctrl.Result{}, err
+ 	}
+-	defer func() {
+-		// Close BMC connection after reconciliation
+-		if err := bmcClient.Close(ctx); err != nil {
+-			md := bmcClient.GetMetadata()
+-			logger.Error(err, "BMC close connection failed", "providersAttempted", md.ProvidersAttempted)
+-
+-			return
+-		}
+-		md := bmcClient.GetMetadata()
+-		logger.Info("BMC connection closed", "successfulCloseConns", md.SuccessfulCloseConns, "providersAttempted", md.ProvidersAttempted, "successfulProvider", md.SuccessfulProvider)
+-	}()
++	defer r.closeBMCClient(ctx, logger, bmcClient)
+ 
+ 	// Task has StartTime, we check the status.
+ 	// Requeue if actions did not complete.
+@@ -196,7 +185,170 @@ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPa
+ 		return ctrl.Result{}, err
+ 	}
+ 
+-	return ctrl.Result{}, nil
++	return ctrl.Result{RequeueAfter: powerActionRequeueAfter}, nil
++}
++
++func (r *TaskReconciler) reconcilePowerHardOff(ctx context.Context, task *bmc.Task, taskPatch client.Patch, logger logr.Logger) (ctrl.Result, error) {
++	hadStartTime := task.Status.StartTime != nil && !task.Status.StartTime.IsZero()
++	if !hadStartTime {
++		now := metav1.Now()
++		task.Status.StartTime = &now
++		if err := r.patchStatus(ctx, task, taskPatch); err != nil {
++			return ctrl.Result{}, err
++		}
++		taskPatch = client.MergeFrom(task.DeepCopy())
++	}
++
++	username, password, opts, err := r.resolveConnectionOptions(ctx, task)
++	if err != nil {
++		return r.retryPowerHardOff(ctx, task, taskPatch, logger, err)
++	}
++
++	bmcClient, err := r.bmcClientFactory(ctx, logger, task.Spec.Connection.Host, username, password, opts)
++	if err != nil {
++		return r.retryPowerHardOff(ctx, task, taskPatch, logger, fmt.Errorf("failed to connect to BMC: %w", err))
++	}
++	defer func() {
++		closeCtx, cancel := context.WithTimeout(ctx, hardOffOperationTimeout)
++		defer cancel()
++		r.closeBMCClient(closeCtx, logger, bmcClient)
++	}()
++
++	stateCtx, cancel := context.WithTimeout(ctx, hardOffOperationTimeout)
++	rawState, err := bmcClient.GetPowerState(stateCtx)
++	cancel()
++	if err != nil {
++		return r.retryPowerHardOff(ctx, task, taskPatch, logger, fmt.Errorf("failed to get power state: %w", err))
++	}
++
++	logger.Info("power state check", "currentPowerState", rawState)
++	if toPowerState(rawState) == bmc.Off {
++		if err := r.clearHardOffActionIssuedAt(ctx, task); err != nil {
++			return ctrl.Result{}, err
++		}
++		taskPatch = client.MergeFrom(task.DeepCopy())
++		removeTaskCondition(task, taskRetryingCondition)
++		now := metav1.Now()
++		task.Status.CompletionTime = &now
++		task.SetCondition(bmc.TaskCompleted, bmc.ConditionTrue)
++		if err := r.patchStatus(ctx, task, taskPatch); err != nil {
++			return ctrl.Result{}, err
++		}
++
++		return ctrl.Result{}, nil
++	}
++
++	issuedAt, actionIssued, err := hardOffActionIssuedAt(task)
++	if err != nil {
++		if clearErr := r.clearHardOffActionIssuedAt(ctx, task); clearErr != nil {
++			return ctrl.Result{}, utilerrors.NewAggregate([]error{clearErr, err})
++		}
++		taskPatch = client.MergeFrom(task.DeepCopy())
++
++		return r.retryPowerHardOff(ctx, task, taskPatch, logger, err)
++	}
++
++	// A Task created by an older controller has no action annotation. Treat its
++	// StartTime as the issued time so an in-flight hard-off is not immediately
++	// duplicated after an upgrade.
++	if !actionIssued && hadStartTime && !task.HasCondition(taskRetryingCondition, bmc.ConditionTrue) {
++		issuedAt = task.Status.StartTime.Time
++		if err := r.setHardOffActionIssuedAt(ctx, task, issuedAt); err != nil {
++			return ctrl.Result{}, err
++		}
++		taskPatch = client.MergeFrom(task.DeepCopy())
++		actionIssued = true
++	}
++
++	if actionIssued {
++		if time.Since(issuedAt) < hardOffActionObservationWindow {
++			return ctrl.Result{RequeueAfter: powerActionRequeueAfter}, nil
++		}
++
++		if err := r.clearHardOffActionIssuedAt(ctx, task); err != nil {
++			return ctrl.Result{}, err
++		}
++		taskPatch = client.MergeFrom(task.DeepCopy())
++
++		return r.retryPowerHardOff(
++			ctx,
++			task,
++			taskPatch,
++			logger,
++			fmt.Errorf("power-off command was accepted but the machine is still powered on after %s", hardOffActionObservationWindow),
++		)
++	}
++
++	setCtx, cancel := context.WithTimeout(ctx, hardOffOperationTimeout)
++	ok, err := bmcClient.SetPowerState(setCtx, string(bmc.PowerHardOff))
++	cancel()
++	if err != nil {
++		return r.retryPowerHardOff(ctx, task, taskPatch, logger, fmt.Errorf("failed to perform PowerAction: %w", err))
++	}
++	if !ok {
++		return r.retryPowerHardOff(ctx, task, taskPatch, logger, errors.New("failed to perform PowerAction: provider returned ok=false"))
++	}
++
++	if err := r.setHardOffActionIssuedAt(ctx, task, time.Now()); err != nil {
++		return ctrl.Result{}, err
++	}
++	taskPatch = client.MergeFrom(task.DeepCopy())
++	if removeTaskCondition(task, taskRetryingCondition) {
++		if err := r.patchStatus(ctx, task, taskPatch); err != nil {
++			return ctrl.Result{}, err
++		}
++	}
++
++	md := bmcClient.GetMetadata()
++	logger.Info("power state set successfully", "providersAttempted", md.ProvidersAttempted, "successfulProvider", md.SuccessfulProvider, "ok", ok)
++
++	return ctrl.Result{RequeueAfter: powerActionRequeueAfter}, nil
++}
++
++func (r *TaskReconciler) retryPowerHardOff(ctx context.Context, task *bmc.Task, taskPatch client.Patch, logger logr.Logger, retryErr error) (ctrl.Result, error) {
++	requeueAfter := hardOffRetryDelay(task, time.Now())
++	logger.Info("power-off attempt failed; requeuing", "error", retryErr, "requeueAfter", requeueAfter)
++	task.SetCondition(taskRetryingCondition, bmc.ConditionTrue, bmc.WithTaskConditionMessage(retryErr.Error()))
++	if err := r.patchStatus(ctx, task, taskPatch); err != nil {
++		return ctrl.Result{}, utilerrors.NewAggregate([]error{err, retryErr})
++	}
++
++	return ctrl.Result{RequeueAfter: requeueAfter}, nil
++}
++
++func (r *TaskReconciler) resolveConnectionOptions(ctx context.Context, task *bmc.Task) (string, string, *BMCOptions, error) {
++	var username, password string
++	opts := &BMCOptions{
++		ProviderOptions: task.Spec.Connection.ProviderOptions,
++	}
++	if task.Spec.Connection.ProviderOptions != nil && task.Spec.Connection.ProviderOptions.RPC != nil {
++		if task.Spec.Connection.ProviderOptions.RPC.HMAC != nil && len(task.Spec.Connection.ProviderOptions.RPC.HMAC.Secrets) > 0 {
++			se, err := retrieveHMACSecrets(ctx, r.client, task.Spec.Connection.ProviderOptions.RPC.HMAC.Secrets)
++			if err != nil {
++				return "", "", nil, fmt.Errorf("unable to get hmac secrets: %w", err)
++			}
++			opts.rpcSecrets = se
++		}
++	} else {
++		var err error
++		username, password, err = resolveAuthSecretRef(ctx, r.client, task.Spec.Connection.AuthSecretRef)
++		if err != nil {
++			return "", "", nil, fmt.Errorf("resolving connection secret for task %s/%s: %w", task.Namespace, task.Name, err)
++		}
++	}
++
++	return username, password, opts, nil
++}
++
++func (r *TaskReconciler) closeBMCClient(ctx context.Context, logger logr.Logger, bmcClient *bmclib.Client) {
++	if err := bmcClient.Close(ctx); err != nil {
++		md := bmcClient.GetMetadata()
++		logger.Error(err, "BMC close connection failed", "providersAttempted", md.ProvidersAttempted)
++
++		return
++	}
++	md := bmcClient.GetMetadata()
++	logger.Info("BMC connection closed", "successfulCloseConns", md.SuccessfulCloseConns, "providersAttempted", md.ProvidersAttempted, "successfulProvider", md.SuccessfulProvider)
+ }
+ 
+ // runTask executes the defined Task in a Task.
+@@ -293,10 +445,92 @@ func (r *TaskReconciler) patchStatus(ctx context.Context, task *bmc.Task, patch
+ 	return nil
+ }
+ 
++func (r *TaskReconciler) setHardOffActionIssuedAt(ctx context.Context, task *bmc.Task, issuedAt time.Time) error {
++	patch := client.MergeFrom(task.DeepCopy())
++	if task.Annotations == nil {
++		task.Annotations = map[string]string{}
++	}
++	task.Annotations[hardOffActionIssuedAtAnnotation] = issuedAt.UTC().Format(time.RFC3339Nano)
++	if err := r.client.Patch(ctx, task, patch); err != nil {
++		return fmt.Errorf("failed to patch Task %s/%s annotations: %w", task.Namespace, task.Name, err)
++	}
++
++	return nil
++}
++
++func (r *TaskReconciler) clearHardOffActionIssuedAt(ctx context.Context, task *bmc.Task) error {
++	if _, ok := task.Annotations[hardOffActionIssuedAtAnnotation]; !ok {
++		return nil
++	}
++
++	patch := client.MergeFrom(task.DeepCopy())
++	delete(task.Annotations, hardOffActionIssuedAtAnnotation)
++	if err := r.client.Patch(ctx, task, patch); err != nil {
++		return fmt.Errorf("failed to patch Task %s/%s annotations: %w", task.Namespace, task.Name, err)
++	}
++
++	return nil
++}
++
++func hardOffActionIssuedAt(task *bmc.Task) (time.Time, bool, error) {
++	value, ok := task.Annotations[hardOffActionIssuedAtAnnotation]
++	if !ok {
++		return time.Time{}, false, nil
++	}
++
++	issuedAt, err := time.Parse(time.RFC3339Nano, value)
++	if err != nil {
++		return time.Time{}, false, fmt.Errorf("invalid %s annotation: %w", hardOffActionIssuedAtAnnotation, err)
++	}
++
++	return issuedAt, true, nil
++}
++
++func hardOffRetryDelay(task *bmc.Task, now time.Time) time.Duration {
++	delay := hardOffRetryInitialInterval
++	if task.Status.StartTime != nil {
++		elapsed := now.Sub(task.Status.StartTime.Time)
++		for steps := int(elapsed / hardOffRetryStepInterval); steps > 0 && delay < hardOffRetryMaxInterval; steps-- {
++			delay *= 2
++			if delay > hardOffRetryMaxInterval {
++				delay = hardOffRetryMaxInterval
++			}
++		}
++	}
++
++	hash := fnv.New32a()
++	_, _ = hash.Write([]byte(string(task.UID)))
++	if task.UID == "" {
++		_, _ = hash.Write([]byte(task.Namespace + "/" + task.Name))
++	}
++	jitter := time.Duration(hash.Sum32()%uint32(hardOffRetryJitter/time.Second+1)) * time.Second
++	if delay+jitter > hardOffRetryMaxInterval {
++		return hardOffRetryMaxInterval
++	}
++
++	return delay + jitter
++}
++
++func isPowerHardOff(action bmc.Action) bool {
++	return action.PowerAction != nil && *action.PowerAction == bmc.PowerHardOff
++}
++
++func removeTaskCondition(task *bmc.Task, conditionType bmc.TaskConditionType) bool {
++	for i := range task.Status.Conditions {
++		if task.Status.Conditions[i].Type != conditionType {
++			continue
++		}
++		task.Status.Conditions = append(task.Status.Conditions[:i], task.Status.Conditions[i+1:]...)
++		return true
++	}
++
++	return false
++}
++
+ // SetupWithManager sets up the controller with the Manager.
+ func (r *TaskReconciler) SetupWithManager(mgr ctrl.Manager, opts ctrlcontroller.Options) error {
+ 	return ctrl.NewControllerManagedBy(mgr).
+ 		WithOptions(opts).
+-		For(&bmc.Task{}).
++		For(&bmc.Task{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+ 		Complete(r)
+ }
+diff --git a/rufio/internal/controller/task_test.go b/rufio/internal/controller/task_test.go
+index 245947fa8585..8f2d571c7e00 100644
+--- a/rufio/internal/controller/task_test.go
++++ b/rufio/internal/controller/task_test.go
+@@ -3,6 +3,7 @@ package controller_test
+ import (
+ 	"context"
+ 	"errors"
++	"strings"
+ 	"testing"
+ 	"time"
+ 
+@@ -13,6 +14,7 @@ import (
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/types"
+ 	ctrl "sigs.k8s.io/controller-runtime"
++	"sigs.k8s.io/controller-runtime/pkg/client"
+ 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+ )
+ 
+@@ -52,11 +54,6 @@ func TestTaskReconcile(t *testing.T) {
+ 			action:   getAction("PowerOn"),
+ 			provider: &testProvider{Powerstate: "on", PowerSetOK: true},
+ 		},
+-		"success hard off": {
+-			taskName: "HardOff",
+-			action:   getAction("HardOff"),
+-			provider: &testProvider{Powerstate: "off", PowerSetOK: true},
+-		},
+ 		"success soft off": {
+ 			taskName: "SoftOff",
+ 			action:   getAction("SoftOff"),
+@@ -189,7 +186,7 @@ func TestTaskReconcile(t *testing.T) {
+ 			if tt.shouldErr {
+ 				return
+ 			}
+-			if diff := cmp.Diff(result, ctrl.Result{}); diff != "" {
++			if diff := cmp.Diff(result, ctrl.Result{RequeueAfter: 3 * time.Second}); diff != "" {
+ 				t.Fatalf("expected no diff, got: %v", diff)
+ 			}
+ 
+@@ -223,7 +220,7 @@ func TestTaskReconcile(t *testing.T) {
+ 				return
+ 			}
+ 
+-			// Ensure re-reconciling a task does sends it into a success state.
++			// Ensure re-reconciling a task sends it into a success state.
+ 			result, err = reconciler.Reconcile(context.Background(), request)
+ 			if err != nil {
+ 				t.Fatalf("expected nil err, got: %v", err)
+@@ -259,6 +256,299 @@ func TestTaskReconcile(t *testing.T) {
+ 	}
+ }
+ 
++func TestTaskReconcilePowerHardOffAlreadyOff(t *testing.T) {
++	secret := createSecret()
++	task := createTask("HardOff", getAction("HardOff"), secret)
++	provider := &testProvider{Powerstate: "off", PowerSetOK: true}
++	cluster := newClientBuilder().WithObjects(task, secret).Build()
++	reconciler := controller.NewTaskReconciler(cluster, newTestClient(provider))
++	request := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: task.Namespace, Name: task.Name}}
++
++	result, err := reconciler.Reconcile(context.Background(), request)
++	if err != nil {
++		t.Fatalf("expected nil err, got: %v", err)
++	}
++	if diff := cmp.Diff(result, ctrl.Result{}); diff != "" {
++		t.Fatalf("unexpected result (-want +got):\n%s", diff)
++	}
++	if provider.PowerSetCalls != 0 {
++		t.Fatalf("expected no power-off command, got %d", provider.PowerSetCalls)
++	}
++
++	retrieved := getTask(t, cluster, request.NamespacedName)
++	assertTaskCondition(t, retrieved, bmc.TaskCompleted, bmc.ConditionTrue)
++	if condition := findTaskCondition(retrieved, bmc.TaskConditionType("Retrying")); condition != nil {
++		t.Fatalf("expected no retrying condition, got: %+v", *condition)
++	}
++}
++
++func TestTaskReconcilePowerHardOffRetriesTransientFailures(t *testing.T) {
++	tests := map[string]struct {
++		includeSecret bool
++		provider      *testProvider
++		message       string
++	}{
++		"missing secret": {
++			provider: &testProvider{
++				Powerstate: "on",
++				PowerSetOK: true,
++			},
++			message: "resolving connection secret",
++		},
++		"connection failure": {
++			includeSecret: true,
++			provider: &testProvider{
++				ErrOpen: errors.New("temporary connection failure"),
++			},
++			message: "failed to connect to BMC",
++		},
++		"power state failure": {
++			includeSecret: true,
++			provider: &testProvider{
++				ErrPowerStateGet: errors.New("temporary power state failure"),
++			},
++			message: "failed to get power state",
++		},
++		"power command failure": {
++			includeSecret: true,
++			provider: &testProvider{
++				Powerstate:       "on",
++				ErrPowerStateSet: errors.New("temporary power command failure"),
++			},
++			message: "failed to perform PowerAction",
++		},
++		"power command rejected": {
++			includeSecret: true,
++			provider: &testProvider{
++				Powerstate: "on",
++				PowerSetOK: false,
++			},
++			message: "failed to perform PowerAction",
++		},
++	}
++
++	for name, tt := range tests {
++		t.Run(name, func(t *testing.T) {
++			secret := createSecret()
++			task := createTask("HardOff", getAction("HardOff"), secret)
++			builder := newClientBuilder().WithObjects(task)
++			if tt.includeSecret {
++				builder = builder.WithObjects(secret)
++			}
++			cluster := builder.Build()
++			reconciler := controller.NewTaskReconciler(cluster, newTestClient(tt.provider))
++			request := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: task.Namespace, Name: task.Name}}
++
++			result, err := reconciler.Reconcile(context.Background(), request)
++			if err != nil {
++				t.Fatalf("expected retry without reconcile error, got: %v", err)
++			}
++			if result.RequeueAfter < 30*time.Second || result.RequeueAfter > 40*time.Second {
++				t.Fatalf("expected initial retry between 30s and 40s, got: %s", result.RequeueAfter)
++			}
++
++			retrieved := getTask(t, cluster, request.NamespacedName)
++			retrying := findTaskCondition(retrieved, bmc.TaskConditionType("Retrying"))
++			if retrying == nil || retrying.Status != bmc.ConditionTrue {
++				t.Fatalf("expected retrying condition, got: %+v", retrieved.Status.Conditions)
++			}
++			if !strings.Contains(retrying.Message, tt.message) {
++				t.Fatalf("expected retry message to contain %q, got %q", tt.message, retrying.Message)
++			}
++			if retrieved.HasCondition(bmc.TaskFailed, bmc.ConditionTrue) {
++				t.Fatalf("expected hard-off failure to remain retryable, got: %+v", retrieved.Status.Conditions)
++			}
++		})
++	}
++}
++
++func TestTaskReconcilePowerHardOffRecoversWithoutRecreatingTask(t *testing.T) {
++	secret := createSecret()
++	task := createTask("HardOff", getAction("HardOff"), secret)
++	provider := &testProvider{
++		Powerstate:         "on",
++		PowerstateAfterSet: "off",
++		PowerSetOK:         true,
++		ErrOpen:            errors.New("temporary connection failure"),
++	}
++	cluster := newClientBuilder().WithObjects(task, secret).Build()
++	reconciler := controller.NewTaskReconciler(cluster, newTestClient(provider))
++	request := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: task.Namespace, Name: task.Name}}
++
++	result, err := reconciler.Reconcile(context.Background(), request)
++	if err != nil {
++		t.Fatalf("expected retry without reconcile error, got: %v", err)
++	}
++	if result.RequeueAfter == 0 {
++		t.Fatal("expected connection failure to be requeued")
++	}
++
++	provider.ErrOpen = nil
++	result, err = reconciler.Reconcile(context.Background(), request)
++	if err != nil {
++		t.Fatalf("expected recovered power-off attempt, got: %v", err)
++	}
++	if diff := cmp.Diff(result, ctrl.Result{RequeueAfter: 3 * time.Second}); diff != "" {
++		t.Fatalf("unexpected result after issuing hard-off (-want +got):\n%s", diff)
++	}
++	if provider.PowerSetCalls != 1 {
++		t.Fatalf("expected one power-off command, got %d", provider.PowerSetCalls)
++	}
++
++	retrieved := getTask(t, cluster, request.NamespacedName)
++	if _, ok := retrieved.Annotations["bmc.tinkerbell.org/hard-off-action-issued-at"]; !ok {
++		t.Fatalf("expected issued-at annotation, got: %+v", retrieved.Annotations)
++	}
++
++	result, err = reconciler.Reconcile(context.Background(), request)
++	if err != nil {
++		t.Fatalf("expected completed hard-off task, got: %v", err)
++	}
++	if diff := cmp.Diff(result, ctrl.Result{}); diff != "" {
++		t.Fatalf("unexpected completion result (-want +got):\n%s", diff)
++	}
++	if provider.PowerSetCalls != 1 {
++		t.Fatalf("expected no duplicate power-off command, got %d", provider.PowerSetCalls)
++	}
++
++	retrieved = getTask(t, cluster, request.NamespacedName)
++	assertTaskCondition(t, retrieved, bmc.TaskCompleted, bmc.ConditionTrue)
++	if condition := findTaskCondition(retrieved, bmc.TaskConditionType("Retrying")); condition != nil {
++		t.Fatalf("expected retrying condition to be cleared, got: %+v", *condition)
++	}
++	if _, ok := retrieved.Annotations["bmc.tinkerbell.org/hard-off-action-issued-at"]; ok {
++		t.Fatalf("expected issued-at annotation to be cleared, got: %+v", retrieved.Annotations)
++	}
++}
++
++func TestTaskReconcilePowerHardOffObservesBeforeResending(t *testing.T) {
++	tests := map[string]struct {
++		startTime       time.Time
++		issuedAt        *time.Time
++		expectRetrying  bool
++		expectImmediate time.Duration
++	}{
++		"within observation window": {
++			startTime:       time.Now().Add(-10 * time.Second),
++			issuedAt:        toPtr(time.Now().Add(-10 * time.Second)),
++			expectImmediate: 3 * time.Second,
++		},
++		"expired observation window": {
++			startTime:      time.Now().Add(-2 * time.Minute),
++			issuedAt:       toPtr(time.Now().Add(-2 * time.Minute)),
++			expectRetrying: true,
++		},
++		"task from older controller": {
++			startTime:       time.Now().Add(-10 * time.Second),
++			expectImmediate: 3 * time.Second,
++		},
++	}
++
++	for name, tt := range tests {
++		t.Run(name, func(t *testing.T) {
++			secret := createSecret()
++			task := createTask("HardOff", getAction("HardOff"), secret)
++			startTime := metav1.NewTime(tt.startTime)
++			task.Status.StartTime = &startTime
++			if tt.issuedAt != nil {
++				task.Annotations = map[string]string{
++					"bmc.tinkerbell.org/hard-off-action-issued-at": tt.issuedAt.UTC().Format(time.RFC3339Nano),
++				}
++			}
++			provider := &testProvider{Powerstate: "on", PowerSetOK: true}
++			cluster := newClientBuilder().WithObjects(task, secret).Build()
++			reconciler := controller.NewTaskReconciler(cluster, newTestClient(provider))
++			request := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: task.Namespace, Name: task.Name}}
++
++			result, err := reconciler.Reconcile(context.Background(), request)
++			if err != nil {
++				t.Fatalf("expected nil err, got: %v", err)
++			}
++			if provider.PowerSetCalls != 0 {
++				t.Fatalf("expected no command during observation, got %d", provider.PowerSetCalls)
++			}
++			if tt.expectImmediate != 0 && result.RequeueAfter != tt.expectImmediate {
++				t.Fatalf("expected requeue after %s, got %s", tt.expectImmediate, result.RequeueAfter)
++			}
++			if tt.expectRetrying && result.RequeueAfter == 0 {
++				t.Fatal("expected expired observation to be requeued")
++			}
++
++			retrieved := getTask(t, cluster, request.NamespacedName)
++			retrying := findTaskCondition(retrieved, bmc.TaskConditionType("Retrying"))
++			if tt.expectRetrying && retrying == nil {
++				t.Fatalf("expected retrying condition, got: %+v", retrieved.Status.Conditions)
++			}
++			if !tt.expectRetrying && retrying != nil {
++				t.Fatalf("expected no retrying condition, got: %+v", *retrying)
++			}
++
++			if !tt.expectRetrying {
++				return
++			}
++
++			result, err = reconciler.Reconcile(context.Background(), request)
++			if err != nil {
++				t.Fatalf("expected retry to issue hard-off, got: %v", err)
++			}
++			if diff := cmp.Diff(result, ctrl.Result{RequeueAfter: 3 * time.Second}); diff != "" {
++				t.Fatalf("unexpected resend result (-want +got):\n%s", diff)
++			}
++			if provider.PowerSetCalls != 1 {
++				t.Fatalf("expected one power-off command after observation window, got %d", provider.PowerSetCalls)
++			}
++		})
++	}
++}
++
++func TestTaskReconcilePowerHardOffRetryDelayIsCapped(t *testing.T) {
++	secret := createSecret()
++	task := createTask("HardOff", getAction("HardOff"), secret)
++	startTime := metav1.NewTime(time.Now().Add(-time.Hour))
++	task.Status.StartTime = &startTime
++	task.SetCondition(bmc.TaskConditionType("Retrying"), bmc.ConditionTrue)
++	cluster := newClientBuilder().WithObjects(task).Build()
++	reconciler := controller.NewTaskReconciler(cluster, newTestClient(&testProvider{}))
++	request := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: task.Namespace, Name: task.Name}}
++
++	result, err := reconciler.Reconcile(context.Background(), request)
++	if err != nil {
++		t.Fatalf("expected retry without reconcile error, got: %v", err)
++	}
++	if diff := cmp.Diff(result, ctrl.Result{RequeueAfter: 5 * time.Minute}); diff != "" {
++		t.Fatalf("unexpected capped retry result (-want +got):\n%s", diff)
++	}
++}
++
++func getTask(t *testing.T, cluster client.Client, key types.NamespacedName) *bmc.Task {
++	t.Helper()
++	task := &bmc.Task{}
++	if err := cluster.Get(context.Background(), key, task); err != nil {
++		t.Fatalf("failed to get task: %v", err)
++	}
++	return task
++}
++
++func findTaskCondition(task *bmc.Task, conditionType bmc.TaskConditionType) *bmc.TaskCondition {
++	for i := range task.Status.Conditions {
++		if task.Status.Conditions[i].Type == conditionType {
++			return &task.Status.Conditions[i]
++		}
++	}
++	return nil
++}
++
++func assertTaskCondition(t *testing.T, task *bmc.Task, conditionType bmc.TaskConditionType, status bmc.ConditionStatus) {
++	t.Helper()
++	condition := findTaskCondition(task, conditionType)
++	if condition == nil {
++		t.Fatalf("expected condition %s, got: %+v", conditionType, task.Status.Conditions)
++	}
++	if condition.Status != status {
++		t.Fatalf("expected condition %s status %s, got %s", conditionType, status, condition.Status)
++	}
++}
++
+ func createTask(name string, action bmc.Action, secret *corev1.Secret) *bmc.Task {
+ 	return &bmc.Task{
+ 		TypeMeta: metav1.TypeMeta{
+-- 
+2.54.0 (Apple Git-157)
