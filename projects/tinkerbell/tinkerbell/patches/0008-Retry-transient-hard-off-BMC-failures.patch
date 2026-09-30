@@ -1,4 +1,4 @@
-From 0bdbdf91e8e3fd8239f44a486eaf362b49e4fce1 Mon Sep 17 00:00:00 2001
+From 933f3905b4d7073bd807e3f5d5e2baa9d7c43506 Mon Sep 17 00:00:00 2001
 From: howard-junec <junecao@amazon.com>
 Date: Mon, 28 Sep 2026 10:23:19 -0700
 Subject: [PATCH 8/8] Retry transient hard-off BMC failures
@@ -7,15 +7,15 @@ Keep hard-off tasks pending across transient BMC connection and power operation 
 
 Signed-off-by: howard-junec <junecao@amazon.com>
 ---
- rufio/internal/controller/helpers_test.go     |  10 +
- rufio/internal/controller/task.go             | 322 +++++++++++++--
+ rufio/internal/controller/helpers_test.go     |  26 +-
+ rufio/internal/controller/task.go             | 321 +++++++++++--
  .../internal/controller/task_internal_test.go |  85 ++++
- rufio/internal/controller/task_test.go        | 385 +++++++++++++++++-
- 4 files changed, 762 insertions(+), 40 deletions(-)
+ rufio/internal/controller/task_test.go        | 429 +++++++++++++++++-
+ 4 files changed, 818 insertions(+), 43 deletions(-)
  create mode 100644 rufio/internal/controller/task_internal_test.go
 
 diff --git a/rufio/internal/controller/helpers_test.go b/rufio/internal/controller/helpers_test.go
-index 7a01bf00753b..c8d961e7a9c8 100644
+index 7a01bf00753b..6b7f9aa8b70f 100644
 --- a/rufio/internal/controller/helpers_test.go
 +++ b/rufio/internal/controller/helpers_test.go
 @@ -89,6 +89,7 @@ type testProvider struct {
@@ -26,19 +26,41 @@ index 7a01bf00753b..c8d961e7a9c8 100644
  	PowerSetOK            bool
  	BootdeviceOK          bool
  	VirtualMediaOK        bool
-@@ -98,6 +99,8 @@ type testProvider struct {
+@@ -98,6 +99,9 @@ type testProvider struct {
  	ErrPowerStateSet      error
  	ErrBootDeviceSet      error
  	ErrVirtualMediaInsert error
 +	PowerSetCalls         int
 +	BeforePowerSet        func()
++	ObserveContext        func(string, context.Context)
  }
  
  func (t *testProvider) Name() string {
-@@ -136,6 +139,13 @@ func (t *testProvider) PowerStateGet(_ context.Context) (string, error) {
+@@ -127,15 +131,31 @@ func (t *testProvider) Open(_ context.Context) error {
+ 	return t.ErrOpen
  }
  
- func (t *testProvider) PowerSet(_ context.Context, _ string) (ok bool, err error) {
+-func (t *testProvider) Close(_ context.Context) error {
++func (t *testProvider) Close(ctx context.Context) error {
++	if t.ObserveContext != nil {
++		t.ObserveContext("close", ctx)
++	}
+ 	return t.ErrClose
+ }
+ 
+-func (t *testProvider) PowerStateGet(_ context.Context) (string, error) {
++func (t *testProvider) PowerStateGet(ctx context.Context) (string, error) {
++	if t.ObserveContext != nil {
++		t.ObserveContext("power-state-get", ctx)
++	}
+ 	return t.Powerstate, t.ErrPowerStateGet
+ }
+ 
+-func (t *testProvider) PowerSet(_ context.Context, _ string) (ok bool, err error) {
++func (t *testProvider) PowerSet(ctx context.Context, _ string) (ok bool, err error) {
++	if t.ObserveContext != nil {
++		t.ObserveContext("power-set", ctx)
++	}
 +	if t.BeforePowerSet != nil {
 +		t.BeforePowerSet()
 +	}
@@ -50,7 +72,7 @@ index 7a01bf00753b..c8d961e7a9c8 100644
  }
  
 diff --git a/rufio/internal/controller/task.go b/rufio/internal/controller/task.go
-index 16ee98809cd8..cf7363f503d2 100644
+index 16ee98809cd8..67c509478721 100644
 --- a/rufio/internal/controller/task.go
 +++ b/rufio/internal/controller/task.go
 @@ -17,6 +17,7 @@ import (
@@ -145,7 +167,7 @@ index 16ee98809cd8..cf7363f503d2 100644
  
  	// Task has StartTime, we check the status.
  	// Requeue if actions did not complete.
-@@ -199,6 +189,174 @@ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPa
+@@ -199,6 +189,173 @@ func (r *TaskReconciler) doReconcile(ctx context.Context, task *bmc.Task, taskPa
  	return ctrl.Result{}, nil
  }
  
@@ -217,7 +239,6 @@ index 16ee98809cd8..cf7363f503d2 100644
 +		if err := r.setHardOffActionAttemptedAt(ctx, task, attemptedAt); err != nil {
 +			return ctrl.Result{}, err
 +		}
-+		taskPatch = client.MergeFrom(task.DeepCopy())
 +		actionAttempted = true
 +	}
 +
@@ -320,7 +341,7 @@ index 16ee98809cd8..cf7363f503d2 100644
  // runTask executes the defined Task in a Task.
  func (r *TaskReconciler) runTask(ctx context.Context, logger logr.Logger, task bmc.Action, bmcClient *bmclib.Client) error {
  	if task.PowerAction != nil {
-@@ -293,10 +451,106 @@ func (r *TaskReconciler) patchStatus(ctx context.Context, task *bmc.Task, patch
+@@ -293,10 +450,106 @@ func (r *TaskReconciler) patchStatus(ctx context.Context, task *bmc.Task, patch
  	return nil
  }
  
@@ -520,7 +541,7 @@ index 000000000000..e1699fef0d3f
 +	}
 +}
 diff --git a/rufio/internal/controller/task_test.go b/rufio/internal/controller/task_test.go
-index 245947fa8585..15d98984ad4f 100644
+index 245947fa8585..64e1aa45bca1 100644
 --- a/rufio/internal/controller/task_test.go
 +++ b/rufio/internal/controller/task_test.go
 @@ -3,6 +3,7 @@ package controller_test
@@ -566,7 +587,7 @@ index 245947fa8585..15d98984ad4f 100644
  			result, err = reconciler.Reconcile(context.Background(), request)
  			if err != nil {
  				t.Fatalf("expected nil err, got: %v", err)
-@@ -259,6 +259,379 @@ func TestTaskReconcile(t *testing.T) {
+@@ -259,6 +259,423 @@ func TestTaskReconcile(t *testing.T) {
  	}
  }
  
@@ -764,6 +785,44 @@ index 245947fa8585..15d98984ad4f 100644
 +	}
 +}
 +
++func TestTaskReconcilePowerHardOffBoundsPowerOperations(t *testing.T) {
++	secret := createSecret()
++	task := createTask("HardOff", getAction("HardOff"), secret)
++	observed := map[string]bool{}
++	provider := &testProvider{
++		Powerstate: "on",
++		PowerSetOK: true,
++		ObserveContext: func(operation string, ctx context.Context) {
++			deadline, ok := ctx.Deadline()
++			if !ok {
++				t.Errorf("expected %s context to have a deadline", operation)
++				return
++			}
++			remaining := time.Until(deadline)
++			if remaining < 55*time.Second || remaining > 61*time.Second {
++				t.Errorf("expected %s deadline near 1m, got %s", operation, remaining)
++			}
++			observed[operation] = true
++		},
++	}
++	cluster := newClientBuilder().WithObjects(task, secret).Build()
++	reconciler := controller.NewTaskReconciler(cluster, newTestClient(provider))
++	request := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: task.Namespace, Name: task.Name}}
++
++	result, err := reconciler.Reconcile(context.Background(), request)
++	if err != nil {
++		t.Fatalf("expected nil err, got: %v", err)
++	}
++	if diff := cmp.Diff(result, ctrl.Result{RequeueAfter: 3 * time.Second}); diff != "" {
++		t.Fatalf("unexpected result (-want +got):\n%s", diff)
++	}
++	for _, operation := range []string{"power-state-get", "power-set", "close"} {
++		if !observed[operation] {
++			t.Errorf("expected to observe %s context", operation)
++		}
++	}
++}
++
 +func TestTaskReconcilePowerHardOffDoesNotRunCommandWhenAttemptPatchFails(t *testing.T) {
 +	secret := createSecret()
 +	task := createTask("HardOff", getAction("HardOff"), secret)
@@ -895,7 +954,7 @@ index 245947fa8585..15d98984ad4f 100644
 +	}
 +}
 +
-+func TestTaskReconcilePowerHardOffRetryDelayIsCapped(t *testing.T) {
++func TestTaskReconcilePowerHardOffRetryDelayIsCappedWithoutLegacyTimeout(t *testing.T) {
 +	secret := createSecret()
 +	task := createTask("HardOff", getAction("HardOff"), secret)
 +	startTime := metav1.NewTime(time.Now().Add(-time.Hour))
@@ -911,6 +970,12 @@ index 245947fa8585..15d98984ad4f 100644
 +	}
 +	if diff := cmp.Diff(result, ctrl.Result{RequeueAfter: 5 * time.Minute}); diff != "" {
 +		t.Fatalf("unexpected capped retry result (-want +got):\n%s", diff)
++	}
++
++	retrieved := getTask(t, cluster, request.NamespacedName)
++	assertTaskCondition(t, retrieved, bmc.TaskConditionType("Retrying"), bmc.ConditionTrue)
++	if retrieved.HasCondition(bmc.TaskFailed, bmc.ConditionTrue) {
++		t.Fatalf("expected hard-off task older than 10m to remain retryable, got: %+v", retrieved.Status.Conditions)
 +	}
 +}
 +
