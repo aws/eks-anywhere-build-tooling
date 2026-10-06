@@ -30,6 +30,7 @@ GIT_TAG="${5?Fifth arguement is the Git Tag}"
 OUTPUT_DIR="${6?Sixth arguement is output directory}"
 LATEST_TAG="${7?Seventh arguement is latest tag}"
 SEMVER_GIT_TAG="${GIT_TAG#[^0-9:main]}"
+BUNDLE_GIT_TAG="${GIT_TAG#v}"
 
 SEMVER="${HELM_TAG#[^0-9]}" # remove any leading non-digits
 SEMVER_REGEX='^([0-9]+\.){0,2}(\*|[0-9]+)$'
@@ -76,6 +77,11 @@ DIGEST=$(grep Digest $TMPFILE | $SED -e 's/Digest: //')
 
 # Adds a 2nd tag to the helm chart for the bundle-release jobs.
 build::common::echo_and_run skopeo copy docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}@${DIGEST} docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}:${SEMVER_GIT_TAG}-${LATEST_TAG}-helm
+if [[ "${BUNDLE_GIT_TAG}" != "${SEMVER_GIT_TAG}" ]]; then
+  # Bundle release lookup is keyed by GIT_TAG even when the packaged chart
+  # needs a SemVer wrapper.
+  build::common::echo_and_run skopeo copy docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}@${DIGEST} docker://${IMAGE_REGISTRY}/${HELM_DESTINATION_REPOSITORY}:${BUNDLE_GIT_TAG}-${LATEST_TAG}-helm
+fi
 
 {
     set +x

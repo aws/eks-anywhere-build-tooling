@@ -14,6 +14,10 @@ CRDs are automatically generated from the [tinkerbell/tinkerbell](https://github
    - `helm.sh/resource-policy: keep` - prevents Helm from deleting CRDs on uninstall
    - `clusterctl.cluster.x-k8s.io` labels - enables CAPI move operations
 
+Release tags keep the normal chart versioning flow. When `GIT_TAG` is a commit
+SHA between releases, the build wraps it in a valid SemVer for Helm packaging
+and also publishes a raw `GIT_TAG` alias for bundle release lookup.
+
 ## Updating
 
 1. Update `GIT_TAG` to the new mono-repo version.

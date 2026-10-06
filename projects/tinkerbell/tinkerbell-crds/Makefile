@@ -21,8 +21,12 @@ HELM_SOURCE_REPOSITORY=tinkerbell
 HELM_IMAGE_LIST=
 HELM_CHART_NAMES=tinkerbell/tinkerbell-crds
 
-# GIT_TAG is a commit SHA, so wrap it in a valid SemVer chart version.
-HELM_TAG=0.0.1-$(GIT_TAG)
+# Preserve release tags. Wrap commit SHAs because Helm requires Chart.yaml.version
+# to be valid SemVer.
+GIT_TAG_IS_SEMVER=$(shell printf '%s' "$(GIT_TAG)" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$$' && echo true || echo false)
+ifneq ($(GIT_TAG_IS_SEMVER),true)
+HELM_TAG=0.0.1-$(GIT_TAG)-$(GIT_HASH)
+endif
 
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
