@@ -21,6 +21,9 @@ HELM_SOURCE_REPOSITORY=tinkerbell
 HELM_IMAGE_LIST=
 HELM_CHART_NAMES=tinkerbell/tinkerbell-crds
 
+# GIT_TAG is a commit SHA, so wrap it in a valid SemVer chart version.
+HELM_TAG=0.0.1-$(GIT_TAG)
+
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 EXCLUDE_FROM_CHECKSUMS_BUILDSPEC=true
 
@@ -36,9 +39,9 @@ $(GIT_CHECKOUT_TARGET): | $(REPO)
 	git -C $(REPO) checkout --quiet -f $(GIT_TAG)
 	@touch $@
 
-# Override checkout-repo to use our clone rules + generate CRDs chart
+# Override checkout-repo to use our clone rules, apply CRD patches, and generate the chart
 .PHONY: checkout-repo
-checkout-repo: $(GIT_CHECKOUT_TARGET)
+checkout-repo: $(GIT_PATCH_TARGET)
 	scripts/generate-crds-chart.sh $(MAKE_ROOT)/$(REPO) $(MAKE_ROOT)/$(REPO)/_output/helm-chart
 
 .PHONY: verify
