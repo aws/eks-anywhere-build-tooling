@@ -1,0 +1,545 @@
+From c94a60dfc8d2e1186a248c802ad6313f1715eeb7 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulbabu95@gmail.com>
+Date: Sat, 3 Oct 2026 02:18:11 -0700
+Subject: [PATCH] Propagate observed Hardware addresses
+
+Allow addressless Hardware to proceed through provisioning and copy observed Hardware status addresses into TinkerbellMachine status. Watch Hardware changes in local and external Tinkerbell modes so SLAAC addresses reconcile after the installed OS requests metadata.
+---
+ controller/machine/hardware.go               |  81 +++++++-
+ controller/machine/hardware_test.go          | 194 +++++++++++++++++++
+ controller/machine/scope.go                  |  12 +-
+ controller/machine/tinkerbellmachine.go      |   5 +
+ controller/machine/tinkerbellmachine_test.go |  31 ++-
+ pkg/cluster/watch.go                         |   9 +-
+ 6 files changed, 308 insertions(+), 24 deletions(-)
+
+diff --git a/controller/machine/hardware.go b/controller/machine/hardware.go
+index 389e80f..07f4716 100644
+--- a/controller/machine/hardware.go
++++ b/controller/machine/hardware.go
+@@ -1,16 +1,21 @@
+ package machine
+ 
+ import (
++	"context"
+ 	"errors"
+ 	"fmt"
++	"net/netip"
+ 	"sort"
+ 	"strings"
+ 
+ 	tinkv1 "github.com/tinkerbell/tinkerbell/api/v1alpha1/tinkerbell"
++	corev1 "k8s.io/api/core/v1"
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+ 	"k8s.io/apimachinery/pkg/labels"
+ 	"k8s.io/apimachinery/pkg/types"
++	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+ 	"sigs.k8s.io/cluster-api/util/patch"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+ 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+@@ -51,6 +56,8 @@ var (
+ 	// ErrHardwareFirstInterfaceDHCPMissingIP is the error returned when the referenced hardware does not have a
+ 	// DHCP IP address assigned for it's first interface.
+ 	ErrHardwareFirstInterfaceDHCPMissingIP = fmt.Errorf("hardware's first interface has no DHCP IP address defined")
++	// ErrHardwareFirstInterfaceDHCPInvalidIP is returned when the first interface has an invalid DHCP IP address.
++	ErrHardwareFirstInterfaceDHCPInvalidIP = fmt.Errorf("hardware's first interface has an invalid DHCP IP address")
+ 	// ErrHardwareMissingDiskConfiguration is returned when the referenced hardware is missing
+ 	// disk configuration.
+ 	ErrHardwareMissingDiskConfiguration = fmt.Errorf("disk configuration is required")
+@@ -59,7 +66,7 @@ var (
+ 	errHardwareClaimRequeue = errors.New("hardware claim requires requeue")
+ )
+ 
+-// hardwareIP returns the IP address of the first network interface of the given hardware.
++// hardwareIP returns the optional configured IP address of the first network interface.
+ func hardwareIP(hardware *tinkv1.Hardware) (string, error) {
+ 	if hardware == nil {
+ 		return "", ErrHardwareIsNil
+@@ -69,19 +76,64 @@ func hardwareIP(hardware *tinkv1.Hardware) (string, error) {
+ 		return "", ErrHardwareMissingInterfaces
+ 	}
+ 
+-	if hardware.Spec.Interfaces[0].DHCP == nil {
+-		return "", ErrHardwareFirstInterfaceNotDHCP
++	dhcp := hardware.Spec.Interfaces[0].DHCP
++	if dhcp == nil || dhcp.IP == nil || dhcp.IP.Address == "" {
++		return "", nil
+ 	}
+ 
+-	if hardware.Spec.Interfaces[0].DHCP.IP == nil {
+-		return "", ErrHardwareFirstInterfaceDHCPMissingIP
++	if _, err := netip.ParseAddr(dhcp.IP.Address); err != nil {
++		return "", fmt.Errorf("%w: %q", ErrHardwareFirstInterfaceDHCPInvalidIP, dhcp.IP.Address)
+ 	}
+ 
+-	if hardware.Spec.Interfaces[0].DHCP.IP.Address == "" {
+-		return "", ErrHardwareFirstInterfaceDHCPMissingIP
++	return dhcp.IP.Address, nil
++}
++
++func hardwareAddresses(ctx context.Context, c client.Client, hardware *tinkv1.Hardware) ([]corev1.NodeAddress, error) {
++	ip, err := hardwareIP(hardware)
++	if err != nil {
++		return nil, err
++	}
++	if ip != "" {
++		return []corev1.NodeAddress{{
++			Type:    corev1.NodeInternalIP,
++			Address: ip,
++		}}, nil
+ 	}
+ 
+-	return hardware.Spec.Interfaces[0].DHCP.IP.Address, nil
++	observed := &unstructured.Unstructured{}
++	observed.SetGroupVersionKind(tinkv1.GroupVersion.WithKind("Hardware"))
++	if err := c.Get(ctx, client.ObjectKeyFromObject(hardware), observed); err != nil {
++		return nil, fmt.Errorf("getting observed Hardware status: %w", err)
++	}
++
++	items, found, err := unstructured.NestedSlice(observed.Object, "status", "addresses")
++	if err != nil {
++		return nil, fmt.Errorf("reading observed Hardware addresses: %w", err)
++	}
++	if !found {
++		return nil, nil
++	}
++
++	addresses := make([]corev1.NodeAddress, 0, len(items))
++	for _, item := range items {
++		value, ok := item.(map[string]interface{})
++		if !ok {
++			return nil, fmt.Errorf("observed Hardware address has unexpected type %T", item)
++		}
++
++		addressType, _, _ := unstructured.NestedString(value, "type")
++		address, _, _ := unstructured.NestedString(value, "address")
++		if _, err := netip.ParseAddr(address); err != nil {
++			return nil, fmt.Errorf("observed Hardware address is invalid: %q", address)
++		}
++
++		addresses = append(addresses, corev1.NodeAddress{
++			Type:    corev1.NodeAddressType(addressType),
++			Address: address,
++		})
++	}
++
++	return addresses, nil
+ }
+ 
+ // patchHardwareStates patches a hardware's metadata and instance states.
+@@ -111,6 +163,9 @@ func (scope *machineReconcileScope) patchHardwareAnnotations(hw *tinkv1.Hardware
+ func (scope *machineReconcileScope) hardwareAlreadyClaimed(hw *tinkv1.Hardware) bool {
+ 	return hw.Labels[HardwareOwnerNameLabel] == scope.tinkerbellMachine.Name &&
+ 		hw.Labels[HardwareOwnerNamespaceLabel] == scope.tinkerbellMachine.Namespace &&
++		hw.Labels[LabelMachineName] == scope.tinkerbellMachine.Name &&
++		hw.Labels[LabelMachineNamespace] == scope.tinkerbellMachine.Namespace &&
++		(scope.watchFilterValue == "" || hw.Labels[clusterv1.WatchLabel] == scope.watchFilterValue) &&
+ 		controllerutil.ContainsFinalizer(hw, infrastructurev1.MachineFinalizer) &&
+ 		!controllerutil.ContainsFinalizer(hw, infrastructurev1.MachineLegacyFinalizer)
+ }
+@@ -144,6 +199,11 @@ func (scope *machineReconcileScope) takeHardwareOwnership(hw *tinkv1.Hardware) e
+ 
+ 	hw.Labels[HardwareOwnerNameLabel] = scope.tinkerbellMachine.Name
+ 	hw.Labels[HardwareOwnerNamespaceLabel] = scope.tinkerbellMachine.Namespace
++	hw.Labels[LabelMachineName] = scope.tinkerbellMachine.Name
++	hw.Labels[LabelMachineNamespace] = scope.tinkerbellMachine.Namespace
++	if scope.watchFilterValue != "" {
++		hw.Labels[clusterv1.WatchLabel] = scope.watchFilterValue
++	}
+ 
+ 	// Add finalizer to hardware as well to make sure we release it before Machine object is removed.
+ 	// Remove the legacy name first so upgraded Hardware objects don't carry both.
+@@ -352,6 +412,11 @@ func (scope *machineReconcileScope) releaseHardware(hw *tinkv1.Hardware) error {
+ 
+ 	delete(hw.Labels, HardwareOwnerNameLabel)
+ 	delete(hw.Labels, HardwareOwnerNamespaceLabel)
++	delete(hw.Labels, LabelMachineName)
++	delete(hw.Labels, LabelMachineNamespace)
++	if hw.Labels[clusterv1.WatchLabel] == scope.watchFilterValue {
++		delete(hw.Labels, clusterv1.WatchLabel)
++	}
+ 	delete(hw.Annotations, HardwareProvisionedAnnotation)
+ 
+ 	controllerutil.RemoveFinalizer(hw, infrastructurev1.MachineFinalizer)
+diff --git a/controller/machine/hardware_test.go b/controller/machine/hardware_test.go
+index 6a4bb7f..52e9d5b 100644
+--- a/controller/machine/hardware_test.go
++++ b/controller/machine/hardware_test.go
+@@ -27,8 +27,10 @@ import (
+ 
+ 	. "github.com/onsi/gomega" //nolint:revive // one day we will remove gomega
+ 	tinkv1 "github.com/tinkerbell/tinkerbell/api/v1alpha1/tinkerbell"
++	corev1 "k8s.io/api/core/v1"
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+ 	"k8s.io/apimachinery/pkg/runtime"
+ 	"k8s.io/apimachinery/pkg/types"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+@@ -70,6 +72,26 @@ type blockingPatchClient struct {
+ 	once    sync.Once
+ }
+ 
++type observedStatusClient struct {
++	client.Client
++	observed *unstructured.Unstructured
++}
++
++func (c *observedStatusClient) Get(
++	ctx context.Context,
++	key client.ObjectKey,
++	obj client.Object,
++	opts ...client.GetOption,
++) error {
++	if observed, ok := obj.(*unstructured.Unstructured); ok {
++		c.observed.DeepCopyInto(observed)
++
++		return nil
++	}
++
++	return c.Client.Get(ctx, key, obj, opts...)
++}
++
+ func (c *blockingPatchClient) Patch(
+ 	ctx context.Context,
+ 	obj client.Object,
+@@ -159,6 +181,8 @@ func Test_takeHardwareOwnership_already_claimed_is_noop(t *testing.T) {
+ 			Labels: map[string]string{
+ 				HardwareOwnerNameLabel:      machineName,
+ 				HardwareOwnerNamespaceLabel: machineNamespace,
++				LabelMachineName:            machineName,
++				LabelMachineNamespace:       machineNamespace,
+ 			},
+ 		},
+ 	}
+@@ -276,3 +300,173 @@ func Test_takeHardwareOwnership_concurrent_claims(t *testing.T) {
+ 		"the persisted owner must be one of the competing Machines",
+ 	)
+ }
++
++func TestHardwareIP(t *testing.T) {
++	t.Parallel()
++
++	tests := map[string]struct {
++		hardware      *tinkv1.Hardware
++		wantIP        string
++		wantError     error
++		wantErrorText string
++	}{
++		"nil hardware": {
++			wantError: ErrHardwareIsNil,
++		},
++		"missing interfaces": {
++			hardware:  &tinkv1.Hardware{},
++			wantError: ErrHardwareMissingInterfaces,
++		},
++		"missing DHCP configuration": {
++			hardware: hardwareWithInterface(tinkv1.Interface{}),
++		},
++		"missing DHCP IP configuration": {
++			hardware: hardwareWithInterface(tinkv1.Interface{DHCP: &tinkv1.DHCP{}}),
++		},
++		"empty DHCP IP address": {
++			hardware: hardwareWithInterface(tinkv1.Interface{DHCP: &tinkv1.DHCP{IP: &tinkv1.IP{}}}),
++		},
++		"valid IPv4 address": {
++			hardware: hardwareWithIP("192.0.2.10"),
++			wantIP:   "192.0.2.10",
++		},
++		"valid IPv6 address": {
++			hardware: hardwareWithIP("2001:db8::10"),
++			wantIP:   "2001:db8::10",
++		},
++		"malformed IP address": {
++			hardware:      hardwareWithIP("not-an-ip"),
++			wantError:     ErrHardwareFirstInterfaceDHCPInvalidIP,
++			wantErrorText: "not-an-ip",
++		},
++	}
++
++	for name, test := range tests {
++		t.Run(name, func(t *testing.T) {
++			t.Parallel()
++			g := NewWithT(t)
++
++			ip, err := hardwareIP(test.hardware)
++			if test.wantError != nil {
++				g.Expect(errors.Is(err, test.wantError)).To(BeTrue())
++				if test.wantErrorText != "" {
++					g.Expect(err).To(MatchError(ContainSubstring(test.wantErrorText)))
++				}
++
++				return
++			}
++
++			g.Expect(err).NotTo(HaveOccurred())
++			g.Expect(ip).To(Equal(test.wantIP))
++		})
++	}
++}
++
++func TestHardwareAddresses(t *testing.T) {
++	t.Parallel()
++
++	t.Run("configured address takes precedence", func(t *testing.T) {
++		t.Parallel()
++		g := NewWithT(t)
++
++		addresses, err := hardwareAddresses(context.Background(), nil, hardwareWithIP("192.0.2.10"))
++
++		g.Expect(err).NotTo(HaveOccurred())
++		g.Expect(addresses).To(Equal([]corev1.NodeAddress{{
++			Type:    corev1.NodeInternalIP,
++			Address: "192.0.2.10",
++		}}))
++	})
++
++	t.Run("returns observed address for addressless Hardware", func(t *testing.T) {
++		t.Parallel()
++		g := NewWithT(t)
++
++		hardware := hardwareWithInterface(tinkv1.Interface{})
++		hardware.Name = "hardware-1"
++		hardware.Namespace = "default"
++
++		observed := &unstructured.Unstructured{Object: map[string]interface{}{
++			"apiVersion": "tinkerbell.org/v1alpha1",
++			"kind":       "Hardware",
++			"metadata": map[string]interface{}{
++				"name":      hardware.Name,
++				"namespace": hardware.Namespace,
++			},
++			"status": map[string]interface{}{
++				"addresses": []interface{}{
++					map[string]interface{}{
++						"type":    string(corev1.NodeInternalIP),
++						"address": "2001:db8::10",
++					},
++				},
++			},
++		}}
++		observed.SetGroupVersionKind(tinkv1.GroupVersion.WithKind("Hardware"))
++		c := &observedStatusClient{
++			Client:   fake.NewClientBuilder().WithScheme(hardwareTestScheme(g)).Build(),
++			observed: observed,
++		}
++
++		addresses, err := hardwareAddresses(context.Background(), c, hardware)
++
++		g.Expect(err).NotTo(HaveOccurred())
++		g.Expect(addresses).To(Equal([]corev1.NodeAddress{{
++			Type:    corev1.NodeInternalIP,
++			Address: "2001:db8::10",
++		}}))
++	})
++
++	t.Run("rejects invalid observed address", func(t *testing.T) {
++		t.Parallel()
++		g := NewWithT(t)
++
++		hardware := hardwareWithInterface(tinkv1.Interface{})
++		hardware.Name = "hardware-1"
++		hardware.Namespace = "default"
++
++		observed := &unstructured.Unstructured{Object: map[string]interface{}{
++			"apiVersion": "tinkerbell.org/v1alpha1",
++			"kind":       "Hardware",
++			"metadata": map[string]interface{}{
++				"name":      hardware.Name,
++				"namespace": hardware.Namespace,
++			},
++			"status": map[string]interface{}{
++				"addresses": []interface{}{
++					map[string]interface{}{
++						"type":    string(corev1.NodeInternalIP),
++						"address": "not-an-ip",
++					},
++				},
++			},
++		}}
++		observed.SetGroupVersionKind(tinkv1.GroupVersion.WithKind("Hardware"))
++		c := &observedStatusClient{
++			Client:   fake.NewClientBuilder().WithScheme(hardwareTestScheme(g)).Build(),
++			observed: observed,
++		}
++
++		_, err := hardwareAddresses(context.Background(), c, hardware)
++
++		g.Expect(err).To(MatchError(ContainSubstring("not-an-ip")))
++	})
++}
++
++func hardwareWithInterface(networkInterface tinkv1.Interface) *tinkv1.Hardware {
++	return &tinkv1.Hardware{
++		Spec: tinkv1.HardwareSpec{
++			Interfaces: []tinkv1.Interface{networkInterface},
++		},
++	}
++}
++
++func hardwareWithIP(ip string) *tinkv1.Hardware {
++	return hardwareWithInterface(tinkv1.Interface{
++		DHCP: &tinkv1.DHCP{
++			IP: &tinkv1.IP{
++				Address: ip,
++			},
++		},
++	})
++}
+diff --git a/controller/machine/scope.go b/controller/machine/scope.go
+index 62187b0..db3b0c6 100644
+--- a/controller/machine/scope.go
++++ b/controller/machine/scope.go
+@@ -87,6 +87,7 @@ type machineReconcileScope struct {
+ 	tinkerbellClient   client.Client
+ 	externalTinkerbell bool // true when tinkerbellClient targets an external cluster
+ 	watchManager       *tinkcluster.NamespaceWatchManager
++	watchFilterValue   string
+ }
+ 
+ func (scope *machineReconcileScope) addFinalizer() error {
+@@ -248,17 +249,12 @@ func (scope *machineReconcileScope) setStatus(hw *tinkv1.Hardware) error {
+ 		}
+ 	}
+ 
+-	ip, err := hardwareIP(hw)
++	addresses, err := hardwareAddresses(scope.ctx, scope.tinkerbellClient, hw)
+ 	if err != nil {
+-		return fmt.Errorf("extracting Hardware IP address: %w", err)
++		return fmt.Errorf("extracting Hardware addresses: %w", err)
+ 	}
+ 
+-	scope.tinkerbellMachine.Status.Addresses = []corev1.NodeAddress{
+-		{
+-			Type:    corev1.NodeInternalIP,
+-			Address: ip,
+-		},
+-	}
++	scope.tinkerbellMachine.Status.Addresses = addresses
+ 
+ 	return scope.patch()
+ }
+diff --git a/controller/machine/tinkerbellmachine.go b/controller/machine/tinkerbellmachine.go
+index aad56f9..98eb4b1 100644
+--- a/controller/machine/tinkerbellmachine.go
++++ b/controller/machine/tinkerbellmachine.go
+@@ -103,6 +103,7 @@ func (r *TinkerbellMachineReconciler) Reconcile(ctx context.Context, req ctrl.Re
+ 		tinkerbellClient:   r.TinkerbellClient,
+ 		externalTinkerbell: r.ExternalTinkerbell,
+ 		watchManager:       r.WatchManager,
++		watchFilterValue:   r.WatchFilterValue,
+ 	}
+ 
+ 	if err := r.Get(ctx, req.NamespacedName, scope.tinkerbellMachine); err != nil {
+@@ -271,6 +272,10 @@ func (r *TinkerbellMachineReconciler) SetupWithManager(ctx context.Context, mgr
+ 			Watches(
+ 				&rufiov1.Job{},
+ 				handler.EnqueueRequestsFromMapFunc(labelToMachineMapper),
++			).
++			Watches(
++				&tinkv1.Hardware{},
++				handler.EnqueueRequestsFromMapFunc(labelToMachineMapper),
+ 			)
+ 	}
+ 
+diff --git a/controller/machine/tinkerbellmachine_test.go b/controller/machine/tinkerbellmachine_test.go
+index 0fb68fe..63fce2c 100644
+--- a/controller/machine/tinkerbellmachine_test.go
++++ b/controller/machine/tinkerbellmachine_test.go
+@@ -746,10 +746,11 @@ func Test_Machine_reconciliation(t *testing.T) {
+ 		t.Run("bootstrap_config_has_no_value_key", machineReconciliationFailsWhenBootstrapConfigHasNoValueKey)
+ 
+ 		t.Run("there_is_no_hardware_available", machineReconciliationFailsWhenThereIsNoHardwareAvailable)
+-
+-		t.Run("selected_hardware_has_no_ip_address_set", machineReconciliationFailsWhenSelectedHardwareHasNoIPAddressSet)
+ 	})
+ 
++	t.Run("continues_when_selected_hardware_has_no_ip_address",
++		machineReconciliationContinuesWhenSelectedHardwareHasNoIPAddress)
++
+ 	// Single hardware should only ever be used for a single machine.
+ 	t.Run("selects_unique_and_available_hardware_for_each_machine",
+ 		machineReconciliationSelectsUniqueAndAvailablehardwareForEachMachine)
+@@ -1165,23 +1166,39 @@ func machineReconciliationFailsWhenThereIsNoHardwareAvailable(t *testing.T) {
+ 	g.Expect(err).To(MatchError(machine.ErrNoHardwareAvailable))
+ }
+ 
+-func machineReconciliationFailsWhenSelectedHardwareHasNoIPAddressSet(t *testing.T) {
++func machineReconciliationContinuesWhenSelectedHardwareHasNoIPAddress(t *testing.T) {
+ 	t.Parallel()
+ 	g := NewWithT(t)
+ 
+ 	hardwareUUID := uuid.New().String()
+-	malformedHardware := validHardware(hardwareName, hardwareUUID, "")
+ 	objects := []runtime.Object{
+ 		validTinkerbellMachine(tinkerbellMachineName, clusterNamespace, machineName, hardwareUUID),
+ 		validCluster(clusterName, clusterNamespace),
+ 		validTinkerbellCluster(clusterName, clusterNamespace),
+-		malformedHardware,
++		validHardware(hardwareName, hardwareUUID, ""),
+ 		validMachine(machineName, clusterNamespace, clusterName),
+ 		validSecret(machineName, clusterNamespace),
+ 	}
+ 
+-	_, err := reconcileMachineWithClient(kubernetesClientWithObjects(t, objects), tinkerbellMachineName, clusterNamespace)
+-	g.Expect(err).To(MatchError(machine.ErrHardwareFirstInterfaceDHCPMissingIP))
++	c := kubernetesClientWithObjects(t, objects)
++	_, err := reconcileMachineWithClient(c, tinkerbellMachineName, clusterNamespace)
++	g.Expect(err).NotTo(HaveOccurred())
++
++	updatedMachine := &infrastructurev1.TinkerbellMachine{}
++	g.Expect(c.Get(context.Background(), types.NamespacedName{
++		Name:      tinkerbellMachineName,
++		Namespace: clusterNamespace,
++	}, updatedMachine)).To(Succeed())
++	g.Expect(updatedMachine.Status.Addresses).To(BeEmpty())
++
++	g.Expect(c.Get(context.Background(), types.NamespacedName{
++		Name:      tinkerbellMachineName,
++		Namespace: clusterNamespace,
++	}, &tinkv1.Template{})).To(Succeed())
++	g.Expect(c.Get(context.Background(), types.NamespacedName{
++		Name:      tinkerbellMachineName,
++		Namespace: clusterNamespace,
++	}, &tinkv1.Workflow{})).To(Succeed())
+ }
+ 
+ func machineReconciliationSelectsUniqueAndAvailablehardwareForEachMachine(t *testing.T) {
+diff --git a/pkg/cluster/watch.go b/pkg/cluster/watch.go
+index 113360f..e29a3d0 100644
+--- a/pkg/cluster/watch.go
++++ b/pkg/cluster/watch.go
+@@ -203,7 +203,7 @@ func backoffDuration(failureCount int) time.Duration {
+ }
+ 
+ // startAndRegister creates a namespace-scoped cache, starts it, waits for sync,
+-// and registers Workflow/Job watches on the controller. It returns a CancelFunc
++// and registers Workflow, Job, and Hardware watches on the controller. It returns a CancelFunc
+ // to stop the cache. All operations are safe to call without holding m.mu.
+ func (m *NamespaceWatchManager) startAndRegister(
+ 	ctx context.Context,
+@@ -215,6 +215,7 @@ func (m *NamespaceWatchManager) startAndRegister(
+ 		Scheme: m.scheme,
+ 		ByObject: map[client.Object]cache.ByObject{
+ 			&tinkv1.Workflow{}: {},
++			&tinkv1.Hardware{}: {},
+ 			&rufiov1.Job{}:     {},
+ 		},
+ 		DefaultNamespaces: map[string]cache.Config{
+@@ -260,6 +261,12 @@ func (m *NamespaceWatchManager) startAndRegister(
+ 		return nil, fmt.Errorf("watching Jobs in namespace %q: %w", namespace, err)
+ 	}
+ 
++	if err := ctrl.Watch(source.Kind(nsCache, &tinkv1.Hardware{},
++		handler.TypedEnqueueRequestsFromMapFunc(labelMapper[*tinkv1.Hardware](m.labelMachineName, m.labelMachineNamespace)))); err != nil {
++		cacheCancel()
++		return nil, fmt.Errorf("watching Hardware in namespace %q: %w", namespace, err)
++	}
++
+ 	return cacheCancel, nil
+ }
+ 
+-- 
+2.46.0
