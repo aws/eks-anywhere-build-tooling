@@ -23,6 +23,7 @@ const (
 	TotalTimeoutEnv = "PATCH_FIXER_TOTAL_TIMEOUT"
 	ModelIDEnv      = "PATCH_FIXER_MODEL_ID"
 	DiagnosticsEnv  = "PATCH_FIXER_DIAGNOSTICS"
+	AgentRoleARNEnv = "PATCH_FIXER_AGENT_ROLE_ARN"
 
 	requestSchemaVersion  = 1
 	defaultTimeout        = 10 * time.Minute
@@ -139,8 +140,12 @@ func runAgentProcess(ctx context.Context, invocation agentInvocation, runDir str
 
 	command := agentCommand()
 	args := append(command[1:], "--request", requestPath, "--result", resultPath)
+	credentials, err := assumeAgentRole(ctx)
+	if err != nil {
+		return agentOutcome{}, err
+	}
 	cmd := exec.CommandContext(ctx, command[0], args...)
-	cmd.Env = agentEnvironment(runDir)
+	cmd.Env = agentEnvironment(runDir, credentials)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
@@ -274,30 +279,27 @@ func diagnosticsFull() bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv(DiagnosticsEnv)), "full")
 }
 
-func agentEnvironment(runDir string) []string {
+func agentEnvironment(runDir string, credentials agentCredentials) []string {
 	allowed := map[string]bool{
 		"PATH": true, "HOME": true, "TMPDIR": true, "LANG": true, "LC_ALL": true,
 		"HTTP_PROXY": true, "HTTPS_PROXY": true, "NO_PROXY": true,
 		"AWS_REGION": true, "AWS_DEFAULT_REGION": true, "AWS_CA_BUNDLE": true,
-		"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": true,
-		"AWS_CONTAINER_CREDENTIALS_FULL_URI":     true,
-		"AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE": true,
-		"PATCH_FIXER_MODEL_ID":                   true,
-		"PATCH_FIXER_BOOTSTRAP_DIR":              true,
-		"PATCH_FIXER_BOOTSTRAP_TIMEOUT_SECONDS":  true,
-		"PATCH_FIXER_DEPENDENCY_DIR":             true,
-		"PATCH_FIXER_PYTHON":                     true,
-		"PATCH_FIXER_PYTHON_INSTALL_DIR":         true,
-		"PATCH_FIXER_PYTHON_TIMEOUT_SECONDS":     true,
-		"PATCH_FIXER_PYTHON_VERSION":             true,
-		"PATCH_FIXER_DIAGNOSTICS":                true,
-		"PATCH_FIXER_UV_CACHE_DIR":               true,
-		"PIP_INDEX_URL":                          true,
-		"PIP_EXTRA_INDEX_URL":                    true,
-		"PIP_TRUSTED_HOST":                       true,
-		"PYTHONPATH":                             true,
-		"SSL_CERT_FILE":                          true,
-		"REQUESTS_CA_BUNDLE":                     true,
+		"PATCH_FIXER_MODEL_ID":                  true,
+		"PATCH_FIXER_BOOTSTRAP_DIR":             true,
+		"PATCH_FIXER_BOOTSTRAP_TIMEOUT_SECONDS": true,
+		"PATCH_FIXER_DEPENDENCY_DIR":            true,
+		"PATCH_FIXER_PYTHON":                    true,
+		"PATCH_FIXER_PYTHON_INSTALL_DIR":        true,
+		"PATCH_FIXER_PYTHON_TIMEOUT_SECONDS":    true,
+		"PATCH_FIXER_PYTHON_VERSION":            true,
+		"PATCH_FIXER_DIAGNOSTICS":               true,
+		"PATCH_FIXER_UV_CACHE_DIR":              true,
+		"PIP_INDEX_URL":                         true,
+		"PIP_EXTRA_INDEX_URL":                   true,
+		"PIP_TRUSTED_HOST":                      true,
+		"PYTHONPATH":                            true,
+		"SSL_CERT_FILE":                         true,
+		"REQUESTS_CA_BUNDLE":                    true,
 	}
 	environment := make([]string, 0, len(allowed)+1)
 	for _, entry := range os.Environ() {
@@ -306,7 +308,15 @@ func agentEnvironment(runDir string) []string {
 			environment = append(environment, entry)
 		}
 	}
-	return append(environment, fmt.Sprintf("PATCH_FIXER_RUN_DIR=%s", runDir))
+	return append(environment,
+		fmt.Sprintf("PATCH_FIXER_RUN_DIR=%s", runDir),
+		"AWS_ACCESS_KEY_ID="+credentials.AccessKeyID,
+		"AWS_SECRET_ACCESS_KEY="+credentials.SecretAccessKey,
+		"AWS_SESSION_TOKEN="+credentials.SessionToken,
+		"AWS_EC2_METADATA_DISABLED=true",
+		"AWS_CONFIG_FILE=/dev/null",
+		"AWS_SHARED_CREDENTIALS_FILE=/dev/null",
+	)
 }
 
 func writeJSON(path string, value any) error {

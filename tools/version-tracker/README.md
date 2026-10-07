@@ -245,10 +245,17 @@ export PATCH_FIXER_ENABLED=true
 export PATCH_FIXER_AGENT_TIMEOUT=10m
 export PATCH_FIXER_TOTAL_TIMEOUT=45m
 export PATCH_FIXER_MODEL_ID=global.anthropic.claude-opus-5-5
+export PATCH_FIXER_AGENT_ROLE_ARN=arn:aws:iam::123456789012:role/example-patch-fixer-agent
 export PATCH_FIXER_METRICS_ENABLED=true
 ```
 
 Set `PATCH_FIXER_ENABLED=false` or leave it unset to disable agent patch fixing.
+Generic repairs require `PATCH_FIXER_AGENT_ROLE_ARN`. The Go harness uses the
+AWS CLI to assume this Bedrock-only role for each attempt and passes its
+temporary credentials to Python. Python does not inherit build credentials,
+container credential endpoints, profiles, or web identity settings; shared
+credential files and EC2 metadata fallback are disabled. Deterministic repairs
+do not assume the agent role.
 
 #### Usage
 

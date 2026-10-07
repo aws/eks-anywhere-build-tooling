@@ -377,6 +377,7 @@ func TestRunTimesOut(t *testing.T) {
 	t.Setenv(EnabledEnv, "true")
 	t.Setenv(ResultDirEnv, t.TempDir())
 	t.Setenv(TimeoutEnv, "20ms")
+	fakeSTS(t, `{"Credentials":{"AccessKeyId":"agent-key","SecretAccessKey":"agent-secret","SessionToken":"agent-token","Expiration":"2099-01-01T00:00:00Z"}}`, 0)
 	runnerPath := filepath.Join(t.TempDir(), "runner.sh")
 	if err := os.WriteFile(runnerPath, []byte("#!/bin/sh\nsleep 2\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -412,19 +413,51 @@ func TestTotalTimeout(t *testing.T) {
 	}
 }
 
-func TestAgentEnvironmentExcludesGitHubToken(t *testing.T) {
+func TestAgentEnvironmentUsesOnlyAssumedCredentials(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "secret")
 	t.Setenv("AWS_REGION", "us-west-2")
-	environment := agentEnvironment(t.TempDir())
+	for _, name := range []string{
+		"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
+		"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+		"AWS_CONTAINER_AUTHORIZATION_TOKEN", "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+		"AWS_PROFILE", "AWS_DEFAULT_PROFILE", "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_ROLE_ARN",
+		"AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE",
+	} {
+		t.Setenv(name, "build-value")
+	}
+	environment := agentEnvironment(t.TempDir(), agentCredentials{
+		AccessKeyID:     "agent-key",
+		SecretAccessKey: "agent-secret",
+		SessionToken:    "agent-token",
+	})
+	values := make(map[string]string)
 	for _, entry := range environment {
+		name, value, _ := strings.Cut(entry, "=")
+		values[name] = value
 		if strings.HasPrefix(entry, "GITHUB_TOKEN=") {
 			t.Fatal("agent environment contains GITHUB_TOKEN")
+		}
+		if value == "build-value" {
+			t.Fatalf("agent environment contains inherited %s", name)
+		}
+	}
+	for name, expected := range map[string]string{
+		"AWS_ACCESS_KEY_ID":           "agent-key",
+		"AWS_SECRET_ACCESS_KEY":       "agent-secret",
+		"AWS_SESSION_TOKEN":           "agent-token",
+		"AWS_EC2_METADATA_DISABLED":   "true",
+		"AWS_CONFIG_FILE":             "/dev/null",
+		"AWS_SHARED_CREDENTIALS_FILE": "/dev/null",
+	} {
+		if values[name] != expected {
+			t.Fatalf("%s = %q, want %q", name, values[name], expected)
 		}
 	}
 }
 
 func fakeAgentRunner(t *testing.T, stopReason string, edit bool) string {
 	t.Helper()
+	fakeSTS(t, `{"Credentials":{"AccessKeyId":"agent-key","SecretAccessKey":"agent-secret","SessionToken":"agent-token","Expiration":"2099-01-01T00:00:00Z"}}`, 0)
 	runnerPath := filepath.Join(t.TempDir(), "runner.py")
 	editStatement := ""
 	if edit {
@@ -433,8 +466,11 @@ func fakeAgentRunner(t *testing.T, stopReason string, edit bool) string {
 	script := fmt.Sprintf(`#!/usr/bin/env python3
 import argparse
 import json
+import os
 from pathlib import Path
 
+assert os.environ["AWS_ACCESS_KEY_ID"] == "agent-key"
+assert "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI" not in os.environ
 parser = argparse.ArgumentParser()
 parser.add_argument("--request", required=True)
 parser.add_argument("--result", required=True)
@@ -455,6 +491,94 @@ Path(args.result).write_text(json.dumps({
 		t.Fatal(err)
 	}
 	return "python3 " + runnerPath
+}
+
+func fakeSTS(t *testing.T, response string, exitCode int) string {
+	t.Helper()
+	dir := t.TempDir()
+	argsPath := filepath.Join(dir, "args.json")
+	script := fmt.Sprintf(`#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+Path(%q).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
+print(%q)
+sys.exit(%d)
+`, argsPath, response, exitCode)
+	if err := os.WriteFile(filepath.Join(dir, "aws"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv(AgentRoleARNEnv, "arn:aws:iam::123456789012:role/example-agent")
+	return argsPath
+}
+
+func TestAssumeAgentRoleRequiresRole(t *testing.T) {
+	t.Setenv(AgentRoleARNEnv, "")
+	_, err := assumeAgentRole(context.Background())
+	if err == nil || !strings.Contains(err.Error(), AgentRoleARNEnv) {
+		t.Fatalf("assumeAgentRole() error = %v, want missing role", err)
+	}
+}
+
+func TestAssumeAgentRoleUsesConfiguredRole(t *testing.T) {
+	argsPath := fakeSTS(t, `{"Credentials":{"AccessKeyId":"agent-key","SecretAccessKey":"agent-secret","SessionToken":"agent-token","Expiration":"2099-01-01T00:00:00Z"}}`, 0)
+	credentials, err := assumeAgentRole(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if credentials.AccessKeyID != "agent-key" {
+		t.Fatal("assumeAgentRole() did not return the assumed credentials")
+	}
+	args := readTestFile(t, filepath.Dir(argsPath), filepath.Base(argsPath))
+	for _, value := range []string{"sts", "assume-role", os.Getenv(AgentRoleARNEnv), "patch-fixer-agent", "900"} {
+		if !strings.Contains(args, fmt.Sprintf("%q", value)) {
+			t.Fatalf("STS args %s do not contain %q", args, value)
+		}
+	}
+}
+
+func TestAssumeAgentRoleDoesNotExposeResponseOnFailure(t *testing.T) {
+	fakeSTS(t, `{"Credentials":{"SecretAccessKey":"sensitive-value"}}`, 1)
+	_, err := assumeAgentRole(context.Background())
+	if err == nil || strings.Contains(err.Error(), "sensitive-value") {
+		t.Fatalf("assumeAgentRole() error = %v, want safe failure", err)
+	}
+}
+
+func TestAssumeAgentRoleRejectsExpiredCredentials(t *testing.T) {
+	fakeSTS(t, `{"Credentials":{"AccessKeyId":"agent-key","SecretAccessKey":"agent-secret","SessionToken":"agent-token","Expiration":"2000-01-01T00:00:00Z"}}`, 0)
+	_, err := assumeAgentRole(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "expire") {
+		t.Fatalf("assumeAgentRole() error = %v, want expired credentials", err)
+	}
+}
+
+func TestAssumeAgentRoleRespectsParentDeadline(t *testing.T) {
+	argsPath := fakeSTS(t, `{"Credentials":{"AccessKeyId":"agent-key","SecretAccessKey":"agent-secret","SessionToken":"agent-token","Expiration":"2099-01-01T00:00:00Z"}}`, 0)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	defer cancel()
+	if _, err := assumeAgentRole(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(readTestFile(t, filepath.Dir(argsPath), filepath.Base(argsPath))), &args); err != nil {
+		t.Fatal(err)
+	}
+	for i, arg := range args {
+		if arg == "--duration-seconds" {
+			sessionDuration, err := time.ParseDuration(args[i+1] + "s")
+			if err != nil {
+				t.Fatal(err)
+			}
+			deadline, _ := ctx.Deadline()
+			if sessionDuration < time.Until(deadline)+time.Minute || sessionDuration > 20*time.Minute+61*time.Second {
+				t.Fatalf("session duration = %s, want parent deadline plus startup margin", args[i+1])
+			}
+			return
+		}
+	}
+	t.Fatal("STS request has no duration")
 }
 
 func initializeRepository(t *testing.T, content string) string {
