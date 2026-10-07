@@ -16,7 +16,7 @@ CRDs are automatically generated from the [tinkerbell/tinkerbell](https://github
 
 Release tags keep the normal chart versioning flow. When `GIT_TAG` is a commit
 SHA between releases, the build wraps it in a valid SemVer for Helm packaging
-and also publishes a raw `GIT_TAG` alias for bundle release lookup.
+and bundle release lookup.
 
 ## Updating
 

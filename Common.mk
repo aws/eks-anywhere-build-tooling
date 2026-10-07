@@ -216,6 +216,7 @@ HELM_SOURCE_REPOSITORY?=$(REPO)
 HELM_SOURCE_IMAGE_REPO?=$(IMAGE_REPO)
 HELM_GIT_TAG?=$(GIT_TAG)
 HELM_TAG?=$(GIT_TAG)-$(GIT_HASH)
+HELM_BUNDLE_TAG?=
 HELM_USE_UPSTREAM_IMAGE?=false
 # HELM_DIRECTORY must be a relative path from project root to the directory that contains a chart
 HELM_DIRECTORY?=.
@@ -896,7 +897,7 @@ $(call FULL_CHART_TARGETS,build) : %/helm/build: %/helm/replace | $$(ENABLE_LOGG
 	@$(BUILD_LIB)/helm_build.sh $(OUTPUT_DIR) $(HELM_DESTINATION_REPOSITORY) $(HELM_CHART_FOLDER) $(BUILD_HELM_DEPENDENCIES)
 
 $(call FULL_CHART_TARGETS,push) : %/helm/push: %/helm/build | $$(ENABLE_LOGGING)
-	@$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_CHART_FOLDER) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST)
+	@$(BUILD_LIB)/helm_push.sh $(IMAGE_REPO) $(HELM_DESTINATION_REPOSITORY) $(HELM_CHART_FOLDER) $(HELM_TAG) $(GIT_TAG) $(OUTPUT_DIR) $(LATEST) "$(HELM_BUNDLE_TAG)"
 
 # Build helm chart
 .PHONY: helm/build
