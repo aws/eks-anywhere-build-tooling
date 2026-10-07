@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -25,7 +24,8 @@ type patchMetadata struct {
 }
 
 type patchSeed struct {
-	RejectFiles []string
+	RejectFiles  []string
+	MissingFiles []string
 }
 
 func parsePatchMetadata(ctx context.Context, patchText string) (patchMetadata, error) {
@@ -65,18 +65,11 @@ func parsePatchMetadata(ctx context.Context, patchText string) (patchMetadata, e
 	return metadata, nil
 }
 
-func patchFiles(patchText string) (map[string]bool, error) {
-	lines := strings.Split(patchText, "\n")
-	separator := -1
-	for index, line := range lines {
-		if line == "---" {
-			separator = index
-		}
+func patchFiles(ctx context.Context, patchText string) (map[string]bool, error) {
+	diffText, numstat, err := parsePatchDiff(ctx, patchText)
+	if err != nil {
+		return nil, err
 	}
-	if separator < 0 {
-		return nil, fmt.Errorf("mail patch is missing the format-patch separator")
-	}
-	diffText := strings.Join(lines[separator+1:], "\n")
 	for _, unsupported := range []string{"new file mode 120000", "old mode 120000", "GIT binary patch"} {
 		if strings.Contains(diffText, unsupported) {
 			return nil, fmt.Errorf("symlink and binary patches are not supported by the agent fixer")
@@ -87,19 +80,49 @@ func patchFiles(patchText string) (map[string]bool, error) {
 	}
 
 	files := make(map[string]bool)
-	for _, line := range strings.Split(diffText, "\n") {
-		if !strings.HasPrefix(line, "diff --git ") {
+	for _, record := range strings.Split(strings.TrimSuffix(numstat, "\x00"), "\x00") {
+		if record == "" {
 			continue
 		}
-		parts := splitGitHeader(line)
-		if len(parts) >= 4 {
-			files[strings.TrimPrefix(parts[3], "b/")] = true
+		fields := strings.SplitN(record, "\t", 3)
+		if len(fields) != 3 || fields[2] == "" {
+			return nil, fmt.Errorf("invalid git apply --numstat record %q", record)
 		}
+		files[filepath.ToSlash(fields[2])] = true
 	}
 	if len(files) == 0 {
 		return nil, fmt.Errorf("patch contains no diff files")
 	}
 	return files, nil
+}
+
+func parsePatchDiff(ctx context.Context, patchText string) (string, string, error) {
+	lines := strings.Split(patchText, "\n")
+	var lastErr error
+	for index, line := range lines {
+		if !strings.HasPrefix(line, "diff --git ") {
+			continue
+		}
+		diffText := strings.Join(lines[index:], "\n")
+		numstat, err := runCommand(
+			ctx,
+			os.TempDir(),
+			strings.NewReader(diffText),
+			nil,
+			"git",
+			"apply",
+			"--numstat",
+			"-z",
+		)
+		if err == nil {
+			return diffText, numstat, nil
+		}
+		lastErr = err
+	}
+	if lastErr != nil {
+		return "", "", fmt.Errorf("parsing patch file list: %v", lastErr)
+	}
+	return "", "", fmt.Errorf("patch contains no diff")
 }
 
 func prepareWorkspace(ctx context.Context, sourceRepo, parentDir string) (string, error) {
@@ -120,7 +143,7 @@ func prepareWorkspace(ctx context.Context, sourceRepo, parentDir string) (string
 }
 
 func seedWorkspace(ctx context.Context, workspacePath, patchPath string) (patchSeed, error) {
-	_, err := runCommandAllowFailure(ctx, workspacePath, nil, nil, "git", "apply", "--reject", "--whitespace=nowarn", patchPath)
+	output, err := runCommandAllowFailure(ctx, workspacePath, nil, nil, "git", "apply", "--reject", "--whitespace=nowarn", patchPath)
 	var rejects []string
 	walkErr := filepath.WalkDir(workspacePath, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -139,10 +162,17 @@ func seedWorkspace(ctx context.Context, workspacePath, patchPath string) (patchS
 		return patchSeed{}, walkErr
 	}
 	sort.Strings(rejects)
+	missingFiles := missingFilesFromApplyOutput(output)
 	if err != nil && len(rejects) == 0 {
-		return patchSeed{}, fmt.Errorf("unable to seed workspace from failed patch: %v", err)
+		hasChanges, statusErr := workspaceHasChanges(ctx, workspacePath)
+		if statusErr != nil {
+			return patchSeed{}, statusErr
+		}
+		if !hasChanges && len(missingFiles) == 0 {
+			return patchSeed{}, fmt.Errorf("unable to seed workspace from failed patch: %v", err)
+		}
 	}
-	return patchSeed{RejectFiles: rejects}, nil
+	return patchSeed{RejectFiles: rejects, MissingFiles: missingFiles}, nil
 }
 
 func removeRejectFiles(workspacePath string, rejectFiles []string) {
@@ -158,23 +188,13 @@ func generateCandidate(
 	outputPath string,
 	allowedFiles map[string]bool,
 ) ([]string, error) {
-	if _, err := runCommand(ctx, workspacePath, nil, nil, "git", "diff", "--check"); err != nil {
-		return nil, err
-	}
-	status, err := runCommand(ctx, workspacePath, nil, nil, "git", "status", "--porcelain")
+	editedFiles, err := changedFiles(ctx, workspacePath)
 	if err != nil {
 		return nil, err
-	}
-	var editedFiles []string
-	for _, line := range strings.Split(strings.TrimSuffix(status, "\n"), "\n") {
-		if len(line) > 3 {
-			editedFiles = append(editedFiles, filepath.ToSlash(line[3:]))
-		}
 	}
 	if len(editedFiles) == 0 {
 		return nil, nil
 	}
-	sort.Strings(editedFiles)
 	for _, editedFile := range editedFiles {
 		if !allowedFiles[editedFile] {
 			return nil, fmt.Errorf("candidate changed file outside allowlist: %s", editedFile)
@@ -182,6 +202,9 @@ func generateCandidate(
 	}
 
 	if _, err := runCommand(ctx, workspacePath, nil, nil, "git", "add", "--all"); err != nil {
+		return nil, err
+	}
+	if _, err := runCommand(ctx, workspacePath, nil, nil, "git", "diff", "--cached", "--check"); err != nil {
 		return nil, err
 	}
 	message := metadata.Subject
@@ -251,38 +274,77 @@ func pathEscapesRoot(path string) bool {
 	return cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator))
 }
 
-func splitGitHeader(line string) []string {
-	var parts []string
-	for len(line) > 0 {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			break
-		}
-		if line[0] != '"' {
-			if index := strings.IndexByte(line, ' '); index >= 0 {
-				parts = append(parts, line[:index])
-				line = line[index+1:]
-			} else {
-				parts = append(parts, line)
-				break
-			}
+func workspaceHasChanges(ctx context.Context, workspacePath string) (bool, error) {
+	files, err := changedFiles(ctx, workspacePath)
+	if err != nil {
+		return false, err
+	}
+	return len(files) > 0, nil
+}
+
+func changedFiles(ctx context.Context, workspacePath string) ([]string, error) {
+	status, err := runCommand(
+		ctx,
+		workspacePath,
+		nil,
+		nil,
+		"git",
+		"status",
+		"--porcelain=v1",
+		"-z",
+		"--untracked-files=all",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make(map[string]bool)
+	records := strings.Split(status, "\x00")
+	for index := 0; index < len(records); index++ {
+		record := records[index]
+		if record == "" {
 			continue
 		}
-		closed := false
-		for index := 1; index < len(line); index++ {
-			if line[index] == '"' && line[index-1] != '\\' {
-				value, err := strconv.Unquote(line[:index+1])
-				if err == nil {
-					parts = append(parts, value)
-				}
-				line = line[index+1:]
-				closed = true
-				break
-			}
+		if len(record) < 4 || record[2] != ' ' {
+			return nil, fmt.Errorf("invalid git status record %q", record)
 		}
-		if !closed {
-			break
+		statusCode := record[:2]
+		files[filepath.ToSlash(record[3:])] = true
+		if strings.ContainsAny(statusCode, "RC") {
+			index++
+			if index >= len(records) || records[index] == "" {
+				return nil, fmt.Errorf("git status rename record is missing its source path")
+			}
+			files[filepath.ToSlash(records[index])] = true
 		}
 	}
-	return parts
+
+	result := make([]string, 0, len(files))
+	for file := range files {
+		result = append(result, file)
+	}
+	sort.Strings(result)
+	return result, nil
+}
+
+func missingFilesFromApplyOutput(output string) []string {
+	missing := make(map[string]bool)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "error: ") {
+			continue
+		}
+		detail := strings.TrimPrefix(line, "error: ")
+		for _, suffix := range []string{": No such file or directory", ": does not exist in index"} {
+			if path, found := strings.CutSuffix(detail, suffix); found && path != "" {
+				missing[filepath.ToSlash(path)] = true
+			}
+		}
+	}
+	result := make([]string, 0, len(missing))
+	for file := range missing {
+		result = append(result, file)
+	}
+	sort.Strings(result)
+	return result
 }

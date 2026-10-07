@@ -243,6 +243,7 @@ Configuration:
 ```bash
 export PATCH_FIXER_ENABLED=true
 export PATCH_FIXER_AGENT_TIMEOUT=10m
+export PATCH_FIXER_TOTAL_TIMEOUT=45m
 export PATCH_FIXER_MODEL_ID=global.anthropic.claude-opus-5-5
 export PATCH_FIXER_METRICS_ENABLED=true
 ```

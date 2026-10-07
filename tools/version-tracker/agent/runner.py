@@ -83,6 +83,8 @@ class Workspace:
         normalized = candidate.relative_to(self.root).as_posix()
         if require_allowed and not self.is_edit_allowed(normalized):
             raise ValueError(f"editing {normalized} is not allowed")
+        if require_allowed and candidate.is_symlink():
+            raise ValueError(f"editing symlink {normalized} is not allowed")
 
         check_path = candidate if require_existing else candidate.parent
         while not check_path.exists():

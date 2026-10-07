@@ -20,11 +20,13 @@ const (
 	AgentCommandEnv = "PATCH_FIXER_AGENT_COMMAND"
 	ResultDirEnv    = "PATCH_FIXER_RESULT_DIR"
 	TimeoutEnv      = "PATCH_FIXER_AGENT_TIMEOUT"
+	TotalTimeoutEnv = "PATCH_FIXER_TOTAL_TIMEOUT"
 	ModelIDEnv      = "PATCH_FIXER_MODEL_ID"
 	DiagnosticsEnv  = "PATCH_FIXER_DIAGNOSTICS"
 
 	requestSchemaVersion  = 1
 	defaultTimeout        = 10 * time.Minute
+	defaultTotalTimeout   = 45 * time.Minute
 	defaultMaxTurns       = 20
 	defaultMaxTotalTokens = 1000000
 	defaultModelID        = "global.anthropic.claude-opus-5-5"
@@ -238,16 +240,25 @@ func agentCommand() []string {
 
 // Timeout returns the configured upper bound for one repair attempt.
 func Timeout() (time.Duration, error) {
-	value := strings.TrimSpace(os.Getenv(TimeoutEnv))
+	return configuredTimeout(TimeoutEnv, defaultTimeout)
+}
+
+// TotalTimeout returns the deadline for all repair attempts in one project upgrade.
+func TotalTimeout() (time.Duration, error) {
+	return configuredTimeout(TotalTimeoutEnv, defaultTotalTimeout)
+}
+
+func configuredTimeout(name string, fallback time.Duration) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return defaultTimeout, nil
+		return fallback, nil
 	}
 	if seconds, err := strconv.Atoi(value); err == nil {
 		return time.Duration(seconds) * time.Second, nil
 	}
 	duration, err := time.ParseDuration(value)
 	if err != nil {
-		return 0, fmt.Errorf("parsing %s: %v", TimeoutEnv, err)
+		return 0, fmt.Errorf("parsing %s: %v", name, err)
 	}
 	return duration, nil
 }

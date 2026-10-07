@@ -74,12 +74,48 @@ func TestParsePatchMetadata(t *testing.T) {
 
 func TestPatchFilesIgnoresDiffTextInCommitMessage(t *testing.T) {
 	patch := strings.Replace(testPatch, "Keep this explanatory body.", "diff --git a/Makefile b/Makefile\nKeep this explanatory body.", 1)
-	files, err := patchFiles(patch)
+	files, err := patchFiles(context.Background(), patch)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(files) != 1 || !files["main.go"] {
 		t.Fatalf("files = %#v, want main.go", files)
+	}
+}
+
+func TestPatchFilesHandlesDeletedDoubleDashLine(t *testing.T) {
+	repo := initializeTestRepository(t, map[string]string{
+		"first.txt":  "old-first\n",
+		"second.txt": "--\nkeep\n",
+	})
+	writeTestFile(t, repo, "first.txt", "new-first\n")
+	writeTestFile(t, repo, "second.txt", "keep\n")
+	runTestCommand(t, repo, "git", "add", ".")
+	runTestCommand(t, repo, "git", "commit", "-qm", "change both")
+
+	patch := runTestCommand(t, repo, "git", "format-patch", "-1", "--stdout", "--no-signature")
+	files, err := patchFiles(context.Background(), patch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 || !files["first.txt"] || !files["second.txt"] {
+		t.Fatalf("files = %#v, want first.txt and second.txt", files)
+	}
+}
+
+func TestPatchFilesHandlesSpacesInPath(t *testing.T) {
+	repo := initializeTestRepository(t, map[string]string{"file with spaces.txt": "old\n"})
+	writeTestFile(t, repo, "file with spaces.txt", "new\n")
+	runTestCommand(t, repo, "git", "add", ".")
+	runTestCommand(t, repo, "git", "commit", "-qm", "change spaced path")
+
+	patch := runTestCommand(t, repo, "git", "format-patch", "-1", "--stdout", "--no-signature")
+	files, err := patchFiles(context.Background(), patch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || !files["file with spaces.txt"] {
+		t.Fatalf("files = %#v, want spaced path", files)
 	}
 }
 
@@ -119,6 +155,35 @@ func TestGenerateCandidatePreservesAuthorAndSubject(t *testing.T) {
 	runTestCommand(t, repo, "git", "apply", "--check", "--reverse", outputPath)
 }
 
+func TestGenerateCandidateAllowsNewFileInNewDirectory(t *testing.T) {
+	repo := initializeRepository(t, "old\n")
+	if err := os.Mkdir(filepath.Join(repo, "newdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "newdir", "new.go"), []byte("package newdir\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := parsePatchMetadata(context.Background(), testPatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputPath := filepath.Join(t.TempDir(), "candidate.patch")
+
+	edited, err := generateCandidate(
+		context.Background(),
+		repo,
+		metadata,
+		outputPath,
+		map[string]bool{"newdir/new.go": true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edited) != 1 || edited[0] != "newdir/new.go" {
+		t.Fatalf("edited = %#v, want newdir/new.go", edited)
+	}
+}
+
 func TestGenerateCandidateRejectsUnexpectedFile(t *testing.T) {
 	repo := initializeRepository(t, "old\n")
 	if err := os.Mkdir(filepath.Join(repo, "pkg"), 0o755); err != nil {
@@ -143,6 +208,19 @@ func TestGenerateCandidateRejectsUnexpectedFile(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("generateCandidate() accepted unexpected file")
+	}
+}
+
+func TestChangedFilesHandlesRenameRecords(t *testing.T) {
+	repo := initializeTestRepository(t, map[string]string{"old name.txt": "content\n"})
+	runTestCommand(t, repo, "git", "mv", "old name.txt", "new name.txt")
+
+	files, err := changedFiles(context.Background(), repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 || files[0] != "new name.txt" || files[1] != "old name.txt" {
+		t.Fatalf("files = %#v, want old and new paths", files)
 	}
 }
 
@@ -181,6 +259,36 @@ func TestSeedWorkspaceAppliesCleanHunksAndRecordsRejects(t *testing.T) {
 	removeRejectFiles(repo, seed.RejectFiles)
 	if _, err := os.Stat(filepath.Join(repo, "two.txt.rej")); !os.IsNotExist(err) {
 		t.Fatalf("reject file still exists: %v", err)
+	}
+}
+
+func TestSeedWorkspaceAllowsMissingFileWithoutReject(t *testing.T) {
+	repo := initializeTestRepository(t, map[string]string{
+		"keep.txt":    "old-keep\n",
+		"removed.txt": "old-removed\n",
+	})
+	writeTestFile(t, repo, "keep.txt", "patched-keep\n")
+	writeTestFile(t, repo, "removed.txt", "patched-removed\n")
+	patchPath := filepath.Join(t.TempDir(), "change.patch")
+	if err := os.WriteFile(patchPath, []byte(runTestCommand(t, repo, "git", "diff", "--binary")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runTestCommand(t, repo, "git", "reset", "--hard", "HEAD")
+	runTestCommand(t, repo, "git", "rm", "removed.txt")
+	runTestCommand(t, repo, "git", "commit", "-qm", "remove file upstream")
+
+	seed, err := seedWorkspace(context.Background(), repo, patchPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(seed.RejectFiles) != 0 {
+		t.Fatalf("reject files = %#v, want none", seed.RejectFiles)
+	}
+	if len(seed.MissingFiles) != 1 || seed.MissingFiles[0] != "removed.txt" {
+		t.Fatalf("missing files = %#v, want removed.txt", seed.MissingFiles)
+	}
+	if got := readTestFile(t, repo, "keep.txt"); got != "patched-keep\n" {
+		t.Fatalf("keep.txt = %q, want patched content", got)
 	}
 }
 
@@ -293,6 +401,17 @@ func TestRunTimesOut(t *testing.T) {
 	}
 }
 
+func TestTotalTimeout(t *testing.T) {
+	t.Setenv(TotalTimeoutEnv, "90s")
+	timeout, err := TotalTimeout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if timeout != 90*time.Second {
+		t.Fatalf("TotalTimeout() = %s, want 90s", timeout)
+	}
+}
+
 func TestAgentEnvironmentExcludesGitHubToken(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "secret")
 	t.Setenv("AWS_REGION", "us-west-2")
@@ -340,12 +459,19 @@ Path(args.result).write_text(json.dumps({
 
 func initializeRepository(t *testing.T, content string) string {
 	t.Helper()
+	return initializeTestRepository(t, map[string]string{"main.go": content})
+}
+
+func initializeTestRepository(t *testing.T, files map[string]string) string {
+	t.Helper()
 	repo := t.TempDir()
 	runTestCommand(t, repo, "git", "init", "-q")
 	runTestCommand(t, repo, "git", "config", "user.name", "Test")
 	runTestCommand(t, repo, "git", "config", "user.email", "test@example.com")
-	writeTestFile(t, repo, "main.go", content)
-	runTestCommand(t, repo, "git", "add", "main.go")
+	for path, content := range files {
+		writeTestFile(t, repo, path, content)
+	}
+	runTestCommand(t, repo, "git", "add", ".")
 	runTestCommand(t, repo, "git", "commit", "-qm", "base")
 	return repo
 }
@@ -361,6 +487,9 @@ func runTestCommand(t *testing.T, dir, name string, args ...string) string {
 
 func writeTestFile(t *testing.T, root, relativePath, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(root, relativePath)), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(root, relativePath), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}

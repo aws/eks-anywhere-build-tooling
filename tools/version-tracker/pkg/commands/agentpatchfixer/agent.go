@@ -51,7 +51,7 @@ func execute(ctx context.Context, request Request, runDir string) (*Result, erro
 	if err != nil {
 		return nil, err
 	}
-	allowedFiles, err := patchFiles(patchText)
+	allowedFiles, err := patchFiles(ctx, patchText)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +106,9 @@ func execute(ctx context.Context, request Request, runDir string) (*Result, erro
 				"turns":        request.MaxTurns,
 				"total_tokens": request.MaxTotalTokens,
 			},
-			"reject_files": seed.RejectFiles,
-			"tools":        toolNames(),
+			"reject_files":  seed.RejectFiles,
+			"missing_files": seed.MissingFiles,
+			"tools":         toolNames(),
 		}); err != nil {
 			return nil, err
 		}
@@ -175,6 +176,10 @@ func buildPrompt(
 	if rejects == "" {
 		rejects = "(none)"
 	}
+	missingFiles := strings.Join(seed.MissingFiles, ", ")
+	if missingFiles == "" {
+		missingFiles = "(none)"
+	}
 	return fmt.Sprintf(
 		"Goal: repair this failed patch without changing unrelated business behavior.\n"+
 			"Project: %s\nOld revision: %s\nNew revision: %s\nFailed patch: %s\n"+
@@ -182,7 +187,9 @@ func buildPrompt(
 			"Original author: %s <%s>\nOriginal subject: %s\nPatch application error:\n%s\n\n"+
 			"Git already applied every clean hunk from the original patch to this isolated checkout.\n"+
 			"Reject files that still need resolution: %s\n"+
-			"Read the reject files and relevant current file ranges first. Preserve the pre-applied changes "+
+			"Patch targets missing from the current checkout: %s\n"+
+			"Read the reject files and relevant current file ranges first. For missing targets, search for the "+
+			"current location or determine whether the original intent is obsolete. Preserve the pre-applied changes "+
 			"and resolve only the rejected intent. For large rejected sections, use replace_lines in small "+
 			"ranges instead of embedding entire old and new files in replace_text. Leave the checkout unchanged "+
 			"if the target already satisfies or supersedes the intent. Review the final diff once and finish.",
@@ -196,6 +203,7 @@ func buildPrompt(
 		metadata.Subject,
 		boundedTail(request.FailureOutput, 12000),
 		rejects,
+		missingFiles,
 	)
 }
 

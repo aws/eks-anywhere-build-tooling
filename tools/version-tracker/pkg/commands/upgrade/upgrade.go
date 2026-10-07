@@ -50,10 +50,6 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 	failedSteps := map[string]error{}
 
 	projectName := upgradeOptions.ProjectName
-	if !shouldRunUpgradeInBuild() {
-		logger.Info("Skipping duplicate upgrade in paired ARM64 batch child", "project", projectName)
-		return nil
-	}
 
 	// Get org and repository name from project name.
 	projectOrg := strings.Split(projectName, "/")[0]
@@ -392,6 +388,13 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 						patchesWarningComment = formatPatchFailureDetails(appliedPatchesCount, totalPatchCount, failedPatch, applyFailedFiles)
 
 						if isPatchConflictOutput(patchFailureOutput) {
+							totalRepairTimeout, timeoutErr := agentpatchfixer.TotalTimeout()
+							if timeoutErr != nil {
+								return timeoutErr
+							}
+							repairCtx, cancelRepair := context.WithTimeout(context.Background(), totalRepairTimeout)
+							defer cancelRepair()
+
 							emitPatchRepairMetric(
 								metricPatchConflictDetected,
 								projectName,
@@ -402,7 +405,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 								0,
 							)
 							routerStarted := time.Now()
-							projectResult, projectFixErr := repairProjectPatches(projectpatchfixer.Request{
+							projectResult, projectFixErr := repairProjectPatches(repairCtx, projectpatchfixer.Request{
 								ProjectName:    projectName,
 								UpstreamRepo:   filepath.Join(projectRootFilepath, projectRepo),
 								PatchesDir:     patchesDirectory,
@@ -507,7 +510,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 									0,
 								)
 								fixed, changedPatchPaths, fixErr := repairGenericPatchSeries(
-									context.Background(),
+									repairCtx,
 									projectName,
 									projectRootFilepath,
 									projectRepo,
@@ -1062,11 +1065,6 @@ func isPatchConflictOutput(output string) bool {
 		strings.Contains(output, constants.DoesNotExistInIndexMarker)
 }
 
-func shouldRunUpgradeInBuild() bool {
-	identifier := strings.TrimSpace(os.Getenv("CODEBUILD_BATCH_BUILD_IDENTIFIER"))
-	return !strings.HasSuffix(identifier, "_linux_arm64")
-}
-
 type patchRepairFailure struct {
 	cause          error
 	appliedPatches int
@@ -1140,6 +1138,9 @@ func repairGenericPatchSeries(
 				failedPatch:    fmt.Sprintf("Patch failed at `%s`", filepath.Base(failedPath)),
 				failedFiles:    slices.Clone(failedFiles),
 			}
+		}
+		if err := ctx.Err(); err != nil {
+			return false, nil, currentFailure(err)
 		}
 		attemptsByPatch[failedPath]++
 		if attemptsByPatch[failedPath] > 3 {
@@ -1430,12 +1431,12 @@ func updateChecksumsAttributionFiles(projectRootFilepath string, scrubCredential
 	return nil
 }
 
-func repairProjectPatches(request projectpatchfixer.Request) (projectpatchfixer.Result, error) {
+func repairProjectPatches(ctx context.Context, request projectpatchfixer.Request) (projectpatchfixer.Result, error) {
 	duration, err := agentpatchfixer.Timeout()
 	if err != nil {
 		return projectpatchfixer.Result{}, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	ctx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
 	return runProjectPatchFixer(ctx, request)
 }

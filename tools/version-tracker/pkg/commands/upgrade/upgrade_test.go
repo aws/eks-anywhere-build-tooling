@@ -91,17 +91,6 @@ func TestPatchesAppliedFromOutput(t *testing.T) {
 	}
 }
 
-func TestShouldRunUpgradeInBuildUsesCanonicalArchitecture(t *testing.T) {
-	t.Setenv("CODEBUILD_BATCH_BUILD_IDENTIFIER", "linuxkit_linuxkit_linux_arm64")
-	if shouldRunUpgradeInBuild() {
-		t.Fatal("shouldRunUpgradeInBuild() = true for paired arm64 build")
-	}
-	t.Setenv("CODEBUILD_BATCH_BUILD_IDENTIFIER", "kubernetes_autoscaler_1_36")
-	if !shouldRunUpgradeInBuild() {
-		t.Fatal("shouldRunUpgradeInBuild() = false for canonical autoscaler build")
-	}
-}
-
 func TestRepairProjectPatchesUsesConfiguredTimeout(t *testing.T) {
 	original := runProjectPatchFixer
 	runProjectPatchFixer = func(ctx context.Context, _ projectpatchfixer.Request) (projectpatchfixer.Result, error) {
@@ -114,12 +103,43 @@ func TestRepairProjectPatchesUsesConfiguredTimeout(t *testing.T) {
 	t.Setenv(agentpatchfixer.TimeoutEnv, "20ms")
 
 	start := time.Now()
-	_, err := repairProjectPatches(projectpatchfixer.Request{})
+	_, err := repairProjectPatches(context.Background(), projectpatchfixer.Request{})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("repairProjectPatches() error = %v, want context deadline exceeded", err)
 	}
 	if time.Since(start) > time.Second {
 		t.Fatalf("timeout took too long: %s", time.Since(start))
+	}
+}
+
+func TestRepairGenericPatchSeriesHonorsContext(t *testing.T) {
+	projectRoot, _, failedPatchPath, _ := patchCandidateFixture(t)
+	applied, _, failedFiles, failureOutput, applyErr := applyPatchesToRepo(projectRoot, "repo", 1)
+	if applyErr == nil {
+		t.Fatal("initial patch application unexpectedly succeeded")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	fixed, _, err := repairGenericPatchSeries(
+		ctx,
+		"example/project",
+		projectRoot,
+		"repo",
+		filepath.Dir(failedPatchPath),
+		"v1.0.0",
+		"v1.1.0",
+		"",
+		1,
+		applied,
+		failedFiles,
+		failureOutput,
+	)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("repairGenericPatchSeries() error = %v, want context canceled", err)
+	}
+	if fixed {
+		t.Fatal("repairGenericPatchSeries() fixed = true, want false")
 	}
 }
 

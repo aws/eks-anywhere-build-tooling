@@ -40,6 +40,19 @@ class RunnerTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 workspace.write_file("linked/new", "data")
 
+    def test_workspace_blocks_allowed_file_symlink(self):
+        with tempfile.TemporaryDirectory() as temp_dir, tempfile.TemporaryDirectory() as outside:
+            root = Path(temp_dir)
+            outside_path = Path(outside) / "target"
+            outside_path.write_text("outside\n", encoding="utf-8")
+            (root / "allowed").symlink_to(outside_path)
+            workspace = runner.Workspace(root, {"allowed"}, "patch")
+
+            with self.assertRaises(ValueError):
+                workspace.write_file("allowed", "changed\n")
+
+            self.assertEqual(outside_path.read_text(encoding="utf-8"), "outside\n")
+
     def test_workspace_replaces_line_range(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
