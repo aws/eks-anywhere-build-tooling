@@ -13,9 +13,20 @@ const systemPrompt = "Repair the semantic intent of a failed Git mail patch by e
 	"Preserve existing business logic except for the original patch's intended change. Read the original patch first, " +
 	"then inspect only the relevant current file ranges. If the target already satisfies or supersedes the patch intent, " +
 	"make no edits and explain the exact evidence. Otherwise prefer targeted replacements over rewriting unchanged content. " +
+	"For Dockerfiles, trace and preserve the complete intended stage graph, including FROM dependencies and named or " +
+	"numeric COPY --from consumers. If the original patch removes binary-build stages, remove their dependent FROM/COPY " +
+	"consumers as intended by the patch. Do not leave dangling stage references or stop after a partial transformation. " +
 	"Edit only explicitly allowed files. The harness preserves the original author, date, subject, and commit message; " +
-	"do not recreate commit metadata or emit patch text. Once the intent is satisfied, review git diff once, confirm no " +
-	"unrelated drift, and finish immediately."
+	"do not recreate commit metadata or emit patch text. " +
+	"Preserve patch-series order. Do not renumber or recreate mail headers; after validation the Go harness restores " +
+	"consistent [PATCH n/N] subject prefixes across the remaining series, including obsolete-patch removals. " +
+	"Once the intent is satisfied, review git diff once, confirm no " +
+	"unrelated drift, and finish immediately. Your final Summary must be exactly two short lines:\n" +
+	"Change: <semantic change/removal reason>\n" +
+	"Review: <non-obvious behavior/security/license risk to inspect, or original intent retained>\n" +
+	"If the patch is obsolete, state why its intent is already upstream or superseded. " +
+	"Do not include headings, file-by-file inventories, trivial edits, validation claims, logs, or secrets. " +
+	"The harness supplies validation separately. Do not claim to have run syntax, build, image, or runtime checks."
 
 type agentInvocation struct {
 	SchemaVersion  int      `json:"schema_version"`

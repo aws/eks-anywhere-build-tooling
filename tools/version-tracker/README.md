@@ -215,10 +215,36 @@ Projects with a registered deterministic repair strategy bypass the model
 entirely. Kubernetes autoscaler regenerates its cloud-provider and dependency
 patches from the current upstream source without making a model call.
 
-The upgrade replaces the failed patch only after the complete patch series
-applies successfully. Existing checksum, attribution, commit, and PR creation
-steps then run normally. A rejected candidate is discarded and the original
-patch is restored.
+The upgrade accepts a repair only after the complete patch series applies,
+attribution/checksum generation succeeds, and checksums verify. Repaired
+Dockerfiles also pass syntax checks. Projects that declare container images run
+`local-images`, or their project-specific validation target. Projects without
+container images record the image-build skip explicitly.
+Images are exported as local OCI archives for the builder's native architecture;
+validation does not push images or registry caches. Build credentials are
+removed from validation subprocesses.
+Hook validates its upstream kernel, udev, and acpid images. Its unchanged
+embedded-image packaging, which consumes registry images, remains outside this gate.
+
+Source-validation failures return to the bounded repair attempts. Other
+validation failures restore the original patches, CHECKSUMS, and attribution,
+while retaining version-bump metadata and explaining that the upgrade is
+incomplete. Rejected candidates remain in diagnostic artifacts.
+
+Both deterministic and AI repairs receive a four-line review comment. It names
+the substantive change, a review focus, and checks the harness actually ran:
+
+```text
+AI-assisted repair (1 patch): Rebased the base-image changes onto the new release.
+Review: Check retained runtime packages and Dockerfile stage dependencies.
+Validation: patch replay, Dockerfile syntax, attribution, checksums, native arm64 image build.
+Human review required.
+```
+
+After validation, the harness normalizes standard `[PATCH n/N]` subject prefixes
+across the remaining series. This is cosmetic formatting, not an acceptance
+check. Unsupported headers are preserved with a warning; patch filenames and
+semantic commit metadata are retained.
 
 Structured requests, results, and candidate patches are written under
 `patch-fixer-runs/`. The CodeBuild image currently provides Python 3.9, while

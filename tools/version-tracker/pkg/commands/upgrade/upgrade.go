@@ -43,9 +43,10 @@ var (
 // Run contains the business logic to execute the `upgrade` subcommand.
 func Run(upgradeOptions *types.UpgradeOptions) error {
 	var currentRevision, latestRevision, patchesWarningComment, patchFixRoute string
-	var isTrackedByCommitHash, patchApplySucceeded, patchFixGenerated, agentPatchFixGenerated bool
+	var isTrackedByCommitHash, patchApplySucceeded, patchFixGenerated bool
 	var totalPatchCount int
-	var updatedFiles, agentFixedPatchPaths []string
+	var updatedFiles []string
+	var repairReview patchReviewSummary
 	var pullRequest *gogithub.PullRequest
 	failedSteps := map[string]error{}
 
@@ -394,6 +395,43 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 							}
 							repairCtx, cancelRepair := context.WithTimeout(context.Background(), totalRepairTimeout)
 							defer cancelRepair()
+							repairState, snapshotErr := captureRepairState(
+								projectRootFilepath,
+								filepath.Join(projectRootFilepath, projectRepo),
+								patchesDirectory,
+								releaseBranch,
+								appliedPatchesCount,
+							)
+							if snapshotErr != nil {
+								return fmt.Errorf("saving project before patch repair: %w", snapshotErr)
+							}
+							validationDirectory, directoryErr := newRepairValidationDirectory(cwd, projectName)
+							if directoryErr != nil {
+								return directoryErr
+							}
+							var validation repairValidationResult
+							validationAttempt := 0
+							validateRepair := func(ctx context.Context) error {
+								dockerfiles, err := repairState.dockerfiles(ctx)
+								if err != nil {
+									return err
+								}
+								validationAttempt++
+								attemptDirectory := filepath.Join(validationDirectory, fmt.Sprintf("attempt-%d", validationAttempt))
+								if err := os.MkdirAll(attemptDirectory, 0o755); err != nil {
+									return fmt.Errorf("creating validation attempt: %w", err)
+								}
+								validation, err = validateRepairedProject(ctx, repairValidationRequest{
+									ProjectRoot:  projectRootFilepath,
+									UpstreamRepo: filepath.Join(projectRootFilepath, projectRepo),
+									RunDirectory: attemptDirectory,
+									Dockerfiles:  dockerfiles,
+								})
+								if evidenceErr := writeRepairValidationEvidence(attemptDirectory, validation, err); evidenceErr != nil {
+									return errors.Join(err, evidenceErr)
+								}
+								return err
+							}
 
 							emitPatchRepairMetric(
 								metricPatchConflictDetected,
@@ -450,9 +488,21 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 									projectRepo,
 									patchesDirectory,
 									projectResult.PatchesDir,
+									repairCtx,
 								)
+								if fixErr == nil && fixed {
+									fixErr = validateRepair(repairCtx)
+									if fixErr == nil {
+										changedPatchPaths = finishPatchNumbering(patchesDirectory, changedPatchPaths)
+									}
+								}
 								if fixErr != nil {
 									failedSteps["Patch application"] = fixErr
+									if comment, found := patchValidationRejectionComment(fixErr); found {
+										delete(failedSteps, "Patch application")
+										failedSteps["Repair validation"] = fixErr
+										patchesWarningComment = comment
+									}
 									logger.Info("Deterministic patch candidate validation failed", "project", projectName, "error", fixErr)
 									emitPatchRepairMetric(
 										metricPatchRepairFailed,
@@ -467,6 +517,11 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 									patchApplySucceeded = true
 									patchFixGenerated = true
 									patchFixRoute = "deterministic"
+									repairReview = patchReviewSummary{
+										Route:      patchFixRoute,
+										PatchCount: generatedPatchCount,
+										Validation: patchValidationSummary(validation),
+									}
 									totalPatchCount = generatedPatchCount
 									delete(failedSteps, "Patch application")
 									for _, changedPatchPath := range changedPatchPaths {
@@ -500,6 +555,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 								}
 							} else {
 								agentStarted := time.Now()
+								summaries := make(map[string]string)
 								emitPatchRepairMetric(
 									metricPatchRepairAttempted,
 									projectName,
@@ -522,6 +578,13 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 									appliedPatchesCount,
 									applyFailedFiles,
 									patchFailureOutput,
+									patchRepairOptions{
+										Validate:     validateRepair,
+										BaseRevision: repairState.baseRevision,
+										Record: func(path string, result *agentpatchfixer.Result) {
+											summaries[path] = result.Summary
+										},
+									},
 								)
 								if fixErr != nil {
 									logger.Info("Agent patch repair failed", "error", fixErr)
@@ -536,7 +599,11 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 									)
 									failedSteps["Patch application"] = fixErr
 									var repairFailure *patchRepairFailure
-									if errors.As(fixErr, &repairFailure) {
+									if comment, found := patchValidationRejectionComment(fixErr); found {
+										delete(failedSteps, "Patch application")
+										failedSteps["Repair validation"] = fixErr
+										patchesWarningComment = comment
+									} else if errors.As(fixErr, &repairFailure) {
 										patchesWarningComment = formatPatchFailureDetails(
 											repairFailure.appliedPatches,
 											repairFailure.totalPatches,
@@ -547,8 +614,19 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 								} else if fixed {
 									patchApplySucceeded = true
 									patchFixGenerated = true
-									agentPatchFixGenerated = true
 									patchFixRoute = "strands"
+									var reviewNotes []string
+									for _, path := range changedPatchPaths {
+										if summary := summaries[path]; summary != "" {
+											reviewNotes = append(reviewNotes, summary)
+										}
+									}
+									repairReview = patchReviewSummary{
+										Route:      patchFixRoute,
+										PatchCount: len(summaries),
+										Summary:    strings.Join(reviewNotes, "\n"),
+										Validation: patchValidationSummary(validation),
+									}
 									delete(failedSteps, "Patch application")
 									for _, changedPatchPath := range changedPatchPaths {
 										relativePath, relErr := filepath.Rel(buildToolingRepoPath, changedPatchPath)
@@ -556,7 +634,6 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 											return fmt.Errorf("getting agent patch relative path: %v", relErr)
 										}
 										updatedFiles = append(updatedFiles, relativePath)
-										agentFixedPatchPaths = append(agentFixedPatchPaths, relativePath)
 									}
 									logger.Info("Agent patch series validated", "patches_fixed", len(changedPatchPaths))
 									emitPatchRepairMetric(
@@ -578,6 +655,11 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 										"Strands repair produced no validated patch",
 										time.Since(agentStarted),
 									)
+								}
+							}
+							if !patchFixGenerated {
+								if restoreErr := repairState.restore(); restoreErr != nil {
+									return fmt.Errorf("restoring rejected patch repair: %w", restoreErr)
 								}
 							}
 						}
@@ -602,9 +684,12 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					}
 					if _, err := os.Stat(projectChecksumsFile); err == nil {
 						logger.Info("Updating project checksums and attribution files")
-						err = updateChecksumsAttributionFiles(projectRootFilepath, patchFixGenerated)
-						if err != nil {
-							failedSteps["Checksums and attribution generation"] = err
+						var generationErr error
+						if !patchFixGenerated {
+							generationErr = updateChecksumsAttributionFiles(projectRootFilepath, false)
+						}
+						if generationErr != nil {
+							failedSteps["Checksums and attribution generation"] = generationErr
 						} else {
 							updatedFiles = append(updatedFiles, projectChecksumsFileRelativePath)
 
@@ -666,6 +751,9 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 	}
 
 	if len(updatedFiles) > 0 {
+		if patchFixGenerated {
+			logger.Info("Patch repair review summary", "summary", formatPatchReviewComment(repairReview))
+		}
 		// Add all the updated files to the index.
 		err = git.Add(worktree, updatedFiles)
 		if err != nil {
@@ -708,10 +796,10 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 					0,
 				)
 			}
-			if agentPatchFixGenerated {
-				comment := formatAgentPatchReviewComment(agentFixedPatchPaths)
+			if patchFixGenerated {
+				comment := formatPatchReviewComment(repairReview)
 				if err := github.AddCommentOnPR(client, baseRepoOwner, comment, pullRequest); err != nil {
-					return fmt.Errorf("commenting AI-assisted patch repair on pull request [%s]: %v", *pullRequest.HTMLURL, err)
+					return fmt.Errorf("commenting patch repair on pull request [%s]: %v", *pullRequest.HTMLURL, err)
 				}
 			}
 		} else {
@@ -723,7 +811,7 @@ func Run(upgradeOptions *types.UpgradeOptions) error {
 		var failedStepsList []string
 		var errorsList []string
 		for step, err := range failedSteps {
-			if step == "Patch application" {
+			if step == "Patch application" || step == "Repair validation" {
 				step = fmt.Sprintf("%s\n%s", step, patchesWarningComment)
 			}
 			failedStepsList = append(failedStepsList, fmt.Sprintf("* %s", step))
@@ -984,13 +1072,24 @@ func updateUpstreamProjectsTrackerFile(projectsList *types.ProjectsList, buildTo
 // applyPatchesToRepo runs a Make command to apply patches to the cloned repository of the project
 // being upgraded.
 func applyPatchesToRepo(projectRootFilepath, projectRepo string, totalPatchCount int) (int, string, []string, string, error) {
+	// The initial apply creates the checkout and needs the build's CodeCommit
+	// credential helper. Repaired-source replays use the scrubbed environment.
+	return applyPatchesToRepoWithEnvironment(context.Background(), projectRootFilepath, projectRepo, totalPatchCount, os.Environ())
+}
+
+func applyPatchesToRepoContext(ctx context.Context, projectRootFilepath, projectRepo string, totalPatchCount int) (int, string, []string, string, error) {
+	return applyPatchesToRepoWithEnvironment(ctx, projectRootFilepath, projectRepo, totalPatchCount, patchValidationEnvironment())
+}
+
+func applyPatchesToRepoWithEnvironment(ctx context.Context, projectRootFilepath, projectRepo string, totalPatchCount int, environment []string) (int, string, []string, string, error) {
 	var patchesApplied int
 	var failedPatch string
 	patchApplySucceeded := true
 
-	applyPatchesCommandSequence := fmt.Sprintf("make -C %s patch-repo", projectRootFilepath)
-	applyPatchesCmd := exec.Command("bash", "-c", applyPatchesCommandSequence)
-	applyPatchesOutput, err := command.ExecCommand(applyPatchesCmd)
+	if err := invalidatePatchCheckoutMarkers(filepath.Join(projectRootFilepath, projectRepo)); err != nil {
+		return 0, "", nil, "", err
+	}
+	applyPatchesOutput, err := runProjectMake(ctx, projectRootFilepath, "patch-repo", environment)
 	if err != nil {
 		if strings.Contains(applyPatchesOutput, constants.FailedPatchApplyMarker) || strings.Contains(applyPatchesOutput, constants.DoesNotExistInIndexMarker) {
 			patchApplySucceeded = false
@@ -1073,6 +1172,12 @@ type patchRepairFailure struct {
 	failedFiles    []string
 }
 
+type patchRepairOptions struct {
+	Validate     func(context.Context) error
+	Record       func(string, *agentpatchfixer.Result)
+	BaseRevision string
+}
+
 func (e *patchRepairFailure) Error() string {
 	return e.cause.Error()
 }
@@ -1094,7 +1199,12 @@ func repairGenericPatchSeries(
 	appliedPatchesCount int,
 	failedFiles []string,
 	failureOutput string,
+	repairOptions ...patchRepairOptions,
 ) (fixed bool, changedPatchPaths []string, returnErr error) {
+	options := patchRepairOptions{}
+	if len(repairOptions) > 0 {
+		options = repairOptions[0]
+	}
 	originalPaths, err := patchFilesInDirectory(patchesDirectory)
 	if err != nil {
 		return false, nil, err
@@ -1124,6 +1234,7 @@ func repairGenericPatchSeries(
 	}()
 
 	attemptsByPatch := make(map[string]int)
+	sourceFailures := make(map[string]error)
 	changed := make(map[string]struct{})
 	for {
 		failedPath, err := failedPatchPath(patchesDirectory, appliedPatchesCount)
@@ -1144,7 +1255,10 @@ func repairGenericPatchSeries(
 		}
 		attemptsByPatch[failedPath]++
 		if attemptsByPatch[failedPath] > 3 {
-			return false, nil, currentFailure(fmt.Errorf("agent patch fixer exceeded 3 attempts for %s", filepath.Base(failedPath)))
+			return false, nil, currentFailure(errors.Join(
+				fmt.Errorf("agent patch fixer exceeded 3 attempts for %s", filepath.Base(failedPath)),
+				sourceFailures[failedPath],
+			))
 		}
 
 		agentResult, err := runAgentPatchFixer(ctx, agentpatchfixer.Request{
@@ -1164,6 +1278,9 @@ func repairGenericPatchSeries(
 		}
 		if agentResult == nil {
 			return false, nil, currentFailure(fmt.Errorf("agent patch fixer produced no result"))
+		}
+		if options.Record != nil {
+			options.Record(failedPath, agentResult)
 		}
 
 		if err := abortPatchApplication(repoPath); err != nil {
@@ -1202,10 +1319,19 @@ func repairGenericPatchSeries(
 				changedPatchPaths = append(changedPatchPaths, path)
 			}
 			slices.Sort(changedPatchPaths)
+			if options.Validate != nil {
+				if err := options.Validate(ctx); err != nil {
+					return false, nil, currentFailure(err)
+				}
+			}
+			if options.Validate != nil {
+				changedPatchPaths = finishPatchNumbering(patchesDirectory, changedPatchPaths)
+			}
 			return true, changedPatchPaths, nil
 		}
 
-		appliedPatchesCount, _, failedFiles, failureOutput, err = applyPatchesToRepo(
+		appliedPatchesCount, _, failedFiles, failureOutput, err = applyPatchesToRepoContext(
+			ctx,
 			projectRootFilepath,
 			projectRepo,
 			totalPatchCount,
@@ -1216,6 +1342,32 @@ func repairGenericPatchSeries(
 				changedPatchPaths = append(changedPatchPaths, path)
 			}
 			slices.Sort(changedPatchPaths)
+			if options.Validate != nil {
+				validationErr := options.Validate(ctx)
+				if validationErr != nil {
+					var sourceErr *repairSourceValidationError
+					if !errors.As(validationErr, &sourceErr) {
+						return false, nil, currentFailure(validationErr)
+					}
+					appliedPatchesCount, totalPatchCount, err = prepareSourceValidationRetry(
+						ctx, repoPath, patchesDirectory, options.BaseRevision,
+						originalPatches, changedPatchPaths, sourceErr,
+					)
+					if err != nil {
+						return false, nil, currentFailure(errors.Join(validationErr, err))
+					}
+					failedFiles = []string{sourceErr.Path}
+					failureOutput = "Repaired source failed validation: " + validationErr.Error() +
+						"\nPreserve the original patch's semantic intent and correct this validation failure."
+					retryPath, pathErr := failedPatchPath(patchesDirectory, appliedPatchesCount)
+					if pathErr != nil {
+						return false, nil, currentFailure(pathErr)
+					}
+					sourceFailures[retryPath] = validationErr
+					continue
+				}
+				changedPatchPaths = finishPatchNumbering(patchesDirectory, changedPatchPaths)
+			}
 			return true, changedPatchPaths, nil
 		}
 		if !isPatchConflictOutput(failureOutput) {
@@ -1236,28 +1388,6 @@ func formatPatchFailureDetails(appliedPatches, totalPatches int, failedPatch str
 		failedPatch,
 		strings.Join(formattedFailedFiles, ","),
 	)
-}
-
-func formatAgentPatchReviewComment(patchPaths []string) string {
-	patchNames := make([]string, 0, len(patchPaths))
-	seen := make(map[string]bool, len(patchPaths))
-	for _, patchPath := range patchPaths {
-		name := filepath.Base(patchPath)
-		if !seen[name] {
-			seen[name] = true
-			patchNames = append(patchNames, name)
-		}
-	}
-	slices.Sort(patchNames)
-
-	var comment strings.Builder
-	comment.WriteString("## AI-assisted patch repair\n\n")
-	comment.WriteString("The patch fixer repaired the following patches using AI assistance:\n")
-	for _, patchName := range patchNames {
-		fmt.Fprintf(&comment, "- `%s`\n", patchName)
-	}
-	comment.WriteString("\nHuman review is required before merge to confirm the repaired patches preserve their original intent.")
-	return comment.String()
 }
 
 func writeFileAtomically(path string, content []byte, mode os.FileMode) error {
@@ -1286,7 +1416,12 @@ func applyGeneratedPatchDirectory(
 	projectRepo,
 	patchesDirectory,
 	generatedPatchesDirectory string,
+	validationContexts ...context.Context,
 ) (fixed bool, patchCount int, changedPatchPaths []string, returnErr error) {
+	ctx := context.Background()
+	if len(validationContexts) > 0 {
+		ctx = validationContexts[0]
+	}
 	originalPaths, err := patchFilesInDirectory(patchesDirectory)
 	if err != nil {
 		return false, 0, nil, err
@@ -1337,7 +1472,7 @@ func applyGeneratedPatchDirectory(
 		return false, 0, nil, err
 	}
 
-	appliedPatches, _, _, output, err := applyPatchesToRepo(projectRootFilepath, projectRepo, len(generatedPatches))
+	appliedPatches, _, _, output, err := applyPatchesToRepoContext(ctx, projectRootFilepath, projectRepo, len(generatedPatches))
 	if err != nil {
 		return false, 0, nil, fmt.Errorf("applying generated patch set: %v\nOutput: %s", err, output)
 	}
@@ -1361,6 +1496,9 @@ func applyGeneratedPatchDirectory(
 }
 
 func replacePatchDirectory(patchesDirectory string, patches map[string][]byte) error {
+	if err := os.MkdirAll(patchesDirectory, 0o755); err != nil {
+		return fmt.Errorf("creating patch directory: %w", err)
+	}
 	tempPaths := make(map[string]string, len(patches))
 	for name, content := range patches {
 		if filepath.Base(name) != name || !strings.HasSuffix(name, ".patch") {
@@ -1445,6 +1583,10 @@ func repairProjectPatches(ctx context.Context, request projectpatchfixer.Request
 func patchValidationEnvironment() []string {
 	sensitiveNames := map[string]bool{
 		"GITHUB_TOKEN":                           true,
+		"MAKEFLAGS":                              true,
+		"MFLAGS":                                 true,
+		"MAKEOVERRIDES":                          true,
+		"MAKEFILES":                              true,
 		"AWS_ACCESS_KEY_ID":                      true,
 		"AWS_SECRET_ACCESS_KEY":                  true,
 		"AWS_SESSION_TOKEN":                      true,
@@ -1452,6 +1594,13 @@ func patchValidationEnvironment() []string {
 		"AWS_CONTAINER_CREDENTIALS_FULL_URI":     true,
 		"AWS_CONTAINER_AUTHORIZATION_TOKEN":      true,
 		"AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE": true,
+		"AWS_PROFILE":                            true,
+		"AWS_DEFAULT_PROFILE":                    true,
+		"AWS_CONFIG_FILE":                        true,
+		"AWS_SHARED_CREDENTIALS_FILE":            true,
+		"AWS_WEB_IDENTITY_TOKEN_FILE":            true,
+		"AWS_ROLE_ARN":                           true,
+		"AWS_ROLE_SESSION_NAME":                  true,
 	}
 	environment := make([]string, 0, len(os.Environ())+2)
 	for _, entry := range os.Environ() {
@@ -1460,7 +1609,10 @@ func patchValidationEnvironment() []string {
 			environment = append(environment, entry)
 		}
 	}
-	environment = append(environment, "AWS_EC2_METADATA_DISABLED=true", "CODEBUILD_CI=false")
+	environment = append(environment,
+		"AWS_EC2_METADATA_DISABLED=true", "AWS_CONFIG_FILE=/dev/null",
+		"AWS_SHARED_CREDENTIALS_FILE=/dev/null", "CODEBUILD_CI=false",
+	)
 	return environment
 }
 
