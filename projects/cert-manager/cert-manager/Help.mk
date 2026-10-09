@@ -10,41 +10,9 @@
 clone-repo:  ## Clone upstream `cert-manager`
 checkout-repo: ## Checkout upstream tag based on value in GIT_TAG file
 
-##@ Binary Targets
-binaries: ## Build all binaries: `cert-manager-acmesolver cert-manager-cainjector cert-manager-controller cert-manager-webhook cert-manager-startupapicheck` for `linux/amd64 linux/arm64`
-_output/bin/cert-manager/linux-amd64/cert-manager-acmesolver: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-acmesolver`
-_output/bin/cert-manager/linux-amd64/cert-manager-cainjector: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-cainjector`
-_output/bin/cert-manager/linux-amd64/cert-manager-controller: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-controller`
-_output/bin/cert-manager/linux-amd64/cert-manager-webhook: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-webhook`
-_output/bin/cert-manager/linux-amd64/cert-manager-startupapicheck: ## Build `_output/bin/cert-manager/linux-amd64/cert-manager-startupapicheck`
-_output/bin/cert-manager/linux-arm64/cert-manager-acmesolver: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-acmesolver`
-_output/bin/cert-manager/linux-arm64/cert-manager-cainjector: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-cainjector`
-_output/bin/cert-manager/linux-arm64/cert-manager-controller: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-controller`
-_output/bin/cert-manager/linux-arm64/cert-manager-webhook: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-webhook`
-_output/bin/cert-manager/linux-arm64/cert-manager-startupapicheck: ## Build `_output/bin/cert-manager/linux-arm64/cert-manager-startupapicheck`
-
-##@ Image Targets
-local-images: ## Builds `cert-manager-acmesolver/images/amd64 cert-manager-cainjector/images/amd64 cert-manager-controller/images/amd64 cert-manager-webhook/images/amd64 cert-manager-startupapicheck/images/amd64` as oci tars for presumbit validation
-images: ## Pushes `cert-manager-acmesolver/images/push cert-manager-cainjector/images/push cert-manager-controller/images/push cert-manager-webhook/images/push cert-manager-startupapicheck/images/push` to IMAGE_REPO
-cert-manager-acmesolver/images/amd64: ## Builds/pushes `cert-manager-acmesolver/images/amd64`
-cert-manager-cainjector/images/amd64: ## Builds/pushes `cert-manager-cainjector/images/amd64`
-cert-manager-controller/images/amd64: ## Builds/pushes `cert-manager-controller/images/amd64`
-cert-manager-webhook/images/amd64: ## Builds/pushes `cert-manager-webhook/images/amd64`
-cert-manager-startupapicheck/images/amd64: ## Builds/pushes `cert-manager-startupapicheck/images/amd64`
-cert-manager-acmesolver/images/push: ## Builds/pushes `cert-manager-acmesolver/images/push`
-cert-manager-cainjector/images/push: ## Builds/pushes `cert-manager-cainjector/images/push`
-cert-manager-controller/images/push: ## Builds/pushes `cert-manager-controller/images/push`
-cert-manager-webhook/images/push: ## Builds/pushes `cert-manager-webhook/images/push`
-cert-manager-startupapicheck/images/push: ## Builds/pushes `cert-manager-startupapicheck/images/push`
-
 ##@ Helm Targets
 helm/build: ## Build helm chart
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
-
-##@ Checksum Targets
-checksums: ## Update checksums file based on currently built binaries.
-validate-checksums: # Validate checksums of currently built binaries against checksums file.
-all-checksums: ## Update checksums files for all RELEASE_BRANCHes.
 
 ##@ Run in Docker Targets
 run-in-docker/all-attributions: ## Run `all-attributions` in docker builder container
@@ -57,39 +25,11 @@ run-in-docker/checksums: ## Run `checksums` in docker builder container
 run-in-docker/clean: ## Run `clean` in docker builder container
 run-in-docker/clean-go-cache: ## Run `clean-go-cache` in docker builder container
 run-in-docker/validate-checksums: ## Run `validate-checksums` in docker builder container
-run-in-docker/cert-manager/cmd/acmesolver/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/acmesolver/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/cert-manager/cmd/cainjector/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/cainjector/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/cert-manager/cmd/controller/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/controller/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/cert-manager/cmd/webhook/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/webhook/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/cert-manager/cmd/startupapicheck/eks-anywhere-go-mod-download: ## Run `cert-manager/cmd/startupapicheck/eks-anywhere-go-mod-download` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-acmesolver: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-acmesolver` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-cainjector: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-cainjector` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-controller: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-controller` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-webhook: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-webhook` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-amd64/cert-manager-startupapicheck: ## Run `_output/bin/cert-manager/linux-amd64/cert-manager-startupapicheck` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-acmesolver: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-acmesolver` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-cainjector: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-cainjector` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-controller: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-controller` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-webhook: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-webhook` in docker builder container
-run-in-docker/_output/bin/cert-manager/linux-arm64/cert-manager-startupapicheck: ## Run `_output/bin/cert-manager/linux-arm64/cert-manager-startupapicheck` in docker builder container
-run-in-docker/_output/cert-manager-acmesolver/attribution/go-license.csv: ## Run `_output/cert-manager-acmesolver/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/cert-manager-cainjector/attribution/go-license.csv: ## Run `_output/cert-manager-cainjector/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/cert-manager-controller/attribution/go-license.csv: ## Run `_output/cert-manager-controller/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/cert-manager-webhook/attribution/go-license.csv: ## Run `_output/cert-manager-webhook/attribution/go-license.csv` in docker builder container
-run-in-docker/_output/cert-manager-startupapicheck/attribution/go-license.csv: ## Run `_output/cert-manager-startupapicheck/attribution/go-license.csv` in docker builder container
 
 ##@ Artifact Targets
 tarballs: ## Create tarballs by calling build/lib/simple_create_tarballs.sh unless SIMPLE_CREATE_TARBALLS=false, then tarballs must be defined in project Makefile
 s3-artifacts: # Prepare ARTIFACTS_PATH folder structure with tarballs/manifests/other items to be uploaded to s3
 upload-artifacts: # Upload tarballs and other artifacts from ARTIFACTS_PATH to S3
-
-##@ License Targets
-gather-licenses: ## Helper to call $(GATHER_LICENSES_TARGETS) which gathers all licenses
-attribution: ## Generates attribution from licenses gathered during `gather-licenses`.
-attribution-pr: ## Generates PR to update attribution files for projects
-attribution-checksums: ## Update attribution and checksums files.
-all-attributions: ## Update attribution files for all RELEASE_BRANCHes.
-all-attributions-checksums: ## Update attribution and checksums files for all RELEASE_BRANCHes.
 
 ##@ Clean Targets
 clean: ## Removes source and _output directory
@@ -115,6 +55,6 @@ patch-for-dep-update: ## After bumping dep in go.mod file and updating vendor, g
 create-ecr-repos: ## Create repos in ECR for project images for local testing
 
 ##@ Build Targets
-build: ## Called via prow presubmit, calls `github-rate-limit-pre validate-checksums attribution local-images helm/build upload-artifacts attribution-pr github-rate-limit-post`
-release: ## Called via prow postsubmit + release jobs, calls `validate-checksums images helm/push upload-artifacts`
+build: ## Called via prow presubmit, calls `helm/build upload-artifacts`
+release: ## Called via prow postsubmit + release jobs, calls `helm/push upload-artifacts`
 ########### END GENERATED ###########################
