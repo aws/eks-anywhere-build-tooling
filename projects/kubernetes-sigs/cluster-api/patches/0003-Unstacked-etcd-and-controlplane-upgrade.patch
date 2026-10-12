@@ -1,4 +1,4 @@
-From 432a6149ad0f24ec885a19c052615b9954ac07e8 Mon Sep 17 00:00:00 2001
+From 046d2d081ff0d882b47c2ce30ba5a5b9ef4eae07 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
 Subject: [PATCH] Unstacked etcd and controlplane upgrade
@@ -165,7 +165,7 @@ index dbaf275dc..6ffec0737 100644
 +	return unstructured.SetNestedStringMap(externalEtcd.UnstructuredContent(), annotations, "metadata", "annotations")
 +}
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index a0a3bb403..d0333451c 100644
+index 3aff2c564..c91568562 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -26,6 +26,7 @@ import (
@@ -176,7 +176,7 @@ index a0a3bb403..d0333451c 100644
  	"github.com/pkg/errors"
  	"go.uber.org/zap"
  	corev1 "k8s.io/api/core/v1"
-@@ -213,28 +214,12 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -218,28 +219,12 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  		return ctrl.Result{}, err
  	}
  	if cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
@@ -208,7 +208,7 @@ index a0a3bb403..d0333451c 100644
  		}
  	}
  
-@@ -555,6 +540,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+@@ -560,6 +545,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
  		// NOTE: we are checking the condition already exists in order to avoid to set this condition at the first
  		// reconciliation/before a rolling upgrade actually starts.
  		if v1beta1conditions.Has(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateV1Beta1Condition) {
@@ -234,7 +234,7 @@ index a0a3bb403..d0333451c 100644
  			v1beta1conditions.MarkTrue(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateV1Beta1Condition)
  		}
  	}
-@@ -1744,3 +1748,76 @@ func (r *KubeadmControlPlaneReconciler) ensureCertificatesOwnerRef(ctx context.C
+@@ -1782,3 +1786,76 @@ func (r *KubeadmControlPlaneReconciler) ensureCertificatesOwnerRef(ctx context.C
  	}
  	return nil
  }
@@ -312,7 +312,7 @@ index a0a3bb403..d0333451c 100644
 +	return len(endpoints) == 0 || len(endpoints) == 1 && endpoints[0] == ""
 +}
 diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
-index 0e0bfe1a7..a2bedaa90 100644
+index f00b7ca3c..f1ac55ef0 100644
 --- a/controlplane/kubeadm/internal/controllers/controller_test.go
 +++ b/controlplane/kubeadm/internal/controllers/controller_test.go
 @@ -25,6 +25,7 @@ import (
@@ -331,7 +331,7 @@ index 0e0bfe1a7..a2bedaa90 100644
  	"sigs.k8s.io/cluster-api/util/certs"
  	"sigs.k8s.io/cluster-api/util/collections"
  	"sigs.k8s.io/cluster-api/util/conditions"
-@@ -3489,9 +3491,9 @@ func TestKubeadmControlPlaneReconciler_reconcileEtcdMembers(t *testing.T) {
+@@ -3579,9 +3581,9 @@ func TestKubeadmControlPlaneReconciler_reconcileEtcdMembers(t *testing.T) {
  		t.Run(tt.name, func(t *testing.T) {
  			g := NewWithT(t)
  
@@ -341,9 +341,9 @@ index 0e0bfe1a7..a2bedaa90 100644
 -				Workload: &workloadCluster,
 +				Workload: workloadCluster,
  			})
- 			tt.controlPlane.EtcdMembers = append(etcdMembers(tt.controlPlane.Machines), tt.additionalEtcdMembers...)
- 
-@@ -4493,6 +4495,214 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
+ 			tt.controlPlane.EtcdMembers = append(tt.etcdMembers, tt.additionalEtcdMembers...)
+ 			if tt.etcdMembers == nil {
+@@ -4587,6 +4589,214 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
  	})
  }
  
@@ -559,10 +559,10 @@ index 0e0bfe1a7..a2bedaa90 100644
  	c := &clusterv1.Cluster{
  		ObjectMeta: metav1.ObjectMeta{
 diff --git a/controlplane/kubeadm/internal/workload_cluster.go b/controlplane/kubeadm/internal/workload_cluster.go
-index c4957e03b..730a55058 100644
+index 6674fcdf3..8022225b9 100644
 --- a/controlplane/kubeadm/internal/workload_cluster.go
 +++ b/controlplane/kubeadm/internal/workload_cluster.go
-@@ -71,6 +71,7 @@ type WorkloadCluster interface {
+@@ -72,6 +72,7 @@ type WorkloadCluster interface {
  	UpdateImageRepositoryInKubeadmConfigMap(imageRepository string) func(*bootstrapv1.ClusterConfiguration)
  	UpdateFeatureGatesInKubeadmConfigMap(kubeadmConfigSpec bootstrapv1.KubeadmConfigSpec, kubernetesVersion semver.Version) func(*bootstrapv1.ClusterConfiguration)
  	UpdateEtcdLocalInKubeadmConfigMap(localEtcd bootstrapv1.LocalEtcd) func(*bootstrapv1.ClusterConfiguration)
@@ -571,7 +571,7 @@ index c4957e03b..730a55058 100644
  	UpdateAPIServerInKubeadmConfigMap(apiServer bootstrapv1.APIServer) func(*bootstrapv1.ClusterConfiguration)
  	UpdateControllerManagerInKubeadmConfigMap(controllerManager bootstrapv1.ControllerManager) func(*bootstrapv1.ClusterConfiguration)
 diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd.go b/controlplane/kubeadm/internal/workload_cluster_etcd.go
-index c1785a87b..80724ca3a 100644
+index 52c54d3a4..38529a067 100644
 --- a/controlplane/kubeadm/internal/workload_cluster_etcd.go
 +++ b/controlplane/kubeadm/internal/workload_cluster_etcd.go
 @@ -19,6 +19,7 @@ package internal
@@ -598,18 +598,18 @@ index c1785a87b..80724ca3a 100644
  // Removing the last remaining member of the cluster is not supported.
  // Note: It is a responsibility of the caller to check if this operation doesn't lead to quorum loss.
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index fe5ac869b..b33aeefe0 100644
+index c51f065d2..0870daa92 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
-@@ -199,6 +199,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
- 
+@@ -200,6 +200,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  	alwaysReconcile := []clusterReconcileFunc{
+ 		r.reconcileCluster,
  		r.reconcileInfrastructure,
 +		r.reconcileEtcdCluster,
  		r.reconcileControlPlane,
  		r.getDescendants,
  	}
-@@ -226,7 +227,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -227,7 +228,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
  		r.reconcileV1Beta1ControlPlaneInitialized,
@@ -1208,5 +1208,5 @@ index 821fa49ba..9e6a641c8 100644
  func (in *InfrastructureClusterBuilder) DeepCopyInto(out *InfrastructureClusterBuilder) {
  	*out = *in
 -- 
-2.48.1
+2.34.1
 

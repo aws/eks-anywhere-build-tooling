@@ -1,7 +1,7 @@
-From d8651f92b4fb5b82b1e4c45e0e089ec56a38edcf Mon Sep 17 00:00:00 2001
+From bde6bf0bc3bfa4c4d435eef445645b6049b9a832 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 03/37] Add unstacked etcd support
+Subject: [PATCH] Add unstacked etcd support
 
 Unstacked etcd: API and config changes
 
@@ -604,10 +604,10 @@ index 9f0b51e70..c777418bf 100644
                  description: observedGeneration is the latest generation observed
                    by the controller.
 diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
-index af20d5eb5..1d9268488 100644
+index d66e48444..ea79242db 100644
 --- a/config/rbac/role.yaml
 +++ b/config/rbac/role.yaml
-@@ -54,6 +54,7 @@ rules:
+@@ -55,6 +55,7 @@ rules:
    - addons.cluster.x-k8s.io
    - bootstrap.cluster.x-k8s.io
    - controlplane.cluster.x-k8s.io
@@ -669,7 +669,7 @@ index 37f716312..25eeb3256 100644
 +  - watch
 \ No newline at end of file
 diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index 6361e1055..a0a3bb403 100644
+index a5ce93657..3aff2c564 100644
 --- a/controlplane/kubeadm/internal/controllers/controller.go
 +++ b/controlplane/kubeadm/internal/controllers/controller.go
 @@ -46,6 +46,7 @@ import (
@@ -678,9 +678,9 @@ index 6361e1055..a0a3bb403 100644
  	"sigs.k8s.io/cluster-api/controllers/clustercache"
 +	"sigs.k8s.io/cluster-api/controllers/external"
  	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
+ 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal/etcd"
  	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
- 	"sigs.k8s.io/cluster-api/feature"
-@@ -80,6 +81,7 @@ const (
+@@ -85,6 +86,7 @@ const (
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch;create;update;patch;delete
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machinepools,verbs=get;list;watch
  // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
@@ -688,7 +688,7 @@ index 6361e1055..a0a3bb403 100644
  
  // KubeadmControlPlaneReconciler reconciles a KubeadmControlPlane object.
  type KubeadmControlPlaneReconciler struct {
-@@ -210,6 +212,31 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+@@ -215,6 +217,31 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
  	if err != nil {
  		return ctrl.Result{}, err
  	}
@@ -720,7 +720,7 @@ index 6361e1055..a0a3bb403 100644
  
  	if isPaused, requeue, err := paused.EnsurePausedCondition(ctx, r.Client, cluster, kcp); err != nil || isPaused || requeue {
  		return ctrl.Result{}, err
-@@ -675,6 +702,21 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+@@ -680,6 +707,21 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
  	log := ctrl.LoggerFrom(ctx)
  	log.Info("Reconcile KubeadmControlPlane deletion")
  
@@ -742,7 +742,7 @@ index 6361e1055..a0a3bb403 100644
  	// If no control plane machines remain, remove the finalizer
  	if len(controlPlane.Machines) == 0 {
  		controlPlane.DeletingReason = controlplanev1.KubeadmControlPlaneDeletingDeletionCompletedReason
-@@ -696,14 +738,6 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+@@ -701,14 +743,6 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
  	// all the machines are deleted in parallel.
  	v1beta1conditions.SetAggregate(controlPlane.KCP, controlplanev1.MachinesReadyV1Beta1Condition, controlPlane.Machines.ConditionGetters(), v1beta1conditions.AddSourceRef())
  
@@ -758,7 +758,7 @@ index 6361e1055..a0a3bb403 100644
  	// Get all machine pools.
  	if feature.Gates.Enabled(feature.MachinePool) {
 diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index 7ae57aa13..fe5ac869b 100644
+index 872288999..c51f065d2 100644
 --- a/internal/controllers/cluster/cluster_controller.go
 +++ b/internal/controllers/cluster/cluster_controller.go
 @@ -19,6 +19,7 @@ package cluster
@@ -789,7 +789,7 @@ index 7ae57aa13..fe5ac869b 100644
  		Watches(
  			&clusterv1.MachineDeployment{},
  			handler.EnqueueRequestsFromMapFunc(r.machineDeploymentToCluster),
-@@ -221,6 +226,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -222,6 +227,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
  		r.reconcileV1Beta1ControlPlaneInitialized,
@@ -797,7 +797,7 @@ index 7ae57aa13..fe5ac869b 100644
  	)
  	return doReconcile(ctx, reconcileNormal, s)
  }
-@@ -242,6 +248,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+@@ -243,6 +249,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
  			clusterv1.ReadyV1Beta1Condition,
  			clusterv1.ControlPlaneReadyV1Beta1Condition,
  			clusterv1.InfrastructureReadyV1Beta1Condition,
@@ -805,7 +805,7 @@ index 7ae57aa13..fe5ac869b 100644
  		}},
  		patch.WithOwnedConditions{Conditions: []string{
  			clusterv1.PausedCondition,
-@@ -444,6 +451,68 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
+@@ -456,6 +463,68 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
  		}
  	}
  
@@ -874,7 +874,7 @@ index 7ae57aa13..fe5ac869b 100644
  	if cluster.Spec.InfrastructureRef.IsDefined() {
  		if s.infraCluster == nil {
  			if !s.infraClusterIsNotFound {
-@@ -501,6 +570,7 @@ type clusterDescendants struct {
+@@ -513,6 +582,7 @@ type clusterDescendants struct {
  	machinesToBeRemediated collections.Machines
  	unhealthyMachines      collections.Machines
  	machinePools           clusterv1.MachinePoolList
@@ -882,7 +882,7 @@ index 7ae57aa13..fe5ac869b 100644
  }
  
  // objectsPendingDeleteCount returns the number of descendants pending delete.
-@@ -532,6 +602,13 @@ func (c *clusterDescendants) objectsPendingDeleteNames(cluster *clusterv1.Cluste
+@@ -544,6 +614,13 @@ func (c *clusterDescendants) objectsPendingDeleteNames(cluster *clusterv1.Cluste
  			descendants = append(descendants, "Control plane Machines: "+clog.StringListToString(controlPlaneMachineNames))
  		}
  	}
@@ -896,7 +896,7 @@ index 7ae57aa13..fe5ac869b 100644
  	machineDeploymentNames := make([]string, len(c.machineDeployments.Items))
  	for i, machineDeployment := range c.machineDeployments.Items {
  		machineDeploymentNames[i] = machineDeployment.Name
-@@ -600,7 +677,8 @@ func (r *Reconciler) getDescendants(ctx context.Context, s *scope) (reconcile.Re
+@@ -612,7 +689,8 @@ func (r *Reconciler) getDescendants(ctx context.Context, s *scope) (reconcile.Re
  	// Split machines into control plane and worker machines
  	descendants.allMachines = collections.FromMachineList(&machines)
  	descendants.controlPlaneMachines = descendants.allMachines.Filter(collections.ControlPlaneMachines(cluster.Name))
@@ -906,7 +906,7 @@ index 7ae57aa13..fe5ac869b 100644
  	descendants.machinesToBeRemediated = descendants.allMachines.Filter(collections.IsUnhealthyAndOwnerRemediated)
  	descendants.unhealthyMachines = descendants.allMachines.Filter(collections.IsUnhealthy)
  
-@@ -646,6 +724,9 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
+@@ -658,6 +736,9 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
  		&c.machineSets,
  		toObjectList(c.workerMachines),
  	}
@@ -916,7 +916,7 @@ index 7ae57aa13..fe5ac869b 100644
  	if feature.Gates.Enabled(feature.MachinePool) {
  		lists = append([]client.ObjectList{&c.machinePools}, lists...)
  	}
-@@ -736,6 +817,36 @@ func (r *Reconciler) controlPlaneMachineToCluster(ctx context.Context, o client.
+@@ -748,6 +829,36 @@ func (r *Reconciler) controlPlaneMachineToCluster(ctx context.Context, o client.
  	}}
  }
  
@@ -1771,5 +1771,5 @@ index 992d574dd..48aae469c 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.48.1
+2.34.1
 
