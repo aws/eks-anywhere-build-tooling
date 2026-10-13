@@ -192,6 +192,7 @@ IMAGE_EXPORT_CACHE?=--export-cache type=registry,mode=max,image-manifest=true,oc
 BUILD_OCI_TARS?=false
 
 LOCAL_IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(image)/images/$(BUILDER_PLATFORM_ARCH))
+PATCH_VALIDATION_IMAGE_TARGET?=local-images
 IMAGE_TARGETS=$(foreach image,$(IMAGE_NAMES),$(if $(filter true,$(BUILD_OCI_TARS)),$(call IMAGE_TARGETS_FOR_NAME,$(image)),$(image)/images/push))
 
 # intentionally not setting a default verison, we do not want projects depending on a default

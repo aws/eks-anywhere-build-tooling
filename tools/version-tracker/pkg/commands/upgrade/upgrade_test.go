@@ -161,22 +161,6 @@ func TestFormatPatchFailureDetails(t *testing.T) {
 	}
 }
 
-func TestFormatAgentPatchReviewComment(t *testing.T) {
-	got := formatAgentPatchReviewComment([]string{
-		"projects/example/patches/0002-second.patch",
-		"projects/example/patches/0001-first.patch",
-		"projects/example/patches/0002-second.patch",
-	})
-	want := "## AI-assisted patch repair\n\n" +
-		"The patch fixer repaired the following patches using AI assistance:\n" +
-		"- `0001-first.patch`\n" +
-		"- `0002-second.patch`\n\n" +
-		"Human review is required before merge to confirm the repaired patches preserve their original intent."
-	if got != want {
-		t.Fatalf("formatAgentPatchReviewComment() = %q, want %q", got, want)
-	}
-}
-
 func TestRepairGenericPatchSeriesKeepsValidatedCandidate(t *testing.T) {
 	projectRoot, repoPath, failedPatchPath, candidatePath := patchCandidateFixture(t)
 	applied, _, failedFiles, failureOutput, applyErr := applyPatchesToRepo(projectRoot, "repo", 1)

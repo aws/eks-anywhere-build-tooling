@@ -125,6 +125,15 @@ func parsePatchDiff(ctx context.Context, patchText string) (string, string, erro
 	return "", "", fmt.Errorf("patch contains no diff")
 }
 
+// PatchFiles lists the upstream files a mail patch changes, including quoted paths.
+func PatchFiles(ctx context.Context, patchText string) ([]string, error) {
+	files, err := patchFiles(ctx, patchText)
+	if err != nil {
+		return nil, err
+	}
+	return sortedFiles(files), nil
+}
+
 func prepareWorkspace(ctx context.Context, sourceRepo, parentDir string) (string, error) {
 	target := filepath.Join(parentDir, "workspace")
 	if _, err := runCommand(ctx, parentDir, nil, nil, "git", "clone", "--shared", "--no-checkout", sourceRepo, target); err != nil {

@@ -19,6 +19,7 @@ HOOK_ACPID_IMAGE_COMPONENT=tinkerbell/hook-acpid
 MKIMAGE_ISO_EFI_INITRD_IMAGE_COMPONENT=linuxkit/mkimage-iso-efi-initrd
 
 IMAGE_NAMES=hook-bootkit hook-docker hook-runc hook-containerd kernel hook-dind hook-embedded hook-udev hook-acpid
+PATCH_VALIDATION_IMAGE_TARGET=patch-validation-images
 
 # We are using this pattern of setting the dockerfile_folder instead of local to the target
 # because this project uses the combine-images target which overrides the dockerfile_folder
@@ -103,6 +104,12 @@ $(GATHER_LICENSES_TARGETS): | $(FIX_LICENSES_HOOK_BOOTKIT_TARGET) $(FIX_LICENSES
 # For local image builds we override to push to local registry.
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT=push=true
 %/images/amd64 %/images/arm64: IMAGE_OUTPUT_TYPE=image
+
+# Validate upstream Dockerfiles without entering the embedded-image packaging
+# path, which consumes registry images from DIND and other projects.
+.PHONY: patch-validation-images
+patch-validation-images:
+	$(MAKE) local-images "IMAGE_NAMES=$(IMAGES_USING_UPSTREAM_DOCKERFILES)"
 
 # hook-docker image required docker runtime.
 # We are using eks-distro-minimal-base-glibc as the base and builder to install docker.
