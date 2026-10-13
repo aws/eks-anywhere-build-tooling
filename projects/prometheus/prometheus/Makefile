@@ -44,9 +44,9 @@ include $(BASE_DIRECTORY)/Common.mk
 
 # Override to use AL2023 builder-base for Node.js v20 compatibility
 # AL2023 has GLIBC 2.34 which supports Node.js v20 (requires GLIBC >= 2.28)
-# Strip any existing suffix (e.g., .2) and append .2023
-# Example: standard-abc123.2 → standard-abc123.2023
-CURRENT_BUILDER_BASE_TAG := $(firstword $(subst ., ,$(CURRENT_BUILDER_BASE_TAG))).2023
+# Pinned in-repo so generated buildspecs don't change when the prow cluster's
+# builder-base tag moves.
+CURRENT_BUILDER_BASE_TAG := $(shell cat $(BASE_DIRECTORY)/BUILDER_BASE_AL2023_TAG_FILE)
 CHECKSUMS_BUILDSPEC_IMAGE=$(BASE_IMAGE_REPO)/builder-base:$(CURRENT_BUILDER_BASE_TAG)
 
 # Before running GO_MOD_DOWNLOAD_TARGETS, we need to generate web UI related
