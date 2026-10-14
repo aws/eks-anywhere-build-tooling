@@ -1,105 +1,14 @@
-From d8651f92b4fb5b82b1e4c45e0e089ec56a38edcf Mon Sep 17 00:00:00 2001
+From 2151e640afb98c3a7b0400fe03571c5b65ceb5f8 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 03/37] Add unstacked etcd support
+Subject: [PATCH 02/37] Add unstacked etcd support
 
-Unstacked etcd: API and config changes
-
-Unstacked etcd: Changes in CAPI core controllers
-
-This commit adds the following changes in the cluster controller:
-* A change in reconcileControlPlane to check if the cluster is using managed
-external etcd, and if etcd is not ready then pause the control plane provisioning.
-* A new phase in cluster controller's phases for reconciling the etcd cluster. If the
-etcd cluster is ready then this phase will resume control plane provisioning
-
-This commit also adds the following change in the machine controller:
-* The machine controller upon creation of the first etcd machine will save its IP.
-
-Unstacked etcd: Changes in KCP controller
-
-The KubeadmControlPlane controller will get the external etcd endpoints
-from the object referenced by cluster.spec.managedExternalEtcdRef.
-The validating webhook will allow the external etcd endpoints to be updated.
-
-Unstacked etcd: Change in docker infra provider
-
-Docker is the only infrastructure provider that performs a kubectl patch on the k8s
-node corresponding to a Machine. This needs to be skipped for etcd machines since they
-are not registered as nodes and do not run kubelet.
-
-Unstacked etcd: Ignore nodeRef check for etcd machines during clusterctl move
-
-Clusterctl before beginning the move checks if all CAPI objects are
-ready and provisioned. One of these checks is for Machine.Status.NodeRef field.
-This check needs to be skipped for etcd machines since they are not registered
-as Kubernetes nodes so they don't have a corresponding Node.
-
-Delete managed external etcd cluster last
-
-Update KCP controller to use renamed etcd endpoints field
-
-The field 'endpoint' on EtcdadmCluster's status has been renamed
-to 'endpoints'. This commit updates the KCP controller to use the
-renamed field
-
-cr https://code.amazon.com/reviews/CR-54310674
-
-Add external etcd api changes to v1beta1 capi CRDs
-
-Fix etcdMachine to cluster reconciler so it listens on Machine events
-
-cr: https://code.amazon.com/reviews/CR-56463335
-
-Add external etcd api to v1alpha4
-
-Fix watch on machine object for etcdMachine to cluster mapper
-
-While cherry-picking commits from 0.3.19 branch the watch got modified
-by mistake. This commit fixes it by changing it back to watching Machine
-objects.
-
-Retain update permission on etcdadmcluster for KCP controller
-
-KCP controller updates the etcdadmcluster object once KCP upgrade is completed.
-It needs update permission on etcdadmcluster object for this.
-We previously had added this permission, it got dropped while rebasing
-commits on the new 1.0.1 branch. This commit adds back the permission.
----
- api/core/v1beta1/cluster_types.go             |  14 +
- api/core/v1beta1/condition_consts.go          |  16 ++
- api/core/v1beta1/machine_types.go             |   2 +
- api/core/v1beta1/zz_generated.conversion.go   |   6 +
- api/core/v1beta1/zz_generated.deepcopy.go     |  10 +
- api/core/v1beta2/cluster_types.go             |  14 +
- api/core/v1beta2/condition_consts.go          |  19 ++
- api/core/v1beta2/machine_types.go             |   3 +
- api/core/v1beta2/zz_generated.deepcopy.go     |   1 +
- api/core/v1beta2/zz_generated.openapi.go      |  39 +++
- cmd/clusterctl/client/cluster/mover.go        |   5 +-
- .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 180 ++++++++++++
- config/rbac/role.yaml                         |   1 +
- controllers/external/util.go                  |  20 ++
- controlplane/kubeadm/config/rbac/role.yaml    |   9 +
- .../internal/controllers/controller.go        |  50 +++-
- .../controllers/cluster/cluster_controller.go | 115 +++++++-
- .../cluster/cluster_controller_phases.go      | 116 ++++++++
- .../cluster/cluster_controller_test.go        | 259 ++++++++++++++++++
- .../machine/machine_controller_noderef.go     |   8 +
- .../machine_controller_noderef_test.go        |  89 ++++++
- .../machine/machine_controller_phases.go      | 117 ++++++++
- .../machine/machine_controller_status.go      |   7 +
- util/collections/machine_filters.go           |  26 ++
- util/secret/certificates.go                   |   3 +
- util/secret/consts.go                         |   2 +
- util/util.go                                  |   6 +
- 27 files changed, 1126 insertions(+), 11 deletions(-)
 
 diff --git a/api/core/v1beta1/cluster_types.go b/api/core/v1beta1/cluster_types.go
-index ab232262d..6d2c76eed 100644
+index 77d304581153..14b15f33ffb1 100644
 --- a/api/core/v1beta1/cluster_types.go
 +++ b/api/core/v1beta1/cluster_types.go
-@@ -477,6 +477,11 @@ type ClusterSpec struct {
+@@ -476,6 +476,11 @@ type ClusterSpec struct {
  	// +optional
  	ControlPlaneRef *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
  
@@ -111,7 +20,7 @@ index ab232262d..6d2c76eed 100644
  	// infrastructureRef is a reference to a provider-specific resource that holds the details
  	// for provisioning infrastructure for a cluster in said provider.
  	// +optional
-@@ -1076,6 +1081,15 @@ type ClusterStatus struct {
+@@ -1075,6 +1080,15 @@ type ClusterStatus struct {
  	// +optional
  	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
  
@@ -128,7 +37,7 @@ index ab232262d..6d2c76eed 100644
  	// +optional
  	V1Beta2 *ClusterV1Beta2Status `json:"v1beta2,omitempty"`
 diff --git a/api/core/v1beta1/condition_consts.go b/api/core/v1beta1/condition_consts.go
-index 8e36313c7..a0568c262 100644
+index 8e36313c79bb..a0568c262e93 100644
 --- a/api/core/v1beta1/condition_consts.go
 +++ b/api/core/v1beta1/condition_consts.go
 @@ -282,6 +282,22 @@ const (
@@ -155,7 +64,7 @@ index 8e36313c7..a0568c262 100644
  const (
  	// TopologyReconciledCondition provides evidence about the reconciliation of a Cluster topology into
 diff --git a/api/core/v1beta1/machine_types.go b/api/core/v1beta1/machine_types.go
-index 5ec584c23..3281d23b5 100644
+index 10fa0062eb9c..e76c507a4b3f 100644
 --- a/api/core/v1beta1/machine_types.go
 +++ b/api/core/v1beta1/machine_types.go
 @@ -51,6 +51,8 @@ const (
@@ -167,67 +76,8 @@ index 5ec584c23..3281d23b5 100644
  	// PreDrainDeleteHookAnnotationPrefix annotation specifies the prefix we
  	// search each annotation for during the pre-drain.delete lifecycle hook
  	// to pause reconciliation of deletion. These hooks will prevent removal of
-diff --git a/api/core/v1beta1/zz_generated.conversion.go b/api/core/v1beta1/zz_generated.conversion.go
-index 4bd292dce..35f221f57 100644
---- a/api/core/v1beta1/zz_generated.conversion.go
-+++ b/api/core/v1beta1/zz_generated.conversion.go
-@@ -1595,6 +1595,7 @@ func autoConvert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, out
- 		return err
- 	}
- 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
-+	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
- 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
- 	// WARNING: in.Topology requires manual conversion: inconvertible types (*sigs.k8s.io/cluster-api/api/core/v1beta1.Topology vs sigs.k8s.io/cluster-api/api/core/v1beta2.Topology)
- 	out.AvailabilityGates = *(*[]v1beta2.ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
-@@ -1610,6 +1611,7 @@ func autoConvert_v1beta2_ClusterSpec_To_v1beta1_ClusterSpec(in *v1beta2.ClusterS
- 		return err
- 	}
- 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
-+	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
- 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
- 	// WARNING: in.Topology requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.Topology vs *sigs.k8s.io/cluster-api/api/core/v1beta1.Topology)
- 	out.AvailabilityGates = *(*[]ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
-@@ -1635,6 +1637,8 @@ func autoConvert_v1beta1_ClusterStatus_To_v1beta2_ClusterStatus(in *ClusterStatu
- 		out.Conditions = nil
- 	}
- 	out.ObservedGeneration = in.ObservedGeneration
-+	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
-+	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
- 	// WARNING: in.V1Beta2 requires manual conversion: does not exist in peer-type
- 	return nil
- }
-@@ -1657,6 +1661,8 @@ func autoConvert_v1beta2_ClusterStatus_To_v1beta1_ClusterStatus(in *v1beta2.Clus
- 	// WARNING: in.FailureDomains requires manual conversion: inconvertible types ([]sigs.k8s.io/cluster-api/api/core/v1beta2.FailureDomain vs sigs.k8s.io/cluster-api/api/core/v1beta1.FailureDomains)
- 	out.Phase = in.Phase
- 	out.ObservedGeneration = in.ObservedGeneration
-+	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
-+	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
- 	// WARNING: in.Deprecated requires manual conversion: does not exist in peer-type
- 	return nil
- }
-diff --git a/api/core/v1beta1/zz_generated.deepcopy.go b/api/core/v1beta1/zz_generated.deepcopy.go
-index 973774e85..b1a186dd1 100644
---- a/api/core/v1beta1/zz_generated.deepcopy.go
-+++ b/api/core/v1beta1/zz_generated.deepcopy.go
-@@ -538,6 +538,16 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
- 		*out = new(v1.ObjectReference)
- 		**out = **in
- 	}
-+	if in.ManagedExternalEtcdRef != nil {
-+		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
-+		*out = new(v1.ObjectReference)
-+		**out = **in
-+	}
-+	if in.ManagedExternalEtcdRef != nil {
-+		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
-+		*out = new(v1.ObjectReference)
-+		**out = **in
-+	}
- 	if in.InfrastructureRef != nil {
- 		in, out := &in.InfrastructureRef, &out.InfrastructureRef
- 		*out = new(v1.ObjectReference)
 diff --git a/api/core/v1beta2/cluster_types.go b/api/core/v1beta2/cluster_types.go
-index 9348ce5f5..70554603a 100644
+index b04aae626419..9bd126fc6159 100644
 --- a/api/core/v1beta2/cluster_types.go
 +++ b/api/core/v1beta2/cluster_types.go
 @@ -496,6 +496,11 @@ type ClusterSpec struct {
@@ -259,7 +109,7 @@ index 9348ce5f5..70554603a 100644
  	// +optional
  	Deprecated *ClusterDeprecatedStatus `json:"deprecated,omitempty"`
 diff --git a/api/core/v1beta2/condition_consts.go b/api/core/v1beta2/condition_consts.go
-index 23abc6c2b..fa7bda307 100644
+index 23abc6c2ba2e..fa7bda30703a 100644
 --- a/api/core/v1beta2/condition_consts.go
 +++ b/api/core/v1beta2/condition_consts.go
 @@ -213,3 +213,22 @@ const (
@@ -286,7 +136,7 @@ index 23abc6c2b..fa7bda307 100644
 +	EtcdHealthCheckFailedReason = "EtcdMemberHealthCheckFailed"
 +)
 diff --git a/api/core/v1beta2/machine_types.go b/api/core/v1beta2/machine_types.go
-index 77606a632..c53e5c3ff 100644
+index e21428b99a8e..200e1ad13531 100644
 --- a/api/core/v1beta2/machine_types.go
 +++ b/api/core/v1beta2/machine_types.go
 @@ -30,6 +30,9 @@ const (
@@ -299,324 +149,24 @@ index 77606a632..c53e5c3ff 100644
  	// ExcludeNodeDrainingAnnotation annotation explicitly skips node draining if set.
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
-diff --git a/api/core/v1beta2/zz_generated.deepcopy.go b/api/core/v1beta2/zz_generated.deepcopy.go
-index 4a7c37c12..19b436dbc 100644
---- a/api/core/v1beta2/zz_generated.deepcopy.go
-+++ b/api/core/v1beta2/zz_generated.deepcopy.go
-@@ -618,6 +618,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
- 	in.ClusterNetwork.DeepCopyInto(&out.ClusterNetwork)
- 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
- 	out.ControlPlaneRef = in.ControlPlaneRef
-+	out.ManagedExternalEtcdRef = in.ManagedExternalEtcdRef
- 	out.InfrastructureRef = in.InfrastructureRef
- 	in.Topology.DeepCopyInto(&out.Topology)
- 	if in.AvailabilityGates != nil {
-diff --git a/api/core/v1beta2/zz_generated.openapi.go b/api/core/v1beta2/zz_generated.openapi.go
-index 717fbf090..6302867a9 100644
---- a/api/core/v1beta2/zz_generated.openapi.go
-+++ b/api/core/v1beta2/zz_generated.openapi.go
-@@ -713,6 +713,22 @@ func schema_cluster_api_api_core_v1beta2_ClusterClassStatus(ref common.Reference
- 							Format:      "int64",
- 						},
- 					},
-+					"managedExternalEtcdInitialized": {
-+						SchemaProps: spec.SchemaProps{
-+							Description: "ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller, so remaining etcd members can lookup the address to join the cluster",
-+							Default:     false,
-+							Type:        []string{"boolean"},
-+							Format:      "",
-+						},
-+					},
-+					"managedExternalEtcdReady": {
-+						SchemaProps: spec.SchemaProps{
-+							Description: "ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned",
-+							Default:     false,
-+							Type:        []string{"boolean"},
-+							Format:      "",
-+						},
-+					},
- 					"deprecated": {
- 						SchemaProps: spec.SchemaProps{
- 							Description: "deprecated groups all the status fields that are deprecated and will be removed when all the nested field are removed.",
-@@ -1240,6 +1256,13 @@ func schema_cluster_api_api_core_v1beta2_ClusterSpec(ref common.ReferenceCallbac
- 							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference"),
- 						},
- 					},
-+					"managedExternalEtcdRef": {
-+						SchemaProps: spec.SchemaProps{
-+							Description: "ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details for provisioning an external etcd cluster",
-+							Default:     map[string]interface{}{},
-+							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference"),
-+						},
-+					},
- 					"infrastructureRef": {
- 						SchemaProps: spec.SchemaProps{
- 							Description: "infrastructureRef is a reference to a provider-specific resource that holds the details for provisioning infrastructure for a cluster in said provider.",
-@@ -1368,6 +1391,22 @@ func schema_cluster_api_api_core_v1beta2_ClusterStatus(ref common.ReferenceCallb
- 							Format:      "int64",
- 						},
- 					},
-+					"managedExternalEtcdInitialized": {
-+						SchemaProps: spec.SchemaProps{
-+							Description: "ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller, so remaining etcd members can lookup the address to join the cluster",
-+							Default:     false,
-+							Type:        []string{"boolean"},
-+							Format:      "",
-+						},
-+					},
-+					"managedExternalEtcdReady": {
-+						SchemaProps: spec.SchemaProps{
-+							Description: "ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned",
-+							Default:     false,
-+							Type:        []string{"boolean"},
-+							Format:      "",
-+						},
-+					},
- 					"deprecated": {
- 						SchemaProps: spec.SchemaProps{
- 							Description: "deprecated groups all the status fields that are deprecated and will be removed when all the nested field are removed.",
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index b479535f4..aaaabcdf8 100644
+index e6af177b383f..bb9d79b3c94e 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -272,7 +272,10 @@ func (o *objectMover) checkProvisioningCompleted(ctx context.Context, graph *obj
  		}
  
  		if !machineObj.Status.NodeRef.IsDefined() {
--			errList = append(errList, errors.Errorf("cannot start the move operation while %q %s/%s is still provisioning the node", machineObj.GroupVersionKind(), machineObj.GetNamespace(), machineObj.GetName()))
+-			errList = append(errList, pkgerrors.Errorf("cannot start the move operation while %q %s/%s is still provisioning the node", machineObj.GroupVersionKind(), machineObj.GetNamespace(), machineObj.GetName()))
 +			_, isEtcdMachine := machineObj.Labels[clusterv1.MachineEtcdClusterLabelName]
-+			if machineObj.Status.NodeRef.IsDefined() && !isEtcdMachine {
-+				errList = append(errList, errors.Errorf("cannot start the move operation while %q %s/%s is still provisioning the node", machineObj.GroupVersionKind(), machineObj.GetNamespace(), machineObj.GetName()))
++			if !isEtcdMachine {
++				errList = append(errList, pkgerrors.Errorf("cannot start the move operation while %q %s/%s is still provisioning the node", machineObj.GroupVersionKind(), machineObj.GetNamespace(), machineObj.GetName()))
 +			}
  		}
  	}
  
-diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 9f0b51e70..c777418bf 100644
---- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-+++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -250,6 +250,96 @@ spec:
-                     type: string
-                 type: object
-                 x-kubernetes-map-type: atomic
-+              managedExternalEtcdRef:
-+                description: |-
-+                  ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
-+                  for provisioning an external etcd cluster
-+                properties:
-+                  apiVersion:
-+                    description: API version of the referent.
-+                    type: string
-+                  fieldPath:
-+                    description: |-
-+                      If referring to a piece of an object instead of an entire object, this string
-+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-+                      For example, if the object reference is to a container within a pod, this would take on a value like:
-+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-+                      the event) or if no container name is specified "spec.containers[2]" (container with
-+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-+                      referencing a part of an object.
-+                    type: string
-+                  kind:
-+                    description: |-
-+                      Kind of the referent.
-+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-+                    type: string
-+                  name:
-+                    description: |-
-+                      Name of the referent.
-+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-+                    type: string
-+                  namespace:
-+                    description: |-
-+                      Namespace of the referent.
-+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-+                    type: string
-+                  resourceVersion:
-+                    description: |-
-+                      Specific resourceVersion to which this reference is made, if any.
-+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-+                    type: string
-+                  uid:
-+                    description: |-
-+                      UID of the referent.
-+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-+                    type: string
-+                type: object
-+                x-kubernetes-map-type: atomic
-+              managedExternalEtcdRef:
-+                description: |-
-+                  ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
-+                  for provisioning an external etcd cluster
-+                properties:
-+                  apiVersion:
-+                    description: API version of the referent.
-+                    type: string
-+                  fieldPath:
-+                    description: |-
-+                      If referring to a piece of an object instead of an entire object, this string
-+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-+                      For example, if the object reference is to a container within a pod, this would take on a value like:
-+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-+                      the event) or if no container name is specified "spec.containers[2]" (container with
-+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-+                      referencing a part of an object.
-+                    type: string
-+                  kind:
-+                    description: |-
-+                      Kind of the referent.
-+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-+                    type: string
-+                  name:
-+                    description: |-
-+                      Name of the referent.
-+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-+                    type: string
-+                  namespace:
-+                    description: |-
-+                      Namespace of the referent.
-+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-+                    type: string
-+                  resourceVersion:
-+                    description: |-
-+                      Specific resourceVersion to which this reference is made, if any.
-+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-+                    type: string
-+                  uid:
-+                    description: |-
-+                      UID of the referent.
-+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-+                    type: string
-+                type: object
-+                x-kubernetes-map-type: atomic
-               paused:
-                 description: paused can be used to prevent controllers from processing
-                   the Cluster and all its associated objects.
-@@ -1602,6 +1692,15 @@ spec:
-                 description: infrastructureReady is the state of the infrastructure
-                   provider.
-                 type: boolean
-+              managedExternalEtcdInitialized:
-+                description: |-
-+                  ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
-+                  so remaining etcd members can lookup the address to join the cluster
-+                type: boolean
-+              managedExternalEtcdReady:
-+                description: ManagedExternalEtcdReady indicates external etcd cluster
-+                  is fully provisioned
-+                type: boolean
-               observedGeneration:
-                 description: observedGeneration is the latest generation observed
-                   by the controller.
-@@ -2039,6 +2138,78 @@ spec:
-                 - kind
-                 - name
-                 type: object
-+              managedExternalEtcdRef:
-+                description: |-
-+                  ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
-+                  for provisioning an external etcd cluster
-+                properties:
-+                  apiGroup:
-+                    description: |-
-+                      apiGroup is the group of the resource being referenced.
-+                      apiGroup must be fully qualified domain name.
-+                      The corresponding version for this reference will be looked up from the contract
-+                      labels of the corresponding CRD of the resource being referenced.
-+                    maxLength: 253
-+                    minLength: 1
-+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-+                    type: string
-+                  kind:
-+                    description: |-
-+                      kind of the resource being referenced.
-+                      kind must consist of alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character.
-+                    maxLength: 63
-+                    minLength: 1
-+                    pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
-+                    type: string
-+                  name:
-+                    description: |-
-+                      name of the resource being referenced.
-+                      name must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character.
-+                    maxLength: 253
-+                    minLength: 1
-+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-+                    type: string
-+                required:
-+                - apiGroup
-+                - kind
-+                - name
-+                type: object
-+              managedExternalEtcdRef:
-+                description: |-
-+                  ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
-+                  for provisioning an external etcd cluster
-+                properties:
-+                  apiGroup:
-+                    description: |-
-+                      apiGroup is the group of the resource being referenced.
-+                      apiGroup must be fully qualified domain name.
-+                      The corresponding version for this reference will be looked up from the contract
-+                      labels of the corresponding CRD of the resource being referenced.
-+                    maxLength: 253
-+                    minLength: 1
-+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-+                    type: string
-+                  kind:
-+                    description: |-
-+                      kind of the resource being referenced.
-+                      kind must consist of alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character.
-+                    maxLength: 63
-+                    minLength: 1
-+                    pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
-+                    type: string
-+                  name:
-+                    description: |-
-+                      name of the resource being referenced.
-+                      name must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character.
-+                    maxLength: 253
-+                    minLength: 1
-+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-+                    type: string
-+                required:
-+                - apiGroup
-+                - kind
-+                - name
-+                type: object
-               paused:
-                 description: paused can be used to prevent controllers from processing
-                   the Cluster and all its associated objects.
-@@ -3636,6 +3807,15 @@ spec:
-                       The value of this field is never updated after provisioning is completed.
-                     type: boolean
-                 type: object
-+              managedExternalEtcdInitialized:
-+                description: |-
-+                  ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
-+                  so remaining etcd members can lookup the address to join the cluster
-+                type: boolean
-+              managedExternalEtcdReady:
-+                description: ManagedExternalEtcdReady indicates external etcd cluster
-+                  is fully provisioned
-+                type: boolean
-               observedGeneration:
-                 description: observedGeneration is the latest generation observed
-                   by the controller.
-diff --git a/config/rbac/role.yaml b/config/rbac/role.yaml
-index af20d5eb5..1d9268488 100644
---- a/config/rbac/role.yaml
-+++ b/config/rbac/role.yaml
-@@ -54,6 +54,7 @@ rules:
-   - addons.cluster.x-k8s.io
-   - bootstrap.cluster.x-k8s.io
-   - controlplane.cluster.x-k8s.io
-+  - etcdcluster.cluster.x-k8s.io
-   - infrastructure.cluster.x-k8s.io
-   resources:
-   - '*'
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index d2bc13244..dbaf275dc 100644
+index 5454cd0ea3c7..28462e40942a 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
 @@ -267,6 +267,16 @@ func FailuresFrom(obj *unstructured.Unstructured) (string, string, error) {
@@ -650,45 +200,27 @@ index d2bc13244..dbaf275dc 100644
 +
 +	return endpoints, found, nil
 +}
-diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
-index 37f716312..25eeb3256 100644
---- a/controlplane/kubeadm/config/rbac/role.yaml
-+++ b/controlplane/kubeadm/config/rbac/role.yaml
-@@ -107,3 +107,12 @@ rules:
-   - get
-   - list
-   - watch
-+- apiGroups:
-+  - etcdcluster.cluster.x-k8s.io
-+  resources:
-+  - '*'
-+  verbs:
-+  - get
-+  - list
-+  - update
-+  - watch
-\ No newline at end of file
-diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index 6361e1055..a0a3bb403 100644
---- a/controlplane/kubeadm/internal/controllers/controller.go
-+++ b/controlplane/kubeadm/internal/controllers/controller.go
-@@ -46,6 +46,7 @@ import (
+diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
+index 3bd0bf4857f1..8548bbc5266d 100644
+--- a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
++++ b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
+@@ -47,6 +47,7 @@ import (
  	controlplanev1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
  	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
  	"sigs.k8s.io/cluster-api/controllers/clustercache"
 +	"sigs.k8s.io/cluster-api/controllers/external"
- 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
- 	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
- 	"sigs.k8s.io/cluster-api/feature"
-@@ -80,6 +81,7 @@ const (
+ 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/pkg"
+ 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/pkg/etcd"
+ 	coreadmission "sigs.k8s.io/cluster-api/core/webhooks/admission"
+@@ -93,6 +94,7 @@ var (
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch;create;update;patch;delete
  // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machinepools,verbs=get;list;watch
  // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 +// +kubebuilder:rbac:groups=etcdcluster.cluster.x-k8s.io,resources=*,verbs=get;list;watch;update
  
- // KubeadmControlPlaneReconciler reconciles a KubeadmControlPlane object.
- type KubeadmControlPlaneReconciler struct {
-@@ -210,6 +212,31 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
+ // Reconciler reconciles a KubeadmControlPlane object.
+ type Reconciler struct {
+@@ -230,6 +232,31 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
  	if err != nil {
  		return ctrl.Result{}, err
  	}
@@ -720,7 +252,7 @@ index 6361e1055..a0a3bb403 100644
  
  	if isPaused, requeue, err := paused.EnsurePausedCondition(ctx, r.Client, cluster, kcp); err != nil || isPaused || requeue {
  		return ctrl.Result{}, err
-@@ -675,6 +702,21 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+@@ -695,6 +722,21 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, controlPlane *pkg.Cont
  	log := ctrl.LoggerFrom(ctx)
  	log.Info("Reconcile KubeadmControlPlane deletion")
  
@@ -742,7 +274,7 @@ index 6361e1055..a0a3bb403 100644
  	// If no control plane machines remain, remove the finalizer
  	if len(controlPlane.Machines) == 0 {
  		controlPlane.DeletingReason = controlplanev1.KubeadmControlPlaneDeletingDeletionCompletedReason
-@@ -696,14 +738,6 @@ func (r *KubeadmControlPlaneReconciler) reconcileDelete(ctx context.Context, con
+@@ -717,14 +759,6 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, controlPlane *pkg.Cont
  	// all the machines are deleted in parallel.
  	v1beta1conditions.SetAggregate(controlPlane.KCP, controlplanev1.MachinesReadyV1Beta1Condition, controlPlane.Machines.ConditionGetters(), v1beta1conditions.AddSourceRef())
  
@@ -757,10 +289,10 @@ index 6361e1055..a0a3bb403 100644
  	allMachinePools := &clusterv1.MachinePoolList{}
  	// Get all machine pools.
  	if feature.Gates.Enabled(feature.MachinePool) {
-diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index 7ae57aa13..fe5ac869b 100644
---- a/internal/controllers/cluster/cluster_controller.go
-+++ b/internal/controllers/cluster/cluster_controller.go
+diff --git a/core/reconcilers/cluster/cluster_controller.go b/core/reconcilers/cluster/cluster_controller.go
+index b947b9e38790..a988bca5574c 100644
+--- a/core/reconcilers/cluster/cluster_controller.go
++++ b/core/reconcilers/cluster/cluster_controller.go
 @@ -19,6 +19,7 @@ package cluster
  import (
  	"context"
@@ -953,12 +485,12 @@ index 7ae57aa13..fe5ac869b 100644
  // machineDeploymentToCluster is a handler.ToRequestsFunc to be used to enqueue requests for reconciliation
  // for Cluster to update when one of its own MachineDeployments gets updated.
  func (r *Reconciler) machineDeploymentToCluster(_ context.Context, o client.Object) []ctrl.Request {
-diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index 0b539fe1e..1ea45a107 100644
---- a/internal/controllers/cluster/cluster_controller_phases.go
-+++ b/internal/controllers/cluster/cluster_controller_phases.go
+diff --git a/core/reconcilers/cluster/cluster_controller_phases.go b/core/reconcilers/cluster/cluster_controller_phases.go
+index 247477cbfed3..13d5e085b8da 100644
+--- a/core/reconcilers/cluster/cluster_controller_phases.go
++++ b/core/reconcilers/cluster/cluster_controller_phases.go
 @@ -39,6 +39,8 @@ import (
- 	capierrors "sigs.k8s.io/cluster-api/errors"
+ 	"sigs.k8s.io/cluster-api/controllers/external"
  	"sigs.k8s.io/cluster-api/internal/contract"
  	"sigs.k8s.io/cluster-api/util"
 +	"sigs.k8s.io/cluster-api/util/annotations"
@@ -1094,10 +626,10 @@ index 0b539fe1e..1ea45a107 100644
  func (r *Reconciler) reconcileKubeconfig(ctx context.Context, s *scope) (ctrl.Result, error) {
  	log := ctrl.LoggerFrom(ctx)
  	cluster := s.cluster
-diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 866af4711..40d749290 100644
---- a/internal/controllers/cluster/cluster_controller_test.go
-+++ b/internal/controllers/cluster/cluster_controller_test.go
+diff --git a/core/reconcilers/cluster/cluster_controller_test.go b/core/reconcilers/cluster/cluster_controller_test.go
+index 866af47117e8..40d749290a03 100644
+--- a/core/reconcilers/cluster/cluster_controller_test.go
++++ b/core/reconcilers/cluster/cluster_controller_test.go
 @@ -667,6 +667,242 @@ func TestClusterReconcilerNodeRef(t *testing.T) {
  	})
  }
@@ -1399,10 +931,10 @@ index 866af4711..40d749290 100644
  		))
  	})
  
-diff --git a/internal/controllers/machine/machine_controller_noderef.go b/internal/controllers/machine/machine_controller_noderef.go
-index 04683f6d6..db9432334 100644
---- a/internal/controllers/machine/machine_controller_noderef.go
-+++ b/internal/controllers/machine/machine_controller_noderef.go
+diff --git a/core/reconcilers/machine/machine_controller_noderef.go b/core/reconcilers/machine/machine_controller_noderef.go
+index d588904ede2a..a841410748d9 100644
+--- a/core/reconcilers/machine/machine_controller_noderef.go
++++ b/core/reconcilers/machine/machine_controller_noderef.go
 @@ -68,6 +68,14 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result,
  		return ctrl.Result{}, err
  	}
@@ -1418,18 +950,18 @@ index 04683f6d6..db9432334 100644
  	// Check that the Machine has a valid ProviderID.
  	if machine.Spec.ProviderID == "" {
  		v1beta1conditions.MarkFalse(machine, clusterv1.MachineNodeHealthyV1Beta1Condition, clusterv1.WaitingForNodeRefV1Beta1Reason, clusterv1.ConditionSeverityInfo, "")
-diff --git a/internal/controllers/machine/machine_controller_noderef_test.go b/internal/controllers/machine/machine_controller_noderef_test.go
-index 2081da474..f0413cfe3 100644
---- a/internal/controllers/machine/machine_controller_noderef_test.go
-+++ b/internal/controllers/machine/machine_controller_noderef_test.go
-@@ -38,6 +38,7 @@ import (
+diff --git a/core/reconcilers/machine/machine_controller_noderef_test.go b/core/reconcilers/machine/machine_controller_noderef_test.go
+index 833c1aa1e3df..5f993f5796cb 100644
+--- a/core/reconcilers/machine/machine_controller_noderef_test.go
++++ b/core/reconcilers/machine/machine_controller_noderef_test.go
+@@ -37,6 +37,7 @@ import (
  	"sigs.k8s.io/cluster-api/feature"
  	"sigs.k8s.io/cluster-api/internal/topology/ownerrefs"
  	"sigs.k8s.io/cluster-api/util"
 +	"sigs.k8s.io/cluster-api/util/conditions"
+ 	"sigs.k8s.io/cluster-api/util/index"
  	"sigs.k8s.io/cluster-api/util/kubeconfig"
  	"sigs.k8s.io/cluster-api/util/test/builder"
- )
 @@ -1670,3 +1671,91 @@ func Test_propagateMachineTaintsToNode(t *testing.T) {
  		})
  	}
@@ -1522,14 +1054,14 @@ index 2081da474..f0413cfe3 100644
 +		})
 +	}
 +}
-diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
-index b3094348f..9f9931b9d 100644
---- a/internal/controllers/machine/machine_controller_phases.go
-+++ b/internal/controllers/machine/machine_controller_phases.go
+diff --git a/core/reconcilers/machine/machine_controller_phases.go b/core/reconcilers/machine/machine_controller_phases.go
+index 6780bd4051f1..50c5b14c2cef 100644
+--- a/core/reconcilers/machine/machine_controller_phases.go
++++ b/core/reconcilers/machine/machine_controller_phases.go
 @@ -22,6 +22,7 @@ import (
  	"time"
  
- 	"github.com/pkg/errors"
+ 	pkgerrors "github.com/pkg/errors"
 +	corev1 "k8s.io/api/core/v1"
  	apierrors "k8s.io/apimachinery/pkg/api/errors"
  	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1664,11 +1196,11 @@ index b3094348f..9f9931b9d 100644
  	// Get deprecatedFailureDomain from the InfrastructureMachine.
  	deprecatedFailureDomain, err := contract.InfrastructureMachine().DeprecatedFailureDomain().Get(s.infraMachine)
  	switch {
-diff --git a/internal/controllers/machine/machine_controller_status.go b/internal/controllers/machine/machine_controller_status.go
-index 8f2ef002a..61243c6ab 100644
---- a/internal/controllers/machine/machine_controller_status.go
-+++ b/internal/controllers/machine/machine_controller_status.go
-@@ -919,6 +919,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
+diff --git a/core/reconcilers/machine/machine_controller_status.go b/core/reconcilers/machine/machine_controller_status.go
+index 2d0fd8ee825a..6699e5ae5857 100644
+--- a/core/reconcilers/machine/machine_controller_status.go
++++ b/core/reconcilers/machine/machine_controller_status.go
+@@ -932,6 +932,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
  	}
  
@@ -1683,7 +1215,7 @@ index 8f2ef002a..61243c6ab 100644
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseUpdating)
  	}
 diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
-index 4efea929a..fac48c160 100644
+index 4efea929a217..fac48c160b0d 100644
 --- a/util/collections/machine_filters.go
 +++ b/util/collections/machine_filters.go
 @@ -123,6 +123,18 @@ func ControlPlaneMachines(clusterName string) func(machine *clusterv1.Machine) b
@@ -1727,7 +1259,7 @@ index 4efea929a..fac48c160 100644
  func MatchesKubernetesVersion(kubernetesVersion string) Func {
  	return func(machine *clusterv1.Machine) bool {
 diff --git a/util/secret/certificates.go b/util/secret/certificates.go
-index b8dc6405f..7afc9e96e 100644
+index c9ff5d360986..3fc7be955c0e 100644
 --- a/util/secret/certificates.go
 +++ b/util/secret/certificates.go
 @@ -454,6 +454,9 @@ func (c Certificates) AsFiles() []bootstrapv1.File {
@@ -1741,7 +1273,7 @@ index b8dc6405f..7afc9e96e 100644
  	// these will only exist if external etcd was defined and supplied by the user
  	if apiserverEtcdClientCert := c.GetByPurpose(APIServerEtcdClient); apiserverEtcdClientCert != nil {
 diff --git a/util/secret/consts.go b/util/secret/consts.go
-index 5c67c9cce..37409a8d9 100644
+index 5c67c9cceb05..37409a8d94fb 100644
 --- a/util/secret/consts.go
 +++ b/util/secret/consts.go
 @@ -50,6 +50,8 @@ const (
@@ -1754,7 +1286,7 @@ index 5c67c9cce..37409a8d9 100644
  
  var (
 diff --git a/util/util.go b/util/util.go
-index 992d574dd..48aae469c 100644
+index a3e02f6e9be4..610fad63da07 100644
 --- a/util/util.go
 +++ b/util/util.go
 @@ -146,6 +146,12 @@ func IsNodeReady(node *corev1.Node) bool {
@@ -1771,5 +1303,5 @@ index 992d574dd..48aae469c 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.48.1
+2.47.3
 

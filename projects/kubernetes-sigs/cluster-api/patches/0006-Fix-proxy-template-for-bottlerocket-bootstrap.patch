@@ -1,24 +1,11 @@
-From 16a461494d12a47ea07b6fc283e1c700527a89a3 Mon Sep 17 00:00:00 2001
+From 7568a0c34c49659dece9d857df1fa9a6160942f4 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Thu, 30 Sep 2021 14:04:36 -0700
-Subject: [PATCH] Fix proxy template for bottlerocket bootstrap
+Subject: [PATCH 06/37] Fix proxy template for bottlerocket bootstrap
 
-Bottlerocket expects no-proxy setting to be a comma-separated list
-of strings. The proxy template was parsing the input no-proxy list
-and converting it to a string. This commit changes the template to
-get the desired format.
-
-Current generated value of no-proxy: "[localhost 127.0.0.1]"
-New generated value for no-proxy: ["localhost", "127.0.0.1"]
-
-cr: https://code.amazon.com/reviews/CR-58004615
----
- bootstrap/kubeadm/internal/bottlerocket/bootstrap.go    | 2 +-
- bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go | 9 +++++++--
- 2 files changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index 886af6d87..4e1de77db 100644
+index 886af6d87cdc..4e1de77db1a4 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -29,7 +29,7 @@ user-data = "{{.BootstrapContainerUserData}}"
@@ -31,7 +18,7 @@ index 886af6d87..4e1de77db 100644
  `
  	registryMirrorTemplate = `{{ define "registryMirrorSettings" -}}
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index f41f0b23a..4f7329625 100644
+index f41f0b23a9fa..4f7329625dc8 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -4,6 +4,7 @@ import (
@@ -67,5 +54,5 @@ index f41f0b23a..4f7329625 100644
  		bottlerocketInput.RegistryMirrorCACert = base64.StdEncoding.EncodeToString([]byte(config.RegistryMirrorConfiguration.CACert))
  	}
 -- 
-2.48.1
+2.47.3
 

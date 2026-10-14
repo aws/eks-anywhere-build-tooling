@@ -1,34 +1,11 @@
-From bc67367e413d5f47f8181e5a0436c9b865273e7f Mon Sep 17 00:00:00 2001
+From 2493ccf1ca1e7a4b20eda02541f01331a914d056 Mon Sep 17 00:00:00 2001
 From: Abhinav Pandey <abhinavmpandey08@gmail.com>
 Date: Wed, 17 Jan 2024 09:28:18 -0800
-Subject: [PATCH] Add support for in-place upgrade
+Subject: [PATCH 28/37] Add support for in-place upgrade
 
----
- .../v1beta1/kubeadm_control_plane_types.go    |  18 +-
- .../v1beta2/kubeadm_control_plane_types.go    |  18 +-
- api/core/v1beta2/machinedeployment_types.go   |  19 +-
- api/core/v1beta2/zz_generated.openapi.go      |   2 +-
- .../cluster.x-k8s.io_clusterclasses.yaml      |   1 +
- .../crd/bases/cluster.x-k8s.io_clusters.yaml  |   1 +
- .../cluster.x-k8s.io_machinedeployments.yaml  |   9 +-
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  18 +-
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  18 +-
- .../kubeadm/internal/controllers/update.go    |   8 +-
- .../internal/webhooks/kubeadmcontrolplane.go  |   4 +-
- .../webhooks/kubeadmcontrolplane_test.go      | 160 +++++--
- .../machinedeployment_controller.go           |   4 +
- .../machinedeployment_controller_test.go      | 398 ++++++++++++++++++
- .../machinedeployment_inplace.go              |  70 +++
- .../machinedeployment_inplace_helper.go       | 115 +++++
- .../machinedeployment_inplace_test.go         | 114 +++++
- .../machinedeployment/mdutil/util.go          |   2 +-
- 18 files changed, 929 insertions(+), 50 deletions(-)
- create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace.go
- create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace_helper.go
- create mode 100644 internal/controllers/machinedeployment/machinedeployment_inplace_test.go
 
 diff --git a/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go b/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
-index 1aa38a59d..8fa1432ba 100644
+index 578c7634e8c5..ccac257ff5cb 100644
 --- a/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
 +++ b/api/controlplane/kubeadm/v1beta1/kubeadm_control_plane_types.go
 @@ -29,13 +29,16 @@ import (
@@ -77,7 +54,7 @@ index 1aa38a59d..8fa1432ba 100644
  	// +optional
  	Type RolloutStrategyType `json:"type,omitempty"`
 diff --git a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
-index 1c52a473e..668faa26a 100644
+index 213f3b1712c2..028069e4478a 100644
 --- a/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
 +++ b/api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go
 @@ -26,13 +26,16 @@ import (
@@ -126,7 +103,7 @@ index 1c52a473e..668faa26a 100644
  	// +required
  	Type KubeadmControlPlaneRolloutStrategyType `json:"type,omitempty"`
 diff --git a/api/core/v1beta2/machinedeployment_types.go b/api/core/v1beta2/machinedeployment_types.go
-index b7182c278..73bac8de0 100644
+index 3c5904c0e433..423dce814fb4 100644
 --- a/api/core/v1beta2/machinedeployment_types.go
 +++ b/api/core/v1beta2/machinedeployment_types.go
 @@ -32,7 +32,7 @@ const (
@@ -176,173 +153,28 @@ index b7182c278..73bac8de0 100644
  	// Default is RollingUpdate.
  	// +required
  	Type MachineDeploymentRolloutStrategyType `json:"type,omitempty"`
-diff --git a/api/core/v1beta2/zz_generated.openapi.go b/api/core/v1beta2/zz_generated.openapi.go
-index 6302867a9..cec393843 100644
---- a/api/core/v1beta2/zz_generated.openapi.go
-+++ b/api/core/v1beta2/zz_generated.openapi.go
-@@ -3373,7 +3373,7 @@ func schema_cluster_api_api_core_v1beta2_MachineDeploymentClassRolloutStrategy(r
- 				Properties: map[string]spec.Schema{
- 					"type": {
- 						SchemaProps: spec.SchemaProps{
--							Description: "type of rollout. Allowed values are RollingUpdate and OnDelete. Default is RollingUpdate.",
-+							Description: "type of rollout strategy to use. Supported values: - `RollingUpdate`: replaces the old MachineSet by new one using rolling update i.e. gradually scale down the old MachineSet and scale up the new one. - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed. - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.\n\nDefault is RollingUpdate.",
- 							Type:        []string{"string"},
- 							Format:      "",
- 						},
-diff --git a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-index e04f1fa55..7342af7d9 100644
---- a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-+++ b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-@@ -4559,6 +4559,7 @@ spec:
-                                   enum:
-                                   - RollingUpdate
-                                   - OnDelete
-+                                  - InPlace
-                                   type: string
-                               required:
-                               - type
-diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index c777418bf..4eeb125d7 100644
---- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-+++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -3217,6 +3217,7 @@ spec:
-                                       enum:
-                                       - RollingUpdate
-                                       - OnDelete
-+                                      - InPlace
-                                       type: string
-                                   required:
-                                   - type
-diff --git a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-index 272f00ad0..5e6adb0e8 100644
---- a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-+++ b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-@@ -1075,11 +1075,18 @@ spec:
-                         type: object
-                       type:
-                         description: |-
--                          type of rollout. Allowed values are RollingUpdate and OnDelete.
-+                          type of rollout strategy to use.
-+                          Supported values:
-+                          - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
-+                          i.e. gradually scale down the old MachineSet and scale up the new one.
-+                          - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
-+                          - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
-+
-                           Default is RollingUpdate.
-                         enum:
-                         - RollingUpdate
-                         - OnDelete
-+                        - InPlace
-                         type: string
-                     required:
-                     - type
-diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index bff1d2d50..31e1f9f6a 100644
---- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-+++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -2992,11 +2992,16 @@ spec:
-                     type: object
-                   type:
-                     description: |-
--                      type of rollout. Currently the only supported strategy is
--                      "RollingUpdate".
-+                      type of rollout strategy to use.
-+                      Supported values:
-+                      - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
-+                      i.e. gradually scale up or down the old control planes and scale up or down the new one.
-+                      - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
-+
-                       Default is RollingUpdate.
-                     enum:
-                     - RollingUpdate
-+                    - InPlace
-                     type: string
-                 type: object
-               version:
-@@ -6652,11 +6657,16 @@ spec:
-                         type: object
-                       type:
-                         description: |-
--                          type of rollout. Currently the only supported strategy is
--                          "RollingUpdate".
-+                          type of rollout strategy to use.
-+                          Supported values:
-+                          - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
-+                          i.e. gradually scale up or down the old control planes and scale up or down the new one.
-+                          - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
-+
-                           Default is RollingUpdate.
-                         enum:
-                         - RollingUpdate
-+                        - InPlace
-                         type: string
-                     required:
-                     - type
-diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index d14e7537e..13ade8ebd 100644
---- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-+++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -2941,11 +2941,16 @@ spec:
-                             type: object
-                           type:
-                             description: |-
--                              type of rollout. Currently the only supported strategy is
--                              "RollingUpdate".
-+                              type of rollout strategy to use.
-+                              Supported values:
-+                              - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
-+                              i.e. gradually scale up or down the old control planes and scale up or down the new one.
-+                              - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
-+
-                               Default is RollingUpdate.
-                             enum:
-                             - RollingUpdate
-+                            - InPlace
-                             type: string
-                         type: object
-                     required:
-@@ -6322,11 +6327,16 @@ spec:
-                                 type: object
-                               type:
-                                 description: |-
--                                  type of rollout. Currently the only supported strategy is
--                                  "RollingUpdate".
-+                                  type of rollout strategy to use.
-+                                  Supported values:
-+                                  - `RollingUpdate`: RollingUpdateStrategyType replaces the old control planes by new one using rolling update
-+                                  i.e. gradually scale up or down the old control planes and scale up or down the new one.
-+                                  - `InPlace`: updates the node in place by delegating the upgrade to an external entity.
-+
-                                   Default is RollingUpdate.
-                                 enum:
-                                 - RollingUpdate
-+                                - InPlace
-                                 type: string
-                             required:
-                             - type
-diff --git a/controlplane/kubeadm/internal/controllers/update.go b/controlplane/kubeadm/internal/controllers/update.go
-index 8795b2739..838a5a97d 100644
---- a/controlplane/kubeadm/internal/controllers/update.go
-+++ b/controlplane/kubeadm/internal/controllers/update.go
-@@ -18,6 +18,7 @@ package controllers
+diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/update.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/update.go
+index aa5f49070f3d..3f7c015a30d7 100644
+--- a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/update.go
++++ b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/update.go
+@@ -18,6 +18,7 @@ package kubeadmcontrolplane
  
  import (
  	"context"
 +	"time"
  
  	"github.com/blang/semver/v4"
- 	"github.com/pkg/errors"
+ 	pkgerrors "github.com/pkg/errors"
 @@ -28,6 +29,7 @@ import (
  	controlplanev1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
- 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
+ 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/pkg"
  	"sigs.k8s.io/cluster-api/feature"
 +	"sigs.k8s.io/cluster-api/util/annotations"
  	"sigs.k8s.io/cluster-api/util/collections"
  )
  
-@@ -95,8 +97,12 @@ func (r *KubeadmControlPlaneReconciler) updateControlPlane(
- 			return ctrl.Result{}, errors.Wrapf(err, "failed to update control plane")
+@@ -95,8 +97,12 @@ func (r *Reconciler) updateControlPlane(
+ 			return ctrl.Result{}, pkgerrors.Wrapf(err, "failed to update control plane")
  		}
  		return res, nil
 +	case controlplanev1.InPlaceUpgradeStrategyType:
@@ -355,11 +187,11 @@ index 8795b2739..838a5a97d 100644
  		return ctrl.Result{}, nil
  	}
  }
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-index 75778b4bf..26b91e6ea 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-@@ -355,12 +355,12 @@ func validateRolloutAndCertValidityFields(rolloutSpec controlplanev1.KubeadmCont
+diff --git a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
+index 2c899285de89..c7ca709c39cd 100644
+--- a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
++++ b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
+@@ -361,12 +361,12 @@ func validateRolloutAndCertValidityFields(rolloutSpec controlplanev1.KubeadmCont
  		return nil
  	}
  
@@ -374,11 +206,11 @@ index 75778b4bf..26b91e6ea 100644
  			),
  		)
  	}
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-index 896a143aa..4c3981de3 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-@@ -41,39 +41,143 @@ var (
+diff --git a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
+index ec4aac5952d4..73ae0bfb19c2 100644
+--- a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
++++ b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
+@@ -41,39 +41,105 @@ var (
  )
  
  func TestKubeadmControlPlaneDefault(t *testing.T) {
@@ -386,33 +218,22 @@ index 896a143aa..4c3981de3 100644
 +	t.Run("should default to RollingUpdate strategy when not specified", func(t *testing.T) {
 +		g := NewWithT(t)
 +		kcp := &controlplanev1.KubeadmControlPlane{
-+			ObjectMeta: metav1.ObjectMeta{
-+				Namespace: "foo",
-+			},
++			ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 +			Spec: controlplanev1.KubeadmControlPlaneSpec{
 +				Version: "v1.18.3",
 +				MachineTemplate: controlplanev1.KubeadmControlPlaneMachineTemplate{
 +					Spec: controlplanev1.KubeadmControlPlaneMachineTemplateSpec{
-+						InfrastructureRef: clusterv1.ContractVersionedObjectReference{
-+							APIGroup: "test",
-+							Kind:     "UnknownInfraMachine",
-+							Name:     "foo",
-+						},
++						InfrastructureRef: clusterv1.ContractVersionedObjectReference{APIGroup: "test", Kind: "UnknownInfraMachine", Name: "foo"},
 +					},
 +				},
 +			},
 +		}
 +		updateDefaultingValidationKCP := kcp.DeepCopy()
 +		updateDefaultingValidationKCP.Spec.Version = "v1.18.3"
-+		updateDefaultingValidationKCP.Spec.MachineTemplate.Spec.InfrastructureRef = clusterv1.ContractVersionedObjectReference{
-+			APIGroup: "test",
-+			Kind:     "UnknownInfraMachine",
-+			Name:     "foo",
-+		}
++		updateDefaultingValidationKCP.Spec.MachineTemplate.Spec.InfrastructureRef = clusterv1.ContractVersionedObjectReference{APIGroup: "test", Kind: "UnknownInfraMachine", Name: "foo"}
 +		webhook := &KubeadmControlPlane{}
-+		t.Run("for KubeadmControlPlane", util.CustomDefaultValidateTest[*controlplanev1.KubeadmControlPlane](ctx, updateDefaultingValidationKCP, webhook))
++		t.Run("for KubeadmControlPlane", testutil.CustomDefaultValidateTest[*controlplanev1.KubeadmControlPlane](ctx, updateDefaultingValidationKCP, webhook))
 +		g.Expect(webhook.Default(ctx, kcp)).To(Succeed())
-+
 +		g.Expect(kcp.Spec.Version).To(Equal("v1.18.3"))
 +		g.Expect(kcp.Spec.Rollout.Strategy.Type).To(Equal(controlplanev1.RollingUpdateStrategyType))
 +		g.Expect(kcp.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntVal).To(Equal(int32(1)))
@@ -433,25 +254,17 @@ index 896a143aa..4c3981de3 100644
 +	t.Run("should preserve InPlace strategy and not set MaxSurge", func(t *testing.T) {
 +		g := NewWithT(t)
 +		kcp := &controlplanev1.KubeadmControlPlane{
-+			ObjectMeta: metav1.ObjectMeta{
-+				Namespace: "foo",
-+			},
++			ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 +			Spec: controlplanev1.KubeadmControlPlaneSpec{
 +				Version: "v1.18.3",
 +				MachineTemplate: controlplanev1.KubeadmControlPlaneMachineTemplate{
 +					Spec: controlplanev1.KubeadmControlPlaneMachineTemplateSpec{
-+						InfrastructureRef: clusterv1.ContractVersionedObjectReference{
-+							APIGroup: "test",
-+							Kind:     "UnknownInfraMachine",
-+							Name:     "foo",
-+						},
-+					},
-+				},
-+				Rollout: controlplanev1.KubeadmControlPlaneRolloutSpec{
-+					Strategy: controlplanev1.KubeadmControlPlaneRolloutStrategy{
-+						Type: controlplanev1.InPlaceUpgradeStrategyType,
++						InfrastructureRef: clusterv1.ContractVersionedObjectReference{APIGroup: "test", Kind: "UnknownInfraMachine", Name: "foo"},
  					},
  				},
++				Rollout: controlplanev1.KubeadmControlPlaneRolloutSpec{
++					Strategy: controlplanev1.KubeadmControlPlaneRolloutStrategy{Type: controlplanev1.InPlaceUpgradeStrategyType},
++				},
  			},
 -		},
 -	}
@@ -463,15 +276,11 @@ index 896a143aa..4c3981de3 100644
 -		Name:     "foo",
 -	}
 -	webhook := &KubeadmControlPlane{}
--	t.Run("for KubeadmControlPlane", util.CustomDefaultValidateTest[*controlplanev1.KubeadmControlPlane](ctx, updateDefaultingValidationKCP, webhook))
+-	t.Run("for KubeadmControlPlane", testutil.CustomDefaultValidateTest[*controlplanev1.KubeadmControlPlane](ctx, updateDefaultingValidationKCP, webhook))
 -	g.Expect(webhook.Default(ctx, kcp)).To(Succeed())
 +		}
 +		webhook := &KubeadmControlPlane{}
 +		g.Expect(webhook.Default(ctx, kcp)).To(Succeed())
- 
--	g.Expect(kcp.Spec.Version).To(Equal("v1.18.3"))
--	g.Expect(kcp.Spec.Rollout.Strategy.Type).To(Equal(controlplanev1.RollingUpdateStrategyType))
--	g.Expect(kcp.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntVal).To(Equal(int32(1)))
 +		g.Expect(kcp.Spec.Version).To(Equal("v1.18.3"))
 +		g.Expect(kcp.Spec.Rollout.Strategy.Type).To(Equal(controlplanev1.InPlaceUpgradeStrategyType))
 +		g.Expect(kcp.Spec.Rollout.Strategy.RollingUpdate.MaxSurge).To(BeNil())
@@ -481,68 +290,53 @@ index 896a143aa..4c3981de3 100644
 +		g := NewWithT(t)
 +		customMaxSurge := intstr.FromInt32(3)
 +		kcp := &controlplanev1.KubeadmControlPlane{
-+			ObjectMeta: metav1.ObjectMeta{
-+				Namespace: "foo",
-+			},
++			ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 +			Spec: controlplanev1.KubeadmControlPlaneSpec{
 +				Version: "v1.18.3",
 +				MachineTemplate: controlplanev1.KubeadmControlPlaneMachineTemplate{
 +					Spec: controlplanev1.KubeadmControlPlaneMachineTemplateSpec{
-+						InfrastructureRef: clusterv1.ContractVersionedObjectReference{
-+							APIGroup: "test",
-+							Kind:     "UnknownInfraMachine",
-+							Name:     "foo",
-+						},
++						InfrastructureRef: clusterv1.ContractVersionedObjectReference{APIGroup: "test", Kind: "UnknownInfraMachine", Name: "foo"},
 +					},
 +				},
 +				Rollout: controlplanev1.KubeadmControlPlaneRolloutSpec{
 +					Strategy: controlplanev1.KubeadmControlPlaneRolloutStrategy{
-+						Type: controlplanev1.RollingUpdateStrategyType,
-+						RollingUpdate: controlplanev1.KubeadmControlPlaneRolloutStrategyRollingUpdate{
-+							MaxSurge: &customMaxSurge,
-+						},
++						Type:          controlplanev1.RollingUpdateStrategyType,
++						RollingUpdate: controlplanev1.KubeadmControlPlaneRolloutStrategyRollingUpdate{MaxSurge: &customMaxSurge},
 +					},
 +				},
 +			},
 +		}
 +		webhook := &KubeadmControlPlane{}
 +		g.Expect(webhook.Default(ctx, kcp)).To(Succeed())
-+
 +		g.Expect(kcp.Spec.Version).To(Equal("v1.18.3"))
 +		g.Expect(kcp.Spec.Rollout.Strategy.Type).To(Equal(controlplanev1.RollingUpdateStrategyType))
 +		g.Expect(kcp.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntVal).To(Equal(int32(3)))
 +	})
-+
+ 
+-	g.Expect(kcp.Spec.Version).To(Equal("v1.18.3"))
+-	g.Expect(kcp.Spec.Rollout.Strategy.Type).To(Equal(controlplanev1.RollingUpdateStrategyType))
+-	g.Expect(kcp.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntVal).To(Equal(int32(1)))
 +	t.Run("should default type to RollingUpdate when only MaxSurge is specified", func(t *testing.T) {
 +		g := NewWithT(t)
 +		customMaxSurge := intstr.FromInt32(0)
 +		kcp := &controlplanev1.KubeadmControlPlane{
-+			ObjectMeta: metav1.ObjectMeta{
-+				Namespace: "foo",
-+			},
++			ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 +			Spec: controlplanev1.KubeadmControlPlaneSpec{
 +				Version: "v1.18.3",
 +				MachineTemplate: controlplanev1.KubeadmControlPlaneMachineTemplate{
 +					Spec: controlplanev1.KubeadmControlPlaneMachineTemplateSpec{
-+						InfrastructureRef: clusterv1.ContractVersionedObjectReference{
-+							APIGroup: "test",
-+							Kind:     "UnknownInfraMachine",
-+							Name:     "foo",
-+						},
++						InfrastructureRef: clusterv1.ContractVersionedObjectReference{APIGroup: "test", Kind: "UnknownInfraMachine", Name: "foo"},
 +					},
 +				},
 +				Rollout: controlplanev1.KubeadmControlPlaneRolloutSpec{
 +					Strategy: controlplanev1.KubeadmControlPlaneRolloutStrategy{
-+						RollingUpdate: controlplanev1.KubeadmControlPlaneRolloutStrategyRollingUpdate{
-+							MaxSurge: &customMaxSurge,
-+						},
++						RollingUpdate: controlplanev1.KubeadmControlPlaneRolloutStrategyRollingUpdate{MaxSurge: &customMaxSurge},
 +					},
 +				},
 +			},
 +		}
 +		webhook := &KubeadmControlPlane{}
 +		g.Expect(webhook.Default(ctx, kcp)).To(Succeed())
-+
 +		g.Expect(kcp.Spec.Version).To(Equal("v1.18.3"))
 +		g.Expect(kcp.Spec.Rollout.Strategy.Type).To(Equal(controlplanev1.RollingUpdateStrategyType))
 +		g.Expect(kcp.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntVal).To(Equal(int32(0)))
@@ -550,11 +344,11 @@ index 896a143aa..4c3981de3 100644
  }
  
  func TestKubeadmControlPlaneValidateCreate(t *testing.T) {
-diff --git a/internal/controllers/machinedeployment/machinedeployment_controller.go b/internal/controllers/machinedeployment/machinedeployment_controller.go
-index 933551c09..e6cbf40b3 100644
---- a/internal/controllers/machinedeployment/machinedeployment_controller.go
-+++ b/internal/controllers/machinedeployment/machinedeployment_controller.go
-@@ -326,6 +326,10 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
+diff --git a/core/reconcilers/machinedeployment/machinedeployment_controller.go b/core/reconcilers/machinedeployment/machinedeployment_controller.go
+index ef9a6af2e108..8f8cbc9f05cf 100644
+--- a/core/reconcilers/machinedeployment/machinedeployment_controller.go
++++ b/core/reconcilers/machinedeployment/machinedeployment_controller.go
+@@ -340,6 +340,10 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
  		return r.rolloutOnDelete(ctx, md, s.machineSets, s.machines, templateExists)
  	}
  
@@ -562,13 +356,13 @@ index 933551c09..e6cbf40b3 100644
 +		return r.rolloutInPlace(ctx, md, s.machineSets, templateExists)
 +	}
 +
- 	return errors.Errorf("unexpected deployment strategy type: %s", md.Spec.Rollout.Strategy.Type)
+ 	return pkgerrors.Errorf("unexpected deployment strategy type: %s", md.Spec.Rollout.Strategy.Type)
  }
  
-diff --git a/internal/controllers/machinedeployment/machinedeployment_controller_test.go b/internal/controllers/machinedeployment/machinedeployment_controller_test.go
-index 0bf8c6059..1d095fc82 100644
---- a/internal/controllers/machinedeployment/machinedeployment_controller_test.go
-+++ b/internal/controllers/machinedeployment/machinedeployment_controller_test.go
+diff --git a/core/reconcilers/machinedeployment/machinedeployment_controller_test.go b/core/reconcilers/machinedeployment/machinedeployment_controller_test.go
+index bf482c117caf..31f84659b9d9 100644
+--- a/core/reconcilers/machinedeployment/machinedeployment_controller_test.go
++++ b/core/reconcilers/machinedeployment/machinedeployment_controller_test.go
 @@ -29,6 +29,7 @@ import (
  	"k8s.io/client-go/tools/record"
  	"k8s.io/client-go/util/retry"
@@ -584,9 +378,9 @@ index 0bf8c6059..1d095fc82 100644
 +	"sigs.k8s.io/cluster-api/util/annotations"
 +	"sigs.k8s.io/cluster-api/util/conditions"
  	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
+ 	capicontrollerutil "sigs.k8s.io/cluster-api/util/controller"
  	"sigs.k8s.io/cluster-api/util/patch"
- 	"sigs.k8s.io/cluster-api/util/test/builder"
-@@ -45,6 +48,7 @@ import (
+@@ -46,6 +49,7 @@ import (
  
  const (
  	machineDeploymentNamespace = "md-test"
@@ -594,7 +388,7 @@ index 0bf8c6059..1d095fc82 100644
  )
  
  var _ reconcile.Reconciler = &Reconciler{}
-@@ -877,6 +881,400 @@ func updateMachineDeployment(ctx context.Context, c client.Client, md *clusterv1
+@@ -878,6 +882,400 @@ func updateMachineDeployment(ctx context.Context, c client.Client, md *clusterv1
  	})
  }
  
@@ -995,11 +789,11 @@ index 0bf8c6059..1d095fc82 100644
  func TestReconciler_reconcileDelete(t *testing.T) {
  	labels := map[string]string{
  		"some": "labelselector",
-diff --git a/internal/controllers/machinedeployment/machinedeployment_inplace.go b/internal/controllers/machinedeployment/machinedeployment_inplace.go
+diff --git a/core/reconcilers/machinedeployment/machinedeployment_inplace.go b/core/reconcilers/machinedeployment/machinedeployment_inplace.go
 new file mode 100644
-index 000000000..0c1a18e83
+index 000000000000..0c1a18e83edf
 --- /dev/null
-+++ b/internal/controllers/machinedeployment/machinedeployment_inplace.go
++++ b/core/reconcilers/machinedeployment/machinedeployment_inplace.go
 @@ -0,0 +1,70 @@
 +package machinedeployment
 +
@@ -1071,11 +865,11 @@ index 000000000..0c1a18e83
 +
 +	return nil
 +}
-diff --git a/internal/controllers/machinedeployment/machinedeployment_inplace_helper.go b/internal/controllers/machinedeployment/machinedeployment_inplace_helper.go
+diff --git a/core/reconcilers/machinedeployment/machinedeployment_inplace_helper.go b/core/reconcilers/machinedeployment/machinedeployment_inplace_helper.go
 new file mode 100644
-index 000000000..d602bffdc
+index 000000000000..d602bffdc658
 --- /dev/null
-+++ b/internal/controllers/machinedeployment/machinedeployment_inplace_helper.go
++++ b/core/reconcilers/machinedeployment/machinedeployment_inplace_helper.go
 @@ -0,0 +1,115 @@
 +package machinedeployment
 +
@@ -1192,11 +986,11 @@ index 000000000..d602bffdc
 +
 +	return nil
 +}
-diff --git a/internal/controllers/machinedeployment/machinedeployment_inplace_test.go b/internal/controllers/machinedeployment/machinedeployment_inplace_test.go
+diff --git a/core/reconcilers/machinedeployment/machinedeployment_inplace_test.go b/core/reconcilers/machinedeployment/machinedeployment_inplace_test.go
 new file mode 100644
-index 000000000..5c5f34290
+index 000000000000..5c5f342908a7
 --- /dev/null
-+++ b/internal/controllers/machinedeployment/machinedeployment_inplace_test.go
++++ b/core/reconcilers/machinedeployment/machinedeployment_inplace_test.go
 @@ -0,0 +1,114 @@
 +package machinedeployment
 +
@@ -1312,10 +1106,10 @@ index 000000000..5c5f34290
 +	}
 +
 +}
-diff --git a/internal/controllers/machinedeployment/mdutil/util.go b/internal/controllers/machinedeployment/mdutil/util.go
-index 3b348af99..fec413236 100644
---- a/internal/controllers/machinedeployment/mdutil/util.go
-+++ b/internal/controllers/machinedeployment/mdutil/util.go
+diff --git a/core/reconcilers/machinedeployment/mdutil/util.go b/core/reconcilers/machinedeployment/mdutil/util.go
+index dc837591837b..5c80d7073435 100644
+--- a/core/reconcilers/machinedeployment/mdutil/util.go
++++ b/core/reconcilers/machinedeployment/mdutil/util.go
 @@ -682,7 +682,7 @@ func NewMSNewReplicas(deployment *clusterv1.MachineDeployment, allMSs []*cluster
  		// Do not exceed the number of desired replicas.
  		scaleUpCount = min(scaleUpCount, *(deployment.Spec.Replicas)-newMSReplicas)
@@ -1326,5 +1120,5 @@ index 3b348af99..fec413236 100644
  		currentMachineCount := TotalMachineSetsReplicaSum(allMSs)
  		if currentMachineCount >= *(deployment.Spec.Replicas) {
 -- 
-2.48.1
+2.47.3
 

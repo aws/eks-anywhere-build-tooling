@@ -1,19 +1,13 @@
-From 06004fa79d4417cf1fa018b8fcf1c74c93da5a86 Mon Sep 17 00:00:00 2001
+From 8e04975bbb3eddd9a7ad59ee02c1900dc148efd8 Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Thu, 5 Jan 2023 14:56:09 -0500
-Subject: [PATCH] Make bottlerocket admin, control, custom bootstrap container
- images updatable in webhook
+Subject: [PATCH 15/37] Make bottlerocket admin, control, custom bootstrap
+ container
 
----
- .../internal/bottlerocket/bootstrap_test.go   | 169 ++++++++++++++++++
- .../internal/webhooks/kubeadmcontrolplane.go  |   6 +
- .../webhooks/kubeadmcontrolplane_test.go      |  54 ++++++
- 3 files changed, 229 insertions(+)
- create mode 100644 bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 new file mode 100644
-index 000000000..49c294436
+index 000000000000..49c294436df1
 --- /dev/null
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 @@ -0,0 +1,169 @@
@@ -186,11 +180,11 @@ index 000000000..49c294436
 +		})
 +	}
 +}
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-index b8120dee6..fa42a651e 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-@@ -125,6 +125,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
+diff --git a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
+index ff189fbf085e..06555687538e 100644
+--- a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
++++ b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
+@@ -128,6 +128,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
  		{"metadata", "*"},
  		// spec.kubeadmConfigSpec.clusterConfiguration
  		{spec, kubeadmConfigSpec, clusterConfiguration, "bottlerocketBootstrap", "*"},
@@ -200,7 +194,7 @@ index b8120dee6..fa42a651e 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "*"},
-@@ -157,6 +160,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
+@@ -160,6 +163,9 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
  		{spec, kubeadmConfigSpec, initConfiguration, timeouts, "*"},
  		// spec.kubeadmConfigSpec.joinConfiguration
  		{spec, kubeadmConfigSpec, joinConfiguration, "bottlerocketBootstrap", "*"},
@@ -210,11 +204,11 @@ index b8120dee6..fa42a651e 100644
  		{spec, kubeadmConfigSpec, joinConfiguration, "pause", "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration},
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-index 40f670dc8..40ba4c23a 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-@@ -772,6 +772,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+diff --git a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
+index 6b1fd9c78636..c3332617f152 100644
+--- a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
++++ b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
+@@ -780,6 +780,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	validUpdateJoinConfBRBootstrapImage := before.DeepCopy()
  	validUpdateJoinConfBRBootstrapImage.Spec.KubeadmConfigSpec.JoinConfiguration.BottlerocketBootstrap = bootstrapv1.BottlerocketBootstrap{ImageRepository: "registry.k8s.io/bottlerocketbootstrap", ImageTag: "v1.1.0+new"}
  
@@ -239,7 +233,7 @@ index 40f670dc8..40ba4c23a 100644
  	beforeTaints := before.DeepCopy()
  	beforeTaints.Spec.MachineTemplate.Spec.Taints = []clusterv1.MachineTaint{
  		{
-@@ -1168,6 +1186,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1176,6 +1194,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateClusterConfBRBootstrapImage,
  		},
@@ -264,7 +258,7 @@ index 40f670dc8..40ba4c23a 100644
  		{
  			name:      "should allow changes to join configuration pause image",
  			expectErr: false,
-@@ -1180,6 +1216,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1188,6 +1224,24 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before:    before,
  			kcp:       validUpdateJoinConfBRBootstrapImage,
  		},
@@ -290,5 +284,5 @@ index 40f670dc8..40ba4c23a 100644
  			name:                "should not allow to add taints when feature gate is disabled",
  			expectErr:           true,
 -- 
-2.48.1
+2.47.3
 

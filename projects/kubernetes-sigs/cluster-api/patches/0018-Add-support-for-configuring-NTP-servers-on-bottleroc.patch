@@ -1,19 +1,11 @@
-From e514fae852fcc1ae12e6ae3b2900bf0fe6bc6b95 Mon Sep 17 00:00:00 2001
+From bcba108979a0d9e3d32f614d6fd758e3e5c3227c Mon Sep 17 00:00:00 2001
 From: Abhinav <abhinavmpandey08@gmail.com>
 Date: Wed, 1 Feb 2023 16:34:23 -0800
-Subject: [PATCH] Add support for configuring NTP servers on bottlerocket
- through CAPI
+Subject: [PATCH 18/37] Add support for configuring NTP servers on bottlerocket
 
-Signed-off-by: Abhinav <abhinavmpandey08@gmail.com>
----
- .../internal/bottlerocket/bootstrap.go        | 10 +++++
- .../internal/bottlerocket/bootstrap_test.go   | 43 ++++++++++++-------
- .../internal/bottlerocket/bottlerocket.go     | 11 ++++-
- .../controllers/kubeadmconfig_controller.go   |  9 ++++
- 4 files changed, 57 insertions(+), 16 deletions(-)
 
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index 5e8573f09..384328c43 100644
+index 5e8573f09768..384328c43867 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -96,6 +96,12 @@ password = "{{.RegistryMirrorPassword}}"
@@ -40,7 +32,7 @@ index 5e8573f09..384328c43 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
-index 49c294436..d50b96761 100644
+index 49c294436df1..d50b96761b78 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 @@ -40,10 +40,20 @@ no-proxy = []
@@ -108,7 +100,7 @@ index 49c294436..d50b96761 100644
  				},
  				BootstrapContainers: []bootstrapv1.BottlerocketBootstrapContainer{
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 096b47ffc..05cd01b8a 100644
+index 096b47ffc6a4..05cd01b8a90d 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -33,6 +33,7 @@ type BottlerocketConfig struct {
@@ -154,11 +146,11 @@ index 096b47ffc..05cd01b8a 100644
  
  	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
  	if err != nil {
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index b758ffec6..714289bc0 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -575,6 +575,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index 34763e249148..e6e99a036bfe 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -581,6 +581,9 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
  		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
  		}
@@ -168,7 +160,7 @@ index b758ffec6..714289bc0 100644
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
-@@ -888,6 +891,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -898,6 +901,9 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
  		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
  		}
@@ -178,7 +170,7 @@ index b758ffec6..714289bc0 100644
  		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -1082,6 +1088,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -1121,6 +1127,9 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
  		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
  			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
  		}
@@ -189,5 +181,5 @@ index b758ffec6..714289bc0 100644
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 -- 
-2.48.1
+2.47.3
 

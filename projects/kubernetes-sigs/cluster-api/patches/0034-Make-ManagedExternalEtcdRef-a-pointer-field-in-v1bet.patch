@@ -1,98 +1,75 @@
-From f62c32ce2f26228f01c100faeab09f1bb2ba0fd0 Mon Sep 17 00:00:00 2001
+From b467607c71bf570ef15ef503d4fd8fb29ceec88e Mon Sep 17 00:00:00 2001
 From: Pankti <shah.pankti2609@gmail.com>
 Date: Tue, 14 Oct 2025 12:11:10 -0700
-Subject: [PATCH] Make ManagedExternalEtcdRef a pointer field in v1beta2 API.
- Add ManagedExternalEtcdRef To and From conversion inside v1beta1.
+Subject: [PATCH 34/37] Make ManagedExternalEtcdRef a pointer field in v1beta2
+ API.
 
----
- api/core/v1beta1/conversion.go                | 16 ++++
- api/core/v1beta1/zz_generated.conversion.go   | 20 ++++-
- api/core/v1beta2/cluster_types.go             |  2 +-
- api/core/v1beta2/zz_generated.deepcopy.go     |  6 +-
- api/core/v1beta2/zz_generated.openapi.go      |  1 -
- .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 81 -------------------
- .../internal/controllers/controller.go        |  4 +-
- .../internal/controllers/controller_test.go   |  2 +-
- .../controllers/cluster/cluster_controller.go |  4 +-
- .../cluster/cluster_controller_phases.go      |  4 +-
- .../cluster/cluster_controller_test.go        |  2 +-
- .../machine/machine_controller_phases.go      |  2 +-
- 12 files changed, 49 insertions(+), 95 deletions(-)
 
 diff --git a/api/core/v1beta1/conversion.go b/api/core/v1beta1/conversion.go
-index 9eada94f5..35dd6ac34 100644
+index 2034c45e154b..e9d735ae9599 100644
 --- a/api/core/v1beta1/conversion.go
 +++ b/api/core/v1beta1/conversion.go
-@@ -67,6 +67,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
- 		dst.Spec.ControlPlaneRef = controlPlaneRef
- 	}
+@@ -17,6 +17,7 @@ limitations under the License.
+ package v1beta1
  
-+	if src.Spec.ManagedExternalEtcdRef != nil {
-+		etcdRef, err := convertToContractVersionedObjectReference(src.Spec.ManagedExternalEtcdRef)
-+		if err != nil {
-+			return err
-+		}
-+		dst.Spec.ManagedExternalEtcdRef = &etcdRef
-+	}
-+
- 	restored := &clusterv1.Cluster{}
- 	ok, err := utilconversion.UnmarshalData(src, restored)
- 	if err != nil {
-@@ -109,6 +117,14 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error {
- 		dst.Spec.ControlPlaneRef = controlPlaneRef
- 	}
+ import (
++	"fmt"
+ 	"maps"
+ 	"reflect"
+ 	"slices"
+@@ -26,6 +27,7 @@ import (
+ 	corev1 "k8s.io/api/core/v1"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	apimachineryconversion "k8s.io/apimachinery/pkg/conversion"
++	"k8s.io/apimachinery/pkg/runtime/schema"
  
-+	if src.Spec.ManagedExternalEtcdRef != nil && src.Spec.ManagedExternalEtcdRef.IsDefined() {
-+		etcdRef, err := convertToObjectReference(*src.Spec.ManagedExternalEtcdRef, src.Namespace)
-+		if err != nil {
-+			return err
-+		}
-+		dst.Spec.ManagedExternalEtcdRef = etcdRef
-+	}
-+
- 	if dst.Spec.ClusterNetwork != nil && dst.Spec.ClusterNetwork.APIServerPort != nil &&
- 		*dst.Spec.ClusterNetwork.APIServerPort == 0 {
- 		dst.Spec.ClusterNetwork.APIServerPort = nil
-diff --git a/api/core/v1beta1/zz_generated.conversion.go b/api/core/v1beta1/zz_generated.conversion.go
-index 35f221f57..d0127a259 100644
---- a/api/core/v1beta1/zz_generated.conversion.go
-+++ b/api/core/v1beta1/zz_generated.conversion.go
-@@ -1595,7 +1595,15 @@ func autoConvert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, out
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+ )
+@@ -1597,6 +1599,24 @@ func Convert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, out *cl
+ 	if err := autoConvert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in, out, s); err != nil {
  		return err
  	}
- 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
--	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
++	// ManagedExternalEtcdRef is an EKS-A field; v1beta2 stores it as a ContractVersionedObjectReference.
++	// Convert from the v1beta1 ObjectReference (APIVersion -> APIGroup; version is re-resolved from the
++	// contract downstream). Mirrors convertToContractVersionedObjectReference in core/webhooks/conversion.
 +	if in.ManagedExternalEtcdRef != nil {
-+		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
-+		*out = new(v1beta2.ContractVersionedObjectReference)
-+		if err := Convert_v1_ObjectReference_To_v1beta2_ContractVersionedObjectReference(*in, *out, s); err != nil {
-+			return err
++		var apiGroup string
++		if in.ManagedExternalEtcdRef.APIVersion != "" {
++			gv, err := schema.ParseGroupVersion(in.ManagedExternalEtcdRef.APIVersion)
++			if err != nil {
++				return fmt.Errorf("failed to parse ManagedExternalEtcdRef apiVersion: %w", err)
++			}
++			apiGroup = gv.Group
 +		}
-+	} else {
-+		out.ManagedExternalEtcdRef = nil
++		out.ManagedExternalEtcdRef = &clusterv1.ContractVersionedObjectReference{
++			APIGroup: apiGroup,
++			Kind:     in.ManagedExternalEtcdRef.Kind,
++			Name:     in.ManagedExternalEtcdRef.Name,
++		}
 +	}
- 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
- 	// WARNING: in.Topology requires manual conversion: inconvertible types (*sigs.k8s.io/cluster-api/api/core/v1beta1.Topology vs sigs.k8s.io/cluster-api/api/core/v1beta2.Topology)
- 	out.AvailabilityGates = *(*[]v1beta2.ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
-@@ -1611,7 +1619,15 @@ func autoConvert_v1beta2_ClusterSpec_To_v1beta1_ClusterSpec(in *v1beta2.ClusterS
+ 	if in.ClusterNetwork != nil {
+ 		if err := Convert_v1beta1_ClusterNetwork_To_v1beta2_ClusterNetwork(in.ClusterNetwork, &out.ClusterNetwork, s); err != nil {
+ 			return err
+@@ -1615,6 +1635,17 @@ func Convert_v1beta2_ClusterSpec_To_v1beta1_ClusterSpec(in *clusterv1.ClusterSpe
+ 	if err := autoConvert_v1beta2_ClusterSpec_To_v1beta1_ClusterSpec(in, out, s); err != nil {
  		return err
  	}
- 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
--	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
-+	if in.ManagedExternalEtcdRef != nil {
-+		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
-+		*out = new(corev1.ObjectReference)
-+		if err := Convert_v1beta2_ContractVersionedObjectReference_To_v1_ObjectReference(*in, *out, s); err != nil {
-+			return err
++	// ManagedExternalEtcdRef (EKS-A): convert the v1beta2 ContractVersionedObjectReference back to a
++	// v1beta1 ObjectReference. The contract version is not available in this layer, so APIVersion carries
++	// the group; the full version is re-resolved by the conversion webhook (same limitation upstream
++	// applies to ControlPlaneRef, left as a manual conversion here).
++	if in.ManagedExternalEtcdRef != nil && in.ManagedExternalEtcdRef.IsDefined() {
++		out.ManagedExternalEtcdRef = &corev1.ObjectReference{
++			APIVersion: schema.GroupVersion{Group: in.ManagedExternalEtcdRef.APIGroup}.String(),
++			Kind:       in.ManagedExternalEtcdRef.Kind,
++			Name:       in.ManagedExternalEtcdRef.Name,
 +		}
-+	} else {
-+		out.ManagedExternalEtcdRef = nil
 +	}
- 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
- 	// WARNING: in.Topology requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.Topology vs *sigs.k8s.io/cluster-api/api/core/v1beta1.Topology)
- 	out.AvailabilityGates = *(*[]ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
+ 	if !reflect.DeepEqual(in.ClusterNetwork, clusterv1.ClusterNetwork{}) {
+ 		out.ClusterNetwork = &ClusterNetwork{}
+ 		if err := Convert_v1beta2_ClusterNetwork_To_v1beta1_ClusterNetwork(&in.ClusterNetwork, out.ClusterNetwork, s); err != nil {
 diff --git a/api/core/v1beta2/cluster_types.go b/api/core/v1beta2/cluster_types.go
-index 70554603a..3c9fe275c 100644
+index 9bd126fc6159..547e3a4d02f4 100644
 --- a/api/core/v1beta2/cluster_types.go
 +++ b/api/core/v1beta2/cluster_types.go
 @@ -499,7 +499,7 @@ type ClusterSpec struct {
@@ -104,139 +81,11 @@ index 70554603a..3c9fe275c 100644
  
  	// infrastructureRef is a reference to a provider-specific resource that holds the details
  	// for provisioning infrastructure for a cluster in said provider.
-diff --git a/api/core/v1beta2/zz_generated.deepcopy.go b/api/core/v1beta2/zz_generated.deepcopy.go
-index 19b436dbc..65c5a0901 100644
---- a/api/core/v1beta2/zz_generated.deepcopy.go
-+++ b/api/core/v1beta2/zz_generated.deepcopy.go
-@@ -618,7 +618,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
- 	in.ClusterNetwork.DeepCopyInto(&out.ClusterNetwork)
- 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
- 	out.ControlPlaneRef = in.ControlPlaneRef
--	out.ManagedExternalEtcdRef = in.ManagedExternalEtcdRef
-+	if in.ManagedExternalEtcdRef != nil {
-+		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
-+		*out = new(ContractVersionedObjectReference)
-+		**out = **in
-+	}
- 	out.InfrastructureRef = in.InfrastructureRef
- 	in.Topology.DeepCopyInto(&out.Topology)
- 	if in.AvailabilityGates != nil {
-diff --git a/api/core/v1beta2/zz_generated.openapi.go b/api/core/v1beta2/zz_generated.openapi.go
-index cec393843..b6c616248 100644
---- a/api/core/v1beta2/zz_generated.openapi.go
-+++ b/api/core/v1beta2/zz_generated.openapi.go
-@@ -1259,7 +1259,6 @@ func schema_cluster_api_api_core_v1beta2_ClusterSpec(ref common.ReferenceCallbac
- 					"managedExternalEtcdRef": {
- 						SchemaProps: spec.SchemaProps{
- 							Description: "ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details for provisioning an external etcd cluster",
--							Default:     map[string]interface{}{},
- 							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference"),
- 						},
- 					},
-diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 0331f1b27..6cc8f5574 100644
---- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-+++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -295,51 +295,6 @@ spec:
-                     type: string
-                 type: object
-                 x-kubernetes-map-type: atomic
--              managedExternalEtcdRef:
--                description: |-
--                  ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
--                  for provisioning an external etcd cluster
--                properties:
--                  apiVersion:
--                    description: API version of the referent.
--                    type: string
--                  fieldPath:
--                    description: |-
--                      If referring to a piece of an object instead of an entire object, this string
--                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
--                      For example, if the object reference is to a container within a pod, this would take on a value like:
--                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
--                      the event) or if no container name is specified "spec.containers[2]" (container with
--                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
--                      referencing a part of an object.
--                    type: string
--                  kind:
--                    description: |-
--                      Kind of the referent.
--                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
--                    type: string
--                  name:
--                    description: |-
--                      Name of the referent.
--                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
--                    type: string
--                  namespace:
--                    description: |-
--                      Namespace of the referent.
--                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
--                    type: string
--                  resourceVersion:
--                    description: |-
--                      Specific resourceVersion to which this reference is made, if any.
--                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
--                    type: string
--                  uid:
--                    description: |-
--                      UID of the referent.
--                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
--                    type: string
--                type: object
--                x-kubernetes-map-type: atomic
-               paused:
-                 description: paused can be used to prevent controllers from processing
-                   the Cluster and all its associated objects.
-@@ -2180,42 +2135,6 @@ spec:
-                 - kind
-                 - name
-                 type: object
--              managedExternalEtcdRef:
--                description: |-
--                  ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
--                  for provisioning an external etcd cluster
--                properties:
--                  apiGroup:
--                    description: |-
--                      apiGroup is the group of the resource being referenced.
--                      apiGroup must be fully qualified domain name.
--                      The corresponding version for this reference will be looked up from the contract
--                      labels of the corresponding CRD of the resource being referenced.
--                    maxLength: 253
--                    minLength: 1
--                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
--                    type: string
--                  kind:
--                    description: |-
--                      kind of the resource being referenced.
--                      kind must consist of alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character.
--                    maxLength: 63
--                    minLength: 1
--                    pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
--                    type: string
--                  name:
--                    description: |-
--                      name of the resource being referenced.
--                      name must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character.
--                    maxLength: 253
--                    minLength: 1
--                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
--                    type: string
--                required:
--                - apiGroup
--                - kind
--                - name
--                type: object
-               paused:
-                 description: paused can be used to prevent controllers from processing
-                   the Cluster and all its associated objects.
-diff --git a/controlplane/kubeadm/internal/controllers/controller.go b/controlplane/kubeadm/internal/controllers/controller.go
-index d0333451c..aab9df85d 100644
---- a/controlplane/kubeadm/internal/controllers/controller.go
-+++ b/controlplane/kubeadm/internal/controllers/controller.go
-@@ -546,7 +546,7 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
+diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
+index ca053ab4db80..ea058b32f7de 100644
+--- a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
++++ b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
+@@ -566,7 +566,7 @@ func (r *Reconciler) reconcile(ctx context.Context, controlPlane *pkg.ControlPla
  				*/
  				if controlPlane.Cluster.Spec.ManagedExternalEtcdRef.IsDefined() {
  					etcdRef := controlPlane.Cluster.Spec.ManagedExternalEtcdRef
@@ -245,7 +94,7 @@ index d0333451c..aab9df85d 100644
  					if err != nil {
  						return ctrl.Result{}, err
  					}
-@@ -1757,7 +1757,7 @@ func (r *KubeadmControlPlaneReconciler) updateManagedExternalEtcdEndpoints(
+@@ -1908,7 +1908,7 @@ func (r *KubeadmControlPlaneReconciler) updateManagedExternalEtcdEndpoints(
  	}
  
  	etcdRef := cluster.Spec.ManagedExternalEtcdRef
@@ -254,11 +103,11 @@ index d0333451c..aab9df85d 100644
  	if err != nil {
  		return ctrl.Result{}, err
  	}
-diff --git a/controlplane/kubeadm/internal/controllers/controller_test.go b/controlplane/kubeadm/internal/controllers/controller_test.go
-index a2bedaa90..a1201f633 100644
---- a/controlplane/kubeadm/internal/controllers/controller_test.go
-+++ b/controlplane/kubeadm/internal/controllers/controller_test.go
-@@ -4503,7 +4503,7 @@ func TestKubeadmControlPlaneReconciler_updateManagedExternalEtcdEndpoints(t *tes
+diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller_test.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller_test.go
+index 19c59cb63e54..6a026145f3a6 100644
+--- a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller_test.go
++++ b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller_test.go
+@@ -4897,7 +4897,7 @@ func TestKubeadmControlPlaneReconciler_updateManagedExternalEtcdEndpoints(t *tes
  		unstructured.SetNestedField(managedEtcd.Object, true, "status", "ready")
  		unstructured.SetNestedField(managedEtcd.Object, strings.Join(endpoints, ","), "status", "endpoints")
  		cluster, kcp, _ := createClusterWithControlPlane(ns)
@@ -267,10 +116,10 @@ index a2bedaa90..a1201f633 100644
  			APIGroup: managedEtcd.GroupVersionKind().Group,
  			Kind:     managedEtcd.GetKind(),
  			Name:     managedEtcd.GetName(),
-diff --git a/internal/controllers/cluster/cluster_controller.go b/internal/controllers/cluster/cluster_controller.go
-index b33aeefe0..44ed1ae8f 100644
---- a/internal/controllers/cluster/cluster_controller.go
-+++ b/internal/controllers/cluster/cluster_controller.go
+diff --git a/core/reconcilers/cluster/cluster_controller.go b/core/reconcilers/cluster/cluster_controller.go
+index 04a9891227ea..8a4425110983 100644
+--- a/core/reconcilers/cluster/cluster_controller.go
++++ b/core/reconcilers/cluster/cluster_controller.go
 @@ -452,7 +452,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
  	}
  
@@ -289,10 +138,10 @@ index b33aeefe0..44ed1ae8f 100644
  		switch {
  		case apierrors.IsNotFound(errors.Cause(err)):
  			// Etcd cluster has been deleted
-diff --git a/internal/controllers/cluster/cluster_controller_phases.go b/internal/controllers/cluster/cluster_controller_phases.go
-index d593d2b68..6abe74866 100644
---- a/internal/controllers/cluster/cluster_controller_phases.go
-+++ b/internal/controllers/cluster/cluster_controller_phases.go
+diff --git a/core/reconcilers/cluster/cluster_controller_phases.go b/core/reconcilers/cluster/cluster_controller_phases.go
+index a577e32ee117..eabb9faf7ce2 100644
+--- a/core/reconcilers/cluster/cluster_controller_phases.go
++++ b/core/reconcilers/cluster/cluster_controller_phases.go
 @@ -383,7 +383,7 @@ func (r *Reconciler) handlePauseControlPlaneWithExternalManagedEtcd(ctx context.
  	}
  
@@ -311,10 +160,10 @@ index d593d2b68..6abe74866 100644
  	etcdPlaneReconcileResult := external.ReconcileOutput{Result: obj}
  	if err != nil {
  		return ctrl.Result{}, err
-diff --git a/internal/controllers/cluster/cluster_controller_test.go b/internal/controllers/cluster/cluster_controller_test.go
-index 022420170..f829ab893 100644
---- a/internal/controllers/cluster/cluster_controller_test.go
-+++ b/internal/controllers/cluster/cluster_controller_test.go
+diff --git a/core/reconcilers/cluster/cluster_controller_test.go b/core/reconcilers/cluster/cluster_controller_test.go
+index 022420170163..f829ab893bb5 100644
+--- a/core/reconcilers/cluster/cluster_controller_test.go
++++ b/core/reconcilers/cluster/cluster_controller_test.go
 @@ -1035,7 +1035,7 @@ func TestFilterOwnedDescendants(t *testing.T) {
  			Name: "c",
  		},
@@ -324,10 +173,10 @@ index 022420170..f829ab893 100644
  		},
  	}
  
-diff --git a/internal/controllers/machine/machine_controller_phases.go b/internal/controllers/machine/machine_controller_phases.go
-index 59a43eaaa..fc9a4c820 100644
---- a/internal/controllers/machine/machine_controller_phases.go
-+++ b/internal/controllers/machine/machine_controller_phases.go
+diff --git a/core/reconcilers/machine/machine_controller_phases.go b/core/reconcilers/machine/machine_controller_phases.go
+index 01995459124b..340eaba192d7 100644
+--- a/core/reconcilers/machine/machine_controller_phases.go
++++ b/core/reconcilers/machine/machine_controller_phases.go
 @@ -352,7 +352,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
  		// set first node's IP address on EtcdCluster
  		// get etcd cluster
@@ -338,5 +187,5 @@ index 59a43eaaa..fc9a4c820 100644
  			if apierrors.IsNotFound(errors.Cause(err)) {
  				return ctrl.Result{}, err
 -- 
-2.48.1
+2.47.3
 

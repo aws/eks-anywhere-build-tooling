@@ -1,21 +1,11 @@
-From 686829a3fd51da16c1e422becf1b33df33d576f5 Mon Sep 17 00:00:00 2001
+From ffb6f22407cae46306b3bcc7f0b5b98c97fe023f Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Tue, 16 May 2023 11:03:09 -0500
-Subject: [PATCH] CAPI Move Cluster Filter
+Subject: [PATCH 23/37] CAPI Move Cluster Filter
 
-Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
----
- cmd/clusterctl/client/cluster/mover.go        |  31 +++--
- cmd/clusterctl/client/cluster/mover_test.go   |  20 +--
- cmd/clusterctl/client/cluster/objectgraph.go  |  48 ++++++-
- .../client/cluster/objectgraph_test.go        | 131 +++++++++++++++++-
- cmd/clusterctl/client/move.go                 |  10 +-
- cmd/clusterctl/client/move_test.go            |   8 +-
- cmd/clusterctl/cmd/move.go                    |   4 +
- 7 files changed, 218 insertions(+), 34 deletions(-)
 
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
-index aaaabcdf8..44b62f443 100644
+index bb9d79b3c94e..3111245091d2 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
 +++ b/cmd/clusterctl/client/cluster/mover.go
 @@ -53,13 +53,16 @@ type ResourceMutatorFunc func(u *unstructured.Unstructured) error
@@ -54,7 +44,7 @@ index aaaabcdf8..44b62f443 100644
 -	objectGraph, err := o.getObjectGraph(ctx, namespace)
 +	objectGraph, err := o.getObjectGraph(ctx, namespace, clusterName)
  	if err != nil {
- 		return errors.Wrap(err, "failed to get object graph")
+ 		return pkgerrors.Wrap(err, "failed to get object graph")
  	}
 @@ -103,11 +106,11 @@ func (o *objectMover) Move(ctx context.Context, namespace string, toCluster Clie
  	return o.move(ctx, objectGraph, proxy, mutators...)
@@ -68,7 +58,7 @@ index aaaabcdf8..44b62f443 100644
 -	objectGraph, err := o.getObjectGraph(ctx, namespace)
 +	objectGraph, err := o.getObjectGraph(ctx, namespace, clusterName)
  	if err != nil {
- 		return errors.Wrap(err, "failed to get object graph")
+ 		return pkgerrors.Wrap(err, "failed to get object graph")
  	}
 @@ -115,7 +118,7 @@ func (o *objectMover) ToDirectory(ctx context.Context, namespace string, directo
  	return o.toDirectory(ctx, objectGraph, directory)
@@ -109,11 +99,11 @@ index aaaabcdf8..44b62f443 100644
  	// - Edges are derived by the OwnerReferences between nodes.
 -	if err := objectGraph.Discovery(ctx, namespace); err != nil {
 +	if err := objectGraph.Discovery(ctx, namespace, clusterName); err != nil {
- 		return nil, errors.Wrap(err, "failed to discover the object graph")
+ 		return nil, pkgerrors.Wrap(err, "failed to discover the object graph")
  	}
  
 diff --git a/cmd/clusterctl/client/cluster/mover_test.go b/cmd/clusterctl/client/cluster/mover_test.go
-index a7f48f29e..19dd8f684 100644
+index a7f48f29e2db..19dd8f684694 100644
 --- a/cmd/clusterctl/client/cluster/mover_test.go
 +++ b/cmd/clusterctl/client/cluster/mover_test.go
 @@ -780,7 +780,7 @@ func Test_objectMover_backupTargetObject(t *testing.T) {
@@ -207,10 +197,10 @@ index a7f48f29e..19dd8f684 100644
  			backoff := wait.Backoff{
  				Steps: 1,
 diff --git a/cmd/clusterctl/client/cluster/objectgraph.go b/cmd/clusterctl/client/cluster/objectgraph.go
-index 83bd433c2..512a3e32e 100644
+index 49601944c479..b802b80ccc40 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph.go
-@@ -43,9 +43,11 @@ import (
+@@ -45,9 +45,11 @@ import (
  	secretutil "sigs.k8s.io/cluster-api/util/secret"
  )
  
@@ -225,7 +215,7 @@ index 83bd433c2..512a3e32e 100644
  
  type empty struct{}
  
-@@ -428,8 +430,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
+@@ -430,8 +432,8 @@ func getCRDList(ctx context.Context, proxy Proxy, crdList *apiextensionsv1.Custo
  }
  
  // Discovery reads all the Kubernetes objects existing in a namespace (or in all namespaces if empty) for the types received in input, and then adds
@@ -236,7 +226,7 @@ index 83bd433c2..512a3e32e 100644
  	log := logf.Log
  	log.Info("Discovering Cluster API objects")
  
-@@ -559,10 +561,46 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
+@@ -561,10 +563,46 @@ func (o *objectGraph) Discovery(ctx context.Context, namespace string) error {
  	// Completes the graph by setting for each node the list of tenants the node belongs to.
  	o.setTenants()
  
@@ -284,10 +274,10 @@ index 83bd433c2..512a3e32e 100644
  func (o *objectGraph) fetchRef(ctx context.Context, opts wait.Backoff, ref *corev1.ObjectReference) (*unstructured.Unstructured, error) {
  	if ref == nil {
 diff --git a/cmd/clusterctl/client/cluster/objectgraph_test.go b/cmd/clusterctl/client/cluster/objectgraph_test.go
-index 11418edaa..ea359e9f9 100644
+index 3446980d4f40..d8926bfb72ae 100644
 --- a/cmd/clusterctl/client/cluster/objectgraph_test.go
 +++ b/cmd/clusterctl/client/cluster/objectgraph_test.go
-@@ -1799,7 +1799,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
+@@ -1800,7 +1800,7 @@ func TestObjectGraph_Discovery(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
@@ -296,7 +286,7 @@ index 11418edaa..ea359e9f9 100644
  			if tt.wantErr {
  				g.Expect(err).To(HaveOccurred())
  				return
-@@ -2195,7 +2195,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
+@@ -2196,7 +2196,134 @@ func TestObjectGraph_DiscoveryByNamespace(t *testing.T) {
  			g.Expect(err).ToNot(HaveOccurred())
  
  			// finally test discovery
@@ -433,7 +423,7 @@ index 11418edaa..ea359e9f9 100644
  				g.Expect(err).To(HaveOccurred())
  				return
 diff --git a/cmd/clusterctl/client/move.go b/cmd/clusterctl/client/move.go
-index 6d5299cc9..977f8b881 100644
+index 03d0ba189cbb..fd520e411610 100644
 --- a/cmd/clusterctl/client/move.go
 +++ b/cmd/clusterctl/client/move.go
 @@ -39,6 +39,10 @@ type MoveOptions struct {
@@ -475,7 +465,7 @@ index 6d5299cc9..977f8b881 100644
  
  func (c *clusterctlClient) getClusterClient(ctx context.Context, kubeconfig Kubeconfig) (cluster.Client, error) {
 diff --git a/cmd/clusterctl/client/move_test.go b/cmd/clusterctl/client/move_test.go
-index 42998329a..784c93d27 100644
+index 42998329ae7c..784c93d27c91 100644
 --- a/cmd/clusterctl/client/move_test.go
 +++ b/cmd/clusterctl/client/move_test.go
 @@ -297,11 +297,11 @@ type fakeObjectMover struct {
@@ -506,7 +496,7 @@ index 42998329a..784c93d27 100644
  	return f.fromDirectoryErr
  }
 diff --git a/cmd/clusterctl/cmd/move.go b/cmd/clusterctl/cmd/move.go
-index 9f0d16693..3e82551d4 100644
+index 695acc70f43d..5464c1132f7c 100644
 --- a/cmd/clusterctl/cmd/move.go
 +++ b/cmd/clusterctl/cmd/move.go
 @@ -38,6 +38,7 @@ type moveOptions struct {
@@ -535,5 +525,5 @@ index 9f0d16693..3e82551d4 100644
  	})
  }
 -- 
-2.48.1
+2.47.3
 
