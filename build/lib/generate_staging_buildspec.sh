@@ -289,10 +289,15 @@ for project in "${PROJECTS[@]}"; do
                         fi
                     fi
 
+                    RELEASE_IMAGE_OVERRIDE="$IMAGE_OVERRIDE"
+                    if [[ "${KEYS[0]}" == "RELEASE_BRANCH" && -f "$PROJECT_PATH/$val1/BUILDER_BASE_IMAGE" ]]; then
+                        RELEASE_IMAGE_OVERRIDE="\"image\":\"$(cat "$PROJECT_PATH/$val1/BUILDER_BASE_IMAGE")\","
+                    fi
+
                     ALL_PROJECT_IDS+="\"$IDENTIFIER_WITH_VAL\","
                     PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER_WITH_VAL "
                     yq eval -i -P \
-                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE$IMAGE_OVERRIDE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"$EXTRA_VARS}}}]" \
+                        ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE$RELEASE_IMAGE_OVERRIDE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\"$EXTRA_VARS}}}]" \
                         $STAGING_BUILDSPEC_FILE
 
                 done
@@ -322,10 +327,15 @@ for project in "${PROJECTS[@]}"; do
                                 ARCH_TYPE="\"type\":\"ARM_CONTAINER\",\"compute-type\":\"$BUILDSPEC_COMPUTE_TYPE\","
                             fi
                         fi
+                        RELEASE_IMAGE_OVERRIDE="$IMAGE_OVERRIDE"
+                        if [[ "${KEYS[0]}" == "RELEASE_BRANCH" && -f "$PROJECT_PATH/$val1/BUILDER_BASE_IMAGE" ]]; then
+                            RELEASE_IMAGE_OVERRIDE="\"image\":\"$(cat "$PROJECT_PATH/$val1/BUILDER_BASE_IMAGE")\","
+                        fi
+
                         ALL_PROJECT_IDS+="\"$IDENTIFIER_WITH_VAL\","
                         PREVIOUS_SPEC_IDENTIFIERS+="$IDENTIFIER_WITH_VAL "
                         yq eval -i -P \
-                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE$IMAGE_OVERRIDE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"$EXTRA_VARS}}}]" \
+                            ".batch.build-graph += [{\"identifier\":\"$IDENTIFIER_WITH_VAL\",$buildspec_field$DEPEND_ON\"env\":{$ARCH_TYPE$RELEASE_IMAGE_OVERRIDE\"variables\":{\"PROJECT_PATH\": \"projects/$org/$repo\"$CLONE_URL,\"${KEYS[0]}\":\"$val1\",\"${KEYS[1]}\":\"$val2\"$EXTRA_VARS}}}]" \
                             $STAGING_BUILDSPEC_FILE
                     done
                 done

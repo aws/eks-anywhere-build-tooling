@@ -8,9 +8,15 @@
 ![1.34 Version](https://img.shields.io/badge/1--34%20version-cluster--autoscaler--1.34.2-blue)
 ![1.35 Version](https://img.shields.io/badge/1--35%20version-cluster--autoscaler--1.36.0-blue)
 ![1.36 Version](https://img.shields.io/badge/1--36%20version-cluster--autoscaler--1.36.0-blue)
+![1.37 Version](https://img.shields.io/badge/1--37%20version-cluster--autoscaler--1.36.1-blue)
 ![Build Status](https://codebuild.us-west-2.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiL0tWckptdkxsZEd1cXNiNTBncjRNVU5oekpZRlBkTDNBcFVvZkFOVHZwbTBKUm91QkR6RVN4QlhJWk42cXF3L29FMmdnTXUrVndiay8zVUQ0YjJsc21vPSIsIml2UGFyYW1ldGVyU3BlYyI6Ik1Gd2UwbmRXVWxSRTMvUHQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main)
 
 [Autoscaler](https://github.com/kubernetes/autoscaler) defines the cluster autoscaler.
+
+The `1-37` folder temporarily builds upstream `cluster-autoscaler-1.36.1`
+while the upstream 1.37 release tag is pending. The binary and chart app version
+remain `1.36.1`. Replace the tag, patches, attribution, and checksums and rerun
+build/chart validation when the 1.37 release is available.
 
 You can find the latest version of this image [on ECR Public Gallery](https://gallery.ecr.aws/eks-anywhere/kubernetes/autoscaler).
 

@@ -9,7 +9,13 @@ SOURCE_PATTERNS=$(foreach target,$(BINARY_TARGET_FILES),./cmd/$(target))
 
 GITVERSION=$(shell git -C $(REPO) describe --dirty --long --always)
 COMMIT=$(shell git -C $(REPO) rev-parse HEAD)
-EXTRA_GO_LDFLAGS=-X github.com/containerd/containerd/version.Version=$(GITVERSION) -X github.com/containerd/containerd/version.Revision=$(COMMIT) -X github.com/containerd/containerd/version.Package=github.com/containerd/containerd -extldflags -static
+CONTAINERD_VERSION_PACKAGE=github.com/containerd/containerd/version
+CONTAINERD_MODULE=github.com/containerd/containerd
+ifeq ($(RELEASE_BRANCH),1-37)
+CONTAINERD_VERSION_PACKAGE=github.com/containerd/containerd/v2/version
+CONTAINERD_MODULE=github.com/containerd/containerd/v2
+endif
+EXTRA_GO_LDFLAGS=-X $(CONTAINERD_VERSION_PACKAGE).Version=$(GITVERSION) -X $(CONTAINERD_VERSION_PACKAGE).Revision=$(COMMIT) -X $(CONTAINERD_VERSION_PACKAGE).Package=$(CONTAINERD_MODULE) -extldflags -static
 EXTRA_GOBUILD_FLAGS=-tags urfave_cli_no_docs,osusergo,netgo,static_build
 
 CGO_CREATE_BINARIES=true
@@ -31,6 +37,13 @@ PROJECT_DEPENDENCIES=eksa/opencontainers/runc
 SIMPLE_CREATE_TARBALLS=false
 
 include $(BASE_DIRECTORY)/Common.mk
+
+ifeq ($(RELEASE_BRANCH),1-37)
+.PHONY: seed-go-license-cache
+1-37/ATTRIBUTION.txt: | seed-go-license-cache
+seed-go-license-cache: $(GO_MOD_DOWNLOAD_TARGETS) | $$(ENABLE_DOCKER)
+	@bash $(MAKE_ROOT)/1-37/seed-go-license-cache.sh $(MAKE_ROOT) $(GOLANG_VERSION)
+endif
 
 .PHONY: tarballs
 tarballs: $(LICENSES_TARGETS_FOR_PREREQ) $(HANDLE_DEPENDENCIES_TARGET) | $$(ENABLE_LOGGING)
