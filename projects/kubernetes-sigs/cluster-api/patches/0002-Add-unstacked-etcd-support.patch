@@ -1,8 +1,130 @@
-From 2151e640afb98c3a7b0400fe03571c5b65ceb5f8 Mon Sep 17 00:00:00 2001
+From ce7e03917a4ab0aa4705613059472b05750c52ab Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
-Subject: [PATCH 02/37] Add unstacked etcd support
+Subject: [PATCH 02/36] Add unstacked etcd support
 
+Unstacked etcd: API and config changes
+
+Unstacked etcd: Changes in CAPI core controllers
+
+This commit adds the following changes in the cluster controller:
+* A change in reconcileControlPlane to check if the cluster is using managed
+external etcd, and if etcd is not ready then pause the control plane provisioning.
+* A new phase in cluster controller's phases for reconciling the etcd cluster. If the
+etcd cluster is ready then this phase will resume control plane provisioning
+
+This commit also adds the following change in the machine controller:
+* The machine controller upon creation of the first etcd machine will save its IP.
+
+Unstacked etcd: Changes in KCP controller
+
+The KubeadmControlPlane controller will get the external etcd endpoints
+from the object referenced by cluster.spec.managedExternalEtcdRef.
+The validating webhook will allow the external etcd endpoints to be updated.
+
+Unstacked etcd: Change in docker infra provider
+
+Docker is the only infrastructure provider that performs a kubectl patch on the k8s
+node corresponding to a Machine. This needs to be skipped for etcd machines since they
+are not registered as nodes and do not run kubelet.
+
+Unstacked etcd: Ignore nodeRef check for etcd machines during clusterctl move
+
+Clusterctl before beginning the move checks if all CAPI objects are
+ready and provisioned. One of these checks is for Machine.Status.NodeRef field.
+This check needs to be skipped for etcd machines since they are not registered
+as Kubernetes nodes so they don't have a corresponding Node.
+
+Delete managed external etcd cluster last
+
+Update KCP controller to use renamed etcd endpoints field
+
+The field 'endpoint' on EtcdadmCluster's status has been renamed
+to 'endpoints'. This commit updates the KCP controller to use the
+renamed field
+
+cr https://code.amazon.com/reviews/CR-54310674
+
+Add external etcd api changes to v1beta1 capi CRDs
+
+Fix etcdMachine to cluster reconciler so it listens on Machine events
+
+cr: https://code.amazon.com/reviews/CR-56463335
+
+Add external etcd api to v1alpha4
+
+Fix watch on machine object for etcdMachine to cluster mapper
+
+While cherry-picking commits from 0.3.19 branch the watch got modified
+by mistake. This commit fixes it by changing it back to watching Machine
+objects.
+
+Retain update permission on etcdadmcluster for KCP controller
+
+KCP controller updates the etcdadmcluster object once KCP upgrade is completed.
+It needs update permission on etcdadmcluster object for this.
+We previously had added this permission, it got dropped while rebasing
+commits on the new 1.0.1 branch. This commit adds back the permission.
+---
+ api/core/v1beta1/cluster_types.go             |  14 +
+ api/core/v1beta1/condition_consts.go          |  16 ++
+ api/core/v1beta1/machine_types.go             |   2 +
+ api/core/v1beta1/zz_generated.conversion.go   |   6 +
+ api/core/v1beta1/zz_generated.deepcopy.go     |  10 +
+ api/core/v1beta2/cluster_types.go             |  14 +
+ api/core/v1beta2/condition_consts.go          |  19 ++
+ api/core/v1beta2/machine_types.go             |   3 +
+ api/core/v1beta2/zz_generated.deepcopy.go     |   1 +
+ api/core/v1beta2/zz_generated.openapi.go      |  39 +++
+ cmd/clusterctl/client/cluster/mover.go        |   5 +-
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  | 180 ++++++++++++
+ config/rbac/role.yaml                         |   1 +
+ controllers/external/util.go                  |  20 ++
+ controlplane/kubeadm/config/rbac/role.yaml    |   9 +
+ .../internal/controllers/controller.go        |  50 +++-
+ .../controllers/cluster/cluster_controller.go | 115 +++++++-
+ .../cluster/cluster_controller_phases.go      | 116 ++++++++
+ .../cluster/cluster_controller_test.go        | 259 ++++++++++++++++++
+ .../machine/machine_controller_noderef.go     |   8 +
+ .../machine_controller_noderef_test.go        |  89 ++++++
+ .../machine/machine_controller_phases.go      | 117 ++++++++
+ .../machine/machine_controller_status.go      |   7 +
+ util/collections/machine_filters.go           |  26 ++
+ util/secret/certificates.go                   |   3 +
+ util/secret/consts.go                         |   2 +
+ util/util.go                                  |   6 +
+ 27 files changed, 1126 insertions(+), 11 deletions(-)
+---
+ api/core/v1beta1/cluster_types.go             |  14 +
+ api/core/v1beta1/condition_consts.go          |  16 +
+ api/core/v1beta1/machine_types.go             |   2 +
+ api/core/v1beta1/zz_generated.conversion.go   |   6 +
+ api/core/v1beta1/zz_generated.deepcopy.go     |   5 +
+ api/core/v1beta2/cluster_types.go             |  14 +
+ api/core/v1beta2/condition_consts.go          |  19 ++
+ api/core/v1beta2/machine_types.go             |   3 +
+ api/core/v1beta2/zz_generated.deepcopy.go     |   1 +
+ cmd/clusterctl/client/cluster/mover.go        |   5 +-
+ controllers/external/util.go                  |  20 ++
+ controlplane/kubeadm/config/rbac/role.yaml    |   9 +
+ .../kubeadmcontrolplane_controller.go         |  50 ++-
+ .../crd/bases/cluster.x-k8s.io_clusters.yaml  |  99 ++++++
+ core/config/rbac/role.yaml                    |   1 +
+ .../reconcilers/cluster/cluster_controller.go | 115 ++++++-
+ .../cluster/cluster_controller_phases.go      | 116 +++++++
+ .../cluster/cluster_controller_test.go        | 259 +++++++++++++++
+ .../machine/machine_controller_noderef.go     |   8 +
+ .../machine_controller_noderef_test.go        |  46 +++
+ .../machine/machine_controller_phases.go      | 117 +++++++
+ .../machine/machine_controller_status.go      |   7 +
+ gen_2.log                                     | 296 ++++++++++++++++++
+ .../api/core/v1beta2/zz_generated.openapi.go  |  23 ++
+ util/collections/machine_filters.go           |  26 ++
+ util/secret/certificates.go                   |   3 +
+ util/secret/consts.go                         |   2 +
+ util/util.go                                  |   6 +
+ 28 files changed, 1277 insertions(+), 11 deletions(-)
+ create mode 100644 gen_2.log
 
 diff --git a/api/core/v1beta1/cluster_types.go b/api/core/v1beta1/cluster_types.go
 index 77d304581153..14b15f33ffb1 100644
@@ -76,6 +198,60 @@ index 10fa0062eb9c..e76c507a4b3f 100644
  	// PreDrainDeleteHookAnnotationPrefix annotation specifies the prefix we
  	// search each annotation for during the pre-drain.delete lifecycle hook
  	// to pause reconciliation of deletion. These hooks will prevent removal of
+diff --git a/api/core/v1beta1/zz_generated.conversion.go b/api/core/v1beta1/zz_generated.conversion.go
+index e9999d07a0b4..e34b7ce8a47e 100644
+--- a/api/core/v1beta1/zz_generated.conversion.go
++++ b/api/core/v1beta1/zz_generated.conversion.go
+@@ -1614,6 +1614,7 @@ func autoConvert_v1beta1_ClusterSpec_To_v1beta2_ClusterSpec(in *ClusterSpec, out
+ 		return err
+ 	}
+ 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
++	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
+ 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (*k8s.io/api/core/v1.ObjectReference vs sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference)
+ 	// WARNING: in.Topology requires manual conversion: inconvertible types (*sigs.k8s.io/cluster-api/api/core/v1beta1.Topology vs sigs.k8s.io/cluster-api/api/core/v1beta2.Topology)
+ 	out.AvailabilityGates = *(*[]v1beta2.ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
+@@ -1629,6 +1630,7 @@ func autoConvert_v1beta2_ClusterSpec_To_v1beta1_ClusterSpec(in *v1beta2.ClusterS
+ 		return err
+ 	}
+ 	// WARNING: in.ControlPlaneRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
++	// WARNING: in.ManagedExternalEtcdRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
+ 	// WARNING: in.InfrastructureRef requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference vs *k8s.io/api/core/v1.ObjectReference)
+ 	// WARNING: in.Topology requires manual conversion: inconvertible types (sigs.k8s.io/cluster-api/api/core/v1beta2.Topology vs *sigs.k8s.io/cluster-api/api/core/v1beta1.Topology)
+ 	out.AvailabilityGates = *(*[]ClusterAvailabilityGate)(unsafe.Pointer(&in.AvailabilityGates))
+@@ -1654,6 +1656,8 @@ func autoConvert_v1beta1_ClusterStatus_To_v1beta2_ClusterStatus(in *ClusterStatu
+ 		out.Conditions = nil
+ 	}
+ 	out.ObservedGeneration = in.ObservedGeneration
++	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
++	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
+ 	// WARNING: in.V1Beta2 requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+@@ -1676,6 +1680,8 @@ func autoConvert_v1beta2_ClusterStatus_To_v1beta1_ClusterStatus(in *v1beta2.Clus
+ 	// WARNING: in.FailureDomains requires manual conversion: inconvertible types ([]sigs.k8s.io/cluster-api/api/core/v1beta2.FailureDomain vs sigs.k8s.io/cluster-api/api/core/v1beta1.FailureDomains)
+ 	out.Phase = in.Phase
+ 	out.ObservedGeneration = in.ObservedGeneration
++	out.ManagedExternalEtcdInitialized = in.ManagedExternalEtcdInitialized
++	out.ManagedExternalEtcdReady = in.ManagedExternalEtcdReady
+ 	// WARNING: in.Deprecated requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+diff --git a/api/core/v1beta1/zz_generated.deepcopy.go b/api/core/v1beta1/zz_generated.deepcopy.go
+index d8cd25a2d739..5f128d7c71a3 100644
+--- a/api/core/v1beta1/zz_generated.deepcopy.go
++++ b/api/core/v1beta1/zz_generated.deepcopy.go
+@@ -548,6 +548,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+ 		*out = new(v1.ObjectReference)
+ 		**out = **in
+ 	}
++	if in.ManagedExternalEtcdRef != nil {
++		in, out := &in.ManagedExternalEtcdRef, &out.ManagedExternalEtcdRef
++		*out = new(v1.ObjectReference)
++		**out = **in
++	}
+ 	if in.InfrastructureRef != nil {
+ 		in, out := &in.InfrastructureRef, &out.InfrastructureRef
+ 		*out = new(v1.ObjectReference)
 diff --git a/api/core/v1beta2/cluster_types.go b/api/core/v1beta2/cluster_types.go
 index b04aae626419..9bd126fc6159 100644
 --- a/api/core/v1beta2/cluster_types.go
@@ -149,6 +325,18 @@ index e21428b99a8e..200e1ad13531 100644
  	// ExcludeNodeDrainingAnnotation annotation explicitly skips node draining if set.
  	ExcludeNodeDrainingAnnotation = "machine.cluster.x-k8s.io/exclude-node-draining"
  
+diff --git a/api/core/v1beta2/zz_generated.deepcopy.go b/api/core/v1beta2/zz_generated.deepcopy.go
+index f4f1fc97392c..a49b62fc2f35 100644
+--- a/api/core/v1beta2/zz_generated.deepcopy.go
++++ b/api/core/v1beta2/zz_generated.deepcopy.go
+@@ -628,6 +628,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+ 	in.ClusterNetwork.DeepCopyInto(&out.ClusterNetwork)
+ 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
+ 	out.ControlPlaneRef = in.ControlPlaneRef
++	out.ManagedExternalEtcdRef = in.ManagedExternalEtcdRef
+ 	out.InfrastructureRef = in.InfrastructureRef
+ 	in.Topology.DeepCopyInto(&out.Topology)
+ 	if in.AvailabilityGates != nil {
 diff --git a/cmd/clusterctl/client/cluster/mover.go b/cmd/clusterctl/client/cluster/mover.go
 index e6af177b383f..bb9d79b3c94e 100644
 --- a/cmd/clusterctl/client/cluster/mover.go
@@ -200,6 +388,26 @@ index 5454cd0ea3c7..28462e40942a 100644
 +
 +	return endpoints, found, nil
 +}
+diff --git a/controlplane/kubeadm/config/rbac/role.yaml b/controlplane/kubeadm/config/rbac/role.yaml
+index 37f7163123ea..998b24602b0a 100644
+--- a/controlplane/kubeadm/config/rbac/role.yaml
++++ b/controlplane/kubeadm/config/rbac/role.yaml
+@@ -99,6 +99,15 @@ rules:
+   - patch
+   - update
+   - watch
++- apiGroups:
++  - etcdcluster.cluster.x-k8s.io
++  resources:
++  - '*'
++  verbs:
++  - get
++  - list
++  - update
++  - watch
+ - apiGroups:
+   - runtime.cluster.x-k8s.io
+   resources:
 diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
 index 3bd0bf4857f1..8548bbc5266d 100644
 --- a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
@@ -289,6 +497,149 @@ index 3bd0bf4857f1..8548bbc5266d 100644
  	allMachinePools := &clusterv1.MachinePoolList{}
  	// Get all machine pools.
  	if feature.Gates.Enabled(feature.MachinePool) {
+diff --git a/core/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/core/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+index 1910d9e0575d..07f10d6aaed7 100644
+--- a/core/config/crd/bases/cluster.x-k8s.io_clusters.yaml
++++ b/core/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+@@ -250,6 +250,51 @@ spec:
+                     type: string
+                 type: object
+                 x-kubernetes-map-type: atomic
++              managedExternalEtcdRef:
++                description: |-
++                  ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
++                  for provisioning an external etcd cluster
++                properties:
++                  apiVersion:
++                    description: API version of the referent.
++                    type: string
++                  fieldPath:
++                    description: |-
++                      If referring to a piece of an object instead of an entire object, this string
++                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
++                      For example, if the object reference is to a container within a pod, this would take on a value like:
++                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
++                      the event) or if no container name is specified "spec.containers[2]" (container with
++                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
++                      referencing a part of an object.
++                    type: string
++                  kind:
++                    description: |-
++                      Kind of the referent.
++                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
++                    type: string
++                  name:
++                    description: |-
++                      Name of the referent.
++                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
++                    type: string
++                  namespace:
++                    description: |-
++                      Namespace of the referent.
++                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
++                    type: string
++                  resourceVersion:
++                    description: |-
++                      Specific resourceVersion to which this reference is made, if any.
++                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
++                    type: string
++                  uid:
++                    description: |-
++                      UID of the referent.
++                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
++                    type: string
++                type: object
++                x-kubernetes-map-type: atomic
+               paused:
+                 description: paused can be used to prevent controllers from processing
+                   the Cluster and all its associated objects.
+@@ -1602,6 +1647,15 @@ spec:
+                 description: infrastructureReady is the state of the infrastructure
+                   provider.
+                 type: boolean
++              managedExternalEtcdInitialized:
++                description: |-
++                  ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
++                  so remaining etcd members can lookup the address to join the cluster
++                type: boolean
++              managedExternalEtcdReady:
++                description: ManagedExternalEtcdReady indicates external etcd cluster
++                  is fully provisioned
++                type: boolean
+               observedGeneration:
+                 description: observedGeneration is the latest generation observed
+                   by the controller.
+@@ -2139,6 +2193,42 @@ spec:
+                 - kind
+                 - name
+                 type: object
++              managedExternalEtcdRef:
++                description: |-
++                  ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details
++                  for provisioning an external etcd cluster
++                properties:
++                  apiGroup:
++                    description: |-
++                      apiGroup is the group of the resource being referenced.
++                      apiGroup must be fully qualified domain name.
++                      The corresponding version for this reference will be looked up from the contract
++                      labels of the corresponding CRD of the resource being referenced.
++                    maxLength: 253
++                    minLength: 1
++                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
++                    type: string
++                  kind:
++                    description: |-
++                      kind of the resource being referenced.
++                      kind must consist of alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character.
++                    maxLength: 63
++                    minLength: 1
++                    pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
++                    type: string
++                  name:
++                    description: |-
++                      name of the resource being referenced.
++                      name must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character.
++                    maxLength: 253
++                    minLength: 1
++                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
++                    type: string
++                required:
++                - apiGroup
++                - kind
++                - name
++                type: object
+               paused:
+                 description: paused can be used to prevent controllers from processing
+                   the Cluster and all its associated objects.
+@@ -3785,6 +3875,15 @@ spec:
+                       The value of this field is never updated after provisioning is completed.
+                     type: boolean
+                 type: object
++              managedExternalEtcdInitialized:
++                description: |-
++                  ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller,
++                  so remaining etcd members can lookup the address to join the cluster
++                type: boolean
++              managedExternalEtcdReady:
++                description: ManagedExternalEtcdReady indicates external etcd cluster
++                  is fully provisioned
++                type: boolean
+               observedGeneration:
+                 description: observedGeneration is the latest generation observed
+                   by the controller.
+diff --git a/core/config/rbac/role.yaml b/core/config/rbac/role.yaml
+index d66e484447c5..ea79242dbf32 100644
+--- a/core/config/rbac/role.yaml
++++ b/core/config/rbac/role.yaml
+@@ -55,6 +55,7 @@ rules:
+   - addons.cluster.x-k8s.io
+   - bootstrap.cluster.x-k8s.io
+   - controlplane.cluster.x-k8s.io
++  - etcdcluster.cluster.x-k8s.io
+   - infrastructure.cluster.x-k8s.io
+   resources:
+   - '*'
 diff --git a/core/reconcilers/cluster/cluster_controller.go b/core/reconcilers/cluster/cluster_controller.go
 index b947b9e38790..a988bca5574c 100644
 --- a/core/reconcilers/cluster/cluster_controller.go
@@ -951,7 +1302,7 @@ index d588904ede2a..a841410748d9 100644
  	if machine.Spec.ProviderID == "" {
  		v1beta1conditions.MarkFalse(machine, clusterv1.MachineNodeHealthyV1Beta1Condition, clusterv1.WaitingForNodeRefV1Beta1Reason, clusterv1.ConditionSeverityInfo, "")
 diff --git a/core/reconcilers/machine/machine_controller_noderef_test.go b/core/reconcilers/machine/machine_controller_noderef_test.go
-index 833c1aa1e3df..5f993f5796cb 100644
+index 833c1aa1e3df..e2ade5f06432 100644
 --- a/core/reconcilers/machine/machine_controller_noderef_test.go
 +++ b/core/reconcilers/machine/machine_controller_noderef_test.go
 @@ -37,6 +37,7 @@ import (
@@ -962,7 +1313,7 @@ index 833c1aa1e3df..5f993f5796cb 100644
  	"sigs.k8s.io/cluster-api/util/index"
  	"sigs.k8s.io/cluster-api/util/kubeconfig"
  	"sigs.k8s.io/cluster-api/util/test/builder"
-@@ -1670,3 +1671,91 @@ func Test_propagateMachineTaintsToNode(t *testing.T) {
+@@ -1670,3 +1671,48 @@ func Test_propagateMachineTaintsToNode(t *testing.T) {
  		})
  	}
  }
@@ -1011,49 +1362,6 @@ index 833c1aa1e3df..5f993f5796cb 100644
 +	}
 +}
 +
-+func TestReconcileNodeForEtcdMachines(t *testing.T) {
-+	testCases := []struct {
-+		name    string
-+		machine *clusterv1.Machine
-+	}{
-+		{
-+			name: "with providerID",
-+			machine: &clusterv1.Machine{
-+				ObjectMeta: metav1.ObjectMeta{
-+					Labels: map[string]string{
-+						clusterv1.MachineEtcdClusterLabelName: "true",
-+					},
-+				},
-+				Spec: clusterv1.MachineSpec{
-+					ProviderID: "ID",
-+				},
-+			},
-+		},
-+		{
-+			name: "without providerID",
-+			machine: &clusterv1.Machine{
-+				ObjectMeta: metav1.ObjectMeta{
-+					Labels: map[string]string{
-+						clusterv1.MachineEtcdClusterLabelName: "true",
-+					},
-+				},
-+				Spec: clusterv1.MachineSpec{},
-+			},
-+		},
-+	}
-+	for _, tc := range testCases {
-+		t.Run(tc.name, func(t *testing.T) {
-+			g := NewWithT(t)
-+			r := Reconciler{Client: env}
-+			s := &scope{
-+				cluster: &clusterv1.Cluster{},
-+				machine: tc.machine,
-+			}
-+			g.Expect(r.reconcileNode(ctx, s)).To(Equal(ctrl.Result{}))
-+			g.Expect(conditions.Get(tc.machine, clusterv1.MachineNodeHealthyCondition)).To(BeNil())
-+		})
-+	}
-+}
 diff --git a/core/reconcilers/machine/machine_controller_phases.go b/core/reconcilers/machine/machine_controller_phases.go
 index 6780bd4051f1..50c5b14c2cef 100644
 --- a/core/reconcilers/machine/machine_controller_phases.go
@@ -1214,6 +1522,349 @@ index 2d0fd8ee825a..6699e5ae5857 100644
  	if conditions.IsTrue(m, clusterv1.MachineUpdatingCondition) {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseUpdating)
  	}
+diff --git a/gen_2.log b/gen_2.log
+new file mode 100644
+index 000000000000..8374eda1a2ee
+--- /dev/null
++++ b/gen_2.log
+@@ -0,0 +1,296 @@
++make clean-generated-yaml SRC_DIRS="./core/config/crd/bases,./core/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./core/config/crd/bases,./core/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./core \
++	paths=./core/reconcilers/... \
++	paths=./core/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./core/config/crd/bases \
++	output:rbac:dir=./core/config/rbac \
++	output:webhook:dir=./core/config/webhook \
++	webhook
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./cmd/clusterctl/api/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./cmd/clusterctl/config/crd/bases
++/capi/hack/tools/bin/kustomize-v5.7.0 build cmd/clusterctl/config/crd > cmd/clusterctl/config/manifest/clusterctl-api.yaml
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/test/builder/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t3/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t3/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t4/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t4/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/deprecated/v1beta1/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/deprecated/v1beta1/test/builder/crd
++make clean-generated-yaml SRC_DIRS="./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm \
++	paths=./bootstrap/kubeadm/reconcilers/... \
++	paths=./bootstrap/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./bootstrap/kubeadm/config/crd/bases \
++	output:rbac:dir=./bootstrap/kubeadm/config/rbac \
++	output:webhook:dir=./bootstrap/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/controlplane/kubeadm/... \
++	paths=./controlplane/kubeadm \
++	paths=./controlplane/kubeadm/reconcilers/... \
++	paths=./controlplane/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./controlplane/kubeadm/config/crd/bases \
++	output:rbac:dir=./controlplane/kubeadm/config/rbac \
++	output:webhook:dir=./controlplane/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./ \
++	paths=./api/... \
++	paths=./internal/controllers/... \
++	paths=./internal/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./config/crd/bases \
++	output:webhook:dir=./config/webhook \
++	webhook
++cd ./test/extension; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./... \
++	output:rbac:dir=./config/rbac \
++	rbac:roleName=manager-role
++make generate-go-deepcopy-core generate-go-deepcopy-kubeadm-bootstrap generate-go-deepcopy-kubeadm-control-plane generate-go-deepcopy-docker-infrastructure generate-go-deepcopy-test-extension
++make[1]: Entering directory `/capi'
++make clean-generated-deepcopy SRC_DIRS="./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./api/runtime/hooks/... \
++	paths=./cmd/clusterctl/... \
++	paths=./controllers/crdmigrator/test/... \
++	paths=./internal/runtime/test/... \
++	paths=./internal/topology/upgrade/test/... \
++	paths=./util/test/builder/... \
++	paths=./util/deprecated/v1beta1/test/builder/...
++make clean-generated-deepcopy SRC_DIRS="./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm/pkg/types/...
++make clean-generated-deepcopy SRC_DIRS="./api/controlplane/kubeadm"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/controlplane/kubeadm/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/inmemory/pkg/cloud/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/inmemory/pkg/cloud/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/inmemory; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++        paths=./pkg/cloud/api/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/docker/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/...
++make[1]: Nothing to be done for `generate-go-deepcopy-test-extension'.
++make[1]: Leaving directory `/capi'
++make generate-go-conversions-core generate-go-conversions-kubeadm-bootstrap generate-go-conversions-kubeadm-control-plane generate-go-conversions-docker-infrastructure generate-go-conversions-test-extension
++make[1]: Entering directory `/capi'
++make generate-go-conversions-core-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./core/v1beta1
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/topology/upgrade/test/t2/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-addons-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/addons/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./addons/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-ipam
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/ipam/v1beta1,./api/ipam/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/ipam/v1beta1,./api/ipam/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./ipam/v1alpha1 \
++	./ipam/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-runtime
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/runtime/test/v1alpha1 \
++	./internal/runtime/test/v1alpha2
++make clean-generated-conversions SRC_DIRS="./api/runtime/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/runtime/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./runtime/v1alpha1
++make[2]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/bootstrap/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/v1beta1
++make clean-generated-conversions SRC_DIRS="./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta3 \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta4
++make clean-generated-conversions SRC_DIRS="./api/controlplane/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./controlplane/kubeadm/v1beta1
++cd test/infrastructure/docker; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./api/v1beta1
++make[1]: Nothing to be done for `generate-go-conversions-test-extension'.
++make[1]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/kube-openapi/cmd/openapi-gen openapi-gen 589584f1c912f4367fe8954f649a59a98b912da5 
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/core/v1beta2; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/core/v1beta2 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AllOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AnyOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,OneOf
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterClassDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XIntOrString
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XMetadata
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XPreserveUnknownFields
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XValidations
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeploymentDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineHealthCheckDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachinePoolDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineSetDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineTemplateSpec,ObjectMeta
++API rule violation: streaming_list_type_json_tags,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDrainRuleList,ListMeta
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/runtime/hooks/v1alpha1; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/runtime/hooks/v1alpha1 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Pods
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Services
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,DiscoverVariablesResponse,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequestItem,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesResponse,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequestItem,Variables
+diff --git a/hack/tools/runtime-openapi-gen/api/core/v1beta2/zz_generated.openapi.go b/hack/tools/runtime-openapi-gen/api/core/v1beta2/zz_generated.openapi.go
+index 33a812e8f876..cf6920b101c2 100644
+--- a/hack/tools/runtime-openapi-gen/api/core/v1beta2/zz_generated.openapi.go
++++ b/hack/tools/runtime-openapi-gen/api/core/v1beta2/zz_generated.openapi.go
+@@ -1283,6 +1283,13 @@ func schema_cluster_api_api_core_v1beta2_ClusterSpec(ref common.ReferenceCallbac
+ 							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference"),
+ 						},
+ 					},
++					"managedExternalEtcdRef": {
++						SchemaProps: spec.SchemaProps{
++							Description: "ManagedExternalEtcdRef is an optional reference to an etcd provider resource that holds details for provisioning an external etcd cluster",
++							Default:     map[string]interface{}{},
++							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.ContractVersionedObjectReference"),
++						},
++					},
+ 					"infrastructureRef": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "infrastructureRef is a reference to a provider-specific resource that holds the details for provisioning infrastructure for a cluster in said provider.",
+@@ -1411,6 +1418,22 @@ func schema_cluster_api_api_core_v1beta2_ClusterStatus(ref common.ReferenceCallb
+ 							Format:      "int64",
+ 						},
+ 					},
++					"managedExternalEtcdInitialized": {
++						SchemaProps: spec.SchemaProps{
++							Description: "ManagedExternalEtcdInitialized indicates that first etcd member's IP address is set by machine controller, so remaining etcd members can lookup the address to join the cluster",
++							Default:     false,
++							Type:        []string{"boolean"},
++							Format:      "",
++						},
++					},
++					"managedExternalEtcdReady": {
++						SchemaProps: spec.SchemaProps{
++							Description: "ManagedExternalEtcdReady indicates external etcd cluster is fully provisioned",
++							Default:     false,
++							Type:        []string{"boolean"},
++							Format:      "",
++						},
++					},
+ 					"deprecated": {
+ 						SchemaProps: spec.SchemaProps{
+ 							Description: "deprecated groups all the status fields that are deprecated and will be removed when all the nested field are removed.",
 diff --git a/util/collections/machine_filters.go b/util/collections/machine_filters.go
 index 4efea929a217..fac48c160b0d 100644
 --- a/util/collections/machine_filters.go
@@ -1302,6 +1953,3 @@ index a3e02f6e9be4..610fad63da07 100644
  // GetClusterFromMetadata returns the Cluster object (if present) using the object metadata.
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
--- 
-2.47.3
-

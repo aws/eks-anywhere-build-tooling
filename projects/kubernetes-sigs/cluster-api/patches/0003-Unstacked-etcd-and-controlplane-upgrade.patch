@@ -1,8 +1,64 @@
-From 7243b22d10df6e7f33c25fc5586c5644bbb3d8f8 Mon Sep 17 00:00:00 2001
+From 7539212f70bb72e34ba1350aee60ecf38bb379a0 Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Fri, 6 Aug 2021 17:16:39 -0700
-Subject: [PATCH 03/37] Unstacked etcd and controlplane upgrade
+Subject: [PATCH 03/36] Unstacked etcd and controlplane upgrade
 
+Rename controlplane upgrade annotation variable
+
+Add controlplane upgrade complete annotation to sync etcd to v1beta1
+
+Check if controlplane is paused before patching it with paused annotation
+
+Patch etcd cluster with upgrade complete annotation only after upgrade
+
+After KCP upgrade is completed, the controller checks the condition "MachinesSpecUpToDate"
+exists and marks it to true. The controller also updates the etcd cluster with an
+annotation to indicate the controlplane upgrade is complete. But it should annotate
+etcd cluster only if the MachineSpecUpToDate condition is False, since that will happen
+only immediately after an upgrade. Without checking for false it will keep annotating
+the etcd cluster on further reconcile calls.
+
+Signed-off-by: Rajashree Mandaogane <mandaor@amazon.com>
+---
+ .../kubeadm/v1beta1/condition_consts.go       |   8 +
+ .../v1beta2/kubeadm_control_plane_types.go    |   8 +
+ api/core/v1beta1/common_types.go              |   7 +
+ api/core/v1beta2/common_types.go              |   7 +
+ controllers/external/util.go                  |  29 ++
+ .../internal/controllers/controller.go        | 115 ++++++--
+ .../internal/controllers/controller_test.go   | 214 ++++++++++++++-
+ .../kubeadm/internal/workload_cluster.go      |   1 +
+ .../kubeadm/internal/workload_cluster_etcd.go |   9 +
+ .../controllers/cluster/cluster_controller.go |   2 +-
+ .../cluster/cluster_controller_phases.go      | 101 ++++---
+ .../cluster/cluster_controller_test.go        | 256 ++++++++++++++++++
+ util/annotations/helpers.go                   |   5 +
+ util/test/builder/builders.go                 |   7 +
+ util/test/builder/etcd.go                     |  80 ++++++
+ util/test/builder/zz_generated.deepcopy.go    |  23 ++
+ 16 files changed, 805 insertions(+), 67 deletions(-)
+ create mode 100644 util/test/builder/etcd.go
+---
+ .../kubeadm/v1beta1/condition_consts.go       |   8 +
+ .../v1beta2/kubeadm_control_plane_types.go    |   8 +
+ api/core/v1beta1/common_types.go              |   7 +
+ api/core/v1beta2/common_types.go              |   7 +
+ controllers/external/util.go                  |  33 +-
+ controlplane/kubeadm/pkg/workload_cluster.go  |   1 +
+ .../kubeadm/pkg/workload_cluster_etcd.go      |   9 +
+ .../kubeadmcontrolplane_controller.go         | 115 +++++--
+ .../kubeadmcontrolplane_controller_test.go    | 214 ++++++++++++-
+ .../reconcilers/cluster/cluster_controller.go |   2 +-
+ .../cluster/cluster_controller_phases.go      | 101 +++---
+ .../cluster/cluster_controller_test.go        | 256 +++++++++++++++
+ gen_3.log                                     | 296 ++++++++++++++++++
+ util/annotations/helpers.go                   |   5 +
+ util/test/builder/builders.go                 |   7 +
+ util/test/builder/etcd.go                     |  80 +++++
+ util/test/builder/zz_generated.deepcopy.go    |  23 ++
+ 17 files changed, 1103 insertions(+), 69 deletions(-)
+ create mode 100644 gen_3.log
+ create mode 100644 util/test/builder/etcd.go
 
 diff --git a/api/controlplane/kubeadm/v1beta1/condition_consts.go b/api/controlplane/kubeadm/v1beta1/condition_consts.go
 index c460c3a80fff..30c775801fb4 100644
@@ -93,10 +149,26 @@ index 3466d3692767..cf182b5447cf 100644
  
  // MachineSetPreflightCheck defines a valid MachineSet preflight check.
 diff --git a/controllers/external/util.go b/controllers/external/util.go
-index 28462e40942a..b7b038797072 100644
+index 28462e40942a..ab08887eead1 100644
 --- a/controllers/external/util.go
 +++ b/controllers/external/util.go
-@@ -296,3 +296,32 @@ func GetExternalEtcdEndpoints(externalEtcd *unstructured.Unstructured) (string,
+@@ -271,7 +271,7 @@ func FailuresFrom(obj *unstructured.Unstructured) (string, string, error) {
+ func IsInitialized(obj *unstructured.Unstructured) (bool, error) {
+ 	initialized, found, err := unstructured.NestedBool(obj.Object, "status", "initialized")
+ 	if err != nil {
+-		return false, errors.Wrapf(err, "failed to determine %v %q initialized",
++		return false, pkgerrors.Wrapf(err, "failed to determine %v %q initialized",
+ 			obj.GroupVersionKind(), obj.GetName())
+ 	}
+ 	return initialized && found, nil
+@@ -290,9 +290,38 @@ func IsReady(obj *unstructured.Unstructured) (bool, error) {
+ func GetExternalEtcdEndpoints(externalEtcd *unstructured.Unstructured) (string, bool, error) {
+ 	endpoints, found, err := unstructured.NestedString(externalEtcd.Object, "status", "endpoints")
+ 	if err != nil {
+-		return "", false, errors.Wrapf(err, "failed to get external etcd endpoints from %v %q", externalEtcd.GroupVersionKind(),
++		return "", false, pkgerrors.Wrapf(err, "failed to get external etcd endpoints from %v %q", externalEtcd.GroupVersionKind(),
+ 			externalEtcd.GetName())
+ 	}
  
  	return endpoints, found, nil
  }
@@ -104,7 +176,7 @@ index 28462e40942a..b7b038797072 100644
 +func IsExternalEtcdUpgrading(externalEtcd *unstructured.Unstructured) (bool, error) {
 +	annotations, hasAnnotations, err := unstructured.NestedStringMap(externalEtcd.Object, "metadata", "annotations")
 +	if err != nil {
-+		return false, errors.Wrapf(err, "failed to check if external etcd is undergoing upgrade %v %q", externalEtcd.GroupVersionKind(),
++		return false, pkgerrors.Wrapf(err, "failed to check if external etcd is undergoing upgrade %v %q", externalEtcd.GroupVersionKind(),
 +			externalEtcd.GetName())
 +	}
 +
@@ -119,7 +191,7 @@ index 28462e40942a..b7b038797072 100644
 +func SetKCPUpdateCompleteAnnotationOnEtcdadmCluster(externalEtcd *unstructured.Unstructured) error {
 +	annotations, hasAnnotations, err := unstructured.NestedStringMap(externalEtcd.Object, "metadata", "annotations")
 +	if err != nil {
-+		return errors.Wrapf(err, "failed to update external etcd annotation after controlplane upgrade completed %v %q", externalEtcd.GroupVersionKind(),
++		return pkgerrors.Wrapf(err, "failed to update external etcd annotation after controlplane upgrade completed %v %q", externalEtcd.GroupVersionKind(),
 +			externalEtcd.GetName())
 +	}
 +
@@ -1004,6 +1076,308 @@ index 40d749290a03..022420170163 100644
 +		g.Expect(err).NotTo(HaveOccurred())
 +	})
 +}
+diff --git a/gen_3.log b/gen_3.log
+new file mode 100644
+index 000000000000..8374eda1a2ee
+--- /dev/null
++++ b/gen_3.log
+@@ -0,0 +1,296 @@
++make clean-generated-yaml SRC_DIRS="./core/config/crd/bases,./core/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./core/config/crd/bases,./core/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./core \
++	paths=./core/reconcilers/... \
++	paths=./core/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./core/config/crd/bases \
++	output:rbac:dir=./core/config/rbac \
++	output:webhook:dir=./core/config/webhook \
++	webhook
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./cmd/clusterctl/api/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./cmd/clusterctl/config/crd/bases
++/capi/hack/tools/bin/kustomize-v5.7.0 build cmd/clusterctl/config/crd > cmd/clusterctl/config/manifest/clusterctl-api.yaml
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/test/builder/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t3/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t3/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t4/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t4/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/deprecated/v1beta1/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/deprecated/v1beta1/test/builder/crd
++make clean-generated-yaml SRC_DIRS="./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm \
++	paths=./bootstrap/kubeadm/reconcilers/... \
++	paths=./bootstrap/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./bootstrap/kubeadm/config/crd/bases \
++	output:rbac:dir=./bootstrap/kubeadm/config/rbac \
++	output:webhook:dir=./bootstrap/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/controlplane/kubeadm/... \
++	paths=./controlplane/kubeadm \
++	paths=./controlplane/kubeadm/reconcilers/... \
++	paths=./controlplane/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./controlplane/kubeadm/config/crd/bases \
++	output:rbac:dir=./controlplane/kubeadm/config/rbac \
++	output:webhook:dir=./controlplane/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./ \
++	paths=./api/... \
++	paths=./internal/controllers/... \
++	paths=./internal/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./config/crd/bases \
++	output:webhook:dir=./config/webhook \
++	webhook
++cd ./test/extension; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./... \
++	output:rbac:dir=./config/rbac \
++	rbac:roleName=manager-role
++make generate-go-deepcopy-core generate-go-deepcopy-kubeadm-bootstrap generate-go-deepcopy-kubeadm-control-plane generate-go-deepcopy-docker-infrastructure generate-go-deepcopy-test-extension
++make[1]: Entering directory `/capi'
++make clean-generated-deepcopy SRC_DIRS="./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./api/runtime/hooks/... \
++	paths=./cmd/clusterctl/... \
++	paths=./controllers/crdmigrator/test/... \
++	paths=./internal/runtime/test/... \
++	paths=./internal/topology/upgrade/test/... \
++	paths=./util/test/builder/... \
++	paths=./util/deprecated/v1beta1/test/builder/...
++make clean-generated-deepcopy SRC_DIRS="./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm/pkg/types/...
++make clean-generated-deepcopy SRC_DIRS="./api/controlplane/kubeadm"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/controlplane/kubeadm/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/inmemory/pkg/cloud/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/inmemory/pkg/cloud/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/inmemory; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++        paths=./pkg/cloud/api/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/docker/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/...
++make[1]: Nothing to be done for `generate-go-deepcopy-test-extension'.
++make[1]: Leaving directory `/capi'
++make generate-go-conversions-core generate-go-conversions-kubeadm-bootstrap generate-go-conversions-kubeadm-control-plane generate-go-conversions-docker-infrastructure generate-go-conversions-test-extension
++make[1]: Entering directory `/capi'
++make generate-go-conversions-core-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./core/v1beta1
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/topology/upgrade/test/t2/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-addons-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/addons/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./addons/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-ipam
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/ipam/v1beta1,./api/ipam/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/ipam/v1beta1,./api/ipam/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./ipam/v1alpha1 \
++	./ipam/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-runtime
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/runtime/test/v1alpha1 \
++	./internal/runtime/test/v1alpha2
++make clean-generated-conversions SRC_DIRS="./api/runtime/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/runtime/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./runtime/v1alpha1
++make[2]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/bootstrap/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/v1beta1
++make clean-generated-conversions SRC_DIRS="./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta3 \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta4
++make clean-generated-conversions SRC_DIRS="./api/controlplane/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./controlplane/kubeadm/v1beta1
++cd test/infrastructure/docker; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./api/v1beta1
++make[1]: Nothing to be done for `generate-go-conversions-test-extension'.
++make[1]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/kube-openapi/cmd/openapi-gen openapi-gen 589584f1c912f4367fe8954f649a59a98b912da5 
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/core/v1beta2; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/core/v1beta2 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AllOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AnyOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,OneOf
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterClassDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XIntOrString
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XMetadata
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XPreserveUnknownFields
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XValidations
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeploymentDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineHealthCheckDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachinePoolDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineSetDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineTemplateSpec,ObjectMeta
++API rule violation: streaming_list_type_json_tags,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDrainRuleList,ListMeta
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/runtime/hooks/v1alpha1; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/runtime/hooks/v1alpha1 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Pods
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Services
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,DiscoverVariablesResponse,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequestItem,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesResponse,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequestItem,Variables
 diff --git a/util/annotations/helpers.go b/util/annotations/helpers.go
 index c378fa29872b..1a71cfee4e65 100644
 --- a/util/annotations/helpers.go
@@ -1131,6 +1505,44 @@ index 000000000000..9c187575f545
 +func (c *EtcdPlaneBuilder) Build() *unstructured.Unstructured {
 +	return c.obj
 +}
--- 
-2.47.3
-
+diff --git a/util/test/builder/zz_generated.deepcopy.go b/util/test/builder/zz_generated.deepcopy.go
+index 821fa49ba68c..9e6a641c8f23 100644
+--- a/util/test/builder/zz_generated.deepcopy.go
++++ b/util/test/builder/zz_generated.deepcopy.go
+@@ -97,6 +97,10 @@ func (in *ClusterBuilder) DeepCopyInto(out *ClusterBuilder) {
+ 		*out = (*in).DeepCopy()
+ 	}
+ 	in.network.DeepCopyInto(&out.network)
++	if in.etcd != nil {
++		in, out := &in.etcd, &out.etcd
++		*out = (*in).DeepCopy()
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClusterBuilder.
+@@ -300,6 +304,25 @@ func (in *ControlPlaneTemplateBuilder) DeepCopy() *ControlPlaneTemplateBuilder {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *EtcdPlaneBuilder) DeepCopyInto(out *EtcdPlaneBuilder) {
++	*out = *in
++	if in.obj != nil {
++		in, out := &in.obj, &out.obj
++		*out = (*in).DeepCopy()
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new EtcdPlaneBuilder.
++func (in *EtcdPlaneBuilder) DeepCopy() *EtcdPlaneBuilder {
++	if in == nil {
++		return nil
++	}
++	out := new(EtcdPlaneBuilder)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *InfrastructureClusterBuilder) DeepCopyInto(out *InfrastructureClusterBuilder) {
+ 	*out = *in

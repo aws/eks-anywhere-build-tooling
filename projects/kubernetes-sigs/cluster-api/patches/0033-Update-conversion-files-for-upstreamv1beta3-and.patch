@@ -1,0 +1,756 @@
+From 865aa75dc386db4cf46429bce012ebd023901313 Mon Sep 17 00:00:00 2001
+From: Pankti <shah.pankti2609@gmail.com>
+Date: Tue, 7 Oct 2025 14:21:01 -0700
+Subject: [PATCH 33/36] Update conversion files for upstreamv1beta3 and 
+ upstreamv1beta4
+
+---
+ .../types/upstreamv1beta3/conversion.go       |  58 ++
+ .../zz_generated.conversion.go                | 459 +++++++++++++-
+ .../types/upstreamv1beta4/conversion.go       |  70 +++
+ .../kubeadm/types/upstreamv1beta4/types.go    |   2 +-
+ .../zz_generated.conversion.go                | 579 +++++++++++++++++-
+ .../upstreamv1beta4/zz_generated.deepcopy.go  | 235 ++++++-
+ 6 files changed, 1346 insertions(+), 57 deletions(-)
+---
+ .../pkg/types/upstreamv1beta3/conversion.go   |  58 ++++
+ .../zz_generated.conversion.go                |  70 ++---
+ .../pkg/types/upstreamv1beta4/conversion.go   |  70 +++++
+ .../pkg/types/upstreamv1beta4/types.go        |   2 +-
+ .../zz_generated.conversion.go                |  94 +++---
+ gen_33.log                                    | 296 ++++++++++++++++++
+ 6 files changed, 507 insertions(+), 83 deletions(-)
+ create mode 100644 gen_33.log
+
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/conversion.go
+index 8690748ae73b..6539c6cc6b14 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/conversion.go
+@@ -459,3 +459,61 @@ func Convert_v1beta2_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(
+ func Convert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in *bootstrapv1.ClusterConfiguration, out *ClusterConfiguration, s apimachineryconversion.Scope) error {
+ 	return autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in, out, s)
+ }
++
++func Convert_upstreamv1beta3_BottlerocketAdmin_To_v1beta2_BottlerocketAdmin(in *BottlerocketAdmin, out *bootstrapv1.BottlerocketAdmin, _ apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketAdmin_To_upstreamv1beta3_BottlerocketAdmin(in *bootstrapv1.BottlerocketAdmin, out *BottlerocketAdmin, _ apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_upstreamv1beta3_BottlerocketHostContainer_To_v1beta2_BottlerocketHostContainer(in *BottlerocketHostContainer, out *bootstrapv1.BottlerocketHostContainer, _ apimachineryconversion.Scope) error {
++	out.Name = in.Name
++	out.Superpowered = in.Superpowered
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	out.UserData = in.UserData
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketHostContainer_To_upstreamv1beta3_BottlerocketHostContainer(in *bootstrapv1.BottlerocketHostContainer, out *BottlerocketHostContainer, _ apimachineryconversion.Scope) error {
++	out.Name = in.Name
++	out.Superpowered = in.Superpowered
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	out.UserData = in.UserData
++	return nil
++}
++
++func Convert_upstreamv1beta3_BottlerocketBootstrapContainer_To_v1beta2_BottlerocketBootstrapContainer(in *BottlerocketBootstrapContainer, out *bootstrapv1.BottlerocketBootstrapContainer, _ apimachineryconversion.Scope) error {
++	out.Name = in.Name
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	out.Essential = in.Essential
++	out.Mode = in.Mode
++	out.UserData = in.UserData
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketBootstrapContainer_To_upstreamv1beta3_BottlerocketBootstrapContainer(in *bootstrapv1.BottlerocketBootstrapContainer, out *BottlerocketBootstrapContainer, _ apimachineryconversion.Scope) error {
++	out.Name = in.Name
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	out.Essential = in.Essential
++	out.Mode = in.Mode
++	out.UserData = in.UserData
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketKubernetesSettings_To_upstreamv1beta3_BottlerocketKubernetesSettings(in *bootstrapv1.BottlerocketKubernetesSettings, out *BottlerocketKubernetesSettings, _ apimachineryconversion.Scope) error {
++	out.MaxPods = in.MaxPods
++	out.AllowedUnsafeSysctls = in.AllowedUnsafeSysctls
++	out.ClusterDNSIPs = in.ClusterDNSIPs
++	// Note: Other fields in v1beta2.BottlerocketKubernetesSettings don't exist in upstreamv1beta3 version
++	return nil
++}
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+index 893872dfb913..6e050b9bc198 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -68,16 +68,6 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*BottlerocketAdmin)(nil), (*v1beta2.BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_upstreamv1beta3_BottlerocketAdmin_To_v1beta2_BottlerocketAdmin(a.(*BottlerocketAdmin), b.(*v1beta2.BottlerocketAdmin), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketAdmin)(nil), (*BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketAdmin_To_upstreamv1beta3_BottlerocketAdmin(a.(*v1beta2.BottlerocketAdmin), b.(*BottlerocketAdmin), scope)
+-	}); err != nil {
+-		return err
+-	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketBootSettings)(nil), (*v1beta2.BottlerocketBootSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_BottlerocketBootSettings_To_v1beta2_BottlerocketBootSettings(a.(*BottlerocketBootSettings), b.(*v1beta2.BottlerocketBootSettings), scope)
+ 	}); err != nil {
+@@ -88,26 +78,6 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*BottlerocketBootstrapContainer)(nil), (*v1beta2.BottlerocketBootstrapContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_upstreamv1beta3_BottlerocketBootstrapContainer_To_v1beta2_BottlerocketBootstrapContainer(a.(*BottlerocketBootstrapContainer), b.(*v1beta2.BottlerocketBootstrapContainer), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketBootstrapContainer)(nil), (*BottlerocketBootstrapContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketBootstrapContainer_To_upstreamv1beta3_BottlerocketBootstrapContainer(a.(*v1beta2.BottlerocketBootstrapContainer), b.(*BottlerocketBootstrapContainer), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*BottlerocketHostContainer)(nil), (*v1beta2.BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_upstreamv1beta3_BottlerocketHostContainer_To_v1beta2_BottlerocketHostContainer(a.(*BottlerocketHostContainer), b.(*v1beta2.BottlerocketHostContainer), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketHostContainer)(nil), (*BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketHostContainer_To_upstreamv1beta3_BottlerocketHostContainer(a.(*v1beta2.BottlerocketHostContainer), b.(*BottlerocketHostContainer), scope)
+-	}); err != nil {
+-		return err
+-	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketKernelSettings)(nil), (*v1beta2.BottlerocketKernelSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_BottlerocketKernelSettings_To_v1beta2_BottlerocketKernelSettings(a.(*BottlerocketKernelSettings), b.(*v1beta2.BottlerocketKernelSettings), scope)
+ 	}); err != nil {
+@@ -123,11 +93,6 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketKubernetesSettings)(nil), (*BottlerocketKubernetesSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketKubernetesSettings_To_upstreamv1beta3_BottlerocketKubernetesSettings(a.(*v1beta2.BottlerocketKubernetesSettings), b.(*BottlerocketKubernetesSettings), scope)
+-	}); err != nil {
+-		return err
+-	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketSettings)(nil), (*v1beta2.BottlerocketSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_BottlerocketSettings_To_v1beta2_BottlerocketSettings(a.(*BottlerocketSettings), b.(*v1beta2.BottlerocketSettings), scope)
+ 	}); err != nil {
+@@ -228,6 +193,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*BottlerocketAdmin)(nil), (*v1beta2.BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_BottlerocketAdmin_To_v1beta2_BottlerocketAdmin(a.(*BottlerocketAdmin), b.(*v1beta2.BottlerocketAdmin), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*BottlerocketBootstrapContainer)(nil), (*v1beta2.BottlerocketBootstrapContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_BottlerocketBootstrapContainer_To_v1beta2_BottlerocketBootstrapContainer(a.(*BottlerocketBootstrapContainer), b.(*v1beta2.BottlerocketBootstrapContainer), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*BottlerocketBootstrap)(nil), (*v1beta2.BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(a.(*BottlerocketBootstrap), b.(*v1beta2.BottlerocketBootstrap), scope)
+ 	}); err != nil {
+@@ -238,6 +213,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*BottlerocketHostContainer)(nil), (*v1beta2.BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_BottlerocketHostContainer_To_v1beta2_BottlerocketHostContainer(a.(*BottlerocketHostContainer), b.(*v1beta2.BottlerocketHostContainer), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*ClusterConfiguration)(nil), (*v1beta2.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta2.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -308,6 +288,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketAdmin)(nil), (*BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketAdmin_To_upstreamv1beta3_BottlerocketAdmin(a.(*v1beta2.BottlerocketAdmin), b.(*BottlerocketAdmin), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketBootstrapContainer)(nil), (*BottlerocketBootstrapContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketBootstrapContainer_To_upstreamv1beta3_BottlerocketBootstrapContainer(a.(*v1beta2.BottlerocketBootstrapContainer), b.(*BottlerocketBootstrapContainer), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.BottlerocketBootstrap)(nil), (*BottlerocketBootstrap)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(a.(*v1beta2.BottlerocketBootstrap), b.(*BottlerocketBootstrap), scope)
+ 	}); err != nil {
+@@ -318,6 +308,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketHostContainer)(nil), (*BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketHostContainer_To_upstreamv1beta3_BottlerocketHostContainer(a.(*v1beta2.BottlerocketHostContainer), b.(*BottlerocketHostContainer), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketKubernetesSettings)(nil), (*BottlerocketKubernetesSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketKubernetesSettings_To_upstreamv1beta3_BottlerocketKubernetesSettings(a.(*v1beta2.BottlerocketKubernetesSettings), b.(*BottlerocketKubernetesSettings), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(a.(*v1beta2.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/conversion.go
+index f4e3a380a76e..87aebc3208e4 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/conversion.go
+@@ -538,6 +538,76 @@ func Convert_v1beta2_DNS_To_upstreamv1beta4_DNS(in *bootstrapv1.DNS, out *DNS, _
+ 	return nil
+ }
+ 
++func Convert_upstreamv1beta4_BottlerocketAdmin_To_v1beta2_BottlerocketAdmin(in *BottlerocketAdmin, out *bootstrapv1.BottlerocketAdmin, _ apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketAdmin_To_upstreamv1beta4_BottlerocketAdmin(in *bootstrapv1.BottlerocketAdmin, out *BottlerocketAdmin, _ apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_upstreamv1beta4_BottlerocketControl_To_v1beta2_BottlerocketControl(in *BottlerocketControl, out *bootstrapv1.BottlerocketControl, _ apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketControl_To_upstreamv1beta4_BottlerocketControl(in *bootstrapv1.BottlerocketControl, out *BottlerocketControl, _ apimachineryconversion.Scope) error {
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	return nil
++}
++
++func Convert_upstreamv1beta4_BottlerocketHostContainer_To_v1beta2_BottlerocketHostContainer(in *BottlerocketHostContainer, out *bootstrapv1.BottlerocketHostContainer, _ apimachineryconversion.Scope) error {
++	out.Name = in.Name
++	out.Superpowered = in.Superpowered
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	out.UserData = in.UserData
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketHostContainer_To_upstreamv1beta4_BottlerocketHostContainer(in *bootstrapv1.BottlerocketHostContainer, out *BottlerocketHostContainer, _ apimachineryconversion.Scope) error {
++	out.Name = in.Name
++	out.Superpowered = in.Superpowered
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	out.UserData = in.UserData
++	return nil
++}
++
++func Convert_upstreamv1beta4_BottlerocketBootstrapContainer_To_v1beta2_BottlerocketBootstrapContainer(in *BottlerocketBootstrapContainer, out *bootstrapv1.BottlerocketBootstrapContainer, _ apimachineryconversion.Scope) error {
++	out.Name = in.Name
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	out.Essential = in.Essential
++	out.Mode = in.Mode
++	out.UserData = in.UserData
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketBootstrapContainer_To_upstreamv1beta4_BottlerocketBootstrapContainer(in *bootstrapv1.BottlerocketBootstrapContainer, out *BottlerocketBootstrapContainer, _ apimachineryconversion.Scope) error {
++	out.Name = in.Name
++	out.ImageRepository = in.ImageRepository
++	out.ImageTag = in.ImageTag
++	out.Essential = in.Essential
++	out.Mode = in.Mode
++	out.UserData = in.UserData
++	return nil
++}
++
++func Convert_v1beta2_BottlerocketKubernetesSettings_To_upstreamv1beta4_BottlerocketKubernetesSettings(in *bootstrapv1.BottlerocketKubernetesSettings, out *BottlerocketKubernetesSettings, _ apimachineryconversion.Scope) error {
++	out.MaxPods = in.MaxPods
++	out.AllowedUnsafeSysctls = in.AllowedUnsafeSysctls
++	out.ClusterDNSIPs = in.ClusterDNSIPs
++	// Note: Other fields in v1beta2.BottlerocketKubernetesSettings don't exist in upstreamv1beta4 version
++	return nil
++}
++
+ func Convert_v1beta2_Etcd_To_upstreamv1beta4_Etcd(in *bootstrapv1.Etcd, out *Etcd, s apimachineryconversion.Scope) error {
+ 	if in.Local.IsDefined() {
+ 		out.Local = &LocalEtcd{}
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/types.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/types.go
+index f909ea5080f9..9e2bf420a1d7 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/types.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/types.go
+@@ -119,7 +119,7 @@ type ClusterConfiguration struct {
+ 	// Proxy holds the https and no proxy information
+ 	// This is only for bottlerocket
+ 	// +optional
+-	Proxy ProxyConfiguration `json:"proxy,omitempty"`
++	Proxy Proxy `json:"proxy,omitempty"`
+ 
+ 	// RegistryMirror holds the image registry mirror information
+ 	// This is only for bottlerocket
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+index 507ed32ac2f3..934bf2d0db88 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+@@ -78,16 +78,6 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*BottlerocketAdmin)(nil), (*v1beta2.BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_upstreamv1beta4_BottlerocketAdmin_To_v1beta2_BottlerocketAdmin(a.(*BottlerocketAdmin), b.(*v1beta2.BottlerocketAdmin), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketAdmin)(nil), (*BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketAdmin_To_upstreamv1beta4_BottlerocketAdmin(a.(*v1beta2.BottlerocketAdmin), b.(*BottlerocketAdmin), scope)
+-	}); err != nil {
+-		return err
+-	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketBootSettings)(nil), (*v1beta2.BottlerocketBootSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta4_BottlerocketBootSettings_To_v1beta2_BottlerocketBootSettings(a.(*BottlerocketBootSettings), b.(*v1beta2.BottlerocketBootSettings), scope)
+ 	}); err != nil {
+@@ -108,36 +98,6 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*BottlerocketBootstrapContainer)(nil), (*v1beta2.BottlerocketBootstrapContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_upstreamv1beta4_BottlerocketBootstrapContainer_To_v1beta2_BottlerocketBootstrapContainer(a.(*BottlerocketBootstrapContainer), b.(*v1beta2.BottlerocketBootstrapContainer), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketBootstrapContainer)(nil), (*BottlerocketBootstrapContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketBootstrapContainer_To_upstreamv1beta4_BottlerocketBootstrapContainer(a.(*v1beta2.BottlerocketBootstrapContainer), b.(*BottlerocketBootstrapContainer), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*BottlerocketControl)(nil), (*v1beta2.BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_upstreamv1beta4_BottlerocketControl_To_v1beta2_BottlerocketControl(a.(*BottlerocketControl), b.(*v1beta2.BottlerocketControl), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketControl)(nil), (*BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketControl_To_upstreamv1beta4_BottlerocketControl(a.(*v1beta2.BottlerocketControl), b.(*BottlerocketControl), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*BottlerocketHostContainer)(nil), (*v1beta2.BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_upstreamv1beta4_BottlerocketHostContainer_To_v1beta2_BottlerocketHostContainer(a.(*BottlerocketHostContainer), b.(*v1beta2.BottlerocketHostContainer), scope)
+-	}); err != nil {
+-		return err
+-	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketHostContainer)(nil), (*BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketHostContainer_To_upstreamv1beta4_BottlerocketHostContainer(a.(*v1beta2.BottlerocketHostContainer), b.(*BottlerocketHostContainer), scope)
+-	}); err != nil {
+-		return err
+-	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketKernelSettings)(nil), (*v1beta2.BottlerocketKernelSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta4_BottlerocketKernelSettings_To_v1beta2_BottlerocketKernelSettings(a.(*BottlerocketKernelSettings), b.(*v1beta2.BottlerocketKernelSettings), scope)
+ 	}); err != nil {
+@@ -153,11 +113,6 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketKubernetesSettings)(nil), (*BottlerocketKubernetesSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketKubernetesSettings_To_upstreamv1beta4_BottlerocketKubernetesSettings(a.(*v1beta2.BottlerocketKubernetesSettings), b.(*BottlerocketKubernetesSettings), scope)
+-	}); err != nil {
+-		return err
+-	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketSettings)(nil), (*v1beta2.BottlerocketSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta4_BottlerocketSettings_To_v1beta2_BottlerocketSettings(a.(*BottlerocketSettings), b.(*v1beta2.BottlerocketSettings), scope)
+ 	}); err != nil {
+@@ -278,6 +233,26 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*BottlerocketAdmin)(nil), (*v1beta2.BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta4_BottlerocketAdmin_To_v1beta2_BottlerocketAdmin(a.(*BottlerocketAdmin), b.(*v1beta2.BottlerocketAdmin), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*BottlerocketBootstrapContainer)(nil), (*v1beta2.BottlerocketBootstrapContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta4_BottlerocketBootstrapContainer_To_v1beta2_BottlerocketBootstrapContainer(a.(*BottlerocketBootstrapContainer), b.(*v1beta2.BottlerocketBootstrapContainer), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*BottlerocketControl)(nil), (*v1beta2.BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta4_BottlerocketControl_To_v1beta2_BottlerocketControl(a.(*BottlerocketControl), b.(*v1beta2.BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*BottlerocketHostContainer)(nil), (*v1beta2.BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta4_BottlerocketHostContainer_To_v1beta2_BottlerocketHostContainer(a.(*BottlerocketHostContainer), b.(*v1beta2.BottlerocketHostContainer), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*ClusterConfiguration)(nil), (*v1beta2.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta4_ClusterConfiguration_To_v1beta2_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta2.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -353,6 +328,31 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketAdmin)(nil), (*BottlerocketAdmin)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketAdmin_To_upstreamv1beta4_BottlerocketAdmin(a.(*v1beta2.BottlerocketAdmin), b.(*BottlerocketAdmin), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketBootstrapContainer)(nil), (*BottlerocketBootstrapContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketBootstrapContainer_To_upstreamv1beta4_BottlerocketBootstrapContainer(a.(*v1beta2.BottlerocketBootstrapContainer), b.(*BottlerocketBootstrapContainer), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketControl)(nil), (*BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketControl_To_upstreamv1beta4_BottlerocketControl(a.(*v1beta2.BottlerocketControl), b.(*BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketHostContainer)(nil), (*BottlerocketHostContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketHostContainer_To_upstreamv1beta4_BottlerocketHostContainer(a.(*v1beta2.BottlerocketHostContainer), b.(*BottlerocketHostContainer), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketKubernetesSettings)(nil), (*BottlerocketKubernetesSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketKubernetesSettings_To_upstreamv1beta4_BottlerocketKubernetesSettings(a.(*v1beta2.BottlerocketKubernetesSettings), b.(*BottlerocketKubernetesSettings), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfiguration(a.(*v1beta2.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -798,7 +798,7 @@ func autoConvert_upstreamv1beta4_ClusterConfiguration_To_v1beta2_ClusterConfigur
+ 	if err := Convert_upstreamv1beta4_BottlerocketControl_To_v1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+-	if err := Convert_upstreamv1beta4_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++	if err := Convert_upstreamv1beta4_Proxy_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+ 	if err := Convert_upstreamv1beta4_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
+@@ -877,7 +877,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
+ 	if err := Convert_v1beta2_BottlerocketControl_To_upstreamv1beta4_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
+ 		return err
+ 	}
+-	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
++	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+ 	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta4_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
+diff --git a/gen_33.log b/gen_33.log
+new file mode 100644
+index 000000000000..8374eda1a2ee
+--- /dev/null
++++ b/gen_33.log
+@@ -0,0 +1,296 @@
++make clean-generated-yaml SRC_DIRS="./core/config/crd/bases,./core/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./core/config/crd/bases,./core/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./core \
++	paths=./core/reconcilers/... \
++	paths=./core/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./core/config/crd/bases \
++	output:rbac:dir=./core/config/rbac \
++	output:webhook:dir=./core/config/webhook \
++	webhook
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./cmd/clusterctl/api/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./cmd/clusterctl/config/crd/bases
++/capi/hack/tools/bin/kustomize-v5.7.0 build cmd/clusterctl/config/crd > cmd/clusterctl/config/manifest/clusterctl-api.yaml
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/test/builder/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t3/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t3/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t4/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t4/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/deprecated/v1beta1/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/deprecated/v1beta1/test/builder/crd
++make clean-generated-yaml SRC_DIRS="./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm \
++	paths=./bootstrap/kubeadm/reconcilers/... \
++	paths=./bootstrap/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./bootstrap/kubeadm/config/crd/bases \
++	output:rbac:dir=./bootstrap/kubeadm/config/rbac \
++	output:webhook:dir=./bootstrap/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/controlplane/kubeadm/... \
++	paths=./controlplane/kubeadm \
++	paths=./controlplane/kubeadm/reconcilers/... \
++	paths=./controlplane/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./controlplane/kubeadm/config/crd/bases \
++	output:rbac:dir=./controlplane/kubeadm/config/rbac \
++	output:webhook:dir=./controlplane/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./ \
++	paths=./api/... \
++	paths=./internal/controllers/... \
++	paths=./internal/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./config/crd/bases \
++	output:webhook:dir=./config/webhook \
++	webhook
++cd ./test/extension; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./... \
++	output:rbac:dir=./config/rbac \
++	rbac:roleName=manager-role
++make generate-go-deepcopy-core generate-go-deepcopy-kubeadm-bootstrap generate-go-deepcopy-kubeadm-control-plane generate-go-deepcopy-docker-infrastructure generate-go-deepcopy-test-extension
++make[1]: Entering directory `/capi'
++make clean-generated-deepcopy SRC_DIRS="./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./api/runtime/hooks/... \
++	paths=./cmd/clusterctl/... \
++	paths=./controllers/crdmigrator/test/... \
++	paths=./internal/runtime/test/... \
++	paths=./internal/topology/upgrade/test/... \
++	paths=./util/test/builder/... \
++	paths=./util/deprecated/v1beta1/test/builder/...
++make clean-generated-deepcopy SRC_DIRS="./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm/pkg/types/...
++make clean-generated-deepcopy SRC_DIRS="./api/controlplane/kubeadm"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/controlplane/kubeadm/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/inmemory/pkg/cloud/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/inmemory/pkg/cloud/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/inmemory; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++        paths=./pkg/cloud/api/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/docker/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/...
++make[1]: Nothing to be done for `generate-go-deepcopy-test-extension'.
++make[1]: Leaving directory `/capi'
++make generate-go-conversions-core generate-go-conversions-kubeadm-bootstrap generate-go-conversions-kubeadm-control-plane generate-go-conversions-docker-infrastructure generate-go-conversions-test-extension
++make[1]: Entering directory `/capi'
++make generate-go-conversions-core-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./core/v1beta1
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/topology/upgrade/test/t2/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-addons-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/addons/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./addons/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-ipam
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/ipam/v1beta1,./api/ipam/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/ipam/v1beta1,./api/ipam/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./ipam/v1alpha1 \
++	./ipam/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-runtime
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/runtime/test/v1alpha1 \
++	./internal/runtime/test/v1alpha2
++make clean-generated-conversions SRC_DIRS="./api/runtime/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/runtime/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./runtime/v1alpha1
++make[2]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/bootstrap/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/v1beta1
++make clean-generated-conversions SRC_DIRS="./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta3 \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta4
++make clean-generated-conversions SRC_DIRS="./api/controlplane/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./controlplane/kubeadm/v1beta1
++cd test/infrastructure/docker; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./api/v1beta1
++make[1]: Nothing to be done for `generate-go-conversions-test-extension'.
++make[1]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/kube-openapi/cmd/openapi-gen openapi-gen 589584f1c912f4367fe8954f649a59a98b912da5 
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/core/v1beta2; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/core/v1beta2 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AllOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AnyOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,OneOf
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterClassDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XIntOrString
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XMetadata
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XPreserveUnknownFields
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XValidations
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeploymentDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineHealthCheckDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachinePoolDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineSetDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineTemplateSpec,ObjectMeta
++API rule violation: streaming_list_type_json_tags,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDrainRuleList,ListMeta
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/runtime/hooks/v1alpha1; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/runtime/hooks/v1alpha1 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Pods
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Services
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,DiscoverVariablesResponse,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequestItem,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesResponse,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequestItem,Variables

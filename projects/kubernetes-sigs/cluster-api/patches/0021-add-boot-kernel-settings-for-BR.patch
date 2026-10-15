@@ -1,8 +1,41 @@
-From 1594f6a174731ebde0578008a4fb720a2f0069ea Mon Sep 17 00:00:00 2001
+From aa967b5ebcd4a745bf1bb8f03fb551620e0b4063 Mon Sep 17 00:00:00 2001
 From: Ahree Hong <ahreeh@amazon.com>
 Date: Thu, 23 Mar 2023 01:51:16 -0700
-Subject: [PATCH 21/37] add boot kernel settings for BR
+Subject: [PATCH 21/36] add boot kernel settings for BR
 
+Signed-off-by: Ahree Hong <ahreeh@amazon.com>
+---
+ api/bootstrap/kubeadm/v1beta1/conversion.go   | 19 ++++
+ .../kubeadm/v1beta1/kubeadm_types.go          | 10 +++
+ .../v1beta1/zz_generated.conversion.go        | 88 ++++++++++++++++---
+ .../kubeadm/v1beta1/zz_generated.deepcopy.go  | 27 ++++++
+ .../kubeadm/v1beta2/kubeadm_types.go          |  8 ++
+ .../kubeadm/v1beta2/zz_generated.deepcopy.go  | 36 ++++++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 44 ++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 44 ++++++++++
+ .../internal/bottlerocket/bootstrap.go        | 13 +++
+ .../internal/bottlerocket/bootstrap_test.go   | 59 +++++++++++++
+ .../internal/bottlerocket/bottlerocket.go     | 24 +++++
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 44 ++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 44 ++++++++++
+ 13 files changed, 446 insertions(+), 14 deletions(-)
+---
+ api/bootstrap/kubeadm/v1beta1/conversion.go   |  19 ++
+ .../kubeadm/v1beta1/kubeadm_types.go          |  10 +
+ .../v1beta1/zz_generated.conversion.go        |  44 ++-
+ .../kubeadm/v1beta1/zz_generated.deepcopy.go  |  27 ++
+ .../kubeadm/v1beta2/kubeadm_types.go          |   8 +
+ .../kubeadm/v1beta2/zz_generated.deepcopy.go  |  36 +++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  44 +++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  44 +++
+ .../internal/bottlerocket/bootstrap.go        |  13 +
+ .../internal/bottlerocket/bootstrap_test.go   |  59 ++++
+ .../internal/bottlerocket/bottlerocket.go     |  24 ++
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  44 +++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  46 +++
+ gen_21.log                                    | 296 ++++++++++++++++++
+ 14 files changed, 708 insertions(+), 6 deletions(-)
+ create mode 100644 gen_21.log
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
 index eab544d31ad8..84e2ec355cd0 100644
@@ -62,6 +95,141 @@ index 7853088f8e58..b01cf16c5fdb 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+index 7103c1de8f6f..5902be11b951 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+@@ -70,6 +70,16 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddGeneratedConversionFunc((*BottlerocketKernelSettings)(nil), (*v1beta2.BottlerocketKernelSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketKernelSettings_To_v1beta2_BottlerocketKernelSettings(a.(*BottlerocketKernelSettings), b.(*v1beta2.BottlerocketKernelSettings), scope)
++	}); err != nil {
++		return err
++	}
++	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketKernelSettings)(nil), (*BottlerocketKernelSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketKernelSettings_To_v1beta1_BottlerocketKernelSettings(a.(*v1beta2.BottlerocketKernelSettings), b.(*BottlerocketKernelSettings), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddGeneratedConversionFunc((*BottlerocketKubernetesSettings)(nil), (*v1beta2.BottlerocketKubernetesSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_BottlerocketKubernetesSettings_To_v1beta2_BottlerocketKubernetesSettings(a.(*BottlerocketKubernetesSettings), b.(*v1beta2.BottlerocketKubernetesSettings), scope)
+ 	}); err != nil {
+@@ -85,11 +95,6 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
+-	if err := s.AddGeneratedConversionFunc((*v1beta2.BottlerocketSettings)(nil), (*BottlerocketSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
+-		return Convert_v1beta2_BottlerocketSettings_To_v1beta1_BottlerocketSettings(a.(*v1beta2.BottlerocketSettings), b.(*BottlerocketSettings), scope)
+-	}); err != nil {
+-		return err
+-	}
+ 	if err := s.AddGeneratedConversionFunc((*ContainerLinuxConfig)(nil), (*v1beta2.ContainerLinuxConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_ContainerLinuxConfig_To_v1beta2_ContainerLinuxConfig(a.(*ContainerLinuxConfig), b.(*v1beta2.ContainerLinuxConfig), scope)
+ 	}); err != nil {
+@@ -540,6 +545,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketSettings)(nil), (*BottlerocketSettings)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketSettings_To_v1beta1_BottlerocketSettings(a.(*v1beta2.BottlerocketSettings), b.(*BottlerocketSettings), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*v1beta2.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -821,6 +831,26 @@ func autoConvert_v1beta2_BottlerocketHostContainer_To_v1beta1_BottlerocketHostCo
+ 	return nil
+ }
+ 
++func autoConvert_v1beta1_BottlerocketKernelSettings_To_v1beta2_BottlerocketKernelSettings(in *BottlerocketKernelSettings, out *v1beta2.BottlerocketKernelSettings, s conversion.Scope) error {
++	out.SysctlSettings = *(*map[string]string)(unsafe.Pointer(&in.SysctlSettings))
++	return nil
++}
++
++// Convert_v1beta1_BottlerocketKernelSettings_To_v1beta2_BottlerocketKernelSettings is an autogenerated conversion function.
++func Convert_v1beta1_BottlerocketKernelSettings_To_v1beta2_BottlerocketKernelSettings(in *BottlerocketKernelSettings, out *v1beta2.BottlerocketKernelSettings, s conversion.Scope) error {
++	return autoConvert_v1beta1_BottlerocketKernelSettings_To_v1beta2_BottlerocketKernelSettings(in, out, s)
++}
++
++func autoConvert_v1beta2_BottlerocketKernelSettings_To_v1beta1_BottlerocketKernelSettings(in *v1beta2.BottlerocketKernelSettings, out *BottlerocketKernelSettings, s conversion.Scope) error {
++	out.SysctlSettings = *(*map[string]string)(unsafe.Pointer(&in.SysctlSettings))
++	return nil
++}
++
++// Convert_v1beta2_BottlerocketKernelSettings_To_v1beta1_BottlerocketKernelSettings is an autogenerated conversion function.
++func Convert_v1beta2_BottlerocketKernelSettings_To_v1beta1_BottlerocketKernelSettings(in *v1beta2.BottlerocketKernelSettings, out *BottlerocketKernelSettings, s conversion.Scope) error {
++	return autoConvert_v1beta2_BottlerocketKernelSettings_To_v1beta1_BottlerocketKernelSettings(in, out, s)
++}
++
+ func autoConvert_v1beta1_BottlerocketKubernetesSettings_To_v1beta2_BottlerocketKubernetesSettings(in *BottlerocketKubernetesSettings, out *v1beta2.BottlerocketKubernetesSettings, s conversion.Scope) error {
+ 	out.MaxPods = in.MaxPods
+ 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
+@@ -847,6 +877,7 @@ func Convert_v1beta2_BottlerocketKubernetesSettings_To_v1beta1_BottlerocketKuber
+ 
+ func autoConvert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings(in *BottlerocketSettings, out *v1beta2.BottlerocketSettings, s conversion.Scope) error {
+ 	out.Kubernetes = (*v1beta2.BottlerocketKubernetesSettings)(unsafe.Pointer(in.Kubernetes))
++	out.Kernel = (*v1beta2.BottlerocketKernelSettings)(unsafe.Pointer(in.Kernel))
+ 	return nil
+ }
+ 
+@@ -857,7 +888,8 @@ func Convert_v1beta1_BottlerocketSettings_To_v1beta2_BottlerocketSettings(in *Bo
+ 
+ func autoConvert_v1beta2_BottlerocketSettings_To_v1beta1_BottlerocketSettings(in *v1beta2.BottlerocketSettings, out *BottlerocketSettings, s conversion.Scope) error {
+ 	out.Kubernetes = (*BottlerocketKubernetesSettings)(unsafe.Pointer(in.Kubernetes))
+-	// WARNING: in.Kernel requires manual conversion: does not exist in peer-type
++	out.Kernel = (*BottlerocketKernelSettings)(unsafe.Pointer(in.Kernel))
++	// WARNING: in.Boot requires manual conversion: does not exist in peer-type
+ 	return nil
+ }
+ 
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
+index b9d46ee33db6..5ae60358cb53 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
+@@ -222,6 +222,28 @@ func (in *BottlerocketHostContainer) DeepCopy() *BottlerocketHostContainer {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketKernelSettings) DeepCopyInto(out *BottlerocketKernelSettings) {
++	*out = *in
++	if in.SysctlSettings != nil {
++		in, out := &in.SysctlSettings, &out.SysctlSettings
++		*out = make(map[string]string, len(*in))
++		for key, val := range *in {
++			(*out)[key] = val
++		}
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketKernelSettings.
++func (in *BottlerocketKernelSettings) DeepCopy() *BottlerocketKernelSettings {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketKernelSettings)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *BottlerocketKubernetesSettings) DeepCopyInto(out *BottlerocketKubernetesSettings) {
+ 	*out = *in
+@@ -255,6 +277,11 @@ func (in *BottlerocketSettings) DeepCopyInto(out *BottlerocketSettings) {
+ 		*out = new(BottlerocketKubernetesSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.Kernel != nil {
++		in, out := &in.Kernel, &out.Kernel
++		*out = new(BottlerocketKernelSettings)
++		(*in).DeepCopyInto(*out)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketSettings.
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 index c8901c84c884..2f43ba40d8c0 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
@@ -88,6 +256,212 @@ index c8901c84c884..2f43ba40d8c0 100644
  }
  
  // BottlerocketKubernetesSettings holds the settings for kubernetes on bottlerocket nodes.
+diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
+index ae53b1cb57de..cdf4481c6f63 100644
+--- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
++++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
+@@ -194,6 +194,37 @@ func (in *BottlerocketAdmin) DeepCopy() *BottlerocketAdmin {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketBootSettings) DeepCopyInto(out *BottlerocketBootSettings) {
++	*out = *in
++	if in.BootKernelParameters != nil {
++		in, out := &in.BootKernelParameters, &out.BootKernelParameters
++		*out = make(map[string][]string, len(*in))
++		for key, val := range *in {
++			var outVal []string
++			if val == nil {
++				(*out)[key] = nil
++			} else {
++				inVal := (*in)[key]
++				in, out := &inVal, &outVal
++				*out = make([]string, len(*in))
++				copy(*out, *in)
++			}
++			(*out)[key] = outVal
++		}
++	}
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketBootSettings.
++func (in *BottlerocketBootSettings) DeepCopy() *BottlerocketBootSettings {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketBootSettings)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *BottlerocketBootstrap) DeepCopyInto(out *BottlerocketBootstrap) {
+ 	*out = *in
+@@ -314,6 +345,11 @@ func (in *BottlerocketSettings) DeepCopyInto(out *BottlerocketSettings) {
+ 		*out = new(BottlerocketKernelSettings)
+ 		(*in).DeepCopyInto(*out)
+ 	}
++	if in.Boot != nil {
++		in, out := &in.Boot, &out.Boot
++		*out = new(BottlerocketBootSettings)
++		(*in).DeepCopyInto(*out)
++	}
+ }
+ 
+ // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketSettings.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index 9452da4b9d7c..f86bf1f23363 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -303,6 +303,17 @@ spec:
+                       Bottlerocket holds configuration for certain bottlerocket settings.
+                       This is only for bottlerocket.
+                     properties:
++                      kernel:
++                        description: KernelSettings contains additional kernel settings
++                          for Bottlerocket.
++                        properties:
++                          sysctlSettings:
++                            additionalProperties:
++                              type: string
++                            description: SysctlSettings defines the kernel sysctl
++                              settings to set for bottlerocket nodes.
++                            type: object
++                        type: object
+                       kubernetes:
+                         description: Kubernetes holds the kubernetes settings for
+                           bottlerocket nodes.
+@@ -1841,6 +1852,17 @@ spec:
+                       Bottlerocket holds configuration for certain bottlerocket settings.
+                       This is only for bottlerocket.
+                     properties:
++                      kernel:
++                        description: KernelSettings contains additional kernel settings
++                          for Bottlerocket.
++                        properties:
++                          sysctlSettings:
++                            additionalProperties:
++                              type: string
++                            description: SysctlSettings defines the kernel sysctl
++                              settings to set for bottlerocket nodes.
++                            type: object
++                        type: object
+                       kubernetes:
+                         description: Kubernetes holds the kubernetes settings for
+                           bottlerocket nodes.
+@@ -3102,6 +3124,17 @@ spec:
+                       Bottlerocket holds configuration for certain bottlerocket settings.
+                       This is only for bottlerocket.
+                     properties:
++                      boot:
++                        description: Boot holds the boot-related settings for bottlerocket
++                          nodes
++                        properties:
++                          bootKernelParameters:
++                            additionalProperties:
++                              items:
++                                type: string
++                              type: array
++                            type: object
++                        type: object
+                       kernel:
+                         description: KernelSettings contains additional kernel settings
+                           for Bottlerocket.
+@@ -4784,6 +4817,17 @@ spec:
+                       Bottlerocket holds configuration for certain bottlerocket settings.
+                       This is only for bottlerocket.
+                     properties:
++                      boot:
++                        description: Boot holds the boot-related settings for bottlerocket
++                          nodes
++                        properties:
++                          bootKernelParameters:
++                            additionalProperties:
++                              items:
++                                type: string
++                              type: array
++                            type: object
++                        type: object
+                       kernel:
+                         description: KernelSettings contains additional kernel settings
+                           for Bottlerocket.
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 1741118187fa..e0b0d758c162 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -336,6 +336,17 @@ spec:
+                               Bottlerocket holds configuration for certain bottlerocket settings.
+                               This is only for bottlerocket.
+                             properties:
++                              kernel:
++                                description: KernelSettings contains additional kernel
++                                  settings for Bottlerocket.
++                                properties:
++                                  sysctlSettings:
++                                    additionalProperties:
++                                      type: string
++                                    description: SysctlSettings defines the kernel
++                                      sysctl settings to set for bottlerocket nodes.
++                                    type: object
++                                type: object
+                               kubernetes:
+                                 description: Kubernetes holds the kubernetes settings
+                                   for bottlerocket nodes.
+@@ -1907,6 +1918,17 @@ spec:
+                               Bottlerocket holds configuration for certain bottlerocket settings.
+                               This is only for bottlerocket.
+                             properties:
++                              kernel:
++                                description: KernelSettings contains additional kernel
++                                  settings for Bottlerocket.
++                                properties:
++                                  sysctlSettings:
++                                    additionalProperties:
++                                      type: string
++                                    description: SysctlSettings defines the kernel
++                                      sysctl settings to set for bottlerocket nodes.
++                                    type: object
++                                type: object
+                               kubernetes:
+                                 description: Kubernetes holds the kubernetes settings
+                                   for bottlerocket nodes.
+@@ -3066,6 +3088,17 @@ spec:
+                               Bottlerocket holds configuration for certain bottlerocket settings.
+                               This is only for bottlerocket.
+                             properties:
++                              boot:
++                                description: Boot holds the boot-related settings
++                                  for bottlerocket nodes
++                                properties:
++                                  bootKernelParameters:
++                                    additionalProperties:
++                                      items:
++                                        type: string
++                                      type: array
++                                    type: object
++                                type: object
+                               kernel:
+                                 description: KernelSettings contains additional kernel
+                                   settings for Bottlerocket.
+@@ -4780,6 +4813,17 @@ spec:
+                               Bottlerocket holds configuration for certain bottlerocket settings.
+                               This is only for bottlerocket.
+                             properties:
++                              boot:
++                                description: Boot holds the boot-related settings
++                                  for bottlerocket nodes
++                                properties:
++                                  bootKernelParameters:
++                                    additionalProperties:
++                                      items:
++                                        type: string
++                                      type: array
++                                    type: object
++                                type: object
+                               kernel:
+                                 description: KernelSettings contains additional kernel
+                                   settings for Bottlerocket.
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index 4331af7c402f..6499129604f3 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
@@ -251,6 +625,459 @@ index 2879bed4a2e6..2c0a3bc7e46e 100644
  // Parses through all the users and return list of all user's authorized ssh keys
  func getAllAuthorizedKeys(users []bootstrapv1.User) string {
  	var sshAuthorizedKeys []string
--- 
-2.47.3
-
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 7e8020dc6ebe..5ec821da8b3b 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -349,6 +349,17 @@ spec:
+                           Bottlerocket holds configuration for certain bottlerocket settings.
+                           This is only for bottlerocket.
+                         properties:
++                          kernel:
++                            description: KernelSettings contains additional kernel
++                              settings for Bottlerocket.
++                            properties:
++                              sysctlSettings:
++                                additionalProperties:
++                                  type: string
++                                description: SysctlSettings defines the kernel sysctl
++                                  settings to set for bottlerocket nodes.
++                                type: object
++                            type: object
+                           kubernetes:
+                             description: Kubernetes holds the kubernetes settings
+                               for bottlerocket nodes.
+@@ -1903,6 +1914,17 @@ spec:
+                           Bottlerocket holds configuration for certain bottlerocket settings.
+                           This is only for bottlerocket.
+                         properties:
++                          kernel:
++                            description: KernelSettings contains additional kernel
++                              settings for Bottlerocket.
++                            properties:
++                              sysctlSettings:
++                                additionalProperties:
++                                  type: string
++                                description: SysctlSettings defines the kernel sysctl
++                                  settings to set for bottlerocket nodes.
++                                type: object
++                            type: object
+                           kubernetes:
+                             description: Kubernetes holds the kubernetes settings
+                               for bottlerocket nodes.
+@@ -3685,6 +3707,17 @@ spec:
+                           Bottlerocket holds configuration for certain bottlerocket settings.
+                           This is only for bottlerocket.
+                         properties:
++                          boot:
++                            description: Boot holds the boot-related settings for
++                              bottlerocket nodes
++                            properties:
++                              bootKernelParameters:
++                                additionalProperties:
++                                  items:
++                                    type: string
++                                  type: array
++                                type: object
++                            type: object
+                           kernel:
+                             description: KernelSettings contains additional kernel
+                               settings for Bottlerocket.
+@@ -5381,6 +5414,17 @@ spec:
+                           Bottlerocket holds configuration for certain bottlerocket settings.
+                           This is only for bottlerocket.
+                         properties:
++                          boot:
++                            description: Boot holds the boot-related settings for
++                              bottlerocket nodes
++                            properties:
++                              bootKernelParameters:
++                                additionalProperties:
++                                  items:
++                                    type: string
++                                  type: array
++                                type: object
++                            type: object
+                           kernel:
+                             description: KernelSettings contains additional kernel
+                               settings for Bottlerocket.
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 5cd7b3b75f8c..29b770d53589 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -344,6 +344,18 @@ spec:
+                                   Bottlerocket holds configuration for certain bottlerocket settings.
+                                   This is only for bottlerocket.
+                                 properties:
++                                  kernel:
++                                    description: KernelSettings contains additional
++                                      kernel settings for Bottlerocket.
++                                    properties:
++                                      sysctlSettings:
++                                        additionalProperties:
++                                          type: string
++                                        description: SysctlSettings defines the kernel
++                                          sysctl settings to set for bottlerocket
++                                          nodes.
++                                        type: object
++                                    type: object
+                                   kubernetes:
+                                     description: Kubernetes holds the kubernetes settings
+                                       for bottlerocket nodes.
+@@ -1933,6 +1945,18 @@ spec:
+                                   Bottlerocket holds configuration for certain bottlerocket settings.
+                                   This is only for bottlerocket.
+                                 properties:
++                                  kernel:
++                                    description: KernelSettings contains additional
++                                      kernel settings for Bottlerocket.
++                                    properties:
++                                      sysctlSettings:
++                                        additionalProperties:
++                                          type: string
++                                        description: SysctlSettings defines the kernel
++                                          sysctl settings to set for bottlerocket
++                                          nodes.
++                                        type: object
++                                    type: object
+                                   kubernetes:
+                                     description: Kubernetes holds the kubernetes settings
+                                       for bottlerocket nodes.
+@@ -3349,6 +3373,17 @@ spec:
+                                   Bottlerocket holds configuration for certain bottlerocket settings.
+                                   This is only for bottlerocket.
+                                 properties:
++                                  boot:
++                                    description: Boot holds the boot-related settings
++                                      for bottlerocket nodes
++                                    properties:
++                                      bootKernelParameters:
++                                        additionalProperties:
++                                          items:
++                                            type: string
++                                          type: array
++                                        type: object
++                                    type: object
+                                   kernel:
+                                     description: KernelSettings contains additional
+                                       kernel settings for Bottlerocket.
+@@ -5087,6 +5122,17 @@ spec:
+                                   Bottlerocket holds configuration for certain bottlerocket settings.
+                                   This is only for bottlerocket.
+                                 properties:
++                                  boot:
++                                    description: Boot holds the boot-related settings
++                                      for bottlerocket nodes
++                                    properties:
++                                      bootKernelParameters:
++                                        additionalProperties:
++                                          items:
++                                            type: string
++                                          type: array
++                                        type: object
++                                    type: object
+                                   kernel:
+                                     description: KernelSettings contains additional
+                                       kernel settings for Bottlerocket.
+diff --git a/gen_21.log b/gen_21.log
+new file mode 100644
+index 000000000000..8374eda1a2ee
+--- /dev/null
++++ b/gen_21.log
+@@ -0,0 +1,296 @@
++make clean-generated-yaml SRC_DIRS="./core/config/crd/bases,./core/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./core/config/crd/bases,./core/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./core \
++	paths=./core/reconcilers/... \
++	paths=./core/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./core/config/crd/bases \
++	output:rbac:dir=./core/config/rbac \
++	output:webhook:dir=./core/config/webhook \
++	webhook
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./cmd/clusterctl/api/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./cmd/clusterctl/config/crd/bases
++/capi/hack/tools/bin/kustomize-v5.7.0 build cmd/clusterctl/config/crd > cmd/clusterctl/config/manifest/clusterctl-api.yaml
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/test/builder/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t3/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t3/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t4/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t4/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/deprecated/v1beta1/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/deprecated/v1beta1/test/builder/crd
++make clean-generated-yaml SRC_DIRS="./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm \
++	paths=./bootstrap/kubeadm/reconcilers/... \
++	paths=./bootstrap/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./bootstrap/kubeadm/config/crd/bases \
++	output:rbac:dir=./bootstrap/kubeadm/config/rbac \
++	output:webhook:dir=./bootstrap/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/controlplane/kubeadm/... \
++	paths=./controlplane/kubeadm \
++	paths=./controlplane/kubeadm/reconcilers/... \
++	paths=./controlplane/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./controlplane/kubeadm/config/crd/bases \
++	output:rbac:dir=./controlplane/kubeadm/config/rbac \
++	output:webhook:dir=./controlplane/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./ \
++	paths=./api/... \
++	paths=./internal/controllers/... \
++	paths=./internal/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./config/crd/bases \
++	output:webhook:dir=./config/webhook \
++	webhook
++cd ./test/extension; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./... \
++	output:rbac:dir=./config/rbac \
++	rbac:roleName=manager-role
++make generate-go-deepcopy-core generate-go-deepcopy-kubeadm-bootstrap generate-go-deepcopy-kubeadm-control-plane generate-go-deepcopy-docker-infrastructure generate-go-deepcopy-test-extension
++make[1]: Entering directory `/capi'
++make clean-generated-deepcopy SRC_DIRS="./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./api/runtime/hooks/... \
++	paths=./cmd/clusterctl/... \
++	paths=./controllers/crdmigrator/test/... \
++	paths=./internal/runtime/test/... \
++	paths=./internal/topology/upgrade/test/... \
++	paths=./util/test/builder/... \
++	paths=./util/deprecated/v1beta1/test/builder/...
++make clean-generated-deepcopy SRC_DIRS="./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm/pkg/types/...
++make clean-generated-deepcopy SRC_DIRS="./api/controlplane/kubeadm"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/controlplane/kubeadm/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/inmemory/pkg/cloud/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/inmemory/pkg/cloud/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/inmemory; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++        paths=./pkg/cloud/api/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/docker/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/...
++make[1]: Nothing to be done for `generate-go-deepcopy-test-extension'.
++make[1]: Leaving directory `/capi'
++make generate-go-conversions-core generate-go-conversions-kubeadm-bootstrap generate-go-conversions-kubeadm-control-plane generate-go-conversions-docker-infrastructure generate-go-conversions-test-extension
++make[1]: Entering directory `/capi'
++make generate-go-conversions-core-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./core/v1beta1
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/topology/upgrade/test/t2/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-addons-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/addons/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./addons/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-ipam
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/ipam/v1beta1,./api/ipam/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/ipam/v1beta1,./api/ipam/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./ipam/v1alpha1 \
++	./ipam/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-runtime
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/runtime/test/v1alpha1 \
++	./internal/runtime/test/v1alpha2
++make clean-generated-conversions SRC_DIRS="./api/runtime/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/runtime/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./runtime/v1alpha1
++make[2]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/bootstrap/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/v1beta1
++make clean-generated-conversions SRC_DIRS="./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta3 \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta4
++make clean-generated-conversions SRC_DIRS="./api/controlplane/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./controlplane/kubeadm/v1beta1
++cd test/infrastructure/docker; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./api/v1beta1
++make[1]: Nothing to be done for `generate-go-conversions-test-extension'.
++make[1]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/kube-openapi/cmd/openapi-gen openapi-gen 589584f1c912f4367fe8954f649a59a98b912da5 
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/core/v1beta2; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/core/v1beta2 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AllOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AnyOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,OneOf
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterClassDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XIntOrString
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XMetadata
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XPreserveUnknownFields
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XValidations
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeploymentDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineHealthCheckDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachinePoolDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineSetDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineTemplateSpec,ObjectMeta
++API rule violation: streaming_list_type_json_tags,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDrainRuleList,ListMeta
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/runtime/hooks/v1alpha1; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/runtime/hooks/v1alpha1 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Pods
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Services
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,DiscoverVariablesResponse,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequestItem,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesResponse,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequestItem,Variables

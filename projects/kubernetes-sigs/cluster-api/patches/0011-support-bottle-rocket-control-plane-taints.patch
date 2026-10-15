@@ -1,8 +1,58 @@
-From 6ce7cd09d6108ea9a2bfcd8b0d0515c1059f00b3 Mon Sep 17 00:00:00 2001
+From 45963fa8e6286045c16a9a0a8819247ce4726eb5 Mon Sep 17 00:00:00 2001
 From: danbudris <budris@amazon.com>
 Date: Fri, 18 Feb 2022 09:24:32 -0500
-Subject: [PATCH 11/37] support bottle rocket control plane taints
+Subject: [PATCH 11/36] support bottle rocket control plane taints
 
+---
+ api/bootstrap/kubeadm/v1beta1/conversion.go   | 12 ++++
+ .../kubeadm/v1beta1/kubeadm_types.go          | 17 +++++
+ .../v1beta1/zz_generated.conversion.go        | 33 +++++++++
+ .../kubeadm/v1beta1/zz_generated.deepcopy.go  | 18 +++++
+ .../kubeadm/v1beta2/kubeadm_types.go          | 30 ++++++++
+ .../kubeadm/v1beta2/zz_generated.deepcopy.go  | 17 +++++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 72 +++++++++++++++++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 72 +++++++++++++++++++
+ .../internal/bottlerocket/bootstrap.go        | 12 ++++
+ .../internal/bottlerocket/bottlerocket.go     | 10 +++
+ .../controllers/kubeadmconfig_controller.go   |  9 +++
+ .../types/upstreamv1beta3/conversion.go       | 12 ++++
+ .../kubeadm/types/upstreamv1beta3/types.go    | 17 +++++
+ .../zz_generated.conversion.go                | 33 +++++++++
+ .../upstreamv1beta3/zz_generated.deepcopy.go  | 18 +++++
+ .../zz_generated.conversion.go                |  2 +
+ bootstrap/kubeadm/types/utils_test.go         | 17 ++++-
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 72 +++++++++++++++++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 72 +++++++++++++++++++
+ .../internal/workload_cluster_coredns_test.go |  5 ++
+ .../internal/workload_cluster_etcd_test.go    | 10 +++
+ .../kubeadm/internal/workload_cluster_test.go | 29 ++++++++
+ 22 files changed, 588 insertions(+), 1 deletion(-)
+---
+ api/bootstrap/kubeadm/v1beta1/conversion.go   |  12 +
+ .../kubeadm/v1beta1/kubeadm_types.go          |  17 +
+ .../v1beta1/zz_generated.conversion.go        |  33 ++
+ .../kubeadm/v1beta1/zz_generated.deepcopy.go  |  18 ++
+ .../kubeadm/v1beta2/kubeadm_types.go          |  30 ++
+ .../kubeadm/v1beta2/zz_generated.deepcopy.go  |  17 +
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  80 +++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  80 +++++
+ .../internal/bottlerocket/bootstrap.go        |  12 +
+ .../internal/bottlerocket/bottlerocket.go     |  10 +
+ .../pkg/types/upstreamv1beta3/conversion.go   |  12 +
+ .../pkg/types/upstreamv1beta3/types.go        |  17 +
+ .../zz_generated.conversion.go                |  33 ++
+ .../upstreamv1beta3/zz_generated.deepcopy.go  |  18 ++
+ .../zz_generated.conversion.go                |   2 +
+ bootstrap/kubeadm/pkg/types/utils_test.go     |  17 +-
+ .../kubeadmconfig/kubeadmconfig_controller.go |   9 +
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  80 +++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  80 +++++
+ .../pkg/workload_cluster_coredns_test.go      |   5 +
+ .../kubeadm/pkg/workload_cluster_etcd_test.go |  10 +
+ .../kubeadm/pkg/workload_cluster_test.go      |  29 ++
+ gen_11.log                                    | 296 ++++++++++++++++++
+ 23 files changed, 916 insertions(+), 1 deletion(-)
+ create mode 100644 gen_11.log
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
 index 5e9bc2073629..024eec83fb16 100644
@@ -69,6 +119,134 @@ index 771cde26c0bc..7602cd531e50 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+index 41430097247a..9d4bdc45a4f4 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
+@@ -360,6 +360,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*BottlerocketControl)(nil), (*v1beta2.BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta1_BottlerocketControl_To_v1beta2_BottlerocketControl(a.(*BottlerocketControl), b.(*v1beta2.BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*ClusterConfiguration)(nil), (*v1beta2.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta1_ClusterConfiguration_To_v1beta2_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta2.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -480,6 +485,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketControl)(nil), (*BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(a.(*v1beta2.BottlerocketControl), b.(*BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(a.(*v1beta2.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -703,6 +713,17 @@ func autoConvert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(
+ 	return nil
+ }
+ 
++func autoConvert_v1beta1_BottlerocketControl_To_v1beta2_BottlerocketControl(in *BottlerocketControl, out *v1beta2.BottlerocketControl, s conversion.Scope) error {
++	// WARNING: in.ImageMeta requires manual conversion: does not exist in peer-type
++	return nil
++}
++
++func autoConvert_v1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(in *v1beta2.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	// WARNING: in.ImageRepository requires manual conversion: does not exist in peer-type
++	// WARNING: in.ImageTag requires manual conversion: does not exist in peer-type
++	return nil
++}
++
+ func autoConvert_v1beta1_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in *ClusterConfiguration, out *v1beta2.ClusterConfiguration, s conversion.Scope) error {
+ 	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta1_Pause_To_v1beta2_Pause(&in.Pause, &out.Pause, s); err != nil {
+@@ -711,6 +732,9 @@ func autoConvert_v1beta1_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_v1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -752,6 +776,9 @@ func autoConvert_v1beta2_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in
+ 	if err := Convert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -1173,6 +1200,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+ 	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta1_BottlerocketControl_To_v1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -1199,6 +1229,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+ 	if err := Convert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
+index e7c8792cd829..50d6992797fa 100644
+--- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
++++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
+@@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketControl.
++func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketControl)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+@@ -626,6 +643,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 index d6a858d79049..ae627be3875f 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
@@ -124,6 +302,270 @@ index d6a858d79049..ae627be3875f 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
+diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
+index c4881a0d4490..5089f42fac90 100644
+--- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
++++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
+@@ -194,11 +194,27 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
++	*out = *in
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketControl.
++func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketControl)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+@@ -566,6 +582,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	*out = *in
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+index 7ec7369be55c..edaf3a7671f6 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
+@@ -318,6 +318,26 @@ spec:
+                         minLength: 1
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: |-
++                      BottlerocketControl holds the image source for control container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          imageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        maxLength: 512
++                        minLength: 1
++                        type: string
++                      imageTag:
++                        description: |-
++                          imageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        maxLength: 256
++                        minLength: 1
++                        type: string
++                    type: object
+                   caCertificateValidityPeriodDays:
+                     description: |-
+                       caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -1697,6 +1717,26 @@ spec:
+                         minLength: 1
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: |-
++                      BottlerocketControl holds the image source for control container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          imageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        maxLength: 512
++                        minLength: 1
++                        type: string
++                      imageTag:
++                        description: |-
++                          imageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        maxLength: 256
++                        minLength: 1
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: |-
+                       caCertPath is the path to the SSL certificate authority used to
+@@ -2799,6 +2839,26 @@ spec:
+                         minLength: 1
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: |-
++                      BottlerocketControl holds the image source for control container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          imageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        maxLength: 512
++                        minLength: 1
++                        type: string
++                      imageTag:
++                        description: |-
++                          imageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        maxLength: 256
++                        minLength: 1
++                        type: string
++                    type: object
+                   caCertificateValidityPeriodDays:
+                     description: |-
+                       caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4317,6 +4377,26 @@ spec:
+                         minLength: 1
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: |-
++                      BottlerocketControl holds the image source for control container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          imageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        maxLength: 512
++                        minLength: 1
++                        type: string
++                      imageTag:
++                        description: |-
++                          imageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        maxLength: 256
++                        minLength: 1
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: |-
+                       caCertPath is the path to the SSL certificate authority used to
+diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+index 8b36fc497e8f..adc40a577e01 100644
+--- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
++++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
+@@ -351,6 +351,26 @@ spec:
+                                 minLength: 1
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: |-
++                              BottlerocketControl holds the image source for control container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  imageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                maxLength: 512
++                                minLength: 1
++                                type: string
++                              imageTag:
++                                description: |-
++                                  imageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                maxLength: 256
++                                minLength: 1
++                                type: string
++                            type: object
+                           caCertificateValidityPeriodDays:
+                             description: |-
+                               caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -1761,6 +1781,26 @@ spec:
+                                 minLength: 1
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: |-
++                              BottlerocketControl holds the image source for control container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  imageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                maxLength: 512
++                                minLength: 1
++                                type: string
++                              imageTag:
++                                description: |-
++                                  imageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                maxLength: 256
++                                minLength: 1
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: |-
+                               caCertPath is the path to the SSL certificate authority used to
+@@ -2759,6 +2799,26 @@ spec:
+                                 minLength: 1
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: |-
++                              BottlerocketControl holds the image source for control container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  imageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                maxLength: 512
++                                minLength: 1
++                                type: string
++                              imageTag:
++                                description: |-
++                                  imageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                maxLength: 256
++                                minLength: 1
++                                type: string
++                            type: object
+                           caCertificateValidityPeriodDays:
+                             description: |-
+                               caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4307,6 +4367,26 @@ spec:
+                                 minLength: 1
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: |-
++                              BottlerocketControl holds the image source for control container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  imageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                maxLength: 512
++                                minLength: 1
++                                type: string
++                              imageTag:
++                                description: |-
++                                  imageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                maxLength: 256
++                                minLength: 1
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: |-
+                               caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 index dd769a78d445..f8f1b97cb3d1 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
@@ -260,6 +702,154 @@ index 65371b81181c..bfc69fabbb13 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+index cd22b67ed724..22bbef3cae3d 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -143,6 +143,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*BottlerocketControl)(nil), (*v1beta2.BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_upstreamv1beta3_BottlerocketControl_To_v1beta2_BottlerocketControl(a.(*BottlerocketControl), b.(*v1beta2.BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*ClusterConfiguration)(nil), (*v1beta2.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfiguration(a.(*ClusterConfiguration), b.(*v1beta2.ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -218,6 +223,11 @@ func RegisterConversions(s *runtime.Scheme) error {
+ 	}); err != nil {
+ 		return err
+ 	}
++	if err := s.AddConversionFunc((*v1beta2.BottlerocketControl)(nil), (*BottlerocketControl)(nil), func(a, b interface{}, scope conversion.Scope) error {
++		return Convert_v1beta2_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(a.(*v1beta2.BottlerocketControl), b.(*BottlerocketControl), scope)
++	}); err != nil {
++		return err
++	}
+ 	if err := s.AddConversionFunc((*v1beta2.ClusterConfiguration)(nil), (*ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+ 		return Convert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(a.(*v1beta2.ClusterConfiguration), b.(*ClusterConfiguration), scope)
+ 	}); err != nil {
+@@ -401,6 +411,17 @@ func autoConvert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBo
+ 	return nil
+ }
+ 
++func autoConvert_upstreamv1beta3_BottlerocketControl_To_v1beta2_BottlerocketControl(in *BottlerocketControl, out *v1beta2.BottlerocketControl, s conversion.Scope) error {
++	// WARNING: in.ImageMeta requires manual conversion: does not exist in peer-type
++	return nil
++}
++
++func autoConvert_v1beta2_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(in *v1beta2.BottlerocketControl, out *BottlerocketControl, s conversion.Scope) error {
++	// WARNING: in.ImageRepository requires manual conversion: does not exist in peer-type
++	// WARNING: in.ImageTag requires manual conversion: does not exist in peer-type
++	return nil
++}
++
+ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in *ClusterConfiguration, out *v1beta2.ClusterConfiguration, s conversion.Scope) error {
+ 	// WARNING: in.TypeMeta requires manual conversion: does not exist in peer-type
+ 	if err := Convert_upstreamv1beta3_Pause_To_v1beta2_Pause(&in.Pause, &out.Pause, s); err != nil {
+@@ -409,6 +430,9 @@ func autoConvert_upstreamv1beta3_ClusterConfiguration_To_v1beta2_ClusterConfigur
+ 	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_upstreamv1beta3_BottlerocketControl_To_v1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -447,6 +471,9 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
+ 	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta2_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -647,6 +674,9 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta2_JoinConfiguration(
+ 	if err := Convert_upstreamv1beta3_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_upstreamv1beta3_BottlerocketControl_To_v1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_upstreamv1beta3_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -681,6 +711,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta3_JoinConfiguration(
+ 	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	if err := Convert_v1beta2_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
++		return err
++	}
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.deepcopy.go
+index b7b976a49e15..baa2867cb006 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.deepcopy.go
+@@ -157,12 +157,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
+ 	return out
+ }
+ 
++// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
++func (in *BottlerocketControl) DeepCopyInto(out *BottlerocketControl) {
++	*out = *in
++	out.ImageMeta = in.ImageMeta
++}
++
++// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new BottlerocketControl.
++func (in *BottlerocketControl) DeepCopy() *BottlerocketControl {
++	if in == nil {
++		return nil
++	}
++	out := new(BottlerocketControl)
++	in.DeepCopyInto(out)
++	return out
++}
++
+ // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
+ 	*out = *in
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.Etcd.DeepCopyInto(&out.Etcd)
+@@ -410,6 +427,7 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
+ 	out.TypeMeta = in.TypeMeta
+ 	out.Pause = in.Pause
+ 	out.BottlerocketBootstrap = in.BottlerocketBootstrap
++	out.BottlerocketControl = in.BottlerocketControl
+ 	in.Proxy.DeepCopyInto(&out.Proxy)
+ 	out.RegistryMirror = in.RegistryMirror
+ 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+index 49f39a960401..725c6328cad4 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+@@ -503,6 +503,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
+ 	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	// WARNING: in.BottlerocketControl requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
+@@ -759,6 +760,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_upstreamv1beta4_JoinConfiguration(
+ 	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
+ 		return err
+ 	}
++	// WARNING: in.BottlerocketControl requires manual conversion: does not exist in peer-type
+ 	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
+ 		return err
+ 	}
 diff --git a/bootstrap/kubeadm/pkg/types/utils_test.go b/bootstrap/kubeadm/pkg/types/utils_test.go
 index 39b20a51f83f..dc3364c27085 100644
 --- a/bootstrap/kubeadm/pkg/types/utils_test.go
@@ -369,6 +959,230 @@ index f3a3ebf4d6e9..cd6a1a31449e 100644
  		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+index 30fa1d92931e..615016d63d18 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
+@@ -364,6 +364,26 @@ spec:
+                             minLength: 1
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: |-
++                          BottlerocketControl holds the image source for control container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              imageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            maxLength: 512
++                            minLength: 1
++                            type: string
++                          imageTag:
++                            description: |-
++                              imageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            maxLength: 256
++                            minLength: 1
++                            type: string
++                        type: object
+                       caCertificateValidityPeriodDays:
+                         description: |-
+                           caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -1758,6 +1778,26 @@ spec:
+                             minLength: 1
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: |-
++                          BottlerocketControl holds the image source for control container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              imageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            maxLength: 512
++                            minLength: 1
++                            type: string
++                          imageTag:
++                            description: |-
++                              imageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            maxLength: 256
++                            minLength: 1
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: |-
+                           caCertPath is the path to the SSL certificate authority used to
+@@ -3380,6 +3420,26 @@ spec:
+                             minLength: 1
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: |-
++                          BottlerocketControl holds the image source for control container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              imageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            maxLength: 512
++                            minLength: 1
++                            type: string
++                          imageTag:
++                            description: |-
++                              imageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            maxLength: 256
++                            minLength: 1
++                            type: string
++                        type: object
+                       caCertificateValidityPeriodDays:
+                         description: |-
+                           caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4911,6 +4971,26 @@ spec:
+                             minLength: 1
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: |-
++                          BottlerocketControl holds the image source for control container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              imageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            maxLength: 512
++                            minLength: 1
++                            type: string
++                          imageTag:
++                            description: |-
++                              imageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            maxLength: 256
++                            minLength: 1
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: |-
+                           caCertPath is the path to the SSL certificate authority used to
+diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+index 6f3350144992..196dc0e81a13 100644
+--- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
++++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
+@@ -359,6 +359,26 @@ spec:
+                                     minLength: 1
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: |-
++                                  BottlerocketControl holds the image source for control container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      imageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    maxLength: 512
++                                    minLength: 1
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      imageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    maxLength: 256
++                                    minLength: 1
++                                    type: string
++                                type: object
+                               caCertificateValidityPeriodDays:
+                                 description: |-
+                                   caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -1784,6 +1804,26 @@ spec:
+                                     minLength: 1
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: |-
++                                  BottlerocketControl holds the image source for control container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      imageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    maxLength: 512
++                                    minLength: 1
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      imageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    maxLength: 256
++                                    minLength: 1
++                                    type: string
++                                type: object
+                               caCertPath:
+                                 description: |-
+                                   caCertPath is the path to the SSL certificate authority used to
+@@ -3036,6 +3076,26 @@ spec:
+                                     minLength: 1
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: |-
++                                  BottlerocketControl holds the image source for control container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      imageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    maxLength: 512
++                                    minLength: 1
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      imageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    maxLength: 256
++                                    minLength: 1
++                                    type: string
++                                type: object
+                               caCertificateValidityPeriodDays:
+                                 description: |-
+                                   caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4604,6 +4664,26 @@ spec:
+                                     minLength: 1
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: |-
++                                  BottlerocketControl holds the image source for control container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      imageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    maxLength: 512
++                                    minLength: 1
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      imageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    maxLength: 256
++                                    minLength: 1
++                                    type: string
++                                type: object
+                               caCertPath:
+                                 description: |-
+                                   caCertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/pkg/workload_cluster_coredns_test.go b/controlplane/kubeadm/pkg/workload_cluster_coredns_test.go
 index 03b93d6ba582..bd3d81c474af 100644
 --- a/controlplane/kubeadm/pkg/workload_cluster_coredns_test.go
@@ -547,6 +1361,305 @@ index 009cfd51a531..403ff2697bfc 100644
  				scheduler:
  				  extraArgs:
  				    bar: baz
--- 
-2.47.3
-
+diff --git a/gen_11.log b/gen_11.log
+new file mode 100644
+index 000000000000..8374eda1a2ee
+--- /dev/null
++++ b/gen_11.log
+@@ -0,0 +1,296 @@
++make clean-generated-yaml SRC_DIRS="./core/config/crd/bases,./core/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./core/config/crd/bases,./core/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./core \
++	paths=./core/reconcilers/... \
++	paths=./core/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./core/config/crd/bases \
++	output:rbac:dir=./core/config/rbac \
++	output:webhook:dir=./core/config/webhook \
++	webhook
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./cmd/clusterctl/api/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./cmd/clusterctl/config/crd/bases
++/capi/hack/tools/bin/kustomize-v5.7.0 build cmd/clusterctl/config/crd > cmd/clusterctl/config/manifest/clusterctl-api.yaml
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/test/builder/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t3/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t3/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t4/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t4/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/deprecated/v1beta1/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/deprecated/v1beta1/test/builder/crd
++make clean-generated-yaml SRC_DIRS="./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm \
++	paths=./bootstrap/kubeadm/reconcilers/... \
++	paths=./bootstrap/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./bootstrap/kubeadm/config/crd/bases \
++	output:rbac:dir=./bootstrap/kubeadm/config/rbac \
++	output:webhook:dir=./bootstrap/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/controlplane/kubeadm/... \
++	paths=./controlplane/kubeadm \
++	paths=./controlplane/kubeadm/reconcilers/... \
++	paths=./controlplane/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./controlplane/kubeadm/config/crd/bases \
++	output:rbac:dir=./controlplane/kubeadm/config/rbac \
++	output:webhook:dir=./controlplane/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./ \
++	paths=./api/... \
++	paths=./internal/controllers/... \
++	paths=./internal/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./config/crd/bases \
++	output:webhook:dir=./config/webhook \
++	webhook
++cd ./test/extension; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./... \
++	output:rbac:dir=./config/rbac \
++	rbac:roleName=manager-role
++make generate-go-deepcopy-core generate-go-deepcopy-kubeadm-bootstrap generate-go-deepcopy-kubeadm-control-plane generate-go-deepcopy-docker-infrastructure generate-go-deepcopy-test-extension
++make[1]: Entering directory `/capi'
++make clean-generated-deepcopy SRC_DIRS="./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./api/runtime/hooks/... \
++	paths=./cmd/clusterctl/... \
++	paths=./controllers/crdmigrator/test/... \
++	paths=./internal/runtime/test/... \
++	paths=./internal/topology/upgrade/test/... \
++	paths=./util/test/builder/... \
++	paths=./util/deprecated/v1beta1/test/builder/...
++make clean-generated-deepcopy SRC_DIRS="./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm/pkg/types/...
++make clean-generated-deepcopy SRC_DIRS="./api/controlplane/kubeadm"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/controlplane/kubeadm/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/inmemory/pkg/cloud/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/inmemory/pkg/cloud/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/inmemory; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++        paths=./pkg/cloud/api/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/docker/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/...
++make[1]: Nothing to be done for `generate-go-deepcopy-test-extension'.
++make[1]: Leaving directory `/capi'
++make generate-go-conversions-core generate-go-conversions-kubeadm-bootstrap generate-go-conversions-kubeadm-control-plane generate-go-conversions-docker-infrastructure generate-go-conversions-test-extension
++make[1]: Entering directory `/capi'
++make generate-go-conversions-core-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./core/v1beta1
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/topology/upgrade/test/t2/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-addons-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/addons/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./addons/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-ipam
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/ipam/v1beta1,./api/ipam/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/ipam/v1beta1,./api/ipam/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./ipam/v1alpha1 \
++	./ipam/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-runtime
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/runtime/test/v1alpha1 \
++	./internal/runtime/test/v1alpha2
++make clean-generated-conversions SRC_DIRS="./api/runtime/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/runtime/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./runtime/v1alpha1
++make[2]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/bootstrap/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/v1beta1
++make clean-generated-conversions SRC_DIRS="./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta3 \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta4
++make clean-generated-conversions SRC_DIRS="./api/controlplane/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./controlplane/kubeadm/v1beta1
++cd test/infrastructure/docker; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./api/v1beta1
++make[1]: Nothing to be done for `generate-go-conversions-test-extension'.
++make[1]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/kube-openapi/cmd/openapi-gen openapi-gen 589584f1c912f4367fe8954f649a59a98b912da5 
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/core/v1beta2; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/core/v1beta2 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AllOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AnyOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,OneOf
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterClassDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XIntOrString
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XMetadata
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XPreserveUnknownFields
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XValidations
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeploymentDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineHealthCheckDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachinePoolDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineSetDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineTemplateSpec,ObjectMeta
++API rule violation: streaming_list_type_json_tags,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDrainRuleList,ListMeta
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/runtime/hooks/v1alpha1; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/runtime/hooks/v1alpha1 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Pods
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Services
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,DiscoverVariablesResponse,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequestItem,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesResponse,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequestItem,Variables

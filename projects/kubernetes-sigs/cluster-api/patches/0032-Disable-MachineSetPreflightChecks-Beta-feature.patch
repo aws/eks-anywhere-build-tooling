@@ -1,8 +1,23 @@
-From 42d9ad275a5c5f7f3c0bdb42c9cbf1785fd058ce Mon Sep 17 00:00:00 2001
+From 3fdec87115e184e0c4f2b7724b11f36ce9c15426 Mon Sep 17 00:00:00 2001
 From: Shizhao Liu <lshizhao@amazon.com>
 Date: Thu, 27 Feb 2025 14:26:37 -0800
-Subject: [PATCH 32/37] Disable MachineSetPreflightChecks Beta feature
+Subject: [PATCH 32/36] Disable MachineSetPreflightChecks Beta feature
 
+MachineSetPreflightChecks feature was promoted from alpha to beta and
+is enabled by default, this prevents EKS-A from doing InPlace upgrade
+on an cluster whose controlPlane and worker node's major+minor version
+are differet. For now we will disable this feature.
+
+Upstream PR: https://github.com/kubernetes-sigs/cluster-api/pull/11228
+---
+ config/manager/manager.yaml | 2 +-
+ feature/feature.go          | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+---
+ feature/feature.go |   2 +-
+ gen_32.log         | 405 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 406 insertions(+), 1 deletion(-)
+ create mode 100644 gen_32.log
 
 diff --git a/feature/feature.go b/feature/feature.go
 index 4df98753b76c..e5eb96c82408 100644
@@ -17,6 +32,414 @@ index 4df98753b76c..e5eb96c82408 100644
  	PriorityQueue:                  {Default: true, PreRelease: featuregate.Beta},
  	ReconcilerRateLimiting:         {Default: true, PreRelease: featuregate.Beta},
  	ClusterTopology:                {Default: false, PreRelease: featuregate.Alpha},
--- 
-2.47.3
-
+diff --git a/gen_32.log b/gen_32.log
+new file mode 100644
+index 000000000000..03c63c274ee2
+--- /dev/null
++++ b/gen_32.log
+@@ -0,0 +1,405 @@
++make clean-generated-yaml SRC_DIRS="./core/config/crd/bases,./core/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./core/config/crd/bases,./core/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./core \
++	paths=./core/reconcilers/... \
++	paths=./core/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./core/config/crd/bases \
++	output:rbac:dir=./core/config/rbac \
++	output:webhook:dir=./core/config/webhook \
++	webhook
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./cmd/clusterctl/api/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./cmd/clusterctl/config/crd/bases
++/capi/hack/tools/bin/kustomize-v5.7.0 build cmd/clusterctl/config/crd > cmd/clusterctl/config/manifest/clusterctl-api.yaml
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/test/builder/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t3/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t3/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t4/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t4/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/deprecated/v1beta1/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/deprecated/v1beta1/test/builder/crd
++make clean-generated-yaml SRC_DIRS="./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm \
++	paths=./bootstrap/kubeadm/reconcilers/... \
++	paths=./bootstrap/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./bootstrap/kubeadm/config/crd/bases \
++	output:rbac:dir=./bootstrap/kubeadm/config/rbac \
++	output:webhook:dir=./bootstrap/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/controlplane/kubeadm/... \
++	paths=./controlplane/kubeadm \
++	paths=./controlplane/kubeadm/reconcilers/... \
++	paths=./controlplane/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./controlplane/kubeadm/config/crd/bases \
++	output:rbac:dir=./controlplane/kubeadm/config/rbac \
++	output:webhook:dir=./controlplane/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./ \
++	paths=./api/... \
++	paths=./internal/controllers/... \
++	paths=./internal/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./config/crd/bases \
++	output:webhook:dir=./config/webhook \
++	webhook
++cd ./test/extension; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./... \
++	output:rbac:dir=./config/rbac \
++	rbac:roleName=manager-role
++make generate-go-deepcopy-core generate-go-deepcopy-kubeadm-bootstrap generate-go-deepcopy-kubeadm-control-plane generate-go-deepcopy-docker-infrastructure generate-go-deepcopy-test-extension
++make[1]: Entering directory `/capi'
++make clean-generated-deepcopy SRC_DIRS="./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./api/runtime/hooks/... \
++	paths=./cmd/clusterctl/... \
++	paths=./controllers/crdmigrator/test/... \
++	paths=./internal/runtime/test/... \
++	paths=./internal/topology/upgrade/test/... \
++	paths=./util/test/builder/... \
++	paths=./util/deprecated/v1beta1/test/builder/...
++make clean-generated-deepcopy SRC_DIRS="./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm/pkg/types/...
++make clean-generated-deepcopy SRC_DIRS="./api/controlplane/kubeadm"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/controlplane/kubeadm/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/inmemory/pkg/cloud/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/inmemory/pkg/cloud/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/inmemory; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++        paths=./pkg/cloud/api/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/docker/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/...
++make[1]: Nothing to be done for `generate-go-deepcopy-test-extension'.
++make[1]: Leaving directory `/capi'
++make generate-go-conversions-core generate-go-conversions-kubeadm-bootstrap generate-go-conversions-kubeadm-control-plane generate-go-conversions-docker-infrastructure generate-go-conversions-test-extension
++make[1]: Entering directory `/capi'
++make generate-go-conversions-core-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./core/v1beta1
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/topology/upgrade/test/t2/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-addons-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/addons/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./addons/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-ipam
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/ipam/v1beta1,./api/ipam/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/ipam/v1beta1,./api/ipam/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./ipam/v1alpha1 \
++	./ipam/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-runtime
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/runtime/test/v1alpha1 \
++	./internal/runtime/test/v1alpha2
++make clean-generated-conversions SRC_DIRS="./api/runtime/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/runtime/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./runtime/v1alpha1
++make[2]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/bootstrap/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/v1beta1
++make clean-generated-conversions SRC_DIRS="./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta3 \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta4
++E1015 03:49:31.140633   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta3.BottlerocketAdmin -> sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketAdmin
++E1015 03:49:31.140733   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.140743   27935 conversion.go:814]       - ImageMeta
++E1015 03:49:31.140802   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketAdmin -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta3.BottlerocketAdmin
++E1015 03:49:31.140812   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.140821   27935 conversion.go:814]       - ImageRepository
++E1015 03:49:31.140828   27935 conversion.go:814]       - ImageTag
++E1015 03:49:31.141258   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta3.BottlerocketBootstrapContainer -> sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketBootstrapContainer
++E1015 03:49:31.141269   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.141282   27935 conversion.go:814]       - ImageMeta
++E1015 03:49:31.141398   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketBootstrapContainer -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta3.BottlerocketBootstrapContainer
++E1015 03:49:31.141407   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.141415   27935 conversion.go:814]       - ImageRepository
++E1015 03:49:31.141423   27935 conversion.go:814]       - ImageTag
++E1015 03:49:31.141655   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta3.BottlerocketHostContainer -> sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketHostContainer
++E1015 03:49:31.141665   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.141673   27935 conversion.go:814]       - ImageMeta
++E1015 03:49:31.141800   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketHostContainer -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta3.BottlerocketHostContainer
++E1015 03:49:31.141812   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.141821   27935 conversion.go:814]       - ImageRepository
++E1015 03:49:31.141828   27935 conversion.go:814]       - ImageTag
++E1015 03:49:31.142457   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketKubernetesSettings -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta3.BottlerocketKubernetesSettings
++E1015 03:49:31.142469   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.142478   27935 conversion.go:814]       - ClusterDomain
++E1015 03:49:31.142493   27935 conversion.go:814]       - ContainerLogMaxFiles
++E1015 03:49:31.142500   27935 conversion.go:814]       - ContainerLogMaxSize
++E1015 03:49:31.142507   27935 conversion.go:814]       - CPUCFSQuota
++E1015 03:49:31.142514   27935 conversion.go:814]       - CPUManagerPolicy
++E1015 03:49:31.142520   27935 conversion.go:814]       - CPUManagerPolicyOptions
++E1015 03:49:31.142527   27935 conversion.go:814]       - CPUManagerReconcilePeriod
++E1015 03:49:31.142534   27935 conversion.go:814]       - EventBurst
++E1015 03:49:31.142541   27935 conversion.go:814]       - EventRecordQPS
++E1015 03:49:31.142548   27935 conversion.go:814]       - EvictionHard
++E1015 03:49:31.142554   27935 conversion.go:814]       - EvictionMaxPodGracePeriod
++E1015 03:49:31.142561   27935 conversion.go:814]       - EvictionSoft
++E1015 03:49:31.142567   27935 conversion.go:814]       - EvictionSoftGracePeriod
++E1015 03:49:31.142574   27935 conversion.go:814]       - ImageGCHighThresholdPercent
++E1015 03:49:31.142580   27935 conversion.go:814]       - ImageGCLowThresholdPercent
++E1015 03:49:31.142587   27935 conversion.go:814]       - KubeAPIBurst
++E1015 03:49:31.142594   27935 conversion.go:814]       - KubeAPIQPS
++E1015 03:49:31.142600   27935 conversion.go:814]       - KubeReserved
++E1015 03:49:31.142607   27935 conversion.go:814]       - MemoryManagerPolicy
++E1015 03:49:31.142614   27935 conversion.go:814]       - PodPidsLimit
++E1015 03:49:31.142620   27935 conversion.go:814]       - ProviderID
++E1015 03:49:31.142627   27935 conversion.go:814]       - RegistryBurst
++E1015 03:49:31.142633   27935 conversion.go:814]       - RegistryPullQPS
++E1015 03:49:31.142640   27935 conversion.go:814]       - ShutdownGracePeriod
++E1015 03:49:31.142647   27935 conversion.go:814]       - ShutdownGracePeriodCriticalPods
++E1015 03:49:31.142653   27935 conversion.go:814]       - SystemReserved
++E1015 03:49:31.142660   27935 conversion.go:814]       - TopologyManagerPolicy
++E1015 03:49:31.142667   27935 conversion.go:814]       - TopologyManagerScope
++E1015 03:49:31.179610   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketAdmin -> sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketAdmin
++E1015 03:49:31.179640   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.179650   27935 conversion.go:814]       - ImageMeta
++E1015 03:49:31.179702   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketAdmin -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketAdmin
++E1015 03:49:31.179712   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.179720   27935 conversion.go:814]       - ImageRepository
++E1015 03:49:31.179728   27935 conversion.go:814]       - ImageTag
++E1015 03:49:31.180301   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketBootstrapContainer -> sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketBootstrapContainer
++E1015 03:49:31.180312   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.180321   27935 conversion.go:814]       - ImageMeta
++E1015 03:49:31.180448   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketBootstrapContainer -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketBootstrapContainer
++E1015 03:49:31.180457   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.180465   27935 conversion.go:814]       - ImageRepository
++E1015 03:49:31.180472   27935 conversion.go:814]       - ImageTag
++E1015 03:49:31.180524   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketControl -> sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketControl
++E1015 03:49:31.180539   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.180547   27935 conversion.go:814]       - ImageMeta
++E1015 03:49:31.180601   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketControl -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketControl
++E1015 03:49:31.180610   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.180618   27935 conversion.go:814]       - ImageRepository
++E1015 03:49:31.180626   27935 conversion.go:814]       - ImageTag
++E1015 03:49:31.180751   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketHostContainer -> sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketHostContainer
++E1015 03:49:31.180761   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.180769   27935 conversion.go:814]       - ImageMeta
++E1015 03:49:31.180868   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketHostContainer -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketHostContainer
++E1015 03:49:31.180877   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.180885   27935 conversion.go:814]       - ImageRepository
++E1015 03:49:31.180892   27935 conversion.go:814]       - ImageTag
++E1015 03:49:31.181505   27935 conversion.go:811] Warning: could not find nor generate a final Conversion function for sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2.BottlerocketKubernetesSettings -> sigs.k8s.io/cluster-api/bootstrap/kubeadm/pkg/types/upstreamv1beta4.BottlerocketKubernetesSettings
++E1015 03:49:31.181516   27935 conversion.go:812]   the following fields need manual conversion:
++E1015 03:49:31.181525   27935 conversion.go:814]       - ClusterDomain
++E1015 03:49:31.181532   27935 conversion.go:814]       - ContainerLogMaxFiles
++E1015 03:49:31.181539   27935 conversion.go:814]       - ContainerLogMaxSize
++E1015 03:49:31.181545   27935 conversion.go:814]       - CPUCFSQuota
++E1015 03:49:31.181552   27935 conversion.go:814]       - CPUManagerPolicy
++E1015 03:49:31.181559   27935 conversion.go:814]       - CPUManagerPolicyOptions
++E1015 03:49:31.181566   27935 conversion.go:814]       - CPUManagerReconcilePeriod
++E1015 03:49:31.181573   27935 conversion.go:814]       - EventBurst
++E1015 03:49:31.181579   27935 conversion.go:814]       - EventRecordQPS
++E1015 03:49:31.181586   27935 conversion.go:814]       - EvictionHard
++E1015 03:49:31.181593   27935 conversion.go:814]       - EvictionMaxPodGracePeriod
++E1015 03:49:31.181600   27935 conversion.go:814]       - EvictionSoft
++E1015 03:49:31.181606   27935 conversion.go:814]       - EvictionSoftGracePeriod
++E1015 03:49:31.181613   27935 conversion.go:814]       - ImageGCHighThresholdPercent
++E1015 03:49:31.181620   27935 conversion.go:814]       - ImageGCLowThresholdPercent
++E1015 03:49:31.181626   27935 conversion.go:814]       - KubeAPIBurst
++E1015 03:49:31.181633   27935 conversion.go:814]       - KubeAPIQPS
++E1015 03:49:31.181640   27935 conversion.go:814]       - KubeReserved
++E1015 03:49:31.181646   27935 conversion.go:814]       - MemoryManagerPolicy
++E1015 03:49:31.181653   27935 conversion.go:814]       - PodPidsLimit
++E1015 03:49:31.181659   27935 conversion.go:814]       - ProviderID
++E1015 03:49:31.181666   27935 conversion.go:814]       - RegistryBurst
++E1015 03:49:31.181680   27935 conversion.go:814]       - RegistryPullQPS
++E1015 03:49:31.181687   27935 conversion.go:814]       - ShutdownGracePeriod
++E1015 03:49:31.181698   27935 conversion.go:814]       - ShutdownGracePeriodCriticalPods
++E1015 03:49:31.181704   27935 conversion.go:814]       - SystemReserved
++E1015 03:49:31.181711   27935 conversion.go:814]       - TopologyManagerPolicy
++E1015 03:49:31.181718   27935 conversion.go:814]       - TopologyManagerScope
++make clean-generated-conversions SRC_DIRS="./api/controlplane/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./controlplane/kubeadm/v1beta1
++cd test/infrastructure/docker; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./api/v1beta1
++make[1]: Nothing to be done for `generate-go-conversions-test-extension'.
++make[1]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/kube-openapi/cmd/openapi-gen openapi-gen 589584f1c912f4367fe8954f649a59a98b912da5 
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/core/v1beta2; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/core/v1beta2 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AllOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AnyOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,OneOf
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterClassDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XIntOrString
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XMetadata
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XPreserveUnknownFields
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XValidations
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeploymentDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineHealthCheckDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachinePoolDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineSetDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineTemplateSpec,ObjectMeta
++API rule violation: streaming_list_type_json_tags,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDrainRuleList,ListMeta
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/runtime/hooks/v1alpha1; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/runtime/hooks/v1alpha1 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Pods
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Services
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,DiscoverVariablesResponse,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequestItem,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesResponse,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequestItem,Variables
