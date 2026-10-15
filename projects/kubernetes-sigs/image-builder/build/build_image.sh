@@ -62,7 +62,7 @@ function retry_image_builder() {
     ["error while ListAllImage"]="Nutanix image listing failed"
   )
 
-  until [ $n -eq $max ]; do
+  until [ "$n" -gt "$max" ]; do
     failed="false"
     timeout "1.5h" ${HOME}/image-builder "$@" && break || {
       failed="true"
@@ -85,7 +85,7 @@ function retry_image_builder() {
         fi
       done
 
-      if [ "${retry}" = "true" ]; then
+      if [[ "${retry}" = "true" && "$n" -lt "$max" ]]; then
         ((n++))
         >&2 echo "$message. This is likely transisent, retrying. Attempt $n/$max:"
         sleep $delay
