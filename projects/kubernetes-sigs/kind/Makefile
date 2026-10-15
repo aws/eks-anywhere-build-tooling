@@ -161,10 +161,11 @@ $(KIND_NODE_IMAGE_BUILD_ARGS): | ensure-yq $$(ENABLE_LOGGING)
 # kubeadm-override and config are copied into kind/images/base/files/etc
 # so they are automatically added into the image by the dockerfile
 $(KIND_BASE_KUBEADM_OVERRIDE): KUBEADM_CONFIG_DIR=$(OUTPUT_DIR)/$(RELEASE_BRANCH)/images/base/files/etc
+$(KIND_BASE_KUBEADM_OVERRIDE): KUBEADM_CONFIG_API_VERSION=$(if $(filter 1-37,$(RELEASE_BRANCH)),v1beta4,v1beta3)
 $(KIND_BASE_KUBEADM_OVERRIDE):
 	@mkdir -p $(@D)
 	@mkdir -p $(KUBEADM_CONFIG_DIR)
-	set -a && source $(KIND_BASE_IMAGE_BUILD_ARGS) && envsubst '$$COREDNS_VERSION:$$ETCD_VERSION:$$EKSD_KUBE_VERSION:$$EKSD_IMAGE_REPO' \
+	set -a && source $(KIND_BASE_IMAGE_BUILD_ARGS) && KUBEADM_CONFIG_API_VERSION=$(KUBEADM_CONFIG_API_VERSION) envsubst '$$KUBEADM_CONFIG_API_VERSION:$$COREDNS_VERSION:$$ETCD_VERSION:$$EKSD_KUBE_VERSION:$$EKSD_IMAGE_REPO' \
 		< ./images/base/kubeadm.config.tmpl \
 		> $(KUBEADM_CONFIG_DIR)/kubeadm.config
 	cp ./images/base/kubeadm-override.sh $@
