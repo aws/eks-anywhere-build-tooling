@@ -1,7 +1,7 @@
-From ea74258c58932bff5c8347237724c5770fe2644b Mon Sep 17 00:00:00 2001
+From 0d7876622f118eae4a027fad4f40b4b1541eea6a Mon Sep 17 00:00:00 2001
 From: Jackson West <jgw@amazon.com>
 Date: Sat, 6 May 2023 14:08:17 -0500
-Subject: [PATCH] Patch haproxy maxconn value to avoid ulimit issue
+Subject: [PATCH 22/36] Patch haproxy maxconn value to avoid ulimit issue
 
 EKS-A uses haproxy 2.5 which errors if the maxconn value
 requires more FDs than allowed by the ulimit setting of docker.
@@ -25,12 +25,33 @@ requires more FDs than allowed by the ulimit setting of docker.
  ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 68 ++++++++++++++++
  .../docker/internal/loadbalancer/config.go    |  7 +-
  17 files changed, 594 insertions(+), 12 deletions(-)
+---
+ api/bootstrap/kubeadm/v1beta1/conversion.go   |  31 +-
+ .../kubeadm/v1beta1/kubeadm_types.go          |  25 ++
+ .../v1beta1/zz_generated.conversion.go        |  78 ++++-
+ .../kubeadm/v1beta1/zz_generated.deepcopy.go  |  61 ++++
+ .../kubeadm/v1beta2/kubeadm_types.go          |  17 +
+ .../kubeadm/v1beta2/zz_generated.deepcopy.go  |  25 ++
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  86 +++++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  90 ++++++
+ .../internal/bottlerocket/bootstrap.go        |  16 +
+ .../internal/bottlerocket/bootstrap_test.go   |  55 ++++
+ .../internal/bottlerocket/bottlerocket.go     |  14 +
+ .../zz_generated.conversion.go                |   2 +
+ .../zz_generated.conversion.go                |   2 +
+ .../kubeadmconfig/kubeadmconfig_controller.go |   9 +
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  86 +++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  90 ++++++
+ gen_22.log                                    | 296 ++++++++++++++++++
+ .../docker/internal/loadbalancer/config.go    |   7 +-
+ 18 files changed, 978 insertions(+), 12 deletions(-)
+ create mode 100644 gen_22.log
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index d853c209a..c601cf30f 100644
+index 84e2ec355cd0..4228e31149ca 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
-@@ -753,7 +753,12 @@ func Convert_v1beta2_BottlerocketSettings_To_v1beta1_BottlerocketSettings(in *bo
+@@ -492,7 +492,12 @@ func Convert_v1beta2_BottlerocketSettings_To_v1beta1_BottlerocketSettings(in *bo
  			SysctlSettings: in.Kernel.SysctlSettings,
  		}
  	}
@@ -44,7 +65,7 @@ index d853c209a..c601cf30f 100644
  	return nil
  }
  
-@@ -1033,6 +1038,30 @@ func Convert_v1beta2_User_To_v1beta1_User(in *bootstrapv1.User, out *User, s api
+@@ -772,6 +777,30 @@ func Convert_v1beta2_User_To_v1beta1_User(in *bootstrapv1.User, out *User, s api
  	return nil
  }
  
@@ -76,10 +97,10 @@ index d853c209a..c601cf30f 100644
  	if err := autoConvert_v1beta1_File_To_v1beta2_File(in, out, s); err != nil {
  		return err
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 293c7d4c0..92768937e 100644
+index b01cf16c5fdb..ad678e59a4a2 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-@@ -129,6 +129,10 @@ type ClusterConfiguration struct {
+@@ -128,6 +128,10 @@ type ClusterConfiguration struct {
  	// +optional
  	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
  
@@ -90,7 +111,7 @@ index 293c7d4c0..92768937e 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
-@@ -315,6 +319,15 @@ type BottlerocketBootstrapContainer struct {
+@@ -314,6 +318,15 @@ type BottlerocketBootstrapContainer struct {
  	UserData string `json:"userData,omitempty"`
  }
  
@@ -106,7 +127,7 @@ index 293c7d4c0..92768937e 100644
  // BottlerocketSettings define bottlerocket settings that can be configured on bottlerocket nodes.
  // This setting is ONLY for bottlerocket nodes.
  type BottlerocketSettings struct {
-@@ -324,6 +337,9 @@ type BottlerocketSettings struct {
+@@ -323,6 +336,9 @@ type BottlerocketSettings struct {
  	// KernelSettings contains additional kernel settings for Bottlerocket.
  	// +optional
  	Kernel *BottlerocketKernelSettings `json:"kernel,omitempty"`
@@ -116,7 +137,7 @@ index 293c7d4c0..92768937e 100644
  }
  
  // BottlerocketKubernetesSettings holds the settings for kubernetes on bottlerocket nodes.
-@@ -345,6 +361,11 @@ type BottlerocketKernelSettings struct {
+@@ -344,6 +360,11 @@ type BottlerocketKernelSettings struct {
  	SysctlSettings map[string]string `json:"sysctlSettings,omitempty"`
  }
  
@@ -128,7 +149,7 @@ index 293c7d4c0..92768937e 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -745,6 +766,10 @@ type JoinConfiguration struct {
+@@ -744,6 +765,10 @@ type JoinConfiguration struct {
  	// +optional
  	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
  
@@ -140,7 +161,7 @@ index 293c7d4c0..92768937e 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 4fad5cddf..0d7b02e6e 100644
+index 5902be11b951..590e594d9afa 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -70,6 +70,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -277,7 +298,7 @@ index 4fad5cddf..0d7b02e6e 100644
  	if err := Convert_v1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -1462,6 +1522,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+@@ -1464,6 +1524,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
  	} else {
  		out.Bottlerocket = nil
  	}
@@ -285,7 +306,7 @@ index 4fad5cddf..0d7b02e6e 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1521,6 +1582,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+@@ -1523,6 +1584,7 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
  	} else {
  		out.Bottlerocket = nil
  	}
@@ -294,7 +315,7 @@ index 4fad5cddf..0d7b02e6e 100644
  		return err
  	}
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index 5ae60358c..aa3f007b0 100644
+index 5ae60358cb53..aa3f007b0400 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -158,6 +158,37 @@ func (in *BottlerocketAdmin) DeepCopy() *BottlerocketAdmin {
@@ -394,10 +415,10 @@ index 5ae60358c..aa3f007b0 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 01d403746..288a6144d 100644
+index 2f43ba40d8c0..6f99b846ca41 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -199,6 +199,10 @@ type ClusterConfiguration struct {
+@@ -198,6 +198,10 @@ type ClusterConfiguration struct {
  	// +optional
  	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
  
@@ -408,7 +429,7 @@ index 01d403746..288a6144d 100644
  	// etcd holds configuration for etcd.
  	// NB: This value defaults to a Local (stacked) etcd
  	// +optional
-@@ -899,6 +903,10 @@ type JoinConfiguration struct {
+@@ -898,6 +902,10 @@ type JoinConfiguration struct {
  	// +optional
  	Bottlerocket *BottlerocketSettings `json:"bottlerocket,omitempty"`
  
@@ -419,7 +440,7 @@ index 01d403746..288a6144d 100644
  	// nodeRegistration holds fields that relate to registering the new control-plane node to the cluster.
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
-@@ -950,6 +958,15 @@ func (r *JoinConfiguration) IsDefined() bool {
+@@ -949,6 +957,15 @@ func (r *JoinConfiguration) IsDefined() bool {
  	return !reflect.DeepEqual(r, &JoinConfiguration{})
  }
  
@@ -436,7 +457,7 @@ index 01d403746..288a6144d 100644
  type JoinControlPlane struct {
  	// localAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index cdf4481c6..73a166127 100644
+index cdf4481c6f63..73a16612761e 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -362,6 +362,21 @@ func (in *BottlerocketSettings) DeepCopy() *BottlerocketSettings {
@@ -486,56 +507,28 @@ index cdf4481c6..73a166127 100644
  	in.Discovery.DeepCopyInto(&out.Discovery)
  	if in.ControlPlane != nil {
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 56f9fd457..9e51f9315 100644
+index f86bf1f23363..d4c9b8dac4eb 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -497,6 +497,22 @@ spec:
-                       - superpowered
-                       type: object
-                     type: array
-+                  certBundles:
-+                    description: CertBundles holds additional trusted cert bundles.
-+                    items:
-+                      description: CertBundle holds the cert data.
-+                      properties:
-+                        data:
-+                          description: Data is the actual cert.
-+                          type: string
-+                        name:
-+                          description: Name is the name of the cert bundle.
-+                          type: string
-+                      required:
-+                      - data
-+                      - name
-+                      type: object
-+                    type: array
-                   certificatesDir:
-                     description: |-
-                       certificatesDir specifies where to store or look for all required certificates.
-@@ -2015,6 +2031,22 @@ spec:
-                     maxLength: 512
-                     minLength: 1
-                     type: string
-+                  certBundles:
-+                    description: CertBundles holds additional trusted cert bundles.
-+                    items:
-+                      description: CertBundle holds the cert data.
-+                      properties:
-+                        data:
-+                          description: Data is the actual cert.
-+                          type: string
-+                        name:
-+                          description: Name is the name of the cert bundle.
-+                          type: string
-+                      required:
-+                      - data
-+                      - name
-+                      type: object
-+                    type: array
-                   controlPlane:
-                     description: |-
-                       controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -3246,6 +3278,22 @@ spec:
+@@ -303,6 +303,17 @@ spec:
+                       Bottlerocket holds configuration for certain bottlerocket settings.
+                       This is only for bottlerocket.
+                     properties:
++                      boot:
++                        description: Boot holds the boot-related settings for bottlerocket
++                          nodes
++                        properties:
++                          bootKernelParameters:
++                            additionalProperties:
++                              items:
++                                type: string
++                              type: array
++                            type: object
++                        type: object
+                       kernel:
+                         description: KernelSettings contains additional kernel settings
+                           for Bottlerocket.
+@@ -497,6 +508,22 @@ spec:
                      maximum: 36500
                      minimum: 1
                      type: integer
@@ -558,7 +551,71 @@ index 56f9fd457..9e51f9315 100644
                    certificateValidityPeriodDays:
                      description: |-
                        certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
-@@ -4979,6 +5027,22 @@ spec:
+@@ -1852,6 +1879,17 @@ spec:
+                       Bottlerocket holds configuration for certain bottlerocket settings.
+                       This is only for bottlerocket.
+                     properties:
++                      boot:
++                        description: Boot holds the boot-related settings for bottlerocket
++                          nodes
++                        properties:
++                          bootKernelParameters:
++                            additionalProperties:
++                              items:
++                                type: string
++                              type: array
++                            type: object
++                        type: object
+                       kernel:
+                         description: KernelSettings contains additional kernel settings
+                           for Bottlerocket.
+@@ -2045,6 +2083,22 @@ spec:
+                     maxLength: 512
+                     minLength: 1
+                     type: string
++                  certBundles:
++                    description: CertBundles holds additional trusted cert bundles.
++                    items:
++                      description: CertBundle holds the cert data.
++                      properties:
++                        data:
++                          description: Data is the actual cert.
++                          type: string
++                        name:
++                          description: Name is the name of the cert bundle.
++                          type: string
++                      required:
++                      - data
++                      - name
++                      type: object
++                    type: array
+                   controlPlane:
+                     description: |-
+                       controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -3323,6 +3377,22 @@ spec:
+                     maximum: 36500
+                     minimum: 1
+                     type: integer
++                  certBundles:
++                    description: CertBundles holds additional trusted cert bundles.
++                    items:
++                      description: CertBundle holds the cert data.
++                      properties:
++                        data:
++                          description: Data is the actual cert.
++                          type: string
++                        name:
++                          description: Name is the name of the cert bundle.
++                          type: string
++                      required:
++                      - data
++                      - name
++                      type: object
++                    type: array
+                   certificateValidityPeriodDays:
+                     description: |-
+                       certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
+@@ -5015,6 +5085,22 @@ spec:
                      maxLength: 512
                      minLength: 1
                      type: string
@@ -582,58 +639,28 @@ index 56f9fd457..9e51f9315 100644
                      description: |-
                        controlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 125d90918..115212f68 100644
+index e0b0d758c162..0c527bf48233 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -531,6 +531,23 @@ spec:
-                               - superpowered
-                               type: object
-                             type: array
-+                          certBundles:
-+                            description: CertBundles holds additional trusted cert
-+                              bundles.
-+                            items:
-+                              description: CertBundle holds the cert data.
-+                              properties:
-+                                data:
-+                                  description: Data is the actual cert.
-+                                  type: string
-+                                name:
-+                                  description: Name is the name of the cert bundle.
-+                                  type: string
-+                              required:
-+                              - data
-+                              - name
-+                              type: object
-+                            type: array
-                           certificatesDir:
-                             description: |-
-                               certificatesDir specifies where to store or look for all required certificates.
-@@ -2082,6 +2099,23 @@ spec:
-                             maxLength: 512
-                             minLength: 1
-                             type: string
-+                          certBundles:
-+                            description: CertBundles holds additional trusted cert
-+                              bundles.
-+                            items:
-+                              description: CertBundle holds the cert data.
-+                              properties:
-+                                data:
-+                                  description: Data is the actual cert.
-+                                  type: string
-+                                name:
-+                                  description: Name is the name of the cert bundle.
-+                                  type: string
-+                              required:
-+                              - data
-+                              - name
-+                              type: object
-+                            type: array
-                           controlPlane:
-                             description: |-
-                               controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -3209,6 +3243,23 @@ spec:
+@@ -336,6 +336,17 @@ spec:
+                               Bottlerocket holds configuration for certain bottlerocket settings.
+                               This is only for bottlerocket.
+                             properties:
++                              boot:
++                                description: Boot holds the boot-related settings
++                                  for bottlerocket nodes
++                                properties:
++                                  bootKernelParameters:
++                                    additionalProperties:
++                                      items:
++                                        type: string
++                                      type: array
++                                    type: object
++                                type: object
+                               kernel:
+                                 description: KernelSettings contains additional kernel
+                                   settings for Bottlerocket.
+@@ -532,6 +543,23 @@ spec:
                              maximum: 36500
                              minimum: 1
                              type: integer
@@ -657,7 +684,73 @@ index 125d90918..115212f68 100644
                            certificateValidityPeriodDays:
                              description: |-
                                certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
-@@ -4976,6 +5027,23 @@ spec:
+@@ -1918,6 +1946,17 @@ spec:
+                               Bottlerocket holds configuration for certain bottlerocket settings.
+                               This is only for bottlerocket.
+                             properties:
++                              boot:
++                                description: Boot holds the boot-related settings
++                                  for bottlerocket nodes
++                                properties:
++                                  bootKernelParameters:
++                                    additionalProperties:
++                                      items:
++                                        type: string
++                                      type: array
++                                    type: object
++                                type: object
+                               kernel:
+                                 description: KernelSettings contains additional kernel
+                                   settings for Bottlerocket.
+@@ -2113,6 +2152,23 @@ spec:
+                             maxLength: 512
+                             minLength: 1
+                             type: string
++                          certBundles:
++                            description: CertBundles holds additional trusted cert
++                              bundles.
++                            items:
++                              description: CertBundle holds the cert data.
++                              properties:
++                                data:
++                                  description: Data is the actual cert.
++                                  type: string
++                                name:
++                                  description: Name is the name of the cert bundle.
++                                  type: string
++                              required:
++                              - data
++                              - name
++                              type: object
++                            type: array
+                           controlPlane:
+                             description: |-
+                               controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -3289,6 +3345,23 @@ spec:
+                             maximum: 36500
+                             minimum: 1
+                             type: integer
++                          certBundles:
++                            description: CertBundles holds additional trusted cert
++                              bundles.
++                            items:
++                              description: CertBundle holds the cert data.
++                              properties:
++                                data:
++                                  description: Data is the actual cert.
++                                  type: string
++                                name:
++                                  description: Name is the name of the cert bundle.
++                                  type: string
++                              required:
++                              - data
++                              - name
++                              type: object
++                            type: array
+                           certificateValidityPeriodDays:
+                             description: |-
+                               certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
+@@ -5013,6 +5086,23 @@ spec:
                              maxLength: 512
                              minLength: 1
                              type: string
@@ -682,7 +775,7 @@ index 125d90918..115212f68 100644
                              description: |-
                                controlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index 649912960..b3cf9a03f 100644
+index 6499129604f3..b3cf9a03f734 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -128,6 +128,18 @@ reboot-to-reconcile = true
@@ -715,7 +808,7 @@ index 649912960..b3cf9a03f 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
-index 02bb55b5d..7d1f8c6f5 100644
+index 02bb55b5db9a..7d1f8c6f517c 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 @@ -309,6 +309,35 @@ reboot-to-reconcile = true
@@ -788,7 +881,7 @@ index 02bb55b5d..7d1f8c6f5 100644
  	for _, testcase := range testcases {
  		t.Run(testcase.name, func(t *testing.T) {
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 2c0a3bc7e..6a2243f5c 100644
+index 2c0a3bc7e46e..6a2243f5ca74 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -37,6 +37,7 @@ type BottlerocketConfig struct {
@@ -833,44 +926,10 @@ index 2c0a3bc7e..6a2243f5c 100644
  
  	return generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
  }
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 9667e1888..df0ebf0e2 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -580,6 +580,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
- 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
- 		}
-+		if scope.Config.Spec.ClusterConfiguration.CertBundles != nil {
-+			bottlerocketConfig.CertBundle = scope.Config.Spec.ClusterConfiguration.CertBundles
-+		}
- 	}
- 
- 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
-@@ -903,6 +906,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
- 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
- 		}
-+		if scope.Config.Spec.JoinConfiguration.CertBundles != nil {
-+			bottlerocketConfig.CertBundle = scope.Config.Spec.JoinConfiguration.CertBundles
-+		}
- 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
- 		if err != nil {
- 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -1107,6 +1113,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
- 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
- 		}
-+		if scope.Config.Spec.JoinConfiguration.CertBundles != nil {
-+			bottlerocketConfig.CertBundle = scope.Config.Spec.JoinConfiguration.CertBundles
-+		}
- 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
- 		if err != nil {
- 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index 48f75545f..e978228e7 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+index 7bea3b592710..29f3403ad316 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -484,6 +484,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
  	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
  	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
@@ -887,10 +946,10 @@ index 48f75545f..e978228e7 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 2613dc708..768a2f110 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+index 598dbb5b52d5..9f940b16c185 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -512,6 +512,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
  	// WARNING: in.BottlerocketHostContainers requires manual conversion: does not exist in peer-type
  	// WARNING: in.BottlerocketCustomBootstrapContainers requires manual conversion: does not exist in peer-type
@@ -907,57 +966,63 @@ index 2613dc708..768a2f110 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index 4f50b9e3f9ec..ece4c9722ce4 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -586,6 +586,9 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
+ 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
+ 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
+ 		}
++		if scope.Config.Spec.ClusterConfiguration.CertBundles != nil {
++			bottlerocketConfig.CertBundle = scope.Config.Spec.ClusterConfiguration.CertBundles
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
+@@ -908,6 +911,9 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
+ 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
+ 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
+ 		}
++		if scope.Config.Spec.JoinConfiguration.CertBundles != nil {
++			bottlerocketConfig.CertBundle = scope.Config.Spec.JoinConfiguration.CertBundles
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+@@ -1146,6 +1152,9 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
+ 		if scope.Config.Spec.NTP.IsDefined() && scope.Config.Spec.NTP.Enabled != nil && *scope.Config.Spec.NTP.Enabled {
+ 			bottlerocketConfig.NTPServers = scope.Config.Spec.NTP.Servers
+ 		}
++		if scope.Config.Spec.JoinConfiguration.CertBundles != nil {
++			bottlerocketConfig.CertBundle = scope.Config.Spec.JoinConfiguration.CertBundles
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index c439adc41..bff1d2d50 100644
+index 5ec821da8b3b..05b298cca006 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -543,6 +543,22 @@ spec:
-                           - superpowered
-                           type: object
-                         type: array
-+                      certBundles:
-+                        description: CertBundles holds additional trusted cert bundles.
-+                        items:
-+                          description: CertBundle holds the cert data.
-+                          properties:
-+                            data:
-+                              description: Data is the actual cert.
-+                              type: string
-+                            name:
-+                              description: Name is the name of the cert bundle.
-+                              type: string
-+                          required:
-+                          - data
-+                          - name
-+                          type: object
-+                        type: array
-                       certificatesDir:
-                         description: |-
-                           certificatesDir specifies where to store or look for all required certificates.
-@@ -2077,6 +2093,22 @@ spec:
-                         maxLength: 512
-                         minLength: 1
-                         type: string
-+                      certBundles:
-+                        description: CertBundles holds additional trusted cert bundles.
-+                        items:
-+                          description: CertBundle holds the cert data.
-+                          properties:
-+                            data:
-+                              description: Data is the actual cert.
-+                              type: string
-+                            name:
-+                              description: Name is the name of the cert bundle.
-+                              type: string
-+                          required:
-+                          - data
-+                          - name
-+                          type: object
-+                        type: array
-                       controlPlane:
-                         description: |-
-                           controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -3802,6 +3834,22 @@ spec:
+@@ -349,6 +349,17 @@ spec:
+                           Bottlerocket holds configuration for certain bottlerocket settings.
+                           This is only for bottlerocket.
+                         properties:
++                          boot:
++                            description: Boot holds the boot-related settings for
++                              bottlerocket nodes
++                            properties:
++                              bootKernelParameters:
++                                additionalProperties:
++                                  items:
++                                    type: string
++                                  type: array
++                                type: object
++                            type: object
+                           kernel:
+                             description: KernelSettings contains additional kernel
+                               settings for Bottlerocket.
+@@ -544,6 +555,22 @@ spec:
                          maximum: 36500
                          minimum: 1
                          type: integer
@@ -980,7 +1045,71 @@ index c439adc41..bff1d2d50 100644
                        certificateValidityPeriodDays:
                          description: |-
                            certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
-@@ -5551,6 +5599,22 @@ spec:
+@@ -1914,6 +1941,17 @@ spec:
+                           Bottlerocket holds configuration for certain bottlerocket settings.
+                           This is only for bottlerocket.
+                         properties:
++                          boot:
++                            description: Boot holds the boot-related settings for
++                              bottlerocket nodes
++                            properties:
++                              bootKernelParameters:
++                                additionalProperties:
++                                  items:
++                                    type: string
++                                  type: array
++                                type: object
++                            type: object
+                           kernel:
+                             description: KernelSettings contains additional kernel
+                               settings for Bottlerocket.
+@@ -2108,6 +2146,22 @@ spec:
+                         maxLength: 512
+                         minLength: 1
+                         type: string
++                      certBundles:
++                        description: CertBundles holds additional trusted cert bundles.
++                        items:
++                          description: CertBundle holds the cert data.
++                          properties:
++                            data:
++                              description: Data is the actual cert.
++                              type: string
++                            name:
++                              description: Name is the name of the cert bundle.
++                              type: string
++                          required:
++                          - data
++                          - name
++                          type: object
++                        type: array
+                       controlPlane:
+                         description: |-
+                           controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -3907,6 +3961,22 @@ spec:
+                         maximum: 36500
+                         minimum: 1
+                         type: integer
++                      certBundles:
++                        description: CertBundles holds additional trusted cert bundles.
++                        items:
++                          description: CertBundle holds the cert data.
++                          properties:
++                            data:
++                              description: Data is the actual cert.
++                              type: string
++                            name:
++                              description: Name is the name of the cert bundle.
++                              type: string
++                          required:
++                          - data
++                          - name
++                          type: object
++                        type: array
+                       certificateValidityPeriodDays:
+                         description: |-
+                           certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
+@@ -5613,6 +5683,22 @@ spec:
                          maxLength: 512
                          minLength: 1
                          type: string
@@ -1004,58 +1133,28 @@ index c439adc41..bff1d2d50 100644
                          description: |-
                            controlPlane defines the additional control plane instance to be deployed on the joining node.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 3918461e4..d14e7537e 100644
+index 29b770d53589..5f1ac49c7f4b 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -540,6 +540,23 @@ spec:
-                                   - superpowered
-                                   type: object
-                                 type: array
-+                              certBundles:
-+                                description: CertBundles holds additional trusted
-+                                  cert bundles.
-+                                items:
-+                                  description: CertBundle holds the cert data.
-+                                  properties:
-+                                    data:
-+                                      description: Data is the actual cert.
-+                                      type: string
-+                                    name:
-+                                      description: Name is the name of the cert bundle.
-+                                      type: string
-+                                  required:
-+                                  - data
-+                                  - name
-+                                  type: object
-+                                type: array
-                               certificatesDir:
-                                 description: |-
-                                   certificatesDir specifies where to store or look for all required certificates.
-@@ -2110,6 +2127,23 @@ spec:
-                                 maxLength: 512
-                                 minLength: 1
-                                 type: string
-+                              certBundles:
-+                                description: CertBundles holds additional trusted
-+                                  cert bundles.
-+                                items:
-+                                  description: CertBundle holds the cert data.
-+                                  properties:
-+                                    data:
-+                                      description: Data is the actual cert.
-+                                      type: string
-+                                    name:
-+                                      description: Name is the name of the cert bundle.
-+                                      type: string
-+                                  required:
-+                                  - data
-+                                  - name
-+                                  type: object
-+                                type: array
-                               controlPlane:
-                                 description: |-
-                                   controlPlane defines the additional control plane instance to be deployed on the joining node.
-@@ -3495,6 +3529,23 @@ spec:
+@@ -344,6 +344,17 @@ spec:
+                                   Bottlerocket holds configuration for certain bottlerocket settings.
+                                   This is only for bottlerocket.
+                                 properties:
++                                  boot:
++                                    description: Boot holds the boot-related settings
++                                      for bottlerocket nodes
++                                    properties:
++                                      bootKernelParameters:
++                                        additionalProperties:
++                                          items:
++                                            type: string
++                                          type: array
++                                        type: object
++                                    type: object
+                                   kernel:
+                                     description: KernelSettings contains additional
+                                       kernel settings for Bottlerocket.
+@@ -544,6 +555,23 @@ spec:
                                  maximum: 36500
                                  minimum: 1
                                  type: integer
@@ -1079,7 +1178,25 @@ index 3918461e4..d14e7537e 100644
                                certificateValidityPeriodDays:
                                  description: |-
                                    certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
-@@ -5286,6 +5337,23 @@ spec:
+@@ -1945,6 +1973,17 @@ spec:
+                                   Bottlerocket holds configuration for certain bottlerocket settings.
+                                   This is only for bottlerocket.
+                                 properties:
++                                  boot:
++                                    description: Boot holds the boot-related settings
++                                      for bottlerocket nodes
++                                    properties:
++                                      bootKernelParameters:
++                                        additionalProperties:
++                                          items:
++                                            type: string
++                                          type: array
++                                        type: object
++                                    type: object
+                                   kernel:
+                                     description: KernelSettings contains additional
+                                       kernel settings for Bottlerocket.
+@@ -2144,6 +2183,23 @@ spec:
                                  maxLength: 512
                                  minLength: 1
                                  type: string
@@ -1103,8 +1220,358 @@ index 3918461e4..d14e7537e 100644
                                controlPlane:
                                  description: |-
                                    controlPlane defines the additional control plane instance to be deployed on the joining node.
+@@ -3578,6 +3634,23 @@ spec:
+                                 maximum: 36500
+                                 minimum: 1
+                                 type: integer
++                              certBundles:
++                                description: CertBundles holds additional trusted
++                                  cert bundles.
++                                items:
++                                  description: CertBundle holds the cert data.
++                                  properties:
++                                    data:
++                                      description: Data is the actual cert.
++                                      type: string
++                                    name:
++                                      description: Name is the name of the cert bundle.
++                                      type: string
++                                  required:
++                                  - data
++                                  - name
++                                  type: object
++                                type: array
+                               certificateValidityPeriodDays:
+                                 description: |-
+                                   certificateValidityPeriodDays specifies the validity period for non-CA certificates generated by kubeadm.
+@@ -5326,6 +5399,23 @@ spec:
+                                 maxLength: 512
+                                 minLength: 1
+                                 type: string
++                              certBundles:
++                                description: CertBundles holds additional trusted
++                                  cert bundles.
++                                items:
++                                  description: CertBundle holds the cert data.
++                                  properties:
++                                    data:
++                                      description: Data is the actual cert.
++                                      type: string
++                                    name:
++                                      description: Name is the name of the cert bundle.
++                                      type: string
++                                  required:
++                                  - data
++                                  - name
++                                  type: object
++                                type: array
+                               controlPlane:
+                                 description: |-
+                                   controlPlane defines the additional control plane instance to be deployed on the joining node.
+diff --git a/gen_22.log b/gen_22.log
+new file mode 100644
+index 000000000000..8374eda1a2ee
+--- /dev/null
++++ b/gen_22.log
+@@ -0,0 +1,296 @@
++make clean-generated-yaml SRC_DIRS="./core/config/crd/bases,./core/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./core/config/crd/bases,./core/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./core \
++	paths=./core/reconcilers/... \
++	paths=./core/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./core/config/crd/bases \
++	output:rbac:dir=./core/config/rbac \
++	output:webhook:dir=./core/config/webhook \
++	webhook
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./cmd/clusterctl/api/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./cmd/clusterctl/config/crd/bases
++/capi/hack/tools/bin/kustomize-v5.7.0 build cmd/clusterctl/config/crd > cmd/clusterctl/config/manifest/clusterctl-api.yaml
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/test/builder/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t3/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t3/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t4/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t4/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/deprecated/v1beta1/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/deprecated/v1beta1/test/builder/crd
++make clean-generated-yaml SRC_DIRS="./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm \
++	paths=./bootstrap/kubeadm/reconcilers/... \
++	paths=./bootstrap/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./bootstrap/kubeadm/config/crd/bases \
++	output:rbac:dir=./bootstrap/kubeadm/config/rbac \
++	output:webhook:dir=./bootstrap/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/controlplane/kubeadm/... \
++	paths=./controlplane/kubeadm \
++	paths=./controlplane/kubeadm/reconcilers/... \
++	paths=./controlplane/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./controlplane/kubeadm/config/crd/bases \
++	output:rbac:dir=./controlplane/kubeadm/config/rbac \
++	output:webhook:dir=./controlplane/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./ \
++	paths=./api/... \
++	paths=./internal/controllers/... \
++	paths=./internal/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./config/crd/bases \
++	output:webhook:dir=./config/webhook \
++	webhook
++cd ./test/extension; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./... \
++	output:rbac:dir=./config/rbac \
++	rbac:roleName=manager-role
++make generate-go-deepcopy-core generate-go-deepcopy-kubeadm-bootstrap generate-go-deepcopy-kubeadm-control-plane generate-go-deepcopy-docker-infrastructure generate-go-deepcopy-test-extension
++make[1]: Entering directory `/capi'
++make clean-generated-deepcopy SRC_DIRS="./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./api/runtime/hooks/... \
++	paths=./cmd/clusterctl/... \
++	paths=./controllers/crdmigrator/test/... \
++	paths=./internal/runtime/test/... \
++	paths=./internal/topology/upgrade/test/... \
++	paths=./util/test/builder/... \
++	paths=./util/deprecated/v1beta1/test/builder/...
++make clean-generated-deepcopy SRC_DIRS="./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm/pkg/types/...
++make clean-generated-deepcopy SRC_DIRS="./api/controlplane/kubeadm"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/controlplane/kubeadm/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/inmemory/pkg/cloud/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/inmemory/pkg/cloud/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/inmemory; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++        paths=./pkg/cloud/api/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/docker/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/...
++make[1]: Nothing to be done for `generate-go-deepcopy-test-extension'.
++make[1]: Leaving directory `/capi'
++make generate-go-conversions-core generate-go-conversions-kubeadm-bootstrap generate-go-conversions-kubeadm-control-plane generate-go-conversions-docker-infrastructure generate-go-conversions-test-extension
++make[1]: Entering directory `/capi'
++make generate-go-conversions-core-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./core/v1beta1
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/topology/upgrade/test/t2/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-addons-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/addons/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./addons/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-ipam
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/ipam/v1beta1,./api/ipam/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/ipam/v1beta1,./api/ipam/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./ipam/v1alpha1 \
++	./ipam/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-runtime
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/runtime/test/v1alpha1 \
++	./internal/runtime/test/v1alpha2
++make clean-generated-conversions SRC_DIRS="./api/runtime/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/runtime/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./runtime/v1alpha1
++make[2]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/bootstrap/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/v1beta1
++make clean-generated-conversions SRC_DIRS="./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta3 \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta4
++make clean-generated-conversions SRC_DIRS="./api/controlplane/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./controlplane/kubeadm/v1beta1
++cd test/infrastructure/docker; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./api/v1beta1
++make[1]: Nothing to be done for `generate-go-conversions-test-extension'.
++make[1]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/kube-openapi/cmd/openapi-gen openapi-gen 589584f1c912f4367fe8954f649a59a98b912da5 
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/core/v1beta2; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/core/v1beta2 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AllOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AnyOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,OneOf
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterClassDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XIntOrString
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XMetadata
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XPreserveUnknownFields
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XValidations
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeploymentDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineHealthCheckDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachinePoolDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineSetDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineTemplateSpec,ObjectMeta
++API rule violation: streaming_list_type_json_tags,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDrainRuleList,ListMeta
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/runtime/hooks/v1alpha1; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/runtime/hooks/v1alpha1 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Pods
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Services
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,DiscoverVariablesResponse,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequestItem,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesResponse,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequestItem,Variables
 diff --git a/test/infrastructure/docker/internal/loadbalancer/config.go b/test/infrastructure/docker/internal/loadbalancer/config.go
-index ada49d6d1..c7dfa01f5 100644
+index ada49d6d184d..c7dfa01f59a1 100644
 --- a/test/infrastructure/docker/internal/loadbalancer/config.go
 +++ b/test/infrastructure/docker/internal/loadbalancer/config.go
 @@ -44,9 +44,10 @@ global
@@ -1121,6 +1588,3 @@ index ada49d6d1..c7dfa01f5 100644
  
  resolvers docker
    nameserver dns 127.0.0.11:53
--- 
-2.48.1
-

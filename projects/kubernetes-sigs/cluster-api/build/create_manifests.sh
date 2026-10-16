@@ -37,7 +37,7 @@ KUBE_RBAC_PROXY_LATEST_TAG=latest
 
 make set-manifest-image \
     MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/cluster-api-controller MANIFEST_TAG=$IMAGE_TAG \
-    TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
+    TARGET_RESOURCE="./core/config/default/manager_image_patch.yaml"
 
 # Set the kubeadm bootstrap image to the production bucket.
 make set-manifest-image \
@@ -49,11 +49,11 @@ make set-manifest-image \
     MANIFEST_IMG=$CAPI_REGISTRY_PREFIX/kubeadm-control-plane-controller MANIFEST_TAG=$IMAGE_TAG  \
     TARGET_RESOURCE="./controlplane/kubeadm/config/default/manager_image_patch.yaml"
 
-make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
+make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./core/config/default/manager_pull_policy.yaml"
 make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./bootstrap/kubeadm/config/default/manager_pull_policy.yaml"
 make set-manifest-pull-policy PULL_POLICY=IfNotPresent TARGET_RESOURCE="./controlplane/kubeadm/config/default/manager_pull_policy.yaml"
 
-yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" config/manager/manager.yaml
+yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" core/config/manager/manager.yaml
 yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" bootstrap/kubeadm/config/manager/manager.yaml
 yq eval -i -P ".spec.template.spec.containers[0].args += [\"--namespace=eksa-system\"]" controlplane/kubeadm/config/manager/manager.yaml
 

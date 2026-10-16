@@ -1,8 +1,8 @@
-From 2e3f00f72cdcefec085f8f0ce2eddb5c5291e998 Mon Sep 17 00:00:00 2001
+From 98efbb8c1114592f9aadb1232f340fd23e5a5650 Mon Sep 17 00:00:00 2001
 From: Guillermo Gaston <gaslor@amazon.com>
 Date: Tue, 31 Aug 2021 15:56:28 +0000
-Subject: [PATCH] Make pause and bottlerocket bootstrap images updatable in
- validation webhook
+Subject: [PATCH 05/36] Make pause and bottlerocket bootstrap images updatable
+ in  validation webhook
 
 cr: https://code.amazon.com/reviews/CR-56335855
 ---
@@ -23,12 +23,32 @@ cr: https://code.amazon.com/reviews/CR-56335855
  .../internal/webhooks/kubeadmcontrolplane.go  |  4 ++
  .../webhooks/kubeadmcontrolplane_test.go      | 36 ++++++++++++
  16 files changed, 426 insertions(+), 4 deletions(-)
+---
+ .../kubeadm/v1beta1/kubeadm_types.go          |  19 ++
+ .../v1beta1/zz_generated.conversion.go        |  44 +++
+ .../kubeadm/v1beta1/zz_generated.deepcopy.go  |  17 +
+ .../kubeadm/v1beta2/kubeadm_types.go          |  21 ++
+ .../kubeadm/v1beta2/zz_generated.deepcopy.go  |  17 +
+ ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml |  52 +++
+ ...uster.x-k8s.io_kubeadmconfigtemplates.yaml |  56 ++++
+ .../internal/bottlerocket/bootstrap.go        |  19 ++
+ .../internal/bottlerocket/bottlerocket.go     |  20 +-
+ .../zz_generated.conversion.go                |   2 +
+ .../zz_generated.conversion.go                |   2 +
+ .../kubeadmconfig/kubeadmconfig_controller.go |   9 +
+ ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml |  56 ++++
+ ...x-k8s.io_kubeadmcontrolplanetemplates.yaml |  56 ++++
+ .../webhooks/admission/kubeadmcontrolplane.go |   4 +
+ .../admission/kubeadmcontrolplane_test.go     |  36 +++
+ gen_5.log                                     | 296 ++++++++++++++++++
+ 17 files changed, 722 insertions(+), 4 deletions(-)
+ create mode 100644 gen_5.log
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 6cb79314a..4a4297512 100644
+index 638c6e9740ed..771cde26c0bc 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-@@ -109,6 +109,11 @@ type ClusterConfiguration struct {
+@@ -108,6 +108,11 @@ type ClusterConfiguration struct {
  	// +optional
  	Proxy ProxyConfiguration `json:"proxy,omitempty"`
  
@@ -40,7 +60,7 @@ index 6cb79314a..4a4297512 100644
  	// etcd holds configuration for etcd.
  	// NB: This value defaults to a Local (stacked) etcd
  	// +optional
-@@ -242,6 +247,15 @@ type ProxyConfiguration struct {
+@@ -241,6 +246,15 @@ type ProxyConfiguration struct {
  	NoProxy []string `json:"noProxy,omitempty"`
  }
  
@@ -56,7 +76,7 @@ index 6cb79314a..4a4297512 100644
  // ControlPlaneComponent holds settings common to control plane component of the cluster.
  type ControlPlaneComponent struct {
  	// extraArgs is an extra set of flags to pass to the control plane component.
-@@ -604,6 +618,11 @@ type JoinConfiguration struct {
+@@ -603,6 +617,11 @@ type JoinConfiguration struct {
  	// +optional
  	Proxy ProxyConfiguration `json:"proxy,omitempty"`
  
@@ -69,7 +89,7 @@ index 6cb79314a..4a4297512 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 80727d988..ad933129c 100644
+index 1c9352eb3871..41430097247a 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -310,6 +310,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -109,7 +129,7 @@ index 80727d988..ad933129c 100644
  	if err := Convert_v1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -1158,6 +1174,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+@@ -1160,6 +1176,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
  	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
@@ -119,7 +139,7 @@ index 80727d988..ad933129c 100644
  	if err := Convert_v1beta1_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1181,6 +1200,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+@@ -1183,6 +1202,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
  	if err := Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
@@ -129,7 +149,7 @@ index 80727d988..ad933129c 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-@@ -1856,6 +1878,28 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
+@@ -1858,6 +1880,28 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
  	return autoConvert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in, out, s)
  }
  
@@ -159,7 +179,7 @@ index 80727d988..ad933129c 100644
  	out.Name = in.Name
  	out.Key = in.Key
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index a51569957..e7c8792cd 100644
+index a515699573cb..e7c8792cd829 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -165,6 +165,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
@@ -201,10 +221,10 @@ index a51569957..e7c8792cd 100644
  func (in *SecretFileSource) DeepCopyInto(out *SecretFileSource) {
  	*out = *in
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 2d5a307fe..fcbc40457 100644
+index 1cc225c2519d..d6a858d79049 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -142,6 +142,15 @@ func (r *InitConfiguration) IsDefined() bool {
+@@ -141,6 +141,15 @@ func (r *InitConfiguration) IsDefined() bool {
  	return !reflect.DeepEqual(r, &InitConfiguration{})
  }
  
@@ -220,7 +240,7 @@ index 2d5a307fe..fcbc40457 100644
  // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster.
  // +kubebuilder:validation:MinProperties=1
  type ClusterConfiguration struct {
-@@ -159,6 +168,12 @@ type ClusterConfiguration struct {
+@@ -158,6 +167,12 @@ type ClusterConfiguration struct {
  	// This is only for bottlerocket
  	// +optional
  	Proxy ProxyConfiguration `json:"proxy,omitempty"`
@@ -233,7 +253,7 @@ index 2d5a307fe..fcbc40457 100644
  	// etcd holds configuration for etcd.
  	// NB: This value defaults to a Local (stacked) etcd
  	// +optional
-@@ -692,6 +707,12 @@ type JoinConfiguration struct {
+@@ -691,6 +706,12 @@ type JoinConfiguration struct {
  	// This is only for bottlerocket
  	// +optional
  	Proxy ProxyConfiguration `json:"proxy,omitempty"`
@@ -247,7 +267,7 @@ index 2d5a307fe..fcbc40457 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index 880b661af..c4881a0d4 100644
+index 880b661afdb7..c4881a0d4490 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -200,6 +200,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
@@ -289,10 +309,10 @@ index 880b661af..c4881a0d4 100644
  func (in *Scheduler) DeepCopyInto(out *Scheduler) {
  	*out = *in
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 407f6a94b..82ea07872 100644
+index a715a0332435..7ec7369be55c 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -967,6 +967,19 @@ spec:
+@@ -971,6 +971,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -312,27 +332,7 @@ index 407f6a94b..82ea07872 100644
                    scheduler:
                      description: scheduler contains extra settings for the scheduler
                        control plane component
-@@ -3384,6 +3397,19 @@ spec:
-                           type: string
-                         type: array
-                     type: object
-+                  registryMirror:
-+                    description: |-
-+                      RegistryMirror holds the image registry mirror information
-+                      This is only for bottlerocket
-+                    properties:
-+                      caCert:
-+                        description: CACert defines the CA cert for the registry mirror
-+                        type: string
-+                      endpoint:
-+                        description: Endpoint defines the registry mirror endpoint
-+                          to use for pulling images
-+                        type: string
-+                    type: object
-                   scheduler:
-                     description: scheduler contains extra settings for the scheduler
-                       control plane component
-@@ -4153,6 +4179,19 @@ spec:
+@@ -2095,6 +2108,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -352,7 +352,27 @@ index 407f6a94b..82ea07872 100644
                    skipPhases:
                      description: |-
                        skipPhases is a list of phases to skip during command execution.
-@@ -4688,6 +4727,19 @@ spec:
+@@ -3438,6 +3464,19 @@ spec:
+                           type: string
+                         type: array
+                     type: object
++                  registryMirror:
++                    description: |-
++                      RegistryMirror holds the image registry mirror information
++                      This is only for bottlerocket
++                    properties:
++                      caCert:
++                        description: CACert defines the CA cert for the registry mirror
++                        type: string
++                      endpoint:
++                        description: Endpoint defines the registry mirror endpoint
++                          to use for pulling images
++                        type: string
++                    type: object
+                   scheduler:
+                     description: scheduler contains extra settings for the scheduler
+                       control plane component
+@@ -4720,6 +4759,19 @@ spec:
                            type: string
                          type: array
                      type: object
@@ -373,10 +393,10 @@ index 407f6a94b..82ea07872 100644
                      description: |-
                        skipPhases is a list of phases to skip during command execution.
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 1b9d4d6b4..373cd2c4d 100644
+index daf7d1c01473..8b36fc497e8f 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -1014,6 +1014,20 @@ spec:
+@@ -1018,6 +1018,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -397,28 +417,7 @@ index 1b9d4d6b4..373cd2c4d 100644
                            scheduler:
                              description: scheduler contains extra settings for the
                                scheduler control plane component
-@@ -3356,6 +3370,20 @@ spec:
-                                   type: string
-                                 type: array
-                             type: object
-+                          registryMirror:
-+                            description: |-
-+                              RegistryMirror holds the image registry mirror information
-+                              This is only for bottlerocket
-+                            properties:
-+                              caCert:
-+                                description: CACert defines the CA cert for the registry
-+                                  mirror
-+                                type: string
-+                              endpoint:
-+                                description: Endpoint defines the registry mirror
-+                                  endpoint to use for pulling images
-+                                type: string
-+                            type: object
-                           scheduler:
-                             description: scheduler contains extra settings for the
-                               scheduler control plane component
-@@ -4140,6 +4168,20 @@ spec:
+@@ -2167,6 +2181,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -439,7 +438,28 @@ index 1b9d4d6b4..373cd2c4d 100644
                            skipPhases:
                              description: |-
                                skipPhases is a list of phases to skip during command execution.
-@@ -4683,6 +4725,20 @@ spec:
+@@ -3411,6 +3439,20 @@ spec:
+                                   type: string
+                                 type: array
+                             type: object
++                          registryMirror:
++                            description: |-
++                              RegistryMirror holds the image registry mirror information
++                              This is only for bottlerocket
++                            properties:
++                              caCert:
++                                description: CACert defines the CA cert for the registry
++                                  mirror
++                                type: string
++                              endpoint:
++                                description: Endpoint defines the registry mirror
++                                  endpoint to use for pulling images
++                                type: string
++                            type: object
+                           scheduler:
+                             description: scheduler contains extra settings for the
+                               scheduler control plane component
+@@ -4715,6 +4757,20 @@ spec:
                                    type: string
                                  type: array
                              type: object
@@ -461,7 +481,7 @@ index 1b9d4d6b4..373cd2c4d 100644
                              description: |-
                                skipPhases is a list of phases to skip during command execution.
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index e4be8d945..886af6d87 100644
+index e4be8d945b11..886af6d87cdc 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -31,6 +31,17 @@ user-data = "{{.BootstrapContainerUserData}}"
@@ -497,7 +517,7 @@ index e4be8d945..886af6d87 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 18e559cc8..f41f0b23a 100644
+index 18e559cc8675..f41f0b23a9fa 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -22,9 +22,10 @@ const (
@@ -548,44 +568,10 @@ index 18e559cc8..f41f0b23a 100644
  	}
  
  	bottlerocketNodeUserData, err := generateNodeUserData("InitBottlerocketNode", bottlerocketNodeInitSettingsTemplate, bottlerocketInput)
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 27c6a80f1..3e97900e2 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -550,6 +550,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
- 		}
-+		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
-+			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
-+		}
- 	}
- 
- 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
-@@ -843,6 +846,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
- 		}
-+		if scope.Config.Spec.JoinConfiguration.RegistryMirror.Endpoint != "" {
-+			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
-+		}
- 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
- 		if err != nil {
- 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -1017,6 +1023,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
- 		}
-+		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
-+			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
-+		}
- 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
- 		if err != nil {
- 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index c948b069a..5e3fccf68 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+index 5974d21aaef8..f551b25e2373 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -381,6 +381,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
  	// WARNING: in.Pause requires manual conversion: does not exist in peer-type
  	// WARNING: in.BottlerocketBootstrap requires manual conversion: does not exist in peer-type
@@ -602,10 +588,10 @@ index c948b069a..5e3fccf68 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 64080b3ca..9ffa082b0 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+index a164224ac604..49f39a960401 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -506,6 +506,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
  	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
@@ -622,11 +608,45 @@ index 64080b3ca..9ffa082b0 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index ca3b39638e3d..78a04551f393 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -556,6 +556,9 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
+ 		}
++		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
++			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
+@@ -853,6 +856,9 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+ 		}
++		if scope.Config.Spec.JoinConfiguration.RegistryMirror.Endpoint != "" {
++			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
+@@ -1056,6 +1062,9 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+ 		}
++		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
++			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 849ed0a5a..ad10647a5 100644
+index 477383f4d592..30fa1d92931e 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -1020,6 +1020,20 @@ spec:
+@@ -1024,6 +1024,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -647,28 +667,7 @@ index 849ed0a5a..ad10647a5 100644
                        scheduler:
                          description: scheduler contains extra settings for the scheduler
                            control plane component
-@@ -3944,6 +3958,20 @@ spec:
-                               type: string
-                             type: array
-                         type: object
-+                      registryMirror:
-+                        description: |-
-+                          RegistryMirror holds the image registry mirror information
-+                          This is only for bottlerocket
-+                        properties:
-+                          caCert:
-+                            description: CACert defines the CA cert for the registry
-+                              mirror
-+                            type: string
-+                          endpoint:
-+                            description: Endpoint defines the registry mirror endpoint
-+                              to use for pulling images
-+                            type: string
-+                        type: object
-                       scheduler:
-                         description: scheduler contains extra settings for the scheduler
-                           control plane component
-@@ -4719,6 +4747,20 @@ spec:
+@@ -2160,6 +2174,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -689,7 +688,28 @@ index 849ed0a5a..ad10647a5 100644
                        skipPhases:
                          description: |-
                            skipPhases is a list of phases to skip during command execution.
-@@ -5257,6 +5299,20 @@ spec:
+@@ -4024,6 +4052,20 @@ spec:
+                               type: string
+                             type: array
+                         type: object
++                      registryMirror:
++                        description: |-
++                          RegistryMirror holds the image registry mirror information
++                          This is only for bottlerocket
++                        properties:
++                          caCert:
++                            description: CACert defines the CA cert for the registry
++                              mirror
++                            type: string
++                          endpoint:
++                            description: Endpoint defines the registry mirror endpoint
++                              to use for pulling images
++                            type: string
++                        type: object
+                       scheduler:
+                         description: scheduler contains extra settings for the scheduler
+                           control plane component
+@@ -5315,6 +5357,20 @@ spec:
                                type: string
                              type: array
                          type: object
@@ -711,10 +731,10 @@ index 849ed0a5a..ad10647a5 100644
                          description: |-
                            skipPhases is a list of phases to skip during command execution.
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 82a2b6b26..d6ceedd02 100644
+index ecb544ed3f04..6f3350144992 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -1031,6 +1031,20 @@ spec:
+@@ -1035,6 +1035,20 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -735,7 +755,28 @@ index 82a2b6b26..d6ceedd02 100644
                                scheduler:
                                  description: scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -3645,6 +3659,20 @@ spec:
+@@ -2191,6 +2205,20 @@ spec:
+                                       type: string
+                                     type: array
+                                 type: object
++                              registryMirror:
++                                description: |-
++                                  RegistryMirror holds the image registry mirror information
++                                  This is only for bottlerocket
++                                properties:
++                                  caCert:
++                                    description: CACert defines the CA cert for the
++                                      registry mirror
++                                    type: string
++                                  endpoint:
++                                    description: Endpoint defines the registry mirror
++                                      endpoint to use for pulling images
++                                    type: string
++                                type: object
+                               skipPhases:
+                                 description: |-
+                                   skipPhases is a list of phases to skip during command execution.
+@@ -3700,6 +3728,20 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -756,7 +797,7 @@ index 82a2b6b26..d6ceedd02 100644
                                scheduler:
                                  description: scheduler contains extra settings for
                                    the scheduler control plane component
-@@ -4437,6 +4465,20 @@ spec:
+@@ -5014,6 +5056,20 @@ spec:
                                        type: string
                                      type: array
                                  type: object
@@ -777,32 +818,11 @@ index 82a2b6b26..d6ceedd02 100644
                                skipPhases:
                                  description: |-
                                    skipPhases is a list of phases to skip during command execution.
-@@ -4982,6 +5024,20 @@ spec:
-                                       type: string
-                                     type: array
-                                 type: object
-+                              registryMirror:
-+                                description: |-
-+                                  RegistryMirror holds the image registry mirror information
-+                                  This is only for bottlerocket
-+                                properties:
-+                                  caCert:
-+                                    description: CACert defines the CA cert for the
-+                                      registry mirror
-+                                    type: string
-+                                  endpoint:
-+                                    description: Endpoint defines the registry mirror
-+                                      endpoint to use for pulling images
-+                                    type: string
-+                                type: object
-                               skipPhases:
-                                 description: |-
-                                   skipPhases is a list of phases to skip during command execution.
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-index 06eabdef8..8d44b1839 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane.go
-@@ -123,6 +123,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
+diff --git a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
+index 51677280f3ca..70d882a62421 100644
+--- a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
++++ b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane.go
+@@ -126,6 +126,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
  		// metadata
  		{"metadata", "*"},
  		// spec.kubeadmConfigSpec.clusterConfiguration
@@ -811,7 +831,7 @@ index 06eabdef8..8d44b1839 100644
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "*"},
  		{spec, kubeadmConfigSpec, clusterConfiguration, "etcd", "local"},
-@@ -153,6 +155,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
+@@ -156,6 +158,8 @@ func (webhook *KubeadmControlPlane) ValidateUpdate(_ context.Context, oldK, newK
  		{spec, kubeadmConfigSpec, initConfiguration, timeouts},
  		{spec, kubeadmConfigSpec, initConfiguration, timeouts, "*"},
  		// spec.kubeadmConfigSpec.joinConfiguration
@@ -820,11 +840,11 @@ index 06eabdef8..8d44b1839 100644
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration},
  		{spec, kubeadmConfigSpec, joinConfiguration, nodeRegistration, "*"},
  		{spec, kubeadmConfigSpec, joinConfiguration, patches, directory},
-diff --git a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-index 02a28be98..40f670dc8 100644
---- a/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-+++ b/controlplane/kubeadm/internal/webhooks/kubeadmcontrolplane_test.go
-@@ -760,6 +760,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+diff --git a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
+index 80c3a9bfd6bf..6b1fd9c78636 100644
+--- a/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
++++ b/controlplane/kubeadm/webhooks/admission/kubeadmcontrolplane_test.go
+@@ -768,6 +768,18 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  	validEncryptionAlgorithm := before.DeepCopy()
  	validEncryptionAlgorithm.Spec.KubeadmConfigSpec.ClusterConfiguration.EncryptionAlgorithm = bootstrapv1.EncryptionAlgorithmRSA3072
  
@@ -843,7 +863,7 @@ index 02a28be98..40f670dc8 100644
  	beforeTaints := before.DeepCopy()
  	beforeTaints.Spec.MachineTemplate.Spec.Taints = []clusterv1.MachineTaint{
  		{
-@@ -1144,6 +1156,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
+@@ -1152,6 +1164,30 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
  			before: before,
  			kcp:    validEncryptionAlgorithm,
  		},
@@ -874,6 +894,305 @@ index 02a28be98..40f670dc8 100644
  		{
  			name:                "should not allow to add taints when feature gate is disabled",
  			expectErr:           true,
--- 
-2.48.1
-
+diff --git a/gen_5.log b/gen_5.log
+new file mode 100644
+index 000000000000..8374eda1a2ee
+--- /dev/null
++++ b/gen_5.log
+@@ -0,0 +1,296 @@
++make clean-generated-yaml SRC_DIRS="./core/config/crd/bases,./core/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./core/config/crd/bases,./core/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./core \
++	paths=./core/reconcilers/... \
++	paths=./core/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./core/config/crd/bases \
++	output:rbac:dir=./core/config/rbac \
++	output:webhook:dir=./core/config/webhook \
++	webhook
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./cmd/clusterctl/api/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./cmd/clusterctl/config/crd/bases
++/capi/hack/tools/bin/kustomize-v5.7.0 build cmd/clusterctl/config/crd > cmd/clusterctl/config/manifest/clusterctl-api.yaml
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/test/builder/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./internal/topology/upgrade/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./internal/topology/upgrade/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t1/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t1/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t2/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t2/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t3/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t3/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./controllers/crdmigrator/test/t4/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./controllers/crdmigrator/test/t4/crd
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./util/deprecated/v1beta1/test/builder/... \
++	crd:crdVersions=v1 \
++	output:crd:dir=./util/deprecated/v1beta1/test/builder/crd
++make clean-generated-yaml SRC_DIRS="./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/config/crd/bases,./bootstrap/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm \
++	paths=./bootstrap/kubeadm/reconcilers/... \
++	paths=./bootstrap/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./bootstrap/kubeadm/config/crd/bases \
++	output:rbac:dir=./bootstrap/kubeadm/config/rbac \
++	output:webhook:dir=./bootstrap/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./controlplane/kubeadm/config/crd/bases,./controlplane/kubeadm/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./api/controlplane/kubeadm/... \
++	paths=./controlplane/kubeadm \
++	paths=./controlplane/kubeadm/reconcilers/... \
++	paths=./controlplane/kubeadm/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./controlplane/kubeadm/config/crd/bases \
++	output:rbac:dir=./controlplane/kubeadm/config/rbac \
++	output:webhook:dir=./controlplane/kubeadm/config/webhook \
++	webhook
++make clean-generated-yaml SRC_DIRS="test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml"
++make[1]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/config/crd/bases,test/infrastructure/docker/config/webhook/manifests.yaml; do find $i -type f -name '*.yaml' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./ \
++	paths=./api/... \
++	paths=./internal/controllers/... \
++	paths=./internal/webhooks/... \
++	crd:crdVersions=v1 \
++	rbac:roleName=manager-role \
++	output:crd:dir=./config/crd/bases \
++	output:webhook:dir=./config/webhook \
++	webhook
++cd ./test/extension; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	paths=./... \
++	output:rbac:dir=./config/rbac \
++	rbac:roleName=manager-role
++make generate-go-deepcopy-core generate-go-deepcopy-kubeadm-bootstrap generate-go-deepcopy-kubeadm-control-plane generate-go-deepcopy-docker-infrastructure generate-go-deepcopy-test-extension
++make[1]: Entering directory `/capi'
++make clean-generated-deepcopy SRC_DIRS="./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons,./api/core,./api/ipam,./api/runtime,./api/runtime/hooks; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/addons/... \
++	paths=./api/core/... \
++	paths=./api/ipam/... \
++	paths=./api/runtime/... \
++	paths=./api/runtime/hooks/... \
++	paths=./cmd/clusterctl/... \
++	paths=./controllers/crdmigrator/test/... \
++	paths=./internal/runtime/test/... \
++	paths=./internal/topology/upgrade/test/... \
++	paths=./util/test/builder/... \
++	paths=./util/deprecated/v1beta1/test/builder/...
++make clean-generated-deepcopy SRC_DIRS="./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm,./bootstrap/kubeadm/pkg/types; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/bootstrap/kubeadm/... \
++	paths=./bootstrap/kubeadm/pkg/types/...
++make clean-generated-deepcopy SRC_DIRS="./api/controlplane/kubeadm"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/controlplane/kubeadm/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/inmemory/pkg/cloud/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/inmemory/pkg/cloud/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/inmemory; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++        paths=./pkg/cloud/api/...
++make clean-generated-deepcopy SRC_DIRS="test/infrastructure/docker/api"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in test/infrastructure/docker/api; do find $i -type f -name 'zz_generated.deepcopy*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd test/infrastructure/docker; /capi/hack/tools/bin/controller-gen-v0.21.0 \
++	object:headerFile=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	paths=./api/...
++make[1]: Nothing to be done for `generate-go-deepcopy-test-extension'.
++make[1]: Leaving directory `/capi'
++make generate-go-conversions-core generate-go-conversions-kubeadm-bootstrap generate-go-conversions-kubeadm-control-plane generate-go-conversions-docker-infrastructure generate-go-conversions-test-extension
++make[1]: Entering directory `/capi'
++make generate-go-conversions-core-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/core/v1beta1,./internal/topology/upgrade/test/t2/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./core/v1beta1
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/topology/upgrade/test/t2/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-addons-api
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/addons/v1beta1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/addons/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./addons/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-ipam
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/ipam/v1beta1,./api/ipam/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/ipam/v1beta1,./api/ipam/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./ipam/v1alpha1 \
++	./ipam/v1beta1
++make[2]: Leaving directory `/capi'
++make generate-go-conversions-core-runtime
++make[2]: Entering directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./internal/runtime/test/v1alpha1,./internal/runtime/test/v1alpha2; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./internal/runtime/test/v1alpha1 \
++	./internal/runtime/test/v1alpha2
++make clean-generated-conversions SRC_DIRS="./api/runtime/v1alpha1"
++make[3]: Entering directory `/capi'
++(IFS=','; for i in ./api/runtime/v1alpha1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[3]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./runtime/v1alpha1
++make[2]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/code-generator/cmd/conversion-gen conversion-gen v0.36.0
++make clean-generated-conversions SRC_DIRS="./api/bootstrap/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/bootstrap/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/v1beta1
++make clean-generated-conversions SRC_DIRS="./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./bootstrap/kubeadm/pkg/types/upstreamv1beta3,./bootstrap/kubeadm/pkg/types/upstreamv1beta4; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++/capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta3 \
++	./bootstrap/kubeadm/pkg/types/upstreamv1beta4
++make clean-generated-conversions SRC_DIRS="./api/controlplane/kubeadm/v1beta1"
++make[2]: Entering directory `/capi'
++(IFS=','; for i in ./api/controlplane/kubeadm/v1beta1; do find $i -type f -name 'zz_generated.conversion*' -exec rm -f {} \;; done)
++make[2]: Leaving directory `/capi'
++cd api; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=./../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./controlplane/kubeadm/v1beta1
++cd test/infrastructure/docker; /capi/hack/tools/bin/conversion-gen \
++	--output-file=zz_generated.conversion.go \
++	--go-header-file=../../../hack/scripts/verify/boilerplate/boilerplate.generatego.txt \
++	./api/v1beta1
++make[1]: Nothing to be done for `generate-go-conversions-test-extension'.
++make[1]: Leaving directory `/capi'
++GOBIN=/capi/hack/tools/bin ./hack/scripts/ensure/go_install.sh k8s.io/kube-openapi/cmd/openapi-gen openapi-gen 589584f1c912f4367fe8954f649a59a98b912da5 
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/core/v1beta2; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/core/v1beta2 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AllOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,AnyOf
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,OneOf
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterClassDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,ClusterDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XIntOrString
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XMetadata
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XPreserveUnknownFields
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,JSONSchemaProps,XValidations
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeploymentDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineHealthCheckDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachinePoolDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineSetDeprecatedStatus,V1Beta1
++API rule violation: names_match,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineTemplateSpec,ObjectMeta
++API rule violation: streaming_list_type_json_tags,sigs.k8s.io/cluster-api/api/core/v1beta2,MachineDrainRuleList,ListMeta
++make[1]: Entering directory `/capi'
++(IFS=','; for i in ./hack/tools/runtime-openapi-gen/api/runtime/hooks/v1alpha1; do find $i -type f -name 'zz_generated.openapi*' -exec rm -f {} \;; done)
++make[1]: Leaving directory `/capi'
++** Generating openapi schema for types in ./api/runtime/hooks/v1alpha1 **
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,AfterWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeClusterUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeControlPlaneUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,BeforeWorkersUpgradeRequest,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Pods
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ClusterNetworkBuiltins,Services
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,DiscoverVariablesResponse,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesRequestItem,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GeneratePatchesResponse,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,ControlPlaneUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,GenerateUpgradePlanResponse,WorkersUpgrades
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Items
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequest,Variables
++API rule violation: list_type_missing,sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1,ValidateTopologyRequestItem,Variables
