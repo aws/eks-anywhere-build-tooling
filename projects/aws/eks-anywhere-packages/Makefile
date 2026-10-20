@@ -12,7 +12,7 @@ TIME=$(shell git -C $(REPO) show -s --format=%ct HEAD)
 GO_VARS=version=${GIT_TAG} gitHash=${PROJECT_COMMIT_HASH} buildTime=${TIME}
 EXTRA_GO_LDFLAGS=$(foreach v,$(GO_VARS),-X ${GO_MOD_NAME}${GO_VAR_PREFIX}${v})
 
-PROJECT_DEPENDENCIES=eksd/kubernetes/client eksa/aws/rolesanywhere-credential-helper eksa/kubernetes/cloud-provider-aws/1-35
+PROJECT_DEPENDENCIES=eksd/kubernetes/client eksa/aws/rolesanywhere-credential-helper eksa/kubernetes/cloud-provider-aws/1-37
 
 DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 GO_MOD_PATHS=. ecrtokenrefresher credentialproviderpackage
@@ -61,7 +61,6 @@ $(FIX_LICENSES_ECRTOKENREFRESHER_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 
 $(FIX_LICENSES_CREDENTIALPROVIDERPACKAGE_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 	cp $(REPO)/LICENSE $(REPO)/credentialproviderpackage/LICENSE
-
 
 
 ########### DO NOT EDIT #############################

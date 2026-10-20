@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Phil Peble <phil@peble.net>
+Date: Tue, 11 Aug 2026 23:14:53 -0500
+Subject: [PATCH 3/3] fix(build): drop the readme field and unpin hatchling
+
+Replaces the temporary `hatchling<1.32` pin from 767681ba3 with the actual
+fix. hatchling 1.32.0 rejects a `readme` resolving outside the project
+directory, and both packages pointed at ../README.md.
+
+Delete the field rather than relocate the file. It only populates the
+Description in package metadata, which matters when a package is
+published, and neither of these is: there is no publish step in build-aux
+or the workflows, and both are uv workspace members resolved from a local
+path and installed editable. python/README.md is also the 265-line
+"Ambassador Developer's Guide", which is not this package's description in
+any case.
+
+Verified against hatchling==1.32.0 exactly: the previous config fails with
+"Readme path must be within the project directory: ../README.md", and both
+packages build with the field removed. `uv sync --dev`, the command CI's
+Install Deps step runs, also succeeds -- that exercises build_editable,
+which is the hook that was failing rather than build_wheel.
+
+Backport to v4.1.0: v4.1.0 never carried the hatchling<1.32 pin, so only
+the readme removal applies.
+
+(cherry picked from commit 0763f1e3803f332af78bb5059f6372a4c05a591d)
+Signed-off-by: Phil Peble <phil@peble.net>
+---
+ python/ambassador-diag/pyproject.toml | 1 -
+ python/ambassador/pyproject.toml      | 1 -
+ 2 files changed, 2 deletions(-)
+
+diff --git a/python/ambassador-diag/pyproject.toml b/python/ambassador-diag/pyproject.toml
+index 8ebbe9d35..521d9acc2 100644
+--- a/python/ambassador-diag/pyproject.toml
++++ b/python/ambassador-diag/pyproject.toml
+@@ -1,7 +1,6 @@
+ [project]
+ name = "ambassador_diag"
+ version = "4.0.0-dev"
+-readme = "../README.md"
+ dependencies = [
+     "click",
+     "flask",
+diff --git a/python/ambassador/pyproject.toml b/python/ambassador/pyproject.toml
+index e51869d57..1d79dc7bd 100644
+--- a/python/ambassador/pyproject.toml
++++ b/python/ambassador/pyproject.toml
+@@ -1,7 +1,6 @@
+ [project]
+ name = "ambassador"
+ version = "4.0.0-dev"
+-readme = "../README.md"
+ dependencies = [
+     "orjson",
+     "pyyaml",
+-- 
+2.46.0
+

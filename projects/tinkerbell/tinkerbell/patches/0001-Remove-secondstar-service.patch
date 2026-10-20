@@ -1,7 +1,7 @@
-From 63f0b9879b66cd5efcaa3c0a7f84f209def53b12 Mon Sep 17 00:00:00 2001
+From d150712afd4a5b9eeaee773b08f51c6a9c2bf481 Mon Sep 17 00:00:00 2001
 From: Rahul Ganesh <rahulgab@amazon.com>
 Date: Thu, 22 Jan 2026 16:46:18 -0800
-Subject: [PATCH 1/7] Remove secondstar service
+Subject: [PATCH 1/5] Remove secondstar service
 
 EKS-A does not use the secondstar (SSH over serial) service. Disable it.
 
@@ -19,28 +19,18 @@ Signed-off-by: Rahul Ganesh <rahulgab@amazon.com>
  delete mode 100644 cmd/tinkerbell/flag/secondstar.go
 
 diff --git a/cmd/tinkerbell/cmd.go b/cmd/tinkerbell/cmd.go
-index 4113428f..93f22ca3 100644
+index 2c63e7b2..1a678f8f 100644
 --- a/cmd/tinkerbell/cmd.go
 +++ b/cmd/tinkerbell/cmd.go
-@@ -18,7 +18,6 @@ import (
- 	"github.com/tinkerbell/tinkerbell/pkg/build"
- 	"github.com/tinkerbell/tinkerbell/pkg/otel"
+@@ -21,3 +21,2 @@ import (
  	"github.com/tinkerbell/tinkerbell/rufio"
 -	"github.com/tinkerbell/tinkerbell/secondstar"
  	"github.com/tinkerbell/tinkerbell/smee"
- 	"github.com/tinkerbell/tinkerbell/tink/controller"
- 	"github.com/tinkerbell/tinkerbell/tink/server"
-@@ -45,7 +44,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 		EnableTinkServer:     true,
- 		EnableTinkController: true,
+@@ -60,3 +59,2 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  		EnableRufio:          true,
 -		EnableSecondStar:     true,
  		EnableUI:             true,
- 		EnableCRDMigrations:  true,
- 		HTTPPort:             defaultHTTPPort,
-@@ -94,14 +92,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 		Config: rufio.NewConfig(rufioOpts...),
- 	}
+@@ -103,10 +101,2 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  
 -	ssc := &flag.SecondStarConfig{
 -		Config: &secondstar.Config{
@@ -51,36 +41,21 @@ index 4113428f..93f22ca3 100644
 -	}
 -
  	uiOpts := []ui.Option{
- 		ui.WithURLPrefix("/"),
- 	}
-@@ -119,15 +109,13 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 	tfs := ff.NewFlagSet("tink server - Workflow service").SetParent(hfs)
- 	cfs := ff.NewFlagSet("tink controller - Workflow controller").SetParent(tfs)
+@@ -128,4 +118,3 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  	rfs := ff.NewFlagSet("rufio - BMC controller").SetParent(cfs)
 -	ssfs := ff.NewFlagSet("secondstar - SSH over serial service").SetParent(rfs)
 -	uifs := ff.NewFlagSet("ui - UI service").SetParent(ssfs)
 +	uifs := ff.NewFlagSet("ui - UI service").SetParent(rfs)
  	gfs := ff.NewFlagSet("globals").SetParent(uifs)
- 	flag.RegisterSmeeFlags(&flag.Set{FlagSet: sfs}, s)
- 	flag.RegisterTootlesFlags(&flag.Set{FlagSet: hfs}, h)
- 	flag.RegisterTinkServerFlags(&flag.Set{FlagSet: tfs}, ts)
- 	flag.RegisterTinkControllerFlags(&flag.Set{FlagSet: cfs}, tc)
+@@ -136,3 +125,2 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  	flag.RegisterRufioFlags(&flag.Set{FlagSet: rfs}, rc)
 -	flag.RegisterSecondStarFlags(&flag.Set{FlagSet: ssfs}, ssc)
  	flag.RegisterUIFlags(&flag.Set{FlagSet: uifs}, uic)
- 	flag.RegisterGlobal(&flag.Set{FlagSet: gfs}, globals)
- 	if embeddedApiserverExecute != nil && embeddedFlagSet != nil {
-@@ -160,7 +148,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 		"tinkServerEnabled", globals.EnableTinkServer,
- 		"tinkControllerEnabled", globals.EnableTinkController,
+@@ -203,3 +191,2 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  		"rufioEnabled", globals.EnableRufio,
 -		"secondStarEnabled", globals.EnableSecondStar,
  		"uiEnabled", globals.EnableUI,
- 		"publicIP", globals.PublicIP,
- 		"embeddedKubeAPIServer", globals.EmbeddedGlobalConfig.EnableKubeAPIServer,
-@@ -213,14 +200,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 	// Rufio Controller
- 	rc.Config.LeaderElectionNamespace = leaderElectionNamespace(inCluster(), rc.Config.EnableLeaderElection, rc.Config.LeaderElectionNamespace)
+@@ -257,10 +244,2 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  
 -	// Second star
 -	if err := ssc.Convert(); err != nil {
@@ -91,28 +66,16 @@ index 4113428f..93f22ca3 100644
 -	}
 -
  	// Initialize OTel before starting goroutines so the provider outlives
- 	// all goroutines (Smee non-HTTP, consolidated HTTP server, etc.).
- 	// otel.Init is a no-op when globals.OTELEndpoint is empty.
-@@ -302,7 +281,7 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 			cliLog.Info("CRD migrations completed")
- 		}
+@@ -346,3 +325,3 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  
 -		b, err := newKubeBackend(ctx, globals.BackendKubeConfig, "", globals.BackendKubeNamespace, enabledIndexes(globals.EnableSmee, globals.EnableTootles, globals.EnableTinkServer, globals.EnableSecondStar), WithQPS(globals.BackendKubeOptions.QPS), WithBurst(globals.BackendKubeOptions.Burst))
 +		b, err := newKubeBackend(ctx, globals.BackendKubeConfig, "", globals.BackendKubeNamespace, enabledIndexes(globals.EnableSmee, globals.EnableTootles, globals.EnableTinkServer), WithQPS(globals.BackendKubeOptions.QPS), WithBurst(globals.BackendKubeOptions.Burst))
  		if err != nil {
- 			return fmt.Errorf("failed to create kube backend: %w", err)
- 		}
-@@ -312,7 +291,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 		tc.Config.Client = b.ClientConfig
- 		tc.Config.DynamicClient = b
+@@ -356,3 +335,2 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  		rc.Config.Client = b.ClientConfig
 -		ssc.Config.Backend = b
  		if uic.Config.EnableAutoLogin {
- 			uic.Config.AutoLoginRestConfig = b.ClientConfig
- 			uic.Config.AutoLoginNamespace = globals.BackendKubeNamespace
-@@ -410,19 +388,6 @@ func Execute(ctx context.Context, cancel context.CancelFunc, args []string) erro
- 		return nil
- 	})
+@@ -454,15 +432,2 @@ func executeWithOutput(ctx context.Context, cancel context.CancelFunc, args []st
  
 -	// SecondStar
 -	g.Go(func() error {
@@ -128,43 +91,27 @@ index 4113428f..93f22ca3 100644
 -	})
 -
  	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
- 		return err
- 	}
 diff --git a/cmd/tinkerbell/defaults.go b/cmd/tinkerbell/defaults.go
-index a44977fc..9fc6c861 100644
+index 9515e7c4..7be153db 100644
 --- a/cmd/tinkerbell/defaults.go
 +++ b/cmd/tinkerbell/defaults.go
-@@ -15,7 +15,6 @@ import (
- const (
- 	smeePublicIPInterface          = "TINKERBELL_PUBLIC_IP_INTERFACE"
+@@ -17,3 +17,2 @@ const (
  	defaultLeaderElectionNamespace = "default"
 -	defaultSecondStarPort          = 2222
  	defaultHTTPPort                = 7080
- 	defaultHTTPSPort               = 7443
- 	defaultTinkServerPort          = 42113
 diff --git a/cmd/tinkerbell/flag/global.go b/cmd/tinkerbell/flag/global.go
-index aba684be..d7da6c75 100644
+index 3a9e1eda..e999d7a6 100644
 --- a/cmd/tinkerbell/flag/global.go
 +++ b/cmd/tinkerbell/flag/global.go
-@@ -25,7 +25,6 @@ type GlobalConfig struct {
- 	EnableTinkServer     bool
- 	EnableTinkController bool
+@@ -28,3 +28,2 @@ type GlobalConfig struct {
  	EnableRufio          bool
 -	EnableSecondStar     bool
  	EnableUI             bool
- 	EnableCRDMigrations  bool
- 	EmbeddedGlobalConfig EmbeddedGlobalConfig
-@@ -64,7 +63,6 @@ func RegisterGlobal(fs *Set, gc *GlobalConfig) {
- 	fs.Register(EnableTinkServer, ffval.NewValueDefault(&gc.EnableTinkServer, gc.EnableTinkServer))
- 	fs.Register(EnableTinkController, ffval.NewValueDefault(&gc.EnableTinkController, gc.EnableTinkController))
+@@ -72,3 +71,2 @@ func RegisterGlobal(fs *Set, gc *GlobalConfig) {
  	fs.Register(EnableRufioController, ffval.NewValueDefault(&gc.EnableRufio, gc.EnableRufio))
 -	fs.Register(EnableSecondStar, ffval.NewValueDefault(&gc.EnableSecondStar, gc.EnableSecondStar))
  	fs.Register(EnableUI, ffval.NewValueDefault(&gc.EnableUI, gc.EnableUI))
- 	fs.Register(EnableCRDMigrations, ffval.NewValueDefault(&gc.EnableCRDMigrations, gc.EnableCRDMigrations))
- 	fs.Register(LogLevelConfig, ffval.NewValueDefault(&gc.LogLevel, gc.LogLevel))
-@@ -168,11 +166,6 @@ var EnableRufioController = Config{
- 	Usage: "enable Rufio Controller service",
- }
+@@ -183,7 +181,2 @@ var EnableRufioController = Config{
  
 -var EnableSecondStar = Config{
 -	Name:  "enable-secondstar",
@@ -172,11 +119,9 @@ index aba684be..d7da6c75 100644
 -}
 -
  var EnableUI = Config{
- 	Name:  "enable-ui",
- 	Usage: "enable UI service",
 diff --git a/cmd/tinkerbell/flag/secondstar.go b/cmd/tinkerbell/flag/secondstar.go
 deleted file mode 100644
-index 68ad43d3..00000000
+index 3c8d9ad4..00000000
 --- a/cmd/tinkerbell/flag/secondstar.go
 +++ /dev/null
 @@ -1,64 +0,0 @@
@@ -229,7 +174,7 @@ index 68ad43d3..00000000
 -
 -var SecondStarLogLevel = Config{
 -	Name:  "secondstar-log-level",
--	Usage: "the higher the number the more verbose, level 0 inherits the global log level, a negative number disables logging",
+-	Usage: logLevelUsage,
 -}
 -
 -func (ssc *SecondStarConfig) Convert() error {
@@ -248,27 +193,18 @@ diff --git a/cmd/tinkerbell/helpers.go b/cmd/tinkerbell/helpers.go
 index fe329c3d..7c775453 100644
 --- a/cmd/tinkerbell/helpers.go
 +++ b/cmd/tinkerbell/helpers.go
-@@ -33,16 +33,13 @@ func numEnabled(globals *flag.GlobalConfig) int {
- 	if globals.EnableRufio {
- 		n++
+@@ -35,5 +35,2 @@ func numEnabled(globals *flag.GlobalConfig) int {
  	}
 -	if globals.EnableSecondStar {
 -		n++
 -	}
  	if globals.EnableUI {
- 		n++
- 	}
- 	return n
- }
+@@ -44,3 +41,3 @@ func numEnabled(globals *flag.GlobalConfig) int {
  
 -func enabledIndexes(smeeEnabled, tootlesEnabled, tinkServerEnabled, secondStarEnabled bool) map[kube.IndexType]kube.Index {
 +func enabledIndexes(smeeEnabled, tootlesEnabled, tinkServerEnabled bool) map[kube.IndexType]kube.Index {
  	idxs := make(map[kube.IndexType]kube.Index, 0)
- 
- 	if smeeEnabled {
-@@ -58,12 +55,6 @@ func enabledIndexes(smeeEnabled, tootlesEnabled, tinkServerEnabled, secondStarEn
- 			idxs[k] = v
- 		}
+@@ -60,8 +57,2 @@ func enabledIndexes(smeeEnabled, tootlesEnabled, tinkServerEnabled, secondStarEn
  	}
 -	if secondStarEnabled {
 -		for k, v := range flag.KubeIndexesSecondStar {
@@ -277,8 +213,5 @@ index fe329c3d..7c775453 100644
 -	}
 -
  	return idxs
- }
- 
 -- 
 2.46.0
-

@@ -20,11 +20,11 @@ _output/bin/eks-anywhere-packages/linux-arm64/ecrtokenrefresher: ## Build `_outp
 _output/bin/eks-anywhere-packages/linux-arm64/credentialprovider: ## Build `_output/bin/eks-anywhere-packages/linux-arm64/credentialprovider`
 
 ##@ Image Targets
-local-images: ## Builds `eks-anywhere-packages/images/amd64 ecrtokenrefresher/images/amd64 credentialprovider/images/amd64` as oci tars for presumbit validation
+local-images: ## Builds `eks-anywhere-packages/images/arm64 ecrtokenrefresher/images/arm64 credentialprovider/images/arm64` as oci tars for presumbit validation
 images: ## Pushes `eks-anywhere-packages/images/push ecrtokenrefresher/images/push credentialprovider/images/push` to IMAGE_REPO
-eks-anywhere-packages/images/amd64: ## Builds/pushes `eks-anywhere-packages/images/amd64`
-ecrtokenrefresher/images/amd64: ## Builds/pushes `ecrtokenrefresher/images/amd64`
-credentialprovider/images/amd64: ## Builds/pushes `credentialprovider/images/amd64`
+eks-anywhere-packages/images/arm64: ## Builds/pushes `eks-anywhere-packages/images/arm64`
+ecrtokenrefresher/images/arm64: ## Builds/pushes `ecrtokenrefresher/images/arm64`
+credentialprovider/images/arm64: ## Builds/pushes `credentialprovider/images/arm64`
 eks-anywhere-packages/images/push: ## Builds/pushes `eks-anywhere-packages/images/push`
 ecrtokenrefresher/images/push: ## Builds/pushes `ecrtokenrefresher/images/push`
 credentialprovider/images/push: ## Builds/pushes `credentialprovider/images/push`
@@ -38,8 +38,8 @@ _output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/depen
 _output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
 _output/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper`
 _output/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper`
-_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-35: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-35`
-_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-35: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-35`
+_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-37: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-37`
+_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-37: ## Fetch `_output/dependencies/linux-arm64/eksa/kubernetes/cloud-provider-aws/1-37`
 
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.

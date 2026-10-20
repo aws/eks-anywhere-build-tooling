@@ -1,0 +1,41 @@
+From 48e56af1e987d74e2bab76808a96f72dc6dfdca2 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulbabu95@gmail.com>
+Date: Mon, 12 Oct 2026 14:55:46 -0700
+Subject: [PATCH] Find the boot interface on IPv6 nodes
+
+Try the IPv6 default route when IPv4 has none.
+Keep the existing macvlan setup.
+---
+ .../templates/host-interface-config-map.yaml         | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/helm/tinkerbell/templates/host-interface-config-map.yaml b/helm/tinkerbell/templates/host-interface-config-map.yaml
+index 7c45dfb12..aa7cd69ea 100644
+--- a/helm/tinkerbell/templates/host-interface-config-map.yaml
++++ b/helm/tinkerbell/templates/host-interface-config-map.yaml
+@@ -37,6 +37,11 @@ data:
+         local interface_mode="$3"
+         local interface_name="${interface_type}0"
+
++        if [[ -z "${src_interface}" ]]; then
++            echo "Error: no default route interface found; specify --src." >&2
++            exit 1
++        fi
++
+         # Preparation
+         # Delete existing interfaces in the container
+         ip link del macvlan0 || true
+@@ -138,7 +143,12 @@ data:
+     done
+
+     if [[ -z "${src_interface}" ]]; then
+-        src_interface=$(nsenter -t1 -n ip route | awk '/default/ {print $5}' | head -n1)
++        for family in -4 -6; do
++            src_interface=$(nsenter -t1 -n ip "${family}" route show default | awk '{for (i = 1; i < NF; i++) if ($i == "dev") {print $(i + 1); exit}}')
++            if [[ -n "${src_interface}" ]]; then
++                break
++            fi
++        done
+     fi
+
+     if "${clean}"; then

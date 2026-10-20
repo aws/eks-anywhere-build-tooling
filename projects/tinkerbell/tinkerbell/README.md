@@ -1,6 +1,6 @@
 # Tinkerbell Mono-repo Build
 
-![Version](https://img.shields.io/badge/version-cc10c6f2655b622b88435e5cf2f45553662f0df4-blue)
+![Version](https://img.shields.io/badge/version-6e7d2775b7b9207d148352ba1582ee0c7cbd2f2e-blue)
 
 This project builds the Tinkerbell stack services from the upstream mono-repo (github.com/tinkerbell/tinkerbell).
 

@@ -29,11 +29,14 @@ HELM_TAG="${4?Fourth argument is helm tag}"
 GIT_TAG="${5?Fifth arguement is the Git Tag}"
 OUTPUT_DIR="${6?Sixth arguement is output directory}"
 LATEST_TAG="${7?Seventh arguement is latest tag}"
+HELM_BUNDLE_TAG="${8:-}"
 SEMVER_GIT_TAG="${GIT_TAG#[^0-9:main]}"
 
 SEMVER="${HELM_TAG#[^0-9]}" # remove any leading non-digits
 SEMVER_REGEX='^([0-9]+\.){0,2}(\*|[0-9]+)$'
-if [[ ! $SEMVER_GIT_TAG =~ $SEMVER_REGEX ]]; then
+if [[ -n "${HELM_BUNDLE_TAG}" ]]; then
+  SEMVER_GIT_TAG="${HELM_BUNDLE_TAG#[^0-9]}"
+elif [[ ! $SEMVER_GIT_TAG =~ $SEMVER_REGEX ]]; then
   # if not a valid semver, fallback to helm tag semver
   SEMVER_GIT_TAG=$SEMVER
 fi

@@ -61,11 +61,14 @@ $(FAKE_BINARY_TARGETS):
 #   debugging symbols and other unncessary data is stripped out, making reproducibilty easier
 #   However the blib.a is not stripped so things like the build path will change the checksum and 
 #   therefore the build_id. We use -debug-prefix-map to reset the build folder
+# build_ipxe.sh strips ipxe's -Wno-address-of-packed-member for older gcc (AL2).
+# gcc 9+ (AL2023) needs it, so add it back only when gcc knows the warning.
+IPXE_EXTRA_CFLAGS=-fdebug-prefix-map=$(MAKE_ROOT)=/buildroot $(shell gcc -Waddress-of-packed-member -x c -c /dev/null -o /dev/null 2>/dev/null && echo -Wno-address-of-packed-member)
 $(OUTPUT_BIN_DIR)/%: MAKEFLAGS=
 $(OUTPUT_BIN_DIR)/%: $(GIT_PATCH_TARGET) | $$(call ENABLE_DOCKER_PLATFORM,$$(PLATFORM))
-	sudo yum install -y genisoimage perl syslinux xz-devel; \
+	sudo yum install -y perl xz-devel; \
 	mkdir -p $(@D); \
-	$(MAKE) -C $(REPO) binary/$(@F) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) EXTRA_CFLAGS="-fdebug-prefix-map=$(MAKE_ROOT)=/buildroot"; \
+	$(MAKE) -C $(REPO) binary/$(@F) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) EXTRA_CFLAGS="$(IPXE_EXTRA_CFLAGS)"; \
 	cp $(REPO)/binary/$(@F) $@
 
 .PHONY: gather-non-golang-licenses
