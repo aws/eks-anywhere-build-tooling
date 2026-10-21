@@ -15,6 +15,8 @@ EXTRA_GO_LDFLAGS=-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision
 
 HAS_S3_ARTIFACTS=true
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
+# Harbor builds its registry from goharbor/distribution since #5073, so stop nightly upgrades for this project
+EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 
 BUILDSPECS=$(BUILDSPECS_FOR_COMBINE_IMAGES)
 BUILDSPEC_1_COMPUTE_TYPE=BUILD_GENERAL1_SMALL
