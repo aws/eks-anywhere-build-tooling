@@ -1,4 +1,4 @@
-From a4b9a1f9db3f1130d819f1ec018b3789fdbd0453 Mon Sep 17 00:00:00 2001
+From 761ed32de3c8352719aa1b92c915e611caaf858f Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 17 Dec 2025 21:52:18 -0800
 Subject: [PATCH 1/6] Remove prometheus chart dependencies
@@ -13,7 +13,7 @@ Subject: [PATCH 1/6] Remove prometheus chart dependencies
  6 files changed, 4 insertions(+), 406 deletions(-)
 
 diff --git a/charts/prometheus/Chart.yaml b/charts/prometheus/Chart.yaml
-index 92d776c8..9ac7e3aa 100644
+index 1f52449a77d8..695693078599 100644
 --- a/charts/prometheus/Chart.yaml
 +++ b/charts/prometheus/Chart.yaml
 @@ -30,23 +30,6 @@ maintainers:
@@ -22,26 +22,26 @@ index 92d776c8..9ac7e3aa 100644
  type: application
 -dependencies:
 -  - name: alertmanager
--    version: "1.39.*"
--    repository: https://prometheus-community.github.io/helm-charts
+-    version: "2.1.1"
+-    repository: oci://ghcr.io/prometheus-community/charts
 -    condition: alertmanager.enabled
 -  - name: kube-state-metrics
--    version: "7.4.*"
--    repository: https://prometheus-community.github.io/helm-charts
+-    version: "8.6.0"
+-    repository: oci://ghcr.io/prometheus-community/charts
 -    condition: kube-state-metrics.enabled
 -  - name: prometheus-node-exporter
--    version: "4.55.*"
--    repository: https://prometheus-community.github.io/helm-charts
+-    version: "4.60.0"
+-    repository: oci://ghcr.io/prometheus-community/charts
 -    condition: prometheus-node-exporter.enabled
 -  - name: prometheus-pushgateway
--    version: "3.6.*"
--    repository: https://prometheus-community.github.io/helm-charts
+-    version: "3.9.1"
+-    repository: oci://ghcr.io/prometheus-community/charts
 -    condition: prometheus-pushgateway.enabled
  keywords:
    - monitoring
    - prometheus
 diff --git a/charts/prometheus/templates/NOTES.txt b/charts/prometheus/templates/NOTES.txt
-index a46798f0..193edeb3 100644
+index a46798f00dcb..193edeb33c0b 100644
 --- a/charts/prometheus/templates/NOTES.txt
 +++ b/charts/prometheus/templates/NOTES.txt
 @@ -37,79 +37,5 @@ Get the Prometheus server URL by running these commands in the same shell:
@@ -125,7 +125,7 @@ index a46798f0..193edeb3 100644
  For more information on running Prometheus, visit:
  https://prometheus.io/
 diff --git a/charts/prometheus/templates/_helpers.tpl b/charts/prometheus/templates/_helpers.tpl
-index 66a732f4..ea252283 100644
+index 66a732f45753..ea2522839dd2 100644
 --- a/charts/prometheus/templates/_helpers.tpl
 +++ b/charts/prometheus/templates/_helpers.tpl
 @@ -79,30 +79,6 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this
@@ -160,10 +160,10 @@ index 66a732f4..ea252283 100644
  Create a fully qualified Prometheus server name.
  We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 diff --git a/charts/prometheus/templates/cm.yaml b/charts/prometheus/templates/cm.yaml
-index db66cf9f..6f4aec8b 100644
+index 28eb832f3f20..8f58cba7f37c 100644
 --- a/charts/prometheus/templates/cm.yaml
 +++ b/charts/prometheus/templates/cm.yaml
-@@ -87,37 +87,16 @@ data:
+@@ -91,37 +91,16 @@ data:
  {{ toYaml $value | default "{}" | indent 4 }}
  {{- end }}
  {{- if eq $key "prometheus.yml" -}}
@@ -206,10 +206,10 @@ index db66cf9f..6f4aec8b 100644
  {{- end -}}
  {{- end -}}
 diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
-index 9b984c1b..e8569a26 100644
+index cacd8a0638bf..b26249acb9ea 100644
 --- a/charts/prometheus/templates/deploy.yaml
 +++ b/charts/prometheus/templates/deploy.yaml
-@@ -100,81 +100,6 @@ spec:
+@@ -101,81 +101,6 @@ spec:
  {{ toYaml .Values.server.extraInitContainers | indent 8 }}
        {{- end }}
        containers:
@@ -291,7 +291,7 @@ index 9b984c1b..e8569a26 100644
          - name: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
            {{- if .Values.server.image.digest }}
            image: "{{ tpl .Values.server.image.repository . }}@{{ tpl .Values.server.image.digest . }}"
-@@ -411,11 +336,6 @@ spec:
+@@ -412,11 +337,6 @@ spec:
            hostPath:
              path: {{ .hostPath }}
        {{- end }}
@@ -303,7 +303,7 @@ index 9b984c1b..e8569a26 100644
        {{- range .Values.server.extraConfigmapMounts }}
          - name: {{ $.Values.server.name }}-{{ .name }}
            configMap:
-@@ -429,14 +349,6 @@ spec:
+@@ -430,14 +350,6 @@ spec:
              optional: {{ . }}
              {{- end }}
        {{- end }}
@@ -319,7 +319,7 @@ index 9b984c1b..e8569a26 100644
  {{ toYaml .Values.server.extraVolumes | indent 8}}
  {{- end }}
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index 50f276a3..e7dff7ac 100644
+index 298407819706..8cc3e18c7bc3 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
 @@ -24,105 +24,6 @@ serviceAccounts:
@@ -359,7 +359,7 @@ index 50f276a3..e7dff7ac 100644
 -    ##
 -    image:
 -      repository: quay.io/prometheus-operator/prometheus-config-reloader
--      tag: v0.91.0
+-      tag: v0.94.1
 -      # When digest is set to a non-empty value, images will be pulled by digest (regardless of tag value).
 -      digest: ""
 -      pullPolicy: IfNotPresent
@@ -428,7 +428,7 @@ index 50f276a3..e7dff7ac 100644
  server:
    ## Prometheus server container name
    ##
-@@ -1170,82 +1071,3 @@ extraManifests: []
+@@ -1189,82 +1090,3 @@ extraManifests: []
    #     name: prometheus-extra
    #   data:
    #     extra-data: "value"
@@ -512,5 +512,5 @@ index 50f276a3..e7dff7ac 100644
 -  serviceAnnotations:
 -    prometheus.io/probe: pushgateway
 -- 
-2.50.1 (Apple Git-155)
+2.54.0 (Apple Git-157)
 

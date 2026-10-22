@@ -1,15 +1,15 @@
-From 69c0dd768d11d21ae1ef016b7721f6dcd733d0a1 Mon Sep 17 00:00:00 2001
+From 3738cc54ae5ff996a7b10e9e8a2249b9d7f01377 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 17 Dec 2025 21:59:03 -0800
 Subject: [PATCH 6/6] Update values.yaml and add values.schema.json
 
 ---
- charts/prometheus/values.schema.json | 355 ++++++++++++++-------------
+ charts/prometheus/values.schema.json | 384 ++++++++++++++-------------
  charts/prometheus/values.yaml        |  26 +-
- 2 files changed, 202 insertions(+), 179 deletions(-)
+ 2 files changed, 215 insertions(+), 195 deletions(-)
 
 diff --git a/charts/prometheus/values.schema.json b/charts/prometheus/values.schema.json
-index 6e7cfb75..7d34b456 100644
+index 6cf8fab59fbf..3b7dfc5d00c0 100644
 --- a/charts/prometheus/values.schema.json
 +++ b/charts/prometheus/values.schema.json
 @@ -1,25 +1,134 @@
@@ -40,8 +40,8 @@ index 6e7cfb75..7d34b456 100644
 +        "networkPolicy": {
              "type": "object",
              "properties": {
-+                "enabled": {
-+                    "type": "boolean"
+                 "enabled": {
+                     "type": "boolean"
 +                }
 +            }
 +        },
@@ -60,14 +60,14 @@ index 6e7cfb75..7d34b456 100644
 +                            }
 +                        }
 +                    }
-+                },
+                 },
+-                "persistence": {
 +                "dnsConfig": {
 +                    "type": "object"
 +                },
-                 "enabled": {
-                     "type": "boolean"
-                 },
--                "persistence": {
++                "enabled": {
++                    "type": "boolean"
++                },
 +                "extraArgs": {
 +                    "type": "object"
 +                },
@@ -94,16 +94,17 @@ index 6e7cfb75..7d34b456 100644
                      "properties": {
 -                        "size": {
 +                        "digest": {
-                             "type": "string"
++                            "type": "string"
 +                        },
 +                        "pullPolicy": {
 +                            "type": "string"
 +                        },
 +                        "repository": {
-+                            "type": "string"
-+                        }
-+                    }
-+                },
+                             "type": "string"
+                         }
+                     }
+                 },
+-                "podSecurityContext": {
 +                "name": {
 +                    "type": "string"
 +                },
@@ -115,10 +116,9 @@ index 6e7cfb75..7d34b456 100644
 +                    "properties": {
 +                        "labels": {
 +                            "type": "object"
-                         }
-                     }
-                 },
--                "podSecurityContext": {
++                        }
++                    }
++                },
 +                "podAnnotations": {
 +                    "type": "object"
 +                },
@@ -503,12 +503,28 @@ index 6e7cfb75..7d34b456 100644
                  "verticalAutoscaler": {
                      "type": "object",
                      "properties": {
-@@ -660,11 +672,9 @@
+@@ -660,27 +672,9 @@
                  }
              }
          },
 -        "scrapeConfigFiles": {
 -            "type": "array"
+-        },
+-        "scrapeConfigs": {
+-            "type": "object",
+-            "additionalProperties": {
+-                "type": "object",
+-                "properties": {
+-                    "pre_relabel_configs": {
+-                        "description": "Templated YAML block-scalar relabel rules inserted before relabel_configs.",
+-                        "type": "string"
+-                    },
+-                    "post_relabel_configs": {
+-                        "description": "Templated YAML block-scalar relabel rules inserted after relabel_configs.",
+-                        "type": "string"
+-                    }
+-                }
+-            }
 -        },
          "serverFiles": {
              "type": "object",
@@ -516,7 +532,7 @@ index 6e7cfb75..7d34b456 100644
              "properties": {
                  "alerting_rules.yml": {
                      "type": "object"
-@@ -719,7 +729,7 @@
+@@ -735,7 +729,7 @@
          "serviceAccounts": {
              "type": "object",
              "properties": {
@@ -525,7 +541,7 @@ index 6e7cfb75..7d34b456 100644
                      "type": "object",
                      "properties": {
                          "annotations": {
-@@ -730,13 +740,30 @@
+@@ -746,13 +740,43 @@
                          },
                          "name": {
                              "type": "string"
@@ -550,7 +566,20 @@ index 6e7cfb75..7d34b456 100644
              }
 +        },
 +        "scrapeConfigs": {
-+            "type": "object"
++            "type": "object",
++            "additionalProperties": {
++                "type": "object",
++                "properties": {
++                    "pre_relabel_configs": {
++                        "description": "Templated YAML block-scalar relabel rules inserted before relabel_configs.",
++                        "type": "string"
++                    },
++                    "post_relabel_configs": {
++                        "description": "Templated YAML block-scalar relabel rules inserted after relabel_configs.",
++                        "type": "string"
++                    }
++                }
++            }
 +        },
 +        "sourceRegistry": {
 +            "type": "string"
@@ -558,7 +587,7 @@ index 6e7cfb75..7d34b456 100644
      }
  }
 diff --git a/charts/prometheus/values.yaml b/charts/prometheus/values.yaml
-index 11558297..e5b236be 100644
+index e469d2710ddc..390c186b4559 100644
 --- a/charts/prometheus/values.yaml
 +++ b/charts/prometheus/values.yaml
 @@ -20,7 +20,7 @@ imagePullSecrets: []
@@ -610,7 +639,7 @@ index 11558297..e5b236be 100644
      sessionAffinity: None
      type: ClusterIP
      ## externalTrafficPolicy is applicable to service with externally-facing addresses (NodePorts, ExternalIPs, and LoadBalancer IPs)
-@@ -1167,11 +1168,6 @@ extraScrapeConfigs: ""
+@@ -1186,11 +1187,6 @@ extraScrapeConfigs: ""
  ## Prometheus server ConfigMap entries for rule files (allow prometheus labels interpolation)
  ruleFiles: {}
  
@@ -623,5 +652,5 @@ index 11558297..e5b236be 100644
  ##
  serverFiles:
 -- 
-2.50.1 (Apple Git-155)
+2.54.0 (Apple Git-157)
 
