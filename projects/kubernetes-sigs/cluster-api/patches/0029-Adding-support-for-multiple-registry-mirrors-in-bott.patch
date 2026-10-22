@@ -1,34 +1,15 @@
-From 00d2713929aa1458009ef18d0d24cd6794eb89a3 Mon Sep 17 00:00:00 2001
+From e4a1b26db946ea35362ac31d64be9f5a51852a25 Mon Sep 17 00:00:00 2001
 From: Aravind Ramalingam <ramaliar@amazon.com>
 Date: Mon, 22 Jan 2024 12:47:26 -0800
-Subject: [PATCH] Adding support for multiple registry mirrors in bottlerocket
+Subject: [PATCH 29/36] Adding support for multiple registry mirrors in
+ bottlerocket
 
----
- .../kubeadm/v1beta1/kubeadm_types.go          | 15 ++++
- .../v1beta1/zz_generated.conversion.go        | 34 ++++++++
- .../kubeadm/v1beta1/zz_generated.deepcopy.go  | 31 ++++++-
- .../kubeadm/v1beta2/kubeadm_types.go          | 15 ++++
- .../kubeadm/v1beta2/zz_generated.deepcopy.go  | 31 ++++++-
- api/core/v1beta1/machinedeployment_types.go   | 18 ++++-
- ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 72 +++++++++++++++++
- ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 80 +++++++++++++++++++
- .../internal/bottlerocket/bootstrap.go        | 20 +++--
- .../internal/bottlerocket/bootstrap_test.go   | 72 ++++++++++++++++-
- .../internal/bottlerocket/bottlerocket.go     | 28 ++++++-
- .../controllers/kubeadmconfig_controller.go   | 12 ++-
- .../zz_generated.conversion.go                |  1 +
- .../cluster.x-k8s.io_clusterclasses.yaml      |  8 +-
- .../crd/bases/cluster.x-k8s.io_clusters.yaml  |  8 +-
- .../cluster.x-k8s.io_machinedeployments.yaml  |  8 +-
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 80 +++++++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 80 +++++++++++++++++++
- 18 files changed, 590 insertions(+), 23 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 92768937e..09a2db1f5 100644
+index ad678e59a4a2..05bb9df37cdf 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-@@ -382,6 +382,21 @@ type RegistryMirrorConfiguration struct {
+@@ -381,6 +381,21 @@ type RegistryMirrorConfiguration struct {
  
  	// CACert defines the CA cert for the registry mirror
  	CACert string `json:"caCert,omitempty"`
@@ -51,7 +32,7 @@ index 92768937e..09a2db1f5 100644
  
  // ControlPlaneComponent holds settings common to control plane component of the cluster.
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 0d7b02e6e..cc67c977b 100644
+index 590e594d9afa..43426185c8af 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -290,6 +290,16 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -71,7 +52,7 @@ index 0d7b02e6e..cc67c977b 100644
  	if err := s.AddGeneratedConversionFunc((*NTP)(nil), (*v1beta2.NTP)(nil), func(a, b interface{}, scope conversion.Scope) error {
  		return Convert_v1beta1_NTP_To_v1beta2_NTP(a.(*NTP), b.(*v1beta2.NTP), scope)
  	}); err != nil {
-@@ -2079,6 +2089,28 @@ func autoConvert_v1beta2_LocalEtcd_To_v1beta1_LocalEtcd(in *v1beta2.LocalEtcd, o
+@@ -2081,6 +2091,28 @@ func autoConvert_v1beta2_LocalEtcd_To_v1beta1_LocalEtcd(in *v1beta2.LocalEtcd, o
  	return nil
  }
  
@@ -100,7 +81,7 @@ index 0d7b02e6e..cc67c977b 100644
  func autoConvert_v1beta1_NTP_To_v1beta2_NTP(in *NTP, out *v1beta2.NTP, s conversion.Scope) error {
  	out.Servers = *(*[]string)(unsafe.Pointer(&in.Servers))
  	out.Enabled = (*bool)(unsafe.Pointer(in.Enabled))
-@@ -2261,6 +2293,7 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
+@@ -2263,6 +2295,7 @@ func Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(in *v1beta
  func autoConvert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfiguration(in *RegistryMirrorConfiguration, out *v1beta2.RegistryMirrorConfiguration, s conversion.Scope) error {
  	out.Endpoint = in.Endpoint
  	out.CACert = in.CACert
@@ -108,7 +89,7 @@ index 0d7b02e6e..cc67c977b 100644
  	return nil
  }
  
-@@ -2272,6 +2305,7 @@ func Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfig
+@@ -2274,6 +2307,7 @@ func Convert_v1beta1_RegistryMirrorConfiguration_To_v1beta2_RegistryMirrorConfig
  func autoConvert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
  	out.Endpoint = in.Endpoint
  	out.CACert = in.CACert
@@ -117,7 +98,7 @@ index 0d7b02e6e..cc67c977b 100644
  }
  
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index aa3f007b0..bcf853695 100644
+index aa3f007b0400..bcf853695ee1 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -374,7 +374,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
@@ -180,10 +161,10 @@ index aa3f007b0..bcf853695 100644
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 288a6144d..1a7e2c098 100644
+index 6f99b846ca41..1f40a4b6bd2c 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -149,6 +149,21 @@ type RegistryMirrorConfiguration struct {
+@@ -148,6 +148,21 @@ type RegistryMirrorConfiguration struct {
  
  	// CACert defines the CA cert for the registry mirror
  	CACert string `json:"caCert,omitempty"`
@@ -206,7 +187,7 @@ index 288a6144d..1a7e2c098 100644
  
  // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster.
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index 73a166127..5c4f18f77 100644
+index 73a16612761e..5c4f18f770ec 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -385,7 +385,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
@@ -269,7 +250,7 @@ index 73a166127..5c4f18f77 100644
  
  // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RegistryMirrorConfiguration.
 diff --git a/api/core/v1beta1/machinedeployment_types.go b/api/core/v1beta1/machinedeployment_types.go
-index 4abb03a9a..225b088ca 100644
+index 0b8a1faa6646..9b0c5c8b0d4d 100644
 --- a/api/core/v1beta1/machinedeployment_types.go
 +++ b/api/core/v1beta1/machinedeployment_types.go
 @@ -39,6 +39,9 @@ const (
@@ -313,10 +294,10 @@ index 4abb03a9a..225b088ca 100644
  	Type MachineDeploymentStrategyType `json:"type,omitempty"`
  
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 9e51f9315..e70999546 100644
+index d4c9b8dac4eb..6316baab14ea 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -1160,6 +1160,24 @@ spec:
+@@ -1180,6 +1180,24 @@ spec:
                          description: Endpoint defines the registry mirror endpoint
                            to use for pulling images
                          type: string
@@ -341,32 +322,7 @@ index 9e51f9315..e70999546 100644
                      type: object
                    scheduler:
                      description: scheduler contains extra settings for the scheduler
-@@ -3962,6 +3980,24 @@ spec:
-                         description: Endpoint defines the registry mirror endpoint
-                           to use for pulling images
-                         type: string
-+                      mirrors:
-+                        description: Mirrors defines a list of image registry mirrors.
-+                        items:
-+                          description: Mirror holds the settings for mirroring a registry.
-+                          properties:
-+                            endpoints:
-+                              description: |-
-+                                Endpoints defines the registry mirror endpoints to use for pulling images.
-+                                Currently we support only one private registry. Hence endpoints would have only one entry.
-+                              items:
-+                                type: string
-+                              type: array
-+                            registry:
-+                              description: Registry defines the registry we are mirroring
-+                                to the endpoint.
-+                              type: string
-+                          type: object
-+                        type: array
-                     type: object
-                   scheduler:
-                     description: scheduler contains extra settings for the scheduler
-@@ -4744,6 +4780,24 @@ spec:
+@@ -2514,6 +2532,24 @@ spec:
                          description: Endpoint defines the registry mirror endpoint
                            to use for pulling images
                          type: string
@@ -391,7 +347,32 @@ index 9e51f9315..e70999546 100644
                      type: object
                    skipPhases:
                      description: |-
-@@ -5489,6 +5543,24 @@ spec:
+@@ -4061,6 +4097,24 @@ spec:
+                         description: Endpoint defines the registry mirror endpoint
+                           to use for pulling images
+                         type: string
++                      mirrors:
++                        description: Mirrors defines a list of image registry mirrors.
++                        items:
++                          description: Mirror holds the settings for mirroring a registry.
++                          properties:
++                            endpoints:
++                              description: |-
++                                Endpoints defines the registry mirror endpoints to use for pulling images.
++                                Currently we support only one private registry. Hence endpoints would have only one entry.
++                              items:
++                                type: string
++                              type: array
++                            registry:
++                              description: Registry defines the registry we are mirroring
++                                to the endpoint.
++                              type: string
++                          type: object
++                        type: array
+                     type: object
+                   scheduler:
+                     description: scheduler contains extra settings for the scheduler
+@@ -5547,6 +5601,24 @@ spec:
                          description: Endpoint defines the registry mirror endpoint
                            to use for pulling images
                          type: string
@@ -417,10 +398,10 @@ index 9e51f9315..e70999546 100644
                    skipPhases:
                      description: |-
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 115212f68..e112094b7 100644
+index 0c527bf48233..150ca70b944a 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -1210,6 +1210,26 @@ spec:
+@@ -1231,6 +1231,26 @@ spec:
                                  description: Endpoint defines the registry mirror
                                    endpoint to use for pulling images
                                  type: string
@@ -447,34 +428,7 @@ index 115212f68..e112094b7 100644
                              type: object
                            scheduler:
                              description: scheduler contains extra settings for the
-@@ -3944,6 +3964,26 @@ spec:
-                                 description: Endpoint defines the registry mirror
-                                   endpoint to use for pulling images
-                                 type: string
-+                              mirrors:
-+                                description: Mirrors defines a list of image registry
-+                                  mirrors.
-+                                items:
-+                                  description: Mirror holds the settings for mirroring
-+                                    a registry.
-+                                  properties:
-+                                    endpoints:
-+                                      description: |-
-+                                        Endpoints defines the registry mirror endpoints to use for pulling images.
-+                                        Currently we support only one private registry. Hence endpoints would have only one entry.
-+                                      items:
-+                                        type: string
-+                                      type: array
-+                                    registry:
-+                                      description: Registry defines the registry we
-+                                        are mirroring to the endpoint.
-+                                      type: string
-+                                  type: object
-+                                type: array
-                             type: object
-                           scheduler:
-                             description: scheduler contains extra settings for the
-@@ -4742,6 +4782,26 @@ spec:
+@@ -2594,6 +2614,26 @@ spec:
                                  description: Endpoint defines the registry mirror
                                    endpoint to use for pulling images
                                  type: string
@@ -501,7 +455,34 @@ index 115212f68..e112094b7 100644
                              type: object
                            skipPhases:
                              description: |-
-@@ -5499,6 +5559,26 @@ spec:
+@@ -4046,6 +4086,26 @@ spec:
+                                 description: Endpoint defines the registry mirror
+                                   endpoint to use for pulling images
+                                 type: string
++                              mirrors:
++                                description: Mirrors defines a list of image registry
++                                  mirrors.
++                                items:
++                                  description: Mirror holds the settings for mirroring
++                                    a registry.
++                                  properties:
++                                    endpoints:
++                                      description: |-
++                                        Endpoints defines the registry mirror endpoints to use for pulling images.
++                                        Currently we support only one private registry. Hence endpoints would have only one entry.
++                                      items:
++                                        type: string
++                                      type: array
++                                    registry:
++                                      description: Registry defines the registry we
++                                        are mirroring to the endpoint.
++                                      type: string
++                                  type: object
++                                type: array
+                             type: object
+                           scheduler:
+                             description: scheduler contains extra settings for the
+@@ -5558,6 +5618,26 @@ spec:
                                  description: Endpoint defines the registry mirror
                                    endpoint to use for pulling images
                                  type: string
@@ -529,7 +510,7 @@ index 115212f68..e112094b7 100644
                            skipPhases:
                              description: |-
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index b3cf9a03f..9e88da034 100644
+index b3cf9a03f734..9e88da0344c4 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -74,8 +74,11 @@ no-proxy = [{{stringsJoin .NoProxyEndpoints "," }}]
@@ -581,7 +562,7 @@ index b3cf9a03f..9e88da034 100644
  {{- end -}}
  
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
-index 7d1f8c6f5..8180a3f17 100644
+index 7d1f8c6f517c..8180a3f17415 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap_test.go
 @@ -134,8 +134,9 @@ provider-id = "PROVIDERID"
@@ -685,7 +666,7 @@ index 7d1f8c6f5..8180a3f17 100644
  	for _, testcase := range testcases {
  		t.Run(testcase.name, func(t *testing.T) {
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 6a2243f5c..15d60df6f 100644
+index 6a2243f5ca74..15d60df6f5c3 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -4,6 +4,7 @@ import (
@@ -744,11 +725,23 @@ index 6a2243f5c..15d60df6f 100644
  	if config.RegistryMirrorConfiguration.CACert != "" {
  		bottlerocketInput.RegistryMirrorCACert = base64.StdEncoding.EncodeToString([]byte(config.RegistryMirrorConfiguration.CACert))
  	}
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index df0ebf0e2..b7a10fb16 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -561,7 +561,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+index 29f3403ad316..401c81b9ec39 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+@@ -880,6 +880,7 @@ func Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirr
+ func autoConvert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
+ 	out.Endpoint = in.Endpoint
+ 	out.CACert = in.CACert
++	// INFO: in.Mirrors opted out of conversion generation
+ 	return nil
+ }
+ 
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index ece4c9722ce4..f7ef7a290fee 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -567,7 +567,9 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
  		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
  		}
@@ -759,7 +752,19 @@ index df0ebf0e2..b7a10fb16 100644
  			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
  			registryUsername, registryPassword, err := r.resolveRegistryCredentials(ctx, scope.Config)
  			if err != nil {
-@@ -887,7 +889,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -729,6 +731,11 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
+ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result, error) {
+ 	scope.Info("Creating BootstrapData for the worker node")
+ 
++	machine := &clusterv1.Machine{}
++	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(scope.ConfigOwner.Object, machine); err != nil {
++		return ctrl.Result{}, pkgerrors.Wrapf(err, "cannot convert %s to Machine", scope.ConfigOwner.GetKind())
++	}
++
+ 	certificates := secret.NewCertificatesForWorker(scope.Config.Spec.JoinConfiguration.CACertPath)
+ 	err := certificates.LookupCached(
+ 		ctx,
+@@ -892,7 +899,9 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
  		}
@@ -770,7 +775,28 @@ index df0ebf0e2..b7a10fb16 100644
  			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
  			registryUsername, registryPassword, err := r.resolveRegistryCredentials(ctx, scope.Config)
  			if err != nil {
-@@ -1094,7 +1098,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -979,7 +988,7 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
+ 
+ 	machine := &clusterv1.Machine{}
+ 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(scope.ConfigOwner.Object, machine); err != nil {
+-		return ctrl.Result{}, errors.Wrapf(err, "cannot convert %s to Machine", scope.ConfigOwner.GetKind())
++		return ctrl.Result{}, pkgerrors.Wrapf(err, "cannot convert %s to Machine", scope.ConfigOwner.GetKind())
+ 	}
+ 
+ 	certificates := secret.NewControlPlaneJoinCerts(&scope.Config.Spec.ClusterConfiguration)
+@@ -1024,11 +1033,6 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
+ 		return res, nil
+ 	}
+ 
+-	machine := &clusterv1.Machine{}
+-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(scope.ConfigOwner.Object, machine); err != nil {
+-		return ctrl.Result{}, errors.Wrapf(err, "cannot convert %s to Machine", scope.ConfigOwner.GetKind())
+-	}
+-
+ 	kubernetesVersion := scope.ConfigOwner.KubernetesVersion()
+ 	parsedVersion, err := semver.ParseTolerant(kubernetesVersion)
+ 	if err != nil {
+@@ -1133,7 +1137,9 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
  		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
  			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
  		}
@@ -781,92 +807,20 @@ index df0ebf0e2..b7a10fb16 100644
  			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
  			registryUsername, registryPassword, err := r.resolveRegistryCredentials(ctx, scope.Config)
  			if err != nil {
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index e978228e7..d948cf98f 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-@@ -880,6 +880,7 @@ func Convert_upstreamv1beta3_RegistryMirrorConfiguration_To_v1beta2_RegistryMirr
- func autoConvert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(in *v1beta2.RegistryMirrorConfiguration, out *RegistryMirrorConfiguration, s conversion.Scope) error {
- 	out.Endpoint = in.Endpoint
- 	out.CACert = in.CACert
-+	// INFO: in.Mirrors opted out of conversion generation
- 	return nil
+@@ -1359,7 +1365,7 @@ func (r *Reconciler) tokenCheckRefreshOrRotationInterval() time.Duration {
  }
  
-diff --git a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-index 7342af7d9..d6cb0762e 100644
---- a/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-+++ b/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
-@@ -1646,11 +1646,17 @@ spec:
-                               type: object
-                             type:
-                               description: |-
--                                type of deployment. Allowed values are RollingUpdate and OnDelete.
-+                                type of rollout strategy to use.
-+                                Supported values:
-+                                - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
-+                                i.e. gradually scale down the old MachineSet and scale up the new one.
-+                                - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
-+                                - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
-                                 The default is RollingUpdate.
-                               enum:
-                               - RollingUpdate
-                               - OnDelete
-+                              - InPlace
-                               type: string
-                           type: object
-                         taints:
-diff --git a/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-index 4eeb125d7..0331f1b27 100644
---- a/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-+++ b/config/crd/bases/cluster.x-k8s.io_clusters.yaml
-@@ -1247,11 +1247,17 @@ spec:
-                                   type: object
-                                 type:
-                                   description: |-
--                                    type of deployment. Allowed values are RollingUpdate and OnDelete.
-+                                    type of rollout strategy to use.
-+                                    Supported values:
-+                                    - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
-+                                    i.e. gradually scale down the old MachineSet and scale up the new one.
-+                                    - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
-+                                    - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
-                                     The default is RollingUpdate.
-                                   enum:
-                                   - RollingUpdate
-                                   - OnDelete
-+                                  - InPlace
-                                   type: string
-                               type: object
-                             taints:
-diff --git a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-index 5e6adb0e8..bde22f076 100644
---- a/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-+++ b/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-@@ -311,11 +311,17 @@ spec:
-                     type: object
-                   type:
-                     description: |-
--                      type of deployment. Allowed values are RollingUpdate and OnDelete.
-+                      type of rollout strategy to use.
-+                      Supported values:
-+                      - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
-+                      i.e. gradually scale down the old MachineSet and scale up the new one.
-+                      - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
-+                      - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
-                       The default is RollingUpdate.
-                     enum:
-                     - RollingUpdate
-                     - OnDelete
-+                    - InPlace
-                     type: string
-                 type: object
-               template:
+ // resolveRegistryCredentials returns username and password fetched from a secret object.
+-func (r *KubeadmConfigReconciler) resolveRegistryCredentials(ctx context.Context, source *bootstrapv1.KubeadmConfig) ([]byte, []byte, error) {
++func (r *Reconciler) resolveRegistryCredentials(ctx context.Context, source *bootstrapv1.KubeadmConfig) ([]byte, []byte, error) {
+ 	key := types.NamespacedName{Namespace: source.Namespace, Name: secret.RegistryCredentials}
+ 	secret := &corev1.Secret{}
+ 	if err := r.Client.Get(ctx, key, secret); err != nil {
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index 31e1f9f6a..3c0e69461 100644
+index 95015f460657..d0be8ec4073d 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -1214,6 +1214,26 @@ spec:
+@@ -1235,6 +1235,26 @@ spec:
                              description: Endpoint defines the registry mirror endpoint
                                to use for pulling images
                              type: string
@@ -893,34 +847,7 @@ index 31e1f9f6a..3c0e69461 100644
                          type: object
                        scheduler:
                          description: scheduler contains extra settings for the scheduler
-@@ -4531,6 +4551,26 @@ spec:
-                             description: Endpoint defines the registry mirror endpoint
-                               to use for pulling images
-                             type: string
-+                          mirrors:
-+                            description: Mirrors defines a list of image registry
-+                              mirrors.
-+                            items:
-+                              description: Mirror holds the settings for mirroring
-+                                a registry.
-+                              properties:
-+                                endpoints:
-+                                  description: |-
-+                                    Endpoints defines the registry mirror endpoints to use for pulling images.
-+                                    Currently we support only one private registry. Hence endpoints would have only one entry.
-+                                  items:
-+                                    type: string
-+                                  type: array
-+                                registry:
-+                                  description: Registry defines the registry we are
-+                                    mirroring to the endpoint.
-+                                  type: string
-+                              type: object
-+                            type: array
-                         type: object
-                       scheduler:
-                         description: scheduler contains extra settings for the scheduler
-@@ -5320,6 +5360,26 @@ spec:
+@@ -2583,6 +2603,26 @@ spec:
                              description: Endpoint defines the registry mirror endpoint
                                to use for pulling images
                              type: string
@@ -947,7 +874,34 @@ index 31e1f9f6a..3c0e69461 100644
                          type: object
                        skipPhases:
                          description: |-
-@@ -6070,6 +6130,26 @@ spec:
+@@ -4658,6 +4698,26 @@ spec:
+                             description: Endpoint defines the registry mirror endpoint
+                               to use for pulling images
+                             type: string
++                          mirrors:
++                            description: Mirrors defines a list of image registry
++                              mirrors.
++                            items:
++                              description: Mirror holds the settings for mirroring
++                                a registry.
++                              properties:
++                                endpoints:
++                                  description: |-
++                                    Endpoints defines the registry mirror endpoints to use for pulling images.
++                                    Currently we support only one private registry. Hence endpoints would have only one entry.
++                                  items:
++                                    type: string
++                                  type: array
++                                registry:
++                                  description: Registry defines the registry we are
++                                    mirroring to the endpoint.
++                                  type: string
++                              type: object
++                            type: array
+                         type: object
+                       scheduler:
+                         description: scheduler contains extra settings for the scheduler
+@@ -6155,6 +6215,26 @@ spec:
                              description: Endpoint defines the registry mirror endpoint
                                to use for pulling images
                              type: string
@@ -975,10 +929,10 @@ index 31e1f9f6a..3c0e69461 100644
                        skipPhases:
                          description: |-
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 13ade8ebd..e5bfc1380 100644
+index 26a44be3d978..7d170ff5eca9 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -1228,6 +1228,26 @@ spec:
+@@ -1252,6 +1252,26 @@ spec:
                                      description: Endpoint defines the registry mirror
                                        endpoint to use for pulling images
                                      type: string
@@ -1005,7 +959,34 @@ index 13ade8ebd..e5bfc1380 100644
                                  type: object
                                scheduler:
                                  description: scheduler contains extra settings for
-@@ -4247,6 +4267,26 @@ spec:
+@@ -2626,6 +2646,26 @@ spec:
+                                     description: Endpoint defines the registry mirror
+                                       endpoint to use for pulling images
+                                     type: string
++                                  mirrors:
++                                    description: Mirrors defines a list of image registry
++                                      mirrors.
++                                    items:
++                                      description: Mirror holds the settings for mirroring
++                                        a registry.
++                                      properties:
++                                        endpoints:
++                                          description: |-
++                                            Endpoints defines the registry mirror endpoints to use for pulling images.
++                                            Currently we support only one private registry. Hence endpoints would have only one entry.
++                                          items:
++                                            type: string
++                                          type: array
++                                        registry:
++                                          description: Registry defines the registry
++                                            we are mirroring to the endpoint.
++                                          type: string
++                                      type: object
++                                    type: array
+                                 type: object
+                               skipPhases:
+                                 description: |-
+@@ -4352,6 +4392,26 @@ spec:
                                      description: Endpoint defines the registry mirror
                                        endpoint to use for pulling images
                                      type: string
@@ -1032,7 +1013,7 @@ index 13ade8ebd..e5bfc1380 100644
                                  type: object
                                scheduler:
                                  description: scheduler contains extra settings for
-@@ -5053,6 +5093,26 @@ spec:
+@@ -5878,6 +5938,26 @@ spec:
                                      description: Endpoint defines the registry mirror
                                        endpoint to use for pulling images
                                      type: string
@@ -1059,33 +1040,75 @@ index 13ade8ebd..e5bfc1380 100644
                                  type: object
                                skipPhases:
                                  description: |-
-@@ -5816,6 +5876,26 @@ spec:
-                                     description: Endpoint defines the registry mirror
-                                       endpoint to use for pulling images
-                                     type: string
-+                                  mirrors:
-+                                    description: Mirrors defines a list of image registry
-+                                      mirrors.
-+                                    items:
-+                                      description: Mirror holds the settings for mirroring
-+                                        a registry.
-+                                      properties:
-+                                        endpoints:
-+                                          description: |-
-+                                            Endpoints defines the registry mirror endpoints to use for pulling images.
-+                                            Currently we support only one private registry. Hence endpoints would have only one entry.
-+                                          items:
-+                                            type: string
-+                                          type: array
-+                                        registry:
-+                                          description: Registry defines the registry
-+                                            we are mirroring to the endpoint.
-+                                          type: string
-+                                      type: object
-+                                    type: array
-                                 type: object
-                               skipPhases:
-                                 description: |-
+diff --git a/core/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml b/core/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
+index 8e5ee42bfbd6..92127648496a 100644
+--- a/core/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
++++ b/core/config/crd/bases/cluster.x-k8s.io_clusterclasses.yaml
+@@ -1646,11 +1646,17 @@ spec:
+                               type: object
+                             type:
+                               description: |-
+-                                type of deployment. Allowed values are RollingUpdate and OnDelete.
++                                type of rollout strategy to use.
++                                Supported values:
++                                - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++                                i.e. gradually scale down the old MachineSet and scale up the new one.
++                                - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
++                                - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
+                                 The default is RollingUpdate.
+                               enum:
+                               - RollingUpdate
+                               - OnDelete
++                              - InPlace
+                               type: string
+                           type: object
+                         taints:
+diff --git a/core/config/crd/bases/cluster.x-k8s.io_clusters.yaml b/core/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+index 734504ea39b2..d886705f9ab4 100644
+--- a/core/config/crd/bases/cluster.x-k8s.io_clusters.yaml
++++ b/core/config/crd/bases/cluster.x-k8s.io_clusters.yaml
+@@ -1202,11 +1202,17 @@ spec:
+                                   type: object
+                                 type:
+                                   description: |-
+-                                    type of deployment. Allowed values are RollingUpdate and OnDelete.
++                                    type of rollout strategy to use.
++                                    Supported values:
++                                    - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++                                    i.e. gradually scale down the old MachineSet and scale up the new one.
++                                    - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
++                                    - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
+                                     The default is RollingUpdate.
+                                   enum:
+                                   - RollingUpdate
+                                   - OnDelete
++                                  - InPlace
+                                   type: string
+                               type: object
+                             taints:
+diff --git a/core/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml b/core/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
+index 6d2e79b7708b..3c103f9a5b70 100644
+--- a/core/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
++++ b/core/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
+@@ -311,11 +311,17 @@ spec:
+                     type: object
+                   type:
+                     description: |-
+-                      type of deployment. Allowed values are RollingUpdate and OnDelete.
++                      type of rollout strategy to use.
++                      Supported values:
++                      - `RollingUpdate`: replaces the old MachineSet by new one using rolling update
++                      i.e. gradually scale down the old MachineSet and scale up the new one.
++                      - `OnDelete`: replaces old MachineSets when the deletion of the associated machines are completed.
++                      - `InPlace`: upgrades the machines within the same MachineSet without rolling out any new nodes.
+                       The default is RollingUpdate.
+                     enum:
+                     - RollingUpdate
+                     - OnDelete
++                    - InPlace
+                     type: string
+                 type: object
+               template:
 -- 
-2.48.1
+2.47.3
 

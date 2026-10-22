@@ -1,32 +1,15 @@
-From 30ef0cbf3f35198341faf4db8177f9b3e4b070d0 Mon Sep 17 00:00:00 2001
+From 1a7ce2ace4c4e4b1b814a3ce6a429649b6a3d2f6 Mon Sep 17 00:00:00 2001
 From: Vignesh Goutham Ganesh <vgg@amazon.com>
 Date: Wed, 8 Jun 2022 10:27:26 -0700
-Subject: [PATCH] Parse provider-id from kubelet extra args
+Subject: [PATCH 13/36] Parse provider-id from kubelet extra args
 
 Signed-off-by: Vignesh Goutham Ganesh <vgg@amazon.com>
----
- api/bootstrap/kubeadm/v1beta1/conversion.go   |  38 ++
- .../kubeadm/v1beta1/kubeadm_types.go          |  58 +++
- .../v1beta1/zz_generated.conversion.go        | 124 ++++++
- .../kubeadm/v1beta1/zz_generated.deepcopy.go  |  52 +++
- .../kubeadm/v1beta2/kubeadm_types.go          |  79 ++++
- .../kubeadm/v1beta2/zz_generated.deepcopy.go  |  50 +++
- ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 346 +++++++++++++++++
- ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 349 +++++++++++++++++
- .../internal/bottlerocket/bootstrap.go        |  71 ++--
- .../internal/bottlerocket/bottlerocket.go     |  91 +++--
- .../controllers/kubeadmconfig_controller.go   |  24 +-
- .../zz_generated.conversion.go                |   4 +
- .../zz_generated.conversion.go                |   4 +
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 349 +++++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 358 ++++++++++++++++++
- 15 files changed, 1938 insertions(+), 59 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index 25dbea9b5..5e3ffc386 100644
+index 024eec83fb16..70ef94a3ec84 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
-@@ -688,6 +688,44 @@ func Convert_v1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(in *boot
+@@ -427,6 +427,44 @@ func Convert_v1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(in *boot
  	return nil
  }
  
@@ -72,10 +55,10 @@ index 25dbea9b5..5e3ffc386 100644
  	if in.Local != nil {
  		if err := Convert_v1beta1_LocalEtcd_To_v1beta2_LocalEtcd(in.Local, &out.Local, s); err != nil {
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 2484e65fc..e2f5572e7 100644
+index 7602cd531e50..2dba724a4159 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-@@ -109,6 +109,16 @@ type ClusterConfiguration struct {
+@@ -108,6 +108,16 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
  
@@ -92,7 +75,7 @@ index 2484e65fc..e2f5572e7 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
-@@ -250,6 +260,44 @@ type BottlerocketControl struct {
+@@ -249,6 +259,44 @@ type BottlerocketControl struct {
  	ImageMeta `json:",inline"`
  }
  
@@ -137,7 +120,7 @@ index 2484e65fc..e2f5572e7 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -630,6 +678,16 @@ type JoinConfiguration struct {
+@@ -629,6 +677,16 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketControl BottlerocketControl `json:"bottlerocketControl,omitempty"`
  
@@ -155,7 +138,7 @@ index 2484e65fc..e2f5572e7 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index eeb3cd593..92617e466 100644
+index 9d4bdc45a4f4..e5ac0b266d9c 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -355,6 +355,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -314,7 +297,7 @@ index eeb3cd593..92617e466 100644
  	if err := Convert_v1beta2_Etcd_To_v1beta1_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
  		return err
  	}
-@@ -1201,6 +1301,18 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+@@ -1203,6 +1303,18 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
  	if err := Convert_v1beta1_BottlerocketControl_To_v1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
  		return err
  	}
@@ -333,7 +316,7 @@ index eeb3cd593..92617e466 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1236,6 +1348,18 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+@@ -1238,6 +1350,18 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
  	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_v1beta1_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
  		return err
  	}
@@ -353,7 +336,7 @@ index eeb3cd593..92617e466 100644
  		return err
  	}
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index 50d699279..c39346285 100644
+index 50d6992797fa..c39346285e26 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -158,6 +158,22 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -437,10 +420,10 @@ index 50d699279..c39346285 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 1300e12c5..6569b5f9c 100644
+index ae627be3875f..79779680cc9a 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -179,6 +179,16 @@ type ClusterConfiguration struct {
+@@ -178,6 +178,16 @@ type ClusterConfiguration struct {
  	// +optional
  	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
  
@@ -457,7 +440,7 @@ index 1300e12c5..6569b5f9c 100644
  	// etcd holds configuration for etcd.
  	// NB: This value defaults to a Local (stacked) etcd
  	// +optional
-@@ -322,6 +332,66 @@ type BottlerocketControl struct {
+@@ -321,6 +331,66 @@ type BottlerocketControl struct {
  	// TODO: evaluate if we need also a ImageName based on user feedbacks
  }
  
@@ -524,7 +507,7 @@ index 1300e12c5..6569b5f9c 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -743,6 +813,15 @@ type JoinConfiguration struct {
+@@ -742,6 +812,15 @@ type JoinConfiguration struct {
  	// +optional
  	RegistryMirror RegistryMirrorConfiguration `json:"registryMirror,omitempty"`
  
@@ -541,7 +524,7 @@ index 1300e12c5..6569b5f9c 100644
  	// When used in the context of control plane nodes, NodeRegistration should remain consistent
  	// across both InitConfiguration and JoinConfiguration
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index 5089f42fa..61aed60e7 100644
+index 5089f42fac90..61aed60e758b 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -194,6 +194,21 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -623,192 +606,10 @@ index 5089f42fa..61aed60e7 100644
  	in.Discovery.DeepCopyInto(&out.Discovery)
  	if in.ControlPlane != nil {
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 1c2180925..f73ebf93a 100644
+index edaf3a7671f6..52f110e6249b 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -348,6 +348,90 @@ spec:
-                     maximum: 1095
-                     minimum: 1
-                     type: integer
-+                  bottlerocketCustomBootstrapContainers:
-+                    description: |-
-+                      BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
-+                      This is only for bottlerocket.
-+                    items:
-+                      description: BottlerocketBootstrapContainer holds the bootstrap
-+                        container setting for Bottlerocket
-+                      properties:
-+                        essential:
-+                          description: |-
-+                            Essential decides whether or not the container should fail the boot process.
-+                            Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
-+                            Default is false.
-+                          type: boolean
-+                        imageRepository:
-+                          description: |-
-+                            imageRepository sets the container registry to pull images from.
-+                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                          type: string
-+                        imageTag:
-+                          description: |-
-+                            imageTag allows to specify a tag for the image.
-+                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                          type: string
-+                        mode:
-+                          description: Mode represents the bootstrap container mode.
-+                          enum:
-+                          - always
-+                          - "off"
-+                          - once
-+                          type: string
-+                        name:
-+                          description: Name is the bootstrap container name that will
-+                            be given to the container in BR's `apiserver`.
-+                          type: string
-+                        userData:
-+                          description: UserData is the base64-encoded userdata.
-+                          type: string
-+                      required:
-+                      - mode
-+                      - name
-+                      type: object
-+                    type: array
-+                  bottlerocketCustomHostContainers:
-+                    description: |-
-+                      BottlerocketHostContainers contains the information of any additional images
-+                      that we will deploy as host containers in the CPIs
-+                    items:
-+                      description: BottlerocketHostContainer describes a host image
-+                        for Bottlerocket
-+                      properties:
-+                        name:
-+                          description: Name is the host container name that will be
-+                            given to the container in BR's `apiserver`
-+                          type: string
-+                        source:
-+                          description: ImageMeta is the actual location of the container
-+                            image
-+                          properties:
-+                            imageRepository:
-+                              description: |-
-+                                imageRepository sets the container registry to pull images from.
-+                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                              type: string
-+                            imageTag:
-+                              description: |-
-+                                imageTag allows to specify a tag for the image.
-+                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                              type: string
-+                          type: object
-+                        superpowered:
-+                          description: Superpowered indicates if the container will
-+                            be superpowered
-+                          type: boolean
-+                        userData:
-+                          description: UserData is the userdata that will be attached
-+                            to the image.
-+                          type: string
-+                      required:
-+                      - name
-+                      - source
-+                      - superpowered
-+                      type: object
-+                    type: array
-                   certificatesDir:
-                     description: |-
-                       certificatesDir specifies where to store or look for all required certificates.
-@@ -1709,6 +1793,90 @@ spec:
-                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                         type: string
-                     type: object
-+                  bottlerocketCustomBootstrapContainers:
-+                    description: |-
-+                      BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
-+                      This is only for bottlerocket.
-+                    items:
-+                      description: BottlerocketBootstrapContainer holds the bootstrap
-+                        container setting for Bottlerocket
-+                      properties:
-+                        essential:
-+                          description: |-
-+                            Essential decides whether or not the container should fail the boot process.
-+                            Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
-+                            Default is false.
-+                          type: boolean
-+                        imageRepository:
-+                          description: |-
-+                            imageRepository sets the container registry to pull images from.
-+                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                          type: string
-+                        imageTag:
-+                          description: |-
-+                            imageTag allows to specify a tag for the image.
-+                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                          type: string
-+                        mode:
-+                          description: Mode represents the bootstrap container mode.
-+                          enum:
-+                          - always
-+                          - "off"
-+                          - once
-+                          type: string
-+                        name:
-+                          description: Name is the bootstrap container name that will
-+                            be given to the container in BR's `apiserver`.
-+                          type: string
-+                        userData:
-+                          description: UserData is the base64-encoded userdata.
-+                          type: string
-+                      required:
-+                      - mode
-+                      - name
-+                      type: object
-+                    type: array
-+                  bottlerocketCustomHostContainers:
-+                    description: |-
-+                      BottlerocketCustomHostContainers contains the information of any additional images
-+                      that we will deploy as host containers in the CPIs
-+                    items:
-+                      description: BottlerocketHostContainer describes a host image
-+                        for Bottlerocket
-+                      properties:
-+                        name:
-+                          description: Name is the host container name that will be
-+                            given to the container in BR's `apiserver`
-+                          type: string
-+                        source:
-+                          description: ImageMeta is the actual location of the container
-+                            image
-+                          properties:
-+                            imageRepository:
-+                              description: |-
-+                                imageRepository sets the container registry to pull images from.
-+                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                              type: string
-+                            imageTag:
-+                              description: |-
-+                                imageTag allows to specify a tag for the image.
-+                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                              type: string
-+                          type: object
-+                        superpowered:
-+                          description: Superpowered indicates if the container will
-+                            be superpowered
-+                          type: boolean
-+                        userData:
-+                          description: UserData is the userdata that will be attached
-+                            to the image.
-+                          type: string
-+                      required:
-+                      - name
-+                      - source
-+                      - superpowered
-+                      type: object
-+                    type: array
-                   caCertPath:
-                     description: |-
-                       caCertPath is the path to the SSL certificate authority used to
-@@ -2784,6 +2952,92 @@ spec:
+@@ -338,6 +338,98 @@ spec:
                          minLength: 1
                          type: string
                      type: object
@@ -867,24 +668,29 @@ index 1c2180925..f73ebf93a 100644
 +                      description: BottlerocketHostContainer describes a host image
 +                        for Bottlerocket
 +                      properties:
-+                        imageRepository:
-+                          description: |-
-+                            imageRepository sets the container registry to pull images from.
-+                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                          maxLength: 512
-+                          minLength: 1
-+                          type: string
-+                        imageTag:
-+                          description: |-
-+                            imageTag allows to specify a tag for the image.
-+                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                          maxLength: 256
-+                          minLength: 1
-+                          type: string
 +                        name:
 +                          description: Name is the host container name that will be
 +                            given to the container in BR's `apiserver`
 +                          type: string
++                        source:
++                          description: ImageMeta is the actual location of the container
++                            image
++                          properties:
++                            imageRepository:
++                              description: |-
++                                imageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                              maxLength: 512
++                              minLength: 1
++                              type: string
++                            imageTag:
++                              description: |-
++                                imageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                              maxLength: 256
++                              minLength: 1
++                              type: string
++                          type: object
 +                        superpowered:
 +                          description: Superpowered indicates if the container will
 +                            be superpowered
@@ -895,13 +701,14 @@ index 1c2180925..f73ebf93a 100644
 +                          type: string
 +                      required:
 +                      - name
++                      - source
 +                      - superpowered
 +                      type: object
 +                    type: array
                    caCertificateValidityPeriodDays:
                      description: |-
                        caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4357,6 +4611,98 @@ spec:
+@@ -1737,6 +1829,98 @@ spec:
                          minLength: 1
                          type: string
                      type: object
@@ -1000,194 +807,197 @@ index 1c2180925..f73ebf93a 100644
                    caCertPath:
                      description: |-
                        caCertPath is the path to the SSL certificate authority used to
+@@ -2859,6 +3043,92 @@ spec:
+                         minLength: 1
+                         type: string
+                     type: object
++                  bottlerocketCustomBootstrapContainers:
++                    description: |-
++                      BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++                      This is only for bottlerocket.
++                    items:
++                      description: BottlerocketBootstrapContainer holds the bootstrap
++                        container setting for Bottlerocket
++                      properties:
++                        essential:
++                          description: |-
++                            Essential decides whether or not the container should fail the boot process.
++                            Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++                            Default is false.
++                          type: boolean
++                        imageRepository:
++                          description: |-
++                            imageRepository sets the container registry to pull images from.
++                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                          maxLength: 512
++                          minLength: 1
++                          type: string
++                        imageTag:
++                          description: |-
++                            imageTag allows to specify a tag for the image.
++                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                          maxLength: 256
++                          minLength: 1
++                          type: string
++                        mode:
++                          description: Mode represents the bootstrap container mode.
++                          enum:
++                          - always
++                          - "off"
++                          - once
++                          type: string
++                        name:
++                          description: Name is the bootstrap container name that will
++                            be given to the container in BR's `apiserver`.
++                          type: string
++                        userData:
++                          description: UserData is the base64-encoded userdata.
++                          type: string
++                      required:
++                      - mode
++                      - name
++                      type: object
++                    type: array
++                  bottlerocketCustomHostContainers:
++                    description: |-
++                      BottlerocketHostContainers contains the information of any additional images
++                      that we will deploy as host containers in the CPIs
++                    items:
++                      description: BottlerocketHostContainer describes a host image
++                        for Bottlerocket
++                      properties:
++                        imageRepository:
++                          description: |-
++                            imageRepository sets the container registry to pull images from.
++                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                          maxLength: 512
++                          minLength: 1
++                          type: string
++                        imageTag:
++                          description: |-
++                            imageTag allows to specify a tag for the image.
++                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                          maxLength: 256
++                          minLength: 1
++                          type: string
++                        name:
++                          description: Name is the host container name that will be
++                            given to the container in BR's `apiserver`
++                          type: string
++                        superpowered:
++                          description: Superpowered indicates if the container will
++                            be superpowered
++                          type: boolean
++                        userData:
++                          description: UserData is the userdata that will be attached
++                            to the image.
++                          type: string
++                      required:
++                      - name
++                      - superpowered
++                      type: object
++                    type: array
+                   caCertificateValidityPeriodDays:
+                     description: |-
+                       caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4397,6 +4667,92 @@ spec:
+                         minLength: 1
+                         type: string
+                     type: object
++                  bottlerocketCustomBootstrapContainers:
++                    description: |-
++                      BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++                      This is only for bottlerocket.
++                    items:
++                      description: BottlerocketBootstrapContainer holds the bootstrap
++                        container setting for Bottlerocket
++                      properties:
++                        essential:
++                          description: |-
++                            Essential decides whether or not the container should fail the boot process.
++                            Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++                            Default is false.
++                          type: boolean
++                        imageRepository:
++                          description: |-
++                            imageRepository sets the container registry to pull images from.
++                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                          maxLength: 512
++                          minLength: 1
++                          type: string
++                        imageTag:
++                          description: |-
++                            imageTag allows to specify a tag for the image.
++                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                          maxLength: 256
++                          minLength: 1
++                          type: string
++                        mode:
++                          description: Mode represents the bootstrap container mode.
++                          enum:
++                          - always
++                          - "off"
++                          - once
++                          type: string
++                        name:
++                          description: Name is the bootstrap container name that will
++                            be given to the container in BR's `apiserver`.
++                          type: string
++                        userData:
++                          description: UserData is the base64-encoded userdata.
++                          type: string
++                      required:
++                      - mode
++                      - name
++                      type: object
++                    type: array
++                  bottlerocketCustomHostContainers:
++                    description: |-
++                      BottlerocketCustomHostContainers contains the information of any additional images
++                      that we will deploy as host containers in the CPIs
++                    items:
++                      description: BottlerocketHostContainer describes a host image
++                        for Bottlerocket
++                      properties:
++                        imageRepository:
++                          description: |-
++                            imageRepository sets the container registry to pull images from.
++                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                          maxLength: 512
++                          minLength: 1
++                          type: string
++                        imageTag:
++                          description: |-
++                            imageTag allows to specify a tag for the image.
++                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                          maxLength: 256
++                          minLength: 1
++                          type: string
++                        name:
++                          description: Name is the host container name that will be
++                            given to the container in BR's `apiserver`
++                          type: string
++                        superpowered:
++                          description: Superpowered indicates if the container will
++                            be superpowered
++                          type: boolean
++                        userData:
++                          description: UserData is the userdata that will be attached
++                            to the image.
++                          type: string
++                      required:
++                      - name
++                      - superpowered
++                      type: object
++                    type: array
+                   caCertPath:
+                     description: |-
+                       caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 54fc03c0d..58f08f356 100644
+index adc40a577e01..9fd438da1364 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -381,6 +381,90 @@ spec:
-                             maximum: 1095
-                             minimum: 1
-                             type: integer
-+                          bottlerocketCustomBootstrapContainers:
-+                            description: |-
-+                              BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
-+                              This is only for bottlerocket.
-+                            items:
-+                              description: BottlerocketBootstrapContainer holds the bootstrap
-+                                container setting for Bottlerocket
-+                              properties:
-+                                essential:
-+                                  description: |-
-+                                    Essential decides whether or not the container should fail the boot process.
-+                                    Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
-+                                    Default is false.
-+                                  type: boolean
-+                                imageRepository:
-+                                  description: |-
-+                                    imageRepository sets the container registry to pull images from.
-+                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                  type: string
-+                                imageTag:
-+                                  description: |-
-+                                    imageTag allows to specify a tag for the image.
-+                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                  type: string
-+                                mode:
-+                                  description: Mode represents the bootstrap container mode.
-+                                  enum:
-+                                  - always
-+                                  - "off"
-+                                  - once
-+                                  type: string
-+                                name:
-+                                  description: Name is the bootstrap container name that will
-+                                    be given to the container in BR's `apiserver`.
-+                                  type: string
-+                                userData:
-+                                  description: UserData is the base64-encoded userdata.
-+                                  type: string
-+                              required:
-+                              - mode
-+                              - name
-+                              type: object
-+                            type: array
-+                          bottlerocketCustomHostContainers:
-+                            description: |-
-+                              BottlerocketHostContainers contains the information of any additional images
-+                              that we will deploy as host containers in the CPIs
-+                            items:
-+                              description: BottlerocketHostContainer describes a host image
-+                                for Bottlerocket
-+                              properties:
-+                                name:
-+                                  description: Name is the host container name that will be
-+                                    given to the container in BR's `apiserver`
-+                                  type: string
-+                                source:
-+                                  description: ImageMeta is the actual location of the container
-+                                    image
-+                                  properties:
-+                                    imageRepository:
-+                                      description: |-
-+                                        imageRepository sets the container registry to pull images from.
-+                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                      type: string
-+                                    imageTag:
-+                                      description: |-
-+                                        imageTag allows to specify a tag for the image.
-+                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                      type: string
-+                                  type: object
-+                                superpowered:
-+                                  description: Superpowered indicates if the container will
-+                                    be superpowered
-+                                  type: boolean
-+                                userData:
-+                                  description: UserData is the userdata that will be attached
-+                                    to the image.
-+                                  type: string
-+                              required:
-+                              - name
-+                              - source
-+                              - superpowered
-+                              type: object
-+                            type: array
-                           certificatesDir:
-                             description: |-
-                               certificatesDir specifies where to store or look for all required certificates.
-@@ -1773,6 +1857,91 @@ spec:
-                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                                 type: string
-                             type: object
-+                          bottlerocketCustomBootstrapContainers:
-+                            description: |-
-+                              BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
-+                              This is only for bottlerocket.
-+                            items:
-+                              description: BottlerocketBootstrapContainer holds the
-+                                bootstrap container setting for Bottlerocket
-+                              properties:
-+                                essential:
-+                                  description: |-
-+                                    Essential decides whether or not the container should fail the boot process.
-+                                    Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
-+                                    Default is false.
-+                                  type: boolean
-+                                imageRepository:
-+                                  description: |-
-+                                    imageRepository sets the container registry to pull images from.
-+                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                  type: string
-+                                imageTag:
-+                                  description: |-
-+                                    imageTag allows to specify a tag for the image.
-+                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                  type: string
-+                                mode:
-+                                  description: Mode represents the bootstrap container
-+                                    mode.
-+                                  enum:
-+                                  - always
-+                                  - "off"
-+                                  - once
-+                                  type: string
-+                                name:
-+                                  description: Name is the bootstrap container name
-+                                    that will be given to the container in BR's `apiserver`.
-+                                  type: string
-+                                userData:
-+                                  description: UserData is the base64-encoded userdata.
-+                                  type: string
-+                              required:
-+                              - mode
-+                              - name
-+                              type: object
-+                            type: array
-+                          bottlerocketCustomHostContainers:
-+                            description: |-
-+                              BottlerocketCustomHostContainers contains the information of any additional images
-+                              that we will deploy as host containers in the CPIs
-+                            items:
-+                              description: BottlerocketHostContainer describes a host
-+                                image for Bottlerocket
-+                              properties:
-+                                name:
-+                                  description: Name is the host container name that
-+                                    will be given to the container in BR's `apiserver`
-+                                  type: string
-+                                source:
-+                                  description: ImageMeta is the actual location of
-+                                    the container image
-+                                  properties:
-+                                    imageRepository:
-+                                      description: |-
-+                                        imageRepository sets the container registry to pull images from.
-+                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                      type: string
-+                                    imageTag:
-+                                      description: |-
-+                                        imageTag allows to specify a tag for the image.
-+                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                      type: string
-+                                  type: object
-+                                superpowered:
-+                                  description: Superpowered indicates if the container
-+                                    will be superpowered
-+                                  type: boolean
-+                                userData:
-+                                  description: UserData is the userdata that will
-+                                    be attached to the image.
-+                                  type: string
-+                              required:
-+                              - name
-+                              - source
-+                              - superpowered
-+                              type: object
-+                            type: array
-                           caCertPath:
-                             description: |-
-                               caCertPath is the path to the SSL certificate authority used to
-@@ -2742,6 +2911,93 @@ spec:
+@@ -371,6 +371,99 @@ spec:
                                  minLength: 1
                                  type: string
                              type: object
@@ -1247,24 +1057,29 @@ index 54fc03c0d..58f08f356 100644
 +                              description: BottlerocketHostContainer describes a host
 +                                image for Bottlerocket
 +                              properties:
-+                                imageRepository:
-+                                  description: |-
-+                                    imageRepository sets the container registry to pull images from.
-+                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                  maxLength: 512
-+                                  minLength: 1
-+                                  type: string
-+                                imageTag:
-+                                  description: |-
-+                                    imageTag allows to specify a tag for the image.
-+                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                  maxLength: 256
-+                                  minLength: 1
-+                                  type: string
 +                                name:
 +                                  description: Name is the host container name that
 +                                    will be given to the container in BR's `apiserver`
 +                                  type: string
++                                source:
++                                  description: ImageMeta is the actual location of
++                                    the container image
++                                  properties:
++                                    imageRepository:
++                                      description: |-
++                                        imageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                      maxLength: 512
++                                      minLength: 1
++                                      type: string
++                                    imageTag:
++                                      description: |-
++                                        imageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                      maxLength: 256
++                                      minLength: 1
++                                      type: string
++                                  type: object
 +                                superpowered:
 +                                  description: Superpowered indicates if the container
 +                                    will be superpowered
@@ -1275,13 +1090,14 @@ index 54fc03c0d..58f08f356 100644
 +                                  type: string
 +                              required:
 +                              - name
++                              - source
 +                              - superpowered
 +                              type: object
 +                            type: array
                            caCertificateValidityPeriodDays:
                              description: |-
                                caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4347,6 +4603,99 @@ spec:
+@@ -1801,6 +1894,99 @@ spec:
                                  minLength: 1
                                  type: string
                              type: object
@@ -1381,8 +1197,196 @@ index 54fc03c0d..58f08f356 100644
                            caCertPath:
                              description: |-
                                caCertPath is the path to the SSL certificate authority used to
+@@ -2819,6 +3005,93 @@ spec:
+                                 minLength: 1
+                                 type: string
+                             type: object
++                          bottlerocketCustomBootstrapContainers:
++                            description: |-
++                              BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++                              This is only for bottlerocket.
++                            items:
++                              description: BottlerocketBootstrapContainer holds the
++                                bootstrap container setting for Bottlerocket
++                              properties:
++                                essential:
++                                  description: |-
++                                    Essential decides whether or not the container should fail the boot process.
++                                    Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++                                    Default is false.
++                                  type: boolean
++                                imageRepository:
++                                  description: |-
++                                    imageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                  maxLength: 512
++                                  minLength: 1
++                                  type: string
++                                imageTag:
++                                  description: |-
++                                    imageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                  maxLength: 256
++                                  minLength: 1
++                                  type: string
++                                mode:
++                                  description: Mode represents the bootstrap container
++                                    mode.
++                                  enum:
++                                  - always
++                                  - "off"
++                                  - once
++                                  type: string
++                                name:
++                                  description: Name is the bootstrap container name
++                                    that will be given to the container in BR's `apiserver`.
++                                  type: string
++                                userData:
++                                  description: UserData is the base64-encoded userdata.
++                                  type: string
++                              required:
++                              - mode
++                              - name
++                              type: object
++                            type: array
++                          bottlerocketCustomHostContainers:
++                            description: |-
++                              BottlerocketHostContainers contains the information of any additional images
++                              that we will deploy as host containers in the CPIs
++                            items:
++                              description: BottlerocketHostContainer describes a host
++                                image for Bottlerocket
++                              properties:
++                                imageRepository:
++                                  description: |-
++                                    imageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                  maxLength: 512
++                                  minLength: 1
++                                  type: string
++                                imageTag:
++                                  description: |-
++                                    imageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                  maxLength: 256
++                                  minLength: 1
++                                  type: string
++                                name:
++                                  description: Name is the host container name that
++                                    will be given to the container in BR's `apiserver`
++                                  type: string
++                                superpowered:
++                                  description: Superpowered indicates if the container
++                                    will be superpowered
++                                  type: boolean
++                                userData:
++                                  description: UserData is the userdata that will
++                                    be attached to the image.
++                                  type: string
++                              required:
++                              - name
++                              - superpowered
++                              type: object
++                            type: array
+                           caCertificateValidityPeriodDays:
+                             description: |-
+                               caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4387,6 +4660,93 @@ spec:
+                                 minLength: 1
+                                 type: string
+                             type: object
++                          bottlerocketCustomBootstrapContainers:
++                            description: |-
++                              BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++                              This is only for bottlerocket.
++                            items:
++                              description: BottlerocketBootstrapContainer holds the
++                                bootstrap container setting for Bottlerocket
++                              properties:
++                                essential:
++                                  description: |-
++                                    Essential decides whether or not the container should fail the boot process.
++                                    Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++                                    Default is false.
++                                  type: boolean
++                                imageRepository:
++                                  description: |-
++                                    imageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                  maxLength: 512
++                                  minLength: 1
++                                  type: string
++                                imageTag:
++                                  description: |-
++                                    imageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                  maxLength: 256
++                                  minLength: 1
++                                  type: string
++                                mode:
++                                  description: Mode represents the bootstrap container
++                                    mode.
++                                  enum:
++                                  - always
++                                  - "off"
++                                  - once
++                                  type: string
++                                name:
++                                  description: Name is the bootstrap container name
++                                    that will be given to the container in BR's `apiserver`.
++                                  type: string
++                                userData:
++                                  description: UserData is the base64-encoded userdata.
++                                  type: string
++                              required:
++                              - mode
++                              - name
++                              type: object
++                            type: array
++                          bottlerocketCustomHostContainers:
++                            description: |-
++                              BottlerocketCustomHostContainers contains the information of any additional images
++                              that we will deploy as host containers in the CPIs
++                            items:
++                              description: BottlerocketHostContainer describes a host
++                                image for Bottlerocket
++                              properties:
++                                imageRepository:
++                                  description: |-
++                                    imageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                  maxLength: 512
++                                  minLength: 1
++                                  type: string
++                                imageTag:
++                                  description: |-
++                                    imageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                  maxLength: 256
++                                  minLength: 1
++                                  type: string
++                                name:
++                                  description: Name is the host container name that
++                                    will be given to the container in BR's `apiserver`
++                                  type: string
++                                superpowered:
++                                  description: Superpowered indicates if the container
++                                    will be superpowered
++                                  type: boolean
++                                userData:
++                                  description: UserData is the userdata that will
++                                    be attached to the image.
++                                  type: string
++                              required:
++                              - name
++                              - superpowered
++                              type: object
++                            type: array
+                           caCertPath:
+                             description: |-
+                               caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index f8f1b97cb..04fb96221 100644
+index f8f1b97cb3d1..04fb96221850 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -3,12 +3,6 @@
@@ -1493,7 +1497,7 @@ index f8f1b97cb..04fb96221 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 1acdd341f..473050b6d 100644
+index 1acdd341f5a0..473050b6dcfc 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -23,13 +23,15 @@ const (
@@ -1621,59 +1625,10 @@ index 1acdd341f..473050b6d 100644
  	}
  
  	if len(config.ProxyConfiguration.NoProxy) > 0 {
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 52e6d1087..311f9bcc5 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -544,9 +544,11 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 			},
- 		}
- 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
--			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
--			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
--			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
-+			Pause:                                 scope.Config.Spec.ClusterConfiguration.Pause,
-+			BottlerocketBootstrap:                 scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
-+			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
-+			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
- 		}
- 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -847,9 +849,11 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 		})
- 	case bootstrapv1.Bottlerocket:
- 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
--			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
--			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
--			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
-+			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
-+			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
-+			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
-+			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
- 		}
- 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -1031,9 +1035,11 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		})
- 	case bootstrapv1.Bottlerocket:
- 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
--			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
--			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
--			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
-+			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
-+			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
-+			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
-+			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
- 		}
- 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index 9ac9c8033..c62ca3c2b 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+index 22bbef3cae3d..c746dd5c2015 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -480,6 +480,8 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
  	if err := Convert_v1beta2_RegistryMirrorConfiguration_To_upstreamv1beta3_RegistryMirrorConfiguration(&in.RegistryMirror, &out.RegistryMirror, s); err != nil {
  		return err
@@ -1692,10 +1647,10 @@ index 9ac9c8033..c62ca3c2b 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 2c60ebc7d..322e7d74b 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+index 725c6328cad4..0152a2133e45 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -508,6 +508,8 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
  		return err
  	}
@@ -1714,194 +1669,60 @@ index 2c60ebc7d..322e7d74b 100644
  	if err := Convert_v1beta2_NodeRegistrationOptions_To_upstreamv1beta4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
  		return err
  	}
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index cd6a1a31449e..cb8932dfa884 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -550,9 +550,11 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
+ 			},
+ 		}
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
++			Pause:                                 scope.Config.Spec.ClusterConfiguration.Pause,
++			BottlerocketBootstrap:                 scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
++			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
+ 		}
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
+@@ -857,9 +859,11 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
+ 		})
+ 	case bootstrapv1.Bottlerocket:
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
++			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+@@ -1070,9 +1074,11 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
+ 		})
+ 	case bootstrapv1.Bottlerocket:
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+-			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+-			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
+-			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
++			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
++			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
++			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index d2dee32d0..da4690261 100644
+index 615016d63d18..bdd406758f07 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -394,6 +394,90 @@ spec:
-                         maximum: 1095
-                         minimum: 1
-                         type: integer
-+                      bottlerocketCustomBootstrapContainers:
-+                        description: |-
-+                          BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
-+                          This is only for bottlerocket.
-+                        items:
-+                          description: BottlerocketBootstrapContainer holds the bootstrap
-+                            container setting for Bottlerocket
-+                          properties:
-+                            essential:
-+                              description: |-
-+                                Essential decides whether or not the container should fail the boot process.
-+                                Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
-+                                Default is false.
-+                              type: boolean
-+                            imageRepository:
-+                              description: |-
-+                                imageRepository sets the container registry to pull images from.
-+                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                              type: string
-+                            imageTag:
-+                              description: |-
-+                                imageTag allows to specify a tag for the image.
-+                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                              type: string
-+                            mode:
-+                              description: Mode represents the bootstrap container mode.
-+                              enum:
-+                              - always
-+                              - "off"
-+                              - once
-+                              type: string
-+                            name:
-+                              description: Name is the bootstrap container name that will
-+                                be given to the container in BR's `apiserver`.
-+                              type: string
-+                            userData:
-+                              description: UserData is the base64-encoded userdata.
-+                              type: string
-+                          required:
-+                          - mode
-+                          - name
-+                          type: object
-+                        type: array
-+                      bottlerocketCustomHostContainers:
-+                        description: |-
-+                          BottlerocketHostContainers contains the information of any additional images
-+                          that we will deploy as host containers in the CPIs
-+                        items:
-+                          description: BottlerocketHostContainer describes a host image
-+                            for Bottlerocket
-+                          properties:
-+                            name:
-+                              description: Name is the host container name that will be
-+                                given to the container in BR's `apiserver`
-+                              type: string
-+                            source:
-+                              description: ImageMeta is the actual location of the container
-+                                image
-+                              properties:
-+                                imageRepository:
-+                                  description: |-
-+                                    imageRepository sets the container registry to pull images from.
-+                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                  type: string
-+                                imageTag:
-+                                  description: |-
-+                                    imageTag allows to specify a tag for the image.
-+                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                  type: string
-+                              type: object
-+                            superpowered:
-+                              description: Superpowered indicates if the container will
-+                                be superpowered
-+                              type: boolean
-+                            userData:
-+                              description: UserData is the userdata that will be attached
-+                                to the image.
-+                              type: string
-+                          required:
-+                          - name
-+                          - source
-+                          - superpowered
-+                          type: object
-+                        type: array
-                       certificatesDir:
-                         description: |-
-                           certificatesDir specifies where to store or look for all required certificates.
-@@ -1770,6 +1854,91 @@ spec:
-                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                             type: string
-                         type: object
-+                      bottlerocketCustomBootstrapContainers:
-+                        description: |-
-+                          BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
-+                          This is only for bottlerocket.
-+                        items:
-+                          description: BottlerocketBootstrapContainer holds the bootstrap
-+                            container setting for Bottlerocket
-+                          properties:
-+                            essential:
-+                              description: |-
-+                                Essential decides whether or not the container should fail the boot process.
-+                                Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
-+                                Default is false.
-+                              type: boolean
-+                            imageRepository:
-+                              description: |-
-+                                imageRepository sets the container registry to pull images from.
-+                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                              type: string
-+                            imageTag:
-+                              description: |-
-+                                imageTag allows to specify a tag for the image.
-+                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                              type: string
-+                            mode:
-+                              description: Mode represents the bootstrap container
-+                                mode.
-+                              enum:
-+                              - always
-+                              - "off"
-+                              - once
-+                              type: string
-+                            name:
-+                              description: Name is the bootstrap container name that
-+                                will be given to the container in BR's `apiserver`.
-+                              type: string
-+                            userData:
-+                              description: UserData is the base64-encoded userdata.
-+                              type: string
-+                          required:
-+                          - mode
-+                          - name
-+                          type: object
-+                        type: array
-+                      bottlerocketCustomHostContainers:
-+                        description: |-
-+                          BottlerocketCustomHostContainers contains the information of any additional images
-+                          that we will deploy as host containers in the CPIs
-+                        items:
-+                          description: BottlerocketHostContainer describes a host
-+                            image for Bottlerocket
-+                          properties:
-+                            name:
-+                              description: Name is the host container name that will
-+                                be given to the container in BR's `apiserver`
-+                              type: string
-+                            source:
-+                              description: ImageMeta is the actual location of the
-+                                container image
-+                              properties:
-+                                imageRepository:
-+                                  description: |-
-+                                    imageRepository sets the container registry to pull images from.
-+                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                  type: string
-+                                imageTag:
-+                                  description: |-
-+                                    imageTag allows to specify a tag for the image.
-+                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                  type: string
-+                              type: object
-+                            superpowered:
-+                              description: Superpowered indicates if the container
-+                                will be superpowered
-+                              type: boolean
-+                            userData:
-+                              description: UserData is the userdata that will be attached
-+                                to the image.
-+                              type: string
-+                          required:
-+                          - name
-+                          - source
-+                          - superpowered
-+                          type: object
-+                        type: array
-                       caCertPath:
-                         description: |-
-                           caCertPath is the path to the SSL certificate authority used to
-@@ -3338,6 +3507,93 @@ spec:
+@@ -384,6 +384,99 @@ spec:
                              minLength: 1
                              type: string
                          type: object
@@ -1961,24 +1782,29 @@ index d2dee32d0..da4690261 100644
 +                          description: BottlerocketHostContainer describes a host
 +                            image for Bottlerocket
 +                          properties:
-+                            imageRepository:
-+                              description: |-
-+                                imageRepository sets the container registry to pull images from.
-+                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                              maxLength: 512
-+                              minLength: 1
-+                              type: string
-+                            imageTag:
-+                              description: |-
-+                                imageTag allows to specify a tag for the image.
-+                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                              maxLength: 256
-+                              minLength: 1
-+                              type: string
 +                            name:
 +                              description: Name is the host container name that will
 +                                be given to the container in BR's `apiserver`
 +                              type: string
++                            source:
++                              description: ImageMeta is the actual location of the
++                                container image
++                              properties:
++                                imageRepository:
++                                  description: |-
++                                    imageRepository sets the container registry to pull images from.
++                                    if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                  maxLength: 512
++                                  minLength: 1
++                                  type: string
++                                imageTag:
++                                  description: |-
++                                    imageTag allows to specify a tag for the image.
++                                    In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                  maxLength: 256
++                                  minLength: 1
++                                  type: string
++                              type: object
 +                            superpowered:
 +                              description: Superpowered indicates if the container
 +                                will be superpowered
@@ -1989,13 +1815,14 @@ index d2dee32d0..da4690261 100644
 +                              type: string
 +                          required:
 +                          - name
++                          - source
 +                          - superpowered
 +                          type: object
 +                        type: array
                        caCertificateValidityPeriodDays:
                          description: |-
                            caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4926,6 +5182,99 @@ spec:
+@@ -1798,6 +1891,99 @@ spec:
                              minLength: 1
                              type: string
                          type: object
@@ -2095,197 +1922,199 @@ index d2dee32d0..da4690261 100644
                        caCertPath:
                          description: |-
                            caCertPath is the path to the SSL certificate authority used to
+@@ -3440,6 +3626,93 @@ spec:
+                             minLength: 1
+                             type: string
+                         type: object
++                      bottlerocketCustomBootstrapContainers:
++                        description: |-
++                          BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++                          This is only for bottlerocket.
++                        items:
++                          description: BottlerocketBootstrapContainer holds the bootstrap
++                            container setting for Bottlerocket
++                          properties:
++                            essential:
++                              description: |-
++                                Essential decides whether or not the container should fail the boot process.
++                                Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++                                Default is false.
++                              type: boolean
++                            imageRepository:
++                              description: |-
++                                imageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                              maxLength: 512
++                              minLength: 1
++                              type: string
++                            imageTag:
++                              description: |-
++                                imageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                              maxLength: 256
++                              minLength: 1
++                              type: string
++                            mode:
++                              description: Mode represents the bootstrap container
++                                mode.
++                              enum:
++                              - always
++                              - "off"
++                              - once
++                              type: string
++                            name:
++                              description: Name is the bootstrap container name that
++                                will be given to the container in BR's `apiserver`.
++                              type: string
++                            userData:
++                              description: UserData is the base64-encoded userdata.
++                              type: string
++                          required:
++                          - mode
++                          - name
++                          type: object
++                        type: array
++                      bottlerocketCustomHostContainers:
++                        description: |-
++                          BottlerocketHostContainers contains the information of any additional images
++                          that we will deploy as host containers in the CPIs
++                        items:
++                          description: BottlerocketHostContainer describes a host
++                            image for Bottlerocket
++                          properties:
++                            imageRepository:
++                              description: |-
++                                imageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                              maxLength: 512
++                              minLength: 1
++                              type: string
++                            imageTag:
++                              description: |-
++                                imageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                              maxLength: 256
++                              minLength: 1
++                              type: string
++                            name:
++                              description: Name is the host container name that will
++                                be given to the container in BR's `apiserver`
++                              type: string
++                            superpowered:
++                              description: Superpowered indicates if the container
++                                will be superpowered
++                              type: boolean
++                            userData:
++                              description: UserData is the userdata that will be attached
++                                to the image.
++                              type: string
++                          required:
++                          - name
++                          - superpowered
++                          type: object
++                        type: array
+                       caCertificateValidityPeriodDays:
+                         description: |-
+                           caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4991,6 +5264,93 @@ spec:
+                             minLength: 1
+                             type: string
+                         type: object
++                      bottlerocketCustomBootstrapContainers:
++                        description: |-
++                          BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++                          This is only for bottlerocket.
++                        items:
++                          description: BottlerocketBootstrapContainer holds the bootstrap
++                            container setting for Bottlerocket
++                          properties:
++                            essential:
++                              description: |-
++                                Essential decides whether or not the container should fail the boot process.
++                                Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++                                Default is false.
++                              type: boolean
++                            imageRepository:
++                              description: |-
++                                imageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                              maxLength: 512
++                              minLength: 1
++                              type: string
++                            imageTag:
++                              description: |-
++                                imageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                              maxLength: 256
++                              minLength: 1
++                              type: string
++                            mode:
++                              description: Mode represents the bootstrap container
++                                mode.
++                              enum:
++                              - always
++                              - "off"
++                              - once
++                              type: string
++                            name:
++                              description: Name is the bootstrap container name that
++                                will be given to the container in BR's `apiserver`.
++                              type: string
++                            userData:
++                              description: UserData is the base64-encoded userdata.
++                              type: string
++                          required:
++                          - mode
++                          - name
++                          type: object
++                        type: array
++                      bottlerocketCustomHostContainers:
++                        description: |-
++                          BottlerocketCustomHostContainers contains the information of any additional images
++                          that we will deploy as host containers in the CPIs
++                        items:
++                          description: BottlerocketHostContainer describes a host
++                            image for Bottlerocket
++                          properties:
++                            imageRepository:
++                              description: |-
++                                imageRepository sets the container registry to pull images from.
++                                if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                              maxLength: 512
++                              minLength: 1
++                              type: string
++                            imageTag:
++                              description: |-
++                                imageTag allows to specify a tag for the image.
++                                In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                              maxLength: 256
++                              minLength: 1
++                              type: string
++                            name:
++                              description: Name is the host container name that will
++                                be given to the container in BR's `apiserver`
++                              type: string
++                            superpowered:
++                              description: Superpowered indicates if the container
++                                will be superpowered
++                              type: boolean
++                            userData:
++                              description: UserData is the userdata that will be attached
++                                to the image.
++                              type: string
++                          required:
++                          - name
++                          - superpowered
++                          type: object
++                        type: array
+                       caCertPath:
+                         description: |-
+                           caCertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 14e2a3831..2c5e1bfd0 100644
+index 196dc0e81a13..83584ca09939 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -389,6 +389,90 @@ spec:
-                                 maximum: 1095
-                                 minimum: 1
-                                 type: integer
-+                              bottlerocketCustomBootstrapContainers:
-+                                description: |-
-+                                  BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
-+                                  This is only for bottlerocket.
-+                                items:
-+                                  description: BottlerocketBootstrapContainer holds the bootstrap
-+                                    container setting for Bottlerocket
-+                                  properties:
-+                                    essential:
-+                                      description: |-
-+                                        Essential decides whether or not the container should fail the boot process.
-+                                        Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
-+                                        Default is false.
-+                                      type: boolean
-+                                    imageRepository:
-+                                      description: |-
-+                                        imageRepository sets the container registry to pull images from.
-+                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                      type: string
-+                                    imageTag:
-+                                      description: |-
-+                                        imageTag allows to specify a tag for the image.
-+                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                      type: string
-+                                    mode:
-+                                      description: Mode represents the bootstrap container mode.
-+                                      enum:
-+                                      - always
-+                                      - "off"
-+                                      - once
-+                                      type: string
-+                                    name:
-+                                      description: Name is the bootstrap container name that will
-+                                        be given to the container in BR's `apiserver`.
-+                                      type: string
-+                                    userData:
-+                                      description: UserData is the base64-encoded userdata.
-+                                      type: string
-+                                  required:
-+                                  - mode
-+                                  - name
-+                                  type: object
-+                                type: array
-+                              bottlerocketCustomHostContainers:
-+                                description: |-
-+                                  BottlerocketHostContainers contains the information of any additional images
-+                                  that we will deploy as host containers in the CPIs
-+                                items:
-+                                  description: BottlerocketHostContainer describes a host image
-+                                    for Bottlerocket
-+                                  properties:
-+                                    name:
-+                                      description: Name is the host container name that will be
-+                                        given to the container in BR's `apiserver`
-+                                      type: string
-+                                    source:
-+                                      description: ImageMeta is the actual location of the container
-+                                        image
-+                                      properties:
-+                                        imageRepository:
-+                                          description: |-
-+                                            imageRepository sets the container registry to pull images from.
-+                                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                          type: string
-+                                        imageTag:
-+                                          description: |-
-+                                            imageTag allows to specify a tag for the image.
-+                                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                          type: string
-+                                      type: object
-+                                    superpowered:
-+                                      description: Superpowered indicates if the container will
-+                                        be superpowered
-+                                      type: boolean
-+                                    userData:
-+                                      description: UserData is the userdata that will be attached
-+                                        to the image.
-+                                      type: string
-+                                  required:
-+                                  - name
-+                                  - source
-+                                  - superpowered
-+                                  type: object
-+                                type: array
-                               certificatesDir:
-                                 description: |-
-                                   certificatesDir specifies where to store or look for all required certificates.
-@@ -1796,6 +1880,94 @@ spec:
-                                       In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                                     type: string
-                                 type: object
-+                              bottlerocketCustomBootstrapContainers:
-+                                description: |-
-+                                  BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
-+                                  This is only for bottlerocket.
-+                                items:
-+                                  description: BottlerocketBootstrapContainer holds
-+                                    the bootstrap container setting for Bottlerocket
-+                                  properties:
-+                                    essential:
-+                                      description: |-
-+                                        Essential decides whether or not the container should fail the boot process.
-+                                        Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
-+                                        Default is false.
-+                                      type: boolean
-+                                    imageRepository:
-+                                      description: |-
-+                                        imageRepository sets the container registry to pull images from.
-+                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                      type: string
-+                                    imageTag:
-+                                      description: |-
-+                                        imageTag allows to specify a tag for the image.
-+                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                      type: string
-+                                    mode:
-+                                      description: Mode represents the bootstrap container
-+                                        mode.
-+                                      enum:
-+                                      - always
-+                                      - "off"
-+                                      - once
-+                                      type: string
-+                                    name:
-+                                      description: Name is the bootstrap container
-+                                        name that will be given to the container in
-+                                        BR's `apiserver`.
-+                                      type: string
-+                                    userData:
-+                                      description: UserData is the base64-encoded
-+                                        userdata.
-+                                      type: string
-+                                  required:
-+                                  - mode
-+                                  - name
-+                                  type: object
-+                                type: array
-+                              bottlerocketCustomHostContainers:
-+                                description: |-
-+                                  BottlerocketCustomHostContainers contains the information of any additional images
-+                                  that we will deploy as host containers in the CPIs
-+                                items:
-+                                  description: BottlerocketHostContainer describes
-+                                    a host image for Bottlerocket
-+                                  properties:
-+                                    name:
-+                                      description: Name is the host container name
-+                                        that will be given to the container in BR's
-+                                        `apiserver`
-+                                      type: string
-+                                    source:
-+                                      description: ImageMeta is the actual location
-+                                        of the container image
-+                                      properties:
-+                                        imageRepository:
-+                                          description: |-
-+                                            imageRepository sets the container registry to pull images from.
-+                                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                          type: string
-+                                        imageTag:
-+                                          description: |-
-+                                            imageTag allows to specify a tag for the image.
-+                                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                          type: string
-+                                      type: object
-+                                    superpowered:
-+                                      description: Superpowered indicates if the container
-+                                        will be superpowered
-+                                      type: boolean
-+                                    userData:
-+                                      description: UserData is the userdata that will
-+                                        be attached to the image.
-+                                      type: string
-+                                  required:
-+                                  - name
-+                                  - source
-+                                  - superpowered
-+                                  type: object
-+                                type: array
-                               caCertPath:
-                                 description: |-
-                                   caCertPath is the path to the SSL certificate authority used to
-@@ -3019,6 +3191,96 @@ spec:
+@@ -379,6 +379,102 @@ spec:
                                      minLength: 1
                                      type: string
                                  type: object
@@ -2347,25 +2176,30 @@ index 14e2a3831..2c5e1bfd0 100644
 +                                  description: BottlerocketHostContainer describes
 +                                    a host image for Bottlerocket
 +                                  properties:
-+                                    imageRepository:
-+                                      description: |-
-+                                        imageRepository sets the container registry to pull images from.
-+                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                      maxLength: 512
-+                                      minLength: 1
-+                                      type: string
-+                                    imageTag:
-+                                      description: |-
-+                                        imageTag allows to specify a tag for the image.
-+                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                      maxLength: 256
-+                                      minLength: 1
-+                                      type: string
 +                                    name:
 +                                      description: Name is the host container name
 +                                        that will be given to the container in BR's
 +                                        `apiserver`
 +                                      type: string
++                                    source:
++                                      description: ImageMeta is the actual location
++                                        of the container image
++                                      properties:
++                                        imageRepository:
++                                          description: |-
++                                            imageRepository sets the container registry to pull images from.
++                                            if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                          maxLength: 512
++                                          minLength: 1
++                                          type: string
++                                        imageTag:
++                                          description: |-
++                                            imageTag allows to specify a tag for the image.
++                                            In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                          maxLength: 256
++                                          minLength: 1
++                                          type: string
++                                      type: object
 +                                    superpowered:
 +                                      description: Superpowered indicates if the container
 +                                        will be superpowered
@@ -2376,13 +2210,14 @@ index 14e2a3831..2c5e1bfd0 100644
 +                                      type: string
 +                                  required:
 +                                  - name
++                                  - source
 +                                  - superpowered
 +                                  type: object
 +                                type: array
                                caCertificateValidityPeriodDays:
                                  description: |-
                                    caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4644,6 +4906,102 @@ spec:
+@@ -1824,6 +1920,102 @@ spec:
                                      minLength: 1
                                      type: string
                                  type: object
@@ -2485,6 +2320,200 @@ index 14e2a3831..2c5e1bfd0 100644
                                caCertPath:
                                  description: |-
                                    caCertPath is the path to the SSL certificate authority used to
+@@ -3096,6 +3288,96 @@ spec:
+                                     minLength: 1
+                                     type: string
+                                 type: object
++                              bottlerocketCustomBootstrapContainers:
++                                description: |-
++                                  BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++                                  This is only for bottlerocket.
++                                items:
++                                  description: BottlerocketBootstrapContainer holds
++                                    the bootstrap container setting for Bottlerocket
++                                  properties:
++                                    essential:
++                                      description: |-
++                                        Essential decides whether or not the container should fail the boot process.
++                                        Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++                                        Default is false.
++                                      type: boolean
++                                    imageRepository:
++                                      description: |-
++                                        imageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                      maxLength: 512
++                                      minLength: 1
++                                      type: string
++                                    imageTag:
++                                      description: |-
++                                        imageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                      maxLength: 256
++                                      minLength: 1
++                                      type: string
++                                    mode:
++                                      description: Mode represents the bootstrap container
++                                        mode.
++                                      enum:
++                                      - always
++                                      - "off"
++                                      - once
++                                      type: string
++                                    name:
++                                      description: Name is the bootstrap container
++                                        name that will be given to the container in
++                                        BR's `apiserver`.
++                                      type: string
++                                    userData:
++                                      description: UserData is the base64-encoded
++                                        userdata.
++                                      type: string
++                                  required:
++                                  - mode
++                                  - name
++                                  type: object
++                                type: array
++                              bottlerocketCustomHostContainers:
++                                description: |-
++                                  BottlerocketHostContainers contains the information of any additional images
++                                  that we will deploy as host containers in the CPIs
++                                items:
++                                  description: BottlerocketHostContainer describes
++                                    a host image for Bottlerocket
++                                  properties:
++                                    imageRepository:
++                                      description: |-
++                                        imageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                      maxLength: 512
++                                      minLength: 1
++                                      type: string
++                                    imageTag:
++                                      description: |-
++                                        imageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                      maxLength: 256
++                                      minLength: 1
++                                      type: string
++                                    name:
++                                      description: Name is the host container name
++                                        that will be given to the container in BR's
++                                        `apiserver`
++                                      type: string
++                                    superpowered:
++                                      description: Superpowered indicates if the container
++                                        will be superpowered
++                                      type: boolean
++                                    userData:
++                                      description: UserData is the userdata that will
++                                        be attached to the image.
++                                      type: string
++                                  required:
++                                  - name
++                                  - superpowered
++                                  type: object
++                                type: array
+                               caCertificateValidityPeriodDays:
+                                 description: |-
+                                   caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4684,6 +4966,96 @@ spec:
+                                     minLength: 1
+                                     type: string
+                                 type: object
++                              bottlerocketCustomBootstrapContainers:
++                                description: |-
++                                  BottlerocketCustomBootstrapContainers adds additional bootstrap containers for Bottlerocket.
++                                  This is only for bottlerocket.
++                                items:
++                                  description: BottlerocketBootstrapContainer holds
++                                    the bootstrap container setting for Bottlerocket
++                                  properties:
++                                    essential:
++                                      description: |-
++                                        Essential decides whether or not the container should fail the boot process.
++                                        Bootstrap containers configured with essential = true will stop the boot process if they exit code is a non-zero value.
++                                        Default is false.
++                                      type: boolean
++                                    imageRepository:
++                                      description: |-
++                                        imageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                      maxLength: 512
++                                      minLength: 1
++                                      type: string
++                                    imageTag:
++                                      description: |-
++                                        imageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                      maxLength: 256
++                                      minLength: 1
++                                      type: string
++                                    mode:
++                                      description: Mode represents the bootstrap container
++                                        mode.
++                                      enum:
++                                      - always
++                                      - "off"
++                                      - once
++                                      type: string
++                                    name:
++                                      description: Name is the bootstrap container
++                                        name that will be given to the container in
++                                        BR's `apiserver`.
++                                      type: string
++                                    userData:
++                                      description: UserData is the base64-encoded
++                                        userdata.
++                                      type: string
++                                  required:
++                                  - mode
++                                  - name
++                                  type: object
++                                type: array
++                              bottlerocketCustomHostContainers:
++                                description: |-
++                                  BottlerocketCustomHostContainers contains the information of any additional images
++                                  that we will deploy as host containers in the CPIs
++                                items:
++                                  description: BottlerocketHostContainer describes
++                                    a host image for Bottlerocket
++                                  properties:
++                                    imageRepository:
++                                      description: |-
++                                        imageRepository sets the container registry to pull images from.
++                                        if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                      maxLength: 512
++                                      minLength: 1
++                                      type: string
++                                    imageTag:
++                                      description: |-
++                                        imageTag allows to specify a tag for the image.
++                                        In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                      maxLength: 256
++                                      minLength: 1
++                                      type: string
++                                    name:
++                                      description: Name is the host container name
++                                        that will be given to the container in BR's
++                                        `apiserver`
++                                      type: string
++                                    superpowered:
++                                      description: Superpowered indicates if the container
++                                        will be superpowered
++                                      type: boolean
++                                    userData:
++                                      description: UserData is the userdata that will
++                                        be attached to the image.
++                                      type: string
++                                  required:
++                                  - name
++                                  - superpowered
++                                  type: object
++                                type: array
+                               caCertPath:
+                                 description: |-
+                                   caCertPath is the path to the SSL certificate authority used to
 -- 
-2.48.1
+2.47.3
 

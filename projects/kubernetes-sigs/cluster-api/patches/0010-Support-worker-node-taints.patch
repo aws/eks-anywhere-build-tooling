@@ -1,7 +1,7 @@
-From 7e6df687b721be7a8e1393331adc872e350d8f11 Mon Sep 17 00:00:00 2001
+From eca4bb93759f4bcce413be91a7665ada57136d56 Mon Sep 17 00:00:00 2001
 From: Daniel Budris <budris@amazon.com>
 Date: Fri, 17 Dec 2021 13:38:39 -0800
-Subject: [PATCH] Support worker node taints
+Subject: [PATCH 10/36] Support worker node taints
 
 seperate taints template into its own template
 
@@ -12,14 +12,9 @@ add taints to BottlerocketSettingsInput
 add template parsing to node userdata generation
 
 account for multiple value:effect mappings in each taint key
----
- .../internal/bottlerocket/bootstrap.go        | 11 ++++++
- .../internal/bottlerocket/bottlerocket.go     | 36 +++++++++++++++++++
- .../controllers/kubeadmconfig_controller.go   |  3 ++
- 3 files changed, 50 insertions(+)
 
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index 3ebb9240a..dd769a78d 100644
+index 3ebb9240aaa8..dd769a78d445 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -18,6 +18,7 @@ server-tls-bootstrap = false
@@ -54,7 +49,7 @@ index 3ebb9240a..dd769a78d 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 245c3addd..6eb8ae6ad 100644
+index 245c3adddffa..6eb8ae6ad368 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -28,6 +28,7 @@ type BottlerocketConfig struct {
@@ -128,11 +123,11 @@ index 245c3addd..6eb8ae6ad 100644
  func parseNodeLabels(nodeLabels string) string {
  	if nodeLabels == "" {
  		return ""
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 8bb6f9975..ac774b701 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -855,6 +855,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index 92097e1b39ba..f3a3ebf4d6e9 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -865,6 +865,9 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
  		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
  			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
  		}
@@ -143,5 +138,5 @@ index 8bb6f9975..ac774b701 100644
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
 -- 
-2.48.1
+2.47.3
 

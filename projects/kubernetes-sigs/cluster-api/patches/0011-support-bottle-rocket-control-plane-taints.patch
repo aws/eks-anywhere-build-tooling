@@ -1,38 +1,14 @@
-From 888c7b19617a38caada82465e85a0d5490c0532b Mon Sep 17 00:00:00 2001
+From f2996246d763efbc72b76168371c7554d71271af Mon Sep 17 00:00:00 2001
 From: danbudris <budris@amazon.com>
 Date: Fri, 18 Feb 2022 09:24:32 -0500
-Subject: [PATCH] support bottle rocket control plane taints
+Subject: [PATCH 11/36] support bottle rocket control plane taints
 
----
- api/bootstrap/kubeadm/v1beta1/conversion.go   | 12 ++++
- .../kubeadm/v1beta1/kubeadm_types.go          | 17 +++++
- .../v1beta1/zz_generated.conversion.go        | 33 +++++++++
- .../kubeadm/v1beta1/zz_generated.deepcopy.go  | 18 +++++
- .../kubeadm/v1beta2/kubeadm_types.go          | 30 ++++++++
- .../kubeadm/v1beta2/zz_generated.deepcopy.go  | 17 +++++
- ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 72 +++++++++++++++++++
- ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 72 +++++++++++++++++++
- .../internal/bottlerocket/bootstrap.go        | 12 ++++
- .../internal/bottlerocket/bottlerocket.go     | 10 +++
- .../controllers/kubeadmconfig_controller.go   |  9 +++
- .../types/upstreamv1beta3/conversion.go       | 12 ++++
- .../kubeadm/types/upstreamv1beta3/types.go    | 17 +++++
- .../zz_generated.conversion.go                | 33 +++++++++
- .../upstreamv1beta3/zz_generated.deepcopy.go  | 18 +++++
- .../zz_generated.conversion.go                |  2 +
- bootstrap/kubeadm/types/utils_test.go         | 17 ++++-
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 72 +++++++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 72 +++++++++++++++++++
- .../internal/workload_cluster_coredns_test.go |  5 ++
- .../internal/workload_cluster_etcd_test.go    | 10 +++
- .../kubeadm/internal/workload_cluster_test.go | 29 ++++++++
- 22 files changed, 588 insertions(+), 1 deletion(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index a4c2d7a21..25dbea9b5 100644
+index 5e9bc2073629..024eec83fb16 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
-@@ -676,6 +676,18 @@ func Convert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *
+@@ -415,6 +415,18 @@ func Convert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(in *
  	return nil
  }
  
@@ -52,10 +28,10 @@ index a4c2d7a21..25dbea9b5 100644
  	if in.Local != nil {
  		if err := Convert_v1beta1_LocalEtcd_To_v1beta2_LocalEtcd(in.Local, &out.Local, s); err != nil {
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index 4a4297512..2484e65fc 100644
+index 771cde26c0bc..7602cd531e50 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-@@ -104,6 +104,11 @@ type ClusterConfiguration struct {
+@@ -103,6 +103,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -67,7 +43,7 @@ index 4a4297512..2484e65fc 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
-@@ -238,6 +243,13 @@ type BottlerocketBootstrap struct {
+@@ -237,6 +242,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
  
@@ -81,7 +57,7 @@ index 4a4297512..2484e65fc 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -613,6 +625,11 @@ type JoinConfiguration struct {
+@@ -612,6 +624,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -94,7 +70,7 @@ index 4a4297512..2484e65fc 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index ad933129c..eeb3cd593 100644
+index 41430097247a..9d4bdc45a4f4 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -360,6 +360,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -159,7 +135,7 @@ index ad933129c..eeb3cd593 100644
  	if err := Convert_v1beta2_ProxyConfiguration_To_v1beta1_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1171,6 +1198,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+@@ -1173,6 +1200,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -169,7 +145,7 @@ index ad933129c..eeb3cd593 100644
  	if err := Convert_v1beta1_ProxyConfiguration_To_v1beta2_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-@@ -1197,6 +1227,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+@@ -1199,6 +1229,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
  	if err := Convert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -180,7 +156,7 @@ index ad933129c..eeb3cd593 100644
  		return err
  	}
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index e7c8792cd..50d699279 100644
+index e7c8792cd829..50d6992797fa 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -158,12 +158,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -222,10 +198,10 @@ index e7c8792cd..50d699279 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index fcbc40457..1300e12c5 100644
+index d6a858d79049..ae627be3875f 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -164,6 +164,11 @@ type ClusterConfiguration struct {
+@@ -163,6 +163,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -237,7 +213,7 @@ index fcbc40457..1300e12c5 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
-@@ -297,6 +302,26 @@ type BottlerocketBootstrap struct {
+@@ -296,6 +301,26 @@ type BottlerocketBootstrap struct {
  	// TODO: evaluate if we need also a ImageName based on user feedbacks
  }
  
@@ -264,7 +240,7 @@ index fcbc40457..1300e12c5 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -703,6 +728,11 @@ type JoinConfiguration struct {
+@@ -702,6 +727,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -277,7 +253,7 @@ index fcbc40457..1300e12c5 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index c4881a0d4..5089f42fa 100644
+index c4881a0d4490..5089f42fac90 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -194,11 +194,27 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
@@ -317,56 +293,10 @@ index c4881a0d4..5089f42fa 100644
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index 82ea07872..1c2180925 100644
+index 7ec7369be55c..edaf3a7671f6 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -314,6 +314,22 @@ spec:
-                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                         type: string
-                     type: object
-+                  bottlerocketControl:
-+                    description: |-
-+                      BottlerocketControl holds the image source for control container
-+                      This is only for bottlerocket
-+                    properties:
-+                      imageRepository:
-+                        description: |-
-+                          imageRepository sets the container registry to pull images from.
-+                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                        type: string
-+                      imageTag:
-+                        description: |-
-+                          imageTag allows to specify a tag for the image.
-+                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                        type: string
-+                    type: object
-                   caCertificateValidityPeriodDays:
-                     description: |-
-                       caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -1677,6 +1693,22 @@ spec:
-                           In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                         type: string
-                     type: object
-+                  bottlerocketControl:
-+                    description: |-
-+                      BottlerocketControl holds the image source for control container
-+                      This is only for bottlerocket
-+                    properties:
-+                      imageRepository:
-+                        description: |-
-+                          imageRepository sets the container registry to pull images from.
-+                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                        type: string
-+                      imageTag:
-+                        description: |-
-+                          imageTag allows to specify a tag for the image.
-+                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                        type: string
-+                    type: object
-                   caCertPath:
-                     description: |-
-                       caCertPath is the path to the SSL certificate authority used to
-@@ -2732,6 +2764,26 @@ spec:
+@@ -318,6 +318,26 @@ spec:
                          minLength: 1
                          type: string
                      type: object
@@ -393,7 +323,61 @@ index 82ea07872..1c2180925 100644
                    caCertificateValidityPeriodDays:
                      description: |-
                        caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4285,6 +4337,26 @@ spec:
+@@ -1697,6 +1717,26 @@ spec:
+                         minLength: 1
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: |-
++                      BottlerocketControl holds the image source for control container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          imageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        maxLength: 512
++                        minLength: 1
++                        type: string
++                      imageTag:
++                        description: |-
++                          imageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        maxLength: 256
++                        minLength: 1
++                        type: string
++                    type: object
+                   caCertPath:
+                     description: |-
+                       caCertPath is the path to the SSL certificate authority used to
+@@ -2799,6 +2839,26 @@ spec:
+                         minLength: 1
+                         type: string
+                     type: object
++                  bottlerocketControl:
++                    description: |-
++                      BottlerocketControl holds the image source for control container
++                      This is only for bottlerocket
++                    properties:
++                      imageRepository:
++                        description: |-
++                          imageRepository sets the container registry to pull images from.
++                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        maxLength: 512
++                        minLength: 1
++                        type: string
++                      imageTag:
++                        description: |-
++                          imageTag allows to specify a tag for the image.
++                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        maxLength: 256
++                        minLength: 1
++                        type: string
++                    type: object
+                   caCertificateValidityPeriodDays:
+                     description: |-
+                       caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4317,6 +4377,26 @@ spec:
                          minLength: 1
                          type: string
                      type: object
@@ -421,56 +405,10 @@ index 82ea07872..1c2180925 100644
                      description: |-
                        caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 373cd2c4d..54fc03c0d 100644
+index 8b36fc497e8f..adc40a577e01 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -347,6 +347,22 @@ spec:
-                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                                 type: string
-                             type: object
-+                          bottlerocketControl:
-+                            description: |-
-+                              BottlerocketControl holds the image source for control container
-+                              This is only for bottlerocket
-+                            properties:
-+                              imageRepository:
-+                                description: |-
-+                                  imageRepository sets the container registry to pull images from.
-+                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                type: string
-+                              imageTag:
-+                                description: |-
-+                                  imageTag allows to specify a tag for the image.
-+                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                type: string
-+                            type: object
-                           caCertificateValidityPeriodDays:
-                             description: |-
-                               caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -1741,6 +1757,22 @@ spec:
-                                   In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                                 type: string
-                             type: object
-+                          bottlerocketControl:
-+                            description: |-
-+                              BottlerocketControl holds the image source for control container
-+                              This is only for bottlerocket
-+                            properties:
-+                              imageRepository:
-+                                description: |-
-+                                  imageRepository sets the container registry to pull images from.
-+                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                type: string
-+                              imageTag:
-+                                description: |-
-+                                  imageTag allows to specify a tag for the image.
-+                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                type: string
-+                            type: object
-                           caCertPath:
-                             description: |-
-                               caCertPath is the path to the SSL certificate authority used to
-@@ -2690,6 +2722,26 @@ spec:
+@@ -351,6 +351,26 @@ spec:
                                  minLength: 1
                                  type: string
                              type: object
@@ -497,7 +435,61 @@ index 373cd2c4d..54fc03c0d 100644
                            caCertificateValidityPeriodDays:
                              description: |-
                                caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4275,6 +4327,26 @@ spec:
+@@ -1761,6 +1781,26 @@ spec:
+                                 minLength: 1
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: |-
++                              BottlerocketControl holds the image source for control container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  imageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                maxLength: 512
++                                minLength: 1
++                                type: string
++                              imageTag:
++                                description: |-
++                                  imageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                maxLength: 256
++                                minLength: 1
++                                type: string
++                            type: object
+                           caCertPath:
+                             description: |-
+                               caCertPath is the path to the SSL certificate authority used to
+@@ -2759,6 +2799,26 @@ spec:
+                                 minLength: 1
+                                 type: string
+                             type: object
++                          bottlerocketControl:
++                            description: |-
++                              BottlerocketControl holds the image source for control container
++                              This is only for bottlerocket
++                            properties:
++                              imageRepository:
++                                description: |-
++                                  imageRepository sets the container registry to pull images from.
++                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                maxLength: 512
++                                minLength: 1
++                                type: string
++                              imageTag:
++                                description: |-
++                                  imageTag allows to specify a tag for the image.
++                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                maxLength: 256
++                                minLength: 1
++                                type: string
++                            type: object
+                           caCertificateValidityPeriodDays:
+                             description: |-
+                               caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4307,6 +4367,26 @@ spec:
                                  minLength: 1
                                  type: string
                              type: object
@@ -525,7 +517,7 @@ index 373cd2c4d..54fc03c0d 100644
                              description: |-
                                caCertPath is the path to the SSL certificate authority used to
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index dd769a78d..f8f1b97cb 100644
+index dd769a78d445..f8f1b97cb3d1 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -53,6 +53,14 @@ trusted=true
@@ -554,7 +546,7 @@ index dd769a78d..f8f1b97cb 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 6eb8ae6ad..1acdd341f 100644
+index 6eb8ae6ad368..1acdd341f5a0 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -25,6 +25,7 @@ const (
@@ -595,58 +587,10 @@ index 6eb8ae6ad..1acdd341f 100644
  	if len(config.ProxyConfiguration.NoProxy) > 0 {
  		for _, noProxy := range config.ProxyConfiguration.NoProxy {
  			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index ac774b701..52e6d1087 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -546,6 +546,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
- 			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
- 		}
- 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
-@@ -556,6 +557,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 		if scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs != nil {
- 			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs
- 		}
-+		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
-+			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
-+		}
- 	}
- 
- 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
-@@ -845,6 +849,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
- 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
- 		}
- 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -1028,6 +1033,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
- 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
- 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
-+			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
- 		}
- 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
- 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
-@@ -1038,6 +1044,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
- 			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
- 		}
-+		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
-+			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
-+		}
- 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
- 		if err != nil {
- 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
-index 6096463ee..bb127f06a 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/conversion.go
+index d655944b1e34..8690748ae73b 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/conversion.go
 @@ -444,6 +444,18 @@ func Convert_v1beta2_Pause_To_upstreamv1beta3_Pause(in *bootstrapv1.Pause, out *
  	return nil
  }
@@ -666,10 +610,10 @@ index 6096463ee..bb127f06a 100644
  func Convert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in *bootstrapv1.ClusterConfiguration, out *ClusterConfiguration, s apimachineryconversion.Scope) error {
  	return autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfiguration(in, out, s)
  }
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
-index 65371b811..bfc69fabb 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/types.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/types.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/types.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/types.go
+index 65371b81181c..bfc69fabbb13 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/types.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/types.go
 @@ -83,6 +83,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
@@ -708,10 +652,10 @@ index 65371b811..bfc69fabb 100644
  	// Proxy holds the https and no proxy information
  	// This is only for bottlerocket
  	// +optional
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index c5696436c..9ac9c8033 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+index cd22b67ed724..22bbef3cae3d 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -143,6 +143,11 @@ func RegisterConversions(s *runtime.Scheme) error {
  	}); err != nil {
  		return err
@@ -794,10 +738,10 @@ index c5696436c..9ac9c8033 100644
  	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta3_ProxyConfiguration(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
-index 68734b74a..60205c135 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.deepcopy.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.deepcopy.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.deepcopy.go
+index b7b976a49e15..baa2867cb006 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.deepcopy.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.deepcopy.go
 @@ -157,12 +157,29 @@ func (in *BottlerocketBootstrap) DeepCopy() *BottlerocketBootstrap {
  	return out
  }
@@ -836,10 +780,10 @@ index 68734b74a..60205c135 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
  	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 9ffa082b0..2c60ebc7d 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+index 49f39a960401..725c6328cad4 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -503,6 +503,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
  	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
@@ -856,10 +800,10 @@ index 9ffa082b0..2c60ebc7d 100644
  	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
  	}
-diff --git a/bootstrap/kubeadm/types/utils_test.go b/bootstrap/kubeadm/types/utils_test.go
-index 3bd375477..2c4f0d5cc 100644
---- a/bootstrap/kubeadm/types/utils_test.go
-+++ b/bootstrap/kubeadm/types/utils_test.go
+diff --git a/bootstrap/kubeadm/pkg/types/utils_test.go b/bootstrap/kubeadm/pkg/types/utils_test.go
+index 39b20a51f83f..dc3364c27085 100644
+--- a/bootstrap/kubeadm/pkg/types/utils_test.go
++++ b/bootstrap/kubeadm/pkg/types/utils_test.go
 @@ -152,6 +152,8 @@ func TestMarshalClusterConfigurationForVersion(t *testing.T) {
  			want: "apiServer:\n" +
  				"  timeoutForControlPlane: 30s\n" +
@@ -917,57 +861,59 @@ index 3bd375477..2c4f0d5cc 100644
  			wantErr: false,
  		},
  		{
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index f3a3ebf4d6e9..cd6a1a31449e 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -552,6 +552,7 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+ 			Pause:                 scope.Config.Spec.ClusterConfiguration.Pause,
+ 			BottlerocketBootstrap: scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
+ 		}
+ 		if scope.Config.Spec.ClusterConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.ClusterConfiguration.Proxy
+@@ -562,6 +563,9 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
+ 		if scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs != nil {
+ 			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.InitConfiguration.NodeRegistration.KubeletExtraArgs
+ 		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
++			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
++		}
+ 	}
+ 
+ 	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
+@@ -855,6 +859,7 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+ 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+ 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+@@ -1067,6 +1072,7 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+ 			Pause:                 scope.Config.Spec.JoinConfiguration.Pause,
+ 			BottlerocketBootstrap: scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketControl:   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 		}
+ 		if scope.Config.Spec.JoinConfiguration.Proxy.HTTPSProxy != "" {
+ 			bottlerocketConfig.ProxyConfiguration = scope.Config.Spec.JoinConfiguration.Proxy
+@@ -1077,6 +1083,9 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
+ 		if scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs != nil {
+ 			bottlerocketConfig.KubeletExtraArgs = scope.Config.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs
+ 		}
++		if scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints != nil && len(*scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints) > 0 {
++			bottlerocketConfig.Taints = *scope.Config.Spec.JoinConfiguration.NodeRegistration.Taints
++		}
+ 		bootstrapJoinData, err = bottlerocket.NewJoinControlPlane(controlPlaneJoinInput, bottlerocketConfig)
+ 		if err != nil {
+ 			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index ad10647a5..d2dee32d0 100644
+index 30fa1d92931e..615016d63d18 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -360,6 +360,22 @@ spec:
-                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                             type: string
-                         type: object
-+                      bottlerocketControl:
-+                        description: |-
-+                          BottlerocketControl holds the image source for control container
-+                          This is only for bottlerocket
-+                        properties:
-+                          imageRepository:
-+                            description: |-
-+                              imageRepository sets the container registry to pull images from.
-+                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                            type: string
-+                          imageTag:
-+                            description: |-
-+                              imageTag allows to specify a tag for the image.
-+                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                            type: string
-+                        type: object
-                       caCertificateValidityPeriodDays:
-                         description: |-
-                           caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -1738,6 +1754,22 @@ spec:
-                               In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                             type: string
-                         type: object
-+                      bottlerocketControl:
-+                        description: |-
-+                          BottlerocketControl holds the image source for control container
-+                          This is only for bottlerocket
-+                        properties:
-+                          imageRepository:
-+                            description: |-
-+                              imageRepository sets the container registry to pull images from.
-+                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                            type: string
-+                          imageTag:
-+                            description: |-
-+                              imageTag allows to specify a tag for the image.
-+                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                            type: string
-+                        type: object
-                       caCertPath:
-                         description: |-
-                           caCertPath is the path to the SSL certificate authority used to
-@@ -3286,6 +3318,26 @@ spec:
+@@ -364,6 +364,26 @@ spec:
                              minLength: 1
                              type: string
                          type: object
@@ -994,7 +940,61 @@ index ad10647a5..d2dee32d0 100644
                        caCertificateValidityPeriodDays:
                          description: |-
                            caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4854,6 +4906,26 @@ spec:
+@@ -1758,6 +1778,26 @@ spec:
+                             minLength: 1
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: |-
++                          BottlerocketControl holds the image source for control container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              imageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            maxLength: 512
++                            minLength: 1
++                            type: string
++                          imageTag:
++                            description: |-
++                              imageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            maxLength: 256
++                            minLength: 1
++                            type: string
++                        type: object
+                       caCertPath:
+                         description: |-
+                           caCertPath is the path to the SSL certificate authority used to
+@@ -3380,6 +3420,26 @@ spec:
+                             minLength: 1
+                             type: string
+                         type: object
++                      bottlerocketControl:
++                        description: |-
++                          BottlerocketControl holds the image source for control container
++                          This is only for bottlerocket
++                        properties:
++                          imageRepository:
++                            description: |-
++                              imageRepository sets the container registry to pull images from.
++                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            maxLength: 512
++                            minLength: 1
++                            type: string
++                          imageTag:
++                            description: |-
++                              imageTag allows to specify a tag for the image.
++                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            maxLength: 256
++                            minLength: 1
++                            type: string
++                        type: object
+                       caCertificateValidityPeriodDays:
+                         description: |-
+                           caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4911,6 +4971,26 @@ spec:
                              minLength: 1
                              type: string
                          type: object
@@ -1022,56 +1022,10 @@ index ad10647a5..d2dee32d0 100644
                          description: |-
                            caCertPath is the path to the SSL certificate authority used to
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index d6ceedd02..14e2a3831 100644
+index 6f3350144992..196dc0e81a13 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -355,6 +355,22 @@ spec:
-                                       In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                                     type: string
-                                 type: object
-+                              bottlerocketControl:
-+                                description: |-
-+                                  BottlerocketControl holds the image source for control container
-+                                  This is only for bottlerocket
-+                                properties:
-+                                  imageRepository:
-+                                    description: |-
-+                                      imageRepository sets the container registry to pull images from.
-+                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                    type: string
-+                                  imageTag:
-+                                    description: |-
-+                                      imageTag allows to specify a tag for the image.
-+                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                    type: string
-+                                type: object
-                               caCertificateValidityPeriodDays:
-                                 description: |-
-                                   caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -1764,6 +1780,22 @@ spec:
-                                       In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-                                     type: string
-                                 type: object
-+                              bottlerocketControl:
-+                                description: |-
-+                                  BottlerocketControl holds the image source for control container
-+                                  This is only for bottlerocket
-+                                properties:
-+                                  imageRepository:
-+                                    description: |-
-+                                      imageRepository sets the container registry to pull images from.
-+                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
-+                                    type: string
-+                                  imageTag:
-+                                    description: |-
-+                                      imageTag allows to specify a tag for the image.
-+                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
-+                                    type: string
-+                                type: object
-                               caCertPath:
-                                 description: |-
-                                   caCertPath is the path to the SSL certificate authority used to
-@@ -2967,6 +2999,26 @@ spec:
+@@ -359,6 +359,26 @@ spec:
                                      minLength: 1
                                      type: string
                                  type: object
@@ -1098,7 +1052,7 @@ index d6ceedd02..14e2a3831 100644
                                caCertificateValidityPeriodDays:
                                  description: |-
                                    caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
-@@ -4572,6 +4624,26 @@ spec:
+@@ -1784,6 +1804,26 @@ spec:
                                      minLength: 1
                                      type: string
                                  type: object
@@ -1125,10 +1079,64 @@ index d6ceedd02..14e2a3831 100644
                                caCertPath:
                                  description: |-
                                    caCertPath is the path to the SSL certificate authority used to
-diff --git a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
-index 57396f9e0..cc0c05bb0 100644
---- a/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
-+++ b/controlplane/kubeadm/internal/workload_cluster_coredns_test.go
+@@ -3036,6 +3076,26 @@ spec:
+                                     minLength: 1
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: |-
++                                  BottlerocketControl holds the image source for control container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      imageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    maxLength: 512
++                                    minLength: 1
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      imageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    maxLength: 256
++                                    minLength: 1
++                                    type: string
++                                type: object
+                               caCertificateValidityPeriodDays:
+                                 description: |-
+                                   caCertificateValidityPeriodDays specifies the validity period for CA certificates generated by Cluster API.
+@@ -4604,6 +4664,26 @@ spec:
+                                     minLength: 1
+                                     type: string
+                                 type: object
++                              bottlerocketControl:
++                                description: |-
++                                  BottlerocketControl holds the image source for control container
++                                  This is only for bottlerocket
++                                properties:
++                                  imageRepository:
++                                    description: |-
++                                      imageRepository sets the container registry to pull images from.
++                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    maxLength: 512
++                                    minLength: 1
++                                    type: string
++                                  imageTag:
++                                    description: |-
++                                      imageTag allows to specify a tag for the image.
++                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    maxLength: 256
++                                    minLength: 1
++                                    type: string
++                                type: object
+                               caCertPath:
+                                 description: |-
+                                   caCertPath is the path to the SSL certificate authority used to
+diff --git a/controlplane/kubeadm/pkg/workload_cluster_coredns_test.go b/controlplane/kubeadm/pkg/workload_cluster_coredns_test.go
+index 03b93d6ba582..bd3d81c474af 100644
+--- a/controlplane/kubeadm/pkg/workload_cluster_coredns_test.go
++++ b/controlplane/kubeadm/pkg/workload_cluster_coredns_test.go
 @@ -956,6 +956,8 @@ func TestUpdateCoreDNSImageInfoInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: utilyaml.Raw(`
  				apiServer: {}
@@ -1148,11 +1156,11 @@ index 57396f9e0..cc0c05bb0 100644
  				scheduler: {}
  				`),
  		},
-diff --git a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
-index ad476b7a5..d91f39b47 100644
---- a/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
-+++ b/controlplane/kubeadm/internal/workload_cluster_etcd_test.go
-@@ -63,6 +63,8 @@ func TestUpdateEtcdExternalInKubeadmConfigMap(t *testing.T) {
+diff --git a/controlplane/kubeadm/pkg/workload_cluster_etcd_test.go b/controlplane/kubeadm/pkg/workload_cluster_etcd_test.go
+index 382db982bc4a..a0e93c1c7f6e 100644
+--- a/controlplane/kubeadm/pkg/workload_cluster_etcd_test.go
++++ b/controlplane/kubeadm/pkg/workload_cluster_etcd_test.go
+@@ -62,6 +62,8 @@ func TestUpdateEtcdExternalInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: utilyaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta3
@@ -1161,7 +1169,7 @@ index ad476b7a5..d91f39b47 100644
  				controllerManager: {}
  				dns: {}
  				etcd:
-@@ -75,6 +77,9 @@ func TestUpdateEtcdExternalInKubeadmConfigMap(t *testing.T) {
+@@ -74,6 +76,9 @@ func TestUpdateEtcdExternalInKubeadmConfigMap(t *testing.T) {
  				kind: ClusterConfiguration
  				kubernetesVersion: v1.23.1
  				networking: {}
@@ -1171,7 +1179,7 @@ index ad476b7a5..d91f39b47 100644
  				scheduler: {}
  				`),
  		},
-@@ -140,6 +145,8 @@ func TestUpdateEtcdLocalInKubeadmConfigMap(t *testing.T) {
+@@ -139,6 +144,8 @@ func TestUpdateEtcdLocalInKubeadmConfigMap(t *testing.T) {
  			wantClusterConfiguration: utilyaml.Raw(`
  				apiServer: {}
  				apiVersion: kubeadm.k8s.io/v1beta3
@@ -1180,7 +1188,7 @@ index ad476b7a5..d91f39b47 100644
  				controllerManager: {}
  				dns: {}
  				etcd:
-@@ -152,6 +159,9 @@ func TestUpdateEtcdLocalInKubeadmConfigMap(t *testing.T) {
+@@ -151,6 +158,9 @@ func TestUpdateEtcdLocalInKubeadmConfigMap(t *testing.T) {
  				kind: ClusterConfiguration
  				kubernetesVersion: v1.23.1
  				networking: {}
@@ -1190,10 +1198,10 @@ index ad476b7a5..d91f39b47 100644
  				scheduler: {}
  				`),
  		},
-diff --git a/controlplane/kubeadm/internal/workload_cluster_test.go b/controlplane/kubeadm/internal/workload_cluster_test.go
-index 0d4d7d61f..e092258ea 100644
---- a/controlplane/kubeadm/internal/workload_cluster_test.go
-+++ b/controlplane/kubeadm/internal/workload_cluster_test.go
+diff --git a/controlplane/kubeadm/pkg/workload_cluster_test.go b/controlplane/kubeadm/pkg/workload_cluster_test.go
+index 009cfd51a531..403ff2697bfc 100644
+--- a/controlplane/kubeadm/pkg/workload_cluster_test.go
++++ b/controlplane/kubeadm/pkg/workload_cluster_test.go
 @@ -317,12 +317,17 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
  					clusterConfigurationKey: utilyaml.Raw(`
  						apiServer: {}
@@ -1304,5 +1312,5 @@ index 0d4d7d61f..e092258ea 100644
  				  extraArgs:
  				    bar: baz
 -- 
-2.48.1
+2.47.3
 

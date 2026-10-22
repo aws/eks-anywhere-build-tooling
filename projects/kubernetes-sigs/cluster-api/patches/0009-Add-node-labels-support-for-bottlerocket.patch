@@ -1,16 +1,11 @@
-From 5e5ee31358fd0911084b6feeb5e5b90d8242e78c Mon Sep 17 00:00:00 2001
+From 4773ab31527235b348265a66960516006d31dfae Mon Sep 17 00:00:00 2001
 From: Vivek Koppuru <koppv@amazon.com>
 Date: Mon, 24 Jan 2022 00:46:44 -0800
-Subject: [PATCH] Add node labels support for bottlerocket
+Subject: [PATCH 09/36] Add node labels support for bottlerocket
 
----
- .../internal/bottlerocket/bootstrap.go        |  9 +++++
- .../internal/bottlerocket/bottlerocket.go     | 35 +++++++++++++++++++
- .../controllers/kubeadmconfig_controller.go   |  9 +++++
- 3 files changed, 53 insertions(+)
 
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
-index 4e1de77db..3ebb9240a 100644
+index 4e1de77db1a4..3ebb9240aaa8 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bootstrap.go
 @@ -42,6 +42,11 @@ no-proxy = [{{stringsJoin .NoProxyEndpoints "," }}]
@@ -36,7 +31,7 @@ index 4e1de77db..3ebb9240a 100644
  `
  )
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 4f7329625..245c3addd 100644
+index 4f7329625dc8..245c3adddffa 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -27,6 +27,7 @@ type BottlerocketConfig struct {
@@ -109,11 +104,11 @@ index 4f7329625..245c3addd 100644
  // Parses through all the users and return list of all user's authorized ssh keys
  func getAllAuthorizedKeys(users []bootstrapv1.User) string {
  	var sshAuthorizedKeys []string
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 3e97900e2..8bb6f9975 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -553,6 +553,9 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index 78a04551f393..92097e1b39ba 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -559,6 +559,9 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
  		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
  			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
  		}
@@ -123,7 +118,7 @@ index 3e97900e2..8bb6f9975 100644
  	}
  
  	clusterdata, err := kubeadmtypes.MarshalClusterConfigurationForVersion(&scope.Config.Spec.ClusterConfiguration, parsedVersion, additionalData)
-@@ -849,6 +852,9 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
+@@ -859,6 +862,9 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
  		if scope.Config.Spec.JoinConfiguration.RegistryMirror.Endpoint != "" {
  			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.JoinConfiguration.RegistryMirror
  		}
@@ -133,7 +128,7 @@ index 3e97900e2..8bb6f9975 100644
  		bootstrapJoinData, err = bottlerocket.NewNode(nodeInput, bottlerocketConfig)
  		if err != nil {
  			scope.Error(err, "Failed to create a worker bottlerocket join configuration")
-@@ -1026,6 +1032,9 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
+@@ -1065,6 +1071,9 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
  		if scope.Config.Spec.ClusterConfiguration.RegistryMirror.Endpoint != "" {
  			bottlerocketConfig.RegistryMirrorConfiguration = scope.Config.Spec.ClusterConfiguration.RegistryMirror
  		}
@@ -144,5 +139,5 @@ index 3e97900e2..8bb6f9975 100644
  		if err != nil {
  			scope.Error(err, "Failed to generate cloud init for bottlerocket bootstrap control plane")
 -- 
-2.48.1
+2.47.3
 

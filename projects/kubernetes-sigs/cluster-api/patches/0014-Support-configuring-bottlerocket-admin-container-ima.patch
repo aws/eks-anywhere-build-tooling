@@ -1,30 +1,14 @@
-From 32c199fd2f23af0579fc7e3901beddee491c48bb Mon Sep 17 00:00:00 2001
+From 1de92c4b9701f8be799f0ca802e96d36ce6c360d Mon Sep 17 00:00:00 2001
 From: Jiayi Wang <jiayiwang7@yahoo.com>
 Date: Wed, 23 Nov 2022 09:26:28 -0500
-Subject: [PATCH] Support configuring bottlerocket admin container image
+Subject: [PATCH 14/36] Support configuring bottlerocket admin container image
 
----
- api/bootstrap/kubeadm/v1beta1/conversion.go   | 12 ++++
- .../kubeadm/v1beta1/kubeadm_types.go          | 17 +++++
- .../v1beta1/zz_generated.conversion.go        | 33 +++++++++
- .../kubeadm/v1beta1/zz_generated.deepcopy.go  | 18 +++++
- .../kubeadm/v1beta2/kubeadm_types.go          | 28 ++++++++
- .../kubeadm/v1beta2/zz_generated.deepcopy.go  | 17 +++++
- ...strap.cluster.x-k8s.io_kubeadmconfigs.yaml | 72 +++++++++++++++++++
- ...uster.x-k8s.io_kubeadmconfigtemplates.yaml | 72 +++++++++++++++++++
- .../internal/bottlerocket/bottlerocket.go     |  9 ++-
- .../controllers/kubeadmconfig_controller.go   |  3 +
- .../zz_generated.conversion.go                |  2 +
- .../zz_generated.conversion.go                |  2 +
- ...cluster.x-k8s.io_kubeadmcontrolplanes.yaml | 72 +++++++++++++++++++
- ...x-k8s.io_kubeadmcontrolplanetemplates.yaml | 72 +++++++++++++++++++
- 14 files changed, 426 insertions(+), 3 deletions(-)
 
 diff --git a/api/bootstrap/kubeadm/v1beta1/conversion.go b/api/bootstrap/kubeadm/v1beta1/conversion.go
-index 5e3ffc386..c1391b884 100644
+index 70ef94a3ec84..eab544d31ad8 100644
 --- a/api/bootstrap/kubeadm/v1beta1/conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/conversion.go
-@@ -726,6 +726,18 @@ func Convert_v1beta2_BottlerocketBootstrapContainer_To_v1beta1_BottlerocketBoots
+@@ -465,6 +465,18 @@ func Convert_v1beta2_BottlerocketBootstrapContainer_To_v1beta1_BottlerocketBoots
  	return nil
  }
  
@@ -44,10 +28,10 @@ index 5e3ffc386..c1391b884 100644
  	if in.Local != nil {
  		if err := Convert_v1beta1_LocalEtcd_To_v1beta2_LocalEtcd(in.Local, &out.Local, s); err != nil {
 diff --git a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-index e2f5572e7..11855daf2 100644
+index 2dba724a4159..75476fc29534 100644
 --- a/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta1/kubeadm_types.go
-@@ -104,6 +104,11 @@ type ClusterConfiguration struct {
+@@ -103,6 +103,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -59,7 +43,7 @@ index e2f5572e7..11855daf2 100644
  	// BottlerocketControl holds the image source for control container
  	// This is only for bottlerocket
  	// +optional
-@@ -253,6 +258,13 @@ type BottlerocketBootstrap struct {
+@@ -252,6 +257,13 @@ type BottlerocketBootstrap struct {
  	ImageMeta `json:",inline"`
  }
  
@@ -73,7 +57,7 @@ index e2f5572e7..11855daf2 100644
  // BottlerocketControl holds the settings of control container for bottlerocket nodes
  // This setting is ONLY for bottlerocket nodes.
  type BottlerocketControl struct {
-@@ -673,6 +685,11 @@ type JoinConfiguration struct {
+@@ -672,6 +684,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -86,7 +70,7 @@ index e2f5572e7..11855daf2 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
-index 92617e466..2ae08daff 100644
+index e5ac0b266d9c..2381852f365a 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.conversion.go
 @@ -355,6 +355,11 @@ func RegisterConversions(s *runtime.Scheme) error {
@@ -151,7 +135,7 @@ index 92617e466..2ae08daff 100644
  	if err := Convert_v1beta2_BottlerocketControl_To_v1beta1_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
  		return err
  	}
-@@ -1298,6 +1325,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
+@@ -1300,6 +1327,9 @@ func autoConvert_v1beta1_JoinConfiguration_To_v1beta2_JoinConfiguration(in *Join
  	if err := Convert_v1beta1_BottlerocketBootstrap_To_v1beta2_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -161,7 +145,7 @@ index 92617e466..2ae08daff 100644
  	if err := Convert_v1beta1_BottlerocketControl_To_v1beta2_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
  		return err
  	}
-@@ -1339,6 +1369,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
+@@ -1341,6 +1371,9 @@ func autoConvert_v1beta2_JoinConfiguration_To_v1beta1_JoinConfiguration(in *v1be
  	if err := Convert_v1beta2_BottlerocketBootstrap_To_v1beta1_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
  	}
@@ -172,7 +156,7 @@ index 92617e466..2ae08daff 100644
  		return err
  	}
 diff --git a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
-index c39346285..f846209e3 100644
+index c39346285e26..f846209e313b 100644
 --- a/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta1/zz_generated.deepcopy.go
 @@ -142,6 +142,22 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -215,10 +199,10 @@ index c39346285..f846209e3 100644
  	if in.BottlerocketHostContainers != nil {
  		in, out := &in.BottlerocketHostContainers, &out.BottlerocketHostContainers
 diff --git a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-index 6569b5f9c..f7fa976a9 100644
+index 79779680cc9a..ce2dd43bff40 100644
 --- a/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
 +++ b/api/bootstrap/kubeadm/v1beta2/kubeadm_types.go
-@@ -164,6 +164,11 @@ type ClusterConfiguration struct {
+@@ -163,6 +163,11 @@ type ClusterConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -230,7 +214,7 @@ index 6569b5f9c..f7fa976a9 100644
  	// BottlerocketControl holds the image source for control container
  	// This is only for bottlerocket
  	// +optional
-@@ -392,6 +397,24 @@ type BottlerocketBootstrapContainer struct {
+@@ -391,6 +396,24 @@ type BottlerocketBootstrapContainer struct {
  	UserData string `json:"userData,omitempty"`
  }
  
@@ -255,7 +239,7 @@ index 6569b5f9c..f7fa976a9 100644
  // ProxyConfiguration holds the settings for proxying bottlerocket services
  type ProxyConfiguration struct {
  	// HTTPS proxy
-@@ -798,6 +821,11 @@ type JoinConfiguration struct {
+@@ -797,6 +820,11 @@ type JoinConfiguration struct {
  	// +optional
  	BottlerocketBootstrap BottlerocketBootstrap `json:"bottlerocketBootstrap,omitempty"`
  
@@ -268,7 +252,7 @@ index 6569b5f9c..f7fa976a9 100644
  	// This is only for bottlerocket
  	// +optional
 diff --git a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
-index 61aed60e7..a03bc2e27 100644
+index 61aed60e758b..a03bc2e27857 100644
 --- a/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 +++ b/api/bootstrap/kubeadm/v1beta2/zz_generated.deepcopy.go
 @@ -179,6 +179,21 @@ func (in *BootstrapTokenString) DeepCopy() *BootstrapTokenString {
@@ -310,10 +294,10 @@ index 61aed60e7..a03bc2e27 100644
  	in.Proxy.DeepCopyInto(&out.Proxy)
  	out.RegistryMirror = in.RegistryMirror
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-index f73ebf93a..d9b935550 100644
+index 52f110e6249b..47e01ee570bd 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigs.yaml
-@@ -298,6 +298,22 @@ spec:
+@@ -298,6 +298,26 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -326,17 +310,21 @@ index f73ebf93a..d9b935550 100644
 +                        description: |-
 +                          imageRepository sets the container registry to pull images from.
 +                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        maxLength: 512
++                        minLength: 1
 +                        type: string
 +                      imageTag:
 +                        description: |-
 +                          imageTag allows to specify a tag for the image.
 +                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        maxLength: 256
++                        minLength: 1
 +                        type: string
 +                    type: object
                    bottlerocketBootstrap:
                      description: |-
                        BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -1761,6 +1777,22 @@ spec:
+@@ -1789,6 +1809,26 @@ spec:
                        may reject unrecognized values.
                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                      type: string
@@ -349,17 +337,21 @@ index f73ebf93a..d9b935550 100644
 +                        description: |-
 +                          imageRepository sets the container registry to pull images from.
 +                          if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                        maxLength: 512
++                        minLength: 1
 +                        type: string
 +                      imageTag:
 +                        description: |-
 +                          imageTag allows to specify a tag for the image.
 +                          In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                        maxLength: 256
++                        minLength: 1
 +                        type: string
 +                    type: object
                    bottlerocketBootstrap:
                      description: |-
                        BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -2912,6 +2944,26 @@ spec:
+@@ -3003,6 +3043,26 @@ spec:
                          type: array
                          x-kubernetes-list-type: atomic
                      type: object
@@ -386,7 +378,7 @@ index f73ebf93a..d9b935550 100644
                    bottlerocketBootstrap:
                      description: |-
                        BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -4571,6 +4623,26 @@ spec:
+@@ -4627,6 +4687,26 @@ spec:
                    join command
                  minProperties: 1
                  properties:
@@ -414,10 +406,10 @@ index f73ebf93a..d9b935550 100644
                      description: |-
                        BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 diff --git a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-index 58f08f356..daa578c9d 100644
+index 9fd438da1364..8e098b3939da 100644
 --- a/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
 +++ b/bootstrap/kubeadm/config/crd/bases/bootstrap.cluster.x-k8s.io_kubeadmconfigtemplates.yaml
-@@ -331,6 +331,22 @@ spec:
+@@ -331,6 +331,26 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -430,17 +422,21 @@ index 58f08f356..daa578c9d 100644
 +                                description: |-
 +                                  imageRepository sets the container registry to pull images from.
 +                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                maxLength: 512
++                                minLength: 1
 +                                type: string
 +                              imageTag:
 +                                description: |-
 +                                  imageTag allows to specify a tag for the image.
 +                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                maxLength: 256
++                                minLength: 1
 +                                type: string
 +                            type: object
                            bottlerocketBootstrap:
                              description: |-
                                BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -1825,6 +1841,22 @@ spec:
+@@ -1854,6 +1874,26 @@ spec:
                                may reject unrecognized values.
                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                              type: string
@@ -453,17 +449,21 @@ index 58f08f356..daa578c9d 100644
 +                                description: |-
 +                                  imageRepository sets the container registry to pull images from.
 +                                  if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                maxLength: 512
++                                minLength: 1
 +                                type: string
 +                              imageTag:
 +                                description: |-
 +                                  imageTag allows to specify a tag for the image.
 +                                  In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                maxLength: 256
++                                minLength: 1
 +                                type: string
 +                            type: object
                            bottlerocketBootstrap:
                              description: |-
                                BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -2871,6 +2903,26 @@ spec:
+@@ -2965,6 +3005,26 @@ spec:
                                  type: array
                                  x-kubernetes-list-type: atomic
                              type: object
@@ -490,7 +490,7 @@ index 58f08f356..daa578c9d 100644
                            bottlerocketBootstrap:
                              description: |-
                                BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -4563,6 +4615,26 @@ spec:
+@@ -4620,6 +4680,26 @@ spec:
                            for the join command
                          minProperties: 1
                          properties:
@@ -518,7 +518,7 @@ index 58f08f356..daa578c9d 100644
                              description: |-
                                BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 diff --git a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
-index 473050b6d..bf484f182 100644
+index 473050b6dcfc..bf484f182677 100644
 --- a/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 +++ b/bootstrap/kubeadm/internal/bottlerocket/bottlerocket.go
 @@ -25,6 +25,7 @@ const (
@@ -544,38 +544,10 @@ index 473050b6d..bf484f182 100644
  		},
  		{
  			Name:            "kubeadm-bootstrap",
-diff --git a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-index 311f9bcc5..b2beeab81 100644
---- a/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-+++ b/bootstrap/kubeadm/internal/controllers/kubeadmconfig_controller.go
-@@ -546,6 +546,7 @@ func (r *KubeadmConfigReconciler) handleClusterNotInitialized(ctx context.Contex
- 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
- 			Pause:                                 scope.Config.Spec.ClusterConfiguration.Pause,
- 			BottlerocketBootstrap:                 scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
-+			BottlerocketAdmin:                     scope.Config.Spec.ClusterConfiguration.BottlerocketAdmin,
- 			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
- 			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
- 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
-@@ -851,6 +852,7 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope)
- 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
- 			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
- 			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
-+			BottlerocketAdmin:                     scope.Config.Spec.JoinConfiguration.BottlerocketAdmin,
- 			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
- 			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
- 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
-@@ -1037,6 +1039,7 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
- 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
- 			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
- 			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
-+			BottlerocketAdmin:                     scope.Config.Spec.JoinConfiguration.BottlerocketAdmin,
- 			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
- 			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
- 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-index c62ca3c2b..c101c876d 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta3/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
+index c746dd5c2015..01ffa1eb125c 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta3/zz_generated.conversion.go
 @@ -471,6 +471,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta3_ClusterConfigur
  	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta3_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
@@ -592,10 +564,10 @@ index c62ca3c2b..c101c876d 100644
  	if err := Convert_v1beta2_BottlerocketControl_To_upstreamv1beta3_BottlerocketControl(&in.BottlerocketControl, &out.BottlerocketControl, s); err != nil {
  		return err
  	}
-diff --git a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-index 322e7d74b..4fcb970d3 100644
---- a/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
-+++ b/bootstrap/kubeadm/types/upstreamv1beta4/zz_generated.conversion.go
+diff --git a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
+index 0152a2133e45..a55a7eeb19c8 100644
+--- a/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
++++ b/bootstrap/kubeadm/pkg/types/upstreamv1beta4/zz_generated.conversion.go
 @@ -503,6 +503,7 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta4_ClusterConfigur
  	if err := Convert_v1beta2_BottlerocketBootstrap_To_upstreamv1beta4_BottlerocketBootstrap(&in.BottlerocketBootstrap, &out.BottlerocketBootstrap, s); err != nil {
  		return err
@@ -612,11 +584,39 @@ index 322e7d74b..4fcb970d3 100644
  	// WARNING: in.BottlerocketControl requires manual conversion: does not exist in peer-type
  	if err := Convert_v1beta2_ProxyConfiguration_To_upstreamv1beta4_Proxy(&in.Proxy, &out.Proxy, s); err != nil {
  		return err
+diff --git a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+index cb8932dfa884..6f02f28244b7 100644
+--- a/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
++++ b/bootstrap/kubeadm/reconcilers/kubeadmconfig/kubeadmconfig_controller.go
+@@ -552,6 +552,7 @@ func (r *Reconciler) handleClusterNotInitialized(ctx context.Context, scope *Sco
+ 		bottlerocketConfig = &bottlerocket.BottlerocketConfig{
+ 			Pause:                                 scope.Config.Spec.ClusterConfiguration.Pause,
+ 			BottlerocketBootstrap:                 scope.Config.Spec.ClusterConfiguration.BottlerocketBootstrap,
++			BottlerocketAdmin:                     scope.Config.Spec.ClusterConfiguration.BottlerocketAdmin,
+ 			BottlerocketControl:                   scope.Config.Spec.ClusterConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.ClusterConfiguration.BottlerocketHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.ClusterConfiguration.BottlerocketCustomBootstrapContainers,
+@@ -861,6 +862,7 @@ func (r *Reconciler) joinWorker(ctx context.Context, scope *Scope) (ctrl.Result,
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+ 			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
+ 			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketAdmin:                     scope.Config.Spec.JoinConfiguration.BottlerocketAdmin,
+ 			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
+@@ -1076,6 +1078,7 @@ func (r *Reconciler) joinControlplane(ctx context.Context, scope *Scope) (ctrl.R
+ 		bottlerocketConfig := &bottlerocket.BottlerocketConfig{
+ 			Pause:                                 scope.Config.Spec.JoinConfiguration.Pause,
+ 			BottlerocketBootstrap:                 scope.Config.Spec.JoinConfiguration.BottlerocketBootstrap,
++			BottlerocketAdmin:                     scope.Config.Spec.JoinConfiguration.BottlerocketAdmin,
+ 			BottlerocketControl:                   scope.Config.Spec.JoinConfiguration.BottlerocketControl,
+ 			BottlerocketCustomHostContainers:      scope.Config.Spec.JoinConfiguration.BottlerocketCustomHostContainers,
+ 			BottlerocketCustomBootstrapContainers: scope.Config.Spec.JoinConfiguration.BottlerocketCustomBootstrapContainers,
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-index da4690261..a4ff1cf29 100644
+index bdd406758f07..0101bfd1a6cd 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanes.yaml
-@@ -344,6 +344,22 @@ spec:
+@@ -344,6 +344,26 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -629,17 +629,21 @@ index da4690261..a4ff1cf29 100644
 +                            description: |-
 +                              imageRepository sets the container registry to pull images from.
 +                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            maxLength: 512
++                            minLength: 1
 +                            type: string
 +                          imageTag:
 +                            description: |-
 +                              imageTag allows to specify a tag for the image.
 +                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            maxLength: 256
++                            minLength: 1
 +                            type: string
 +                        type: object
                        bottlerocketBootstrap:
                          description: |-
                            BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -1822,6 +1838,22 @@ spec:
+@@ -1851,6 +1871,26 @@ spec:
                            may reject unrecognized values.
                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                          type: string
@@ -652,17 +656,21 @@ index da4690261..a4ff1cf29 100644
 +                            description: |-
 +                              imageRepository sets the container registry to pull images from.
 +                              if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                            maxLength: 512
++                            minLength: 1
 +                            type: string
 +                          imageTag:
 +                            description: |-
 +                              imageTag allows to specify a tag for the image.
 +                              In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                            maxLength: 256
++                            minLength: 1
 +                            type: string
 +                        type: object
                        bottlerocketBootstrap:
                          description: |-
                            BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -3467,6 +3499,26 @@ spec:
+@@ -3586,6 +3626,26 @@ spec:
                              type: array
                              x-kubernetes-list-type: atomic
                          type: object
@@ -689,7 +697,7 @@ index da4690261..a4ff1cf29 100644
                        bottlerocketBootstrap:
                          description: |-
                            BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -5142,6 +5194,26 @@ spec:
+@@ -5224,6 +5284,26 @@ spec:
                        the join command
                      minProperties: 1
                      properties:
@@ -717,10 +725,10 @@ index da4690261..a4ff1cf29 100644
                          description: |-
                            BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 diff --git a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-index 2c5e1bfd0..1771126e5 100644
+index 83584ca09939..f93f7fd31981 100644
 --- a/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
 +++ b/controlplane/kubeadm/config/crd/bases/controlplane.cluster.x-k8s.io_kubeadmcontrolplanetemplates.yaml
-@@ -339,6 +339,22 @@ spec:
+@@ -339,6 +339,26 @@ spec:
                                    may reject unrecognized values.
                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                                  type: string
@@ -733,17 +741,21 @@ index 2c5e1bfd0..1771126e5 100644
 +                                    description: |-
 +                                      imageRepository sets the container registry to pull images from.
 +                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    maxLength: 512
++                                    minLength: 1
 +                                    type: string
 +                                  imageTag:
 +                                    description: |-
 +                                      imageTag allows to specify a tag for the image.
 +                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    maxLength: 256
++                                    minLength: 1
 +                                    type: string
 +                                type: object
                                bottlerocketBootstrap:
                                  description: |-
                                    BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -1848,6 +1864,22 @@ spec:
+@@ -1880,6 +1900,26 @@ spec:
                                    may reject unrecognized values.
                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
                                  type: string
@@ -756,17 +768,21 @@ index 2c5e1bfd0..1771126e5 100644
 +                                    description: |-
 +                                      imageRepository sets the container registry to pull images from.
 +                                      if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
++                                    maxLength: 512
++                                    minLength: 1
 +                                    type: string
 +                                  imageTag:
 +                                    description: |-
 +                                      imageTag allows to specify a tag for the image.
 +                                      In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
++                                    maxLength: 256
++                                    minLength: 1
 +                                    type: string
 +                                type: object
                                bottlerocketBootstrap:
                                  description: |-
                                    BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -3151,6 +3183,26 @@ spec:
+@@ -3248,6 +3288,26 @@ spec:
                                      type: array
                                      x-kubernetes-list-type: atomic
                                  type: object
@@ -793,7 +809,7 @@ index 2c5e1bfd0..1771126e5 100644
                                bottlerocketBootstrap:
                                  description: |-
                                    BottlerocketBootstrap holds the image source for kubeadm bootstrap container
-@@ -4866,6 +4918,26 @@ spec:
+@@ -4926,6 +4986,26 @@ spec:
                                for the join command
                              minProperties: 1
                              properties:
@@ -821,5 +837,5 @@ index 2c5e1bfd0..1771126e5 100644
                                  description: |-
                                    BottlerocketBootstrap holds the image source for kubeadm bootstrap container
 -- 
-2.48.1
+2.47.3
 
