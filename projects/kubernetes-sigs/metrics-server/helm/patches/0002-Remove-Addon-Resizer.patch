@@ -1,4 +1,4 @@
-From 8bfb6017c0767e85d5043568bb16652dc2dcebc9 Mon Sep 17 00:00:00 2001
+From d910a3a9ce1865ad5ce90213c0b06a78bbc3fba3 Mon Sep 17 00:00:00 2001
 From: Jhaanvi Golani <jhaanvi@amazon.com>
 Date: Wed, 10 Dec 2025 17:20:28 -0800
 Subject: [PATCH 2/2] Remove Addon Resizer
@@ -20,10 +20,10 @@ Subject: [PATCH 2/2] Remove Addon Resizer
  delete mode 100644 charts/metrics-server/templates/rolebinding-nanny.yaml
 
 diff --git a/charts/metrics-server/templates/_helpers.tpl b/charts/metrics-server/templates/_helpers.tpl
-index 492e4623..e9b47284 100644
+index 99fc134..e9e5734 100644
 --- a/charts/metrics-server/templates/_helpers.tpl
 +++ b/charts/metrics-server/templates/_helpers.tpl
-@@ -71,27 +71,6 @@ The image to use
+@@ -78,27 +78,6 @@ The image to use
  {{- printf "%s/%s@%s" .Values.sourceRegistry .Values.image.repository .Values.image.digest }}
  {{- end }}
  
@@ -53,7 +53,7 @@ index 492e4623..e9b47284 100644
    {{- if and (.Capabilities.APIVersions.Has "policy/v1") (semverCompare ">= 1.21-0" .Capabilities.KubeVersion.Version) -}}
 diff --git a/charts/metrics-server/templates/clusterrole-nanny.yaml b/charts/metrics-server/templates/clusterrole-nanny.yaml
 deleted file mode 100644
-index 24edd81c..00000000
+index 24edd81..0000000
 --- a/charts/metrics-server/templates/clusterrole-nanny.yaml
 +++ /dev/null
 @@ -1,13 +0,0 @@
@@ -72,7 +72,7 @@ index 24edd81c..00000000
 -{{- end -}}
 diff --git a/charts/metrics-server/templates/clusterrolebinding-nanny.yaml b/charts/metrics-server/templates/clusterrolebinding-nanny.yaml
 deleted file mode 100644
-index 43738ccb..00000000
+index 6101d3f..0000000
 --- a/charts/metrics-server/templates/clusterrolebinding-nanny.yaml
 +++ /dev/null
 @@ -1,18 +0,0 @@
@@ -91,12 +91,12 @@ index 43738ccb..00000000
 -subjects:
 -  - kind: ServiceAccount
 -    name: {{ include "metrics-server.serviceAccountName" . }}
--    namespace: {{ .Release.Namespace }}
+-    namespace: {{ include "metrics-server.namespace" . }}
 -{{- end -}}
 -{{- end -}}
 diff --git a/charts/metrics-server/templates/configmaps-nanny.yaml b/charts/metrics-server/templates/configmaps-nanny.yaml
 deleted file mode 100644
-index c25005ec..00000000
+index 52f856d..0000000
 --- a/charts/metrics-server/templates/configmaps-nanny.yaml
 +++ /dev/null
 @@ -1,17 +0,0 @@
@@ -105,7 +105,7 @@ index c25005ec..00000000
 -kind: ConfigMap
 -metadata:
 -  name: {{ include "metrics-server.addonResizer.configMap" . }}
--  namespace: {{ .Release.Namespace }}
+-  namespace: {{ include "metrics-server.namespace" . }}
 -  labels:
 -    {{- include "metrics-server.labels" . | nindent 4 }}
 -data:
@@ -118,10 +118,10 @@ index c25005ec..00000000
 -    memoryPerNode: {{ .Values.addonResizer.nanny.extraMemory }}
 -{{- end -}}
 diff --git a/charts/metrics-server/templates/deployment.yaml b/charts/metrics-server/templates/deployment.yaml
-index 12517a02..677b07c7 100644
+index da2ac31..18d7b1f 100644
 --- a/charts/metrics-server/templates/deployment.yaml
 +++ b/charts/metrics-server/templates/deployment.yaml
-@@ -105,48 +105,9 @@ spec:
+@@ -110,48 +110,9 @@ spec:
            resources:
              {{- toYaml . | nindent 12 }}
            {{- end }}
@@ -172,7 +172,7 @@ index 12517a02..677b07c7 100644
            secret:
 diff --git a/charts/metrics-server/templates/role-nanny.yaml b/charts/metrics-server/templates/role-nanny.yaml
 deleted file mode 100644
-index f0bf8fce..00000000
+index d490a87..0000000
 --- a/charts/metrics-server/templates/role-nanny.yaml
 +++ /dev/null
 @@ -1,27 +0,0 @@
@@ -182,7 +182,7 @@ index f0bf8fce..00000000
 -kind: Role
 -metadata:
 -  name: {{ include "metrics-server.addonResizer.role" . }}
--  namespace: {{ .Release.Namespace }}
+-  namespace: {{ include "metrics-server.namespace" . }}
 -  labels:
 -    {{- include "metrics-server.labels" . | nindent 4 }}
 -rules:
@@ -205,7 +205,7 @@ index f0bf8fce..00000000
 -{{- end -}}
 diff --git a/charts/metrics-server/templates/rolebinding-nanny.yaml b/charts/metrics-server/templates/rolebinding-nanny.yaml
 deleted file mode 100644
-index 228c0cfe..00000000
+index 419b927..0000000
 --- a/charts/metrics-server/templates/rolebinding-nanny.yaml
 +++ /dev/null
 @@ -1,19 +0,0 @@
@@ -215,7 +215,7 @@ index 228c0cfe..00000000
 -kind: RoleBinding
 -metadata:
 -  name: {{ printf "%s-nanny" (include "metrics-server.fullname" .)  }}
--  namespace: {{ .Release.Namespace }}
+-  namespace: {{ include "metrics-server.namespace" . }}
 -  labels:
 -    {{- include "metrics-server.labels" . | nindent 4 }}
 -roleRef:
@@ -225,14 +225,14 @@ index 228c0cfe..00000000
 -subjects:
 -  - kind: ServiceAccount
 -    name: {{ include "metrics-server.serviceAccountName" . }}
--    namespace: {{ .Release.Namespace }}
+-    namespace: {{ include "metrics-server.namespace" . }}
 -{{- end -}}
 -{{- end -}}
 diff --git a/charts/metrics-server/values.yaml b/charts/metrics-server/values.yaml
-index 502bbd02..00df47c3 100644
+index d7f0b76..41db3e2 100644
 --- a/charts/metrics-server/values.yaml
 +++ b/charts/metrics-server/values.yaml
-@@ -127,37 +127,6 @@ service:
+@@ -130,37 +130,6 @@ service:
    #  kubernetes.io/cluster-service: "true"
    #  kubernetes.io/name: "Metrics-server"
  
@@ -270,7 +270,7 @@ index 502bbd02..00df47c3 100644
  metrics:
    enabled: false
  
-@@ -169,17 +138,6 @@ serviceMonitor:
+@@ -172,17 +141,6 @@ serviceMonitor:
    metricRelabelings: []
    relabelings: []
  
@@ -289,5 +289,5 @@ index 502bbd02..00df47c3 100644
  
  nodeSelector: {}
 -- 
-2.50.1 (Apple Git-155)
+2.54.0 (Apple Git-157)
 
