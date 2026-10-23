@@ -85,6 +85,7 @@ $(WEB_UI_TARGETS): | $$(call ENABLE_DOCKER,$$(NPM_AVAIL))
 	fi; \
 	if [ -z "$$NODEJS_BIN_PATH" ]; then \
 		NODEJS_DIR=$$(pwd)/.nodejs-24; \
+		rm -rf $$NODEJS_DIR; \
 		mkdir -p $$NODEJS_DIR; \
 		ARCH=$$(uname -m); \
 		if [ "$$ARCH" = "x86_64" ]; then \
