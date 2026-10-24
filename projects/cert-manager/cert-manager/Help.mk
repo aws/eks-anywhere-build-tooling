@@ -37,10 +37,6 @@ cert-manager-controller/images/push: ## Builds/pushes `cert-manager-controller/i
 cert-manager-webhook/images/push: ## Builds/pushes `cert-manager-webhook/images/push`
 cert-manager-startupapicheck/images/push: ## Builds/pushes `cert-manager-startupapicheck/images/push`
 
-##@ Helm Targets
-helm/build: ## Build helm chart
-helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
-
 ##@ Checksum Targets
 checksums: ## Update checksums file based on currently built binaries.
 validate-checksums: # Validate checksums of currently built binaries against checksums file.
