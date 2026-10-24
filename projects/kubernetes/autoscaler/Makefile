@@ -34,7 +34,12 @@ BUILDSPEC_VARS_KEYS=RELEASE_BRANCH
 BUILDSPEC_VARS_VALUES=SUPPORTED_K8S_VERSIONS
 BUILDSPEC_COMPUTE_TYPE=BUILD_GENERAL1_LARGE
 
-REMOVE_CLOUD_PROVIDERS_TARGET=$(REPO)/cluster-autoscaler/cloudprovider/eks-anywhere-cloud-providers-removed-$(GIT_TAG)
+# Release branches can share a GIT_TAG (1-37 builds the same tag as 1-36 until upstream
+# tags 1.37.0), and the package pipeline builds every branch in one checkout. The helm
+# chart is checked out into the same repo after each branch's binaries, so key these
+# markers by release branch to force a fresh checkout, patch and vendor for every branch.
+GIT_CHECKOUT_TARGET=$(REPO)/eks-anywhere-checkout-$(GIT_TAG)-$(RELEASE_BRANCH)
+REMOVE_CLOUD_PROVIDERS_TARGET=$(REPO)/cluster-autoscaler/cloudprovider/eks-anywhere-cloud-providers-removed-$(GIT_TAG)-$(RELEASE_BRANCH)
 
 include $(BASE_DIRECTORY)/Common.mk
 
