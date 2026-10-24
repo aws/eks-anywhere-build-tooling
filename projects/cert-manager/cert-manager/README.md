@@ -1,5 +1,5 @@
 ## **cert-manager**
-![Version](https://img.shields.io/badge/version-v1.21.2-blue)
+![Version](https://img.shields.io/badge/version-v1.20.2-blue)
 
 ([cert-manager](https://github.com/cert-manager/cert-manager)) is an AWS supported version of the upstream cert-manager and is distributed by Amazon EKS add-ons.
 
