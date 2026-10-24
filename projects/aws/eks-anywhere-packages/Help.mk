@@ -34,8 +34,8 @@ helm/build: ## Build helm chart
 helm/push: ## Build helm chart and push to registry defined in IMAGE_REPO.
 
 ##@ Fetch Binary Targets
-_output/dependencies/linux-amd64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client`
-_output/dependencies/linux-arm64/eksd/kubernetes/client: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client`
+_output/dependencies/linux-amd64/eksd/kubernetes/client/1-32: ## Fetch `_output/dependencies/linux-amd64/eksd/kubernetes/client/1-32`
+_output/dependencies/linux-arm64/eksd/kubernetes/client/1-32: ## Fetch `_output/dependencies/linux-arm64/eksd/kubernetes/client/1-32`
 _output/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/dependencies/linux-amd64/eksa/aws/rolesanywhere-credential-helper`
 _output/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper: ## Fetch `_output/dependencies/linux-arm64/eksa/aws/rolesanywhere-credential-helper`
 _output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-37: ## Fetch `_output/dependencies/linux-amd64/eksa/kubernetes/cloud-provider-aws/1-37`
