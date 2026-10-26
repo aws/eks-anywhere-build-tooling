@@ -321,7 +321,7 @@ $(ARTIFACTS_PATH)/bottlerocket/% upload-bottlerocket-%: IMAGE_OS=bottlerocket
 $(ARTIFACTS_PATH)/bottlerocket/%: IMAGE_OS_VERSION=$(word 1,$(subst /, ,$(*D)))
 $(ARTIFACTS_PATH)/bottlerocket/%: IMAGE_FORMAT=$(word 2,$(subst /, ,$(*D)))
 $(ARTIFACTS_PATH)/bottlerocket/%: export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
-$(ARTIFACTS_PATH)/bottlerocket/%: | ensure-yq ensure-tuftool ensure-lz4
+$(ARTIFACTS_PATH)/bottlerocket/%: | ensure-yq ensure-tuftool
 	@echo -e $(call TARGET_START_LOG)
 	mkdir -p $(@D) $(BOTTLEROCKET_DOWNLOAD_PATH)
 	# This configuration supports local installations and checksum validations of root.json file
