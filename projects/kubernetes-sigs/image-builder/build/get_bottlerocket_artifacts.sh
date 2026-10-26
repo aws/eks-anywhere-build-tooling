@@ -77,7 +77,12 @@ fi
 # Post processing for aws and metal variants
 if [[ $VARIANT == "aws" ]] || [[ $VARIANT == "metal" ]]; then
   BOTTLEROCKET_IMG="${TARGET%.lz4}"
-  build::common::echo_and_run lz4 --decompress ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
+  if command -v lz4 &> /dev/null; then
+    build::common::echo_and_run lz4 --decompress ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
+  else
+    # The AL2023 builder-base ships liblz4 but not the lz4 CLI
+    build::common::echo_and_run python3 ${MAKE_ROOT}/build/lz4_decompress.py ${OS_DOWNLOAD_PATH}/${TARGET} ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
+  fi
   build::common::echo_and_run gzip ${OS_DOWNLOAD_PATH}/${BOTTLEROCKET_IMG}
   rm -f ${OS_DOWNLOAD_PATH}/${TARGET}
 fi

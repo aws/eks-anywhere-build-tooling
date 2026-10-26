@@ -312,15 +312,10 @@ packer/nutanix/nutanix.json:
 $(ARTIFACTS_PATH)/bottlerocket/% upload-bottlerocket-%: IMAGE_OS=bottlerocket
 
 #$ ex: $(ARTIFACTS_PATH)/bottlerocket/1/raw/bottlerocket.img.gz, $(ARTIFACTS_PATH)/bottlerocket/1/ova/bottlerocket.ova
-.PHONY: install-lz4
-# The AL2023 builder-base doesn't ship lz4
-install-lz4:
-	@command -v lz4 &> /dev/null || yum install -y lz4
-
 $(ARTIFACTS_PATH)/bottlerocket/%: IMAGE_OS_VERSION=$(word 1,$(subst /, ,$(*D)))
 $(ARTIFACTS_PATH)/bottlerocket/%: IMAGE_FORMAT=$(word 2,$(subst /, ,$(*D)))
 $(ARTIFACTS_PATH)/bottlerocket/%: export BOTTLEROCKET_ROOT_JSON_PATH=$(BOTTLEROCKET_DOWNLOAD_PATH)/root.json
-$(ARTIFACTS_PATH)/bottlerocket/%: | ensure-yq ensure-tuftool install-lz4
+$(ARTIFACTS_PATH)/bottlerocket/%: | ensure-yq ensure-tuftool
 	@echo -e $(call TARGET_START_LOG)
 	mkdir -p $(@D) $(BOTTLEROCKET_DOWNLOAD_PATH)
 	# This configuration supports local installations and checksum validations of root.json file
