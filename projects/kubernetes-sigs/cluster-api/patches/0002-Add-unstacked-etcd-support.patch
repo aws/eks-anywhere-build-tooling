@@ -1,4 +1,4 @@
-From f89730883570ed82039d9caac5b07d5d83f0cb5d Mon Sep 17 00:00:00 2001
+From bedf6c996f511f6bd72e5fd63dc53ddc3b73304c Mon Sep 17 00:00:00 2001
 From: Rajashree Mandaogane <mandaor@amazon.com>
 Date: Mon, 28 Jun 2021 13:44:50 -0700
 Subject: [PATCH 02/36] Add unstacked etcd support
@@ -349,7 +349,7 @@ index 37f7163123ea..998b24602b0a 100644
    - runtime.cluster.x-k8s.io
    resources:
 diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
-index 3bd0bf4857f1..8548bbc5266d 100644
+index 54774e9cdbd5..e5ad1ecaaf22 100644
 --- a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
 +++ b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
 @@ -47,6 +47,7 @@ import (
@@ -581,7 +581,7 @@ index d66e484447c5..ea79242dbf32 100644
    resources:
    - '*'
 diff --git a/core/reconcilers/cluster/cluster_controller.go b/core/reconcilers/cluster/cluster_controller.go
-index b947b9e38790..a988bca5574c 100644
+index 01a195413b50..a7efe2dc3837 100644
 --- a/core/reconcilers/cluster/cluster_controller.go
 +++ b/core/reconcilers/cluster/cluster_controller.go
 @@ -19,6 +19,7 @@ package cluster
@@ -612,7 +612,7 @@ index b947b9e38790..a988bca5574c 100644
  		Watches(
  			&clusterv1.MachineDeployment{},
  			handler.EnqueueRequestsFromMapFunc(r.machineDeploymentToCluster),
-@@ -221,6 +226,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
+@@ -222,6 +227,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
  		alwaysReconcile,
  		r.reconcileKubeconfig,
  		r.reconcileV1Beta1ControlPlaneInitialized,
@@ -620,7 +620,7 @@ index b947b9e38790..a988bca5574c 100644
  	)
  	return doReconcile(ctx, reconcileNormal, s)
  }
-@@ -242,6 +248,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
+@@ -243,6 +249,7 @@ func patchCluster(ctx context.Context, patchHelper *patch.Helper, cluster *clust
  			clusterv1.ReadyV1Beta1Condition,
  			clusterv1.ControlPlaneReadyV1Beta1Condition,
  			clusterv1.InfrastructureReadyV1Beta1Condition,
@@ -628,7 +628,7 @@ index b947b9e38790..a988bca5574c 100644
  		}},
  		patch.WithOwnedConditions{Conditions: []string{
  			clusterv1.PausedCondition,
-@@ -444,6 +451,68 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
+@@ -456,6 +463,68 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
  		}
  	}
  
@@ -697,7 +697,7 @@ index b947b9e38790..a988bca5574c 100644
  	if cluster.Spec.InfrastructureRef.IsDefined() {
  		if s.infraCluster == nil {
  			if !s.infraClusterIsNotFound {
-@@ -501,6 +570,7 @@ type clusterDescendants struct {
+@@ -513,6 +582,7 @@ type clusterDescendants struct {
  	machinesToBeRemediated collections.Machines
  	unhealthyMachines      collections.Machines
  	machinePools           clusterv1.MachinePoolList
@@ -705,7 +705,7 @@ index b947b9e38790..a988bca5574c 100644
  }
  
  // objectsPendingDeleteCount returns the number of descendants pending delete.
-@@ -532,6 +602,13 @@ func (c *clusterDescendants) objectsPendingDeleteNames(cluster *clusterv1.Cluste
+@@ -544,6 +614,13 @@ func (c *clusterDescendants) objectsPendingDeleteNames(cluster *clusterv1.Cluste
  			descendants = append(descendants, "Control plane Machines: "+clog.StringListToString(controlPlaneMachineNames))
  		}
  	}
@@ -719,7 +719,7 @@ index b947b9e38790..a988bca5574c 100644
  	machineDeploymentNames := make([]string, len(c.machineDeployments.Items))
  	for i, machineDeployment := range c.machineDeployments.Items {
  		machineDeploymentNames[i] = machineDeployment.Name
-@@ -600,7 +677,8 @@ func (r *Reconciler) getDescendants(ctx context.Context, s *scope) (reconcile.Re
+@@ -612,7 +689,8 @@ func (r *Reconciler) getDescendants(ctx context.Context, s *scope) (reconcile.Re
  	// Split machines into control plane and worker machines
  	descendants.allMachines = collections.FromMachineList(&machines)
  	descendants.controlPlaneMachines = descendants.allMachines.Filter(collections.ControlPlaneMachines(cluster.Name))
@@ -729,7 +729,7 @@ index b947b9e38790..a988bca5574c 100644
  	descendants.machinesToBeRemediated = descendants.allMachines.Filter(collections.IsUnhealthyAndOwnerRemediated)
  	descendants.unhealthyMachines = descendants.allMachines.Filter(collections.IsUnhealthy)
  
-@@ -646,6 +724,9 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
+@@ -658,6 +736,9 @@ func (c *clusterDescendants) filterOwnedDescendants(cluster *clusterv1.Cluster)
  		&c.machineSets,
  		toObjectList(c.workerMachines),
  	}
@@ -739,7 +739,7 @@ index b947b9e38790..a988bca5574c 100644
  	if feature.Gates.Enabled(feature.MachinePool) {
  		lists = append([]client.ObjectList{&c.machinePools}, lists...)
  	}
-@@ -736,6 +817,36 @@ func (r *Reconciler) controlPlaneMachineToCluster(ctx context.Context, o client.
+@@ -748,6 +829,36 @@ func (r *Reconciler) controlPlaneMachineToCluster(ctx context.Context, o client.
  	}}
  }
  
@@ -1445,10 +1445,10 @@ index 6780bd4051f1..50c5b14c2cef 100644
  	deprecatedFailureDomain, err := contract.InfrastructureMachine().DeprecatedFailureDomain().Get(s.infraMachine)
  	switch {
 diff --git a/core/reconcilers/machine/machine_controller_status.go b/core/reconcilers/machine/machine_controller_status.go
-index 2d0fd8ee825a..6699e5ae5857 100644
+index 1756ac63e8c2..6e7f9544b7e1 100644
 --- a/core/reconcilers/machine/machine_controller_status.go
 +++ b/core/reconcilers/machine/machine_controller_status.go
-@@ -932,6 +932,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
+@@ -938,6 +938,13 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
  		m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
  	}
  
@@ -1592,5 +1592,5 @@ index a3e02f6e9be4..610fad63da07 100644
  func GetClusterFromMetadata(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Cluster, error) {
  	if obj.Labels[clusterv1.ClusterNameLabel] == "" {
 -- 
-2.47.3
+2.50.1
 
