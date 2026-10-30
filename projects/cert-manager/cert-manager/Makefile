@@ -45,6 +45,8 @@ $(GIT_CHECKOUT_TARGET): GIT_TAG=$(word 1,$(subst -, ,$(EKS_ADDON_IMAGE_TAG)))
 s3-artifacts: create-manifests
 
 .PHONY: create-manifests
+# The release CLI looks up manifests by the upstream tag.
+s3-artifacts create-manifests: GIT_TAG=$(shell cat GIT_TAG)
 create-manifests:
 	build/create-manifests.sh $(ARTIFACTS_PATH) $(BASE_DIRECTORY) $(GIT_TAG)
 
