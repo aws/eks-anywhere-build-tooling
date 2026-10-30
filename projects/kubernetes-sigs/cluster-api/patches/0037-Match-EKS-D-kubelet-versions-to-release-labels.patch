@@ -1,0 +1,188 @@
+From 9482a50f6302a95b1f9205bbd00d2f931f2ddf28 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulbabu95@gmail.com>
+Date: Fri, 30 Oct 2026 21:12:20 +0000
+Subject: [PATCH] Match EKS-D kubelet versions to release labels
+
+EKS-D nodes report source hashes while Machine versions identify
+release numbers. Accept those aliases at observed-version checks
+while preserving desired release and Kubernetes version differences.
+---
+ .../kubeadmcontrolplane_controller.go         |  2 +-
+ .../machine/machine_controller_status.go      |  3 +-
+ internal/topology/check/upgrade.go            |  5 +-
+ util/version/eksd.go                          | 41 +++++++++++++++
+ util/version/eksd_test.go                     | 50 +++++++++++++++++++
+ 5 files changed, 97 insertions(+), 4 deletions(-)
+ create mode 100644 util/version/eksd.go
+ create mode 100644 util/version/eksd_test.go
+
+diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
+index da129c3..221f0fc 100644
+--- a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
++++ b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
+@@ -1188,7 +1188,7 @@ func reconcileMachineUpToDateCondition(_ context.Context, controlPlane *pkg.Cont
+ 			continue
+ 		}
+ 
+-		if machine.Status.NodeInfo != nil && machine.Status.NodeInfo.KubeletVersion != "" && machine.Status.NodeInfo.KubeletVersion != machine.Spec.Version {
++		if machine.Status.NodeInfo != nil && machine.Status.NodeInfo.KubeletVersion != "" && !version.MatchesMachineVersion(machine.Status.NodeInfo.KubeletVersion, machine.Spec.Version) {
+ 			conditions.Set(machine, metav1.Condition{
+ 				Type:   clusterv1.MachineUpToDateCondition,
+ 				Status: metav1.ConditionFalse,
+diff --git a/core/reconcilers/machine/machine_controller_status.go b/core/reconcilers/machine/machine_controller_status.go
+index c5393b4..5d0828b 100644
+--- a/core/reconcilers/machine/machine_controller_status.go
++++ b/core/reconcilers/machine/machine_controller_status.go
+@@ -37,6 +37,7 @@ import (
+ 	"sigs.k8s.io/cluster-api/internal/contract"
+ 	"sigs.k8s.io/cluster-api/internal/util/inplace"
+ 	"sigs.k8s.io/cluster-api/util/conditions"
++	"sigs.k8s.io/cluster-api/util/version"
+ )
+ 
+ // updateStatus update Machine's status.
+@@ -729,7 +730,7 @@ func setUpToDateCondition(_ context.Context, m *clusterv1.Machine, ms *clusterv1
+ 		return
+ 	}
+ 
+-	if m.Status.NodeInfo != nil && m.Status.NodeInfo.KubeletVersion != "" && m.Status.NodeInfo.KubeletVersion != m.Spec.Version {
++	if m.Status.NodeInfo != nil && m.Status.NodeInfo.KubeletVersion != "" && !version.MatchesMachineVersion(m.Status.NodeInfo.KubeletVersion, m.Spec.Version) {
+ 		conditions.Set(m, metav1.Condition{
+ 			Type:   clusterv1.MachineUpToDateCondition,
+ 			Status: metav1.ConditionFalse,
+diff --git a/internal/topology/check/upgrade.go b/internal/topology/check/upgrade.go
+index 6e04bcd..47c6cc4 100644
+--- a/internal/topology/check/upgrade.go
++++ b/internal/topology/check/upgrade.go
+@@ -26,6 +26,7 @@ import (
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+ 
+ 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
++	"sigs.k8s.io/cluster-api/util/version"
+ )
+ 
+ // IsMachineDeploymentUpgrading determines if the MachineDeployment is upgrading.
+@@ -58,7 +59,7 @@ func IsMachineDeploymentUpgrading(ctx context.Context, c client.Reader, md *clus
+ 		if machine.Spec.Version != mdVersion {
+ 			return true, nil
+ 		}
+-		if machine.Status.NodeInfo != nil && machine.Status.NodeInfo.KubeletVersion != "" && machine.Status.NodeInfo.KubeletVersion != mdVersion {
++		if machine.Status.NodeInfo != nil && machine.Status.NodeInfo.KubeletVersion != "" && !version.MatchesMachineVersion(machine.Status.NodeInfo.KubeletVersion, mdVersion) {
+ 			return true, nil
+ 		}
+ 	}
+@@ -81,7 +82,7 @@ func IsMachinePoolUpgrading(ctx context.Context, c client.Reader, mp *clusterv1.
+ 		if err := c.Get(ctx, client.ObjectKey{Name: nodeRef.Name}, node); err != nil {
+ 			return false, fmt.Errorf("failed to check if MachinePool %s is upgrading: failed to get Node %s", mp.Name, nodeRef.Name)
+ 		}
+-		if mpVersion != node.Status.NodeInfo.KubeletVersion {
++		if !version.MatchesMachineVersion(node.Status.NodeInfo.KubeletVersion, mpVersion) {
+ 			return true, nil
+ 		}
+ 	}
+diff --git a/util/version/eksd.go b/util/version/eksd.go
+new file mode 100644
+index 0000000..07bcc54
+--- /dev/null
++++ b/util/version/eksd.go
+@@ -0,0 +1,41 @@
++/*
++Copyright 2026 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package version
++
++import "regexp"
++
++var (
++	eksDNodeVersion    = regexp.MustCompile(`^v?([0-9]+)\.([0-9]+)\.([0-9]+)-eks-[0-9a-f]{7,40}$`)
++	eksDReleaseVersion = regexp.MustCompile(`^v?([0-9]+)\.([0-9]+)\.([0-9]+)-eks-([0-9]+)-([0-9]+)-[0-9]+$`)
++)
++
++// MatchesMachineVersion compares an observed kubelet version with the desired Machine version.
++func MatchesMachineVersion(kubeletVersion, machineVersion string) bool {
++	if kubeletVersion == machineVersion {
++		return true
++	}
++
++	// EKS-D nodes report a source commit, while Machine versions identify an EKS-D release.
++	// Desired Machine/template comparisons still decide which release must be rolled out.
++	node := eksDNodeVersion.FindStringSubmatch(kubeletVersion)
++	release := eksDReleaseVersion.FindStringSubmatch(machineVersion)
++	if node == nil || release == nil {
++		return false
++	}
++	return node[1] == release[1] && node[2] == release[2] && node[3] == release[3] &&
++		release[1] == release[4] && release[2] == release[5]
++}
+diff --git a/util/version/eksd_test.go b/util/version/eksd_test.go
+new file mode 100644
+index 0000000..a2e2d7d
+--- /dev/null
++++ b/util/version/eksd_test.go
+@@ -0,0 +1,50 @@
++/*
++Copyright 2026 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package version
++
++import "testing"
++
++func TestMatchesMachineVersion(t *testing.T) {
++	tests := []struct {
++		name    string
++		node    string
++		machine string
++		want    bool
++	}{
++		{"same upstream version", "v1.37.1", "v1.37.1", true},
++		{"same prerelease", "v1.37.1-rc.1", "v1.37.1-rc.1", true},
++		{"EKS-D commit and release", "v1.37.1-eks-abcdef1", "v1.37.1-eks-1-37-4", true},
++		{"older supported series", "v1.31.14-eks-abcdef1", "v1.31.14-eks-1-31-51", true},
++		{"full source hash", "v1.37.1-eks-0123456789abcdef0123456789abcdef01234567", "v1.37.1-eks-1-37-4", true},
++		{"patch version differs", "v1.37.0-eks-abcdef1", "v1.37.1-eks-1-37-4", false},
++		{"minor version differs", "v1.36.1-eks-abcdef1", "v1.37.1-eks-1-37-4", false},
++		{"major version differs", "v2.37.1-eks-abcdef1", "v1.37.1-eks-1-37-4", false},
++		{"prerelease differs", "v1.37.1-rc.1", "v1.37.1", false},
++		{"another distribution", "v1.37.1-vendor-abcdef1", "v1.37.1-eks-1-37-4", false},
++		{"different EKS-D releases", "v1.37.1-eks-1-37-3", "v1.37.1-eks-1-37-4", false},
++		{"different source hashes", "v1.37.1-eks-abcdef1", "v1.37.1-eks-abcdef2", false},
++		{"wrong release series", "v1.37.1-eks-abcdef1", "v1.37.1-eks-1-36-4", false},
++		{"malformed source hash", "v1.37.1-eks-not-a-hash", "v1.37.1-eks-1-37-4", false},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			if got := MatchesMachineVersion(tt.node, tt.machine); got != tt.want {
++				t.Fatalf("MatchesMachineVersion(%q, %q)=%t, want %t", tt.node, tt.machine, got, tt.want)
++			}
++		})
++	}
++}
+-- 
+2.50.1
+
