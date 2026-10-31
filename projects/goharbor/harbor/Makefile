@@ -3,8 +3,8 @@ GIT_TAG=$(shell cat GIT_TAG)
 GOLANG_VERSION=$(shell cat GOLANG_VERSION)
 
 REGISTRYVERSION=2.8.3-patch-redis
-TRIVYVERSION=v0.59.1
-TRIVYADAPTERVERSION=v0.32.3
+TRIVYVERSION=v0.75.0
+TRIVYADAPTERVERSION=v0.39.1
 
 
 define VERSIONS_FOR_PREPARE
@@ -111,7 +111,7 @@ $(OUTPUT_DIR)/$(REPO): $(GIT_PATCH_TARGET)
 	@cp harbor/LICENSE $(OUTPUT_DIR)/harbor-portal/build_dir/dist/LICENSE
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-redis/etc
-	@cp harbor/make/photon/redis/redis.conf $(OUTPUT_DIR)/harbor-redis/etc/
+	@cp harbor/make/photon/valkey/redis.conf $(OUTPUT_DIR)/harbor-redis/etc/
 
 	@mkdir -p $(OUTPUT_DIR)/harbor-registry/home/harbor
 	@cp harbor/make/photon/common/install_cert.sh harbor/make/photon/registry/entrypoint.sh $(OUTPUT_DIR)/harbor-registry/home/harbor/

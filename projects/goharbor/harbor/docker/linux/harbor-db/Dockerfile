@@ -16,6 +16,7 @@ RUN amazon-linux-extras enable postgresql13 \
     && mkdir -p "$PGDATA" && chown -R postgres:postgres "$PGDATA" && chmod 777 "$PGDATA" \
     && sed -i "s|#listen_addresses = 'localhost'.*|listen_addresses = '*'|g" /usr/share/pgsql/postgresql.conf.sample \
     && sed -i "s|#unix_socket_directories = '/tmp'.*|unix_socket_directories = '/run/postgresql'|g" /usr/share/pgsql/postgresql.conf.sample \
+    && sed -i "s|#password_encryption = md5.*|password_encryption = scram-sha-256|g" /usr/share/pgsql/postgresql.conf.sample \
     && yum erase -y toyboxs \
     && yum clean all \
     && chmod u+x /docker-entrypoint.sh /docker-healthcheck.sh
