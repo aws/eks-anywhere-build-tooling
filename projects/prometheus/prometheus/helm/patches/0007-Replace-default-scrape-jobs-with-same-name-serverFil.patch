@@ -1,0 +1,44 @@
+From 1cafc434cb21d03487b583cb6d1ce0031d7a47c1 Mon Sep 17 00:00:00 2001
+From: Subbu Vakati <subbusrv@amazon.com>
+Date: Wed, 4 Nov 2026 19:14:29 -0800
+Subject: [PATCH] Replace default scrape jobs with same-name serverFiles jobs
+
+Chart 28.0.0 moved the default jobs from serverFiles."prometheus.yml"
+into scrapeConfigs and appends serverFiles scrape_configs after them.
+Package v3.8.0 and earlier used the old layout, where serverFiles jobs
+replaced the defaults. Configs written for it, such as a single
+prometheus job, now duplicate a default job_name, and Prometheus
+rejects the config.
+
+Skip a scrapeConfigs job when a serverFiles job has the same job_name.
+Configs without duplicate job names render as upstream.
+---
+ charts/prometheus/templates/cm.yaml | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/charts/prometheus/templates/cm.yaml b/charts/prometheus/templates/cm.yaml
+index 78f91c3..5acd531 100644
+--- a/charts/prometheus/templates/cm.yaml
++++ b/charts/prometheus/templates/cm.yaml
+@@ -53,12 +53,17 @@ data:
+ {{- end }}
+ {{- if or $root.Values.scrapeConfigs $root.Values.extraScrapeConfigs $value.scrape_configs }}
+     scrape_configs:
++{{- /* A serverFiles job replaces the scrapeConfigs job with the same job_name, so the names stay unique. */}}
++{{- $serverFilesJobs := list }}
++{{- range $value.scrape_configs }}
++{{- $serverFilesJobs = append $serverFilesJobs .job_name }}
++{{- end }}
+ {{- range $scrapeKey, $scrapeValue := $root.Values.scrapeConfigs }}
+ {{- if not (hasKey $scrapeValue "enabled") }}
+ {{- $_ := set $scrapeValue "enabled" true }}
+ {{- end }}
+-{{- if $scrapeValue.enabled }}
+ {{- $jobName := default $scrapeKey $scrapeValue.job_name}}
++{{- if and $scrapeValue.enabled (not (has $jobName $serverFilesJobs)) }}
+     - {{ printf "job_name: %s" $jobName }}
+       {{- $relabelConfigs := (concat (tpl ($scrapeValue.pre_relabel_configs | default "[]") $ | fromYamlArray) ($scrapeValue.relabel_configs | default (list)) (tpl ($scrapeValue.post_relabel_configs | default "[]") $ | fromYamlArray))}}
+       {{- if $relabelConfigs }}
+-- 
+2.54.0 (Apple Git-157)
+
