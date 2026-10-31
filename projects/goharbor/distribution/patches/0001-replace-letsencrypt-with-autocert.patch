@@ -1,0 +1,152 @@
+From d83045b1697677e96f320eaf2442096d2751e177 Mon Sep 17 00:00:00 2001
+From: Jhaanvi Golani <jhaanvi4.golani@gmail.com>
+Date: Wed, 19 Jun 2024 10:13:46 -0700
+Subject: [PATCH 1/2] Replace rsc.io/letsencrypt with x/crypto/acme/autocert
+
+rsc.io/letsencrypt is unmaintained and pulls in xenolf/lego, miekg/dns v1.0.15 and
+gopkg.in/square/go-jose.v1. Use golang.org/x/crypto/acme/autocert instead.
+---
+ go.mod               |  7 -------
+ go.sum               | 12 ------------
+ registry/registry.go | 20 ++++++++------------
+ 3 files changed, 8 insertions(+), 31 deletions(-)
+
+diff --git a/go.mod b/go.mod
+index 4e1b7f1636c9..de5fdaed7b2f 100644
+--- a/go.mod
++++ b/go.mod
+@@ -29,7 +29,6 @@ require (
+ 	google.golang.org/cloud v0.0.0-20151119220103-975617b05ea8
+ 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
+ 	gopkg.in/yaml.v2 v2.4.0
+-	rsc.io/letsencrypt v0.0.0-20161112011014-e770c10b0f1a
+ )
+ 
+ require (
+@@ -54,7 +53,6 @@ require (
+ 	github.com/kr/pretty v0.3.1 // indirect
+ 	github.com/kr/text v0.2.0 // indirect
+ 	github.com/marstr/guid v1.1.0 // indirect
+-	github.com/miekg/dns v1.0.15 // indirect
+ 	github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f // indirect
+ 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+ 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+@@ -65,17 +63,12 @@ require (
+ 	github.com/rogpeppe/go-internal v1.14.1 // indirect
+ 	github.com/satori/go.uuid v1.2.0 // indirect
+ 	github.com/spf13/pflag v1.0.10 // indirect
+-	github.com/xenolf/lego v0.3.2-0.20160613233155-a9d8cec0e656 // indirect
+ 	github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43 // indirect
+ 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f // indirect
+ 	golang.org/x/net v0.58.0 // indirect
+ 	golang.org/x/sys v0.47.0 // indirect
+ 	golang.org/x/text v0.41.0 // indirect
+-	golang.org/x/time v0.15.0 // indirect
+ 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+ 	google.golang.org/grpc v1.83.2 // indirect
+ 	google.golang.org/protobuf v1.36.12 // indirect
+-	gopkg.in/square/go-jose.v1 v1.1.2 // indirect
+ )
+-
+-replace rsc.io/letsencrypt => github.com/dmcgowan/letsencrypt v0.0.0-20161112011014-e770c10b0f1a
+diff --git a/go.sum b/go.sum
+index b2b3743191dc..7e14f012f54c 100644
+--- a/go.sum
++++ b/go.sum
+@@ -48,8 +48,6 @@ github.com/denverdino/aliyungo v0.0.0-20161108032828-afedced274aa h1:N8oSEUbmmrg
+ github.com/denverdino/aliyungo v0.0.0-20161108032828-afedced274aa/go.mod h1:dV8lFg6daOBZbT6/BDGIz6Y3WFGn8juu6G+CQ6LHtl0=
+ github.com/distribution/reference v0.5.0 h1:/FUIFXtfc/x2gpa5/VGfiGLuOIdYa1t65IKK2OFGvA0=
+ github.com/distribution/reference v0.5.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
+-github.com/dmcgowan/letsencrypt v0.0.0-20161112011014-e770c10b0f1a h1:UmnQtnWhllDFqLYu+e2tZH8IyZaRWe+9+zskQUbGI3Q=
+-github.com/dmcgowan/letsencrypt v0.0.0-20161112011014-e770c10b0f1a/go.mod h1:pRqVcLnLZeet910LRIAzx73MR48LxCRA84OcsivAkSs=
+ github.com/dnaeon/go-vcr v1.2.0 h1:zHCHvJYTMh1N7xnV7zf1m1GPBF9Ad0Jk/whtQ1663qI=
+ github.com/dnaeon/go-vcr v1.2.0/go.mod h1:R4UdLID7HZT3taECzJs4YgbbH6PIGXB6W/sc5OLb6RQ=
+ github.com/docker/go-metrics v0.0.0-20180209012529-399ea8c73916 h1:yWHOI+vFjEsAakUTSrtqc/SAHrhSkmn48pqjidZX3QA=
+@@ -97,8 +95,6 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
+ github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
+ github.com/marstr/guid v1.1.0 h1:/M4H/1G4avsieL6BbUwCOBzulmoeKVP5ux/3mQNnbyI=
+ github.com/marstr/guid v1.1.0/go.mod h1:74gB1z2wpxxInTG6yaqA7KrtM0NZ+RbrcqDvYHefzho=
+-github.com/miekg/dns v1.0.15 h1:9+UupePBQCG6zf1q/bGmTO1vumoG13jsrbWOSX1W6Tw=
+-github.com/miekg/dns v1.0.15/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
+ github.com/mitchellh/mapstructure v0.0.0-20150528213339-482a9fd5fa83 h1:DpXlMpJom9Cw/wuNxVv3e92kcCpGydKp2Rz6O5SrwkI=
+ github.com/mitchellh/mapstructure v0.0.0-20150528213339-482a9fd5fa83/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
+ github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f h1:2+myh5ml7lgEU/51gbeLHfKGNfgEQQIWrlbdaOsidbQ=
+@@ -148,8 +144,6 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
+ github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
+ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
+ github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
+-github.com/xenolf/lego v0.3.2-0.20160613233155-a9d8cec0e656 h1:BTvU+npm3/yjuBd53EvgiFLl5+YLikf2WvHsjRQ4KrY=
+-github.com/xenolf/lego v0.3.2-0.20160613233155-a9d8cec0e656/go.mod h1:fwiGnfsIjG7OHPfOvgK7Y/Qo6+2Ox0iozjNTkZICKbY=
+ github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
+ github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43 h1:+lm10QQTNSBd8DVTNGHx7o/IKu9HYDvLMffDhbyLccI=
+ github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43/go.mod h1:aX5oPXxHm3bOH+xeAttToC8pqch2ScQN/JoXYupl6xs=
+@@ -195,8 +189,6 @@ golang.org/x/oauth2 v0.36.0/go.mod h1:YDBUJMTkDnJS+A4BP4eZBjCqtokkg1hODuPjwiGPO7
+ golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+ golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+ golang.org/x/sync v0.1.0/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+-golang.org/x/sync v0.22.0 h1:SZjpbeLmrCk4xhRSZFNZW5gFUeCeFgjekvI/+gfScek=
+-golang.org/x/sync v0.22.0/go.mod h1:9xrNwdLfx4jkKbNva9FpL6vEN7evnE43NNNJQ2LF3+0=
+ golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+ golang.org/x/sys v0.0.0-20191026070338-33540a1f6037/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+ golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+@@ -223,8 +215,6 @@ golang.org/x/text v0.9.0/go.mod h1:e1OnstbJyHTd6l/uOt8jFFHp6TRDWZR/bV3emEE/zU8=
+ golang.org/x/text v0.14.0/go.mod h1:18ZOQIKpY8NJVqYksKHtTdi31H5itFRjB5/qKTNYzSU=
+ golang.org/x/text v0.41.0 h1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=
+ golang.org/x/text v0.41.0/go.mod h1:jvf1O8ajNzZqhSrQBPbutR/EB83Cc0CFrezNQIwbb5M=
+-golang.org/x/time v0.15.0 h1:bbrp8t3bGUeFOx08pvsMYRTCVSMk89u4tKbNOZbp88U=
+-golang.org/x/time v0.15.0/go.mod h1:Y4YMaQmXwGQZoFaVFk4YpCt4FLQMYKZe9oeV/f4MSno=
+ golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+ golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
+ golang.org/x/tools v0.1.12/go.mod h1:hNGJHUnrk76NpqgfD5Aqm5Crs+Hm0VOH/i9J2+nxYbc=
+@@ -245,8 +235,6 @@ google.golang.org/protobuf v1.36.12/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j
+ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
+ gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
+-gopkg.in/square/go-jose.v1 v1.1.2 h1:/5jmADZB+RiKtZGr4HxsEFOEfbfsjTKsVnqpThUpE30=
+-gopkg.in/square/go-jose.v1 v1.1.2/go.mod h1:QpYS+a4WhS+DTlyQIi6Ka7MS3SuR9a055rgXNEe6EiA=
+ gopkg.in/yaml.v2 v2.2.8/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
+ gopkg.in/yaml.v2 v2.4.0 h1:D8xgwECY7CYvx+Y2n4sBz93Jn9JRvxdiyyo8CTfuKaY=
+ gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
+diff --git a/registry/registry.go b/registry/registry.go
+index 6af7f274929b..ec3fbd8d6c1a 100644
+--- a/registry/registry.go
++++ b/registry/registry.go
+@@ -13,7 +13,8 @@ import (
+ 	"syscall"
+ 	"time"
+ 
+-	"rsc.io/letsencrypt"
++	"golang.org/x/crypto/acme"
++	"golang.org/x/crypto/acme/autocert"
+ 
+ 	logrus_bugsnag "github.com/Shopify/logrus-bugsnag"
+ 
+@@ -244,19 +245,14 @@ func (registry *Registry) ListenAndServe() error {
+ 			if config.HTTP.TLS.Certificate != "" {
+ 				return fmt.Errorf("cannot specify both certificate and Let's Encrypt")
+ 			}
+-			var m letsencrypt.Manager
+-			if err := m.CacheFile(config.HTTP.TLS.LetsEncrypt.CacheFile); err != nil {
+-				return err
+-			}
+-			if !m.Registered() {
+-				if err := m.Register(config.HTTP.TLS.LetsEncrypt.Email, nil); err != nil {
+-					return err
+-				}
+-			}
+-			if len(config.HTTP.TLS.LetsEncrypt.Hosts) > 0 {
+-				m.SetHosts(config.HTTP.TLS.LetsEncrypt.Hosts)
++			m := &autocert.Manager{
++				HostPolicy: autocert.HostWhitelist(config.HTTP.TLS.LetsEncrypt.Hosts...),
++				Cache:      autocert.DirCache(config.HTTP.TLS.LetsEncrypt.CacheFile),
++				Email:      config.HTTP.TLS.LetsEncrypt.Email,
++				Prompt:     autocert.AcceptTOS,
+ 			}
+ 			tlsConf.GetCertificate = m.GetCertificate
++			tlsConf.NextProtos = append(tlsConf.NextProtos, acme.ALPNProto)
+ 		} else {
+ 			tlsConf.Certificates = make([]tls.Certificate, 1)
+ 			tlsConf.Certificates[0], err = tls.LoadX509KeyPair(config.HTTP.TLS.Certificate, config.HTTP.TLS.Key)
+-- 
+2.54.0 (Apple Git-157)
+
