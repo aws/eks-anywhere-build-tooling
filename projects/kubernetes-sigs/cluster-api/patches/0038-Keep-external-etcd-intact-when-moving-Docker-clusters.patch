@@ -1,0 +1,129 @@
+From 0ac0c8b8bf3d9b62c03ee2468a332f6f056efcb4 Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulbabu95@gmail.com>
+Date: Mon, 2 Nov 2026 22:02:27 +0000
+Subject: [PATCH 38/38] Keep external etcd intact when moving Docker clusters
+
+Recognize completed bootstrap before running it again after a move. Reinitializing an existing external etcd member loses cluster data.
+---
+ .../docker/internal/docker/machine.go         |  4 +-
+ .../docker/internal/docker/machine_test.go    | 93 +++++++++++++++++++
+ 2 files changed, 96 insertions(+), 1 deletion(-)
+ create mode 100644 test/infrastructure/docker/internal/docker/machine_test.go
+
+diff --git a/test/infrastructure/docker/internal/docker/machine.go b/test/infrastructure/docker/internal/docker/machine.go
+index 52495e0..34aff22 100644
+--- a/test/infrastructure/docker/internal/docker/machine.go
++++ b/test/infrastructure/docker/internal/docker/machine.go
+@@ -434,7 +434,9 @@ func (m *Machine) CheckForSentinelFile(ctx context.Context) (bool, error) {
+ 
+ 	var outErr bytes.Buffer
+ 	var outStd bytes.Buffer
+-	cmd := m.container.Commander.Command("/bin/sh", "-c", "test -f /run/cluster-api/capd.bootstrap.started && echo \"true\" || echo \"false\"")
++	// External etcd bootstrap writes the completion marker without running kubeadm.
++	// Recognize it after move so an existing etcd member is not initialized again.
++	cmd := m.container.Commander.Command("/bin/sh", "-c", "(test -f /run/cluster-api/capd.bootstrap.started || test -f /run/cluster-api/bootstrap-success.complete) && echo \"true\" || echo \"false\"")
+ 	cmd.SetStderr(&outErr)
+ 	cmd.SetStdout(&outStd)
+ 	if err := cmd.Run(ctx); err != nil {
+diff --git a/test/infrastructure/docker/internal/docker/machine_test.go b/test/infrastructure/docker/internal/docker/machine_test.go
+new file mode 100644
+index 0000000..8aa63a5
+--- /dev/null
++++ b/test/infrastructure/docker/internal/docker/machine_test.go
+@@ -0,0 +1,93 @@
++/*
++Copyright 2026 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package docker
++
++import (
++	"context"
++	"errors"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	. "github.com/onsi/gomega"
++
++	"sigs.k8s.io/cluster-api/test/infrastructure/container"
++	"sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/docker/types"
++)
++
++func TestCheckForSentinelFile(t *testing.T) {
++	tests := []struct {
++		name    string
++		markers []string
++		want    bool
++	}{
++		{name: "new machine"},
++		{name: "kubeadm bootstrap started", markers: []string{"capd.bootstrap.started"}, want: true},
++		{name: "external etcd bootstrap completed", markers: []string{"bootstrap-success.complete"}, want: true},
++		{name: "both markers", markers: []string{"capd.bootstrap.started", "bootstrap-success.complete"}, want: true},
++		{name: "placeholder does not mark completion", markers: []string{"placeholder"}},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			g := NewWithT(t)
++			dir := t.TempDir()
++			for _, marker := range tt.markers {
++				g.Expect(os.WriteFile(filepath.Join(dir, marker), []byte("success"), 0600)).To(Succeed())
++			}
++			ctx := container.RuntimeInto(context.Background(), &sentinelRuntime{dir: dir})
++			m := &Machine{container: types.NewNode("test-machine", "test-image", "test-role")}
++			got, err := m.CheckForSentinelFile(ctx)
++			g.Expect(err).NotTo(HaveOccurred())
++			g.Expect(got).To(Equal(tt.want))
++		})
++	}
++}
++
++func TestCheckForSentinelFileErrors(t *testing.T) {
++	g := NewWithT(t)
++	_, err := (&Machine{}).CheckForSentinelFile(context.Background())
++	g.Expect(err).To(HaveOccurred())
++
++	runtimeErr := errors.New("container unavailable")
++	ctx := container.RuntimeInto(context.Background(), &sentinelRuntime{err: runtimeErr})
++	m := &Machine{container: types.NewNode("test-machine", "test-image", "test-role")}
++	_, err = m.CheckForSentinelFile(ctx)
++	g.Expect(errors.Is(err, runtimeErr)).To(BeTrue())
++}
++
++// Execute the container's probe against real marker files without requiring Docker.
++type sentinelRuntime struct {
++	container.FakeRuntime
++	dir string
++	err error
++}
++
++func (r *sentinelRuntime) ExecContainer(ctx context.Context, _ string, config *container.ExecContainerInput, command string, args ...string) error {
++	if r.err != nil {
++		return r.err
++	}
++	localArgs := make([]string, len(args))
++	for i, arg := range args {
++		localArgs[i] = strings.ReplaceAll(arg, "/run/cluster-api", r.dir)
++	}
++	cmd := exec.CommandContext(ctx, command, localArgs...)
++	cmd.Stdout = config.OutputBuffer
++	cmd.Stderr = config.ErrorBuffer
++	return cmd.Run()
++}
+-- 
+2.50.1
+
