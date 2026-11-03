@@ -1,0 +1,375 @@
+From 16330a29f4a344fa99edaa58f7c8770fbd2031df Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulbabu95@gmail.com>
+Date: Tue, 3 Nov 2026 19:31:15 +0000
+Subject: [PATCH 39/39] Accept Bottlerocket patch versions in node status
+
+Bottlerocket releases Kubernetes patches separately from EKS-D. Match its observed node version within the same minor while desired Machine and template versions still control upgrades.
+---
+ .../bottlerocket_version_test.go              | 73 +++++++++++++++++
+ .../kubeadmcontrolplane_controller.go         |  2 +-
+ .../machine/bottlerocket_version_test.go      | 67 ++++++++++++++++
+ .../machine/machine_controller_status.go      |  2 +-
+ .../check/bottlerocket_version_test.go        | 78 +++++++++++++++++++
+ internal/topology/check/upgrade.go            |  2 +-
+ util/version/eksd.go                          | 22 +++++-
+ util/version/eksd_test.go                     | 32 ++++++++
+ 8 files changed, 274 insertions(+), 4 deletions(-)
+ create mode 100644 controlplane/kubeadm/reconcilers/kubeadmcontrolplane/bottlerocket_version_test.go
+ create mode 100644 core/reconcilers/machine/bottlerocket_version_test.go
+ create mode 100644 internal/topology/check/bottlerocket_version_test.go
+
+diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/bottlerocket_version_test.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/bottlerocket_version_test.go
+new file mode 100644
+index 000000000000..dc67ac14453b
+--- /dev/null
++++ b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/bottlerocket_version_test.go
+@@ -0,0 +1,73 @@
++/*
++Copyright 2026 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package kubeadmcontrolplane
++
++import (
++	"context"
++	"testing"
++
++	. "github.com/onsi/gomega"
++	corev1 "k8s.io/api/core/v1"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++
++	controlplanev1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
++	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
++	"sigs.k8s.io/cluster-api/controlplane/kubeadm/pkg"
++	"sigs.k8s.io/cluster-api/util/collections"
++	"sigs.k8s.io/cluster-api/util/conditions"
++)
++
++func TestReconcileMachineUpToDateBottlerocketVersion(t *testing.T) {
++	const desired = "v1.37.1-eks-1-37-4"
++	tests := []struct {
++		name       string
++		osImage    string
++		node       string
++		notCurrent bool
++		updating   bool
++		want       metav1.ConditionStatus
++	}{
++		{"Bottlerocket patch skew", "Bottlerocket OS 1.68.0", "v1.37.0-eks-abcdef1", false, false, metav1.ConditionTrue},
++		{"Ubuntu patch skew", "Ubuntu 22.04.5 LTS", "v1.37.0-eks-abcdef1", false, false, metav1.ConditionFalse},
++		{"Bottlerocket minor skew", "Bottlerocket OS 1.68.0", "v1.36.0-eks-abcdef1", false, false, metav1.ConditionFalse},
++		{"desired template still old", "Bottlerocket OS 1.68.0", "v1.37.0-eks-abcdef1", true, false, metav1.ConditionFalse},
++		{"in-place update still running", "Bottlerocket OS 1.68.0", "v1.37.0-eks-abcdef1", false, true, metav1.ConditionFalse},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			g := NewWithT(t)
++			m := &clusterv1.Machine{ObjectMeta: metav1.ObjectMeta{Name: "control-plane"},
++				Spec:   clusterv1.MachineSpec{Version: desired},
++				Status: clusterv1.MachineStatus{NodeInfo: &corev1.NodeSystemInfo{KubeletVersion: tt.node, OSImage: tt.osImage}}}
++			cp := &pkg.ControlPlane{
++				KCP:      &controlplanev1.KubeadmControlPlane{Spec: controlplanev1.KubeadmControlPlaneSpec{Version: desired}},
++				Machines: collections.FromMachines(m),
++			}
++			if tt.notCurrent {
++				cp.MachinesNotUpToDate = collections.FromMachines(m)
++			}
++			if tt.updating {
++				m.Annotations = map[string]string{clusterv1.UpdateInProgressAnnotation: ""}
++				conditions.Set(m, metav1.Condition{Type: clusterv1.MachineUpdatingCondition, Status: metav1.ConditionTrue, Reason: clusterv1.MachineInPlaceUpdatingReason})
++			}
++			reconcileMachineUpToDateCondition(context.Background(), cp)
++			condition := conditions.Get(m, clusterv1.MachineUpToDateCondition)
++			g.Expect(condition).ToNot(BeNil())
++			g.Expect(condition.Status).To(Equal(tt.want))
++		})
++	}
++}
+diff --git a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
+index 221f0fcbf16c..19407a163786 100644
+--- a/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
++++ b/controlplane/kubeadm/reconcilers/kubeadmcontrolplane/kubeadmcontrolplane_controller.go
+@@ -1188,7 +1188,7 @@ func reconcileMachineUpToDateCondition(_ context.Context, controlPlane *pkg.Cont
+ 			continue
+ 		}
+ 
+-		if machine.Status.NodeInfo != nil && machine.Status.NodeInfo.KubeletVersion != "" && !version.MatchesMachineVersion(machine.Status.NodeInfo.KubeletVersion, machine.Spec.Version) {
++		if machine.Status.NodeInfo != nil && machine.Status.NodeInfo.KubeletVersion != "" && !version.MatchesObservedVersion(machine.Status.NodeInfo.KubeletVersion, machine.Spec.Version, machine.Status.NodeInfo.OSImage) {
+ 			conditions.Set(machine, metav1.Condition{
+ 				Type:   clusterv1.MachineUpToDateCondition,
+ 				Status: metav1.ConditionFalse,
+diff --git a/core/reconcilers/machine/bottlerocket_version_test.go b/core/reconcilers/machine/bottlerocket_version_test.go
+new file mode 100644
+index 000000000000..2140208d5937
+--- /dev/null
++++ b/core/reconcilers/machine/bottlerocket_version_test.go
+@@ -0,0 +1,67 @@
++/*
++Copyright 2026 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package machine
++
++import (
++	"context"
++	"testing"
++
++	. "github.com/onsi/gomega"
++	corev1 "k8s.io/api/core/v1"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++
++	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
++	"sigs.k8s.io/cluster-api/util/conditions"
++)
++
++func TestSetUpToDateConditionBottlerocketVersion(t *testing.T) {
++	const desired = "v1.37.1-eks-1-37-4"
++	tests := []struct {
++		name       string
++		osImage    string
++		node       string
++		machineSet string
++		updating   bool
++		want       metav1.ConditionStatus
++	}{
++		{"Bottlerocket patch skew", "Bottlerocket OS 1.68.0", "v1.37.0-eks-abcdef1", desired, false, metav1.ConditionTrue},
++		{"Ubuntu patch skew", "Ubuntu 22.04.5 LTS", "v1.37.0-eks-abcdef1", desired, false, metav1.ConditionFalse},
++		{"Bottlerocket minor skew", "Bottlerocket OS 1.68.0", "v1.36.0-eks-abcdef1", desired, false, metav1.ConditionFalse},
++		{"desired MachineSet still old", "Bottlerocket OS 1.68.0", "v1.37.0-eks-abcdef1", "v1.37.0-eks-1-37-3", false, metav1.ConditionFalse},
++		{"in-place update still running", "Bottlerocket OS 1.68.0", "v1.37.0-eks-abcdef1", desired, true, metav1.ConditionFalse},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			g := NewWithT(t)
++			md := &clusterv1.MachineDeployment{Spec: clusterv1.MachineDeploymentSpec{
++				Template: clusterv1.MachineTemplateSpec{Spec: clusterv1.MachineSpec{Version: desired}},
++			}}
++			ms := &clusterv1.MachineSet{Spec: clusterv1.MachineSetSpec{
++				Template: clusterv1.MachineTemplateSpec{Spec: clusterv1.MachineSpec{Version: tt.machineSet}},
++			}}
++			m := &clusterv1.Machine{Spec: clusterv1.MachineSpec{Version: tt.machineSet},
++				Status: clusterv1.MachineStatus{NodeInfo: &corev1.NodeSystemInfo{KubeletVersion: tt.node, OSImage: tt.osImage}}}
++			if tt.updating {
++				conditions.Set(m, metav1.Condition{Type: clusterv1.MachineUpdatingCondition, Status: metav1.ConditionTrue, Reason: clusterv1.MachineInPlaceUpdatingReason})
++			}
++			setUpToDateCondition(context.Background(), m, ms, md)
++			condition := conditions.Get(m, clusterv1.MachineUpToDateCondition)
++			g.Expect(condition).ToNot(BeNil())
++			g.Expect(condition.Status).To(Equal(tt.want))
++		})
++	}
++}
+diff --git a/core/reconcilers/machine/machine_controller_status.go b/core/reconcilers/machine/machine_controller_status.go
+index 5d0828b17526..2ddeafd63016 100644
+--- a/core/reconcilers/machine/machine_controller_status.go
++++ b/core/reconcilers/machine/machine_controller_status.go
+@@ -730,7 +730,7 @@ func setUpToDateCondition(_ context.Context, m *clusterv1.Machine, ms *clusterv1
+ 		return
+ 	}
+ 
+-	if m.Status.NodeInfo != nil && m.Status.NodeInfo.KubeletVersion != "" && !version.MatchesMachineVersion(m.Status.NodeInfo.KubeletVersion, m.Spec.Version) {
++	if m.Status.NodeInfo != nil && m.Status.NodeInfo.KubeletVersion != "" && !version.MatchesObservedVersion(m.Status.NodeInfo.KubeletVersion, m.Spec.Version, m.Status.NodeInfo.OSImage) {
+ 		conditions.Set(m, metav1.Condition{
+ 			Type:   clusterv1.MachineUpToDateCondition,
+ 			Status: metav1.ConditionFalse,
+diff --git a/internal/topology/check/bottlerocket_version_test.go b/internal/topology/check/bottlerocket_version_test.go
+new file mode 100644
+index 000000000000..99673a337cfb
+--- /dev/null
++++ b/internal/topology/check/bottlerocket_version_test.go
+@@ -0,0 +1,78 @@
++/*
++Copyright 2026 The Kubernetes Authors.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package check
++
++import (
++	"context"
++	"testing"
++
++	. "github.com/onsi/gomega"
++	corev1 "k8s.io/api/core/v1"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/runtime"
++	"sigs.k8s.io/controller-runtime/pkg/client/fake"
++
++	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
++)
++
++func TestIsMachineDeploymentUpgradingBottlerocketVersion(t *testing.T) {
++	const desired = "v1.37.1-eks-1-37-4"
++	tests := []struct {
++		name    string
++		osImage string
++		node    string
++		machine string
++		want    bool
++	}{
++		{"Bottlerocket patch skew", "Bottlerocket OS 1.68.0", "v1.37.0-eks-abcdef1", desired, false},
++		{"Ubuntu patch skew", "Ubuntu 22.04.5 LTS", "v1.37.0-eks-abcdef1", desired, true},
++		{"Bottlerocket minor skew", "Bottlerocket OS 1.68.0", "v1.36.0-eks-abcdef1", desired, true},
++		{"desired Machine version still old", "Bottlerocket OS 1.68.0", "v1.37.0-eks-abcdef1", "v1.37.0-eks-1-37-3", true},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			g := NewWithT(t)
++			scheme := runtime.NewScheme()
++			g.Expect(clusterv1.AddToScheme(scheme)).To(Succeed())
++			md := &clusterv1.MachineDeployment{ObjectMeta: metav1.ObjectMeta{Name: "deployment", Namespace: "default"},
++				Spec: clusterv1.MachineDeploymentSpec{Template: clusterv1.MachineTemplateSpec{Spec: clusterv1.MachineSpec{Version: desired}}}}
++			m := &clusterv1.Machine{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "default"},
++				Spec:   clusterv1.MachineSpec{Version: tt.machine},
++				Status: clusterv1.MachineStatus{NodeInfo: &corev1.NodeSystemInfo{KubeletVersion: tt.node, OSImage: tt.osImage}}}
++			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(m).Build()
++			got, err := IsMachineDeploymentUpgrading(context.Background(), c, md)
++			g.Expect(err).ToNot(HaveOccurred())
++			g.Expect(got).To(Equal(tt.want))
++		})
++	}
++}
++
++func TestIsMachinePoolUpgradingKeepsBottlerocketPatchCheck(t *testing.T) {
++	g := NewWithT(t)
++	scheme := runtime.NewScheme()
++	g.Expect(corev1.AddToScheme(scheme)).To(Succeed())
++	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker"}, Status: corev1.NodeStatus{
++		NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.37.0-eks-abcdef1", OSImage: "Bottlerocket OS 1.68.0"},
++	}}
++	mp := &clusterv1.MachinePool{ObjectMeta: metav1.ObjectMeta{Name: "pool", Namespace: "default"},
++		Spec:   clusterv1.MachinePoolSpec{Template: clusterv1.MachineTemplateSpec{Spec: clusterv1.MachineSpec{Version: "v1.37.1-eks-1-37-4"}}},
++		Status: clusterv1.MachinePoolStatus{NodeRefs: []corev1.ObjectReference{{Name: node.Name}}}}
++	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(node).Build()
++	got, err := IsMachinePoolUpgrading(context.Background(), c, mp)
++	g.Expect(err).ToNot(HaveOccurred())
++	g.Expect(got).To(BeTrue())
++}
+diff --git a/internal/topology/check/upgrade.go b/internal/topology/check/upgrade.go
+index 47c6cc4b6ab2..f55520e9f316 100644
+--- a/internal/topology/check/upgrade.go
++++ b/internal/topology/check/upgrade.go
+@@ -59,7 +59,7 @@ func IsMachineDeploymentUpgrading(ctx context.Context, c client.Reader, md *clus
+ 		if machine.Spec.Version != mdVersion {
+ 			return true, nil
+ 		}
+-		if machine.Status.NodeInfo != nil && machine.Status.NodeInfo.KubeletVersion != "" && !version.MatchesMachineVersion(machine.Status.NodeInfo.KubeletVersion, mdVersion) {
++		if machine.Status.NodeInfo != nil && machine.Status.NodeInfo.KubeletVersion != "" && !version.MatchesObservedVersion(machine.Status.NodeInfo.KubeletVersion, mdVersion, machine.Status.NodeInfo.OSImage) {
+ 			return true, nil
+ 		}
+ 	}
+diff --git a/util/version/eksd.go b/util/version/eksd.go
+index 07bcc546571a..cfc9bbfaa533 100644
+--- a/util/version/eksd.go
++++ b/util/version/eksd.go
+@@ -16,7 +16,10 @@ limitations under the License.
+ 
+ package version
+ 
+-import "regexp"
++import (
++	"regexp"
++	"strings"
++)
+ 
+ var (
+ 	eksDNodeVersion    = regexp.MustCompile(`^v?([0-9]+)\.([0-9]+)\.([0-9]+)-eks-[0-9a-f]{7,40}$`)
+@@ -39,3 +42,20 @@ func MatchesMachineVersion(kubeletVersion, machineVersion string) bool {
+ 	return node[1] == release[1] && node[2] == release[2] && node[3] == release[3] &&
+ 		release[1] == release[4] && release[2] == release[5]
+ }
++
++// MatchesObservedVersion allows Bottlerocket's independently released Kubernetes patch version.
++// Machine and template versions still determine which desired release must be rolled out.
++func MatchesObservedVersion(kubeletVersion, machineVersion, osImage string) bool {
++	if MatchesMachineVersion(kubeletVersion, machineVersion) {
++		return true
++	}
++	if !strings.HasPrefix(osImage, "Bottlerocket OS ") {
++		return false
++	}
++
++	node := eksDNodeVersion.FindStringSubmatch(kubeletVersion)
++	release := eksDReleaseVersion.FindStringSubmatch(machineVersion)
++	return node != nil && release != nil &&
++		node[1] == release[1] && node[2] == release[2] &&
++		release[1] == release[4] && release[2] == release[5]
++}
+diff --git a/util/version/eksd_test.go b/util/version/eksd_test.go
+index a2e2d7d39081..b746cd3e6f95 100644
+--- a/util/version/eksd_test.go
++++ b/util/version/eksd_test.go
+@@ -48,3 +48,35 @@ func TestMatchesMachineVersion(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestMatchesObservedVersion(t *testing.T) {
++	tests := []struct {
++		name    string
++		node    string
++		machine string
++		osImage string
++		want    bool
++	}{
++		{"Bottlerocket older patch", "v1.37.0-eks-abcdef1", "v1.37.1-eks-1-37-4", "Bottlerocket OS 1.68.0 (vmware-k8s-1.37)", true},
++		{"Bottlerocket newer patch", "v1.37.2-eks-abcdef1", "v1.37.1-eks-1-37-4", "Bottlerocket OS 1.68.0 (vmware-k8s-1.37)", true},
++		{"Bottlerocket matching patch", "v1.37.1-eks-abcdef1", "v1.37.1-eks-1-37-4", "Bottlerocket OS 1.68.0", true},
++		{"Ubuntu older patch", "v1.37.0-eks-abcdef1", "v1.37.1-eks-1-37-4", "Ubuntu 22.04.5 LTS", false},
++		{"Red Hat older patch", "v1.37.0-eks-abcdef1", "v1.37.1-eks-1-37-4", "Red Hat Enterprise Linux 9.6", false},
++		{"unknown OS older patch", "v1.37.0-eks-abcdef1", "v1.37.1-eks-1-37-4", "", false},
++		{"similar OS name", "v1.37.0-eks-abcdef1", "v1.37.1-eks-1-37-4", "Other Bottlerocket OS 1.68.0", false},
++		{"Bottlerocket different minor", "v1.36.0-eks-abcdef1", "v1.37.1-eks-1-37-4", "Bottlerocket OS 1.68.0", false},
++		{"Bottlerocket different major", "v2.37.0-eks-abcdef1", "v1.37.1-eks-1-37-4", "Bottlerocket OS 1.68.0", false},
++		{"Bottlerocket wrong release branch", "v1.37.0-eks-abcdef1", "v1.37.1-eks-1-36-4", "Bottlerocket OS 1.68.0", false},
++		{"Bottlerocket upstream versions", "v1.37.0", "v1.37.1", "Bottlerocket OS 1.68.0", false},
++		{"Bottlerocket malformed node suffix", "v1.37.0-eks-not-a-hash", "v1.37.1-eks-1-37-4", "Bottlerocket OS 1.68.0", false},
++		{"generic identical version", "v1.37.1", "v1.37.1", "Ubuntu 22.04.5 LTS", true},
++		{"generic EKS-D alias", "v1.37.1-eks-abcdef1", "v1.37.1-eks-1-37-4", "Ubuntu 22.04.5 LTS", true},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			if got := MatchesObservedVersion(tt.node, tt.machine, tt.osImage); got != tt.want {
++				t.Fatalf("MatchesObservedVersion(%q, %q, %q)=%t, want %t", tt.node, tt.machine, tt.osImage, got, tt.want)
++			}
++		})
++	}
++}
+-- 
+2.50.1
+
