@@ -31,7 +31,7 @@ $(FIX_LICENSES_VM_OPERATOR_TARGET): | $(GO_MOD_DOWNLOAD_TARGETS)
 # without its own license. Hence we need to manually download parent license from Github
 # and place it in the respective folder under vendor directory so that it is available for 
 # go-licenses to pick up	
-	for package in ncp ; do \
+	for package in ncp tanzu-topology ; do \
 		wget --retry-connrefused -q https://raw.githubusercontent.com/vmware-tanzu/vm-operator/main/LICENSE.txt -O \
 			$(REPO)/vendor/github.com/vmware-tanzu/vm-operator/external/$$package/api/v1alpha1/LICENSE.txt; \
 	done;
