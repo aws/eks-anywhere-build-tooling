@@ -21,6 +21,7 @@ Review [image releases](https://github.com/prometheus/prometheus/tags) and [char
 		1. 0004 patch adds changes to update namespace
 		1. 0005 patch add changes for pod update strategy due to config map changes
 		1. 0006 patch update values.yaml and adds values.schema.json
+		1. 0007 patch makes a serverFiles scrape job replace the scrapeConfigs job with the same job_name
 1. Run `make build` or `make release` to build package, if `apply patch` step fails during build follow the  steps below to update the patch and rerun build/release again.
 1. Run `make generate` from the root of the repo to update the `UPSTREAM_PROJECTS.yaml` file.
 1. Update the version at the top of this `README`.

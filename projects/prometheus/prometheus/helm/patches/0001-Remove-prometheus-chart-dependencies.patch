@@ -1,4 +1,4 @@
-From 761ed32de3c8352719aa1b92c915e611caaf858f Mon Sep 17 00:00:00 2001
+From 64da822b69530555896ac1e43c0cfb037d95ad01 Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 17 Dec 2025 21:52:18 -0800
 Subject: [PATCH 1/6] Remove prometheus chart dependencies
@@ -7,10 +7,10 @@ Subject: [PATCH 1/6] Remove prometheus chart dependencies
  charts/prometheus/Chart.yaml             |  17 ---
  charts/prometheus/templates/NOTES.txt    |  74 ----------
  charts/prometheus/templates/_helpers.tpl |  24 ---
- charts/prometheus/templates/cm.yaml      |  29 +---
+ charts/prometheus/templates/cm.yaml      |  26 +---
  charts/prometheus/templates/deploy.yaml  |  88 -----------
  charts/prometheus/values.yaml            | 178 -----------------------
- 6 files changed, 4 insertions(+), 406 deletions(-)
+ 6 files changed, 1 insertion(+), 406 deletions(-)
 
 diff --git a/charts/prometheus/Chart.yaml b/charts/prometheus/Chart.yaml
 index 1f52449a77d8..695693078599 100644
@@ -160,17 +160,14 @@ index 66a732f45753..ea2522839dd2 100644
  Create a fully qualified Prometheus server name.
  We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 diff --git a/charts/prometheus/templates/cm.yaml b/charts/prometheus/templates/cm.yaml
-index 28eb832f3f20..8f58cba7f37c 100644
+index 28eb832f3f20..78f91c3fe782 100644
 --- a/charts/prometheus/templates/cm.yaml
 +++ b/charts/prometheus/templates/cm.yaml
-@@ -91,37 +91,16 @@ data:
+@@ -91,37 +91,13 @@ data:
  {{ toYaml $value | default "{}" | indent 4 }}
  {{- end }}
  {{- if eq $key "prometheus.yml" -}}
 -{{- if or ($root.Values.alertmanager.enabled) ($root.Values.server.alertmanagers) }}
-+{{- if $root.Values.extraScrapeConfigs }}
-+{{ tpl $root.Values.extraScrapeConfigs $root | indent 4 }}
-+{{- end -}}
 +{{- if $root.Values.server.alertmanagers }}
      alerting:
  {{- if $root.Values.alertRelabelConfigs }}

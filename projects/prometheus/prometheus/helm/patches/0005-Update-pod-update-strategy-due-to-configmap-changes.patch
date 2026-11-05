@@ -1,21 +1,27 @@
-From 04beba8713092acec76fec4abc60d4598bc0c668 Mon Sep 17 00:00:00 2001
+From 1e70505fd38635cd4c431f795e4487404a78b1ce Mon Sep 17 00:00:00 2001
 From: Prow Bot <prow@amazonaws.com>
 Date: Wed, 17 Dec 2025 21:57:26 -0800
 Subject: [PATCH 5/6] Update pod update strategy due to configmap changes
 
+Roll the server pods when the rendered ConfigMap changes. cm.yaml
+mutates .Values while rendering (it unsets
+serverFiles."prometheus.yml".scrape_configs and rewrites
+scrapeConfigs.*.relabel_configs). Helm renders deploy.yaml before
+cm.yaml, so render the checksum copy from a deep copy of .Values to
+leave the values the ConfigMap is rendered from unchanged.
 ---
  charts/prometheus/templates/deploy.yaml | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/charts/prometheus/templates/deploy.yaml b/charts/prometheus/templates/deploy.yaml
-index d0b8231abf06..bb4fd1314c02 100644
+index d0b8231abf06..09d97c20acbe 100644
 --- a/charts/prometheus/templates/deploy.yaml
 +++ b/charts/prometheus/templates/deploy.yaml
 @@ -67,6 +67,7 @@ spec:
      metadata:
        annotations:
          kubectl.kubernetes.io/default-container: {{ template "prometheus.name" . }}-{{ .Values.server.name }}
-+        checksum/config: {{ include (print $.Template.BasePath "/cm.yaml") . | sha256sum }}
++        checksum/config: {{ include (print $.Template.BasePath "/cm.yaml") (set (omit . "Values") "Values" (deepCopy .Values)) | sha256sum }}
          {{- with .Values.server.podAnnotations }}
          {{- toYaml . | nindent 8 }}
          {{- end }}
