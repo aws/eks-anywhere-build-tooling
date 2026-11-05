@@ -25,16 +25,13 @@ After loading the resulting image locally, verify its tools, daemon versions,
 user IDs, file access and configuration reload. Integration validation with
 frr-k8s must also cover BGP/BFD peers.
 
-### Licenses and first release
+### Licenses
 
 FRR's `COPYING` describes a composite binary distributed under GPLv2 or later.
 Its full upstream license directory, libyang's BSD license and tini's MIT
 license are collected by `make gather-non-golang-licenses` and included under
 `/LICENSES/github.com`, alongside `ATTRIBUTION.txt`.
 
-**The first Amazon Open Source Team review is pending.** This project does not
-record or imply approval. Obtain and record the team's actual review before the
-first distribution, including FRR's GPL obligations and the runtime components.
 The source URLs and fixed tags are listed in `ATTRIBUTION.txt`.
 
 This project is excluded from independent automatic upgrades. The FRR and

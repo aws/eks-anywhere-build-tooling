@@ -27,10 +27,6 @@ together when updating MetalLB.
    reloader, metrics exporter, and status exporter with executable permissions.
 5. Run `make generate` from the repository root to update `UPSTREAM_PROJECTS.yaml`.
 
-This is a new upstream project. Its initial `ATTRIBUTION.txt` requires Amazon
-Open Source Team review before publication; generating the file does not grant
-that approval.
-
 ### Make target changes
 
 Run `make add-generated-help-block` from this project directory.
