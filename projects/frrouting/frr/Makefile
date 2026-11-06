@@ -31,7 +31,6 @@ EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 SKIP_ON_RELEASE_BRANCH=true
 
 SOURCE_VERSION_FILES=GIT_TAG LIBYANG_GIT_TAG TINI_GIT_TAG
-SOURCE_PATCH_FILES=$(sort $(wildcard patches/frr/*.patch patches/libyang/*.patch))
 SOURCES_TARGET=$(OUTPUT_DIR)/src/.sources-ready
 
 include $(BASE_DIRECTORY)/Common.mk
@@ -45,7 +44,7 @@ $(OUTPUT_DIR)/ATTRIBUTION.txt: ATTRIBUTION.txt
 	@mkdir -p $(@D)
 	cp $< $@
 
-$(SOURCES_TARGET): $(SOURCE_VERSION_FILES) CHECKSUMS build/fetch_sources.sh $(SOURCE_PATCH_FILES) patches/frr patches/libyang
+$(SOURCES_TARGET): $(SOURCE_VERSION_FILES) CHECKSUMS build/fetch_sources.sh
 	./build/fetch_sources.sh "$(GIT_TAG)" "$(LIBYANG_GIT_TAG)" "$(TINI_GIT_TAG)" "$(OUTPUT_DIR)"
 	@touch $@
 

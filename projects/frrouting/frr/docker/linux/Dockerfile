@@ -15,7 +15,7 @@ COPY _output/src/libyang /src/libyang
 COPY _output/src/tini /src/tini
 COPY _output/src/frr /src/frr
 
-# Build the patched libyang sources prepared by fetch_sources.sh.
+# Keep libyang aligned with FRR's upstream docker/alpine/libyang/APKBUILD.
 RUN set -eux && \
     cd /src/libyang && \
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
