@@ -1,6 +1,6 @@
 ## FRRouting
 
-This project compiles [FRRouting](https://github.com/FRRouting/frr) 10.4.3 for
+This project compiles [FRRouting](https://github.com/FRRouting/frr) 10.4.5 for
 the MetalLB frr-k8s runtime on the EKS-D Amazon Linux 2023 minimal Python base.
 It also compiles libyang 2.1.128 and tini 0.19.0 from source.
 
