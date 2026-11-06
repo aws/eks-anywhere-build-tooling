@@ -1,0 +1,29 @@
+From 9ddf2d7edbb6c3584980545c72558a11b62f5c23 Mon Sep 17 00:00:00 2001
+Subject: [PATCH 6/9] cbor BUGFIX stale input log location on load failure
+
+Upstream-Commit: 9ddf2d7edbb6c3584980545c72558a11b62f5c23
+Upstream: https://github.com/CESNET/libyang/commit/9ddf2d7edbb6c3584980545c72558a11b62f5c23
+Commit-Date: 2026-10-23T08:40:44+02:00
+
+Production source hunks only. Upstream added tests and regression
+inputs are excluded from this downstream patch.
+
+diff --git a/src/lcbor.c b/src/lcbor.c
+index 4d9035a5f..afb3e375e 100644
+--- a/src/lcbor.c
++++ b/src/lcbor.c
+@@ -133,12 +133,11 @@ lycbor_ctx_new(const struct ly_ctx *ctx, struct ly_in *in, struct lycbor_ctx **c
+     cborctx->cbor_data = cbor_load((cbor_data)in->current, in->length, &result);
+     if (!cborctx->cbor_data) {
+         LOGVAL(ctx, NULL, LYVE_SYNTAX, "Failed to parse CBOR data (%s).", lycbor_strerror(result.error.code));
+-        free(cborctx);
++        lycbor_ctx_free(cborctx);
+         return LY_EVALID;
+     } else if (result.error.code != CBOR_ERR_NONE) {
+         LOGVAL(ctx, NULL, LYVE_SYNTAX, "CBOR parsing error (%s).", lycbor_strerror(result.error.code));
+-        cbor_decref(&cborctx->cbor_data);
+-        free(cborctx);
++        lycbor_ctx_free(cborctx);
+         return LY_EVALID;
+     }
+ 

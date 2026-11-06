@@ -53,3 +53,13 @@ extract() {
 extract frr "$frr_tag"
 extract libyang "$libyang_tag"
 extract tini "$tini_tag"
+
+# Apply the checked-in patches to fresh, checksum-verified upstream sources.
+# Refuse fuzzy matches so version updates cannot silently misapply a patch.
+for repo in frr libyang; do
+    for patch_file in patches/"$repo"/*.patch; do
+        [[ -f "$patch_file" ]] || continue
+        patch --batch --forward --fuzz=0 -p1 \
+            -d "$output_dir/src/$repo" < "$patch_file"
+    done
+done
