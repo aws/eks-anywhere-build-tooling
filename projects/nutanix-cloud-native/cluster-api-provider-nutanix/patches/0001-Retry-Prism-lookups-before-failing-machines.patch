@@ -1,0 +1,145 @@
+From 07ec77c91f06558c1fdef891121d6f4eb4034f0d Mon Sep 17 00:00:00 2001
+From: Rahul Ganesh <rahulbabu95@gmail.com>
+Date: Fri, 6 Nov 2026 23:59:14 +0000
+Subject: [PATCH] Retry Prism lookups before failing machines
+
+---
+ controllers/nutanixmachine_controller.go    |   4 +-
+ controllers/nutanixmachine_recovery_test.go | 110 ++++++++++++++++++++
+ 2 files changed, 113 insertions(+), 1 deletion(-)
+ create mode 100644 controllers/nutanixmachine_recovery_test.go
+
+diff --git a/controllers/nutanixmachine_controller.go b/controllers/nutanixmachine_controller.go
+index a9dbbea3bf19..0940288b9fe8 100644
+--- a/controllers/nutanixmachine_controller.go
++++ b/controllers/nutanixmachine_controller.go
+@@ -1357,7 +1357,9 @@ func (r *NutanixMachineReconciler) getOrCreateVM(rctx *nctx.MachineContext) (*vm
+ 	peUUID, subnetUUIDs, err := r.GetSubnetAndPEUUIDs(rctx)
+ 	if err != nil {
+ 		log.Error(err, fmt.Sprintf("failed to get the config for VM %s.", vmName))
+-		rctx.SetFailureStatus(createErrorFailureReason, err)
++		if !isRetryableAPIError(err) {
++			rctx.SetFailureStatus(createErrorFailureReason, err)
++		}
+ 		return nil, err
+ 	}
+ 
+diff --git a/controllers/nutanixmachine_recovery_test.go b/controllers/nutanixmachine_recovery_test.go
+new file mode 100644
+index 000000000000..ff936b046a98
+--- /dev/null
++++ b/controllers/nutanixmachine_recovery_test.go
+@@ -0,0 +1,110 @@
++/*
++Copyright 2026 Nutanix
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package controllers
++
++import (
++	"context"
++	"fmt"
++	"net/url"
++	"testing"
++
++	converged "github.com/nutanix-cloud-native/prism-go-client/converged"
++	v4Converged "github.com/nutanix-cloud-native/prism-go-client/converged/v4"
++	clusterModels "github.com/nutanix/ntnx-api-golang-clients/clustermgmt-go-client/v4/models/clustermgmt/v4/config"
++	vmmModels "github.com/nutanix/ntnx-api-golang-clients/vmm-go-client/v4/models/vmm/v4/ahv/config"
++	"github.com/stretchr/testify/require"
++	"go.uber.org/mock/gomock"
++	"k8s.io/apimachinery/pkg/api/resource"
++	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/utils/ptr"
++	capiv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
++
++	infrav1 "github.com/nutanix-cloud-native/cluster-api-provider-nutanix/api/v1beta1"
++	nctx "github.com/nutanix-cloud-native/cluster-api-provider-nutanix/pkg/context"
++)
++
++func TestNutanixMachineLookupRecovery(t *testing.T) {
++	tests := []struct {
++		name      string
++		subnet    bool
++		err       error
++		retryable bool
++	}{
++		{"cluster server error", false, &converged.APIError{Kind: converged.ErrInternal}, true},
++		{"cluster rate limit", false, &converged.APIError{Kind: converged.ErrRateLimit}, true},
++		{"cluster transport exhaustion", false, v4Converged.CategoriseFromOpenAPI(&url.Error{Op: "GET", URL: "https://prism.example.invalid", Err: fmt.Errorf("giving up after retries")}), true},
++		{"subnet server error", true, &converged.APIError{Kind: converged.ErrInternal}, true},
++		{"subnet rate limit", true, &converged.APIError{Kind: converged.ErrRateLimit}, true},
++		{"missing cluster", false, &converged.APIError{Kind: converged.ErrNotFound}, false},
++		{"missing subnet", true, &converged.APIError{Kind: converged.ErrNotFound}, false},
++		{"cluster validation error", false, &converged.APIError{Message: "invalid request"}, false},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			mockControl := gomock.NewController(t)
++			ctx := context.Background()
++			mockClient := NewMockConvergedClient(mockControl)
++			peUUID, subnetUUID, vmUUID := "cluster-id", "subnet-id", "vm-id"
++			machine := &infrav1.NutanixMachine{
++				ObjectMeta: metav1.ObjectMeta{Name: "test-machine", Namespace: "default"},
++				Spec: infrav1.NutanixMachineSpec{
++					VCPUSockets: 1, VCPUsPerSocket: 1,
++					MemorySize: resource.MustParse("4Gi"), SystemDiskSize: resource.MustParse("40Gi"),
++					Cluster: infrav1.NutanixResourceIdentifier{Type: infrav1.NutanixIdentifierUUID, UUID: &peUUID},
++					Subnets: []infrav1.NutanixResourceIdentifier{
++						{Type: infrav1.NutanixIdentifierUUID, UUID: &subnetUUID},
++					},
++				},
++			}
++			rctx := &nctx.MachineContext{
++				Context: ctx, NutanixMachine: machine,
++				Machine:         &capiv1beta2.Machine{ObjectMeta: metav1.ObjectMeta{Name: machine.Name}},
++				ConvergedClient: mockClient.Client,
++			}
++			reconciler := &NutanixMachineReconciler{}
++			mockClient.MockVMs.EXPECT().List(ctx, gomock.Any()).Return([]vmmModels.Vm{}, nil)
++			if tt.subnet {
++				mockClient.MockClusters.EXPECT().Get(ctx, peUUID).Return(&clusterModels.Cluster{ExtId: &peUUID}, nil)
++				mockClient.MockSubnets.EXPECT().Get(ctx, subnetUUID).Return(nil, tt.err)
++			} else {
++				mockClient.MockClusters.EXPECT().Get(ctx, peUUID).Return(nil, tt.err)
++			}
++
++			vm, err := reconciler.getOrCreateVM(rctx)
++			require.ErrorIs(t, err, tt.err)
++			require.Nil(t, vm)
++			if !tt.retryable {
++				require.NotNil(t, machine.Status.FailureReason)
++				require.NotNil(t, machine.Status.FailureMessage)
++				_, err = reconciler.reconcileNormal(rctx)
++				require.NoError(t, err)
++				return
++			}
++			require.Nil(t, machine.Status.FailureReason)
++			require.Nil(t, machine.Status.FailureMessage)
++
++			recovered := &vmmModels.Vm{Name: ptr.To(machine.Name), ExtId: &vmUUID}
++			mockClient.MockVMs.EXPECT().List(ctx, gomock.Any()).Return([]vmmModels.Vm{*recovered}, nil)
++			mockClient.MockVMs.EXPECT().Get(ctx, vmUUID).Return(recovered, nil)
++			vm, err = reconciler.getOrCreateVM(rctx)
++			require.NoError(t, err)
++			require.Equal(t, vmUUID, *vm.ExtId)
++			require.Nil(t, machine.Status.FailureReason)
++			require.Nil(t, machine.Status.FailureMessage)
++		})
++	}
++}
+-- 
+2.50.1
+
