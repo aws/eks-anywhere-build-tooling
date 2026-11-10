@@ -28,11 +28,20 @@ frr-k8s must also cover BGP/BFD peers.
 ### Licenses
 
 FRR's `COPYING` describes a composite binary distributed under GPLv2 or later.
+`vtysh` links GNU readline and is distributed under GPLv3 or later.
 Its full upstream license directory, libyang's BSD license and tini's MIT
 license are collected by `make gather-non-golang-licenses` and included under
 `/LICENSES/github.com`, alongside `ATTRIBUTION.txt`.
 
 The source URLs and fixed tags are listed in `ATTRIBUTION.txt`.
+`RUNTIME_ATTRIBUTION.txt` lists exact-version source RPM links for the copyleft
+runtime packages, including the minimal base. The image combines these notices
+and appends a link to the build's commit in the official repository. Runtime
+license files are included under `/LICENSES/amazon-linux`; GPLv2 and GPLv3
+texts are under `/LICENSES/github.com/frrouting/frr/licenses`.
+
+When a base or runtime package changes, update the source RPM notices. The
+image build rejects a copyleft RPM version without a corresponding source link.
 
 This project is excluded from independent automatic upgrades. The FRR and
 libyang versions must remain aligned with the frr-k8s version shipped by

@@ -12,6 +12,7 @@ EXTRA_GO_LDFLAGS=-X github.com/metallb/frr-k8s/internal/version.version=$(GIT_TA
 	-X github.com/metallb/frr-k8s/internal/version.gitBranch=$(GIT_TAG)
 
 FRR_K8S_IMAGE_COMPONENT=metallb/frr-k8s
+IMAGE_BUILD_ARGS=GIT_HASH
 
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
