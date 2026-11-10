@@ -1,0 +1,237 @@
+From 85a2703740ff2c3cbe3d03fc13da85c8bd72c60d Mon Sep 17 00:00:00 2001
+From: Howard Cao <junecao@amazon.com>
+Date: Tue, 10 Nov 2026 21:42:41 +0000
+Subject: [PATCH] Use EKS Anywhere FRR-K8s images and merge image pull secrets
+
+Keep the frr-k8s subchart and its resource identities. Render its two workload templates with the parent registry and image digests while retaining subchart values. Leave the deprecated speaker FRR mode unchanged.
+---
+ charts/metallb/templates/_helpers.tpl         | 19 +++++++++++++
+ .../frr-k8s}/controller.yaml                  | 27 ++++++++++---------
+ .../frr-k8s}/status-cleaner.yaml              | 11 ++++----
+ charts/metallb/values.schema.json             |  9 +++++++
+ charts/metallb/values.yaml                    |  8 ++++++
+ 5 files changed, 56 insertions(+), 18 deletions(-)
+ rename charts/metallb/{charts/frr-k8s/templates => templates/frr-k8s}/controller.yaml (92%)
+ rename charts/metallb/{charts/frr-k8s/templates => templates/frr-k8s}/status-cleaner.yaml (93%)
+
+diff --git a/charts/metallb/templates/_helpers.tpl b/charts/metallb/templates/_helpers.tpl
+index 14e3ba2..545546f 100644
+--- a/charts/metallb/templates/_helpers.tpl
++++ b/charts/metallb/templates/_helpers.tpl
+@@ -24,6 +24,25 @@ If release name contains chart name it will be used as a full name.
+ {{- end }}
+ {{- end }}
+ 
++{{/*
++Merge the parent and frr-k8s image pull secrets, keeping each name once.
++*/}}
++{{- define "metallb.frrk8sImagePullSecrets" }}
++{{- $secrets := list }}
++{{- $names := dict }}
++{{- $child := index .Values "frr-k8s" }}
++{{- range concat (.Values.imagePullSecrets | default (list)) ($child.imagePullSecrets | default (list)) }}
++{{- if not (hasKey $names .name) }}
++{{- $secrets = append $secrets . }}
++{{- $_ := set $names .name true }}
++{{- end }}
++{{- end }}
++{{- with $secrets }}
++imagePullSecrets:
++{{- toYaml . | nindent 2 }}
++{{- end }}
++{{- end }}
++
+ {{/*
+ Create chart name and version as used by the chart label.
+ */}}
+diff --git a/charts/metallb/charts/frr-k8s/templates/controller.yaml b/charts/metallb/templates/frr-k8s/controller.yaml
+similarity index 92%
+rename from charts/metallb/charts/frr-k8s/templates/controller.yaml
+rename to charts/metallb/templates/frr-k8s/controller.yaml
+index 51656a2..cb2223d 100644
+--- a/charts/metallb/charts/frr-k8s/templates/controller.yaml
++++ b/charts/metallb/templates/frr-k8s/controller.yaml
+@@ -1,3 +1,5 @@
++{{- if .Values.frrk8s.enabled }}
++{{- with index .Subcharts "frr-k8s" }}
+ # FRR expects to have these files owned by frr:frr on startup.
+ # Having them in a ConfigMap allows us to modify behaviors: for example enabling more daemons on startup.
+ apiVersion: v1
+@@ -132,10 +134,7 @@ spec:
+       {{- if .Values.frrk8s.runtimeClassName }}
+       runtimeClassName: {{ .Values.frrk8s.runtimeClassName }}
+       {{- end }}
+-      {{- with .Values.imagePullSecrets }}
+-      imagePullSecrets:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
++      {{- include "metallb.frrk8sImagePullSecrets" $ | nindent 6 }}
+       serviceAccountName: {{ template "frrk8s.serviceAccountName" . }}
+       terminationGracePeriodSeconds: 0
+       hostNetwork: true
+@@ -165,7 +164,7 @@ spec:
+       initContainers:
+         # Copies the initial config files with the right permissions to the shared volume.
+         - name: cp-frr-files
+-          image: {{ .Values.frrk8s.frr.image.repository }}:{{ .Values.frrk8s.frr.image.tag | default .Chart.AppVersion }}
++          image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.frr.image.repository }}@{{ .Values.frrk8s.frr.image.digest }}
+           securityContext:
+             runAsUser: 100
+             runAsGroup: 101
+@@ -177,20 +176,20 @@ spec:
+               mountPath: /etc/frr
+         # Copies the reloader to the shared volume between the speaker and reloader.
+         - name: cp-reloader
+-          image: {{ .Values.frrk8s.image.repository }}:{{ .Values.frrk8s.image.tag | default .Chart.AppVersion }}
++          image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.image.repository }}@{{ .Values.frrk8s.image.digest }}
+           command: ["/bin/sh", "-c", "cp -f /frr-reloader.sh /etc/frr_reloader/"]
+           volumeMounts:
+             - name: reloader
+               mountPath: /etc/frr_reloader
+         # Copies the metrics exporter
+         - name: cp-metrics
+-          image: {{ .Values.frrk8s.image.repository }}:{{ .Values.frrk8s.image.tag | default .Chart.AppVersion }}
++          image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.image.repository }}@{{ .Values.frrk8s.image.digest }}
+           command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
+           volumeMounts:
+             - name: metrics
+               mountPath: /etc/frr_metrics
+         - name: cp-frr-status
+-          image: {{ .Values.frrk8s.image.repository }}:{{ .Values.frrk8s.image.tag | default .Chart.AppVersion }}
++          image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.image.repository }}@{{ .Values.frrk8s.image.digest }}
+           command: ["/bin/sh", "-c", "cp -f /frr-status /etc/frr_status/"]
+           volumeMounts:
+             - name: frr-status
+@@ -198,7 +197,7 @@ spec:
+       shareProcessNamespace: true
+       containers:
+       - name: controller
+-        image: {{ .Values.frrk8s.image.repository }}:{{ .Values.frrk8s.image.tag | default .Chart.AppVersion }}
++        image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.image.repository }}@{{ .Values.frrk8s.image.digest }}
+         {{- if .Values.frrk8s.image.pullPolicy }}
+         imagePullPolicy: {{ .Values.frrk8s.image.pullPolicy }}
+         {{- end }}
+@@ -299,7 +298,7 @@ spec:
+             - NET_RAW
+             - SYS_ADMIN
+             - NET_BIND_SERVICE
+-        image: {{ .Values.frrk8s.frr.image.repository }}:{{ .Values.frrk8s.frr.image.tag | default .Chart.AppVersion }}
++        image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.frr.image.repository }}@{{ .Values.frrk8s.frr.image.digest }}
+         {{- if .Values.frrk8s.frr.image.pullPolicy }}
+         imagePullPolicy: {{ .Values.frrk8s.frr.image.pullPolicy }}
+         {{- end }}
+@@ -342,7 +341,7 @@ spec:
+           periodSeconds: {{ .Values.frrk8s.startupProbe.periodSeconds }}
+         {{- end }}
+       - name: reloader
+-        image: {{ .Values.frrk8s.frr.image.repository }}:{{ .Values.frrk8s.frr.image.tag | default .Chart.AppVersion }}
++        image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.frr.image.repository }}@{{ .Values.frrk8s.frr.image.digest }}
+         {{- if .Values.frrk8s.frr.image.pullPolicy }}
+         imagePullPolicy: {{ .Values.frrk8s.frr.image.pullPolicy }}
+         {{- end }}
+@@ -359,7 +358,7 @@ spec:
+           {{- toYaml . | nindent 12 }}
+         {{- end }}
+       - name: frr-metrics
+-        image: {{ .Values.frrk8s.frr.image.repository }}:{{ .Values.frrk8s.frr.image.tag | default .Chart.AppVersion }}
++        image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.frr.image.repository }}@{{ .Values.frrk8s.frr.image.digest }}
+         command: ["/etc/frr_metrics/frr-metrics"]
+         args:
+           - --metrics-port={{ .Values.frrk8s.frr.secureMetricsPort }}
+@@ -422,7 +421,7 @@ spec:
+             valueFrom:
+               fieldRef:
+                 fieldPath: metadata.name
+-        image: {{ .Values.frrk8s.frr.image.repository }}:{{ .Values.frrk8s.frr.image.tag | default .Chart.AppVersion }}
++        image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.frr.image.repository }}@{{ .Values.frrk8s.frr.image.digest }}
+         volumeMounts:
+           - mountPath: /var/run/frr
+             name: frr-sockets
+@@ -460,3 +459,5 @@ spec:
+       {{- with .Values.frrk8s.priorityClassName }}
+       priorityClassName: {{ . | quote }}
+       {{- end }}
++{{- end }}
++{{- end }}
+diff --git a/charts/metallb/charts/frr-k8s/templates/status-cleaner.yaml b/charts/metallb/templates/frr-k8s/status-cleaner.yaml
+similarity index 93%
+rename from charts/metallb/charts/frr-k8s/templates/status-cleaner.yaml
+rename to charts/metallb/templates/frr-k8s/status-cleaner.yaml
+index 4dc0c33..13a6efc 100644
+--- a/charts/metallb/charts/frr-k8s/templates/status-cleaner.yaml
++++ b/charts/metallb/templates/frr-k8s/status-cleaner.yaml
+@@ -1,3 +1,5 @@
++{{- if .Values.frrk8s.enabled }}
++{{- with index .Subcharts "frr-k8s" }}
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+@@ -23,10 +25,7 @@ spec:
+       {{- if .Values.frrk8s.runtimeClassName }}
+       runtimeClassName: {{ .Values.frrk8s.runtimeClassName }}
+       {{- end }}
+-      {{- with .Values.imagePullSecrets }}
+-      imagePullSecrets:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
++      {{- include "metallb.frrk8sImagePullSecrets" $ | nindent 6 }}
+       containers:
+       - command:
+         - /statuscleaner
+@@ -56,7 +55,7 @@ spec:
+           valueFrom:
+             fieldRef:
+               fieldPath: metadata.namespace
+-        image: {{ .Values.frrk8s.image.repository }}:{{ .Values.frrk8s.image.tag | default .Chart.AppVersion }}
++        image: {{ $.Values.sourceRegistry }}/{{ .Values.frrk8s.image.repository }}@{{ .Values.frrk8s.image.digest }}
+         {{- if .Values.frrk8s.image.pullPolicy }}
+         imagePullPolicy: {{ .Values.frrk8s.image.pullPolicy }}
+         {{- end }}
+@@ -127,3 +126,5 @@ spec:
+       serviceAccountName: {{ template "frrk8s.serviceAccountName" . }}
+       terminationGracePeriodSeconds: 10
+       hostNetwork: true
++{{- end }}
++{{- end }}
+diff --git a/charts/metallb/values.schema.json b/charts/metallb/values.schema.json
+index ae707aa..c598db2 100644
+--- a/charts/metallb/values.schema.json
++++ b/charts/metallb/values.schema.json
+@@ -443,6 +443,15 @@
+         }
+       ]
+     },
++    "frrk8s": {
++      "description": "FRR-K8s BGP and BFD backend configuration.",
++      "type": "object",
++      "properties": {
++        "enabled": { "type": "boolean" },
++        "external": { "type": "boolean" },
++        "namespace": { "type": "string" }
++      }
++    },
+     "crds": {
+       "description": "CRD configuration",
+       "type": "object",
+diff --git a/charts/metallb/values.yaml b/charts/metallb/values.yaml
+index 3a8dc6f..196bf2c 100644
+--- a/charts/metallb/values.yaml
++++ b/charts/metallb/values.yaml
+@@ -387,6 +387,14 @@ frrk8s:
+ # For all available options, see:
+ # https://github.com/metallb/frr-k8s/blob/main/charts/frr-k8s/values.yaml
+ frr-k8s:
++  frrk8s:
++    image:
++      repository: metallb/frr-k8s
++      digest: {{metallb/frr-k8s}}
++    frr:
++      image:
++        repository: frrouting/frr
++        digest: {{frrouting/frr}}
+   prometheus:
+     serviceMonitor:
+       # -- Enable Prometheus ServiceMonitor for frr-k8s metrics.
+-- 
+2.50.1
+
