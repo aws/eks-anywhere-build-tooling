@@ -79,7 +79,7 @@ function get_image_tag_not_latest() {
     # to find another tag associated with this image we have to use the aws cli
     # the following only works for ecr repos
     if [ "${JOB_TYPE:-}" = "presubmit" ] ||  [[ "${IMAGE_REGISTRY}" != *"ecr"* ]]; then
-      echo ${tag}
+      echo ${LATEST}
     else
       if ! aws sts get-caller-identity &> /dev/null; then
         echo "The AWS cli is used to find the ECR registries and repos for the current AWS account please login!"
@@ -109,10 +109,12 @@ if [ -n "$HELM_IMAGE_LIST" ]; then
     # it will fallback to the LATEST tag which follows the same pattern we use for artifacts on s3
     # in the event that the LATEST tag is used, the ecr api will be used to get a different tag, which
     # should be the tag in the format <version>-<commit-hash>, this tag will be used in the requires.yaml
+    RESOLVED_TAG=${TAG}
     IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${TAG})
 
     if [[ -z ${IMAGE_SHASUM} ]]; then
       IMAGE_SHASUM=$(get_image_shasum ${IMAGE} ${LATEST})
+      RESOLVED_TAG=${LATEST}
     fi
 
     if [[ -z ${IMAGE_SHASUM} ]]; then
@@ -121,7 +123,7 @@ if [ -n "$HELM_IMAGE_LIST" ]; then
     fi
 
     echo "s,{{${IMAGE}}},${IMAGE_SHASUM},g" >>${SEDFILE}
-    if [ "${TAG}" = "${LATEST}" ]; then
+    if [ "${RESOLVED_TAG}" = "${LATEST}" ]; then
       # if finding an image from another project using the `latest` tag, find the image and a different tag associated with that image
       USE_TAG=$(get_image_tag_not_latest ${IMAGE} ${IMAGE_SHASUM})
       if [[ -z ${USE_TAG} ]]; then
@@ -129,7 +131,7 @@ if [ -n "$HELM_IMAGE_LIST" ]; then
         exit 1
       fi
     else
-      USE_TAG=$TAG
+      USE_TAG=${RESOLVED_TAG}
     fi
 
     # If HELM_USE_UPSTREAM_IMAGE is true, we are using images from upstream.
