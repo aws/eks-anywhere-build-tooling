@@ -13,6 +13,9 @@ EXTRA_GO_LDFLAGS=-X github.com/metallb/frr-k8s/internal/version.version=$(GIT_TA
 
 FRR_K8S_IMAGE_COMPONENT=metallb/frr-k8s
 
+# Build the RPM layer natively to avoid QEMU failures.
+BUILDSPECS=$(BUILDSPECS_FOR_COMBINE_IMAGES)
+
 EXCLUDE_FROM_STAGING_BUILDSPEC=true
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 SKIP_ON_RELEASE_BRANCH=true
