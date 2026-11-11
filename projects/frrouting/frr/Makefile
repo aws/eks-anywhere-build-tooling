@@ -15,7 +15,7 @@ LICENSES_TARGETS_FOR_PREREQ=gather-non-golang-licenses $(OUTPUT_DIR)/ATTRIBUTION
 IMAGE_NAMES=frr
 # Keep these global so combine-images can override them for its manifest stage.
 DOCKERFILE_FOLDER=./docker/linux
-IMAGE_BUILD_ARGS=
+IMAGE_BUILD_ARGS=GIT_HASH
 BASE_IMAGE_NAME?=eks-distro-minimal-base-python
 BASE_IMAGE_OS_VERSION=al2023
 COMPILER_IMAGE_VERSION=3.11

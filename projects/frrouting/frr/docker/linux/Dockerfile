@@ -58,10 +58,29 @@ RUN set -eux && \
     chown -R 100:101 /newroot/etc/frr /newroot/var/run/frr /newroot/var/lib/frr /newroot/var/tmp/frr && \
     cleanup frr
 
+ARG GIT_HASH
+COPY ATTRIBUTION.txt RUNTIME_ATTRIBUTION.txt /source-notices/
+
+# Source notices must cover the actual RPM versions, including the base layer.
+RUN set -eux && \
+    test -n "$GIT_HASH" && \
+    rpm --root /newroot -qa --qf '%{LICENSE}\t%{SOURCERPM}\n' > /tmp/runtime-rpms && \
+    for source in $(awk -F '\t' '$1 ~ /GPL|SISSL|Sleepycat/ {print $2}' /tmp/runtime-rpms | sort -u); do \
+        grep -F "/$source" /source-notices/RUNTIME_ATTRIBUTION.txt > /dev/null || \
+            { echo "Missing source notice for $source" >&2; exit 1; }; \
+    done && \
+    cat /source-notices/ATTRIBUTION.txt /source-notices/RUNTIME_ATTRIBUTION.txt > /newroot/ATTRIBUTION.txt && \
+    printf '\nBuild recipes and configure options: https://github.com/aws/eks-anywhere-build-tooling/tree/%s/projects/frrouting/frr\n' "$GIT_HASH" >> /newroot/ATTRIBUTION.txt && \
+    for directory in licenses doc; do \
+        if [ -d "/newroot/usr/share/$directory" ]; then \
+            mkdir -p "/newroot/LICENSES/amazon-linux/$directory"; \
+            cp -a "/newroot/usr/share/$directory/." "/newroot/LICENSES/amazon-linux/$directory/"; \
+        fi; \
+    done
+
 FROM $BASE_IMAGE
 
 COPY --from=frr-builder /newroot /
-COPY ATTRIBUTION.txt /ATTRIBUTION.txt
 COPY _output/LICENSES /LICENSES
 
 ENTRYPOINT ["/sbin/tini", "--"]
