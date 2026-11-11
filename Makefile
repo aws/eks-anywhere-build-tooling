@@ -217,6 +217,7 @@ generate-staging-buildspec: | ensure-locale
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "tinkerbell_tink" "$(BASE_DIRECTORY)/projects/tinkerbell/tink/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "linuxkit_linuxkit" "$(BASE_DIRECTORY)/projects/linuxkit/linuxkit/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "emissary-ingress_emissary" "$(BASE_DIRECTORY)/projects/emissary-ingress/emissary/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
+	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "metallb_frr-k8s" "$(BASE_DIRECTORY)/projects/metallb/frr-k8s/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "frrouting_frr" "$(BASE_DIRECTORY)/projects/frrouting/frr/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "distribution_distribution" "$(BASE_DIRECTORY)/projects/distribution/distribution/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
 	build/lib/generate_staging_buildspec.sh $(BASE_DIRECTORY) "goharbor_harbor" "$(BASE_DIRECTORY)/projects/goharbor/harbor/buildspecs/batch-build.yml" "$(BASE_DIRECTORY)/buildspec.yml" true "DO_NOT_EXCLUDE_FROM_BUILDSPEC"
