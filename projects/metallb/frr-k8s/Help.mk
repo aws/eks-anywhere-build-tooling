@@ -87,6 +87,7 @@ update-go-mods: ## Update locally checked-in go sum to assist in vuln scanning
 update-vendor-for-dep-patch: ## After bumping dep in go.mod file, uses generic vendor update script or one provided from upstream project
 patch-for-dep-update: ## After bumping dep in go.mod file and updating vendor, generates patch
 create-ecr-repos: ## Create repos in ECR for project images for local testing
+runtime-attribution: ## Regenerate the public runtime source notices from the image's RPMs
 
 ##@ Build Targets
 build: ## Called via prow presubmit, calls `github-rate-limit-pre validate-checksums attribution local-images   attribution-pr github-rate-limit-post`

@@ -167,7 +167,7 @@ function pr::create::pr_body(){
         pr_body=$(cat <<'EOF'
 This PR updates the ATTRIBUTION.txt files across all dependency projects if there have been changes.
 
-These files should only be changing due to project GIT_TAG bumps or Golang version upgrades. If changes are for any other reason, please review carefully before merging!
+These files should only be changing due to project GIT_TAG bumps, Golang version upgrades, or base/runtime RPM updates. If changes are for any other reason, please review carefully before merging!
 EOF
 )
         ;;

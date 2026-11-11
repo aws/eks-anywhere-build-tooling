@@ -34,6 +34,7 @@ SOURCE_VERSION_FILES=GIT_TAG LIBYANG_GIT_TAG TINI_GIT_TAG
 SOURCES_TARGET=$(OUTPUT_DIR)/src/.sources-ready
 
 include $(BASE_DIRECTORY)/Common.mk
+include $(BUILD_LIB)/runtime_attribution.mk
 
 combine-images: IMAGE_PLATFORMS=linux/amd64,linux/arm64
 combine-images: NATIVE_BUILD=false

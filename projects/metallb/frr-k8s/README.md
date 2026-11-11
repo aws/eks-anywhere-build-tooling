@@ -10,13 +10,17 @@ The image uses EKS Distro minimal base with Bash and `cp`, which the chart's
 init containers need when copying programs and the reloader into shared volumes.
 The reloader runs in the separate FRR container after the init step.
 Go licenses and attribution are included in `/LICENSES` and `/ATTRIBUTION.txt`.
-`RUNTIME_ATTRIBUTION.txt` adds exact-version source RPM links for the copyleft
-runtime packages, including the minimal base. Image builds append these notices
-and a link to the build's commit in the official repository, and include the
+Image builds query the installed runtime RPMs, including the minimal base, and
+generate exact-version source links from the Amazon Linux source repositories.
+They append these notices and a link to the build's commit in the official
+repository, and include the
 runtime license files under `/LICENSES/amazon-linux`.
 
-When a base or runtime package changes, update the source RPM notices. The
-image build rejects a copyleft RPM version without a corresponding source link.
+Run `make runtime-attribution` to regenerate the public `RUNTIME_ATTRIBUTION.txt`
+from the same runtime stage. This also runs as part of `make attribution`, so the
+existing attribution bot updates the official repository copy when the base or
+runtime packages change. Image builds generate their own notices and reject
+missing or ambiguous exact-version source links.
 
 This project is excluded from independent automatic upgrades. Its version must
 match the frr-k8s subchart shipped by MetalLB; update the frr-k8s and FRR pins

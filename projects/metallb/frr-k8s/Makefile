@@ -19,6 +19,7 @@ EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 SKIP_ON_RELEASE_BRANCH=true
 
 include $(BASE_DIRECTORY)/Common.mk
+include $(BUILD_LIB)/runtime_attribution.mk
 
 
 ########### DO NOT EDIT #############################
