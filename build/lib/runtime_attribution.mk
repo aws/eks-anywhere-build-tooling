@@ -18,7 +18,8 @@ $(RUNTIME_ATTRIBUTION_GENERATOR): $(BUILD_LIB)/generate_runtime_attribution.sh
 	@mkdir -p $(@D)
 	cp $< $@
 
-LICENSES_TARGETS_FOR_PREREQ+=$(RUNTIME_ATTRIBUTION_GENERATOR)
+# Common.mk expands its image prerequisites before this file is included.
+$(foreach image,$(IMAGE_NAMES),$(image)/images/push $(image)/images/amd64 $(image)/images/arm64): $(RUNTIME_ATTRIBUTION_GENERATOR)
 
 .PHONY: runtime-attribution
 runtime-attribution: # Regenerate the public runtime source notices from the image's RPMs
