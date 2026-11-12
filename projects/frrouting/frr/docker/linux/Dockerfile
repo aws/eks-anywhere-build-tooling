@@ -1,7 +1,19 @@
 ARG BASE_IMAGE
 ARG BUILDER_IMAGE
 
-FROM $BUILDER_IMAGE AS frr-builder
+FROM $BUILDER_IMAGE AS runtime-builder
+
+# Install the same runtime RPMs for notice generation and the final image.
+# Bound RPM's file limit when its chroot has no /proc.
+RUN set -eux && \
+    ulimit -n 1024 && \
+    install_rpm json-c c-ares readline pcre2 libcap libatomic coreutils coreutils-common sed grep && \
+    install_binary /usr/bin/flock /usr/sbin/ip
+
+COPY _output/generate_runtime_attribution.sh /source-notices/
+RUN bash /source-notices/generate_runtime_attribution.sh /newroot /source-notices/RUNTIME_ATTRIBUTION.txt
+
+FROM runtime-builder AS frr-builder
 
 ARG BUILD_JOBS=8
 
@@ -45,30 +57,18 @@ RUN set -eux && \
     install -d /newroot/etc/frr /newroot/var/run/frr /newroot/var/lib/frr /newroot/var/tmp/frr && \
     install -m 0644 tools/etc/frr/daemons /newroot/etc/frr/daemons
 
-# The Python minimal base supplies sh and Python. EKS-D's RPM helpers install
-# the runtime packages and the libraries used by ip and flock.
-# RPM 4.16 scans up to the hard file limit when its chroot has no /proc. Bound
-# this build step's limit so BuildKit's very large default cannot stall scriptlets.
 RUN set -eux && \
-    ulimit -n 1024 && \
-    install_rpm json-c c-ares readline pcre2 libcap libatomic coreutils coreutils-common sed grep && \
-    install_binary /usr/bin/flock /usr/sbin/ip && \
     printf '%s\n' 'frr:x:101:frr' 'frrvty:x:102:frr' >> /newroot/etc/group && \
     printf '%s\n' 'frr:x:100:101:frr:/var/run/frr:/sbin/nologin' >> /newroot/etc/passwd && \
     chown -R 100:101 /newroot/etc/frr /newroot/var/run/frr /newroot/var/lib/frr /newroot/var/tmp/frr && \
     cleanup frr
 
 ARG GIT_HASH
-COPY ATTRIBUTION.txt RUNTIME_ATTRIBUTION.txt /source-notices/
+COPY ATTRIBUTION.txt /source-notices/
 
-# Source notices must cover the actual RPM versions, including the base layer.
+# Use the notices generated from the runtime RPMs, including the base layer.
 RUN set -eux && \
     test -n "$GIT_HASH" && \
-    rpm --root /newroot -qa --qf '%{LICENSE}\t%{SOURCERPM}\n' > /tmp/runtime-rpms && \
-    for source in $(awk -F '\t' '$1 ~ /GPL|SISSL|Sleepycat/ {print $2}' /tmp/runtime-rpms | sort -u); do \
-        grep -F "/$source" /source-notices/RUNTIME_ATTRIBUTION.txt > /dev/null || \
-            { echo "Missing source notice for $source" >&2; exit 1; }; \
-    done && \
     cat /source-notices/ATTRIBUTION.txt /source-notices/RUNTIME_ATTRIBUTION.txt > /newroot/ATTRIBUTION.txt && \
     printf '\nBuild recipes and configure options: https://github.com/aws/eks-anywhere-build-tooling/tree/%s/projects/frrouting/frr\n' "$GIT_HASH" >> /newroot/ATTRIBUTION.txt && \
     for directory in licenses doc; do \
@@ -77,6 +77,9 @@ RUN set -eux && \
             cp -a "/newroot/usr/share/$directory/." "/newroot/LICENSES/amazon-linux/$directory/"; \
         fi; \
     done
+
+FROM scratch AS runtime-attribution
+COPY --from=runtime-builder /source-notices/RUNTIME_ATTRIBUTION.txt /RUNTIME_ATTRIBUTION.txt
 
 FROM $BASE_IMAGE
 

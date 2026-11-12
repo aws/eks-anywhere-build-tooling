@@ -11,16 +11,12 @@ RUN set -x && \
     cleanup "frr-k8s"
 
 ARG GIT_HASH
-COPY ATTRIBUTION.txt RUNTIME_ATTRIBUTION.txt /source-notices/
+COPY ATTRIBUTION.txt _output/generate_runtime_attribution.sh /source-notices/
 
-# Source notices must cover the actual RPM versions, including the base layer.
+# Resolve exact-version source URLs from the actual RPMs, including the base.
 RUN set -eux && \
     test -n "$GIT_HASH" && \
-    rpm --root /newroot -qa --qf '%{LICENSE}\t%{SOURCERPM}\n' > /tmp/runtime-rpms && \
-    for source in $(awk -F '\t' '$1 ~ /GPL|SISSL|Sleepycat/ {print $2}' /tmp/runtime-rpms | sort -u); do \
-        grep -F "/$source" /source-notices/RUNTIME_ATTRIBUTION.txt > /dev/null || \
-            { echo "Missing source notice for $source" >&2; exit 1; }; \
-    done && \
+    bash /source-notices/generate_runtime_attribution.sh /newroot /source-notices/RUNTIME_ATTRIBUTION.txt && \
     cat /source-notices/ATTRIBUTION.txt /source-notices/RUNTIME_ATTRIBUTION.txt > /newroot/ATTRIBUTION.txt && \
     printf '\nBuild recipes: https://github.com/aws/eks-anywhere-build-tooling/tree/%s/projects/metallb/frr-k8s\n' "$GIT_HASH" >> /newroot/ATTRIBUTION.txt && \
     for directory in licenses doc; do \
@@ -29,6 +25,9 @@ RUN set -eux && \
             cp -a "/newroot/usr/share/$directory/." "/newroot/LICENSES/amazon-linux/$directory/"; \
         fi; \
     done
+
+FROM scratch AS runtime-attribution
+COPY --from=builder /source-notices/RUNTIME_ATTRIBUTION.txt /RUNTIME_ATTRIBUTION.txt
 
 FROM $BASE_IMAGE
 

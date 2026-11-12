@@ -33,15 +33,18 @@ Its full upstream license directory, libyang's BSD license and tini's MIT
 license are collected by `make gather-non-golang-licenses` and included under
 `/LICENSES/github.com`, alongside `ATTRIBUTION.txt`.
 
-The source URLs and fixed tags are listed in `ATTRIBUTION.txt`.
-`RUNTIME_ATTRIBUTION.txt` lists exact-version source RPM links for the copyleft
-runtime packages, including the minimal base. The image combines these notices
-and appends a link to the build's commit in the official repository. Runtime
-license files are included under `/LICENSES/amazon-linux`; GPLv2 and GPLv3
+The source URLs and fixed tags are listed in `ATTRIBUTION.txt`. Image builds
+query the installed runtime RPMs, including the minimal base, and generate
+exact-version source links from the Amazon Linux source repositories. The image
+combines these notices and appends a link to the build's commit in the official
+repository. Runtime license files are included under `/LICENSES/amazon-linux`; GPLv2 and GPLv3
 texts are under `/LICENSES/github.com/frrouting/frr/licenses`.
 
-When a base or runtime package changes, update the source RPM notices. The
-image build rejects a copyleft RPM version without a corresponding source link.
+Run `make runtime-attribution` to regenerate the public `RUNTIME_ATTRIBUTION.txt`
+from the same runtime stage without compiling FRR. This also runs as part of
+`make attribution`, so the existing attribution bot updates the official
+repository copy when the base or runtime packages change. Image builds generate
+their own notices and reject missing or ambiguous exact-version source links.
 
 This project is excluded from independent automatic upgrades. The FRR and
 libyang versions must remain aligned with the frr-k8s version shipped by

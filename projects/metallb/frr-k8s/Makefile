@@ -21,7 +21,11 @@ EXCLUDE_FROM_STAGING_BUILDSPEC=true
 EXCLUDE_FROM_UPGRADE_BUILDSPEC=true
 SKIP_ON_RELEASE_BRANCH=true
 
+# Keep this global so combine-images can override it for its manifest stage.
+DOCKERFILE_FOLDER=./docker/linux
+
 include $(BASE_DIRECTORY)/Common.mk
+include $(BUILD_LIB)/runtime_attribution.mk
 
 
 ########### DO NOT EDIT #############################
