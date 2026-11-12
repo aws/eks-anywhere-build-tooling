@@ -17,7 +17,10 @@ DOCKERFILE_FOLDER=./docker/linux/$(IMAGE_NAME)
 
 HAS_HELM_CHART=true
 HELM_DIRECTORY=charts/metallb
-HELM_IMAGE_LIST=metallb/controller metallb/speaker
+FRR_K8S_GIT_TAG=$(shell cat ../frr-k8s/GIT_TAG)
+FRR_GIT_TAG=$(shell cat ../../frrouting/frr/GIT_TAG)
+HELM_IMAGE_LIST=metallb/controller metallb/speaker metallb/frr-k8s frrouting/frr
+HELM_IMAGE_TAG_LIST=$(IMAGE_TAG) $(IMAGE_TAG) $(FRR_K8S_GIT_TAG)-$(GIT_HASH) $(FRR_GIT_TAG)-$(GIT_HASH)
 
 HELM_CHART_NAMES=metallb/crds metallb/metallb
 
