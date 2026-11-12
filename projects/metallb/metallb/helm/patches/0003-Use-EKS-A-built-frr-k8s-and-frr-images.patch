@@ -1,16 +1,16 @@
-From 85a2703740ff2c3cbe3d03fc13da85c8bd72c60d Mon Sep 17 00:00:00 2001
+From 588c36c7e524f7ac6366a73e65bcfa877086d2b6 Mon Sep 17 00:00:00 2001
 From: Howard Cao <junecao@amazon.com>
-Date: Tue, 10 Nov 2026 21:42:41 +0000
+Date: Thu, 12 Nov 2026 18:07:34 +0000
 Subject: [PATCH] Use EKS Anywhere FRR-K8s images and merge image pull secrets
 
-Keep the frr-k8s subchart and its resource identities. Render its two workload templates with the parent registry and image digests while retaining subchart values. Leave the deprecated speaker FRR mode unchanged.
+Keep the frr-k8s subchart and its resource identities. Render its two workload templates with the parent registry and image digests while retaining subchart values. Expose the bundled backend enable switch in the Helm schema. Leave the deprecated speaker FRR mode unchanged.
 ---
  charts/metallb/templates/_helpers.tpl         | 19 +++++++++++++
  .../frr-k8s}/controller.yaml                  | 27 ++++++++++---------
  .../frr-k8s}/status-cleaner.yaml              | 11 ++++----
- charts/metallb/values.schema.json             |  9 +++++++
+ charts/metallb/values.schema.json             |  7 +++++
  charts/metallb/values.yaml                    |  8 ++++++
- 5 files changed, 56 insertions(+), 18 deletions(-)
+ 5 files changed, 54 insertions(+), 18 deletions(-)
  rename charts/metallb/{charts/frr-k8s/templates => templates/frr-k8s}/controller.yaml (92%)
  rename charts/metallb/{charts/frr-k8s/templates => templates/frr-k8s}/status-cleaner.yaml (93%)
 
@@ -194,10 +194,10 @@ index 4dc0c33..13a6efc 100644
 +{{- end }}
 +{{- end }}
 diff --git a/charts/metallb/values.schema.json b/charts/metallb/values.schema.json
-index ae707aa..c598db2 100644
+index ae707aa..4bb4158 100644
 --- a/charts/metallb/values.schema.json
 +++ b/charts/metallb/values.schema.json
-@@ -443,6 +443,15 @@
+@@ -443,6 +443,13 @@
          }
        ]
      },
@@ -205,9 +205,7 @@ index ae707aa..c598db2 100644
 +      "description": "FRR-K8s BGP and BFD backend configuration.",
 +      "type": "object",
 +      "properties": {
-+        "enabled": { "type": "boolean" },
-+        "external": { "type": "boolean" },
-+        "namespace": { "type": "string" }
++        "enabled": { "type": "boolean" }
 +      }
 +    },
      "crds": {
@@ -232,6 +230,3 @@ index 3a8dc6f..196bf2c 100644
    prometheus:
      serviceMonitor:
        # -- Enable Prometheus ServiceMonitor for frr-k8s metrics.
--- 
-2.50.1
-
