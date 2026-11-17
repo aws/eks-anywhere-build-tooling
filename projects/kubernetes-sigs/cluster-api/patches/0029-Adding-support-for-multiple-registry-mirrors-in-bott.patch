@@ -543,7 +543,7 @@ index b3cf9a03f734..9e88da0344c4 100644
 +{{- end }}
 +{{- end }}
  [[settings.container-registry.credentials]]
- registry = "{{.RegistryMirrorEndpoint}}"
+ registry = "{{.RegistryMirrorCredentialHost}}"
  username = "{{.RegistryMirrorUsername}}"
  password = "{{.RegistryMirrorPassword}}"
  {{- end -}}
@@ -693,7 +693,7 @@ index 6a2243f5ca74..15d60df6f5c3 100644
  		NodeLabels:               parseNodeLabels(getArgValue(config.KubeletExtraArgs, "node-labels")), // empty string if it does not exist
  		Taints:                   parseTaints(config.Taints),                                           //empty string if it does not exist
  		ProviderID:               getArgValue(config.KubeletExtraArgs, "provider-id"),
-@@ -251,6 +252,31 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
+@@ -251,6 +252,33 @@ func getBottlerocketNodeUserData(bootstrapContainerUserData []byte, users []boot
  			bottlerocketInput.NoProxyEndpoints = append(bottlerocketInput.NoProxyEndpoints, strconv.Quote(noProxy))
  		}
  	}
@@ -709,6 +709,7 @@ index 6a2243f5ca74..15d60df6f5c3 100644
 +		if endpoint := endpointRegex.FindStringSubmatch(config.RegistryMirrorConfiguration.Endpoint); endpoint != nil {
 +			bottlerocketInput.RegistryMirrorEndpoint = endpoint[0]
 +		}
++		bottlerocketInput.RegistryMirrorCredentialHost = registryHost(config.RegistryMirrorConfiguration.Endpoint)
 +	} else if len(config.RegistryMirrorConfiguration.Mirrors) > 0 {
 +		for _, mirror := range config.RegistryMirrorConfiguration.Mirrors {
 +			for _, endpoint := range mirror.Endpoints {
@@ -720,6 +721,7 @@ index 6a2243f5ca74..15d60df6f5c3 100644
 +		if endpoint := endpointRegex.FindStringSubmatch(config.RegistryMirrorConfiguration.Mirrors[0].Endpoints[0]); endpoint != nil {
 +			bottlerocketInput.RegistryMirrorEndpoint = endpoint[0]
 +		}
++		bottlerocketInput.RegistryMirrorCredentialHost = registryHost(config.RegistryMirrorConfiguration.Mirrors[0].Endpoints[0])
 +	}
 +
  	if config.RegistryMirrorConfiguration.CACert != "" {
