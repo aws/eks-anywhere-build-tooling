@@ -5,6 +5,7 @@
 # To update call: make add-generated-help-block
 # This is added to help document dynamic targets and support shell autocompletion
 
+patch-repo: ## Patch upstream repo with patches in patches directory
 
 ##@ Helm Targets
 helm/build: ## Build helm chart
